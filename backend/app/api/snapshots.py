@@ -4,12 +4,14 @@ import datetime as dt
 import uuid
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session
 from app.models import JobQueue, SchemaSnapshot, SchemaSnapshotData
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
+from app.ddl.export import snapshot_json_to_sql
 
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
@@ -77,6 +79,16 @@ async def get_snapshot(
         error_message=snap.error_message,
         snapshot_json=data.snapshot_json if data else None,
     )
+
+
+@router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
+async def export_snapshot_sql(
+    schema_snapshot_uuid: uuid.UUID, session: AsyncSession = Depends(get_session)
+) -> str:
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "-- snapshot data not found\n"
+    return snapshot_json_to_sql(data.snapshot_json)
 
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[SnapshotOut])
