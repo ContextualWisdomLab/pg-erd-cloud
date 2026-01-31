@@ -33,7 +33,7 @@ SELECT
   n.nspname AS schema_name,
   c.oid AS relation_oid,
   c.relname AS relation_name,
-  c.relkind AS relation_kind,
+  c.relkind::text AS relation_kind,
   c.relispartition AS is_partition
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -62,7 +62,7 @@ SELECT
   n.nspname AS schema_name,
   c.oid AS relation_oid,
   c.relname AS relation_name,
-  c.relkind AS relation_kind,
+  c.relkind::text AS relation_kind,
   a.attnum AS column_position,
   a.attname AS column_name,
   pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
@@ -100,7 +100,7 @@ WITH params AS (
 SELECT
   con.oid AS constraint_oid,
   con.conname AS constraint_name,
-  con.contype AS constraint_type,
+  con.contype::text AS constraint_type,
   n.nspname AS schema_name,
   rel.oid AS relation_oid,
   rel.relname AS relation_name,
@@ -109,9 +109,9 @@ SELECT
   frel.relname AS foreign_relation_name,
   con.conkey AS constrained_attnums,
   con.confkey AS referenced_attnums,
-  con.confupdtype AS fk_on_update,
-  con.confdeltype AS fk_on_delete,
-  con.confmatchtype AS fk_match_type,
+  con.confupdtype::text AS fk_on_update,
+  con.confdeltype::text AS fk_on_delete,
+  con.confmatchtype::text AS fk_match_type,
   pg_catalog.pg_get_constraintdef(con.oid, true) AS constraint_def,
   pg_catalog.pg_get_expr(con.conbin, con.conrelid) AS check_expr
 FROM pg_catalog.pg_constraint con

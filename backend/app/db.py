@@ -15,7 +15,8 @@ def get_sync_database_url() -> str:
     # Alembic uses sync engine; convert async URL.
     url = settings.database_url
     if url.startswith("postgresql+asyncpg://"):
-        return url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        # Prefer psycopg (v3) for sync migrations.
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     return url
 
 

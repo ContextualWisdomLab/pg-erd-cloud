@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections.abc import Mapping
 
 
@@ -12,15 +13,20 @@ def sanitize_for_storage(obj: object) -> object:
     """Recursively sanitize strings for DB storage.
 
     - Removes NUL chars from *all* strings.
-    - Leaves bytes/bytearray unchanged (binary data should not be stored in text).
+    - Converts bytes/memoryview to safe text (best-effort UTF-8; fallback base64).
     """
 
     if obj is None:
         return obj
     if isinstance(obj, str):
         return strip_nul(obj)
+    if isinstance(obj, memoryview):
+        obj = obj.tobytes()
     if isinstance(obj, (bytes, bytearray)):
-        return obj
+        try:
+            return strip_nul(bytes(obj).decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            return base64.b64encode(bytes(obj)).decode("ascii")
     if isinstance(obj, list):
         return [sanitize_for_storage(v) for v in obj]
     if isinstance(obj, tuple):
