@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+import asyncio
+import datetime as dt
+from collections.abc import Awaitable, Callable
+from collections.abc import Mapping
+from typing import TypeAlias
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import JobQueue
+
+Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
+
+
+async def claim_one_job(session: AsyncSession) -> JobQueue | None:
+    # Transaction: claim a queued job using SKIP LOCKED (non-blocking)
+    # We use raw SQL to leverage FOR UPDATE SKIP LOCKED reliably.
+    row = await session.execute(
+        text(
+            """
+            SELECT job_queue_uuid
+            FROM job_queue
+            WHERE status = 'queued' AND run_after <= now()
+            ORDER BY run_after ASC
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+            """
+        )
+    )
+    job_id = row.scalar_one_or_none()
+    if job_id is None:
+        return None
+
+    job = await session.get(JobQueue, job_id)
+    if job is None:
+        return None
+    job.status = "running"
+    job.started_at = dt.datetime.now(dt.timezone.utc)
+    job.attempt_count = int(job.attempt_count) + 1
+    return job
+
+
+async def run_worker_forever(
+    session_factory: Callable[[], AsyncSession],
+    handlers: Mapping[str, Handler],
+    poll_interval_s: float = 1.0,
+) -> None:
+    while True:
+        async with session_factory() as session:
+            async with session.begin():
+                job = await claim_one_job(session)
+
+            if job is None:
+                await asyncio.sleep(poll_interval_s)
+                continue
+
+            handler = handlers.get(job.job_type)
+            if handler is None:
+                async with session.begin():
+                    job.status = "failed"
+                    job.last_error = f"Unknown job_type: {job.job_type}"
+                    job.finished_at = dt.datetime.now(dt.timezone.utc)
+                continue
+
+            try:
+                await handler(session_factory, job)
+                async with session.begin():
+                    job.status = "succeeded"
+                    job.last_error = None
+                    job.finished_at = dt.datetime.now(dt.timezone.utc)
+            except Exception as e:  # noqa: BLE001
+                async with session.begin():
+                    job.status = "failed"
+                    job.last_error = str(e)
+                    job.finished_at = dt.datetime.now(dt.timezone.utc)

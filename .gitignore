@@ -1,0 +1,24 @@
+.DS_Store
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.*
+**/secrets/**
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+
+# node
+node_modules/
+dist/
+.vite/
