@@ -53,6 +53,17 @@ docker compose up -d --build
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8000 (health: /healthz)
 
+## 실행(프로덕션 스타일, Docker)
+
+프론트는 정적 빌드 + nginx로 서빙하며, `/api/*`는 백엔드로 프록시합니다.
+
+```bash
+cp .env.example .env
+docker compose -f compose.prod.yaml up -d --build
+```
+
+- Frontend: http://localhost:8080
+
 ## 개발(비-Docker)
 
 ### Backend

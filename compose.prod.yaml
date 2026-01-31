@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: erd_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-erd}
+      POSTGRES_USER: ${POSTGRES_USER:-erd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-54321}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h 127.0.0.1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: erd_backend
+    env_file: ./.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-8080}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    command: >
+      sh -lc "
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: erd_frontend
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,6 +1,7 @@
 import type { Connection, Project, Snapshot, SnapshotDetail } from './types'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// Default to same-origin in production; set VITE_API_BASE_URL for dev.
+const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 
 function devHeaders(): Record<string, string> {
   const devUser = localStorage.getItem('devUser')
