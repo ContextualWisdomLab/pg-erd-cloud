@@ -3,13 +3,19 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import CurrentUser, get_current_user
 from app.db import get_session
-from app.models import ProjectSpace
-from app.schemas import ProjectCreateIn, ProjectOut
+from app.models import ProjectMember, ProjectSpace, UserAccount
+from app.schemas import (
+    ProjectCreateIn,
+    ProjectMemberAddIn,
+    ProjectMemberOut,
+    ProjectOut,
+)
 from app.sanitize import sanitize_for_storage
 
 
@@ -18,10 +24,17 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 @router.get("", response_model=list[ProjectOut])
 async def list_projects(
+    user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProjectOut]:
     rows = await session.execute(
-        select(ProjectSpace).order_by(ProjectSpace.created_at.desc())
+        select(ProjectSpace)
+        .join(
+            ProjectMember,
+            ProjectMember.project_space_uuid == ProjectSpace.project_space_uuid,
+        )
+        .where(ProjectMember.user_account_uuid == user.user_account_uuid)
+        .order_by(ProjectSpace.created_at.desc())
     )
     projects = rows.scalars().all()
     return [
@@ -32,18 +45,117 @@ async def list_projects(
 
 @router.post("", response_model=ProjectOut)
 async def create_project(
-    body: ProjectCreateIn, session: AsyncSession = Depends(get_session)
+    body: ProjectCreateIn,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
-    # MVP: no auth yet; created_by is random placeholder.
-    created_by = uuid.uuid4()
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
         project_name=str(sanitize_for_storage(body.project_name)),
-        created_by_user_uuid=created_by,
+        created_by_user_uuid=user.user_account_uuid,
         created_at=dt.datetime.now(dt.timezone.utc),
     )
     session.add(p)
+    await session.flush()  # ensure project_space row exists before FK insert
+
+    m = ProjectMember(
+        project_space_uuid=p.project_space_uuid,
+        user_account_uuid=user.user_account_uuid,
+        project_role="owner",
+        created_at=dt.datetime.now(dt.timezone.utc),
+    )
+    session.add(m)
     await session.commit()
     return ProjectOut(
         project_space_uuid=p.project_space_uuid, project_name=p.project_name
+    )
+
+
+@router.get("/{project_space_uuid}/members", response_model=list[ProjectMemberOut])
+async def list_project_members(
+    project_space_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ProjectMemberOut]:
+    # owner/editor/viewer 모두 멤버 조회 가능(MVP)
+    row = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_space_uuid == project_space_uuid,
+            ProjectMember.user_account_uuid == user.user_account_uuid,
+        )
+    )
+    if row.scalars().first() is None:
+        raise HTTPException(status_code=403, detail="project access denied")
+
+    rows = await session.execute(
+        select(ProjectMember, UserAccount)
+        .join(
+            UserAccount,
+            UserAccount.user_account_uuid == ProjectMember.user_account_uuid,
+        )
+        .where(ProjectMember.project_space_uuid == project_space_uuid)
+        .order_by(ProjectMember.created_at.asc())
+    )
+    out: list[ProjectMemberOut] = []
+    for m, u in rows.all():
+        out.append(
+            ProjectMemberOut(
+                user_account_uuid=u.user_account_uuid,
+                member_subject=u.oidc_subject,
+                project_role=m.project_role,
+            )
+        )
+    return out
+
+
+@router.post("/{project_space_uuid}/members", response_model=ProjectMemberOut)
+async def add_project_member(
+    project_space_uuid: uuid.UUID,
+    body: ProjectMemberAddIn,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectMemberOut:
+    # MVP 권한: owner만 초대 가능
+    row = await session.execute(
+        select(ProjectMember.project_role).where(
+            ProjectMember.project_space_uuid == project_space_uuid,
+            ProjectMember.user_account_uuid == user.user_account_uuid,
+        )
+    )
+    role = row.scalar_one_or_none()
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="owner role required")
+
+    subject = str(sanitize_for_storage(body.member_subject)).strip()
+    if not subject:
+        raise HTTPException(status_code=400, detail="member_subject required")
+
+    # Ensure user exists.
+    row2 = await session.execute(
+        select(UserAccount).where(UserAccount.oidc_subject == subject)
+    )
+    u = row2.scalars().first()
+    if u is None:
+        u = UserAccount(
+            user_account_uuid=uuid.uuid4(),
+            oidc_subject=subject,
+            display_name=None,
+            created_at=dt.datetime.now(dt.timezone.utc),
+        )
+        session.add(u)
+        await session.flush()
+
+    m = ProjectMember(
+        project_space_uuid=project_space_uuid,
+        user_account_uuid=u.user_account_uuid,
+        project_role=body.project_role,
+        created_at=dt.datetime.now(dt.timezone.utc),
+    )
+    session.add(m)
+    await session.commit()
+
+    return ProjectMemberOut(
+        user_account_uuid=u.user_account_uuid,
+        member_subject=u.oidc_subject,
+        project_role=m.project_role,
     )

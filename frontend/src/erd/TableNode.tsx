@@ -4,6 +4,7 @@ type Column = {
   column_name: string
   data_type: string
   is_not_null: boolean
+  is_pk?: boolean
 }
 
 export default function TableNode(props: NodeProps) {
@@ -22,6 +23,7 @@ export default function TableNode(props: NodeProps) {
           <div key={c.column_name} className="tableNode__col">
             <span className="tableNode__colName">{c.column_name}</span>
             <span className="tableNode__colType">{c.data_type}</span>
+            {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
             {c.is_not_null ? <span className="tableNode__badge">NOT NULL</span> : null}
           </div>
         ))}

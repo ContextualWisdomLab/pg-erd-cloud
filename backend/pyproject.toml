@@ -30,6 +30,7 @@ dev = [
   "pytest-asyncio>=0.23.0",
   "mypy>=1.10.0",
   "asyncpg-stubs>=0.31.0",
+  "types-python-jose>=3.5.0",
   "types-requests",
 ]
 

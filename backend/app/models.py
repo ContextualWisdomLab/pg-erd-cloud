@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import DateTime, Index, Integer, LargeBinary, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -36,7 +36,9 @@ class ProjectSpace(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_name: Mapped[str] = mapped_column(Text())
-    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
@@ -46,10 +48,14 @@ class ProjectMember(Base):
     __tablename__ = "project_member"
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid"),
+        primary_key=True,
     )
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid"),
+        primary_key=True,
     )
     project_role: Mapped[str] = mapped_column(Text())
     created_at: Mapped[dt.datetime] = mapped_column(
@@ -68,7 +74,7 @@ class DbConnection(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), index=True
+        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
     )
     conn_name: Mapped[str] = mapped_column(Text())
     dsn_ciphertext: Mapped[bytes] = mapped_column(LargeBinary())
@@ -88,9 +94,11 @@ class SchemaSnapshot(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), index=True
+        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
     )
-    db_connection_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("db_connection.db_connection_uuid")
+    )
     status: Mapped[str] = mapped_column(Text())
     schema_filter: Mapped[str | None] = mapped_column(Text(), nullable=True)
     started_at: Mapped[dt.datetime | None] = mapped_column(
@@ -109,7 +117,9 @@ class SchemaSnapshotData(Base):
     __tablename__ = "schema_snapshot_data"
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid"),
+        primary_key=True,
     )
     snapshot_json: Mapped[dict] = mapped_column(JSONB())
     created_at: Mapped[dt.datetime] = mapped_column(
@@ -142,3 +152,24 @@ class JobQueue(Base):
     )
 
     __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+
+
+class ShareLink(Base):
+    __tablename__ = "share_link"
+
+    share_link_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+    )
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    permission_kind: Mapped[str] = mapped_column(Text())  # viewer/editor (MVP: viewer)
+    expires_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )

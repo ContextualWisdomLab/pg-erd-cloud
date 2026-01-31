@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import CurrentUser, get_current_user
 from app.db import get_session
 from app.models import DbConnection
+from app.permissions import require_project_member
 from app.schemas import ConnectionCreateIn, ConnectionOut
 from app.security import encrypt_text
 from app.sanitize import sanitize_for_storage
@@ -19,8 +21,11 @@ router = APIRouter(prefix="/api/connections", tags=["connections"])
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[ConnectionOut])
 async def list_connections(
-    project_space_uuid: uuid.UUID, session: AsyncSession = Depends(get_session)
+    project_space_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> list[ConnectionOut]:
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(DbConnection)
         .where(DbConnection.project_space_uuid == project_space_uuid)
@@ -37,8 +42,10 @@ async def list_connections(
 async def create_connection(
     project_space_uuid: uuid.UUID,
     body: ConnectionCreateIn,
+    user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConnectionOut:
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
         db_connection_uuid=uuid.uuid4(),

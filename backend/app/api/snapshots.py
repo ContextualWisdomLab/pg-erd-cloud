@@ -8,8 +8,10 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import SessionLocal, get_session
-from app.models import JobQueue, SchemaSnapshot, SchemaSnapshotData
+from app.auth import CurrentUser, get_current_user
+from app.db import get_session
+from app.models import DbConnection, JobQueue, SchemaSnapshot, SchemaSnapshotData
+from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
 
@@ -21,8 +23,20 @@ router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 async def create_snapshot(
     project_space_uuid: uuid.UUID,
     body: SnapshotCreateIn,
+    user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotOut:
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+
+    # Ensure connection belongs to this project
+    conn = await session.get(DbConnection, body.db_connection_uuid)
+    if conn is None or conn.project_space_uuid != project_space_uuid:
+        return SnapshotOut(
+            schema_snapshot_uuid=uuid.uuid4(),
+            status="failed",
+            schema_filter=body.schema_filter,
+        )
+
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),
         project_space_uuid=project_space_uuid,
@@ -60,7 +74,9 @@ async def create_snapshot(
 
 @router.get("/{schema_snapshot_uuid}", response_model=SnapshotDetailOut)
 async def get_snapshot(
-    schema_snapshot_uuid: uuid.UUID, session: AsyncSession = Depends(get_session)
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> SnapshotDetailOut:
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
     if snap is None:
@@ -71,6 +87,9 @@ async def get_snapshot(
             error_message="snapshot not found",
             snapshot_json=None,
         )
+    await require_project_member(
+        session, snap.project_space_uuid, user.user_account_uuid
+    )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     return SnapshotDetailOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
@@ -83,8 +102,16 @@ async def get_snapshot(
 
 @router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
 async def export_snapshot_sql(
-    schema_snapshot_uuid: uuid.UUID, session: AsyncSession = Depends(get_session)
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> str:
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    if snap is None:
+        return "-- snapshot not found\n"
+    await require_project_member(
+        session, snap.project_space_uuid, user.user_account_uuid
+    )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
@@ -93,8 +120,11 @@ async def export_snapshot_sql(
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[SnapshotOut])
 async def list_snapshots(
-    project_space_uuid: uuid.UUID, session: AsyncSession = Depends(get_session)
+    project_space_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> list[SnapshotOut]:
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(SchemaSnapshot)
         .where(SchemaSnapshot.project_space_uuid == project_space_uuid)

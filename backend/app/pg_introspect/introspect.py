@@ -23,6 +23,10 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             queries.CONSTRAINTS_SQL, schema_name, include_system
         )
         indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
+        pk_columns = await conn.fetch(
+            queries.PK_COLUMNS_SQL, schema_name, include_system
+        )
+        fk_edges = await conn.fetch(queries.FK_EDGES_SQL, schema_name, include_system)
 
         snapshot = {
             "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -33,6 +37,8 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             "columns": [dict(r) for r in columns],
             "constraints": [dict(r) for r in constraints],
             "indexes": [dict(r) for r in indexes],
+            "pk_columns": [dict(r) for r in pk_columns],
+            "fk_edges": [dict(r) for r in fk_edges],
         }
 
         return sanitize_for_storage(snapshot)  # type: ignore[return-value]

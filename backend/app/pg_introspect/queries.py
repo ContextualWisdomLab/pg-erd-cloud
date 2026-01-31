@@ -177,3 +177,101 @@ WHERE
   )
 ORDER BY tbl_ns.nspname, tbl.relname, idx.relname;
 """
+
+
+PK_COLUMNS_SQL = """
+WITH params AS (
+  SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system
+), pk AS (
+  SELECT con.*
+  FROM pg_catalog.pg_constraint con
+  JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+  JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
+  CROSS JOIN params p
+  WHERE
+    con.contype = 'p'
+    AND (p.schema_name IS NULL OR n.nspname = p.schema_name)
+    AND (
+      p.include_system
+      OR (
+        n.nspname NOT IN ('pg_catalog', 'information_schema')
+        AND n.nspname NOT LIKE 'pg_toast%'
+        AND n.nspname NOT LIKE 'pg_temp_%'
+        AND n.nspname NOT LIKE 'pg_toast_temp_%'
+      )
+    )
+)
+SELECT
+  con.oid AS constraint_oid,
+  con.conname AS constraint_name,
+  n.nspname AS schema_name,
+  rel.oid AS relation_oid,
+  rel.relname AS relation_name,
+  k.ordinality AS column_ordinal,
+  a.attname AS column_name
+FROM pk con
+JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
+JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ordinality) ON true
+JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+ORDER BY n.nspname, rel.relname, con.conname, k.ordinality;
+"""
+
+
+FK_EDGES_SQL = """
+WITH params AS (
+  SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system
+), fk AS (
+  SELECT con.*
+  FROM pg_catalog.pg_constraint con
+  JOIN pg_catalog.pg_class child_rel ON child_rel.oid = con.conrelid
+  JOIN pg_catalog.pg_namespace child_ns ON child_ns.oid = child_rel.relnamespace
+  CROSS JOIN params p
+  WHERE
+    con.contype = 'f'
+    AND (p.schema_name IS NULL OR child_ns.nspname = p.schema_name)
+    AND (
+      p.include_system
+      OR (
+        child_ns.nspname NOT IN ('pg_catalog', 'information_schema')
+        AND child_ns.nspname NOT LIKE 'pg_toast%'
+        AND child_ns.nspname NOT LIKE 'pg_temp_%'
+        AND child_ns.nspname NOT LIKE 'pg_toast_temp_%'
+      )
+    )
+)
+SELECT
+  con.oid AS fk_constraint_oid,
+  con.conname AS fk_constraint_name,
+
+  child_ns.nspname AS child_schema_name,
+  child_rel.oid AS child_relation_oid,
+  child_rel.relname AS child_relation_name,
+
+  parent_ns.nspname AS parent_schema_name,
+  parent_rel.oid AS parent_relation_oid,
+  parent_rel.relname AS parent_relation_name,
+
+  map.ordinality AS column_ordinal,
+  child_att.attname AS child_column_name,
+  parent_att.attname AS parent_column_name,
+
+  con.confupdtype::text AS fk_on_update,
+  con.confdeltype::text AS fk_on_delete,
+  con.confmatchtype::text AS fk_match_type
+FROM fk con
+JOIN pg_catalog.pg_class child_rel ON child_rel.oid = con.conrelid
+JOIN pg_catalog.pg_namespace child_ns ON child_ns.oid = child_rel.relnamespace
+JOIN pg_catalog.pg_class parent_rel ON parent_rel.oid = con.confrelid
+JOIN pg_catalog.pg_namespace parent_ns ON parent_ns.oid = parent_rel.relnamespace
+JOIN LATERAL (
+  SELECT ck.attnum AS child_attnum, fk.attnum AS parent_attnum, ck.ord AS ordinality
+  FROM unnest(con.conkey) WITH ORDINALITY AS ck(attnum, ord)
+  JOIN unnest(con.confkey) WITH ORDINALITY AS fk(attnum, ord) USING (ord)
+) AS map ON true
+JOIN pg_catalog.pg_attribute child_att
+  ON child_att.attrelid = con.conrelid AND child_att.attnum = map.child_attnum
+JOIN pg_catalog.pg_attribute parent_att
+  ON parent_att.attrelid = con.confrelid AND parent_att.attnum = map.parent_attnum
+ORDER BY child_schema_name, child_relation_name, fk_constraint_name, column_ordinal;
+"""

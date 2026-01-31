@@ -14,6 +14,19 @@ class ProjectOut(BaseModel):
     project_name: str
 
 
+class ProjectMemberAddIn(BaseModel):
+    member_subject: str = Field(
+        min_length=1, description="OIDC sub, or dev:<name> in dev mode"
+    )
+    project_role: str = Field(default="viewer")
+
+
+class ProjectMemberOut(BaseModel):
+    user_account_uuid: uuid.UUID
+    member_subject: str
+    project_role: str
+
+
 class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(min_length=1)
     dsn: str = Field(
@@ -45,3 +58,9 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class MeOut(BaseModel):
+    user_account_uuid: uuid.UUID
+    subject: str
+    display_name: str | None

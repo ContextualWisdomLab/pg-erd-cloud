@@ -1,6 +1,7 @@
 import { Background, Controls, ReactFlow, type NodeTypes } from '@xyflow/react'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  getMe,
   createConnection,
   createProject,
   createSnapshot,
@@ -14,6 +15,8 @@ import { snapshotToGraph } from './erd/convert'
 import type { Connection, Project, SnapshotDetail } from './types'
 
 export default function App() {
+  const [devUser, setDevUser] = useState<string>(() => localStorage.getItem('devUser') || 'local')
+  const [me, setMe] = useState<{ subject: string; display_name: string | null } | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [projectName, setProjectName] = useState('demo')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
@@ -31,13 +34,15 @@ export default function App() {
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), [])
 
   useEffect(() => {
-    listProjects()
-      .then((p) => {
+    localStorage.setItem('devUser', devUser)
+    Promise.all([getMe(), listProjects()])
+      .then(([m, p]) => {
+        setMe({ subject: m.subject, display_name: m.display_name })
         setProjects(p)
-        if (p[0]) setSelectedProjectId(p[0].project_space_uuid)
+        setSelectedProjectId(p[0]?.project_space_uuid || null)
       })
       .catch((e) => setError(String(e)))
-  }, [])
+  }, [devUser])
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -96,6 +101,19 @@ export default function App() {
       </a>
       <aside className="sidebar">
         <h2>pg-erd-cloud</h2>
+
+        <div className="field">
+          <label htmlFor="dev-user">User (dev)</label>
+          <input
+            id="dev-user"
+            value={devUser}
+            onChange={(e) => setDevUser(e.target.value)}
+            placeholder="local"
+          />
+          <div style={{ fontSize: 12, color: '#4b5563' }}>
+            Subject: <code>{me?.subject || '—'}</code>
+          </div>
+        </div>
 
         <div className="field">
           <label htmlFor="project-select">Project</label>

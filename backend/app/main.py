@@ -6,7 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
+from app.api.me import router as me_router
 from app.api.projects import router as projects_router
+from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.db import SessionLocal
 from app.jobs.snapshot_job import handle_snapshot_job
@@ -33,6 +35,8 @@ async def healthz() -> dict:
 app.include_router(projects_router)
 app.include_router(connections_router)
 app.include_router(snapshots_router)
+app.include_router(me_router)
+app.include_router(share_router)
 
 
 @app.on_event("startup")
