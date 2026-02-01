@@ -145,6 +145,23 @@ async def add_project_member(
         session.add(u)
         await session.flush()
 
+    # Idempotent invite: if already a member, update role instead of raising 500.
+    row3 = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_space_uuid == project_space_uuid,
+            ProjectMember.user_account_uuid == u.user_account_uuid,
+        )
+    )
+    existing = row3.scalars().first()
+    if existing is not None:
+        existing.project_role = body.project_role
+        await session.commit()
+        return ProjectMemberOut(
+            user_account_uuid=u.user_account_uuid,
+            member_subject=u.oidc_subject,
+            project_role=existing.project_role,
+        )
+
     m = ProjectMember(
         project_space_uuid=project_space_uuid,
         user_account_uuid=u.user_account_uuid,

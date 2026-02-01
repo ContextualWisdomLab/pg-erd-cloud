@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +18,17 @@ from app.jobs.worker import run_worker_forever
 from app.settings import settings
 
 
-app = FastAPI(title="pg-erd-cloud backend")
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    handlers = {"snapshot": handle_snapshot_job}
+    task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
+    try:
+        yield
+    finally:
+        task.cancel()
+
+
+app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,10 +49,3 @@ app.include_router(connections_router)
 app.include_router(snapshots_router)
 app.include_router(me_router)
 app.include_router(share_router)
-
-
-@app.on_event("startup")
-async def start_worker() -> None:
-    handlers = {"snapshot": handle_snapshot_job}
-    # Background worker loop. For production, run as separate process.
-    asyncio.create_task(run_worker_forever(SessionLocal, handlers))

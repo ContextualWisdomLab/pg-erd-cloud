@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { NodeProps } from '@xyflow/react'
 
 type Column = {
@@ -7,7 +8,7 @@ type Column = {
   is_pk?: boolean
 }
 
-export default function TableNode(props: NodeProps) {
+function TableNode(props: NodeProps) {
   const data = props.data as { title: string; columns: Column[]; badges?: { pk?: boolean; fk?: boolean } }
   return (
     <div className="tableNode">
@@ -32,3 +33,5 @@ export default function TableNode(props: NodeProps) {
     </div>
   )
 }
+
+export default memo(TableNode)

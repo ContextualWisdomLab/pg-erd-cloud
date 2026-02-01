@@ -49,12 +49,12 @@ class ProjectMember(Base):
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("project_space.project_space_uuid"),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("user_account.user_account_uuid"),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     project_role: Mapped[str] = mapped_column(Text())
@@ -74,7 +74,9 @@ class DbConnection(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     conn_name: Mapped[str] = mapped_column(Text())
     dsn_ciphertext: Mapped[bytes] = mapped_column(LargeBinary())
@@ -94,10 +96,13 @@ class SchemaSnapshot(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("db_connection.db_connection_uuid")
+        UUID(as_uuid=True),
+        ForeignKey("db_connection.db_connection_uuid", ondelete="CASCADE"),
     )
     status: Mapped[str] = mapped_column(Text())
     schema_filter: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -118,7 +123,7 @@ class SchemaSnapshotData(Base):
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("schema_snapshot.schema_snapshot_uuid"),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     snapshot_json: Mapped[dict] = mapped_column(JSONB())
@@ -161,10 +166,13 @@ class ShareLink(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
     )
     permission_kind: Mapped[str] = mapped_column(Text())  # viewer/editor (MVP: viewer)
     expires_at: Mapped[dt.datetime | None] = mapped_column(

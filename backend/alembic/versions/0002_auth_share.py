@@ -18,6 +18,22 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Backfill: ensure any existing project_space.created_by_user_uuid values exist in user_account
+    # before adding FK constraints. Previous versions could have inserted random UUIDs.
+    op.execute(
+        """
+        INSERT INTO user_account (user_account_uuid, oidc_subject, display_name, created_at)
+        SELECT
+          p.created_by_user_uuid,
+          'migrated:' || p.created_by_user_uuid::text,
+          NULL,
+          now()
+        FROM project_space p
+        LEFT JOIN user_account u ON u.user_account_uuid = p.created_by_user_uuid
+        WHERE p.created_by_user_uuid IS NOT NULL AND u.user_account_uuid IS NULL;
+        """
+    )
+
     # Add FK constraints (MVP: best-effort for fresh DB)
     op.create_foreign_key(
         "fk_project_space__created_by_user",
