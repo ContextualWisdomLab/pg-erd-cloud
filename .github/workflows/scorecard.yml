@@ -14,6 +14,7 @@ jobs:
   analysis:
     permissions:
       contents: read
+      administration: read
       security-events: write
       id-token: write
     runs-on: ubuntu-latest
@@ -31,6 +32,6 @@ jobs:
           publish_results: true
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
+        uses: github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30 # v4.32.0
         with:
           sarif_file: results.sarif

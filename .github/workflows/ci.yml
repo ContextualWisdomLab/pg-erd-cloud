@@ -28,8 +28,8 @@ jobs:
       - name: Install backend deps
         working-directory: backend
         run: |
-          python -m pip install -U pip
-          python -m pip install -e ".[dev]"
+          # Use a lockfile to satisfy Scorecard Pinned-Dependencies.
+          python -m pip install -r requirements-dev.lock
 
       - name: Typecheck (mypy)
         working-directory: backend
