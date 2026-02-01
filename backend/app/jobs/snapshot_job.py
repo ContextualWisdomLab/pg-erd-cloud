@@ -15,6 +15,7 @@ async def handle_snapshot_job(
     session_factory: Callable[[], AsyncSession],
     job: JobQueue,
 ) -> None:
+    """Run a schema snapshot job and persist the resulting JSON."""
     payload = job.payload_json
     snapshot_id = uuid.UUID(payload["schema_snapshot_uuid"])
     async with session_factory() as session:

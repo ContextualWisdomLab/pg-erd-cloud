@@ -9,14 +9,19 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """SQLAlchemy declarative base for ORM models."""
+
     pass
 
 
 def utcnow() -> dt.datetime:
+    """Return the current UTC timestamp (timezone-aware)."""
     return dt.datetime.now(dt.timezone.utc)
 
 
 class UserAccount(Base):
+    """User record keyed by a UUID and identified by OIDC subject."""
+
     __tablename__ = "user_account"
 
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -30,6 +35,8 @@ class UserAccount(Base):
 
 
 class ProjectSpace(Base):
+    """Project container that groups connections and snapshots."""
+
     __tablename__ = "project_space"
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -45,16 +52,18 @@ class ProjectSpace(Base):
 
 
 class ProjectMember(Base):
+    """Membership mapping between users and projects with a role."""
+
     __tablename__ = "project_member"
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("project_space.project_space_uuid"),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("user_account.user_account_uuid"),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     project_role: Mapped[str] = mapped_column(Text())
@@ -68,13 +77,17 @@ class ProjectMember(Base):
 
 
 class DbConnection(Base):
+    """Encrypted PostgreSQL DSN belonging to a project."""
+
     __tablename__ = "db_connection"
 
     db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     conn_name: Mapped[str] = mapped_column(Text())
     dsn_ciphertext: Mapped[bytes] = mapped_column(LargeBinary())
@@ -88,16 +101,21 @@ class DbConnection(Base):
 
 
 class SchemaSnapshot(Base):
+    """Snapshot job record for a database introspection run."""
+
     __tablename__ = "schema_snapshot"
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("db_connection.db_connection_uuid")
+        UUID(as_uuid=True),
+        ForeignKey("db_connection.db_connection_uuid", ondelete="CASCADE"),
     )
     status: Mapped[str] = mapped_column(Text())
     schema_filter: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -114,11 +132,13 @@ class SchemaSnapshot(Base):
 
 
 class SchemaSnapshotData(Base):
+    """Captured schema snapshot JSON payload."""
+
     __tablename__ = "schema_snapshot_data"
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("schema_snapshot.schema_snapshot_uuid"),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="CASCADE"),
         primary_key=True,
     )
     snapshot_json: Mapped[dict] = mapped_column(JSONB())
@@ -128,6 +148,8 @@ class SchemaSnapshotData(Base):
 
 
 class JobQueue(Base):
+    """Lightweight DB-backed job queue (MVP)."""
+
     __tablename__ = "job_queue"
 
     job_queue_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -155,16 +177,21 @@ class JobQueue(Base):
 
 
 class ShareLink(Base):
+    """Public share link granting read access to a project's snapshots."""
+
     __tablename__ = "share_link"
 
     share_link_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("project_space.project_space_uuid"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
     )
     created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
     )
     permission_kind: Mapped[str] = mapped_column(Text())  # viewer/editor (MVP: viewer)
     expires_at: Mapped[dt.datetime | None] = mapped_column(

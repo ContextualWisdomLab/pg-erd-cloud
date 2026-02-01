@@ -23,6 +23,7 @@ async def create_share_link(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    """Create a share link for a project (owner-only)."""
     # owner only
     row = await session.execute(
         select(ProjectMember.project_role).where(
@@ -55,6 +56,7 @@ async def get_share_link_info(
     share_link_uuid: uuid.UUID,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    """Return share link metadata and recent snapshots."""
     link = await session.get(ShareLink, share_link_uuid)
     if link is None:
         raise HTTPException(status_code=404, detail="share link not found")
@@ -91,6 +93,7 @@ async def get_shared_snapshot(
     schema_snapshot_uuid: uuid.UUID,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    """Return a snapshot via a share link (no auth)."""
     link = await session.get(ShareLink, share_link_uuid)
     if link is None:
         raise HTTPException(status_code=404, detail="share link not found")
@@ -122,6 +125,7 @@ async def export_shared_snapshot_sql(
     schema_snapshot_uuid: uuid.UUID,
     session: AsyncSession = Depends(get_session),
 ) -> str:
+    """Export a shared snapshot as SQL via a share link."""
     link = await session.get(ShareLink, share_link_uuid)
     if link is None:
         raise HTTPException(status_code=404, detail="share link not found")

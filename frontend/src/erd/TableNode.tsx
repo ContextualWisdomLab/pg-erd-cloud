@@ -1,4 +1,7 @@
-import type { NodeProps } from '@xyflow/react'
+import { memo } from 'react'
+import type { Node, NodeProps } from '@xyflow/react'
+
+const MAX_RENDERED_COLUMNS = 25
 
 type Column = {
   column_name: string
@@ -7,8 +10,16 @@ type Column = {
   is_pk?: boolean
 }
 
-export default function TableNode(props: NodeProps) {
-  const data = props.data as { title: string; columns: Column[]; badges?: { pk?: boolean; fk?: boolean } }
+type TableNodeData = {
+  title: string
+  columns: Column[]
+  badges?: { pk?: boolean; fk?: boolean }
+}
+
+type TableNodeNode = Node<TableNodeData, 'tableNode'>
+
+function TableNode(props: NodeProps<TableNodeNode>) {
+  const { data } = props
   return (
     <div className="tableNode">
       <div className="tableNode__title">
@@ -19,7 +30,7 @@ export default function TableNode(props: NodeProps) {
         </span>
       </div>
       <div className="tableNode__cols">
-        {data.columns.slice(0, 25).map((c) => (
+        {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => (
           <div key={c.column_name} className="tableNode__col">
             <span className="tableNode__colName">{c.column_name}</span>
             <span className="tableNode__colType">{c.data_type}</span>
@@ -27,8 +38,39 @@ export default function TableNode(props: NodeProps) {
             {c.is_not_null ? <span className="tableNode__badge">NOT NULL</span> : null}
           </div>
         ))}
-        {data.columns.length > 25 ? <div className="tableNode__more">… {data.columns.length - 25} more</div> : null}
+        {data.columns.length > MAX_RENDERED_COLUMNS ? (
+          <div className="tableNode__more">… {data.columns.length - MAX_RENDERED_COLUMNS} more</div>
+        ) : null}
       </div>
     </div>
   )
 }
+
+function isSameRenderedColumns(prevCols: Column[], nextCols: Column[]): boolean {
+  if (prevCols.length !== nextCols.length) return false
+
+  // The component only renders the first MAX_RENDERED_COLUMNS and the "… N more" count.
+  const limit = Math.min(MAX_RENDERED_COLUMNS, prevCols.length, nextCols.length)
+  for (let i = 0; i < limit; i += 1) {
+    const a = prevCols[i]
+    const b = nextCols[i]
+    if (a.column_name !== b.column_name) return false
+    if (a.data_type !== b.data_type) return false
+    if (a.is_not_null !== b.is_not_null) return false
+    if (a.is_pk !== b.is_pk) return false
+  }
+  return true
+}
+
+export default memo(TableNode, (prev, next) => {
+  // React Flow typically provides new node objects when data changes.
+  // This comparator is a conservative safeguard for the most relevant fields.
+  // Note: if upstream mutates `columns` in-place between renders, no memo comparator can
+  // reliably detect it. Prefer immutable updates from the graph producer.
+  return (
+    prev.data.title === next.data.title &&
+    isSameRenderedColumns(prev.data.columns, next.data.columns) &&
+    prev.data.badges?.pk === next.data.badges?.pk &&
+    prev.data.badges?.fk === next.data.badges?.fk
+  )
+})

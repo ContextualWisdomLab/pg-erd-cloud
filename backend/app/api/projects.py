@@ -5,6 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
@@ -27,6 +28,7 @@ async def list_projects(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProjectOut]:
+    """List projects that the current user is a member of."""
     rows = await session.execute(
         select(ProjectSpace)
         .join(
@@ -49,6 +51,7 @@ async def create_project(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
+    """Create a new project and add the creator as the owner."""
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
         project_name=str(sanitize_for_storage(body.project_name)),
@@ -77,6 +80,7 @@ async def list_project_members(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProjectMemberOut]:
+    """List members of a project (MVP: any member can view)."""
     # owner/editor/viewer 모두 멤버 조회 가능(MVP)
     row = await session.execute(
         select(ProjectMember).where(
@@ -115,6 +119,10 @@ async def add_project_member(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ProjectMemberOut:
+    """Invite/add a project member (owner-only).
+
+    Uses a Postgres upsert to make the operation idempotent and race-safe.
+    """
     # MVP 권한: owner만 초대 가능
     row = await session.execute(
         select(ProjectMember.project_role).where(
@@ -145,17 +153,43 @@ async def add_project_member(
         session.add(u)
         await session.flush()
 
-    m = ProjectMember(
-        project_space_uuid=project_space_uuid,
-        user_account_uuid=u.user_account_uuid,
-        project_role=body.project_role,
-        created_at=dt.datetime.now(dt.timezone.utc),
+    # Idempotent invite: if already a member, update role instead of raising 500.
+    row3 = await session.execute(
+        select(ProjectMember.project_role).where(
+            ProjectMember.project_space_uuid == project_space_uuid,
+            ProjectMember.user_account_uuid == u.user_account_uuid,
+        )
     )
-    session.add(m)
+    existing_role = row3.scalar_one_or_none()
+    if existing_role == "owner":
+        # Avoid leaving project without an owner via this endpoint.
+        raise HTTPException(
+            status_code=400, detail="cannot change owner role via invite endpoint"
+        )
+
+    # Race-safe upsert on composite PK.
+    stmt = (
+        insert(ProjectMember)
+        .values(
+            project_space_uuid=project_space_uuid,
+            user_account_uuid=u.user_account_uuid,
+            project_role=body.project_role,
+            created_at=dt.datetime.now(dt.timezone.utc),
+        )
+        .on_conflict_do_update(
+            index_elements=[
+                ProjectMember.project_space_uuid,
+                ProjectMember.user_account_uuid,
+            ],
+            set_={"project_role": body.project_role},
+        )
+        .returning(ProjectMember.project_role)
+    )
+    new_role = (await session.execute(stmt)).scalar_one()
     await session.commit()
 
     return ProjectMemberOut(
         user_account_uuid=u.user_account_uuid,
         member_subject=u.oidc_subject,
-        project_role=m.project_role,
+        project_role=str(new_role),
     )

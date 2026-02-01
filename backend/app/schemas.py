@@ -1,33 +1,45 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class ProjectCreateIn(BaseModel):
+    """Request body for creating a project."""
+
     project_name: str = Field(min_length=1)
 
 
 class ProjectOut(BaseModel):
+    """Project summary returned by API."""
+
     project_space_uuid: uuid.UUID
     project_name: str
 
 
 class ProjectMemberAddIn(BaseModel):
+    """Request body for inviting/adding a project member."""
+
     member_subject: str = Field(
         min_length=1, description="OIDC sub, or dev:<name> in dev mode"
     )
-    project_role: str = Field(default="viewer")
+    # MVP: restrict to non-owner roles. Owner is assigned at project creation.
+    project_role: Literal["viewer", "editor"] = Field(default="viewer")
 
 
 class ProjectMemberOut(BaseModel):
+    """Project member representation returned by API."""
+
     user_account_uuid: uuid.UUID
     member_subject: str
     project_role: str
 
 
 class ConnectionCreateIn(BaseModel):
+    """Request body for creating a DB connection."""
+
     conn_name: str = Field(min_length=1)
     dsn: str = Field(
         min_length=1, description="PostgreSQL connection string. Not logged."
@@ -35,11 +47,15 @@ class ConnectionCreateIn(BaseModel):
 
 
 class ConnectionOut(BaseModel):
+    """Connection summary returned by API."""
+
     db_connection_uuid: uuid.UUID
     conn_name: str
 
 
 class SnapshotCreateIn(BaseModel):
+    """Request body for creating a schema snapshot."""
+
     db_connection_uuid: uuid.UUID
     schema_filter: str | None = Field(
         default=None, description="If set, only introspect this schema"
@@ -47,12 +63,16 @@ class SnapshotCreateIn(BaseModel):
 
 
 class SnapshotOut(BaseModel):
+    """Snapshot summary returned by API."""
+
     schema_snapshot_uuid: uuid.UUID
     status: str
     schema_filter: str | None
 
 
 class SnapshotDetailOut(BaseModel):
+    """Snapshot detail returned by API."""
+
     schema_snapshot_uuid: uuid.UUID
     status: str
     schema_filter: str | None
@@ -61,6 +81,8 @@ class SnapshotDetailOut(BaseModel):
 
 
 class MeOut(BaseModel):
+    """Current user payload returned by /me."""
+
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None

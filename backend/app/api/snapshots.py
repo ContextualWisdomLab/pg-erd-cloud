@@ -26,6 +26,7 @@ async def create_snapshot(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotOut:
+    """Create a schema snapshot job for a project connection."""
     await require_project_member(session, project_space_uuid, user.user_account_uuid)
 
     # Ensure connection belongs to this project
@@ -78,6 +79,7 @@ async def get_snapshot(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotDetailOut:
+    """Get a snapshot's status and (if present) captured JSON."""
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
     if snap is None:
         return SnapshotDetailOut(
@@ -106,6 +108,7 @@ async def export_snapshot_sql(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> str:
+    """Export a snapshot as PostgreSQL DDL (best-effort)."""
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
     if snap is None:
         return "-- snapshot not found\n"
@@ -124,6 +127,7 @@ async def list_snapshots(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[SnapshotOut]:
+    """List snapshots for a project."""
     await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(SchemaSnapshot)

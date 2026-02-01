@@ -5,6 +5,8 @@ from collections.abc import Mapping
 
 
 def strip_nul(value: str) -> str:
+    """Remove NUL (0x00) characters from a string."""
+
     # PostgreSQL text/json rejects NUL(0x00). Remove it.
     return value.replace("\x00", "")
 

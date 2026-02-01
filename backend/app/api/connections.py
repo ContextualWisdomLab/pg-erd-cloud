@@ -25,6 +25,7 @@ async def list_connections(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ConnectionOut]:
+    """List DB connections for a project."""
     await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(DbConnection)
@@ -45,6 +46,7 @@ async def create_connection(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConnectionOut:
+    """Create a DB connection for a project (encrypt DSN at rest)."""
     await require_project_member(session, project_space_uuid, user.user_account_uuid)
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
