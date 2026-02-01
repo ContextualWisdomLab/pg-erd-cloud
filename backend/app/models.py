@@ -9,6 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """SQLAlchemy declarative base for ORM models."""
+
     pass
 
 
@@ -18,6 +20,8 @@ def utcnow() -> dt.datetime:
 
 
 class UserAccount(Base):
+    """User record keyed by a UUID and identified by OIDC subject."""
+
     __tablename__ = "user_account"
 
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -31,6 +35,8 @@ class UserAccount(Base):
 
 
 class ProjectSpace(Base):
+    """Project container that groups connections and snapshots."""
+
     __tablename__ = "project_space"
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -46,6 +52,8 @@ class ProjectSpace(Base):
 
 
 class ProjectMember(Base):
+    """Membership mapping between users and projects with a role."""
+
     __tablename__ = "project_member"
 
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -69,6 +77,8 @@ class ProjectMember(Base):
 
 
 class DbConnection(Base):
+    """Encrypted PostgreSQL DSN belonging to a project."""
+
     __tablename__ = "db_connection"
 
     db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -91,6 +101,8 @@ class DbConnection(Base):
 
 
 class SchemaSnapshot(Base):
+    """Snapshot job record for a database introspection run."""
+
     __tablename__ = "schema_snapshot"
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -120,6 +132,8 @@ class SchemaSnapshot(Base):
 
 
 class SchemaSnapshotData(Base):
+    """Captured schema snapshot JSON payload."""
+
     __tablename__ = "schema_snapshot_data"
 
     schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -134,6 +148,8 @@ class SchemaSnapshotData(Base):
 
 
 class JobQueue(Base):
+    """Lightweight DB-backed job queue (MVP)."""
+
     __tablename__ = "job_queue"
 
     job_queue_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -161,6 +177,8 @@ class JobQueue(Base):
 
 
 class ShareLink(Base):
+    """Public share link granting read access to a project's snapshots."""
+
     __tablename__ = "share_link"
 
     share_link_uuid: Mapped[uuid.UUID] = mapped_column(

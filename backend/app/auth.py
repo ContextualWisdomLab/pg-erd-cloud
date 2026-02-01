@@ -18,6 +18,8 @@ from app.settings import settings
 
 @dataclass(frozen=True)
 class CurrentUser:
+    """Authenticated user identity used by API handlers."""
+
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None

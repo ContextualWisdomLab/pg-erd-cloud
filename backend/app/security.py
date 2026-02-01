@@ -21,6 +21,8 @@ def _derive_key() -> bytes:
 
 @dataclass(frozen=True)
 class EncryptedBlob:
+    """Encrypted bytes plus nonce for AES-GCM."""
+
     ciphertext: bytes
     nonce: bytes
 
