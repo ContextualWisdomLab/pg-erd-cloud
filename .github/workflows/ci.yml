@@ -33,10 +33,14 @@ jobs:
 
       - name: Typecheck (mypy)
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: mypy app
 
       - name: Tests (pytest)
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: pytest -q
 
   frontend:
