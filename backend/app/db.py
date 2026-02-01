@@ -12,6 +12,12 @@ from app.settings import settings
 
 
 def get_sync_database_url() -> str:
+    """Return a sync database URL for Alembic.
+
+    Alembic uses a synchronous engine; convert an async SQLAlchemy URL to a
+    compatible sync URL.
+    """
+
     # Alembic uses sync engine; convert async URL.
     url = settings.database_url
     if url.startswith("postgresql+asyncpg://"):
@@ -25,5 +31,6 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency that yields an AsyncSession."""
     async with SessionLocal() as session:
         yield session

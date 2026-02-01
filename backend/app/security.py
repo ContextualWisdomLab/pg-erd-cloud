@@ -9,6 +9,11 @@ from app.settings import settings
 
 
 def _derive_key() -> bytes:
+    """Derive a stable 32-byte key from APP_SECRET (MVP).
+
+    In production, prefer KMS/HKDF with rotation.
+    """
+
     # MVP key derivation: stable 32-bytes from APP_SECRET.
     # In production prefer KMS/HKDF with rotation.
     return hashlib.sha256(settings.app_secret.encode("utf-8")).digest()
@@ -21,6 +26,7 @@ class EncryptedBlob:
 
 
 def encrypt_text(plaintext: str) -> EncryptedBlob:
+    """Encrypt a UTF-8 string using AES-256-GCM."""
     key = _derive_key()
     aes = AESGCM(key)
     import os
@@ -31,6 +37,7 @@ def encrypt_text(plaintext: str) -> EncryptedBlob:
 
 
 def decrypt_text(ciphertext: bytes, nonce: bytes) -> str:
+    """Decrypt a blob produced by encrypt_text."""
     key = _derive_key()
     aes = AESGCM(key)
     plaintext = aes.decrypt(nonce, ciphertext, None)
@@ -38,6 +45,8 @@ def decrypt_text(ciphertext: bytes, nonce: bytes) -> str:
 
 
 def redact_dsn(dsn: str) -> str:
+    """Redact credentials from a DSN for safe logging."""
+
     # Avoid leaking credentials in logs.
     # Best-effort: remove password in typical URI formats.
     # If unsure, return a constant to avoid partial leaks.

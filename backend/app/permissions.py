@@ -14,6 +14,7 @@ async def require_project_member(
     project_space_uuid: uuid.UUID,
     user_account_uuid: uuid.UUID,
 ) -> str:
+    """Ensure the user is a project member and return their role."""
     row = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,

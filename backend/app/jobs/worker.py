@@ -15,6 +15,8 @@ Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[
 
 
 async def claim_one_job(session: AsyncSession) -> JobQueue | None:
+    """Claim one queued job using FOR UPDATE SKIP LOCKED."""
+
     # Transaction: claim a queued job using SKIP LOCKED (non-blocking)
     # We use raw SQL to leverage FOR UPDATE SKIP LOCKED reliably.
     row = await session.execute(
@@ -47,6 +49,7 @@ async def run_worker_forever(
     handlers: Mapping[str, Handler],
     poll_interval_s: float = 1.0,
 ) -> None:
+    """Continuously poll the queue and dispatch jobs to handlers."""
     while True:
         async with session_factory() as session:
             async with session.begin():

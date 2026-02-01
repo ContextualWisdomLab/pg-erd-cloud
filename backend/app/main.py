@@ -20,6 +20,12 @@ from app.settings import settings
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Run application startup/shutdown hooks.
+
+    Starts a background job worker on startup and ensures it is cancelled and
+    awaited on shutdown.
+    """
+
     handlers = {"snapshot": handle_snapshot_job}
     task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
     try:
@@ -45,6 +51,7 @@ app.add_middleware(
 
 @app.get("/healthz")
 async def healthz() -> dict:
+    """Simple health-check endpoint."""
     return {"ok": True}
 
 

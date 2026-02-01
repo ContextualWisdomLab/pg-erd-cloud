@@ -4,11 +4,14 @@ from collections.abc import Iterable
 
 
 def _q(ident: str) -> str:
+    """Quote a PostgreSQL identifier."""
+
     # Quote identifier with double-quotes, escaping internal quotes.
     return '"' + ident.replace('"', '""') + '"'
 
 
 def _qname(schema: str, name: str) -> str:
+    """Quote a schema-qualified name."""
     return f"{_q(schema)}.{_q(name)}"
 
 

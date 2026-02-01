@@ -9,6 +9,8 @@ from app.sanitize import sanitize_for_storage
 
 
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
+    """Introspect a PostgreSQL database and return a snapshot JSON."""
+
     # Note: avoid logging DSN.
     conn = await asyncpg.connect(dsn, timeout=10)
     try:

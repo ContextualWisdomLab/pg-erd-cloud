@@ -13,6 +13,7 @@ class Base(DeclarativeBase):
 
 
 def utcnow() -> dt.datetime:
+    """Return the current UTC timestamp (timezone-aware)."""
     return dt.datetime.now(dt.timezone.utc)
 
 

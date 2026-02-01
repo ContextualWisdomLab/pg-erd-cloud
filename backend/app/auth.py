@@ -29,6 +29,7 @@ _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 
 
 async def _get_oidc_config() -> dict:
+    """Fetch and cache the OIDC discovery document."""
     if not settings.oidc_issuer:
         raise RuntimeError("OIDC is disabled")
 
@@ -50,6 +51,7 @@ async def _get_oidc_config() -> dict:
 
 
 async def _get_jwks() -> dict:
+    """Fetch and cache the OIDC JWKS (signing keys)."""
     config = await _get_oidc_config()
     jwks_uri = config.get("jwks_uri")
     if not isinstance(jwks_uri, str):
@@ -70,6 +72,7 @@ async def _get_jwks() -> dict:
 
 
 def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
+    """Pick a JWK from a JWKS set by kid (or first if kid is None)."""
     keys = jwks.get("keys")
     if not isinstance(keys, list):
         return None
@@ -82,6 +85,12 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
 
 
 async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
+    """Extract (subject, display_name) from a request.
+
+    Uses OIDC bearer tokens when configured; otherwise falls back to a dev
+    header for local development.
+    """
+
     # OIDC mode (Casdoor etc.)
     if settings.oidc_issuer:
         auth = request.headers.get("Authorization", "")
@@ -125,6 +134,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
 async def _ensure_user(
     session: AsyncSession, subject: str, display_name: str | None
 ) -> CurrentUser:
+    """Get or create a UserAccount for the given OIDC subject."""
     row = await session.execute(
         select(UserAccount).where(UserAccount.oidc_subject == subject)
     )
@@ -155,6 +165,7 @@ async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> CurrentUser:
+    """FastAPI dependency that authenticates and returns the current user."""
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

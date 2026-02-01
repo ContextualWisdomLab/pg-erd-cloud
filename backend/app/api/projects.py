@@ -28,6 +28,7 @@ async def list_projects(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProjectOut]:
+    """List projects that the current user is a member of."""
     rows = await session.execute(
         select(ProjectSpace)
         .join(
@@ -50,6 +51,7 @@ async def create_project(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
+    """Create a new project and add the creator as the owner."""
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
         project_name=str(sanitize_for_storage(body.project_name)),
@@ -78,6 +80,7 @@ async def list_project_members(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProjectMemberOut]:
+    """List members of a project (MVP: any member can view)."""
     # owner/editor/viewer 모두 멤버 조회 가능(MVP)
     row = await session.execute(
         select(ProjectMember).where(
@@ -116,6 +119,10 @@ async def add_project_member(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ProjectMemberOut:
+    """Invite/add a project member (owner-only).
+
+    Uses a Postgres upsert to make the operation idempotent and race-safe.
+    """
     # MVP 권한: owner만 초대 가능
     row = await session.execute(
         select(ProjectMember.project_role).where(
