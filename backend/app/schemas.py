@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +19,8 @@ class ProjectMemberAddIn(BaseModel):
     member_subject: str = Field(
         min_length=1, description="OIDC sub, or dev:<name> in dev mode"
     )
-    project_role: str = Field(default="viewer")
+    # MVP: restrict to non-owner roles. Owner is assigned at project creation.
+    project_role: Literal["viewer", "editor"] = Field(default="viewer")
 
 
 class ProjectMemberOut(BaseModel):

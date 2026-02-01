@@ -5,6 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
@@ -147,32 +148,41 @@ async def add_project_member(
 
     # Idempotent invite: if already a member, update role instead of raising 500.
     row3 = await session.execute(
-        select(ProjectMember).where(
+        select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
             ProjectMember.user_account_uuid == u.user_account_uuid,
         )
     )
-    existing = row3.scalars().first()
-    if existing is not None:
-        existing.project_role = body.project_role
-        await session.commit()
-        return ProjectMemberOut(
-            user_account_uuid=u.user_account_uuid,
-            member_subject=u.oidc_subject,
-            project_role=existing.project_role,
+    existing_role = row3.scalar_one_or_none()
+    if existing_role == "owner":
+        # Avoid leaving project without an owner via this endpoint.
+        raise HTTPException(
+            status_code=400, detail="cannot change owner role via invite endpoint"
         )
 
-    m = ProjectMember(
-        project_space_uuid=project_space_uuid,
-        user_account_uuid=u.user_account_uuid,
-        project_role=body.project_role,
-        created_at=dt.datetime.now(dt.timezone.utc),
+    # Race-safe upsert on composite PK.
+    stmt = (
+        insert(ProjectMember)
+        .values(
+            project_space_uuid=project_space_uuid,
+            user_account_uuid=u.user_account_uuid,
+            project_role=body.project_role,
+            created_at=dt.datetime.now(dt.timezone.utc),
+        )
+        .on_conflict_do_update(
+            index_elements=[
+                ProjectMember.project_space_uuid,
+                ProjectMember.user_account_uuid,
+            ],
+            set_={"project_role": body.project_role},
+        )
+        .returning(ProjectMember.project_role)
     )
-    session.add(m)
+    new_role = (await session.execute(stmt)).scalar_one()
     await session.commit()
 
     return ProjectMemberOut(
         user_account_uuid=u.user_account_uuid,
         member_subject=u.oidc_subject,
-        project_role=m.project_role,
+        project_role=str(new_role),
     )

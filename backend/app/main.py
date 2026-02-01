@@ -26,6 +26,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)

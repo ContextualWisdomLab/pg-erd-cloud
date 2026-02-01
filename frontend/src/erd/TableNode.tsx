@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { NodeProps } from '@xyflow/react'
+import type { Node, NodeProps } from '@xyflow/react'
 
 type Column = {
   column_name: string
@@ -8,8 +8,16 @@ type Column = {
   is_pk?: boolean
 }
 
-function TableNode(props: NodeProps) {
-  const data = props.data as { title: string; columns: Column[]; badges?: { pk?: boolean; fk?: boolean } }
+type TableNodeData = {
+  title: string
+  columns: Column[]
+  badges?: { pk?: boolean; fk?: boolean }
+}
+
+type TableNodeNode = Node<TableNodeData, 'tableNode'>
+
+function TableNode(props: NodeProps<TableNodeNode>) {
+  const { data } = props
   return (
     <div className="tableNode">
       <div className="tableNode__title">
