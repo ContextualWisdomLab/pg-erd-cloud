@@ -1,11 +1,13 @@
-name: codeql
+name: codeql-advanced (manual)
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-  schedule:
-    - cron: "0 2 * * 1"
+  # NOTE: This repository has GitHub Code Scanning "default setup" enabled and
+  # it is controlled by organization administrators. Running an advanced
+  # CodeQL workflow alongside default setup can fail with:
+  # "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled".
+  #
+  # To avoid merge-gate noise, keep this workflow manual only.
+  workflow_dispatch:
 
 permissions:
   contents: read
