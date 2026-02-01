@@ -22,6 +22,7 @@ __pycache__/
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 
 # opencode tooling artifacts
 registered_agents.json
