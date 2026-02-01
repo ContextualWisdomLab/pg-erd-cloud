@@ -42,4 +42,13 @@ function TableNode(props: NodeProps<TableNodeNode>) {
   )
 }
 
-export default memo(TableNode)
+export default memo(TableNode, (prev, next) => {
+  // React Flow typically provides new node objects when data changes.
+  // This comparator is a conservative safeguard for the most relevant fields.
+  return (
+    prev.data.title === next.data.title &&
+    prev.data.columns === next.data.columns &&
+    prev.data.badges?.pk === next.data.badges?.pk &&
+    prev.data.badges?.fk === next.data.badges?.fk
+  )
+})
