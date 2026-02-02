@@ -18,7 +18,8 @@ def test_classify_pooler_version_text() -> None:
 
 def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
     dsn, password = build_admin_console_dsn(
-        "postgresql+asyncpg://u:p@localhost:5432/appdb", "pgbouncer"
+        "postgresql+asyncpg://u:p@localhost:5432/appdb",
+        "pgbouncer",  # noqa: S105
     )
     assert dsn.startswith("postgresql://")
     assert "/pgbouncer" in dsn

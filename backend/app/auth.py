@@ -118,10 +118,10 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
                 issuer=settings.oidc_issuer,
                 options={"verify_aud": bool(settings.oidc_audience)},
             )
-        except Exception:  # noqa: BLE001
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(
                 status_code=401, detail="token verification failed"
-            )
+            ) from err
 
         sub = claims.get("sub")
         name = claims.get("name") or claims.get("preferred_username")

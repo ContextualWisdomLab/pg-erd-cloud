@@ -76,7 +76,7 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
 
     # libpq's connect_timeout is specified in whole seconds.
     # Note: some PostgreSQL/libpq versions effectively treat values < 2 as 2.
-    timeout_seconds = max(2, int(math.ceil(raw_timeout)))
+    timeout_seconds = max(2, math.ceil(raw_timeout))
 
     def _run() -> str | None:
         with psycopg.connect(
