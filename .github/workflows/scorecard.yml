@@ -14,7 +14,6 @@ jobs:
   analysis:
     permissions:
       contents: read
-      administration: read
       security-events: write
       id-token: write
     runs-on: ubuntu-latest
