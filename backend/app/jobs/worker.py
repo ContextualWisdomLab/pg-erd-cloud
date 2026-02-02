@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import JobQueue
 
-Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
+Handler: TypeAlias = Callable[
+    [Callable[[], AsyncSession], JobQueue], Awaitable[None]
+]
 
 
 async def claim_one_job(session: AsyncSession) -> JobQueue | None:
@@ -19,18 +21,14 @@ async def claim_one_job(session: AsyncSession) -> JobQueue | None:
 
     # Transaction: claim a queued job using SKIP LOCKED (non-blocking)
     # We use raw SQL to leverage FOR UPDATE SKIP LOCKED reliably.
-    row = await session.execute(
-        text(
-            """
+    row = await session.execute(text("""
             SELECT job_queue_uuid
             FROM job_queue
             WHERE status = 'queued' AND run_after <= now()
             ORDER BY run_after ASC
             FOR UPDATE SKIP LOCKED
             LIMIT 1
-            """
-        )
-    )
+            """))
     job_id = row.scalar_one_or_none()
     if job_id is None:
         return None

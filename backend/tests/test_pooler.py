@@ -17,11 +17,15 @@ def test_classify_pooler_version_text() -> None:
 
 
 def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
-    dsn = build_admin_console_dsn(
+    dsn, password = build_admin_console_dsn(
         "postgresql+asyncpg://u:p@localhost:5432/appdb", "pgbouncer"
     )
     assert dsn.startswith("postgresql://")
     assert "/pgbouncer" in dsn
+    assert password == "p"
+
+    # Password must not be embedded in the DSN string.
+    assert ":p@" not in dsn
 
 
 def test_should_route_reads_to_read_only() -> None:

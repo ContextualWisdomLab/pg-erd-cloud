@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 SCHEMAS_SQL = """
 WITH params AS (
   SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system

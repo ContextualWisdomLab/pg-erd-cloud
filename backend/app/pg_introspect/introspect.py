@@ -18,17 +18,27 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
         schema_name = schema_filter
         include_system = False
 
-        schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
-        relations = await conn.fetch(queries.RELATIONS_SQL, schema_name, include_system)
-        columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)
+        schemas = await conn.fetch(
+            queries.SCHEMAS_SQL, schema_name, include_system
+        )
+        relations = await conn.fetch(
+            queries.RELATIONS_SQL, schema_name, include_system
+        )
+        columns = await conn.fetch(
+            queries.COLUMNS_SQL, schema_name, include_system
+        )
         constraints = await conn.fetch(
             queries.CONSTRAINTS_SQL, schema_name, include_system
         )
-        indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
+        indexes = await conn.fetch(
+            queries.INDEXES_SQL, schema_name, include_system
+        )
         pk_columns = await conn.fetch(
             queries.PK_COLUMNS_SQL, schema_name, include_system
         )
-        fk_edges = await conn.fetch(queries.FK_EDGES_SQL, schema_name, include_system)
+        fk_edges = await conn.fetch(
+            queries.FK_EDGES_SQL, schema_name, include_system
+        )
 
         snapshot = {
             "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 
 
 class PoolerKind(str, Enum):
@@ -38,8 +38,10 @@ def classify_pooler_version_text(version_text: str) -> PoolerKind:
     return PoolerKind.UNKNOWN
 
 
-def build_admin_console_dsn(database_url: str, admin_database: str) -> str:
-    """Build a sync DSN string for pooler admin consoles.
+def build_admin_console_dsn(
+    database_url: str, admin_database: str
+) -> tuple[str, str | None]:
+    """Build a sync DSN (without password) for pooler admin consoles.
 
     Pooler admin consoles are typically exposed as virtual databases such as
     `pgbouncer` and `pgcat`. This helper rewrites an async SQLAlchemy URL into a
@@ -53,8 +55,25 @@ def build_admin_console_dsn(database_url: str, admin_database: str) -> str:
     if drivername.startswith("postgresql+"):
         drivername = "postgresql"
 
-    next_url = url.set(drivername=drivername, database=admin_database)
-    return str(next_url.render_as_string(hide_password=False))
+    # Avoid embedding credentials in DSN strings. Some drivers/loggers may echo
+    # DSNs, so keep the password separate.
+    password = url.password
+
+    # NOTE: URL.set(password=None) does not clear the password; it leaves it as
+    # is. Construct a fresh URL to ensure the password is omitted.
+    safe_url = URL.create(
+        drivername=drivername,
+        username=url.username,
+        password=None,
+        host=url.host,
+        port=url.port,
+        database=admin_database,
+        query=url.query,
+    )
+
+    # Render as a string with password redaction enabled (defense-in-depth).
+    dsn = str(safe_url.render_as_string(hide_password=True))
+    return dsn, password
 
 
 def should_route_reads_to_read_only(

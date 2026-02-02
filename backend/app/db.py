@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 import asyncio
+import math
 import time
 
 import psycopg
@@ -67,11 +68,22 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
     simple query protocol.
     """
 
-    dsn = build_admin_console_dsn(settings.database_url, admin_db)
-    timeout = float(settings.db_pooler_probe_timeout_seconds)
+    dsn, password = build_admin_console_dsn(settings.database_url, admin_db)
+
+    raw_timeout = float(settings.db_pooler_probe_timeout_seconds)
+    if raw_timeout <= 0.0:
+        return None
+
+    # libpq's connect_timeout is specified in whole seconds.
+    # Note: some PostgreSQL/libpq versions effectively treat values < 2 as 2.
+    timeout_seconds = max(2, int(math.ceil(raw_timeout)))
 
     def _run() -> str | None:
-        with psycopg.connect(dsn, connect_timeout=str(timeout)) as conn:
+        with psycopg.connect(
+            dsn,
+            password=password,
+            connect_timeout=str(timeout_seconds),
+        ) as conn:
             with conn.cursor() as cur:
                 cur.execute("SHOW VERSION;")
                 row = cur.fetchone()
@@ -81,7 +93,7 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
 
     try:
         return await asyncio.wait_for(
-            asyncio.to_thread(_run), timeout=timeout + 0.2
+            asyncio.to_thread(_run), timeout=float(timeout_seconds) + 0.2
         )
     except Exception:  # noqa: BLE001
         return None
@@ -90,8 +102,8 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
 async def get_pooler_detection() -> PoolerDetectionResult:
     """Return a cached best-effort pooler detection result."""
 
-    global _pooler_cache_at  # noqa: PLW0603
-    global _pooler_cache  # noqa: PLW0603
+    global _pooler_cache_at
+    global _pooler_cache
 
     # Fast path: honor explicit configuration.
     if settings.db_pooler_kind is not None:

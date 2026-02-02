@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends
 from app.auth import CurrentUser, get_current_user
 from app.schemas import MeOut
 
-
 router = APIRouter(prefix="/api", tags=["me"])
 
 
