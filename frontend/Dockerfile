@@ -2,6 +2,9 @@ FROM node:20.20.0-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28
 
 WORKDIR /app
 
+# Ensure the non-root `node` user can write to /app (e.g. for node_modules).
+RUN chown -R node:node /app
+
 COPY --chown=node:node package.json package-lock.json /app/
 
 USER node
