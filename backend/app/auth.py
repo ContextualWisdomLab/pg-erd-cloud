@@ -118,7 +118,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
                 issuer=settings.oidc_issuer,
                 options={"verify_aud": bool(settings.oidc_audience)},
             )
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             raise HTTPException(
                 status_code=401, detail="token verification failed"
             ) from err
