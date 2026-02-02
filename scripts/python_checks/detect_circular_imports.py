@@ -137,8 +137,10 @@ def main(argv: list[str] | None = None) -> int:
         packages.append(("app", backend_app))
 
     if not packages:
-        print("No known package directories found; skipping.")
-        return 0
+        print(
+            "ERROR: no known package directories found; check --root or repo layout"
+        )
+        return 1
 
     known_modules: set[str] = set()
     file_to_module: dict[Path, str] = {}
