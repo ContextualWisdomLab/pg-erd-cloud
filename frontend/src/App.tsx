@@ -1,5 +1,15 @@
-import { Background, Controls, ReactFlow, type NodeTypes } from '@xyflow/react'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  Background,
+  Controls,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeTypes,
+  type ReactFlowInstance,
+  useEdgesState,
+  useNodesState
+} from '@xyflow/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getMe,
   createConnection,
@@ -11,7 +21,8 @@ import {
   listSnapshots
 } from './api'
 import TableNode from './erd/TableNode'
-import { snapshotToGraph } from './erd/convert'
+import { snapshotToGraph, type TableNodeData } from './erd/convert'
+import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './erd/layoutConstants'
 import type { Connection, Project, SnapshotDetail } from './types'
 
 export default function App() {
@@ -30,6 +41,14 @@ export default function App() {
   const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<SnapshotDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const reactFlowRef = useRef<ReactFlowInstance<Node<TableNodeData>, Edge> | null>(null)
+
+  const [isLayouting, setIsLayouting] = useState(false)
+  const [layoutMessage, setLayoutMessage] = useState<string>('')
+  const [undoPositions, setUndoPositions] = useState<Map<string, { x: number; y: number }> | null>(null)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), [])
 
@@ -64,10 +83,98 @@ export default function App() {
     return () => clearInterval(timer)
   }, [snapshotId])
 
+  const snapshotJsonKey = useMemo(() => {
+    return snapshot?.snapshot_json ? JSON.stringify(snapshot.snapshot_json) : ''
+  }, [snapshot?.snapshot_json])
+
   const graph = useMemo(() => {
-    if (!snapshot?.snapshot_json) return { nodes: [], edges: [] }
-    return snapshotToGraph(snapshot.snapshot_json)
-  }, [snapshot])
+    return snapshot?.snapshot_json ? snapshotToGraph(snapshot.snapshot_json) : null
+  }, [snapshotJsonKey])
+
+  useEffect(() => {
+    if (!graph) {
+      setNodes([])
+      setEdges([])
+      setUndoPositions(null)
+      return
+    }
+
+    setEdges(graph.edges)
+
+    setNodes((prev) => {
+      const prevPos = new Map(prev.map((n) => [n.id, n.position]))
+      return graph.nodes.map((n) => {
+        const position = prevPos.get(n.id)
+        return position ? { ...n, position } : n
+      })
+    })
+  }, [graph, setEdges, setNodes])
+
+  function snapshotNodePositions(currentNodes: Array<Node<TableNodeData>>): Map<string, { x: number; y: number }> {
+    const map = new Map<string, { x: number; y: number }>()
+    for (const n of currentNodes) map.set(n.id, { x: n.position.x, y: n.position.y })
+    return map
+  }
+
+  function applyPositions(
+    currentNodes: Array<Node<TableNodeData>>,
+    positions: Map<string, { x: number; y: number }>
+  ): Array<Node<TableNodeData>> {
+    return currentNodes.map((n) => {
+      const p = positions.get(n.id)
+      return p ? { ...n, position: { x: p.x, y: p.y } } : n
+    })
+  }
+
+  function computeSortedGridLayout(currentNodes: Array<Node<TableNodeData>>): Array<Node<TableNodeData>> {
+    const sorted = [...currentNodes].sort((a, b) => {
+      const aTitle = a.data?.title ?? a.id
+      const bTitle = b.data?.title ?? b.id
+      return aTitle.localeCompare(bTitle, 'en')
+    })
+
+    return sorted.map((n, i) => ({
+      ...n,
+      position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP }
+    }))
+  }
+
+  async function onAutoLayout() {
+    if (nodes.length === 0 || isLayouting) return
+    setIsLayouting(true)
+    setLayoutMessage('')
+
+    // Capture current positions for a one-step undo.
+    setUndoPositions(snapshotNodePositions(nodes))
+
+    try {
+      // Yield to the browser so the UI can reflect the loading state.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+
+      const next = computeSortedGridLayout(nodes)
+      setNodes(next)
+
+      requestAnimationFrame(() => {
+        reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 })
+      })
+
+      setLayoutMessage('정렬 완료')
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Auto-layout failed', error)
+      }
+      setLayoutMessage('정렬에 실패했습니다. 다시 시도해 주세요.')
+    } finally {
+      setIsLayouting(false)
+    }
+  }
+
+  function onUndoLayout() {
+    if (!undoPositions || isLayouting) return
+    setNodes((prev) => applyPositions(prev, undoPositions))
+    setUndoPositions(null)
+    setLayoutMessage('되돌렸습니다')
+  }
 
   async function onCreateProject() {
     setError(null)
@@ -196,10 +303,47 @@ export default function App() {
       </aside>
 
       <main id="main" className="main" tabIndex={-1}>
-        <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} fitView>
-          <Background />
-          <Controls />
-        </ReactFlow>
+        <div className="canvas">
+          <div className="canvasToolbar" role="toolbar" aria-label="ERD 캔버스 도구">
+            <button
+              type="button"
+              onClick={onAutoLayout}
+              disabled={nodes.length === 0 || isLayouting}
+              aria-label="ERD 자동 정렬"
+              aria-busy={isLayouting}
+              title={nodes.length === 0 ? '정렬할 항목이 없습니다' : '자동 정렬'}
+            >
+              {isLayouting ? '정렬 중…' : '정렬'}
+            </button>
+            <button
+              type="button"
+              onClick={onUndoLayout}
+              disabled={!undoPositions || isLayouting}
+              title="정렬 되돌리기"
+              aria-label="정렬 되돌리기"
+            >
+              되돌리기
+            </button>
+            <div className="srOnly" aria-live="polite">
+              {layoutMessage}
+            </div>
+          </div>
+
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            onInit={(instance) => {
+              reactFlowRef.current = instance
+            }}
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
       </main>
     </div>
   )
