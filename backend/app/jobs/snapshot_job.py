@@ -6,7 +6,12 @@ from collections.abc import Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DbConnection, JobQueue, SchemaSnapshot, SchemaSnapshotData
+from app.models import (
+    DbConnection,
+    JobQueue,
+    SchemaSnapshot,
+    SchemaSnapshotData,
+)
 from app.pg_introspect.introspect import introspect_postgres
 from app.security import decrypt_text
 

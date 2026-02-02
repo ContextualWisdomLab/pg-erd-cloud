@@ -58,7 +58,13 @@ class SnapshotCreateIn(BaseModel):
 
     db_connection_uuid: uuid.UUID
     schema_filter: str | None = Field(
-        default=None, description="If set, only introspect this schema"
+        default=None,
+        description=(
+            "If set, only introspect this schema (unquoted PostgreSQL identifier)"
+        ),
+        min_length=1,
+        max_length=63,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_$]{0,62}$",
     )
 
 
