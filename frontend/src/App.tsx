@@ -21,7 +21,8 @@ import {
   listSnapshots
 } from './api'
 import TableNode from './erd/TableNode'
-import { snapshotToGraph } from './erd/convert'
+import { snapshotToGraph, type TableNodeData } from './erd/convert'
+import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './erd/layoutConstants'
 import type { Connection, Project, SnapshotDetail } from './types'
 
 export default function App() {
@@ -41,9 +42,9 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<SnapshotDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const reactFlowRef = useRef<ReactFlowInstance | null>(null)
+  const reactFlowRef = useRef<ReactFlowInstance<Node<TableNodeData>, Edge> | null>(null)
 
   const [isLayouting, setIsLayouting] = useState(false)
   const [layoutMessage, setLayoutMessage] = useState<string>('')
@@ -82,15 +83,22 @@ export default function App() {
     return () => clearInterval(timer)
   }, [snapshotId])
 
+  const snapshotJsonKey = useMemo(() => {
+    return snapshot?.snapshot_json ? JSON.stringify(snapshot.snapshot_json) : ''
+  }, [snapshot?.snapshot_json])
+
+  const graph = useMemo(() => {
+    return snapshot?.snapshot_json ? snapshotToGraph(snapshot.snapshot_json) : null
+  }, [snapshotJsonKey])
+
   useEffect(() => {
-    if (!snapshot?.snapshot_json) {
+    if (!graph) {
       setNodes([])
       setEdges([])
       setUndoPositions(null)
       return
     }
 
-    const graph = snapshotToGraph(snapshot.snapshot_json)
     setEdges(graph.edges)
 
     setNodes((prev) => {
@@ -100,35 +108,34 @@ export default function App() {
         return position ? { ...n, position } : n
       })
     })
-  }, [snapshot?.snapshot_json, setEdges, setNodes])
+  }, [graph, setEdges, setNodes])
 
-  function snapshotNodePositions(currentNodes: Node[]): Map<string, { x: number; y: number }> {
+  function snapshotNodePositions(currentNodes: Array<Node<TableNodeData>>): Map<string, { x: number; y: number }> {
     const map = new Map<string, { x: number; y: number }>()
     for (const n of currentNodes) map.set(n.id, { x: n.position.x, y: n.position.y })
     return map
   }
 
-  function applyPositions(currentNodes: Node[], positions: Map<string, { x: number; y: number }>): Node[] {
+  function applyPositions(
+    currentNodes: Array<Node<TableNodeData>>,
+    positions: Map<string, { x: number; y: number }>
+  ): Array<Node<TableNodeData>> {
     return currentNodes.map((n) => {
       const p = positions.get(n.id)
       return p ? { ...n, position: { x: p.x, y: p.y } } : n
     })
   }
 
-  function computeSortedGridLayout(currentNodes: Node[]): Node[] {
-    const columns = 4
-    const xGap = 320
-    const yGap = 220
-
+  function computeSortedGridLayout(currentNodes: Array<Node<TableNodeData>>): Array<Node<TableNodeData>> {
     const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = String((a.data as any)?.title ?? a.id)
-      const bTitle = String((b.data as any)?.title ?? b.id)
-      return aTitle.localeCompare(bTitle)
+      const aTitle = a.data?.title ?? a.id
+      const bTitle = b.data?.title ?? b.id
+      return aTitle.localeCompare(bTitle, 'en')
     })
 
     return sorted.map((n, i) => ({
       ...n,
-      position: { x: (i % columns) * xGap, y: Math.floor(i / columns) * yGap }
+      position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP }
     }))
   }
 
@@ -152,7 +159,10 @@ export default function App() {
       })
 
       setLayoutMessage('정렬 완료')
-    } catch {
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Auto-layout failed', error)
+      }
       setLayoutMessage('정렬에 실패했습니다. 다시 시도해 주세요.')
     } finally {
       setIsLayouting(false)
@@ -296,6 +306,7 @@ export default function App() {
         <div className="canvas">
           <div className="canvasToolbar" role="toolbar" aria-label="ERD 캔버스 도구">
             <button
+              type="button"
               onClick={onAutoLayout}
               disabled={nodes.length === 0 || isLayouting}
               aria-label="ERD 자동 정렬"
@@ -304,7 +315,13 @@ export default function App() {
             >
               {isLayouting ? '정렬 중…' : '정렬'}
             </button>
-            <button onClick={onUndoLayout} disabled={!undoPositions || isLayouting} title="정렬 되돌리기">
+            <button
+              type="button"
+              onClick={onUndoLayout}
+              disabled={!undoPositions || isLayouting}
+              title="정렬 되돌리기"
+              aria-label="정렬 되돌리기"
+            >
               되돌리기
             </button>
             <div className="srOnly" aria-live="polite">

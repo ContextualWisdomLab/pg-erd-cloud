@@ -1,5 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 
+import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
+
 type SnapshotJson = {
   relations: Array<{ relation_oid: number; relation_kind: string; schema_name: string; relation_name: string }>
   columns: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean }>
@@ -16,7 +18,16 @@ type SnapshotJson = {
   }>
 }
 
-export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Node[]; edges: Edge[] } {
+export type TableNodeData = {
+  title: string
+  columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean }>
+  badges: {
+    pk: boolean
+    fk: boolean
+  }
+}
+
+export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<TableNodeData>>; edges: Edge[] } {
   const tableRels = snapshot.relations.filter((r) => r.relation_kind === 'r' || r.relation_kind === 'p')
   const pkColsByRel = new Map<number, Set<string>>()
   for (const p of snapshot.pk_columns || []) {
@@ -25,7 +36,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Node[]; edges:
     pkColsByRel.set(p.relation_oid, set)
   }
 
-  const columnsByRel = new Map<number, Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean }>>()
+  const columnsByRel = new Map<number, TableNodeData['columns']>()
   for (const c of snapshot.columns) {
     const list = columnsByRel.get(c.relation_oid) || []
     const isPk = pkColsByRel.get(c.relation_oid)?.has(c.column_name) || false
@@ -74,12 +85,12 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Node[]; edges:
     }
   }
 
-  const nodes: Node[] = tableRels.map((t, i) => {
+  const nodes: Array<Node<TableNodeData>> = tableRels.map((t, i) => {
     const cols = columnsByRel.get(t.relation_oid) || []
     return {
       id: String(t.relation_oid),
       type: 'tableNode',
-      position: { x: (i % 4) * 320, y: Math.floor(i / 4) * 220 },
+      position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
       data: {
         title: `${t.schema_name}.${t.relation_name}`,
         columns: cols,
