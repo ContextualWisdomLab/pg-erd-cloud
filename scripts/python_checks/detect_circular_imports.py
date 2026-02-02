@@ -52,11 +52,24 @@ def _collect_internal_imports(
                 continue
             if not node.module:
                 continue
-            name = node.module
-            if name == module_prefix or name.startswith(f"{module_prefix}."):
-                resolved = _resolve_to_known(name, known_modules)
-                if resolved:
-                    imported.add(resolved)
+            base = node.module
+            if base == module_prefix or base.startswith(f"{module_prefix}."):
+                # Handle cases like:
+                #   from app import models
+                # where `node.module` is "app" but the imported module is
+                # "app.models".
+                for alias in node.names:
+                    candidates: list[str]
+                    if alias.name == "*":
+                        candidates = [base]
+                    else:
+                        candidates = [f"{base}.{alias.name}", base]
+
+                    for candidate in candidates:
+                        resolved = _resolve_to_known(candidate, known_modules)
+                        if resolved:
+                            imported.add(resolved)
+                            break
     return imported
 
 
