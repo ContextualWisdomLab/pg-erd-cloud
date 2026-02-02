@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
-from app.db import get_session
+from app.db import get_read_session, get_session
 from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
     ProjectCreateIn,
@@ -19,14 +19,13 @@ from app.schemas import (
 )
 from app.sanitize import sanitize_for_storage
 
-
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 @router.get("", response_model=list[ProjectOut])
 async def list_projects(
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[ProjectOut]:
     """List projects that the current user is a member of."""
     rows = await session.execute(
@@ -40,7 +39,9 @@ async def list_projects(
     )
     projects = rows.scalars().all()
     return [
-        ProjectOut(project_space_uuid=p.project_space_uuid, project_name=p.project_name)
+        ProjectOut(
+            project_space_uuid=p.project_space_uuid, project_name=p.project_name
+        )
         for p in projects
     ]
 
@@ -74,11 +75,13 @@ async def create_project(
     )
 
 
-@router.get("/{project_space_uuid}/members", response_model=list[ProjectMemberOut])
+@router.get(
+    "/{project_space_uuid}/members", response_model=list[ProjectMemberOut]
+)
 async def list_project_members(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[ProjectMemberOut]:
     """List members of a project (MVP: any member can view)."""
     # owner/editor/viewer 모두 멤버 조회 가능(MVP)
@@ -164,7 +167,8 @@ async def add_project_member(
     if existing_role == "owner":
         # Avoid leaving project without an owner via this endpoint.
         raise HTTPException(
-            status_code=400, detail="cannot change owner role via invite endpoint"
+            status_code=400,
+            detail="cannot change owner role via invite endpoint",
         )
 
     # Race-safe upsert on composite PK.
