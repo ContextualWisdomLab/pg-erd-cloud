@@ -3,17 +3,9 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import defaultdict
-from collections.abc import Iterable
 from pathlib import Path
 
-
-def _iter_python_files(package_dir: Path) -> Iterable[Path]:
-    for path in package_dir.rglob("*.py"):
-        if "__pycache__" in path.parts:
-            continue
-        if ".venv" in path.parts or "site-packages" in path.parts:
-            continue
-        yield path
+from scripts.python_checks.check_import_safety import iter_python_files
 
 
 def _module_name(package_name: str, package_dir: Path, file_path: Path) -> str:
@@ -84,11 +76,8 @@ def _find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
                 dfs(nxt)
             elif nxt in on_stack:
                 # Extract cycle path.
-                try:
-                    idx = stack.index(nxt)
-                except ValueError:
-                    idx = 0
-                cycle = stack[idx:] + [nxt]
+                idx = stack.index(nxt)
+                cycle = [*stack[idx:], nxt]
                 # Deduplicate: store normalized string form.
                 cycles.append(cycle)
 
@@ -111,7 +100,7 @@ def _find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
         if key in seen:
             continue
         seen.add(key)
-        unique.append(list(key) + [key[0]])
+        unique.append([*key, key[0]])
     return unique
 
 
@@ -141,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     known_modules: set[str] = set()
     file_to_module: dict[Path, str] = {}
     for package_name, package_dir in packages:
-        for file_path in _iter_python_files(package_dir):
+        for file_path in iter_python_files(package_dir):
             mod = _module_name(package_name, package_dir, file_path)
             known_modules.add(mod)
             file_to_module[file_path] = mod

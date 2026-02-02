@@ -7,9 +7,7 @@ from app.pooler import (
     should_route_reads_to_read_only,
 )
 
-_DUMMY_DATABASE_URL = (
-    "postgresql+asyncpg://u:dummy@localhost:5432/appdb"  # noqa: S105
-)
+_DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
 
 
 def test_classify_pooler_version_text() -> None:
@@ -47,6 +45,12 @@ def test_should_route_reads_to_read_only() -> None:
             mode="on", read_only_url=ro_url, pooler_detected=False
         )
         is True
+    )
+    assert (
+        should_route_reads_to_read_only(
+            mode="on", read_only_url=None, pooler_detected=True
+        )
+        is False
     )
     assert (
         should_route_reads_to_read_only(

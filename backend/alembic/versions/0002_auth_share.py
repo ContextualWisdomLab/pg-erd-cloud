@@ -18,6 +18,7 @@ depends_on = None
 
 
 _MIGRATED_OIDC_SUBJECT_PREFIX = "migrated:0002_auth_share:"
+_MIGRATED_DISPLAY_NAME_PREFIX = "migrated-0002_auth_share-"
 
 
 def upgrade() -> None:
@@ -28,7 +29,7 @@ def upgrade() -> None:
         SELECT DISTINCT
           p.created_by_user_uuid,
           '{_MIGRATED_OIDC_SUBJECT_PREFIX}' || p.created_by_user_uuid::text,
-          'migrated-0002_auth_share-' || p.created_by_user_uuid::text,
+          '{_MIGRATED_DISPLAY_NAME_PREFIX}' || p.created_by_user_uuid::text,
           now()
         FROM project_space p
         LEFT JOIN user_account u ON u.user_account_uuid = p.created_by_user_uuid

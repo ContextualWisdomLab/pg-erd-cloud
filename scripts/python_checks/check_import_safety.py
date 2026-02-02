@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+from collections.abc import Iterable
 from pathlib import Path
 
-_SKIP_DIR_NAMES = {
+SKIP_DIR_NAMES = {
     ".git",
     ".mypy_cache",
     ".ruff_cache",
@@ -17,24 +18,43 @@ _SKIP_DIR_NAMES = {
 }
 
 
-def _iter_python_files(root: Path) -> list[Path]:
-    files: list[Path] = []
+def iter_python_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*.py"):
-        if any(part in _SKIP_DIR_NAMES for part in path.parts):
+        if any(part in SKIP_DIR_NAMES for part in path.parts):
             continue
-        files.append(path)
-    return files
+        yield path
 
 
-def _has_sys_path_mutation(src: str) -> bool:
-    # A simple, conservative heuristic.
-    needles = (
-        "sys.path.append",
-        "sys.path.insert",
-        "sys.path +=",
-        "sys.path =",
+def _is_sys_path(expr: ast.AST) -> bool:
+    return (
+        isinstance(expr, ast.Attribute)
+        and expr.attr == "path"
+        and isinstance(expr.value, ast.Name)
+        and expr.value.id == "sys"
     )
-    return any(n in src for n in needles)
+
+
+def _has_sys_path_mutation(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        # sys.path.append(...) / sys.path.insert(...) / sys.path.extend(...)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in (
+                "append",
+                "insert",
+                "extend",
+            ) and _is_sys_path(node.func.value):
+                return True
+
+        # sys.path += ...
+        if isinstance(node, ast.AugAssign) and _is_sys_path(node.target):
+            return True
+
+        # sys.path = ...
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if _is_sys_path(target):
+                    return True
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,19 +86,23 @@ def main(argv: list[str] | None = None) -> int:
     self_path = Path(__file__).resolve()
 
     for target in targets:
-        for file_path in _iter_python_files(target):
+        for file_path in iter_python_files(target):
             if file_path.resolve() == self_path:
                 # Avoid false-positives from the checker searching for its own
                 # detection strings.
                 continue
             src = file_path.read_text(encoding="utf-8")
-            if _has_sys_path_mutation(src):
-                errors.append(f"{file_path}: sys.path mutation detected")
 
             try:
                 tree = ast.parse(src)
-            except SyntaxError:
+            except SyntaxError as exc:
+                warnings.append(
+                    f"{file_path}: SyntaxError ({exc.msg}) at line {exc.lineno}"
+                )
                 continue
+
+            if _has_sys_path_mutation(tree):
+                errors.append(f"{file_path}: sys.path mutation detected")
 
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom):
@@ -97,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
                 if isinstance(
                     node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
                 ):
-                    for child in node.body:
+                    for child in ast.walk(node):
                         if isinstance(child, (ast.Import, ast.ImportFrom)):
                             warnings.append(
                                 f"{file_path}:{child.lineno} import not at top-level"
