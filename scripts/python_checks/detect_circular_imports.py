@@ -137,7 +137,11 @@ def main(argv: list[str] | None = None) -> int:
 
     graph: dict[str, set[str]] = defaultdict(set)
     for file_path, mod in file_to_module.items():
-        src = file_path.read_text(encoding="utf-8")
+        try:
+            src = file_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError) as exc:
+            print(f"WARN: failed to read {file_path}: {exc}")
+            continue
         internal_imports = _collect_internal_imports(
             src, module_prefix=mod.split(".")[0], known_modules=known_modules
         )
