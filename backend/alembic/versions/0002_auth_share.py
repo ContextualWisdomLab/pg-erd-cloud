@@ -17,15 +17,18 @@ branch_labels = None
 depends_on = None
 
 
+_MIGRATED_OIDC_SUBJECT_PREFIX = "migrated:0002_auth_share:"
+
+
 def upgrade() -> None:
     # Backfill: ensure any existing project_space.created_by_user_uuid values exist in user_account
     # before adding FK constraints. Previous versions could have inserted random UUIDs.
-    op.execute("""
+    op.execute(f"""
         INSERT INTO user_account (user_account_uuid, oidc_subject, display_name, created_at)
         SELECT DISTINCT
           p.created_by_user_uuid,
-          'migrated:' || p.created_by_user_uuid::text,
-          'migrated-' || p.created_by_user_uuid::text,
+          '{_MIGRATED_OIDC_SUBJECT_PREFIX}' || p.created_by_user_uuid::text,
+          'migrated-0002_auth_share-' || p.created_by_user_uuid::text,
           now()
         FROM project_space p
         LEFT JOIN user_account u ON u.user_account_uuid = p.created_by_user_uuid
@@ -165,7 +168,7 @@ def downgrade() -> None:
     )
 
     # Remove backfilled user_account rows created during upgrade.
-    op.execute("""
+    op.execute(f"""
         DELETE FROM user_account
-        WHERE oidc_subject LIKE 'migrated:%';
+        WHERE oidc_subject LIKE '{_MIGRATED_OIDC_SUBJECT_PREFIX}%';
         """)
