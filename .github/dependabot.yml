@@ -8,6 +8,20 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
+  # Keep Python dependencies fresh.
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Keep Node.js dependencies fresh.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   # Keep Docker base image digests fresh.
   - package-ecosystem: "docker"
     directory: "/backend"
