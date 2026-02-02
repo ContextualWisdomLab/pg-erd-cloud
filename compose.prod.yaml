@@ -35,7 +35,7 @@ services:
     command: >
       sh -lc "
       alembic upgrade head &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      hypercorn app.main:app --bind 0.0.0.0:8000 --access-logfile - --error-logfile -
       "
     restart: unless-stopped
 
