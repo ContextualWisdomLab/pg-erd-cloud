@@ -1,13 +1,16 @@
 # API Security Checklist (pg-erd-cloud)
 
-이 문서는 pg-erd-cloud의 **backend HTTP API**(FastAPI) 기준으로, 설계/구현/배포/운영에서 확인해야 할 보안 체크리스트를 정리한 것입니다.
+이 문서는 pg-erd-cloud의 **backend HTTP API**(FastAPI) 기준으로, 설계/구현/
+배포/운영에서 확인해야 할 보안 체크리스트를 정리한 것입니다.
 
-> 주의: OWASP API Security Top 10은 **CC BY-SA 4.0**(ShareAlike) 라이선스 문서이므로, 본 문서는 내용을 복제하지 않고 **링크와 개념 매핑**만 제공합니다.
+> 주의: OWASP API Security Top 10은 **CC BY-SA 4.0**(ShareAlike) 라이선스
+> 문서이므로, 본 문서는 내용을 복제하지 않고 **링크와 개념 매핑**만 제공합니다.
 
 ## References (patterns only)
 
-- shieldfy/API-Security-Checklist (MIT): https://github.com/shieldfy/API-Security-Checklist
-- OWASP API Security Top 10 (CC BY-SA 4.0): https://owasp.org/API-Security/
+- shieldfy/API-Security-Checklist (MIT):
+  <https://github.com/shieldfy/API-Security-Checklist>
+- OWASP API Security Top 10 (CC BY-SA 4.0): <https://owasp.org/API-Security/>
 
 ## Scope
 
@@ -17,6 +20,7 @@
 ## Checklist
 
 표기:
+
 - ✅: 현재 코드/CI에서 충족(또는 강제)
 - 🟡: 부분 충족(운영/배포 설정에 따라 달라짐)
 - ⏳: 미구현(후속 작업 필요)
@@ -45,7 +49,9 @@
   - 근거: `backend/app/main.py` (CORSMiddleware 설정)
   - 체크 포인트:
     - `allow_origins`는 최소 허용(정확한 allowlist)으로 유지
-    - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만)
+    - `allow_methods`/`allow_headers`는 가능한 한 명시적 allowlist로 제한
+      (예: GET/POST/OPTIONS, Authorization/Content-Type 등)
+    - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만; 기본은 False 권장)
     - ingress/ALB 등 외부 계층에서도 동일 정책(또는 더 엄격한 정책)을 적용했는지 확인
 
 ### Input validation
@@ -65,7 +71,8 @@
 
 ### Output / Response hardening
 
-- ⏳ 보안 응답 헤더(CSP/XFO/nosniff 등)는 (1) ingress/proxy에서 일괄 적용하거나 (2) FastAPI middleware로 추가 적용 검토 — tracked: #48
+- ⏳ 보안 응답 헤더(CSP/XFO/nosniff 등)는 (1) ingress/proxy에서 일괄 적용하거나
+  (2) FastAPI middleware로 추가 적용 검토 — tracked: #48
 - ✅ 오류 메시지는 과도한 내부정보를 노출하지 않도록 일반화(상세는 서버 로그로)
   - 근거: `backend/app/auth.py` 등(HTTPException detail)
 

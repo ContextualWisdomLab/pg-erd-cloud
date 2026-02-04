@@ -131,15 +131,19 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         except Exception:  # noqa: BLE001
             raise HTTPException(status_code=401, detail="invalid token header")
 
-        header_alg = header.get("alg")
-        if not isinstance(header_alg, str) or not header_alg:
+        header_alg_raw = header.get("alg")
+        if not isinstance(header_alg_raw, str) or not header_alg_raw:
             raise HTTPException(status_code=401, detail="token missing alg")
+
+        # Normalize so equivalent-case values (e.g. "rs256" vs "RS256") don't
+        # fail the allowlist check.
+        header_alg = header_alg_raw.upper()
 
         allowed_algs = _parse_oidc_algorithms(settings.oidc_algorithms)
         if header_alg not in allowed_algs:
             raise HTTPException(
                 status_code=401,
-                detail=f"token algorithm not allowed: {header_alg}",
+                detail=f"token algorithm not allowed: {header_alg_raw}",
             )
 
         jwks = await _get_jwks()
