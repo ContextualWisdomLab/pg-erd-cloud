@@ -38,7 +38,9 @@ def get_sync_database_url() -> str:
     return url
 
 
-engine: AsyncEngine = create_async_engine(settings.database_url, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(
+    settings.database_url, pool_pre_ping=True
+)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 read_only_engine: AsyncEngine | None = (
@@ -107,7 +109,9 @@ async def get_pooler_detection() -> PoolerDetectionResult:
     if settings.db_pooler_kind is not None:
         kind = PoolerKind(settings.db_pooler_kind)
         detected = kind is not PoolerKind.NONE
-        return PoolerDetectionResult(kind=kind, detected=detected, version_text=None)
+        return PoolerDetectionResult(
+            kind=kind, detected=detected, version_text=None
+        )
 
     now = time.monotonic()
     if (

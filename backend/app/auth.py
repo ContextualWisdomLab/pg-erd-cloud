@@ -24,10 +24,23 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
     - We pass an explicit allowlist to the verifier.
     """
 
-    parts = [p.strip() for p in raw.split(",") if p.strip()]
-    # Defensive: never allow unsigned tokens.
-    parts = [p for p in parts if p.lower() not in {"none"}]
-    return parts or ["RS256"]
+    # Normalize and deduplicate so env values like "rs256, RS256" behave
+    # predictably.
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        alg = part.strip().upper()
+        if not alg:
+            continue
+        # Defensive: never allow unsigned tokens.
+        if alg == "NONE":
+            continue
+        if alg in seen:
+            continue
+        seen.add(alg)
+        normalized.append(alg)
+
+    return normalized or ["RS256"]
 
 
 @dataclass(frozen=True)

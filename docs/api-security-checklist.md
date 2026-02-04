@@ -39,8 +39,14 @@
 
 ### Access / Abuse Prevention
 
-- ⏳ Rate limiting / throttling (API Gateway/WAF 또는 앱 레이어)
+- ⏳ Rate limiting / throttling (API Gateway/WAF 또는 앱 레이어) — tracked: #47
 - 🟡 HTTPS/TLS/HSTS는 인그레스/리버스프록시 계층에서 강제 필요
+- 🟡 CORS(CORSMiddleware) 설정 검증
+  - 근거: `backend/app/main.py` (CORSMiddleware 설정)
+  - 체크 포인트:
+    - `allow_origins`는 최소 허용(정확한 allowlist)으로 유지
+    - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만)
+    - ingress/ALB 등 외부 계층에서도 동일 정책(또는 더 엄격한 정책)을 적용했는지 확인
 
 ### Input validation
 
@@ -59,7 +65,7 @@
 
 ### Output / Response hardening
 
-- ⏳ 보안 응답 헤더(CSP/XFO/nosniff 등)는 (1) ingress/proxy에서 일괄 적용하거나 (2) FastAPI middleware로 추가 적용 검토
+- ⏳ 보안 응답 헤더(CSP/XFO/nosniff 등)는 (1) ingress/proxy에서 일괄 적용하거나 (2) FastAPI middleware로 추가 적용 검토 — tracked: #48
 - ✅ 오류 메시지는 과도한 내부정보를 노출하지 않도록 일반화(상세는 서버 로그로)
   - 근거: `backend/app/auth.py` 등(HTTPException detail)
 
@@ -72,4 +78,4 @@
 
 ### Monitoring
 
-- ⏳ 중앙 로그/메트릭/알림(운영 환경별 설계 필요)
+- ⏳ 중앙 로그/메트릭/알림(운영 환경별 설계 필요) — tracked: #49
