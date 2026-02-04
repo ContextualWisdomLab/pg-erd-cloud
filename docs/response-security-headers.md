@@ -23,8 +23,8 @@ This repository applies headers in two places:
 ### Conditional
 
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-  - Applied only when the request is HTTPS (detected via `X-Forwarded-Proto` or
-    request scheme).
+  - Applied only when the request is HTTPS (request URL scheme).
+  - If you terminate TLS at a reverse proxy, prefer setting HSTS at the proxy.
 
 ### CSP
 

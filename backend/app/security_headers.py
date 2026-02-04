@@ -14,9 +14,8 @@ _DOCS_PREFIXES: tuple[str, ...] = (
 
 
 def _is_https(request: Request) -> bool:
-    xfp = request.headers.get("X-Forwarded-Proto")
-    if xfp and xfp.lower() == "https":
-        return True
+    # Do not trust X-Forwarded-Proto here.
+    # If you need HSTS behind a proxy, set it at the ingress/reverse-proxy.
     return request.url.scheme.lower() == "https"
 
 

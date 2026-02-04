@@ -18,23 +18,32 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    client = TestClient(app)
+    client = TestClient(app, base_url="https://testserver")
     r = client.get("/healthz")
     assert r.status_code == 200
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r.headers
+    assert "Content-Security-Policy" in r.headers
+    assert (
+        r.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
+    )
 
     r2 = client.get("/api/ping")
     assert r2.status_code == 200
     assert "Content-Security-Policy" in r2.headers
+    assert (
+        r2.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
+    )
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:
     app = FastAPI()  # includes /docs by default
     app.middleware("http")(make_security_headers_middleware())
-    client = TestClient(app)
+    client = TestClient(app, base_url="https://testserver")
 
     r = client.get("/docs")
     assert r.status_code == 200

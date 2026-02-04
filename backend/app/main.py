@@ -47,10 +47,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 
-# Apply response security headers early so the middleware runs outermost and can
-# attach headers even when inner middleware returns errors.
-app.middleware("http")(make_security_headers_middleware())
-
 _rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
 )
@@ -79,6 +75,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Apply response security headers outermost.
+# This wraps both CORSMiddleware and rate limiting so headers are present even
+# for early returns (e.g. CORS preflight, 429, etc.).
+app.middleware("http")(make_security_headers_middleware())
 
 
 @app.get("/healthz")
