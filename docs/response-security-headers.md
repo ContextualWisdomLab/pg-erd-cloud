@@ -30,10 +30,14 @@ This repository applies headers in two places:
 
 The FastAPI middleware sets a minimal API-friendly CSP by default:
 
+<!-- markdownlint-disable MD013 -->
 ```http
-Content-Security-Policy: default-src 'none'; base-uri 'none';
-  frame-ancestors 'none'; form-action 'none'
+Content-Security-Policy: default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
 ```
+<!-- markdownlint-enable MD013 -->
+
+Note: HTTP headers are transmitted as a single line; any wrapping in this
+document is for readability only.
 
 To avoid breaking Swagger UI, CSP is **not applied** to these endpoints:
 
