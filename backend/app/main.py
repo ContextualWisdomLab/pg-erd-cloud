@@ -51,7 +51,14 @@ async def add_security_headers(
     """Attach a baseline set of security headers to every response."""
 
     response = await call_next(request)
-    apply_security_headers(response)
+
+    # Add HSTS only for secure requests.
+    # - request.url.scheme is reliable for direct TLS.
+    # - X-Forwarded-Proto is used when TLS is terminated at a trusted proxy.
+    xfp = (request.headers.get("X-Forwarded-Proto") or "").split(",", 1)[0]
+    is_https = request.url.scheme == "https" or xfp.strip().lower() == "https"
+
+    apply_security_headers(response, is_https=is_https)
     return response
 
 
