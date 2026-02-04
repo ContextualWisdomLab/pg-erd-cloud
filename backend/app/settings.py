@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +29,40 @@ class Settings(BaseSettings):
     # Best-effort pooler probe timeout. Keep it small to avoid blocking request
     # paths.
     db_pooler_probe_timeout_seconds: float = Field(0.7, ge=0.0)
+    # Required encryption key material.
+    #
+    # Supports the Docker/Podman *_FILE pattern (e.g. /run/secrets/app_secret)
+    # to avoid putting secrets directly into environment variables.
     app_secret: str
+    app_secret_file: str | None = Field(
+        default=None, validation_alias="APP_SECRET_FILE"
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _load_app_secret_from_file(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+
+        secret_file = data.get("APP_SECRET_FILE") or data.get("app_secret_file")
+        if not secret_file:
+            return data
+
+        path = Path(str(secret_file))
+        if not path.is_file():
+            raise ValueError(
+                f"APP_SECRET_FILE does not exist or is not a file: {path}"
+            )
+
+        # Important: secret files commonly include a trailing newline.
+        secret = path.read_text(encoding="utf-8").rstrip("\r\n")
+        if secret == "":
+            raise ValueError("APP_SECRET_FILE is empty")
+
+        # If APP_SECRET_FILE is provided, prefer it deterministically.
+        new_data = dict(data)
+        new_data["app_secret"] = secret
+        return new_data
 
     cors_origins: str = "http://localhost:5173"
 

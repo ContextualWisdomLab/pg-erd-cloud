@@ -59,6 +59,17 @@ docker compose up -d --build
 
 ```bash
 cp .env.example .env
+
+# 프로덕션 스타일에서는 Docker secret 파일로 APP_SECRET을 주입합니다.
+# (이 파일은 커밋 금지: .gitignore에 **/secrets/** 포함)
+mkdir -p secrets
+python - <<'PY'
+import secrets
+
+with open('secrets/app_secret', 'w', encoding='utf-8') as f:
+    f.write(secrets.token_urlsafe(48) + "\n")
+PY
+
 docker compose -f compose.prod.yaml up -d --build
 ```
 
@@ -75,6 +86,12 @@ pip install -e .
 alembic upgrade head
 hypercorn app.main:app --reload
 ```
+
+#### 운영 팁
+
+- Hypercorn worker 수는 `HYPERCORN_WORKERS`(또는 `WEB_CONCURRENCY`)로 조절할 수 있습니다.
+- `APP_SECRET`은 앱 DB에 저장되는 DSN 암호화 키로 사용되므로, 변경 시 기존 데이터 복호화에 영향을 줄 수 있습니다.
+  가능하면 `APP_SECRET_FILE`(예: `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요.
 
 ### Frontend
 ```bash
