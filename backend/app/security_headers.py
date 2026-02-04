@@ -80,6 +80,7 @@ def make_security_headers_middleware() -> (
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        """ASGI middleware that attaches baseline response headers."""
         response = await call_next(request)
         apply_security_headers(request, response)
         return response

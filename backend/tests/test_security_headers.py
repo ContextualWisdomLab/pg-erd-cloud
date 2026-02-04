@@ -7,6 +7,7 @@ from app.security_headers import make_security_headers_middleware
 
 
 def test_security_headers_present_on_healthz_and_api() -> None:
+    """Baseline headers should be present on API + health endpoints."""
     app = FastAPI()
     app.middleware("http")(make_security_headers_middleware())
 
@@ -41,6 +42,7 @@ def test_security_headers_present_on_healthz_and_api() -> None:
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:
+    """Swagger UI should not be broken by an overly strict CSP."""
     app = FastAPI()  # includes /docs by default
     app.middleware("http")(make_security_headers_middleware())
     client = TestClient(app, base_url="https://testserver")
