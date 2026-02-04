@@ -39,9 +39,7 @@ async def list_projects(
     )
     projects = rows.scalars().all()
     return [
-        ProjectOut(
-            project_space_uuid=p.project_space_uuid, project_name=p.project_name
-        )
+        ProjectOut(project_space_uuid=p.project_space_uuid, project_name=p.project_name)
         for p in projects
     ]
 
@@ -75,9 +73,7 @@ async def create_project(
     )
 
 
-@router.get(
-    "/{project_space_uuid}/members", response_model=list[ProjectMemberOut]
-)
+@router.get("/{project_space_uuid}/members", response_model=list[ProjectMemberOut])
 async def list_project_members(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),

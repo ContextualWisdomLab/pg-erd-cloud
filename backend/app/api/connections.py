@@ -18,18 +18,14 @@ from app.sanitize import sanitize_for_storage
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
 
-@router.get(
-    "/by-project/{project_space_uuid}", response_model=list[ConnectionOut]
-)
+@router.get("/by-project/{project_space_uuid}", response_model=list[ConnectionOut])
 async def list_connections(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> list[ConnectionOut]:
     """List DB connections for a project."""
-    await require_project_member(
-        session, project_space_uuid, user.user_account_uuid
-    )
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(DbConnection)
         .where(DbConnection.project_space_uuid == project_space_uuid)
@@ -37,9 +33,7 @@ async def list_connections(
     )
     cons = rows.scalars().all()
     return [
-        ConnectionOut(
-            db_connection_uuid=c.db_connection_uuid, conn_name=c.conn_name
-        )
+        ConnectionOut(db_connection_uuid=c.db_connection_uuid, conn_name=c.conn_name)
         for c in cons
     ]
 
@@ -52,9 +46,7 @@ async def create_connection(
     session: AsyncSession = Depends(get_session),
 ) -> ConnectionOut:
     """Create a DB connection for a project (encrypt DSN at rest)."""
-    await require_project_member(
-        session, project_space_uuid, user.user_account_uuid
-    )
+    await require_project_member(session, project_space_uuid, user.user_account_uuid)
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
         db_connection_uuid=uuid.uuid4(),
@@ -67,6 +59,4 @@ async def create_connection(
     )
     session.add(c)
     await session.commit()
-    return ConnectionOut(
-        db_connection_uuid=c.db_connection_uuid, conn_name=c.conn_name
-    )
+    return ConnectionOut(db_connection_uuid=c.db_connection_uuid, conn_name=c.conn_name)

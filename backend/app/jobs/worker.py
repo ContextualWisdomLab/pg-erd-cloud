@@ -11,9 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import JobQueue
 
-Handler: TypeAlias = Callable[
-    [Callable[[], AsyncSession], JobQueue], Awaitable[None]
-]
+Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
 
 
 async def claim_one_job(session: AsyncSession) -> JobQueue | None:

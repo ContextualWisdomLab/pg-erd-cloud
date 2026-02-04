@@ -88,6 +88,7 @@ npm run dev
 - `.env`는 커밋 금지(이미 .gitignore에 포함).
 - 대상 DB 연결정보(DSN)는 **APP_SECRET** 기반으로 암호화하여 앱 DB에 저장합니다.
 - 역공학(리버스) 작업은 요청 경로에서 동기 대기하지 않고 job queue로 비동기 처리합니다.
+- API 보안 체크리스트(프로젝트 기준): [docs/api-security-checklist.md](docs/api-security-checklist.md)
 
 ## 로드맵(요약)
 
