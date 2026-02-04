@@ -25,8 +25,11 @@ def _is_https(request: Request) -> bool:
 
 def _should_apply_csp(request: Request) -> bool:
     """Return True when CSP should be applied for this request."""
-    path = request.url.path
-    return not any(path.startswith(p) for p in _DOCS_PREFIXES)
+    # Be robust to non-canonical paths (e.g. //docs, /DOCS).
+    raw_path = request.url.path
+    normalized = "/" + raw_path.lstrip("/")
+    path = normalized.lower()
+    return not any(path.startswith(p.lower()) for p in _DOCS_PREFIXES)
 
 
 def apply_security_headers(request: Request, response: Response) -> None:
@@ -41,6 +44,7 @@ def apply_security_headers(request: Request, response: Response) -> None:
     """
 
     def _set_if_missing(name: str, value: str) -> None:
+        """Set a response header only when not already present."""
         if name not in response.headers:
             response.headers[name] = value
 

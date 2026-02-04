@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
+from app import security_headers
 from app.security_headers import make_security_headers_middleware
 
 
@@ -50,3 +52,28 @@ def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:
     r = client.get("/docs")
     assert r.status_code == 200
     assert "Content-Security-Policy" not in r.headers
+
+    # Non-canonical paths should also be treated as docs paths for CSP purposes.
+    r2 = client.get("/DOCS")
+    assert "Content-Security-Policy" not in r2.headers
+
+
+def test_csp_path_normalization_handles_double_slash() -> None:
+    """CSP checks should treat //docs as a docs path (no CSP)."""
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "//docs",
+        "raw_path": b"//docs",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "root_path": "",
+    }
+    request = Request(scope)
+    assert security_headers._should_apply_csp(request) is False
