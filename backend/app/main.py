@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from app.api.connections import router as connections_router
 from app.api.me import router as me_router
@@ -15,6 +16,7 @@ from app.api.snapshots import router as snapshots_router
 from app.db import SessionLocal
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
+from app.security_headers import apply_security_headers
 from app.settings import settings
 
 
@@ -39,6 +41,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def add_security_headers(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Attach a baseline set of security headers to every response."""
+
+    response = await call_next(request)
+    apply_security_headers(response)
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
