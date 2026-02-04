@@ -40,9 +40,7 @@ def _collect_internal_imports(
         if isinstance(node, ast.Import):
             for alias in node.names:
                 name = alias.name
-                if name == module_prefix or name.startswith(
-                    f"{module_prefix}."
-                ):
+                if name == module_prefix or name.startswith(f"{module_prefix}."):
                     resolved = _resolve_to_known(name, known_modules)
                     if resolved:
                         imported.add(resolved)
@@ -137,9 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         packages.append(("app", backend_app))
 
     if not packages:
-        print(
-            "ERROR: no known package directories found; check --root or repo layout"
-        )
+        print("ERROR: no known package directories found; check --root or repo layout")
         return 1
 
     known_modules: set[str] = set()

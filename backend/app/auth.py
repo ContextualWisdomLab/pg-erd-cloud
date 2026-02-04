@@ -16,6 +16,20 @@ from app.models import UserAccount
 from app.settings import settings
 
 
+def _parse_oidc_algorithms(raw: str) -> list[str]:
+    """Parse OIDC_ALGORITHMS into a non-empty allowlist.
+
+    Security note:
+    - JWT verification must *not* trust the token header's `alg`.
+    - We pass an explicit allowlist to the verifier.
+    """
+
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    # Defensive: never allow unsigned tokens.
+    parts = [p for p in parts if p.lower() not in {"none"}]
+    return parts or ["RS256"]
+
+
 @dataclass(frozen=True)
 class CurrentUser:
     """Authenticated user identity used by API handlers."""
@@ -104,6 +118,17 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         except Exception:  # noqa: BLE001
             raise HTTPException(status_code=401, detail="invalid token header")
 
+        header_alg = header.get("alg")
+        if not isinstance(header_alg, str) or not header_alg:
+            raise HTTPException(status_code=401, detail="token missing alg")
+
+        allowed_algs = _parse_oidc_algorithms(settings.oidc_algorithms)
+        if header_alg not in allowed_algs:
+            raise HTTPException(
+                status_code=401,
+                detail=f"token algorithm not allowed: {header_alg}",
+            )
+
         jwks = await _get_jwks()
         jwk = _pick_jwk(jwks, header.get("kid"))
         if jwk is None:
@@ -113,7 +138,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             claims = jwt.decode(
                 token,
                 jwk,
-                algorithms=[str(header.get("alg"))],
+                algorithms=allowed_algs,
                 audience=settings.oidc_audience,
                 issuer=settings.oidc_issuer,
                 options={"verify_aud": bool(settings.oidc_audience)},

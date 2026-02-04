@@ -21,9 +21,7 @@ from app.settings import settings
 
 _logger = logging.getLogger(__name__)
 
-Handler: TypeAlias = Callable[
-    [Callable[[], AsyncSession], JobQueue], Awaitable[None]
-]
+Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
 
 
 async def claim_one_job(session: AsyncSession) -> JobQueue | None:

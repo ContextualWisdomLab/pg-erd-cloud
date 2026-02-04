@@ -11,9 +11,7 @@ _DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
 
 
 def test_classify_pooler_version_text() -> None:
-    assert (
-        classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
-    )
+    assert classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
     assert classify_pooler_version_text("PgCat 0.10.0") == PoolerKind.PGCAT
     assert classify_pooler_version_text("something else") == PoolerKind.UNKNOWN
 

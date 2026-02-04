@@ -16,9 +16,7 @@ class Settings(BaseSettings):
     database_read_only_url: str | None = None
 
     # Optional: pooler kind hint. If set, probing is skipped.
-    db_pooler_kind: Literal["pgbouncer", "pgcat", "unknown", "none"] | None = (
-        None
-    )
+    db_pooler_kind: Literal["pgbouncer", "pgcat", "unknown", "none"] | None = None
 
     # Read routing mode. In auto mode, read-only DSN is used only when a pooler
     # is detected (or hinted via db_pooler_kind).
@@ -48,6 +46,12 @@ class Settings(BaseSettings):
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
+
+    # Allowed JWT signing algorithms for OIDC verification.
+    # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
+    # NOTE: Do not trust the token header's alg; only accept algorithms from
+    # this allowlist.
+    oidc_algorithms: str = "RS256"
 
 
 settings = Settings()  # type: ignore[call-arg]
