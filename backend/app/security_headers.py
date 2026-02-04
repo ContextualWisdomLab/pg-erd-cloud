@@ -14,12 +14,17 @@ _DOCS_PREFIXES: tuple[str, ...] = (
 
 
 def _is_https(request: Request) -> bool:
+    """Return True when the request URL scheme is HTTPS.
+
+    Security note: we intentionally do not trust X-Forwarded-Proto here.
+    """
     # Do not trust X-Forwarded-Proto here.
     # If you need HSTS behind a proxy, set it at the ingress/reverse-proxy.
     return request.url.scheme.lower() == "https"
 
 
 def _should_apply_csp(request: Request) -> bool:
+    """Return True when CSP should be applied for this request."""
     path = request.url.path
     return not any(path.startswith(p) for p in _DOCS_PREFIXES)
 
