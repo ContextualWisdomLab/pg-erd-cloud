@@ -15,6 +15,7 @@ from app.api.snapshots import router as snapshots_router
 from app.db import SessionLocal
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
+from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
 
@@ -39,6 +40,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
+
+# Apply response security headers early so the middleware runs outermost and can
+# attach headers even when inner middleware returns errors.
+app.middleware("http")(make_security_headers_middleware())
 
 app.add_middleware(
     CORSMiddleware,
