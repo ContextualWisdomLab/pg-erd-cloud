@@ -12,9 +12,15 @@ from app.api.me import router as me_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
+from app.auth import try_get_subject_for_rate_limit
 from app.db import SessionLocal
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
+from app.rate_limit import (
+    InMemoryFixedWindowRateLimiter,
+    RateLimitPolicy,
+    make_rate_limit_middleware,
+)
 from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
@@ -44,6 +50,25 @@ app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 # Apply response security headers early so the middleware runs outermost and can
 # attach headers even when inner middleware returns errors.
 app.middleware("http")(make_security_headers_middleware())
+
+_rate_limiter = InMemoryFixedWindowRateLimiter(
+    max_keys=settings.api_rate_limit_max_keys
+)
+_rate_limit_policy = RateLimitPolicy(
+    enabled=settings.api_rate_limit_enabled,
+    requests=settings.api_rate_limit_requests,
+    window_seconds=settings.api_rate_limit_window_seconds,
+    route_prefix="/api",
+    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+)
+
+app.middleware("http")(
+    make_rate_limit_middleware(
+        limiter=_rate_limiter,
+        policy=_rate_limit_policy,
+        get_subject=try_get_subject_for_rate_limit,
+    )
+)
 
 app.add_middleware(
     CORSMiddleware,
