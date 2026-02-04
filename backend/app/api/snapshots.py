@@ -31,7 +31,9 @@ async def create_snapshot(
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotOut:
     """Create a schema snapshot job for a project connection."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid
+    )
 
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
@@ -106,7 +108,9 @@ async def get_snapshot(
     )
 
 
-@router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
+@router.get(
+    "/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse
+)
 async def export_snapshot_sql(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
@@ -125,14 +129,18 @@ async def export_snapshot_sql(
     return snapshot_json_to_sql(data.snapshot_json)
 
 
-@router.get("/by-project/{project_space_uuid}", response_model=list[SnapshotOut])
+@router.get(
+    "/by-project/{project_space_uuid}", response_model=list[SnapshotOut]
+)
 async def list_snapshots(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> list[SnapshotOut]:
     """List snapshots for a project."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid
+    )
     rows = await session.execute(
         select(SchemaSnapshot)
         .where(SchemaSnapshot.project_space_uuid == project_space_uuid)

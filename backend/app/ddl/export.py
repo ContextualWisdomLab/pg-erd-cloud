@@ -45,7 +45,9 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
             constraints_by_oid.setdefault(oid, []).append(con)
 
     schemas: set[str] = {
-        t.get("schema_name") for t in tables if isinstance(t.get("schema_name"), str)
+        t.get("schema_name")
+        for t in tables
+        if isinstance(t.get("schema_name"), str)
     }
 
     lines: list[str] = []
@@ -63,7 +65,9 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
         oid = t.get("relation_oid")
         kind = t.get("relation_kind")
         if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
+            isinstance(schema, str)
+            and isinstance(name, str)
+            and isinstance(oid, int)
         ):
             continue
 

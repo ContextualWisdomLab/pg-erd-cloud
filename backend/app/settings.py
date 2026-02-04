@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     database_read_only_url: str | None = None
 
     # Optional: pooler kind hint. If set, probing is skipped.
-    db_pooler_kind: Literal["pgbouncer", "pgcat", "unknown", "none"] | None = None
+    db_pooler_kind: Literal["pgbouncer", "pgcat", "unknown", "none"] | None = (
+        None
+    )
 
     # Read routing mode. In auto mode, read-only DSN is used only when a pooler
     # is detected (or hinted via db_pooler_kind).
