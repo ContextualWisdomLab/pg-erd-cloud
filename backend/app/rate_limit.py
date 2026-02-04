@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 SubjectGetter = Callable[[Request], Awaitable[str | None]]
+
+
+_logger = logging.getLogger(__name__)
+_UNKNOWN_IP_LOG_THROTTLE_SECONDS = 60.0
+_last_unknown_ip_log_at = 0.0
 
 
 @dataclass(frozen=True)
@@ -30,18 +36,36 @@ class RateLimitPolicy:
 
 
 def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
+    global _last_unknown_ip_log_at
+
     if trust_x_forwarded_for:
         xff = request.headers.get("X-Forwarded-For")
         if xff:
             # Use the left-most value (original client), trimming whitespace.
             # This header is user-controllable unless sanitized by a trusted
             # proxy/ingress. Keep default trust off.
-            return xff.split(",", 1)[0].strip() or "unknown"
+            ip = xff.split(",", 1)[0].strip()
+            if ip:
+                return ip
 
     client = request.client
     if client is None:
-        return "unknown"
-    return client.host or "unknown"
+        ip = "unknown"
+    else:
+        ip = client.host or "unknown"
+
+    # Avoid silently aggregating many callers under an "unknown" key.
+    if ip == "unknown":
+        now = time.monotonic()
+        if now - _last_unknown_ip_log_at >= _UNKNOWN_IP_LOG_THROTTLE_SECONDS:
+            _last_unknown_ip_log_at = now
+            _logger.warning(
+                "rate_limit: unable to resolve client IP; falling back to 'unknown'"
+                " (path=%s, x_forwarded_for_present=%s)",
+                request.url.path,
+                bool(request.headers.get("X-Forwarded-For")),
+            )
+    return ip
 
 
 class InMemoryFixedWindowRateLimiter:
@@ -64,7 +88,7 @@ class InMemoryFixedWindowRateLimiter:
             return True, 0
         if policy.requests <= 0:
             # Always reject when configured to 0.
-            return False, int(math.ceil(policy.window_seconds))
+            return False, math.ceil(policy.window_seconds)
 
         now = time.monotonic()
         window_id = int(now // policy.window_seconds)
@@ -73,9 +97,26 @@ class InMemoryFixedWindowRateLimiter:
         )
 
         async with self._lock:
-            if len(self._buckets) > self._max_keys:
-                # Fail-open by clearing state to avoid unbounded memory growth.
-                self._buckets.clear()
+            # Best-effort eviction to cap memory.
+            # Prefer removing expired windows first, then evict oldest entries.
+            if (
+                key not in self._buckets
+                and len(self._buckets) >= self._max_keys
+            ):
+                expired_keys = [
+                    k
+                    for k, (wid, _) in self._buckets.items()
+                    if wid != window_id
+                ]
+                for k in expired_keys:
+                    self._buckets.pop(k, None)
+
+                while (
+                    key not in self._buckets
+                    and len(self._buckets) >= self._max_keys
+                ):
+                    oldest_key = next(iter(self._buckets))
+                    self._buckets.pop(oldest_key, None)
 
             prev = self._buckets.get(key)
             if prev is None or prev[0] != window_id:
@@ -83,6 +124,8 @@ class InMemoryFixedWindowRateLimiter:
             else:
                 count = prev[1] + 1
 
+            # Move key to the end to approximate LRU behavior.
+            self._buckets.pop(key, None)
             self._buckets[key] = (window_id, count)
             allowed = count <= policy.requests
             return allowed, retry_after
