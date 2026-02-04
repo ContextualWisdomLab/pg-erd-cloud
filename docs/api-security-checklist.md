@@ -59,7 +59,8 @@
   - 체크 포인트:
     - `allow_origins`는 최소 허용(정확한 allowlist)으로 유지
     - `allow_methods`/`allow_headers`는 가능한 한 명시적 allowlist로 제한
-    - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만)
+      (예: GET/POST/OPTIONS, Authorization/Content-Type 등)
+    - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만; 기본은 False 권장)
     - ingress/ALB 등 외부 계층에서도 동일 정책(또는 더 엄격한 정책)을 적용했는지 확인
 
 ### Access / Abuse Prevention

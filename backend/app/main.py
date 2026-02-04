@@ -83,9 +83,12 @@ app.add_middleware(
     allow_origins=[
         o.strip() for o in settings.cors_origins.split(",") if o.strip()
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Default to the strictest safe setting. Enable credentials only when you
+    # actually need cookie-based auth.
+    allow_credentials=False,
+    # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Dev-User"],
 )
 
 # Observability should be registered after other middleware so it can capture
