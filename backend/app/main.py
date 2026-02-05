@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,9 +14,10 @@ from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
-from app.db import SessionLocal
+from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
+from app.observability import setup_observability
 from app.rate_limit import (
     InMemoryFixedWindowRateLimiter,
     RateLimitPolicy,
@@ -36,6 +38,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     handlers = {"snapshot": handle_snapshot_job}
     task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
     try:
+        # Best-effort pooler detection (log once for ops visibility).
+        try:
+            detection = await get_pooler_detection()
+            logging.getLogger(__name__).info(
+                "db_pooler_detection: kind=%s detected=%s",
+                detection.kind.value,
+                detection.detected,
+            )
+        except Exception:
+            logging.getLogger(__name__).exception("db_pooler_detection failed")
         yield
     finally:
         task.cancel()
@@ -75,6 +87,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Observability should be registered after other middleware so it can capture
+# early returns (e.g. 429, CORS preflight).
+#
+# Note: security headers are registered last (outermost) so headers are attached
+# even when another middleware returns early.
+setup_observability(app)
 
 # Apply response security headers.
 #
