@@ -23,6 +23,7 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
 
@@ -79,17 +80,28 @@ app.middleware("http")(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        o.strip() for o in settings.cors_origins.split(",") if o.strip()
-    ],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Observability should be registered after other middleware so it runs outermost
-# and captures early returns (e.g. 429, CORS preflight).
+# Observability should be registered after other middleware so it can capture
+# early returns (e.g. 429, CORS preflight).
+#
+# Note: security headers are registered last (outermost) so headers are attached
+# even when another middleware returns early.
 setup_observability(app)
+
+# Apply response security headers.
+#
+# Starlette middleware order: the **last** registered middleware wraps earlier
+# ones (i.e., it becomes the outermost).
+#
+# We register security headers last so headers are attached even when another
+# middleware returns early (e.g., CORS preflight, 429 rate-limit responses).
+# See: backend/tests/test_security_headers.py
+app.middleware("http")(make_security_headers_middleware())
 
 
 @app.get("/healthz")
