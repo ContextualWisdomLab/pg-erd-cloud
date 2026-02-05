@@ -78,11 +78,12 @@ app.add_middleware(
 
 # Apply response security headers.
 #
-# FastAPI/Starlette middleware order: the **last** middleware registration wraps
-# earlier ones (i.e., it becomes the outermost).
+# Starlette middleware order: the **last** registered middleware wraps earlier
+# ones (i.e., it becomes the outermost).
 #
-# We register security headers after other middleware so headers are attached
-# even when an inner middleware returns early (e.g., CORS preflight, 429, etc.).
+# We register security headers last so headers are attached even when another
+# middleware returns early (e.g., CORS preflight, 429 rate-limit responses).
+# See: backend/tests/test_security_headers.py
 app.middleware("http")(make_security_headers_middleware())
 
 
