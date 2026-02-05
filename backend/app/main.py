@@ -21,6 +21,7 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
 
@@ -74,6 +75,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Apply response security headers.
+#
+# Starlette middleware order: the **last** registered middleware wraps earlier
+# ones (i.e., it becomes the outermost).
+#
+# We register security headers last so headers are attached even when another
+# middleware returns early (e.g., CORS preflight, 429 rate-limit responses).
+# See: backend/tests/test_security_headers.py
+app.middleware("http")(make_security_headers_middleware())
 
 
 @app.get("/healthz")
