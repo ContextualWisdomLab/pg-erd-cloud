@@ -76,9 +76,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Apply response security headers outermost.
-# This wraps both CORSMiddleware and rate limiting so headers are present even
-# for early returns (e.g. CORS preflight, 429, etc.).
+# Apply response security headers.
+#
+# Keep this registration after other middleware registrations so it runs
+# outermost in Starlette's middleware stack and headers are present even for
+# early returns (e.g. CORS preflight, 429, etc.).
 app.middleware("http")(make_security_headers_middleware())
 
 
