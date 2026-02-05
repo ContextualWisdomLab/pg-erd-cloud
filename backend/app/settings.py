@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     api_rate_limit_trust_x_forwarded_for: bool = False
     api_rate_limit_max_keys: int = Field(10_000, ge=1)
 
+    # Observability (MVP)
+    observability_request_logging_enabled: bool = True
+    observability_metrics_enabled: bool = True
+
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
