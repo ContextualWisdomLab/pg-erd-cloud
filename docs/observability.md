@@ -88,5 +88,7 @@ Example:
 curl -fsS -D- http://127.0.0.1:8000/healthz -o /dev/null
 
 # Metrics
-curl -fsS http://127.0.0.1:8000/metrics | head -50
+METRICS_TOKEN="<metrics-token>"  # required when /metrics is enabled
+curl -fsS -H "X-Metrics-Token: $METRICS_TOKEN" \
+  http://127.0.0.1:8000/metrics | head -50
 ```

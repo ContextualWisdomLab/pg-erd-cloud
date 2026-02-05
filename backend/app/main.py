@@ -46,7 +46,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
                 detection.kind.value,
                 detection.detected,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logging.getLogger(__name__).exception("db_pooler_detection failed")
         yield
     finally:

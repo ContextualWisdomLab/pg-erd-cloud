@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import re
 import secrets
 import time
 import uuid
@@ -28,6 +29,8 @@ from app.metrics import (
 from app.settings import settings
 
 _logger = logging.getLogger("app.observability")
+
+_SAFE_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _utc_now_iso() -> str:
@@ -80,12 +83,16 @@ def make_request_observability_middleware() -> (
         # Avoid recursive noise in logs/metrics.
         is_metrics_path = request.url.path == "/metrics"
 
-        request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+        raw_request_id = (request.headers.get("X-Request-Id") or "").strip()
+        if raw_request_id and _SAFE_REQUEST_ID_RE.fullmatch(raw_request_id):
+            request_id = raw_request_id
+        else:
+            request_id = str(uuid.uuid4())
         start = time.perf_counter()
 
         try:
             response = await call_next(request)
-        except Exception:  # noqa: BLE001
+        except Exception:
             duration_s = time.perf_counter() - start
             route = normalize_route_label(_get_route_template(request))
 

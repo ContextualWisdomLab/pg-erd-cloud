@@ -32,6 +32,11 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         unauth = client.get("/metrics")
         assert unauth.status_code == 403
 
+        wrong = client.get(
+            "/metrics", headers={"X-Metrics-Token": "wrong-token"}
+        )
+        assert wrong.status_code == 403
+
         m = client.get("/metrics", headers={"X-Metrics-Token": "test-token"})
         assert m.status_code == 200
         assert "http_requests_total" in m.text
