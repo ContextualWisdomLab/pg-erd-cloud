@@ -23,9 +23,8 @@ def test_security_headers_present_on_healthz_and_api() -> None:
         return {"ok": True}
 
     client = TestClient(app, base_url="https://testserver")
-    request_headers = {"X-Forwarded-Proto": "https"}
 
-    r = client.get("/healthz", headers=request_headers)
+    r = client.get("/healthz")
     assert r.status_code == 200
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["X-Frame-Options"] == "DENY"
@@ -37,8 +36,12 @@ def test_security_headers_present_on_healthz_and_api() -> None:
         == "max-age=31536000; includeSubDomains"
     )
 
-    r2 = client.get("/api/ping", headers=request_headers)
+    r2 = client.get("/api/ping")
     assert r2.status_code == 200
+    assert r2.headers["X-Content-Type-Options"] == "nosniff"
+    assert r2.headers["X-Frame-Options"] == "DENY"
+    assert r2.headers["Referrer-Policy"] == "no-referrer"
+    assert "Permissions-Policy" in r2.headers
     assert "Content-Security-Policy" in r2.headers
     assert (
         r2.headers["Strict-Transport-Security"]
@@ -92,6 +95,7 @@ def test_security_headers_present_on_cors_preflight() -> None:
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r.headers
+    assert "Strict-Transport-Security" not in r.headers
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:
