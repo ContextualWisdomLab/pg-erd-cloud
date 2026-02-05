@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from collections.abc import Mapping
@@ -17,6 +18,8 @@ from app.metrics import (
     JOB_QUEUE_WAIT_SECONDS,
 )
 from app.settings import settings
+
+_logger = logging.getLogger(__name__)
 
 Handler: TypeAlias = Callable[
     [Callable[[], AsyncSession], JobQueue], Awaitable[None]
@@ -56,8 +59,28 @@ async def claim_one_job(session: AsyncSession) -> JobQueue | None:
                 )
         except Exception:  # noqa: BLE001
             # Never fail job claiming due to metrics.
-            pass
+            _logger.debug(
+                "job queue wait metric observation failed", exc_info=True
+            )
     return job
+
+
+def _publish_job_metrics(
+    *,
+    job_type: str,
+    outcome: str,
+    duration_s: float | None,
+) -> None:
+    """Publish job metrics (best-effort) when metrics are enabled."""
+    if not settings.observability_metrics_enabled:
+        return
+
+    JOB_QUEUE_JOBS_TOTAL.labels(job_type=job_type, outcome=outcome).inc()
+    if duration_s is not None:
+        JOB_QUEUE_PROCESSING_SECONDS.labels(
+            job_type=job_type,
+            outcome=outcome,
+        ).observe(duration_s)
 
 
 async def run_worker_forever(
@@ -92,13 +115,11 @@ async def run_worker_forever(
                     job.last_error = None
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
 
-                if settings.observability_metrics_enabled:
-                    JOB_QUEUE_JOBS_TOTAL.labels(
-                        job_type=job.job_type, outcome="succeeded"
-                    ).inc()
-                    JOB_QUEUE_PROCESSING_SECONDS.labels(
-                        job_type=job.job_type, outcome="succeeded"
-                    ).observe(duration_s)
+                _publish_job_metrics(
+                    job_type=job.job_type,
+                    outcome="succeeded",
+                    duration_s=duration_s,
+                )
             except Exception as e:  # noqa: BLE001
                 duration_s = time.perf_counter() - started
                 async with session.begin():
@@ -106,10 +127,8 @@ async def run_worker_forever(
                     job.last_error = str(e)
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
 
-                if settings.observability_metrics_enabled:
-                    JOB_QUEUE_JOBS_TOTAL.labels(
-                        job_type=job.job_type, outcome="failed"
-                    ).inc()
-                    JOB_QUEUE_PROCESSING_SECONDS.labels(
-                        job_type=job.job_type, outcome="failed"
-                    ).observe(duration_s)
+                _publish_job_metrics(
+                    job_type=job.job_type,
+                    outcome="failed",
+                    duration_s=duration_s,
+                )

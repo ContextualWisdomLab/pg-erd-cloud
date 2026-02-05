@@ -40,7 +40,10 @@ class Settings(BaseSettings):
 
     # Observability (MVP)
     observability_request_logging_enabled: bool = True
-    observability_metrics_enabled: bool = True
+    # Metrics exposure must be opt-in.
+    observability_metrics_enabled: bool = False
+    # Optional shared token for /metrics when OIDC isn't configured.
+    observability_metrics_token: str | None = None
 
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None

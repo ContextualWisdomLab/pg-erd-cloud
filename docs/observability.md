@@ -38,6 +38,14 @@ When enabled, the backend exposes metrics at:
 
 - `GET /metrics` (not included in OpenAPI schema)
 
+### /metrics exposure policy
+
+- `/metrics` is **disabled by default** (`OBSERVABILITY_METRICS_ENABLED=false`).
+- When enabled, it should only be reachable on **internal networks** or behind a
+  reverse proxy with auth/IP allowlist.
+- If you enable it directly on the app, set `OBSERVABILITY_METRICS_TOKEN` and
+  send `X-Metrics-Token: <token>` from the Prometheus scraper.
+
 ### HTTP metrics
 
 - `http_requests_total{method,route,status}`

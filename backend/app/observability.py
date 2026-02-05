@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import secrets
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -20,6 +21,8 @@ from starlette.requests import Request
 from app.metrics import (
     HTTP_REQUEST_DURATION_SECONDS,
     HTTP_REQUESTS_TOTAL,
+    normalize_route_label,
+    prime_http_metrics,
     render_metrics,
 )
 from app.settings import settings
@@ -36,7 +39,8 @@ def _get_route_template(request: Request) -> str:
     path = getattr(route, "path", None)
     if isinstance(path, str) and path:
         return path
-    return request.url.path
+    # Avoid high-cardinality labels for unmatched routes (e.g., 404 paths).
+    return "unmatched"
 
 
 def _get_client_ip(request: Request) -> str:
@@ -73,41 +77,59 @@ def make_request_observability_middleware() -> (
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        if not settings.observability_request_logging_enabled:
-            return await call_next(request)
-
-        # Avoid recursive noise.
-        if request.url.path == "/metrics":
-            return await call_next(request)
+        # Avoid recursive noise in logs/metrics.
+        is_metrics_path = request.url.path == "/metrics"
 
         request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
         start = time.perf_counter()
 
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception:  # noqa: BLE001
             duration_s = time.perf_counter() - start
-            _log_json(
-                "http_request",
-                {
-                    "request_id": request_id,
-                    "method": request.method,
-                    "route": _get_route_template(request),
-                    "status": 500,
-                    "duration_ms": round(duration_s * 1000.0, 3),
-                    "client_ip": _get_client_ip(request),
-                },
-                level=logging.ERROR,
-            )
-            raise
+            route = normalize_route_label(_get_route_template(request))
+
+            if settings.observability_metrics_enabled and not is_metrics_path:
+                HTTP_REQUESTS_TOTAL.labels(
+                    method=request.method,
+                    route=route,
+                    status="500",
+                ).inc()
+                HTTP_REQUEST_DURATION_SECONDS.labels(
+                    method=request.method,
+                    route=route,
+                ).observe(duration_s)
+
+            if (
+                settings.observability_request_logging_enabled
+                and not is_metrics_path
+            ):
+                _log_json(
+                    "http_request",
+                    {
+                        "request_id": request_id,
+                        "method": request.method,
+                        "route": route,
+                        "status": 500,
+                        "duration_ms": round(duration_s * 1000.0, 3),
+                        "client_ip": _get_client_ip(request),
+                    },
+                    level=logging.ERROR,
+                )
+
+            # Ensure the request id is visible to clients even on 500.
+            _logger.exception("unhandled request exception")
+            error_response = Response(status_code=500)
+            error_response.headers["X-Request-Id"] = request_id
+            return error_response
 
         duration_s = time.perf_counter() - start
         status = int(response.status_code)
-        route = _get_route_template(request)
+        route = normalize_route_label(_get_route_template(request))
 
         response.headers["X-Request-Id"] = request_id
 
-        if settings.observability_metrics_enabled:
+        if settings.observability_metrics_enabled and not is_metrics_path:
             HTTP_REQUESTS_TOTAL.labels(
                 method=request.method,
                 route=route,
@@ -118,24 +140,28 @@ def make_request_observability_middleware() -> (
                 route=route,
             ).observe(duration_s)
 
-        level = logging.INFO
-        if status >= 500:
-            level = logging.ERROR
-        elif status >= 400:
-            level = logging.WARNING
+        if (
+            settings.observability_request_logging_enabled
+            and not is_metrics_path
+        ):
+            level = logging.INFO
+            if status >= 500:
+                level = logging.ERROR
+            elif status >= 400:
+                level = logging.WARNING
 
-        _log_json(
-            "http_request",
-            {
-                "request_id": request_id,
-                "method": request.method,
-                "route": route,
-                "status": status,
-                "duration_ms": round(duration_s * 1000.0, 3),
-                "client_ip": _get_client_ip(request),
-            },
-            level=level,
-        )
+            _log_json(
+                "http_request",
+                {
+                    "request_id": request_id,
+                    "method": request.method,
+                    "route": route,
+                    "status": status,
+                    "duration_ms": round(duration_s * 1000.0, 3),
+                    "client_ip": _get_client_ip(request),
+                },
+                level=level,
+            )
         return response
 
     return middleware
@@ -145,9 +171,40 @@ def setup_observability(app: FastAPI) -> None:
     """Register observability hooks on the given FastAPI app."""
     app.middleware("http")(make_request_observability_middleware())
 
-    if settings.observability_metrics_enabled:
+    if not settings.observability_metrics_enabled:
+        return
 
-        @app.get("/metrics", include_in_schema=False)
-        async def metrics() -> Response:
-            content, content_type = render_metrics()
-            return Response(content=content, media_type=content_type)
+    token = (settings.observability_metrics_token or "").strip()
+    if not token:
+        _logger.warning(
+            "observability_metrics_enabled=true but token missing; "
+            "skipping /metrics route registration"
+        )
+        return
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics(request: Request) -> Response:
+        provided = request.headers.get("X-Metrics-Token") or ""
+        if not secrets.compare_digest(provided, token):
+            return Response(status_code=403)
+        content, content_type = render_metrics()
+        return Response(content=content, media_type=content_type)
+
+    def _prime_metrics_on_startup() -> None:
+        methods: set[str] = set()
+        routes: set[str] = set()
+        for r in app.routes:
+            path = getattr(r, "path", None)
+            if isinstance(path, str) and path:
+                routes.add(path)
+
+            r_methods = getattr(r, "methods", None)
+            if isinstance(r_methods, set):
+                methods.update({m for m in r_methods if m not in {"HEAD"}})
+
+        routes.discard("/metrics")
+        if not methods:
+            methods.add("GET")
+        prime_http_metrics(methods=methods, routes=routes)
+
+    app.add_event_handler("startup", _prime_metrics_on_startup)

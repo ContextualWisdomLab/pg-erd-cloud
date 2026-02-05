@@ -38,12 +38,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
     try:
         # Best-effort pooler detection (log once for ops visibility).
-        detection = await get_pooler_detection()
-        logging.getLogger(__name__).info(
-            "db_pooler_detection: kind=%s detected=%s",
-            detection.kind.value,
-            detection.detected,
-        )
+        try:
+            detection = await get_pooler_detection()
+            logging.getLogger(__name__).info(
+                "db_pooler_detection: kind=%s detected=%s",
+                detection.kind.value,
+                detection.detected,
+            )
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("db_pooler_detection failed")
         yield
     finally:
         task.cancel()

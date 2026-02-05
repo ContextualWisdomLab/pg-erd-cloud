@@ -13,6 +13,39 @@ from prometheus_client import (
     generate_latest,
 )
 
+
+def normalize_route_label(route: str) -> str:
+    """Normalize a route label to avoid high-cardinality metrics.
+
+    This codebase intentionally records *route templates* (e.g. `/api/x/{id}`)
+    rather than raw request paths.
+    """
+    if not route:
+        return "unmatched"
+    if route == "unmatched":
+        return route
+    if not route.startswith("/"):
+        return "unmatched"
+    return route
+
+
+def prime_http_metrics(*, methods: set[str], routes: set[str]) -> None:
+    """Create common label series so metrics show up before first traffic."""
+    for method in sorted(methods):
+        for route in sorted(routes):
+            normalized = normalize_route_label(route)
+            # Counters need an explicit sample.
+            HTTP_REQUESTS_TOTAL.labels(
+                method=method,
+                route=normalized,
+                status="200",
+            ).inc(0)
+            # Histograms can be created without observing.
+            HTTP_REQUEST_DURATION_SECONDS.labels(
+                method=method, route=normalized
+            )
+
+
 HTTP_REQUESTS_TOTAL = Counter(
     "http_requests_total",
     "Total number of HTTP responses by method/route/status.",
