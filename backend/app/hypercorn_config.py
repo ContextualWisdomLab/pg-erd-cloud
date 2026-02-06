@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def _int_env(name: str, default: str) -> int:
@@ -14,11 +17,26 @@ def _int_env(name: str, default: str) -> int:
     value = (raw if raw is not None else default).strip()
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except ValueError as exc:
         try:
             parsed = int(str(default).strip())
-        except (TypeError, ValueError):
+        except ValueError as default_exc:
             parsed = 1
+            logger.warning(
+                "Invalid %s=%r and default=%r; falling back to 1 (%s)",
+                name,
+                raw,
+                default,
+                default_exc,
+            )
+        else:
+            logger.warning(
+                "Invalid %s=%r; falling back to default=%r (%s)",
+                name,
+                raw,
+                default,
+                exc,
+            )
 
     return max(1, parsed)
 

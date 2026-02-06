@@ -19,6 +19,8 @@ SKIP_DIR_NAMES = {
 def iter_python_files(root: Path) -> Iterable[Path]:
     """Yield Python files under root, skipping common build/cache dirs."""
     for path in root.rglob("*.py"):
-        if any(part in SKIP_DIR_NAMES for part in path.parts):
+        # Only consider path components *under* root.
+        rel_parts = path.relative_to(root).parts
+        if any(part in SKIP_DIR_NAMES for part in rel_parts):
             continue
         yield path

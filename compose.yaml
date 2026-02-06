@@ -51,7 +51,10 @@ services:
       dockerfile: Dockerfile
     container_name: erd_frontend
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${BACKEND_PORT:-8000}}
+      # NOTE: Avoid nested ${VAR:-${OTHER:-default}} expressions here.
+      # podman-compose (python) may leave a trailing '}' which breaks API calls.
+      # If you run the backend on a non-default port, set VITE_API_BASE_URL explicitly.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     depends_on:
       - backend
     ports:

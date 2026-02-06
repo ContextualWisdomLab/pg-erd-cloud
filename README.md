@@ -96,7 +96,9 @@ python -m venv .venv && source .venv/bin/activate
 pip install -U pip
 pip install -e .
 alembic upgrade head
-hypercorn app.main:app --reload
+hypercorn --config python:app.hypercorn_config app.main:app \
+  --bind 0.0.0.0:8000 --reload \
+  --access-logfile - --error-logfile -
 ```
 
 #### 운영 팁
