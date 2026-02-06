@@ -49,13 +49,29 @@ class Settings(BaseSettings):
             return data
 
         path = Path(str(secret_file))
-        if not path.is_file():
+        try:
+            resolved = path.resolve(strict=True)
+        except FileNotFoundError as exc:
+            raise ValueError(f"APP_SECRET_FILE does not exist: {path}") from exc
+
+        # Security hardening: avoid symlink tricks and restrict secret files to
+        # the expected secrets mount.
+        #
+        # Docker/Podman secrets are typically mounted under /run/secrets.
+        allowed_base = Path("/run/secrets").resolve()
+        if path.is_symlink():
+            raise ValueError("APP_SECRET_FILE must not be a symlink")
+        if not resolved.is_relative_to(allowed_base):
             raise ValueError(
-                f"APP_SECRET_FILE does not exist or is not a file: {path}"
+                f"APP_SECRET_FILE must be under {allowed_base}: {resolved}"
+            )
+        if not resolved.is_file():
+            raise ValueError(
+                f"APP_SECRET_FILE does not exist or is not a file: {resolved}"
             )
 
         # Important: secret files commonly include a trailing newline.
-        secret = path.read_text(encoding="utf-8").rstrip("\r\n")
+        secret = resolved.read_text(encoding="utf-8").rstrip("\r\n")
         if secret == "":
             raise ValueError("APP_SECRET_FILE is empty")
 
