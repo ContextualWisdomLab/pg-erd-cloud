@@ -56,7 +56,8 @@
   - 근거: `backend/app/main.py`, `backend/app/settings.py`
 - ✅ 기본값은 `allow_credentials=False` + `allow_methods`/`allow_headers`
   명시적 allowlist를 권장(“reviewable”)
-  - 체크 포인트:
+  - 검증 포인트(코드 리뷰 시):
+    - `backend/app/main.py`에서 `CORSMiddleware` 설정 확인
     - `allow_origins`는 최소 허용(정확한 allowlist)으로 유지
     - `allow_methods`/`allow_headers`는 가능한 한 명시적 allowlist로 제한
       (예: GET/POST/OPTIONS, Authorization/Content-Type 등)
