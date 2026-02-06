@@ -3,17 +3,19 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-SKIP_DIR_NAMES = {
-    ".git",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".venv",
-    "__pycache__",
-    "node_modules",
-    "site-packages",
-    "build",
-    "dist",
-}
+SKIP_DIR_NAMES = frozenset(
+    {
+        ".git",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "node_modules",
+        "site-packages",
+        "build",
+        "dist",
+    }
+)
 
 
 def iter_python_files(root: Path) -> Iterable[Path]:
