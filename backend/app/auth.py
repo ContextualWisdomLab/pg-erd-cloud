@@ -143,7 +143,9 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         if header_alg not in allowed_algs:
             raise HTTPException(
                 status_code=401,
-                detail=f"token algorithm not allowed: {header_alg_raw}",
+                # Avoid exposing algorithm values (probe signal) in the
+                # response detail.
+                detail="token algorithm not allowed",
             )
 
         jwks = await _get_jwks()
