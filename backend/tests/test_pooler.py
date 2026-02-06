@@ -11,11 +11,16 @@ _DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
 
 
 def test_classify_pooler_version_text() -> None:
-    assert (
-        classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
-    )
+    assert classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
     assert classify_pooler_version_text("PgCat 0.10.0") == PoolerKind.PGCAT
     assert classify_pooler_version_text("something else") == PoolerKind.UNKNOWN
+
+
+def test_classify_pooler_version_text_edge_cases() -> None:
+    assert classify_pooler_version_text("") == PoolerKind.UNKNOWN
+    assert classify_pooler_version_text("   ") == PoolerKind.UNKNOWN
+    assert classify_pooler_version_text("PGBOUNCER 1.21.0") == PoolerKind.PGBOUNCER
+    assert classify_pooler_version_text("PGCAT 0.10.0") == PoolerKind.PGCAT
 
 
 def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
