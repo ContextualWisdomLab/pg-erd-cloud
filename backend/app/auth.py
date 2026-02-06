@@ -135,6 +135,22 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     return f"dev:{dev_user}", dev_user
 
 
+async def try_get_subject_for_rate_limit(request: Request) -> str | None:
+    """Best-effort subject extraction for rate limiting.
+
+    This helper is intentionally lightweight:
+    - It must NOT touch the DB (unlike get_current_user).
+    - It must NOT change auth behavior. Missing/invalid auth returns None so
+      unauthenticated requests can still be limited by IP.
+    """
+
+    try:
+        subject, _ = await _get_subject_from_request(request)
+        return subject
+    except HTTPException:
+        return None
+
+
 async def _ensure_user(
     session: AsyncSession, subject: str, display_name: str | None
 ) -> CurrentUser:
