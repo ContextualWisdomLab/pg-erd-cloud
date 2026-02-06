@@ -25,7 +25,10 @@ services:
     env_file: ./.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173}}
+      # NOTE: Avoid nested ${VAR:-${OTHER:-default}} expressions here.
+      # podman-compose (python) may leave a trailing '}' which breaks CORS.
+      # If you run the frontend on a non-default port, set CORS_ORIGINS explicitly.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       APP_SECRET: ${APP_SECRET:?set in .env}
     depends_on:
       postgres:
