@@ -16,6 +16,9 @@ jobs:
       contents: read
       security-events: write
       id-token: write
+      issues: read
+      pull-requests: read
+      checks: read
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
