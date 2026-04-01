@@ -1,0 +1,103 @@
+name: Strix Security Scan
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  schedule:
+    # Nightly scan on protected branches.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: strix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  strix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Self-test Strix gate script
+        run: bash ./scripts/ci/test_strix_quick_gate.sh
+
+      - name: Gate Strix secrets
+        id: gate
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          if [ -z "$STRIX_LLM" ] || [ -z "$LLM_API_KEY" ]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Strix secrets not configured; skipping.'
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Gate GCP credentials
+        id: gcp_gate
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -n "$GCP_SA_KEY" ]; then
+            echo 'has_gcp=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_gcp=false' >> "$GITHUB_OUTPUT"
+            echo 'GCP credentials not configured; Vertex AI auth will not be available.'
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: steps.gate.outputs.enabled == 'true' && steps.gcp_gate.outputs.has_gcp == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Install Strix
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --no-cache-dir "strix-agent==0.7.0" "google-cloud-aiplatform>=1.133.0,<2"
+
+      - name: Run Strix (quick)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          RAW_LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
+          STRIX_VERTEX_FALLBACK_MODELS: "vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
+          STRIX_TARGET_PATH: ./
+          STRIX_REASONING_EFFORT: ${{ github.event_name == 'push' && 'low' || 'minimal' }}
+          STRIX_LLM_MAX_RETRIES: 1
+          LLM_TIMEOUT: 90
+          STRIX_MEMORY_COMPRESSOR_TIMEOUT: 10
+          STRIX_ATTEMPT_TIMEOUT_SECONDS: 480
+          STRIX_ATTEMPT_KILL_AFTER_SECONDS: 20
+          STRIX_TRANSIENT_RETRY_PER_MODEL: 2
+          STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 3
+          STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
+        run: bash ./scripts/ci/strix_quick_gate.sh
+
+      - name: Upload Strix reports artifact
+        if: ${{ always() && !cancelled() && steps.gate.outputs.enabled == 'true' }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: strix-reports
+          path: strix_runs/
+          if-no-files-found: warn
+          retention-days: 5
