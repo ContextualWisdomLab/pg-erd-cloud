@@ -11,7 +11,9 @@ on:
 
 concurrency:
   group: strix-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # cancel-in-progress deliberately disabled: an attacker could force-push
+  # a benign commit to cancel an in-progress scan of a malicious commit.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -19,8 +21,6 @@ permissions:
 jobs:
   strix:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
@@ -40,8 +40,17 @@ jobs:
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ -z "$STRIX_LLM" ] || [ -z "$LLM_API_KEY" ]; then
+          strix_llm="$(printf '%s' "$STRIX_LLM" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          llm_api_key="$(printf '%s' "$LLM_API_KEY" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if [ -z "$strix_llm" ] || [ -z "$llm_api_key" ]; then
+            # On push/schedule to protected branches, fail-closed: missing
+            # secrets must not silently produce a green check.
+            if [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "schedule" ]; then
+              echo '::error::Strix secrets not configured on push/schedule event; failing closed.'
+              exit 1
+            fi
             echo 'enabled=false' >> "$GITHUB_OUTPUT"
             echo 'Strix secrets not configured; skipping.'
           else
@@ -71,13 +80,30 @@ jobs:
         if: steps.gate.outputs.enabled == 'true'
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install --no-cache-dir "strix-agent==0.7.0" "google-cloud-aiplatform>=1.133.0,<2"
+          python3 -m pip install --no-cache-dir "strix-agent==0.8.3" "google-cloud-aiplatform>=1.133.0,<2"
+
+      - name: Mask LLM API key
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          # Sanitize CR/LF before masking to prevent broken ::add-mask::
+          # commands and potential workflow command injection.
+          sanitized="$(printf '%s' "$LLM_API_KEY" | tr -d '\r\n')"
+          if [ -n "$sanitized" ]; then
+            echo "::add-mask::${sanitized}"
+            trimmed="$(printf '%s' "$sanitized" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ -n "$trimmed" ] && [ "$trimmed" != "$sanitized" ]; then
+              echo "::add-mask::${trimmed}"
+            fi
+          fi
 
       - name: Run Strix (quick)
         if: steps.gate.outputs.enabled == 'true'
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
+          VERTEX_LOCATION: global
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           RAW_LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
           STRIX_VERTEX_FALLBACK_MODELS: "vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
@@ -86,8 +112,6 @@ jobs:
           STRIX_LLM_MAX_RETRIES: 1
           LLM_TIMEOUT: 90
           STRIX_MEMORY_COMPRESSOR_TIMEOUT: 10
-          STRIX_ATTEMPT_TIMEOUT_SECONDS: 480
-          STRIX_ATTEMPT_KILL_AFTER_SECONDS: 20
           STRIX_TRANSIENT_RETRY_PER_MODEL: 2
           STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 3
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
