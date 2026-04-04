@@ -49,21 +49,35 @@ run_gate_case() {
 	if [ "$raw_llm_api_base_override" != "__DEFAULT__" ]; then
 		raw_llm_api_base="$raw_llm_api_base_override"
 	fi
-	local attempt_timeout_seconds="${12-}"
-	local fake_hang_seconds="${13-2}"
-	local transient_retry_per_model="${14-0}"
-	local min_fail_severity="${15-CRITICAL}"
+	local transient_retry_per_model="${12-0}"
+	local min_fail_severity="${13-CRITICAL}"
+	local transient_retry_backoff_seconds="${14-0}"
+	local custom_target_path="${15-}"
+	local custom_source_dirs="${16-}"
 
 	local tmp_dir
 	tmp_dir="$(mktemp -d)"
-	# Create src/ so is_hallucinated_endpoint_finding() has a directory to scan,
-	# making the test self-contained regardless of the repo's actual layout.
-	mkdir -p "$tmp_dir/src"
-	local fake_strix="$tmp_dir/strix"
+	# Separate bin/ (fake strix + helper files) from workspace/ (target path)
+	# so grep -r over the target path never matches the fake strix script itself.
+	local bin_dir="$tmp_dir/bin"
+	local workspace_dir="$tmp_dir/workspace"
+	mkdir -p "$bin_dir" "$workspace_dir/src"
+	local fake_strix="$bin_dir/strix"
 	local call_log="$tmp_dir/calls.log"
 	local api_base_log="$tmp_dir/api_base.log"
 	local state_file="$tmp_dir/state.log"
 	local output_log="$tmp_dir/output.log"
+
+	# Resolve target path: use custom if provided, else default to $workspace_dir.
+	local effective_target_path="$workspace_dir"
+	if [ "$custom_target_path" = "__USE_SUBDIR_SRC__" ]; then
+		# Simulate STRIX_TARGET_PATH=./src by using $workspace_dir/src.
+		effective_target_path="$workspace_dir/src"
+	elif [ -n "$custom_target_path" ]; then
+		effective_target_path="$custom_target_path"
+		# Ensure the custom target path exists
+		mkdir -p "$effective_target_path"
+	fi
 
 	cat >"$fake_strix" <<'EOF'
 #!/usr/bin/env bash
@@ -75,7 +89,7 @@ echo "${LLM_API_BASE:-<unset>}" >> "${FAKE_STRIX_API_BASE_LOG:?}"
 STRIX_REPORTS_DIR="${STRIX_REPORTS_DIR:-strix_runs}"
 
 case "${FAKE_STRIX_SCENARIO:?}" in
-	success)
+	success|vertex-primary-success-timing-message)
 		echo "scan ok"
 		exit 0
 		;;
@@ -155,6 +169,15 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			;;
 		esac
 		;;
+	vertex-custom-model-resource-path)
+		# projects/<p>/locations/<l>/models/<id> (no publishers/ segment)
+		if [ "${STRIX_LLM:-}" = "vertex_ai/my-custom-model-123" ]; then
+			echo "scan ok with custom model resource-path normalization"
+			exit 0
+		fi
+		echo "Error: custom model resource-path not normalized (${STRIX_LLM:-})" >&2
+		exit 40
+		;;
 	vertex-notfound-without-status-fallback-success)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/missing-primary)
@@ -174,6 +197,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 	vertex-notfound-compact-status-fallback-success)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/missing-primary)
+			echo 'litellm.exceptions.NotFoundError: VertexAI error'
 			echo '{"error":{"status":"NOT_FOUND"}}'
 			exit 1
 			;;
@@ -269,7 +293,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 	vertex-primary-429-fallback-success)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/http429-primary)
-			echo "HTTP 429 Too Many Requests"
+			echo "litellm: HTTP 429 Too Many Requests"
 			exit 1
 			;;
 		vertex_ai/fallback-one)
@@ -320,33 +344,33 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			;;
 		esac
 		;;
+	vertex-primary-ratelimit-retry-same-model-success|vertex-primary-ratelimit-retry-reason-message)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/retry-ratelimit-primary)
+			attempt="0"
+			if [ -f "${FAKE_STRIX_STATE_FILE:?}" ]; then
+				attempt="$(cat "${FAKE_STRIX_STATE_FILE:?}")"
+			fi
+			attempt="$((attempt + 1))"
+			echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
+			if [ "$attempt" -eq 1 ]; then
+				echo "Penetration test failed: LLM request failed: RateLimitError"
+				exit 1
+			fi
+			echo "scan ok after same-model rate-limit retry"
+			exit 0
+			;;
+		*)
+			echo "Error: same-model rate-limit retry path unexpected (${STRIX_LLM:-})" >&2
+			exit 31
+			;;
+		esac
+		;;
 	vertex-all-ratelimited)
 		echo "Penetration test failed: LLM request failed: RateLimitError"
 		exit 1
 		;;
-	vertex-primary-timeout-fallback-success)
-		case "${STRIX_LLM:-}" in
-		vertex_ai/timeout-primary)
-			sleep "${FAKE_STRIX_HANG_SECONDS:-2}"
-			echo "litellm.exceptions.Timeout: litellm.Timeout: Connection timed out after None seconds."
-			exit 1
-			;;
-		vertex_ai/fallback-one)
-			echo "scan ok after timeout fallback"
-			exit 0
-			;;
-		*)
-			echo "Error: timeout fallback path unexpected (${STRIX_LLM:-})" >&2
-			exit 22
-			;;
-		esac
-		;;
-	vertex-all-timeout)
-		sleep "${FAKE_STRIX_HANG_SECONDS:-2}"
-		echo "litellm.exceptions.Timeout: litellm.Timeout: Connection timed out after None seconds."
-		exit 1
-		;;
-	vertex-primary-hallucinated-endpoint-fallback-success)
+	vertex-primary-hallucinated-endpoint-fallback-success|target-path-src-default-source-dirs)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/hallucination-primary)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-hallucinated/vulnerabilities"
@@ -366,9 +390,9 @@ EOS
 			;;
 		esac
 		;;
-	vertex-primary-existing-endpoint-nonrecoverable)
+	vertex-primary-existing-endpoint-nonrecoverable|multi-source-dirs-existing-endpoint)
 		case "${STRIX_LLM:-}" in
-		vertex_ai/existing-endpoint-primary)
+		vertex_ai/existing-endpoint-primary|vertex_ai/multi-dir-primary)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-existing-endpoint/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-existing-endpoint/vulnerabilities/vuln-0001.md" <<'EOS'
 **Endpoint:** /api/status
@@ -385,6 +409,32 @@ EOS
 			exit 28
 			;;
 		esac
+		;;
+	endpoint-in-excluded-dir)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/excluded-dir-primary)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-excluded-dir/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-excluded-dir/vulnerabilities/vuln-0001.md" <<'EOS'
+**Endpoint:** /api/hidden-secret
+EOS
+			echo "Penetration test failed: CRITICAL finding on /api/hidden-secret"
+			exit 1
+			;;
+		vertex_ai/fallback-one)
+			echo "scan ok after excluded-dir hallucination fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: excluded-dir scenario unexpected model (${STRIX_LLM:-})" >&2
+			exit 29
+			;;
+		esac
+		;;
+	empty-fallback-models)
+		# Output must match is_vertex_not_found_error() patterns so the gate
+		# proceeds to the fallback loop (where empty array triggers the message).
+		echo "Publisher Model vertex_ai/empty-fb-primary was not found in project."
+		exit 1
 		;;
 	high-vuln-below-threshold)
 		mkdir -p "$STRIX_REPORTS_DIR/fake-high/vulnerabilities"
@@ -409,6 +459,42 @@ Severity details: high confidence marker only
 EOS
 		echo "Penetration test failed: malformed severity marker"
 		exit 1
+		;;
+	model-disagreement-critical-in-earlier-report)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/model-a)
+			mkdir -p "$STRIX_REPORTS_DIR/run-001/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/run-001/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: CRITICAL
+EOS
+			echo "Error: litellm.NotFoundError: Vertex_aiException - x"
+			echo '"status": "NOT_FOUND"'
+			echo "Penetration test failed: CRITICAL finding by model-a"
+			exit 1
+			;;
+		vertex_ai/model-b)
+			mkdir -p "$STRIX_REPORTS_DIR/run-002/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/run-002/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: LOW
+EOS
+			echo "Error: litellm.NotFoundError: Vertex_aiException - x"
+			echo '"status": "NOT_FOUND"'
+			echo "Penetration test failed: LOW finding by model-b"
+			exit 1
+			;;
+		*)
+			echo "Error: model-disagreement unexpected model (${STRIX_LLM:-})" >&2
+			exit 32
+			;;
+		esac
+		;;
+	nonvertex-slash-model-not-rewritten)
+		if [ "${STRIX_LLM:-}" = "deepseek/models/deepseek-r1" ]; then
+			echo "scan ok with deepseek model passthrough"
+			exit 0
+		fi
+		echo "Error: deepseek model was rewritten (${STRIX_LLM:-})" >&2
+		exit 33
 		;;
 	preserve-existing-api-base)
 		if [ "${LLM_API_BASE:-}" = "https://preexisting.invalid" ]; then
@@ -435,6 +521,246 @@ EOS
 			;;
 		esac
 		;;
+	vertex-primary-timeout-retry-same-model-success|vertex-primary-timeout-retry-reason-message)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/retry-timeout-primary)
+			attempt="0"
+			if [ -f "${FAKE_STRIX_STATE_FILE:?}" ]; then
+				attempt="$(cat "${FAKE_STRIX_STATE_FILE:?}")"
+			fi
+			attempt="$((attempt + 1))"
+			echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
+			if [ "$attempt" -eq 1 ]; then
+				echo "litellm.exceptions.Timeout: litellm.Timeout: Connection timed out after None seconds."
+				exit 1
+			fi
+			echo "scan ok after same-model timeout retry"
+			exit 0
+			;;
+		*)
+			echo "Error: same-model timeout retry path unexpected (${STRIX_LLM:-})" >&2
+			exit 34
+			;;
+		esac
+		;;
+	all-fallbacks-same-as-primary)
+		# Bug 13: All fallback models are the same as the primary model.
+		# The gate should emit an ERROR and exit 1.
+		echo "Error: litellm.NotFoundError: Vertex_aiException - x"
+		echo '"status": "NOT_FOUND"'
+		exit 1
+		;;
+	vertex-primary-timeout-exhausted-fallback-success)
+		# Primary always times out (even after retries). Fallback succeeds.
+		case "${STRIX_LLM:-}" in
+		vertex_ai/timeout-exhaust-primary)
+			echo "litellm.exceptions.Timeout: litellm.Timeout: Connection timed out after None seconds."
+			exit 1
+			;;
+		vertex_ai/fallback-one)
+			echo "scan ok after timeout-exhausted fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: timeout-exhausted-fallback unexpected model (${STRIX_LLM:-})" >&2
+			exit 35
+			;;
+		esac
+		;;
+	bare-timeout-with-provider-marker)
+		# Emit bare "Connection timed out" alongside a provider marker so
+		# is_timeout_error() matches the Tier 3 branch gated on
+		# LLM_PROVIDER_ONLY_REGEX.  Does NOT include
+		# litellm.exceptions.Timeout / httpx.ReadTimeout to ensure we
+		# exercise the provider-marker fallback path specifically.
+		# First call times out; same-model retry succeeds.
+		if [ -f "$FAKE_STRIX_STATE_FILE" ]; then
+			echo "scan ok after bare-timeout-with-provider retry"
+			exit 0
+		fi
+		touch "$FAKE_STRIX_STATE_FILE"
+		echo "Connection timed out"
+		echo "vertex_ai model invocation failed"
+		exit 1
+		;;
+	bare-timeout-no-provider-marker)
+		# Emit "Connection timed out" with transport library names (httpx,
+		# httpcore, requests) but WITHOUT any real LLM provider marker.
+		# is_timeout_error() Tier 3 uses LLM_PROVIDER_ONLY_REGEX which
+		# excludes transport libs, so this should NOT match.
+		echo "Connection timed out"
+		echo "httpx transport layer connection reset"
+		echo "httpcore pool timeout"
+		echo "requests transport timeout"
+		exit 1
+		;;
+	below-threshold-with-timeout)
+		# Produce a below-threshold (LOW) finding but also emit a timeout error
+		# so the infrastructure guard detects an incomplete scan.
+		mkdir -p "$STRIX_REPORTS_DIR/fake-low-timeout/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-low-timeout/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: LOW
+EOS
+		echo "litellm.exceptions.Timeout: litellm.Timeout: Connection timed out after None seconds."
+		echo "Penetration test failed: simulated timeout with low finding"
+		exit 1
+		;;
+	below-threshold-with-ratelimit)
+		# Produce a below-threshold (LOW) finding but also emit a rate-limit error.
+		mkdir -p "$STRIX_REPORTS_DIR/fake-low-ratelimit/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-low-ratelimit/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: LOW
+EOS
+		echo "Penetration test failed: LLM request failed: RateLimitError"
+		echo "Penetration test failed: simulated ratelimit with low finding"
+		exit 1
+		;;
+	below-threshold-with-connection-error)
+		# Produce a below-threshold (INFO) finding but also emit a
+		# ConnectionError WITH an LLM-provider context marker so the
+		# infrastructure guard detects an incomplete scan.
+		# The two-grep guard requires BOTH a transport error class AND an
+		# LLM_PROVIDER_ONLY_REGEX marker (litellm, openai, anthropic, etc.).
+		mkdir -p "$STRIX_REPORTS_DIR/fake-info-conn/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-info-conn/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: INFO
+EOS
+		echo "litellm.exceptions.APIConnectionError: ConnectionError - connection refused"
+		echo "Penetration test failed: simulated connection error with info finding"
+		exit 1
+		;;
+	below-threshold-with-connection-error-no-provider)
+		# Produce a below-threshold (INFO) finding and emit a ConnectionError
+		# WITHOUT any LLM-provider context marker.  The infra-error detector
+		# should NOT match because the log lacks provider markers like
+		# "litellm", "openai", "anthropic", etc.  This validates that the
+		# two-grep guard avoids false positives from target-application logs.
+		mkdir -p "$STRIX_REPORTS_DIR/fake-info-conn-noprov/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-info-conn-noprov/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: INFO
+EOS
+		echo "ConnectionError: target server refused connection on port 8443"
+		echo "Penetration test failed: simulated app-level connection error"
+		exit 1
+		;;
+	below-threshold-with-requests-connection-error)
+		# Produce a below-threshold (INFO) finding with a
+		# requests.exceptions.ConnectionError — the transport library prefix
+		# "requests" matches the broad PROVIDER_CONTEXT_REGEX but is
+		# intentionally excluded from LLM_PROVIDER_ONLY_REGEX.
+		#
+		# Before commit 0e90d48, the connection-error path used
+		# has_provider_context_marker() (PROVIDER_CONTEXT_REGEX) and would
+		# have incorrectly classified this as an LLM infrastructure error.
+		# After that fix, LLM_PROVIDER_ONLY_REGEX is used, so "requests"
+		# alone does NOT satisfy the provider check → below-threshold bypass
+		# succeeds → exit 0.
+		mkdir -p "$STRIX_REPORTS_DIR/fake-info-conn-requests/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-info-conn-requests/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: INFO
+EOS
+		echo "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.example.com', port=443): Max retries exceeded with url: /v1/scan"
+		echo "Penetration test failed: simulated requests transport error"
+		exit 1
+		;;
+	below-threshold-with-midstream)
+		# Produce a below-threshold (MEDIUM) finding below CRITICAL threshold
+		# but also emit a MidStreamFallbackError.
+		mkdir -p "$STRIX_REPORTS_DIR/fake-medium-midstream/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-medium-midstream/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: MEDIUM
+EOS
+		echo "Penetration test failed: LLM request failed: MidStreamFallbackError"
+		echo "Penetration test failed: simulated midstream with medium finding"
+		exit 1
+		;;
+	bare-timeout-provider-marker-exhausted-fallback)
+		# Bare "Connection timed out" + provider marker: primary always fails
+		# (even after transient retries). Gate exhausts retries on primary,
+		# then falls back to fallback-one which succeeds.
+		case "${STRIX_LLM:-}" in
+		vertex_ai/bare-timeout-exhaust-primary)
+			echo "Connection timed out"
+			echo "vertex_ai model invocation failed"
+			exit 1
+			;;
+		vertex_ai/fallback-one)
+			echo "scan ok after bare-timeout-exhaust fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: bare-timeout-exhaust-fallback unexpected model (${STRIX_LLM:-})" >&2
+			exit 35
+			;;
+		esac
+		;;
+	httpx-read-timeout-with-provider-marker)
+		# Tier 2: httpx.ReadTimeout + provider-context marker (litellm).
+		# First call times out; same-model retry succeeds.
+		if [ -f "$FAKE_STRIX_STATE_FILE" ]; then
+			echo "scan ok after httpx-timeout retry"
+			exit 0
+		fi
+		touch "$FAKE_STRIX_STATE_FILE"
+		echo "httpx.ReadTimeout: timed out"
+		echo "litellm.proxy: connection to upstream model failed"
+		exit 1
+		;;
+	httpx-read-timeout-no-provider-marker)
+		# Tier 2 negative: httpx.ReadTimeout WITHOUT any provider-context
+		# marker.  Should NOT be classified as retryable timeout.
+		echo "httpx.ReadTimeout: timed out"
+		echo "application server connection pool exhausted"
+		exit 1
+		;;
+	httpcore-read-timeout-with-provider-marker)
+		# Tier 2b: httpcore.ReadTimeout + provider-context marker.
+		# First call times out; same-model retry succeeds.
+		if [ -f "$FAKE_STRIX_STATE_FILE" ]; then
+			echo "scan ok after httpcore-timeout retry"
+			exit 0
+		fi
+		touch "$FAKE_STRIX_STATE_FILE"
+		echo "httpcore.ReadTimeout: timed out"
+		echo "litellm.proxy: connection to upstream model failed"
+		exit 1
+		;;
+	httpcore-read-timeout-no-provider-marker)
+		# Tier 2b negative: httpcore.ReadTimeout WITHOUT any provider-context
+		# marker.  Should NOT be classified as retryable timeout.
+		echo "httpcore.ReadTimeout: timed out"
+		echo "application server connection pool exhausted"
+		exit 1
+		;;
+	infra-error-sticky-flag)
+		# Sticky flag test: first call hits infra error (rate limit),
+		# second call fails with a non-retryable error but produces a
+		# LOW finding report.  After exhausting retries, the gate checks
+		# has_only_below_threshold_vulnerabilities — which finds LOW
+		# findings but sees INFRA_ERROR_DETECTED=1 (set from the first
+		# call's rate-limit error) and refuses the below-threshold bypass.
+		case "${STRIX_LLM:-}" in
+		vertex_ai/sticky-flag-primary)
+			if [ -f "$FAKE_STRIX_STATE_FILE" ]; then
+				# Second call: non-retryable failure with a partial LOW report
+				mkdir -p "$STRIX_REPORTS_DIR/run-sticky/vulnerabilities"
+				cat > "$STRIX_REPORTS_DIR/run-sticky/vulnerabilities/vuln-0001.md" <<'FINDINGS'
+Severity: LOW
+FINDINGS
+				echo "non-retryable scan error with partial results"
+				exit 1
+			fi
+			touch "$FAKE_STRIX_STATE_FILE"
+			echo "RateLimitError: rate limit exceeded"
+			echo "litellm.proxy: rate limit on vertex_ai model"
+			exit 1
+			;;
+		*)
+			echo "Error: infra-error-sticky-flag unexpected model (${STRIX_LLM:-})" >&2
+			exit 35
+			;;
+		esac
+		;;
 	*)
 		echo "unknown scenario ${FAKE_STRIX_SCENARIO:?}" >&2
 		exit 8
@@ -446,27 +772,50 @@ EOF
 	# Scenario-specific source-tree setup so is_hallucinated_endpoint_finding()
 	# can locate "real" endpoints inside the self-contained temp workspace.
 	if [ "$scenario" = "vertex-primary-existing-endpoint-nonrecoverable" ]; then
-		echo 'GET /api/status' >"$tmp_dir/src/routes.txt"
+		echo 'GET /api/status' >"$workspace_dir/src/routes.txt"
+	elif [ "$scenario" = "multi-source-dirs-existing-endpoint" ]; then
+		# Endpoint lives in api/ (not src/), validating multi-dir scanning.
+		mkdir -p "$workspace_dir/api"
+		echo 'GET /api/status' >"$workspace_dir/api/routes.txt"
+	elif [ "$scenario" = "endpoint-in-excluded-dir" ]; then
+		# Endpoint /api/hidden-secret exists ONLY inside excluded directories
+		# (.git/ and node_modules/). The grep excludes must prevent matching,
+		# so the finding is treated as hallucinated → fallback allowed.
+		mkdir -p "$workspace_dir/.git/refs"
+		echo 'GET /api/hidden-secret' >"$workspace_dir/.git/refs/leaked.txt"
+		mkdir -p "$workspace_dir/node_modules/fake-pkg"
+		echo 'GET /api/hidden-secret' >"$workspace_dir/node_modules/fake-pkg/index.js"
 	fi
 
 	set +e
-	PATH="$tmp_dir:$PATH" \
-		FAKE_STRIX_SCENARIO="$scenario" \
-		FAKE_STRIX_CALL_LOG="$call_log" \
-		FAKE_STRIX_API_BASE_LOG="$api_base_log" \
-		STRIX_LLM="$initial_model" \
-		STRIX_LLM_DEFAULT_PROVIDER="$default_provider" \
-		LLM_API_KEY="dummy" \
-		RAW_LLM_API_BASE="$raw_llm_api_base" \
-		LLM_API_BASE="$initial_llm_api_base" \
-		STRIX_ATTEMPT_TIMEOUT_SECONDS="$attempt_timeout_seconds" \
-		FAKE_STRIX_HANG_SECONDS="$fake_hang_seconds" \
-		FAKE_STRIX_STATE_FILE="$state_file" \
-		STRIX_TRANSIENT_RETRY_PER_MODEL="$transient_retry_per_model" \
-		STRIX_FAIL_ON_MIN_SEVERITY="$min_fail_severity" \
-		STRIX_VERTEX_FALLBACK_MODELS="$fallback_models" \
-		STRIX_REPORTS_DIR="$tmp_dir/strix_runs" \
-		STRIX_TARGET_PATH="$tmp_dir" \
+	local env_cmd=(
+		PATH="$bin_dir:$PATH"
+		FAKE_STRIX_SCENARIO="$scenario"
+		FAKE_STRIX_CALL_LOG="$call_log"
+		FAKE_STRIX_API_BASE_LOG="$api_base_log"
+		STRIX_LLM="$initial_model"
+		STRIX_LLM_DEFAULT_PROVIDER="$default_provider"
+		LLM_API_KEY="dummy"
+		RAW_LLM_API_BASE="$raw_llm_api_base"
+		LLM_API_BASE="$initial_llm_api_base"
+		FAKE_STRIX_STATE_FILE="$state_file"
+		STRIX_TRANSIENT_RETRY_PER_MODEL="$transient_retry_per_model"
+		STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="$transient_retry_backoff_seconds"
+		STRIX_FAIL_ON_MIN_SEVERITY="$min_fail_severity"
+		STRIX_REPORTS_DIR="$workspace_dir/strix_runs"
+		STRIX_TARGET_PATH="$effective_target_path"
+	)
+	# Only export STRIX_VERTEX_FALLBACK_MODELS when a non-empty value is
+	# provided so that the gate's ${STRIX_VERTEX_FALLBACK_MODELS+x} check
+	# correctly distinguishes "unset → use defaults" from "set to empty →
+	# disable fallbacks".
+	if [ -n "$fallback_models" ]; then
+		env_cmd+=(STRIX_VERTEX_FALLBACK_MODELS="$fallback_models")
+	fi
+	if [ -n "$custom_source_dirs" ]; then
+		env_cmd+=(STRIX_SOURCE_DIRS="$custom_source_dirs")
+	fi
+	env "${env_cmd[@]}" \
 		bash "$GATE_SCRIPT" >"$output_log" 2>&1
 	local rc=$?
 	set -e
@@ -742,6 +1091,18 @@ run_gate_case "provider-prefix-resource-path-primary-notfound-fallback-success" 
 	"vertex_ai/missing-primary|vertex_ai/fallback-one" \
 	"<unset>|<unset>"
 
+# Regression: Vertex custom model resource path projects/<p>/locations/<l>/models/<id>
+# (no publishers/ segment) must be recognized as a Vertex resource path and
+# normalized to vertex_ai/<model_id>.
+run_gate_case "vertex-custom-model-resource-path" \
+	"projects/my-proj/locations/us-central1/models/my-custom-model-123" \
+	"vertex_ai/fallback-one" \
+	"0" \
+	"Normalized STRIX_LLM to provider-qualified model 'vertex_ai/my-custom-model-123'." \
+	"1" \
+	"vertex_ai/my-custom-model-123" \
+	"<unset>"
+
 run_gate_case "vertex-notfound-without-status-fallback-success" \
 	"vertex_ai/missing-primary" \
 	"vertex_ai/fallback-one" \
@@ -834,8 +1195,50 @@ run_gate_case "vertex-primary-midstream-retry-same-model-success" \
 	"vertex_ai" \
 	"__DEFAULT__" \
 	"" \
-	"" \
+	"1"
+
+# Bug 9: Rate-limit transient same-model retry (previously untested path)
+run_gate_case "vertex-primary-ratelimit-retry-same-model-success" \
+	"vertex_ai/retry-ratelimit-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after same-model rate-limit retry" \
 	"2" \
+	"vertex_ai/retry-ratelimit-primary|vertex_ai/retry-ratelimit-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Bug 11: Timeout transient same-model retry (timeout was not retried with same model)
+run_gate_case "vertex-primary-timeout-retry-same-model-success" \
+	"vertex_ai/retry-timeout-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after same-model timeout retry" \
+	"2" \
+	"vertex_ai/retry-timeout-primary|vertex_ai/retry-timeout-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Bug 11b: Timeout → retries exhausted → fallback model succeeds.
+# Primary always times out; after 1 same-model retry is exhausted, gate falls
+# back to the next Vertex model which succeeds.
+run_gate_case "vertex-primary-timeout-exhausted-fallback-success" \
+	"vertex_ai/timeout-exhaust-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after timeout-exhausted fallback" \
+	"3" \
+	"vertex_ai/timeout-exhaust-primary|vertex_ai/timeout-exhaust-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
 	"1"
 
 run_gate_case "vertex-all-ratelimited" \
@@ -846,34 +1249,6 @@ run_gate_case "vertex-all-ratelimited" \
 	"3" \
 	"vertex_ai/ratelimit-primary|vertex_ai/fallback-one|vertex_ai/fallback-two" \
 	"<unset>|<unset>|<unset>"
-
-run_gate_case "vertex-primary-timeout-fallback-success" \
-	"vertex_ai/timeout-primary" \
-	"vertex_ai/fallback-one vertex_ai/fallback-two" \
-	"0" \
-	"Strix run timed out for model 'vertex_ai/timeout-primary' after 1s." \
-	"2" \
-	"vertex_ai/timeout-primary|vertex_ai/fallback-one" \
-	"<unset>|<unset>" \
-	"vertex_ai" \
-	"__DEFAULT__" \
-	"" \
-	"1" \
-	"2"
-
-run_gate_case "vertex-all-timeout" \
-	"vertex_ai/timeout-primary" \
-	"vertex_ai/fallback-one vertex_ai/fallback-two" \
-	"1" \
-	"Configured Vertex model and fallback models were unavailable." \
-	"3" \
-	"vertex_ai/timeout-primary|vertex_ai/fallback-one|vertex_ai/fallback-two" \
-	"<unset>|<unset>|<unset>" \
-	"vertex_ai" \
-	"__DEFAULT__" \
-	"" \
-	"1" \
-	"2"
 
 run_gate_case "vertex-primary-hallucinated-endpoint-fallback-success" \
 	"vertex_ai/hallucination-primary" \
@@ -902,6 +1277,91 @@ run_gate_case "high-vuln-below-threshold" \
 	"vertex_ai/high-vuln-primary" \
 	"<unset>"
 
+# Infrastructure error guard: below-threshold findings must NOT pass when the
+# strix log contains evidence of infrastructure-level errors (timeout,
+# rate-limit, transport failures) because the scan was likely incomplete.
+
+# Guard test 1: LOW finding + timeout → should fail (exit 1).
+# The below-threshold check runs first but detects infrastructure errors in the
+# strix log and refuses bypass.  The timeout is also vertex-retryable, so the
+# gate continues into the fallback loop.  All attempts see the same timeout.
+run_gate_case "below-threshold-with-timeout" \
+	"vertex_ai/low-timeout-primary" \
+	"vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash" \
+	"1" \
+	"infrastructure errors occurred during this pipeline run; refusing bypass" \
+	"3" \
+	"vertex_ai/low-timeout-primary|vertex_ai/gemini-2.5-pro|vertex_ai/gemini-2.5-flash" \
+	"<unset>|<unset>|<unset>"
+
+# Guard test 2: LOW finding + rate-limit → should fail (exit 1).
+# Below-threshold check refuses bypass due to infra errors.
+# Rate-limit is vertex-retryable, so the gate also tries fallback models.
+run_gate_case "below-threshold-with-ratelimit" \
+	"vertex_ai/low-ratelimit-primary" \
+	"vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash" \
+	"1" \
+	"infrastructure errors occurred during this pipeline run; refusing bypass" \
+	"3" \
+	"vertex_ai/low-ratelimit-primary|vertex_ai/gemini-2.5-pro|vertex_ai/gemini-2.5-flash" \
+	"<unset>|<unset>|<unset>"
+
+# Guard test 3: INFO finding + ConnectionError → should fail (exit 1).
+# ConnectionError is NOT vertex-retryable, so only the primary model is tried.
+run_gate_case "below-threshold-with-connection-error" \
+	"vertex_ai/info-conn-primary" \
+	"" \
+	"1" \
+	"infrastructure errors occurred during this pipeline run; refusing bypass" \
+	"1" \
+	"vertex_ai/info-conn-primary" \
+	"<unset>"
+
+# Guard test 3b: INFO finding + ConnectionError WITHOUT provider marker → should
+# PASS (exit 0).  The two-grep infra-error detector requires both a transport
+# error class AND an LLM_PROVIDER_ONLY_REGEX marker (litellm, openai,
+# anthropic, VertexAI, etc.).  Note: transport libraries (requests, httpx,
+# httpcore) are intentionally excluded from LLM_PROVIDER_ONLY_REGEX to avoid
+# false positives — see guard test 3c below.
+# A bare "ConnectionError" from the target application lacks the marker, so
+# has_detected_infrastructure_error() returns 1 (no infra error) and the
+# below-threshold bypass succeeds.
+run_gate_case "below-threshold-with-connection-error-no-provider" \
+	"vertex_ai/info-conn-noprov-primary" \
+	"" \
+	"0" \
+	"below configured fail threshold" \
+	"1" \
+	"vertex_ai/info-conn-noprov-primary" \
+	"<unset>"
+
+# Guard test 3c: INFO finding + requests.exceptions.ConnectionError → should
+# PASS (exit 0).  The "requests" transport library matches the broad
+# PROVIDER_CONTEXT_REGEX but is intentionally excluded from LLM_PROVIDER_ONLY_REGEX.
+# Before commit 0e90d48 the connection-error path used PROVIDER_CONTEXT_REGEX
+# and would have mis-classified this as an LLM infrastructure error; now it
+# correctly uses LLM_PROVIDER_ONLY_REGEX, so below-threshold bypass succeeds.
+run_gate_case "below-threshold-with-requests-connection-error" \
+	"vertex_ai/info-conn-requests-primary" \
+	"" \
+	"0" \
+	"below configured fail threshold" \
+	"1" \
+	"vertex_ai/info-conn-requests-primary" \
+	"<unset>"
+
+# Guard test 4: MEDIUM finding + MidStreamFallbackError → should fail (exit 1).
+# Midstream is vertex-retryable, so the gate also tries fallback models
+# (after the below-threshold check refuses bypass due to infra errors).
+run_gate_case "below-threshold-with-midstream" \
+	"vertex_ai/medium-midstream-primary" \
+	"vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash" \
+	"1" \
+	"infrastructure errors occurred during this pipeline run; refusing bypass" \
+	"3" \
+	"vertex_ai/medium-midstream-primary|vertex_ai/gemini-2.5-pro|vertex_ai/gemini-2.5-flash" \
+	"<unset>|<unset>|<unset>"
+
 run_gate_case "critical-vuln-at-threshold" \
 	"vertex_ai/critical-vuln-primary" \
 	"" \
@@ -919,6 +1379,73 @@ run_gate_case "malformed-severity-marker-nonrecoverable" \
 	"1" \
 	"vertex_ai/malformed-severity-primary" \
 	"<unset>"
+
+# Bug 7: Model disagreement — primary produces CRITICAL, fallback produces LOW.
+# The CRITICAL from the earlier report must NOT be ignored.
+# Both models produce NOT_FOUND errors, so the gate exhausts fallbacks and
+# reports "Configured Vertex model and fallback models were unavailable."
+# The key assertion is exit 1: the CRITICAL finding is NOT downgraded to pass.
+run_gate_case "model-disagreement-critical-in-earlier-report" \
+	"vertex_ai/model-a" \
+	"vertex_ai/model-b" \
+	"1" \
+	"Configured Vertex model and fallback models were unavailable." \
+	"2" \
+	"vertex_ai/model-a|vertex_ai/model-b" \
+	"<unset>|<unset>"
+
+# Bug 4: deepseek/models/deepseek-r1 must NOT be rewritten to vertex_ai/deepseek-r1
+run_gate_case "nonvertex-slash-model-not-rewritten" \
+	"deepseek/models/deepseek-r1" \
+	"vertex_ai/fallback-one" \
+	"0" \
+	"scan ok with deepseek model passthrough" \
+	"1" \
+	"deepseek/models/deepseek-r1" \
+	"https://example.invalid"
+
+# Regression: STRIX_TARGET_PATH=<dir>/src with default STRIX_SOURCE_DIRS (now ".")
+# must resolve to <dir>/src/. (i.e. <dir>/src itself), NOT <dir>/src/src.
+# The hallucinated-endpoint scenario writes a vuln report with a fake endpoint;
+# the gate should detect it's absent from source and trigger fallback — which
+# requires the source dir to actually exist and be scanned.
+run_gate_case "target-path-src-default-source-dirs" \
+	"vertex_ai/hallucination-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"Strix quick scan succeeded with fallback model 'vertex_ai/fallback-one'." \
+	"2" \
+	"vertex_ai/hallucination-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1" \
+	"CRITICAL" \
+	"0" \
+	"__USE_SUBDIR_SRC__" \
+	""
+
+# Bug 2 follow-up: multi-entry STRIX_SOURCE_DIRS test.
+# Endpoint /api/status lives in api/ (not src/).  With STRIX_SOURCE_DIRS="src api"
+# the gate must find the endpoint in the api/ dir and treat the finding as
+# non-hallucinated → non-recoverable failure (exit 1).
+run_gate_case "multi-source-dirs-existing-endpoint" \
+	"vertex_ai/multi-dir-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"1" \
+	"Strix quick scan failed with a non-recoverable error." \
+	"1" \
+	"vertex_ai/multi-dir-primary" \
+	"<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"src api"
 
 run_gate_case "preserve-existing-api-base" \
 	"openai/gpt-4o-mini" \
@@ -941,6 +1468,190 @@ run_gate_case "default-fallback-order-fast-first" \
 	"vertex_ai/missing-primary|vertex_ai/gemini-2.5-pro" \
 	"<unset>|<unset>"
 
+# Bug 13: All fallback models are the same as the primary model.
+# The gate should detect that no distinct fallback was tried and emit an ERROR.
+run_gate_case "all-fallbacks-same-as-primary" \
+	"vertex_ai/same-primary" \
+	"vertex_ai/same-primary vertex_ai/same-primary" \
+	"1" \
+	"ERROR: All configured fallback models are the same as the primary model" \
+	"1" \
+	"vertex_ai/same-primary" \
+	"<unset>"
+
+# Bug 14: Retry reason messages — timeout retry should say "due to timeout".
+run_gate_case "vertex-primary-timeout-retry-reason-message" \
+	"vertex_ai/retry-timeout-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"due to timeout" \
+	"2" \
+	"vertex_ai/retry-timeout-primary|vertex_ai/retry-timeout-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"2"
+
+# Bug 14: Retry reason messages — rate-limit retry should say "due to rate limit".
+run_gate_case "vertex-primary-ratelimit-retry-reason-message" \
+	"vertex_ai/retry-ratelimit-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"due to rate limit" \
+	"2" \
+	"vertex_ai/retry-ratelimit-primary|vertex_ai/retry-ratelimit-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"2"
+
+# Bug 14: Timing message — success should log elapsed time.
+run_gate_case "vertex-primary-success-timing-message" \
+	"vertex_ai/ready-primary" \
+	"" \
+	"0" \
+	"Strix run succeeded for model 'vertex_ai/ready-primary' in " \
+	"1" \
+	"vertex_ai/ready-primary" \
+	"<unset>"
+
+# is_timeout_error() provider-context marker test:
+# Bare "Connection timed out" without any LLM provider marker should NOT
+# be treated as a timeout error. The gate should fail without retrying.
+# The fake strix now also emits "httpx", "httpcore", and "requests" strings
+# to verify that transport library names alone do NOT qualify as provider markers.
+# Model name deliberately avoids containing any provider marker string
+# (litellm, openai, anthropic, VertexAI, vertex.ai, google.cloud).
+run_gate_case "bare-timeout-no-provider-marker" \
+	"custom/bare-timeout-model" \
+	"" \
+	"1" \
+	"" \
+	"1" \
+	"custom/bare-timeout-model" \
+	"https://example.invalid" \
+	"custom" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# is_timeout_error() Tier 2: httpx.ReadTimeout + provider-context marker.
+# The middle tier classifies httpx transport timeouts as retryable when
+# accompanied by a provider-context marker (PROVIDER_CONTEXT_REGEX).
+# First call times out with httpx.ReadTimeout → same-model retry succeeds.
+run_gate_case "httpx-read-timeout-with-provider-marker" \
+	"vertex_ai/httpx-timeout-primary" \
+	"" \
+	"0" \
+	"scan ok after httpx-timeout retry" \
+	"2" \
+	"vertex_ai/httpx-timeout-primary|vertex_ai/httpx-timeout-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Negative: httpx.ReadTimeout WITHOUT provider-context marker should NOT
+# be classified as a retryable timeout (the gate should treat it as a
+# non-recoverable scan failure).
+run_gate_case "httpx-read-timeout-no-provider-marker" \
+	"custom/httpx-timeout-no-ctx" \
+	"" \
+	"1" \
+	"non-recoverable error" \
+	"1" \
+	"custom/httpx-timeout-no-ctx" \
+	"https://example.invalid" \
+	"custom" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# is_timeout_error() Tier 2b: httpcore.ReadTimeout + provider-context marker.
+# Mirrors the httpx.ReadTimeout positive case above, using httpcore instead.
+# First call times out with httpcore.ReadTimeout → same-model retry succeeds.
+run_gate_case "httpcore-read-timeout-with-provider-marker" \
+	"vertex_ai/httpcore-timeout-primary" \
+	"" \
+	"0" \
+	"scan ok after httpcore-timeout retry" \
+	"2" \
+	"vertex_ai/httpcore-timeout-primary|vertex_ai/httpcore-timeout-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Negative: httpcore.ReadTimeout WITHOUT provider-context marker should NOT
+# be classified as a retryable timeout (the gate should treat it as a
+# non-recoverable scan failure).
+run_gate_case "httpcore-read-timeout-no-provider-marker" \
+	"custom/httpcore-timeout-no-ctx" \
+	"" \
+	"1" \
+	"non-recoverable error" \
+	"1" \
+	"custom/httpcore-timeout-no-ctx" \
+	"https://example.invalid" \
+	"custom" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# is_timeout_error() positive branch for "Connection timed out" + provider marker:
+# When "Connection timed out" appears alongside an LLM provider marker (e.g.
+# litellm, vertex_ai), the gate should classify it as a retryable timeout.
+# First call times out with provider context → same-model retry succeeds.
+run_gate_case "bare-timeout-with-provider-marker" \
+	"vertex_ai/bare-timeout-primary" \
+	"" \
+	"0" \
+	"scan ok after bare-timeout-with-provider retry" \
+	"2" \
+	"vertex_ai/bare-timeout-primary|vertex_ai/bare-timeout-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Bare "Connection timed out" + provider marker: primary exhausts all retries,
+# then gate falls back to fallback-one which succeeds.
+# Expected: primary(fail) → retry(fail) → fallback-one(success) = 3 calls, exit 0.
+run_gate_case "bare-timeout-provider-marker-exhausted-fallback" \
+	"vertex_ai/bare-timeout-exhaust-primary" \
+	"vertex_ai/fallback-one" \
+	"0" \
+	"scan ok after bare-timeout-exhaust fallback" \
+	"3" \
+	"vertex_ai/bare-timeout-exhaust-primary|vertex_ai/bare-timeout-exhaust-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
+# Sticky INFRA_ERROR_DETECTED flag: first call hits rate-limit (infra error),
+# second call fails with a non-retryable error but leaves a partial LOW report.
+# The gate must refuse the below-threshold bypass because an infrastructure
+# error was detected during this pipeline run.
+run_gate_case "infra-error-sticky-flag" \
+	"vertex_ai/sticky-flag-primary" \
+	"" \
+	"1" \
+	"infrastructure errors occurred" \
+	"2" \
+	"vertex_ai/sticky-flag-primary|vertex_ai/sticky-flag-primary" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"1"
+
 run_invalid_min_fail_severity_case
 run_stale_report_case
 run_symlink_report_case
@@ -949,6 +1660,97 @@ run_missing_config_case "missing-strix-llm" "" "dummy" "ERROR: STRIX_LLM is requ
 run_missing_config_case "missing-llm-api-key" "vertex_ai/ready-primary" "" "ERROR: LLM_API_KEY is required."
 run_missing_config_case "whitespace-only-strix-llm" "   " "dummy" "ERROR: STRIX_LLM is required."
 run_missing_config_case "whitespace-only-llm-api-key" "vertex_ai/ready-primary" $'\t  ' "ERROR: LLM_API_KEY is required."
+
+# ── Segment boundary enforcement for is_vertex_resource_path / extract_vertex_model_id ──
+# Shell glob '*' matches '/' so the old case-pattern implementation accepted
+# malformed paths with extra segments (e.g. "projects/a/b/locations/…").
+# These tests verify that only paths with the exact expected segment count match.
+#
+# The gate script cannot be sourced directly (it has top-level side effects),
+# so we extract the two functions via sed and eval them in this shell.
+_vertex_funcs="$(sed -n '/^is_vertex_resource_path()/,/^}/p; /^extract_vertex_model_id()/,/^}/p' "$GATE_SCRIPT")"
+eval "$_vertex_funcs"
+
+assert_vertex_path() {
+	local label="$1" path="$2" expect_rc="$3"
+	local actual_rc
+	if is_vertex_resource_path "$path"; then
+		actual_rc=0
+	else
+		actual_rc=1
+	fi
+	if [ "$actual_rc" -ne "$expect_rc" ]; then
+		echo "FAIL: is_vertex_resource_path($label): got rc=$actual_rc want $expect_rc" >&2
+		FAILURES=$((FAILURES + 1))
+	fi
+}
+
+assert_vertex_extract() {
+	local label="$1" path="$2" expected="$3"
+	local actual
+	actual="$(extract_vertex_model_id "$path")"
+	if [ "$actual" != "$expected" ]; then
+		echo "FAIL: extract_vertex_model_id($label): got '$actual' want '$expected'" >&2
+		FAILURES=$((FAILURES + 1))
+	fi
+}
+
+# Valid paths — should return 0
+assert_vertex_path "models/<id>" "models/gemini-2.5-pro" 0
+assert_vertex_path "publishers/<p>/models/<id>" "publishers/google/models/gemini-2.5-pro" 0
+assert_vertex_path "projects/<p>/locations/<l>/models/<id>" "projects/my-proj/locations/us-central1/models/gemini-2.5-pro" 0
+assert_vertex_path "projects/<p>/locations/<l>/publishers/<pub>/models/<id>" "projects/my-proj/locations/us-central1/publishers/google/models/gemini-2.5-pro" 0
+
+# Malformed paths — extra segments that '*' used to match across '/'
+assert_vertex_path "extra-segment-in-project" "projects/a/b/locations/us/models/foo" 1
+assert_vertex_path "extra-segment-in-location" "projects/a/locations/b/c/models/foo" 1
+assert_vertex_path "extra-segment-in-publisher" "projects/a/locations/b/publishers/c/d/models/foo" 1
+assert_vertex_path "extra-segment-after-models" "projects/a/locations/b/models/foo/bar" 1
+assert_vertex_path "empty-model-id" "models/" 1
+assert_vertex_path "empty-project" "projects//locations/us/models/foo" 1
+assert_vertex_path "plain-model-name" "gemini-2.5-pro" 1
+assert_vertex_path "non-vertex-provider-slash" "deepseek/models/deepseek-r1" 1
+assert_vertex_path "empty-string" "" 1
+
+# extract_vertex_model_id — valid paths
+assert_vertex_extract "models/<id>" "models/gemini-2.5-pro" "gemini-2.5-pro"
+assert_vertex_extract "publishers/<p>/models/<id>" "publishers/google/models/gemini-2.5-pro" "gemini-2.5-pro"
+assert_vertex_extract "projects/<p>/locations/<l>/models/<id>" "projects/my-proj/locations/us-central1/models/gemini-2.5-pro" "gemini-2.5-pro"
+assert_vertex_extract "projects/…/publishers/…/models/<id>" "projects/my-proj/locations/us-central1/publishers/google/models/gemini-2.5-pro" "gemini-2.5-pro"
+
+# extract_vertex_model_id — non-vertex paths return as-is
+assert_vertex_extract "non-vertex-passthrough" "deepseek/models/deepseek-r1" "deepseek/models/deepseek-r1"
+assert_vertex_extract "plain-model-passthrough" "gemini-2.5-pro" "gemini-2.5-pro"
+
+# Whitespace in paths — must be rejected (SAST word-splitting guard)
+assert_vertex_path "space-in-project" "projects/my proj/locations/us/models/foo" 1
+assert_vertex_path "tab-in-model-id" $'models/gemini\t2.5' 1
+assert_vertex_extract "space-passthrough" "models/my model" "models/my model"
+
+# Endpoint only exists in excluded directories (.git/, node_modules/).
+# The grep --exclude-dir patterns must prevent matching, so the finding
+# is treated as hallucinated and fallback is allowed → exit 0.
+run_gate_case "endpoint-in-excluded-dir" \
+	"vertex_ai/excluded-dir-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after excluded-dir hallucination fallback" \
+	"2" \
+	"vertex_ai/excluded-dir-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>"
+
+# Whitespace-only fallback models: STRIX_VERTEX_FALLBACK_MODELS set to "  ".
+# This bypasses the :- default but produces an empty array from read -r -a.
+# The gate should emit "No fallback models configured" (not the misleading
+# "All configured fallback models are the same as the primary model").
+run_gate_case "empty-fallback-models" \
+	"vertex_ai/empty-fb-primary" \
+	"   " \
+	"1" \
+	"No fallback models configured" \
+	"1" \
+	"vertex_ai/empty-fb-primary" \
+	"<unset>"
 
 if [ "$FAILURES" -ne 0 ]; then
 	echo "test_strix_quick_gate: ${FAILURES} failure(s)" >&2
