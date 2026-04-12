@@ -74,7 +74,10 @@ run_gate_case() {
   # so grep -r over the target path never matches the fake strix script itself.
   local bin_dir="$tmp_dir/bin"
   local workspace_dir="$tmp_dir/workspace"
-  mkdir -p "$bin_dir" "$workspace_dir/src"
+  local repo_root_dir="$workspace_dir/smart-crawling-server"
+  mkdir -p "$bin_dir" "$repo_root_dir/src"
+  mkdir -p "$repo_root_dir/scripts/ci"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
   local fake_strix="$bin_dir/strix"
   local call_log="$tmp_dir/calls.log"
   local api_base_log="$tmp_dir/api_base.log"
@@ -82,11 +85,11 @@ run_gate_case() {
   local state_file="$tmp_dir/state.log"
   local output_log="$tmp_dir/output.log"
 
-  # Resolve target path: use custom if provided, else default to $workspace_dir.
-  local effective_target_path="$workspace_dir"
+  # Resolve target path: use custom if provided, else default to $repo_root_dir.
+  local effective_target_path="$repo_root_dir"
   if [ "$custom_target_path" = "__USE_SUBDIR_SRC__" ]; then
-    # Simulate STRIX_TARGET_PATH=./src by using $workspace_dir/src.
-    effective_target_path="$workspace_dir/src"
+    # Simulate STRIX_TARGET_PATH=./src by using $repo_root_dir/src.
+    effective_target_path="$repo_root_dir/src"
   elif [ -n "$custom_target_path" ]; then
     effective_target_path="$custom_target_path"
     # Ensure the custom target path exists
@@ -905,30 +908,32 @@ EOF
   # Scenario-specific source-tree setup so is_hallucinated_endpoint_finding()
   # can locate "real" endpoints inside the self-contained temp workspace.
   if [ "$effective_event_name" = "pull_request" ]; then
-    mkdir -p "$workspace_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller"
-    mkdir -p "$workspace_dir/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service"
-    mkdir -p "$workspace_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util"
-    echo 'class ChangedController {}' >"$workspace_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
-    echo 'class ChangedPlaywright {}' >"$workspace_dir/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java"
-    echo 'class ChangedJwtUtil {}' >"$workspace_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
+    mkdir -p "$repo_root_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller"
+    mkdir -p "$repo_root_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl"
+    mkdir -p "$repo_root_dir/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service"
+    mkdir -p "$repo_root_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util"
+    echo 'class ChangedController {}' >"$repo_root_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
+    echo 'class BaselineUserService {}' >"$repo_root_dir/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java"
+    echo 'class ChangedPlaywright {}' >"$repo_root_dir/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java"
+    echo 'class ChangedJwtUtil {}' >"$repo_root_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
   fi
 
   if [ "$scenario" = "vertex-primary-existing-endpoint-nonrecoverable" ]; then
-    echo 'GET /api/status' >"$workspace_dir/src/routes.txt"
+    echo 'GET /api/status' >"$repo_root_dir/src/routes.txt"
   elif [ "$scenario" = "multi-source-dirs-existing-endpoint" ]; then
     # Endpoint lives in api/ (not src/), validating multi-dir scanning.
-    mkdir -p "$workspace_dir/api"
-    echo 'GET /api/status' >"$workspace_dir/api/routes.txt"
+    mkdir -p "$repo_root_dir/api"
+    echo 'GET /api/status' >"$repo_root_dir/api/routes.txt"
   elif [ "$scenario" = "endpoint-in-excluded-dir" ]; then
     # Endpoint /api/hidden-secret exists ONLY inside excluded directories
     # (.git/ and node_modules/). The grep excludes must prevent matching,
     # so the finding is treated as hallucinated → fallback allowed.
-    mkdir -p "$workspace_dir/.git/refs"
-    echo 'GET /api/hidden-secret' >"$workspace_dir/.git/refs/leaked.txt"
-    mkdir -p "$workspace_dir/node_modules/fake-pkg"
-    echo 'GET /api/hidden-secret' >"$workspace_dir/node_modules/fake-pkg/index.js"
+    mkdir -p "$repo_root_dir/.git/refs"
+    echo 'GET /api/hidden-secret' >"$repo_root_dir/.git/refs/leaked.txt"
+    mkdir -p "$repo_root_dir/node_modules/fake-pkg"
+    echo 'GET /api/hidden-secret' >"$repo_root_dir/node_modules/fake-pkg/index.js"
   elif [ "$scenario" = "pr-changed-scope-bounded" ]; then
-    echo 'class Unrelated {}' >"$workspace_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
+    echo 'class Unrelated {}' >"$repo_root_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
   fi
 
   set +e
@@ -950,8 +955,9 @@ EOF
     STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="$transient_retry_backoff_seconds"
     STRIX_PROCESS_TIMEOUT_SECONDS="$process_timeout_seconds"
     STRIX_TOTAL_TIMEOUT_SECONDS="$total_timeout_seconds"
+    STRIX_REPO_ROOT="$repo_root_dir"
     STRIX_FAIL_ON_MIN_SEVERITY="$min_fail_severity"
-    STRIX_REPORTS_DIR="$workspace_dir/strix_runs"
+    STRIX_REPORTS_DIR="$repo_root_dir/strix_runs"
     STRIX_TARGET_PATH="$effective_target_path"
   )
   # Only export STRIX_VERTEX_FALLBACK_MODELS when a non-empty value is
@@ -2016,7 +2022,7 @@ run_gate_case "pr-changed-scope-bounded" \
   "1200" \
   "0" \
   "pull_request" \
-  $'sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java\nsync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java'
+  "sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
 
 run_gate_case "pr-changed-scope-bounded" \
   "openai/gpt-4o-mini" \
@@ -2037,7 +2043,7 @@ run_gate_case "pr-changed-scope-bounded" \
   "1200" \
   "0" \
   "" \
-  $'sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java\nsync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java' \
+  "sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
   "pull_request"
 
 run_gate_case "success" \
