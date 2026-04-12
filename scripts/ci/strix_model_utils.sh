@@ -7,6 +7,43 @@ trim_whitespace() {
   echo "$value"
 }
 
+is_safe_model_token() {
+  [[ "$1" =~ ^[[:alnum:]_.:-]+$ ]]
+}
+
+sanitize_provider_name() {
+  local provider
+  provider="$(trim_whitespace "$1")"
+  if [ -z "$provider" ]; then
+    return 0
+  fi
+  if ! is_safe_model_token "$provider"; then
+    echo "ERROR: provider name '$provider' contains unsupported characters." >&2
+    return 2
+  fi
+  printf '%s\n' "$provider"
+}
+
+validate_model_identifier() {
+  local identifier
+  identifier="$(trim_whitespace "$1")"
+  if [ -z "$identifier" ]; then
+    echo "ERROR: model identifier must not be empty." >&2
+    return 2
+  fi
+
+  local segment
+  IFS='/' read -r -a _model_segments <<<"$identifier"
+  for segment in "${_model_segments[@]}"; do
+    if [ -z "$segment" ] || ! is_safe_model_token "$segment"; then
+      echo "ERROR: model identifier '$identifier' contains unsupported characters." >&2
+      return 2
+    fi
+  done
+
+  printf '%s\n' "$identifier"
+}
+
 is_provider_qualified_model() {
   case "$1" in
     vertex_ai/* | vertex_ai_beta/* | openai/* | anthropic/* | azure/* | gemini/* | bedrock/* | groq/* | mistral/* | cohere/* | ollama/* | huggingface/* | xai/*)
@@ -102,17 +139,20 @@ normalize_model() {
   fi
 
   if is_provider_qualified_model "$raw_model"; then
-    echo "$raw_model"
-    return 0
+    validate_model_identifier "$raw_model"
+    return $?
   fi
 
   if [[ "$raw_model" == */* ]] && ! is_vertex_resource_path "$raw_model"; then
-    echo "$raw_model"
-    return 0
+    validate_model_identifier "$raw_model"
+    return $?
   fi
 
   local provider="${DEFAULT_PROVIDER:-${STRIX_LLM_DEFAULT_PROVIDER:-}}"
   provider="${provider%/}"
+  if ! provider="$(sanitize_provider_name "$provider")"; then
+    return 2
+  fi
 
   if is_vertex_resource_path "$raw_model"; then
     local vertex_provider="$provider"
@@ -120,13 +160,13 @@ normalize_model() {
       vertex_provider="vertex_ai"
     fi
 
-    echo "$vertex_provider/$(extract_vertex_model_id "$raw_model")"
-    return 0
+    validate_model_identifier "$vertex_provider/$(extract_vertex_model_id "$raw_model")"
+    return $?
   fi
 
   if [ -z "$provider" ]; then
-    echo "$raw_model"
-    return 0
+    validate_model_identifier "$raw_model"
+    return $?
   fi
 
   local normalized_model="$raw_model"
@@ -134,5 +174,5 @@ normalize_model() {
     normalized_model="$(extract_vertex_model_id "$raw_model")"
   fi
 
-  echo "$provider/$normalized_model"
+  validate_model_identifier "$provider/$normalized_model"
 }
