@@ -67,6 +67,7 @@ run_gate_case() {
   local github_event_name="${19-}"
   local changed_files_override="${20-}"
   local event_name_override="${21-}"
+  local pr_scope_max_files_per_batch="${22-}"
 
   local tmp_dir
   tmp_dir="$(mktemp -d)"
@@ -77,7 +78,10 @@ run_gate_case() {
   local repo_root_dir="$workspace_dir/smart-crawling-server"
   mkdir -p "$bin_dir" "$repo_root_dir/src"
   mkdir -p "$repo_root_dir/scripts/ci"
+  local gate_under_test="$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$GATE_SCRIPT" "$gate_under_test"
   cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$gate_under_test"
   local fake_strix="$bin_dir/strix"
   local call_log="$tmp_dir/calls.log"
   local api_base_log="$tmp_dir/api_base.log"
@@ -892,6 +896,48 @@ EOS
 		echo "scan ok with bounded changed-file scope"
 		exit 0
 		;;
+	pr-changed-scope-batched)
+		attempt="0"
+		if [ -f "${FAKE_STRIX_STATE_FILE:?}" ]; then
+			attempt="$(cat "${FAKE_STRIX_STATE_FILE:?}")"
+		fi
+		attempt="$((attempt + 1))"
+		echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
+		if [ "$attempt" -eq 1 ]; then
+			if [ ! -f "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" ]; then
+				echo "Error: first batch missing controller file ($target_path)" >&2
+				exit 44
+			fi
+			if [ ! -f "$target_path/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java" ]; then
+				echo "Error: first batch missing playwright file ($target_path)" >&2
+				exit 45
+			fi
+			if [ -e "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java" ]; then
+				echo "Error: first batch leaked second-batch file ($target_path)" >&2
+				exit 46
+			fi
+			echo "scan ok with batched changed-file scope (batch 1)"
+			exit 0
+		fi
+		if [ "$attempt" -eq 2 ]; then
+			if [ -e "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" ]; then
+				echo "Error: second batch leaked first-batch controller ($target_path)" >&2
+				exit 47
+			fi
+			if [ -e "$target_path/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java" ]; then
+				echo "Error: second batch leaked first-batch playwright file ($target_path)" >&2
+				exit 48
+			fi
+			if [ ! -f "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java" ]; then
+				echo "Error: second batch missing service impl file ($target_path)" >&2
+				exit 49
+			fi
+			echo "scan ok with batched changed-file scope (batch 2)"
+			exit 0
+		fi
+		echo "Error: unexpected batch attempt $attempt" >&2
+		exit 50
+		;;
 	*)
 		echo "unknown scenario ${FAKE_STRIX_SCENARIO:?}" >&2
 		exit 8
@@ -970,6 +1016,9 @@ EOF
   if [ -n "$custom_source_dirs" ]; then
     env_cmd+=(STRIX_SOURCE_DIRS="$custom_source_dirs")
   fi
+  if [ -n "$pr_scope_max_files_per_batch" ]; then
+    env_cmd+=(STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="$pr_scope_max_files_per_batch")
+  fi
   if [ -n "$github_event_name" ]; then
     env_cmd+=(GITHUB_EVENT_NAME="$github_event_name")
   fi
@@ -982,7 +1031,7 @@ EOF
     env_cmd+=(STRIX_CHANGED_FILES="$changed_files_override")
   fi
   env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_CHANGED_FILES "${env_cmd[@]}" \
-    bash "$GATE_SCRIPT" >"$output_log" 2>&1
+    bash "$gate_under_test" >"$output_log" 2>&1
   local rc=$?
   set -e
 
@@ -2045,6 +2094,29 @@ run_gate_case "pr-changed-scope-bounded" \
   "" \
   "sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
   "pull_request"
+
+run_gate_case "pr-changed-scope-batched" \
+  "openai/gpt-4o-mini" \
+  "" \
+  "0" \
+  "Scoped pull request Strix scan to 3 changed file(s) across 2 batch(es)." \
+  "2" \
+  "openai/gpt-4o-mini|openai/gpt-4o-mini" \
+  "https://example.invalid|https://example.invalid" \
+  "vertex_ai" \
+  "__DEFAULT__" \
+  "" \
+  "0" \
+  "CRITICAL" \
+  "0" \
+  "" \
+  "" \
+  "1200" \
+  "0" \
+  "pull_request" \
+  $'sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java\nsync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java\nsync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java' \
+  "" \
+  "2"
 
 run_gate_case "success" \
   "openai/gpt-4o-mini" \
