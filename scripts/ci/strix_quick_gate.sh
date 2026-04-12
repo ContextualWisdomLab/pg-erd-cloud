@@ -11,8 +11,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$({ CDPATH='' && cd -P -- "$(dirname -- "$0")" && pwd -P; })"
 REPO_ROOT="$({ CDPATH='' && cd -P -- "$SCRIPT_DIR/../.." && pwd -P; })"
-TARGET_PATH="${STRIX_TARGET_PATH:-./}"
-SCAN_MODE="${STRIX_SCAN_MODE:-quick}"
+RAW_TARGET_PATH="${STRIX_TARGET_PATH:-./}"
+TARGET_PATH=""
+RAW_SCAN_MODE="${STRIX_SCAN_MODE:-quick}"
+SCAN_MODE=""
 ARTIFACT_REPORTS_DIR_RAW="${STRIX_REPORTS_DIR:-strix_runs}"
 case "$ARTIFACT_REPORTS_DIR_RAW" in
   /*) ARTIFACT_REPORTS_DIR="$ARTIFACT_REPORTS_DIR_RAW" ;;
@@ -24,9 +26,10 @@ ACTIVE_REPORTS_DIR="$STRIX_RUNTIME_DIR/reports"
 STRIX_REPORTS_DIR="$ACTIVE_REPORTS_DIR"
 STRIX_PROCESS_TIMEOUT_SECONDS="${STRIX_PROCESS_TIMEOUT_SECONDS:-1200}"
 STRIX_TOTAL_TIMEOUT_SECONDS="${STRIX_TOTAL_TIMEOUT_SECONDS:-0}"
-STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="${STRIX_PR_SCOPE_MAX_FILES_PER_BATCH:-40}"
+STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="${STRIX_PR_SCOPE_MAX_FILES_PER_BATCH:-20}"
 # shellcheck disable=SC2034  # consumed by sourced normalize_model helper
-DEFAULT_PROVIDER="${STRIX_LLM_DEFAULT_PROVIDER:-}"
+DEFAULT_PROVIDER_RAW="${STRIX_LLM_DEFAULT_PROVIDER:-}"
+DEFAULT_PROVIDER=""
 ORIGINAL_LLM_API_BASE="${LLM_API_BASE:-}"
 STRIX_TRANSIENT_RETRY_PER_MODEL="${STRIX_TRANSIENT_RETRY_PER_MODEL:-0}"
 STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="${STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS:-3}"
@@ -47,7 +50,7 @@ PR_FINDINGS_DECISION="not_applicable"
 CHANGED_FILES=()
 PULL_REQUEST_SCOPE_DIRS=()
 
-# shellcheck disable=SC2317  # invoked from cleanup trap
+# shellcheck disable=SC2317,SC2329  # invoked from cleanup trap
 publish_artifact_reports() {
   if [ -L "$ARTIFACT_REPORTS_DIR" ]; then
     echo "ERROR: artifact reports path must not be a symlink: $ARTIFACT_REPORTS_DIR" >&2
@@ -60,7 +63,7 @@ publish_artifact_reports() {
   fi
 }
 
-# shellcheck disable=SC2317  # invoked from EXIT/INT/TERM trap
+# shellcheck disable=SC2317,SC2329  # invoked from EXIT/INT/TERM trap
 cleanup_runtime() {
   publish_artifact_reports || true
   rm -f "$STRIX_LOG"
@@ -161,6 +164,10 @@ is_preexisting_report_dir() {
   return 1
 }
 
+if ! DEFAULT_PROVIDER="$(sanitize_provider_name "$DEFAULT_PROVIDER_RAW")"; then
+  exit 2
+fi
+
 PRIMARY_MODEL="$(normalize_model "$STRIX_LLM")"
 if [ "$PRIMARY_MODEL" != "$STRIX_LLM" ]; then
   echo "Normalized STRIX_LLM to provider-qualified model '$PRIMARY_MODEL'."
@@ -194,8 +201,6 @@ remaining_total_budget() {
 }
 
 capture_preexisting_report_dirs
-
-require_safe_scan_mode "$SCAN_MODE"
 
 is_pull_request_event() {
   [ "${GITHUB_EVENT_NAME:-${EVENT_NAME:-}}" = "pull_request" ]
@@ -253,6 +258,12 @@ PY
   fi
   printf '%s\n' "$resolved_target"
 }
+
+SCAN_MODE="$(trim_whitespace "$RAW_SCAN_MODE")"
+require_safe_scan_mode "$SCAN_MODE"
+if ! TARGET_PATH="$(resolve_scan_target_path "$RAW_TARGET_PATH")"; then
+  exit 2
+fi
 
 load_pull_request_changed_files() {
   CHANGED_FILES=()
@@ -393,10 +404,24 @@ extract_vulnerability_locations() {
   local vuln_file="$1"
   local location
 
+  changed_file_is_in_pull_request_scope() {
+    local candidate="$1"
+    local changed_file
+    for changed_file in "${CHANGED_FILES[@]}"; do
+      if [ "$candidate" = "$changed_file" ]; then
+        return 0
+      fi
+    done
+    return 1
+  }
+
   normalize_vulnerability_location() {
     local raw_location="$1"
     raw_location="$(trim_whitespace "$raw_location")"
     if [ -z "$raw_location" ]; then
+      return 1
+    fi
+    if [[ "$raw_location" == *".."* ]]; then
       return 1
     fi
 
@@ -415,6 +440,9 @@ extract_vulnerability_locations() {
     fi
 
     if [ -f "$REPO_ROOT/$raw_location" ] && [ ! -L "$REPO_ROOT/$raw_location" ]; then
+      if is_pull_request_event && ! changed_file_is_in_pull_request_scope "$raw_location"; then
+        return 1
+      fi
       printf '%s\n' "$raw_location"
       return 0
     fi
