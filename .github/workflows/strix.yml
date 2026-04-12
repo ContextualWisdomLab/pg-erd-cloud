@@ -31,6 +31,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Self-test Strix gate script
         run: bash ./scripts/ci/test_strix_quick_gate.sh
@@ -71,10 +72,28 @@ jobs:
           fi
 
       - name: Authenticate to Google Cloud
+        id: gcp_auth
         if: steps.gate.outputs.enabled == 'true' && steps.gcp_gate.outputs.has_gcp == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Relocate generated GCP credentials outside scan target
+        if: steps.gate.outputs.enabled == 'true' && steps.gcp_gate.outputs.has_gcp == 'true'
+        run: |
+          auth_creds_path="${{ steps.gcp_auth.outputs.credentials_file_path }}"
+          if [ -z "$auth_creds_path" ] || [ ! -f "$auth_creds_path" ]; then
+            echo "Expected Google credentials file from auth step." >&2
+            exit 1
+          fi
+
+          relocated="$RUNNER_TEMP/$(basename "$auth_creds_path")"
+          mv "$auth_creds_path" "$relocated"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$relocated"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$relocated"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$relocated"
+          } >> "$GITHUB_ENV"
 
       - name: Install Strix
         if: steps.gate.outputs.enabled == 'true'
@@ -115,6 +134,9 @@ jobs:
           STRIX_TRANSIENT_RETRY_PER_MODEL: 2
           STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 3
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
 
       - name: Upload Strix reports artifact
