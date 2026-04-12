@@ -148,7 +148,7 @@ normalize_model() {
     return $?
   fi
 
-  local provider="${DEFAULT_PROVIDER:-${STRIX_LLM_DEFAULT_PROVIDER:-}}"
+  local provider="$DEFAULT_PROVIDER"
   provider="${provider%/}"
   if ! provider="$(sanitize_provider_name "$provider")"; then
     return 2
