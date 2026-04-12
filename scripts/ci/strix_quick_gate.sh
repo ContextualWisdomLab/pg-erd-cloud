@@ -9,12 +9,22 @@
 # for the 3-tier timeout classification hierarchy.
 set -euo pipefail
 
+SCRIPT_DIR="$({ CDPATH='' && cd -P -- "$(dirname -- "$0")" && pwd -P; })"
+REPO_ROOT="$({ CDPATH='' && cd -P -- "$SCRIPT_DIR/../.." && pwd -P; })"
 TARGET_PATH="${STRIX_TARGET_PATH:-./}"
 SCAN_MODE="${STRIX_SCAN_MODE:-quick}"
-STRIX_LOG="$(mktemp)"
-STRIX_REPORTS_DIR="${STRIX_REPORTS_DIR:-strix_runs}"
+ARTIFACT_REPORTS_DIR_RAW="${STRIX_REPORTS_DIR:-strix_runs}"
+case "$ARTIFACT_REPORTS_DIR_RAW" in
+  /*) ARTIFACT_REPORTS_DIR="$ARTIFACT_REPORTS_DIR_RAW" ;;
+  *) ARTIFACT_REPORTS_DIR="$REPO_ROOT/$ARTIFACT_REPORTS_DIR_RAW" ;;
+esac
+STRIX_RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/strix-runtime.XXXXXX")"
+STRIX_LOG="$STRIX_RUNTIME_DIR/strix.log"
+ACTIVE_REPORTS_DIR="$STRIX_RUNTIME_DIR/reports"
+STRIX_REPORTS_DIR="$ACTIVE_REPORTS_DIR"
 STRIX_PROCESS_TIMEOUT_SECONDS="${STRIX_PROCESS_TIMEOUT_SECONDS:-1200}"
 STRIX_TOTAL_TIMEOUT_SECONDS="${STRIX_TOTAL_TIMEOUT_SECONDS:-0}"
+STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="${STRIX_PR_SCOPE_MAX_FILES_PER_BATCH:-40}"
 # shellcheck disable=SC2034  # consumed by sourced normalize_model helper
 DEFAULT_PROVIDER="${STRIX_LLM_DEFAULT_PROVIDER:-}"
 ORIGINAL_LLM_API_BASE="${LLM_API_BASE:-}"
@@ -23,11 +33,10 @@ STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="${STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS:-
 STRIX_FAIL_ON_MIN_SEVERITY="${STRIX_FAIL_ON_MIN_SEVERITY:-CRITICAL}"
 RUN_START_EPOCH="$(date +%s)"
 PREEXISTING_REPORT_DIRS=()
-REPO_ROOT="${STRIX_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 REPO_NAME="${REPO_ROOT##*/}"
 SUPPORTED_SOURCE_FILE_EXTENSIONS='java|kt|kts|groovy|scala|py|js|jsx|ts|tsx|vue|yaml|yml|sh|sql|xml|json|md'
 # shellcheck source=scripts/ci/strix_model_utils.sh
-. "$REPO_ROOT/scripts/ci/strix_model_utils.sh"
+. "$SCRIPT_DIR/strix_model_utils.sh"
 # Sticky flag: once ANY attempt encounters an infrastructure error (rate limit,
 # LLM connection failure, mid-stream fallback, etc.), this flag stays 1 for
 # the rest of the run.  It prevents the "all findings below threshold" bypass
@@ -36,9 +45,33 @@ SUPPORTED_SOURCE_FILE_EXTENSIONS='java|kt|kts|groovy|scala|py|js|jsx|ts|tsx|vue|
 INFRA_ERROR_DETECTED=0
 PR_FINDINGS_DECISION="not_applicable"
 CHANGED_FILES=()
-PULL_REQUEST_SCOPE_DIR=""
+PULL_REQUEST_SCOPE_DIRS=()
 
-trap 'rm -f "$STRIX_LOG"; if [ -n "$PULL_REQUEST_SCOPE_DIR" ] && [ -d "$PULL_REQUEST_SCOPE_DIR" ]; then rm -rf "$PULL_REQUEST_SCOPE_DIR"; fi' EXIT INT TERM
+publish_artifact_reports() {
+  if [ -L "$ARTIFACT_REPORTS_DIR" ]; then
+    echo "ERROR: artifact reports path must not be a symlink: $ARTIFACT_REPORTS_DIR" >&2
+    return 1
+  fi
+  rm -rf "$ARTIFACT_REPORTS_DIR"
+  mkdir -p "$ARTIFACT_REPORTS_DIR"
+  if [ -d "$ACTIVE_REPORTS_DIR" ]; then
+    cp -R "$ACTIVE_REPORTS_DIR"/. "$ARTIFACT_REPORTS_DIR"/
+  fi
+}
+
+cleanup_runtime() {
+  publish_artifact_reports || true
+  rm -f "$STRIX_LOG"
+  rm -rf "$STRIX_RUNTIME_DIR"
+  local scope_dir
+  for scope_dir in "${PULL_REQUEST_SCOPE_DIRS[@]}"; do
+    if [ -n "$scope_dir" ] && [ -d "$scope_dir" ]; then
+      rm -rf "$scope_dir"
+    fi
+  done
+}
+
+trap cleanup_runtime EXIT INT TERM
 
 STRIX_LLM="$(trim_whitespace "${STRIX_LLM:-}")"
 if [ -z "$STRIX_LLM" ]; then
@@ -51,8 +84,6 @@ if [ -z "$LLM_API_KEY" ]; then
   echo "ERROR: LLM_API_KEY is required." >&2
   exit 2
 fi
-export STRIX_LLM
-export LLM_API_KEY
 
 require_non_negative_integer() {
   local value="$1"
@@ -61,6 +92,17 @@ require_non_negative_integer() {
     echo "ERROR: $label must be a non-negative integer, got '$value'." >&2
     exit 2
   fi
+}
+
+require_positive_integer() {
+  local value="$1"
+  local label="$2"
+  require_non_negative_integer "$value" "$label"
+  if [ "$value" -le 0 ]; then
+    echo "ERROR: $label must be greater than zero, got '$value'." >&2
+    exit 2
+  fi
+  return 0
 }
 
 severity_rank() {
@@ -118,6 +160,7 @@ require_non_negative_integer "$STRIX_TRANSIENT_RETRY_PER_MODEL" "STRIX_TRANSIENT
 require_non_negative_integer "$STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS" "STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS"
 require_non_negative_integer "$STRIX_PROCESS_TIMEOUT_SECONDS" "STRIX_PROCESS_TIMEOUT_SECONDS"
 require_non_negative_integer "$STRIX_TOTAL_TIMEOUT_SECONDS" "STRIX_TOTAL_TIMEOUT_SECONDS"
+require_positive_integer "$STRIX_PR_SCOPE_MAX_FILES_PER_BATCH" "STRIX_PR_SCOPE_MAX_FILES_PER_BATCH"
 
 if [ "$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")" -lt 0 ]; then
   echo "ERROR: STRIX_FAIL_ON_MIN_SEVERITY must be one of CRITICAL/HIGH/MEDIUM/LOW/INFO/INFORMATIONAL/NONE, got '$STRIX_FAIL_ON_MIN_SEVERITY'." >&2
@@ -225,6 +268,20 @@ is_scannable_changed_file() {
   return 0
 }
 
+build_pull_request_scope_dir() {
+  local scope_dir
+  scope_dir="$(mktemp -d "${TMPDIR:-/tmp}/strix-pr-scope.XXXXXX")"
+  PULL_REQUEST_SCOPE_DIRS+=("$scope_dir")
+
+  local changed_file
+  for changed_file in "$@"; do
+    mkdir -p "$scope_dir/$(dirname "$changed_file")"
+    cp "$REPO_ROOT/$changed_file" "$scope_dir/$changed_file"
+  done
+
+  printf '%s\n' "$scope_dir"
+}
+
 prepare_pull_request_scan_scope() {
   if ! is_pull_request_event; then
     return 0
@@ -248,13 +305,21 @@ prepare_pull_request_scan_scope() {
   fi
 
   CHANGED_FILES=("${scoped_changed_files[@]}")
-  PULL_REQUEST_SCOPE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/strix-pr-scope.XXXXXX")"
-  for changed_file in "${CHANGED_FILES[@]}"; do
-    mkdir -p "$PULL_REQUEST_SCOPE_DIR/$(dirname "$changed_file")"
-    cp "$REPO_ROOT/$changed_file" "$PULL_REQUEST_SCOPE_DIR/$changed_file"
+  local total_files="${#CHANGED_FILES[@]}"
+  local batch_count=$(((total_files + STRIX_PR_SCOPE_MAX_FILES_PER_BATCH - 1) / STRIX_PR_SCOPE_MAX_FILES_PER_BATCH))
+  local batch_start=0
+  while [ "$batch_start" -lt "$total_files" ]; do
+    build_pull_request_scope_dir "${CHANGED_FILES[@]:batch_start:STRIX_PR_SCOPE_MAX_FILES_PER_BATCH}" >/dev/null
+    batch_start=$((batch_start + STRIX_PR_SCOPE_MAX_FILES_PER_BATCH))
   done
-  TARGET_PATH="$PULL_REQUEST_SCOPE_DIR"
-  printf "Scoped pull request Strix scan to %s changed file(s).\n" "${#CHANGED_FILES[@]}" >&2
+  printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
+  if [ "$batch_count" -gt 1 ]; then
+    printf " across %s batch(es)" "$batch_count" >&2
+  fi
+  printf ".\n" >&2
+  if [ "$batch_count" -eq 1 ]; then
+    TARGET_PATH="${PULL_REQUEST_SCOPE_DIRS[0]}"
+  fi
   return 0
 }
 
@@ -385,32 +450,41 @@ is_vertex_model() {
   esac
 }
 
-prepare_llm_api_base() {
+resolved_llm_api_base_for_model() {
   local model="$1"
 
   if is_vertex_model "$model"; then
-    unset LLM_API_BASE
     return 0
   fi
 
   local llm_api_base_value="${RAW_LLM_API_BASE:-$ORIGINAL_LLM_API_BASE}"
   llm_api_base_value="${llm_api_base_value%%/generateContent*}"
   llm_api_base_value="${llm_api_base_value%%:generateContent*}"
-  if [ -n "$llm_api_base_value" ]; then
-    export LLM_API_BASE="$llm_api_base_value"
-  else
-    unset LLM_API_BASE
+  llm_api_base_value="$(trim_whitespace "$llm_api_base_value")"
+  if [ -z "$llm_api_base_value" ]; then
+    return 0
   fi
+  if [[ "$llm_api_base_value" =~ [[:space:][:cntrl:]] ]]; then
+    echo "ERROR: LLM_API_BASE must not contain whitespace or control characters." >&2
+    return 2
+  fi
+  if [[ ! "$llm_api_base_value" =~ ^https://[^[:space:]]+$ ]]; then
+    echo "ERROR: LLM_API_BASE must be an https URL when configured." >&2
+    return 2
+  fi
+  printf '%s\n' "$llm_api_base_value"
 }
 
 ## Run a single strix invocation against TARGET_PATH with the given model.
-## Sets STRIX_LLM, LLM_MODEL, and prepares LLM_API_BASE before invocation.
+## Builds a child-only environment so secrets and model routing do not leak
+## through the parent shell process.
 ## Returns 0 on success (strix exit 0), 1 on any failure.
 ## The caller is responsible for retry/fallback logic; process-level timeout
 ## wrapping prevents CI from hanging indefinitely.
 run_strix_once() {
   local model="$1"
   local rc
+  local llm_api_base_value
   local timeout_seconds="$STRIX_PROCESS_TIMEOUT_SECONDS"
   if [ "$STRIX_TOTAL_TIMEOUT_SECONDS" -gt 0 ]; then
     local remaining_budget
@@ -423,17 +497,20 @@ run_strix_once() {
       timeout_seconds="$remaining_budget"
     fi
   fi
-  export STRIX_LLM="$model"
-  export LLM_MODEL="$model"
-  prepare_llm_api_base "$model"
+  if ! llm_api_base_value="$(resolved_llm_api_base_for_model "$model")"; then
+    return 1
+  fi
   local start_epoch
   start_epoch="$(date +%s)"
   set -o pipefail
   set +e
-  python3 - "$timeout_seconds" "$TARGET_PATH" "$SCAN_MODE" "$STRIX_LOG" <<'PY'
+  STRIX_CHILD_MODEL="$model" \
+    STRIX_CHILD_LLM_API_KEY="$LLM_API_KEY" \
+    STRIX_CHILD_LLM_API_BASE="$llm_api_base_value" \
+    STRIX_CHILD_REPORTS_DIR="$ACTIVE_REPORTS_DIR" \
+    python3 - "$timeout_seconds" "$TARGET_PATH" "$SCAN_MODE" "$STRIX_LOG" <<'PY'
 import os
 import pathlib
-import shlex
 import signal
 import subprocess
 import sys
@@ -443,28 +520,43 @@ target_path = sys.argv[2]
 scan_mode = sys.argv[3]
 log_path = pathlib.Path(sys.argv[4])
 process_timeout = None if timeout_seconds == 0 else timeout_seconds
+child_env = os.environ.copy()
+child_env["STRIX_LLM"] = os.environ["STRIX_CHILD_MODEL"]
+child_env["LLM_MODEL"] = os.environ["STRIX_CHILD_MODEL"]
+child_env["LLM_API_KEY"] = os.environ["STRIX_CHILD_LLM_API_KEY"]
+child_env["STRIX_REPORTS_DIR"] = os.environ["STRIX_CHILD_REPORTS_DIR"]
+llm_api_base = os.environ.get("STRIX_CHILD_LLM_API_BASE", "")
+if llm_api_base:
+    child_env["LLM_API_BASE"] = llm_api_base
+else:
+    child_env.pop("LLM_API_BASE", None)
 
-command = (
-    f"set -o pipefail; strix -n -t {shlex.quote(target_path)} "
-    f"--scan-mode {shlex.quote(scan_mode)} 2>&1 | tee {shlex.quote(str(log_path))}"
-)
+command = ["strix", "-n", "-t", target_path, "--scan-mode", scan_mode]
 
 try:
     process = subprocess.Popen(
         command,
-        shell=True,
-        executable="/bin/bash",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=child_env,
         start_new_session=True,
     )
-    completed = process.wait(timeout=process_timeout)
-    raise SystemExit(completed)
+    output, _ = process.communicate(timeout=process_timeout)
+    if output:
+        sys.stdout.write(output)
+    log_path.write_text(output or "", encoding="utf-8")
+    raise SystemExit(process.returncode)
 except subprocess.TimeoutExpired:
     os.killpg(process.pid, signal.SIGTERM)
     try:
-        process.wait(timeout=5)
+        output, _ = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
+        output, _ = process.communicate()
+    if output:
+        sys.stdout.write(output)
+    log_path.write_text(output or "", encoding="utf-8")
     raise SystemExit(124)
 PY
   rc=$?
@@ -956,84 +1048,104 @@ is_vertex_retryable_error() {
   return 1
 }
 
-prepare_pull_request_scan_scope
+run_current_target_scan() {
+  INFRA_ERROR_DETECTED=0
 
-if run_strix_with_transient_retry "$PRIMARY_MODEL"; then
-  exit 0
-fi
-
-if has_only_below_threshold_vulnerabilities; then
-  exit 0
-fi
-
-if evaluate_pull_request_findings; then
-  exit 0
-fi
-
-case "$PR_FINDINGS_DECISION" in
-  block_changed | block_unmapped)
-    exit 1
-    ;;
-esac
-
-if ! is_vertex_model "$PRIMARY_MODEL"; then
-  echo "Strix quick scan failed with a non-recoverable error." >&2
-  exit 1
-fi
-
-if ! is_vertex_retryable_error; then
-  echo "Strix quick scan failed with a non-recoverable error." >&2
-  exit 1
-fi
-
-if [ -z "${STRIX_VERTEX_FALLBACK_MODELS+x}" ]; then
-  FALLBACK_MODELS_RAW="vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
-else
-  FALLBACK_MODELS_RAW="$STRIX_VERTEX_FALLBACK_MODELS"
-fi
-FALLBACK_MODELS_RAW="${FALLBACK_MODELS_RAW//$'\r'/ }"
-FALLBACK_MODELS_RAW="${FALLBACK_MODELS_RAW//$'\n'/ }"
-read -r -a FALLBACK_MODELS <<<"$FALLBACK_MODELS_RAW"
-
-fallback_tried=0
-for candidate_raw in "${FALLBACK_MODELS[@]}"; do
-  candidate="$(normalize_model "$candidate_raw")"
-  if [ -z "$candidate" ] || [ "$candidate" = "$PRIMARY_MODEL" ]; then
-    if [ -n "$candidate" ]; then
-      echo "Skipping fallback model '$candidate' — same as primary model." >&2
-    fi
-    continue
-  fi
-
-  fallback_tried=1
-  echo "Primary Vertex model unavailable; retrying with fallback '$candidate'."
-  if run_strix_with_transient_retry "$candidate"; then
-    echo "Strix quick scan succeeded with fallback model '$candidate'."
-    exit 0
+  if run_strix_with_transient_retry "$PRIMARY_MODEL"; then
+    return 0
   fi
 
   if has_only_below_threshold_vulnerabilities; then
-    exit 0
+    return 0
+  fi
+
+  if evaluate_pull_request_findings; then
+    return 0
+  fi
+
+  case "$PR_FINDINGS_DECISION" in
+    block_changed | block_unmapped)
+      return 1
+      ;;
+  esac
+
+  if ! is_vertex_model "$PRIMARY_MODEL"; then
+    echo "Strix quick scan failed with a non-recoverable error." >&2
+    return 1
   fi
 
   if ! is_vertex_retryable_error; then
     echo "Strix quick scan failed with a non-recoverable error." >&2
-    exit 1
+    return 1
   fi
-done
 
-## Differentiated fallback error messaging:
-## - Empty STRIX_VERTEX_FALLBACK_MODELS → "No fallback models configured"
-## - All entries match primary → "All configured fallback models are the same"
-## This prevents the misleading "all same as primary" message when no models
-## were configured at all.
-if [ "$fallback_tried" -eq 0 ]; then
-  if [ "${#FALLBACK_MODELS[@]}" -eq 0 ]; then
-    echo "ERROR: No fallback models configured (STRIX_VERTEX_FALLBACK_MODELS is empty). Configure distinct models." >&2
+  if [ -z "${STRIX_VERTEX_FALLBACK_MODELS+x}" ]; then
+    FALLBACK_MODELS_RAW="vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
   else
-    echo "ERROR: All configured fallback models are the same as the primary model '$PRIMARY_MODEL'. Configure distinct models in STRIX_VERTEX_FALLBACK_MODELS." >&2
+    FALLBACK_MODELS_RAW="$STRIX_VERTEX_FALLBACK_MODELS"
   fi
+  FALLBACK_MODELS_RAW="${FALLBACK_MODELS_RAW//$'\r'/ }"
+  FALLBACK_MODELS_RAW="${FALLBACK_MODELS_RAW//$'\n'/ }"
+  read -r -a FALLBACK_MODELS <<<"$FALLBACK_MODELS_RAW"
+
+  fallback_tried=0
+  for candidate_raw in "${FALLBACK_MODELS[@]}"; do
+    candidate="$(normalize_model "$candidate_raw")"
+    if [ -z "$candidate" ] || [ "$candidate" = "$PRIMARY_MODEL" ]; then
+      if [ -n "$candidate" ]; then
+        echo "Skipping fallback model '$candidate' — same as primary model." >&2
+      fi
+      continue
+    fi
+
+    fallback_tried=1
+    echo "Primary Vertex model unavailable; retrying with fallback '$candidate'."
+    if run_strix_with_transient_retry "$candidate"; then
+      echo "Strix quick scan succeeded with fallback model '$candidate'."
+      return 0
+    fi
+
+    if has_only_below_threshold_vulnerabilities; then
+      return 0
+    fi
+
+    if ! is_vertex_retryable_error; then
+      echo "Strix quick scan failed with a non-recoverable error." >&2
+      return 1
+    fi
+  done
+
+  if [ "$fallback_tried" -eq 0 ]; then
+    if [ "${#FALLBACK_MODELS[@]}" -eq 0 ]; then
+      echo "ERROR: No fallback models configured (STRIX_VERTEX_FALLBACK_MODELS is empty). Configure distinct models." >&2
+    else
+      echo "ERROR: All configured fallback models are the same as the primary model '$PRIMARY_MODEL'. Configure distinct models in STRIX_VERTEX_FALLBACK_MODELS." >&2
+    fi
+  fi
+
+  echo "Configured Vertex model and fallback models were unavailable." >&2
+  return 1
+}
+
+prepare_pull_request_scan_scope
+
+if [ "${#PULL_REQUEST_SCOPE_DIRS[@]}" -gt 1 ]; then
+  total_batches="${#PULL_REQUEST_SCOPE_DIRS[@]}"
+  batch_number=0
+  for scope_dir in "${PULL_REQUEST_SCOPE_DIRS[@]}"; do
+    batch_number=$((batch_number + 1))
+    TARGET_PATH="$scope_dir"
+    echo "Running pull request Strix batch ${batch_number}/${total_batches}." >&2
+    if ! run_current_target_scan; then
+      exit 1
+    fi
+    capture_preexisting_report_dirs
+  done
+  exit 0
 fi
 
-echo "Configured Vertex model and fallback models were unavailable." >&2
+if run_current_target_scan; then
+  exit 0
+fi
+
 exit 1
