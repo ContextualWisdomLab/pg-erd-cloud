@@ -104,8 +104,8 @@ run_gate_case() {
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "${STRIX_LLM:-}" >> "${FAKE_STRIX_CALL_LOG:?}"
-echo "${LLM_API_BASE:-<unset>}" >> "${FAKE_STRIX_API_BASE_LOG:?}"
+printf '%s\n' "${STRIX_LLM:-}" >> "${FAKE_STRIX_CALL_LOG:?}"
+printf '%s\n' "${LLM_API_BASE:-<unset>}" >> "${FAKE_STRIX_API_BASE_LOG:?}"
 
 target_path=""
 while [ "$#" -gt 0 ]; do
@@ -115,7 +115,7 @@ while [ "$#" -gt 0 ]; do
 	fi
 	shift
 done
-echo "$target_path" >> "${FAKE_STRIX_TARGET_LOG:?}"
+printf '%s\n' "$target_path" >> "${FAKE_STRIX_TARGET_LOG:?}"
 
 STRIX_REPORTS_DIR="${STRIX_REPORTS_DIR:-strix_runs}"
 
@@ -1108,7 +1108,11 @@ run_timeout_cleanup_case() {
   tmp_dir="$(mktemp -d)"
   local bin_dir="$tmp_dir/bin"
   local workspace_dir="$tmp_dir/workspace"
-  mkdir -p "$bin_dir" "$workspace_dir"
+  local repo_root_dir="$workspace_dir/smart-crawling-server"
+  mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
+  cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
   local fake_strix="$bin_dir/strix"
   local child_pid_file="$tmp_dir/child.pid"
   local output_log="$tmp_dir/output.log"
@@ -1132,9 +1136,9 @@ EOF
     LLM_API_KEY="dummy" \
     STRIX_PROCESS_TIMEOUT_SECONDS="1" \
     STRIX_VERTEX_FALLBACK_MODELS="" \
-    STRIX_REPORTS_DIR="$workspace_dir/strix_runs" \
-    STRIX_TARGET_PATH="$workspace_dir" \
-    bash "$GATE_SCRIPT" >"$output_log" 2>&1
+    STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+    STRIX_TARGET_PATH="$repo_root_dir" \
+    bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
   local rc=$?
   set -e
 
@@ -1168,7 +1172,11 @@ run_total_timeout_case() {
   tmp_dir="$(mktemp -d)"
   local bin_dir="$tmp_dir/bin"
   local workspace_dir="$tmp_dir/workspace"
-  mkdir -p "$bin_dir" "$workspace_dir"
+  local repo_root_dir="$workspace_dir/smart-crawling-server"
+  mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
+  cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
   local fake_strix="$bin_dir/strix"
   local output_log="$tmp_dir/output.log"
   local call_count_file="$tmp_dir/calls.log"
@@ -1193,9 +1201,9 @@ EOF
     STRIX_VERTEX_FALLBACK_MODELS="vertex_ai/fallback-one" \
     STRIX_TRANSIENT_RETRY_PER_MODEL="2" \
     STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="0" \
-    STRIX_REPORTS_DIR="$workspace_dir/strix_runs" \
-    STRIX_TARGET_PATH="$workspace_dir" \
-    bash "$GATE_SCRIPT" >"$output_log" 2>&1
+    STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+    STRIX_TARGET_PATH="$repo_root_dir" \
+    bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
   local rc=$?
   set -e
 
