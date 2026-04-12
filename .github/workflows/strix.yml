@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   strix:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -117,6 +118,50 @@ jobs:
             fi
           fi
 
+      - name: Compute pull_request Strix scan scope
+        id: pr_scope
+        if: steps.gate.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          base = os.environ.get("PR_BASE_SHA", "").strip()
+          head = os.environ.get("PR_HEAD_SHA", "").strip()
+          files = []
+          if base and head:
+              completed = subprocess.run(
+                  ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              pattern = re.compile(r".*\.(java|kt|kts|groovy|scala|py|js|jsx|ts|tsx|vue|yaml|yml|sh|sql|xml|json|md)$", re.IGNORECASE)
+              for raw_line in completed.stdout.splitlines():
+                  rel_path = raw_line.strip()
+                  if not rel_path or not pattern.fullmatch(rel_path):
+                      continue
+                  if rel_path.endswith((".md", ".txt")):
+                      continue
+                  if "/src/test/" in rel_path or rel_path.startswith("tests/"):
+                      continue
+                  if rel_path.endswith(("pnpm-lock.yaml", "package-lock.json", "yarn.lock", "uv.lock")):
+                      continue
+                  if not pathlib.Path(rel_path).is_file():
+                      continue
+                  files.append(rel_path)
+
+          print("files<<EOF")
+          if files:
+              print("\n".join(files))
+          print("EOF")
+          PY
+
       - name: Run Strix (quick)
         if: steps.gate.outputs.enabled == 'true'
         env:
@@ -133,8 +178,11 @@ jobs:
           STRIX_MEMORY_COMPRESSOR_TIMEOUT: 10
           STRIX_TRANSIENT_RETRY_PER_MODEL: 2
           STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 3
+          STRIX_PROCESS_TIMEOUT_SECONDS: 1200
+          STRIX_TOTAL_TIMEOUT_SECONDS: 3000
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
           EVENT_NAME: ${{ github.event_name }}
+          STRIX_CHANGED_FILES: ${{ github.event_name == 'pull_request' && steps.pr_scope.outputs.files || '' }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
