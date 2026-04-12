@@ -5,7 +5,7 @@ on:
     branches: [develop, main]
   pull_request:
   schedule:
-    # Nightly scan on protected branches.
+    # Weekly scan on protected branches (Mondays at 03:00 UTC).
     - cron: '0 3 * * 1'
   workflow_dispatch:
 
