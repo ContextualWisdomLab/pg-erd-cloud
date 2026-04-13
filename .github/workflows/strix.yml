@@ -119,6 +119,21 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install --no-cache-dir "strix-agent==0.8.3" "google-cloud-aiplatform>=1.133.0,<2"
 
+      - name: Resolve Strix executable
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          strix_bin="$(python3 - <<'PY'
+import pathlib
+import shutil
+
+path = shutil.which("strix")
+if not path:
+    raise SystemExit("strix executable not found after installation")
+print(pathlib.Path(path).resolve(strict=True))
+PY
+          )"
+          echo "STRIX_BIN=$strix_bin" >> "$GITHUB_ENV"
+
       - name: Mask LLM API key
         if: steps.gate.outputs.enabled == 'true'
         env:
@@ -199,6 +214,7 @@ jobs:
           STRIX_TOTAL_TIMEOUT_SECONDS: 3000
           STRIX_PR_SCOPE_MAX_FILES_PER_BATCH: 20
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
+          STRIX_BIN: ${{ env.STRIX_BIN }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
