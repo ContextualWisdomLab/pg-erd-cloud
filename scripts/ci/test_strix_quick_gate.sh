@@ -1331,9 +1331,15 @@ EOF
 run_stale_report_case() {
   local tmp_dir
   tmp_dir="$(mktemp -d)"
+  local repo_root_dir="$tmp_dir/workspace/smart-crawling-server"
   local output_log="$tmp_dir/output.log"
   local fake_strix="$tmp_dir/strix"
-  local stale_report_dir="$tmp_dir/strix_runs/stale/vulnerabilities"
+  local stale_report_dir="$repo_root_dir/strix_runs/stale/vulnerabilities"
+
+  mkdir -p "$repo_root_dir/scripts/ci"
+  cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
 
   mkdir -p "$stale_report_dir"
   cat >"$stale_report_dir/vuln-0001.md" <<'EOF'
@@ -1354,8 +1360,8 @@ EOF
     STRIX_LLM="openai/gpt-4o-mini" \
     LLM_API_KEY="dummy" \
     RAW_LLM_API_BASE="https://example.invalid/generateContent" \
-    STRIX_REPORTS_DIR="$tmp_dir/strix_runs" \
-    bash "$GATE_SCRIPT" >"$output_log" 2>&1
+    STRIX_REPORTS_DIR="strix_runs" \
+    bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
   local rc=$?
   set -e
 
@@ -1368,15 +1374,21 @@ EOF
 run_symlink_report_case() {
   local tmp_dir
   tmp_dir="$(mktemp -d)"
+  local repo_root_dir="$tmp_dir/workspace/smart-crawling-server"
   local output_log="$tmp_dir/output.log"
   local fake_strix="$tmp_dir/strix"
   local external_report_dir="$tmp_dir/external/vulnerabilities"
 
-  mkdir -p "$external_report_dir" "$tmp_dir/strix_runs"
+  mkdir -p "$repo_root_dir/scripts/ci"
+  cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+  mkdir -p "$external_report_dir" "$repo_root_dir/strix_runs"
   cat >"$external_report_dir/vuln-0001.md" <<'EOF'
 Severity: LOW
 EOF
-  ln -s "$tmp_dir/external" "$tmp_dir/strix_runs/latest"
+  ln -s "$tmp_dir/external" "$repo_root_dir/strix_runs/latest"
 
   cat >"$fake_strix" <<'EOF'
 #!/usr/bin/env bash
@@ -1392,8 +1404,8 @@ EOF
     STRIX_LLM="openai/gpt-4o-mini" \
     LLM_API_KEY="dummy" \
     RAW_LLM_API_BASE="https://example.invalid/generateContent" \
-    STRIX_REPORTS_DIR="$tmp_dir/strix_runs" \
-    bash "$GATE_SCRIPT" >"$output_log" 2>&1
+    STRIX_REPORTS_DIR="strix_runs" \
+    bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
   local rc=$?
   set -e
 
