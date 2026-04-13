@@ -372,6 +372,15 @@ is_scannable_changed_file() {
   if [ -z "$changed_file" ]; then
     return 1
   fi
+  if [[ "$changed_file" == *.md || "$changed_file" == *.txt ]]; then
+    return 1
+  fi
+  if [[ "$changed_file" == */src/test/* || "$changed_file" == tests/* || "$changed_file" == */tests/* ]]; then
+    return 1
+  fi
+  if [[ "$changed_file" == pnpm-lock.yaml || "$changed_file" == package-lock.json || "$changed_file" == yarn.lock || "$changed_file" == uv.lock ]]; then
+    return 1
+  fi
   if [[ "$changed_file" == */ ]]; then
     return 1
   fi
