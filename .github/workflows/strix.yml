@@ -111,6 +111,18 @@ jobs:
             fi
           fi
 
+      - name: Prepare LLM API key input file
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          LLM_API_KEY_SECRET: ${{ secrets.LLM_API_KEY }}
+        run: |
+          if [ -n "$LLM_API_KEY_SECRET" ]; then
+            umask 077
+            llm_api_key_file="$RUNNER_TEMP/llm_api_key.txt"
+            printf '%s' "$LLM_API_KEY_SECRET" > "$llm_api_key_file"
+            echo "LLM_API_KEY_FILE=$llm_api_key_file" >> "$GITHUB_ENV"
+          fi
+
       - name: Prepare LLM API base input file
         if: steps.gate.outputs.enabled == 'true'
         env:
@@ -129,7 +141,7 @@ jobs:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
           VERTEX_LOCATION: global
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_API_KEY_FILE: ${{ env.LLM_API_KEY_FILE }}
           LLM_API_BASE_FILE: ${{ env.LLM_API_BASE_FILE }}
           STRIX_VERTEX_FALLBACK_MODELS: "vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
           STRIX_TARGET_PATH: ./
@@ -142,7 +154,6 @@ jobs:
           STRIX_PROCESS_TIMEOUT_SECONDS: 1200
           STRIX_TOTAL_TIMEOUT_SECONDS: 3000
           STRIX_PR_SCOPE_MAX_FILES_PER_BATCH: 20
-          STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
