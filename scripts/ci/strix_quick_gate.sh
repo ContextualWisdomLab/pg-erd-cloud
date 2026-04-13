@@ -27,7 +27,7 @@ STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="${STRIX_PR_SCOPE_MAX_FILES_PER_BATCH:-20}"
 DEFAULT_PROVIDER_RAW="${STRIX_LLM_DEFAULT_PROVIDER:-}"
 # shellcheck disable=SC2034  # consumed indirectly by sourced model helper functions
 DEFAULT_PROVIDER=""
-ORIGINAL_LLM_API_BASE="${LLM_API_BASE:-}"
+LLM_API_BASE_FILE="${LLM_API_BASE_FILE:-}"
 STRIX_TRANSIENT_RETRY_PER_MODEL="${STRIX_TRANSIENT_RETRY_PER_MODEL:-0}"
 STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="${STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS:-3}"
 STRIX_FAIL_ON_MIN_SEVERITY="${STRIX_FAIL_ON_MIN_SEVERITY:-CRITICAL}"
@@ -743,7 +743,16 @@ resolved_llm_api_base_for_model() {
 		return 0
 	fi
 
-	local llm_api_base_value="${RAW_LLM_API_BASE:-$ORIGINAL_LLM_API_BASE}"
+	if [ -z "$LLM_API_BASE_FILE" ]; then
+		return 0
+	fi
+	if [ ! -f "$LLM_API_BASE_FILE" ] || [ -L "$LLM_API_BASE_FILE" ]; then
+		echo "ERROR: LLM_API_BASE_FILE must reference a regular file." >&2
+		return 2
+	fi
+
+	local llm_api_base_value
+	llm_api_base_value="$(cat -- "$LLM_API_BASE_FILE")"
 	llm_api_base_value="${llm_api_base_value%%/generateContent*}"
 	llm_api_base_value="${llm_api_base_value%%:generateContent*}"
 	llm_api_base_value="$(trim_whitespace "$llm_api_base_value")"
