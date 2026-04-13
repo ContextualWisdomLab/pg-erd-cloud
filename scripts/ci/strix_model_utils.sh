@@ -33,6 +33,7 @@ validate_model_identifier() {
   fi
 
   local segment
+  local -a _model_segments
   IFS='/' read -r -a _model_segments <<<"$identifier"
   for segment in "${_model_segments[@]}"; do
     if [ -z "$segment" ] || ! is_safe_model_token "$segment"; then
