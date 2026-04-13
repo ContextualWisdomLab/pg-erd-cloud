@@ -4,7 +4,7 @@ trim_whitespace() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
   value="${value%"${value##*[![:space:]]}"}"
-  echo "$value"
+  printf '%s\n' "$value"
 }
 
 is_safe_model_token() {
