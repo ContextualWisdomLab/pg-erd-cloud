@@ -83,9 +83,14 @@ if [ -z "$STRIX_LLM" ]; then
 	exit 2
 fi
 
-LLM_API_KEY="$(trim_whitespace "${LLM_API_KEY:-}")"
+LLM_API_KEY_FILE="${LLM_API_KEY_FILE:-}"
+if [ -z "$LLM_API_KEY_FILE" ] || [ ! -f "$LLM_API_KEY_FILE" ] || [ -L "$LLM_API_KEY_FILE" ]; then
+	echo "ERROR: LLM_API_KEY_FILE must reference a regular file containing the API key." >&2
+	exit 2
+fi
+LLM_API_KEY="$(trim_whitespace "$(cat -- "$LLM_API_KEY_FILE")")"
 if [ -z "$LLM_API_KEY" ]; then
-	echo "ERROR: LLM_API_KEY is required." >&2
+	echo "ERROR: LLM_API_KEY_FILE must contain a non-empty API key." >&2
 	exit 2
 fi
 
@@ -478,8 +483,7 @@ scope_root = Path(sys.argv[2]).resolve(strict=True)
 relative_path = Path(sys.argv[3])
 src_path = (repo_root / relative_path).resolve(strict=True)
 src_path.relative_to(repo_root)
-dst_path = (scope_root / relative_path).resolve(strict=False)
-dst_path.relative_to(scope_root)
+dst_path = scope_root / relative_path
 print(src_path)
 print(dst_path)
 PY
