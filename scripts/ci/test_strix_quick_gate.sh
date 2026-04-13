@@ -1415,6 +1415,48 @@ EOF
   rm -rf "$tmp_dir"
 }
 
+run_unsafe_target_path_case() {
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  local repo_root_dir="$tmp_dir/workspace/smart-crawling-server"
+  local output_log="$tmp_dir/output.log"
+  local fake_strix="$tmp_dir/strix"
+  local call_log="$tmp_dir/calls.log"
+
+  mkdir -p "$repo_root_dir/scripts/ci"
+  cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+  cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+  chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+  cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' called >>"${FAKE_STRIX_CALL_LOG:?}"
+exit 0
+EOF
+  chmod +x "$fake_strix"
+
+  set +e
+  env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+    PATH="$tmp_dir:$PATH" \
+    FAKE_STRIX_CALL_LOG="$call_log" \
+    STRIX_LLM="openai/gpt-4o-mini" \
+    LLM_API_KEY="dummy" \
+    RAW_LLM_API_BASE="https://example.invalid/generateContent" \
+    STRIX_TARGET_PATH="../../../../../etc/passwd" \
+    bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+  local rc=$?
+  set -e
+
+  assert_equals "2" "$rc" "case=unsafe-target-path exit code"
+  assert_file_contains "$output_log" "contains unsupported path syntax" "case=unsafe-target-path output"
+  if [ -f "$call_log" ]; then
+    record_failure "case=unsafe-target-path should reject before invoking strix"
+  fi
+
+  rm -rf "$tmp_dir"
+}
+
 run_gate_case "success" \
   "vertex_ai/ready-primary" \
   "vertex_ai/fallback-one vertex_ai/fallback-two" \
@@ -2063,6 +2105,7 @@ run_gate_case "infra-error-sticky-flag" \
 run_invalid_min_fail_severity_case
 run_stale_report_case
 run_symlink_report_case
+run_unsafe_target_path_case
 
 run_gate_case "slow-timeout" \
   "vertex_ai/slow-primary" \
