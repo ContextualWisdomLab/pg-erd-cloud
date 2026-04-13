@@ -85,6 +85,7 @@ jobs:
           relocated="$(python3 - "$auth_creds_path" <<'PY'
           from pathlib import Path
           import os
+          import re
           import shutil
           import sys
 
@@ -93,8 +94,13 @@ jobs:
 
           src_path = Path(sys.argv[1]).resolve(strict=True)
           runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
-          if runner_temp not in src_path.parents:
-              raise SystemExit(f"Expected auth-generated credentials inside RUNNER_TEMP, got {src_path}")
+          github_workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True)
+          if not re.fullmatch(r"gha-creds-[A-Za-z0-9]+\.json", src_path.name):
+              raise SystemExit(f"Unexpected auth credential filename: {src_path.name}")
+
+          allowed_roots = (runner_temp, github_workspace)
+          if not any(root == src_path.parent or root in src_path.parents for root in allowed_roots):
+              raise SystemExit(f"Expected auth-generated credentials inside RUNNER_TEMP or GITHUB_WORKSPACE, got {src_path}")
 
           relocated = runner_temp / "gha-creds-relocated.json"
           shutil.move(str(src_path), relocated)
