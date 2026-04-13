@@ -199,7 +199,6 @@ jobs:
           STRIX_TOTAL_TIMEOUT_SECONDS: 3000
           STRIX_PR_SCOPE_MAX_FILES_PER_BATCH: 20
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
-          STRIX_CHANGED_FILES: ${{ github.event_name == 'pull_request' && steps.pr_scope.outputs.files || '' }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
