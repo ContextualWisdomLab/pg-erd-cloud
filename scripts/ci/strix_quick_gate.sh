@@ -1266,13 +1266,14 @@ run_pull_request_batch_files() {
 	TARGET_PATH="$LAST_PULL_REQUEST_SCOPE_DIR"
 	echo "Running pull request Strix batch ${batch_label}/${total_batches}." >&2
 
-	if run_current_target_scan; then
+	run_current_target_scan
+	local batch_rc=$?
+	if [ "$batch_rc" -eq 0 ]; then
 		capture_preexisting_report_dirs
 		CURRENT_PULL_REQUEST_BATCH_FILE_COUNT="$previous_batch_file_count"
 		return 0
 	fi
 
-	local batch_rc=$?
 	if [ "$batch_rc" -eq 75 ]; then
 		local midpoint=$((CURRENT_PULL_REQUEST_BATCH_FILE_COUNT / 2))
 		if [ "$midpoint" -le 0 ]; then
