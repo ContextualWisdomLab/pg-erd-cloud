@@ -42,14 +42,13 @@ jobs:
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           strix_llm="$(printf '%s' "$STRIX_LLM" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           llm_api_key="$(printf '%s' "$LLM_API_KEY" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           if [ -z "$strix_llm" ] || [ -z "$llm_api_key" ]; then
             # On push/schedule to protected branches, fail-closed: missing
             # secrets must not silently produce a green check.
-            if [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "schedule" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
               echo '::error::Strix secrets not configured on push/schedule event; failing closed.'
               exit 1
             fi
@@ -180,8 +179,8 @@ jobs:
           STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 3
           STRIX_PROCESS_TIMEOUT_SECONDS: 1200
           STRIX_TOTAL_TIMEOUT_SECONDS: 3000
+          STRIX_PR_SCOPE_MAX_FILES_PER_BATCH: 20
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
-          EVENT_NAME: ${{ github.event_name }}
           STRIX_CHANGED_FILES: ${{ github.event_name == 'pull_request' && steps.pr_scope.outputs.files || '' }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
