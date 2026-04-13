@@ -82,31 +82,7 @@ jobs:
         if: steps.gate.outputs.enabled == 'true' && steps.gcp_gate.outputs.has_gcp == 'true'
         run: |
           auth_creds_path="${{ steps.gcp_auth.outputs.credentials_file_path }}"
-          relocated="$(python3 - "$auth_creds_path" <<'PY'
-          from pathlib import Path
-          import os
-          import re
-          import shutil
-          import sys
-
-          if len(sys.argv) != 2:
-              raise SystemExit("Expected credentials file path argument")
-
-          src_path = Path(sys.argv[1]).resolve(strict=True)
-          runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
-          github_workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True)
-          if not re.fullmatch(r"gha-creds-[A-Za-z0-9]+\.json", src_path.name):
-              raise SystemExit(f"Unexpected auth credential filename: {src_path.name}")
-
-          allowed_roots = (runner_temp, github_workspace)
-          if not any(root == src_path.parent or root in src_path.parents for root in allowed_roots):
-              raise SystemExit(f"Expected auth-generated credentials inside RUNNER_TEMP or GITHUB_WORKSPACE, got {src_path}")
-
-          relocated = runner_temp / "gha-creds-relocated.json"
-          shutil.move(str(src_path), relocated)
-          print(relocated)
-          PY
-          )"
+          relocated="$(AUTH_CREDS_PATH="$auth_creds_path" python3 -c 'from pathlib import Path; import os,re,shutil; src_path = Path(os.environ["AUTH_CREDS_PATH"]).resolve(strict=True); runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True); github_workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True); pattern = r"gha-creds-[A-Za-z0-9]+\.json"; (_ for _ in ()).throw(SystemExit(f"Unexpected auth credential filename: {src_path.name}")) if not re.fullmatch(pattern, src_path.name) else None; allowed_roots = (runner_temp, github_workspace); (_ for _ in ()).throw(SystemExit(f"Expected auth-generated credentials inside RUNNER_TEMP or GITHUB_WORKSPACE, got {src_path}")) if not any(root == src_path.parent or root in src_path.parents for root in allowed_roots) else None; relocated = runner_temp / "gha-creds-relocated.json"; shutil.move(str(src_path), relocated); print(relocated)')"
           {
             echo "GOOGLE_GHA_CREDS_PATH=$relocated"
             echo "GOOGLE_APPLICATION_CREDENTIALS=$relocated"
@@ -122,16 +98,7 @@ jobs:
       - name: Resolve Strix executable
         if: steps.gate.outputs.enabled == 'true'
         run: |
-          strix_bin="$(python3 - <<'PY'
-import pathlib
-import shutil
-
-path = shutil.which("strix")
-if not path:
-    raise SystemExit("strix executable not found after installation")
-print(pathlib.Path(path).resolve(strict=True))
-PY
-          )"
+          strix_bin="$(python3 -c 'import pathlib, shutil; path = shutil.which("strix"); (_ for _ in ()).throw(SystemExit("strix executable not found after installation")) if not path else None; print(pathlib.Path(path).resolve(strict=True))')"
           echo "STRIX_BIN=$strix_bin" >> "$GITHUB_ENV"
 
       - name: Mask LLM API key
