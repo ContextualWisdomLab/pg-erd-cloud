@@ -703,6 +703,7 @@ run_strix_once() {
 import os
 import pathlib
 import signal
+import shutil
 import subprocess
 import sys
 
@@ -722,7 +723,15 @@ if llm_api_base:
 else:
     child_env.pop("LLM_API_BASE", None)
 
-command = ["strix", "-n", "-t", target_path, "--scan-mode", scan_mode]
+resolved_strix_bin = os.environ.get("STRIX_BIN", "").strip()
+if not resolved_strix_bin:
+    resolved_strix_bin = shutil.which("strix") or ""
+if not resolved_strix_bin:
+    sys.stderr.write("ERROR: strix executable not found in PATH or STRIX_BIN.\n")
+    raise SystemExit(127)
+resolved_strix_bin = str(pathlib.Path(resolved_strix_bin).resolve(strict=True))
+
+command = [resolved_strix_bin, "-n", "-t", target_path, "--scan-mode", scan_mode]
 
 try:
     process = subprocess.Popen(
