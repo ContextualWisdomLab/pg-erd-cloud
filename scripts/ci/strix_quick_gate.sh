@@ -492,24 +492,36 @@ PY
 
   normalize_vulnerability_location() {
     local raw_location="$1"
-    raw_location="$(trim_whitespace "$raw_location")"
-    if [ -z "$raw_location" ]; then
-      return 1
-    fi
-    if [[ "$raw_location" == *".."* ]]; then
-      return 1
-    fi
+    raw_location="$({
+      python3 - "$REPO_ROOT" "$REPO_NAME" "$raw_location" <<'PY'
+from pathlib import Path
+from urllib.parse import unquote
+import sys
 
-    case "$raw_location" in
-      "$REPO_ROOT"/*)
-        raw_location="${raw_location#"$REPO_ROOT"/}"
-        ;;
-      /workspace/"$REPO_NAME"/*)
-        raw_location="${raw_location#/workspace/"$REPO_NAME"/}"
-        ;;
-    esac
+repo_root = Path(sys.argv[1]).resolve(strict=True)
+repo_name = sys.argv[2]
+raw_location = unquote(sys.argv[3].strip())
+if not raw_location:
+    raise SystemExit(1)
 
-    raw_location="${raw_location#./}"
+prefixes = (
+    str(repo_root) + "/",
+    f"/workspace/{repo_name}/",
+)
+for prefix in prefixes:
+    if raw_location.startswith(prefix):
+        raw_location = raw_location[len(prefix):]
+        break
+
+raw_location = raw_location.lstrip("./")
+if not raw_location:
+    raise SystemExit(1)
+
+candidate = (repo_root / raw_location).resolve(strict=True)
+relative = candidate.relative_to(repo_root)
+print(relative.as_posix())
+PY
+    })" || return 1
     if [ -z "$raw_location" ]; then
       return 1
     fi
@@ -575,6 +587,11 @@ evaluate_pull_request_findings() {
           fi
         fi
       done < <(grep -Ei 'severity[[:space:]]*:' "$vuln_file" || true)
+      if [ "$rank" -lt 0 ]; then
+        PR_FINDINGS_DECISION="block_unmapped"
+        echo "Unrecognized Strix severity marker; failing closed for pull request." >&2
+        return 1
+      fi
       if [ "$rank" -lt "$threshold_rank" ]; then
         continue
       fi
