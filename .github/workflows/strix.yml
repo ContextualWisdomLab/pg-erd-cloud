@@ -95,12 +95,6 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install --no-cache-dir "strix-agent==0.8.3" "google-cloud-aiplatform>=1.133.0,<2"
 
-      - name: Resolve Strix executable
-        if: steps.gate.outputs.enabled == 'true'
-        run: |
-          strix_bin="$(python3 -c 'import pathlib, shutil; path = shutil.which("strix"); (_ for _ in ()).throw(SystemExit("strix executable not found after installation")) if not path else None; print(pathlib.Path(path).resolve(strict=True))')"
-          echo "STRIX_BIN=$strix_bin" >> "$GITHUB_ENV"
-
       - name: Mask LLM API key
         if: steps.gate.outputs.enabled == 'true'
         env:
@@ -117,49 +111,17 @@ jobs:
             fi
           fi
 
-      - name: Compute pull_request Strix scan scope
-        id: pr_scope
-        if: steps.gate.outputs.enabled == 'true' && github.event_name == 'pull_request'
+      - name: Prepare LLM API base input file
+        if: steps.gate.outputs.enabled == 'true'
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LLM_API_BASE_SECRET: ${{ secrets.LLM_API_BASE }}
         run: |
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import os
-          import pathlib
-          import re
-          import subprocess
-
-          base = os.environ.get("PR_BASE_SHA", "").strip()
-          head = os.environ.get("PR_HEAD_SHA", "").strip()
-          files = []
-          if base and head:
-              completed = subprocess.run(
-                  ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head],
-                  check=True,
-                  capture_output=True,
-                  text=True,
-              )
-              pattern = re.compile(r".*\.(java|kt|kts|groovy|scala|py|js|jsx|ts|tsx|vue|yaml|yml|sh|sql|xml|json|md)$", re.IGNORECASE)
-              for raw_line in completed.stdout.splitlines():
-                  rel_path = raw_line.strip()
-                  if not rel_path or not pattern.fullmatch(rel_path):
-                      continue
-                  if rel_path.endswith((".md", ".txt")):
-                      continue
-                  if "/src/test/" in rel_path or rel_path.startswith("tests/"):
-                      continue
-                  if rel_path.endswith(("pnpm-lock.yaml", "package-lock.json", "yarn.lock", "uv.lock")):
-                      continue
-                  if not pathlib.Path(rel_path).is_file():
-                      continue
-                  files.append(rel_path)
-
-          print("files<<EOF")
-          if files:
-              print("\n".join(files))
-          print("EOF")
-          PY
+          if [ -n "$LLM_API_BASE_SECRET" ]; then
+            umask 077
+            llm_api_base_file="$RUNNER_TEMP/llm_api_base.txt"
+            printf '%s' "$LLM_API_BASE_SECRET" > "$llm_api_base_file"
+            echo "LLM_API_BASE_FILE=$llm_api_base_file" >> "$GITHUB_ENV"
+          fi
 
       - name: Run Strix (quick)
         if: steps.gate.outputs.enabled == 'true'
@@ -168,7 +130,7 @@ jobs:
           STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
           VERTEX_LOCATION: global
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          RAW_LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
+          LLM_API_BASE_FILE: ${{ env.LLM_API_BASE_FILE }}
           STRIX_VERTEX_FALLBACK_MODELS: "vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
           STRIX_TARGET_PATH: ./
           STRIX_REASONING_EFFORT: ${{ github.event_name == 'push' && 'low' || 'minimal' }}
@@ -181,7 +143,6 @@ jobs:
           STRIX_TOTAL_TIMEOUT_SECONDS: 3000
           STRIX_PR_SCOPE_MAX_FILES_PER_BATCH: 20
           STRIX_FAIL_ON_MIN_SEVERITY: CRITICAL
-          STRIX_BIN: ${{ env.STRIX_BIN }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         run: bash ./scripts/ci/strix_quick_gate.sh
