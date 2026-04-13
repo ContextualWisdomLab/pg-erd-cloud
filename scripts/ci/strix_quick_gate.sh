@@ -16,10 +16,7 @@ TARGET_PATH=""
 RAW_SCAN_MODE="${STRIX_SCAN_MODE:-quick}"
 SCAN_MODE=""
 ARTIFACT_REPORTS_DIR_RAW="${STRIX_REPORTS_DIR:-strix_runs}"
-case "$ARTIFACT_REPORTS_DIR_RAW" in
-  /*) ARTIFACT_REPORTS_DIR="$ARTIFACT_REPORTS_DIR_RAW" ;;
-  *) ARTIFACT_REPORTS_DIR="$REPO_ROOT/$ARTIFACT_REPORTS_DIR_RAW" ;;
-esac
+ARTIFACT_REPORTS_DIR=""
 STRIX_RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/strix-runtime.XXXXXX")"
 STRIX_LOG="$STRIX_RUNTIME_DIR/strix.log"
 ACTIVE_REPORTS_DIR="$STRIX_RUNTIME_DIR/reports"
@@ -59,10 +56,10 @@ publish_artifact_reports() {
     echo "ERROR: artifact reports path must not be a symlink: $ARTIFACT_REPORTS_DIR" >&2
     return 1
   fi
-  rm -rf "$ARTIFACT_REPORTS_DIR"
-  mkdir -p "$ARTIFACT_REPORTS_DIR"
+  rm -rf -- "$ARTIFACT_REPORTS_DIR"
+  mkdir -p -- "$ARTIFACT_REPORTS_DIR"
   if [ -d "$ACTIVE_REPORTS_DIR" ]; then
-    cp -R "$ACTIVE_REPORTS_DIR"/. "$ARTIFACT_REPORTS_DIR"/
+    cp -R -- "$ACTIVE_REPORTS_DIR"/. "$ARTIFACT_REPORTS_DIR"/
   fi
 }
 
@@ -74,7 +71,7 @@ cleanup_runtime() {
   local scope_dir
   for scope_dir in "${PULL_REQUEST_SCOPE_DIRS[@]}"; do
     if [ -n "$scope_dir" ] && [ -d "$scope_dir" ]; then
-      rm -rf "$scope_dir"
+      rm -rf -- "$scope_dir"
     fi
   done
 }
@@ -119,6 +116,44 @@ require_safe_scan_mode() {
     echo "ERROR: STRIX_SCAN_MODE contains unsupported characters: '$scan_mode'." >&2
     exit 2
   fi
+}
+
+resolve_artifact_reports_dir() {
+  local raw_dir="$1"
+  python3 - "$REPO_ROOT" "$raw_dir" <<'PY'
+from pathlib import Path
+import sys
+
+repo_root = Path(sys.argv[1]).resolve(strict=True)
+raw_dir = sys.argv[2].strip()
+if not raw_dir:
+    raise SystemExit(1)
+
+candidate = Path(raw_dir)
+if not candidate.is_absolute():
+    candidate = repo_root / candidate
+resolved = candidate.resolve(strict=False)
+try:
+    resolved.relative_to(repo_root)
+except ValueError:
+    raise SystemExit(1)
+if resolved == repo_root:
+    raise SystemExit(1)
+print(resolved)
+PY
+}
+
+changed_file_has_safe_path() {
+  local changed_file="$1"
+  if [ -z "$changed_file" ] || [[ "$changed_file" == /* ]] || [[ "$changed_file" == -* ]]; then
+    return 1
+  fi
+  case "$changed_file" in
+    ../* | */../* | */.. | ..)
+      return 1
+      ;;
+  esac
+  return 0
 }
 
 is_supported_source_file() {
@@ -216,6 +251,11 @@ remaining_total_budget() {
 }
 
 capture_preexisting_report_dirs
+
+if ! ARTIFACT_REPORTS_DIR="$(resolve_artifact_reports_dir "$ARTIFACT_REPORTS_DIR_RAW")"; then
+  echo "ERROR: STRIX_REPORTS_DIR must resolve to a dedicated directory inside the repository checkout." >&2
+  exit 2
+fi
 
 github_event_payload_has_pull_request() {
   if [ "${STRIX_TEST_CHANGED_FILES_OVERRIDE+x}" = x ] || { [ -n "${PR_BASE_SHA:-}" ] && [ -n "${PR_HEAD_SHA:-}" ]; }; then
@@ -384,6 +424,9 @@ is_scannable_changed_file() {
   if [[ "$changed_file" == */ ]]; then
     return 1
   fi
+  if ! changed_file_has_safe_path "$changed_file"; then
+    return 1
+  fi
   if ! is_supported_source_file "$changed_file"; then
     return 1
   fi
@@ -401,8 +444,12 @@ build_pull_request_scope_dir() {
 
   local changed_file
   for changed_file in "$@"; do
-    mkdir -p "$scope_dir/$(dirname "$changed_file")"
-    cp "$REPO_ROOT/$changed_file" "$scope_dir/$changed_file"
+    if ! changed_file_has_safe_path "$changed_file"; then
+      echo "ERROR: pull request changed file path is unsafe: $changed_file" >&2
+      return 2
+    fi
+    mkdir -p -- "$scope_dir/$(dirname -- "$changed_file")"
+    cp -- "$REPO_ROOT/$changed_file" "$scope_dir/$changed_file"
   done
   LAST_PULL_REQUEST_SCOPE_DIR="$scope_dir"
 }
