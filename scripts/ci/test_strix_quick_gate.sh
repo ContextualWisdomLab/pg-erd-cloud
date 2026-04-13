@@ -1214,7 +1214,7 @@ run_total_timeout_case() {
 set -euo pipefail
 
 echo "1" >> "${FAKE_STRIX_CALL_COUNT_FILE:?}"
-sleep 2
+sleep 5
 EOF
 	chmod +x "$fake_strix"
 
@@ -1225,7 +1225,7 @@ EOF
 		STRIX_LLM="vertex_ai/total-timeout-primary" \
 		LLM_API_KEY="dummy" \
 		STRIX_PROCESS_TIMEOUT_SECONDS="10" \
-		STRIX_TOTAL_TIMEOUT_SECONDS="1" \
+		STRIX_TOTAL_TIMEOUT_SECONDS="3" \
 		STRIX_VERTEX_FALLBACK_MODELS="vertex_ai/fallback-one" \
 		STRIX_TRANSIENT_RETRY_PER_MODEL="2" \
 		STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="0" \
@@ -1236,7 +1236,7 @@ EOF
 	set -e
 
 	assert_equals "1" "$rc" "total timeout exit code"
-	assert_file_contains "$output_log" "Strix quick scan exceeded total timeout of 1s." "total timeout output"
+	assert_file_contains "$output_log" "Strix quick scan exceeded total timeout of 3s." "total timeout output"
 	local actual_calls="0"
 	if [ -f "$call_count_file" ]; then
 		actual_calls="$(wc -l <"$call_count_file" | tr -d ' ')"
