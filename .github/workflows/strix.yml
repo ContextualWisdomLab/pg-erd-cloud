@@ -82,13 +82,25 @@ jobs:
         if: steps.gate.outputs.enabled == 'true' && steps.gcp_gate.outputs.has_gcp == 'true'
         run: |
           auth_creds_path="${{ steps.gcp_auth.outputs.credentials_file_path }}"
-          if [ -z "$auth_creds_path" ] || [ ! -f "$auth_creds_path" ]; then
-            echo "Expected Google credentials file from auth step." >&2
-            exit 1
-          fi
+          relocated="$(python3 - "$auth_creds_path" <<'PY'
+          from pathlib import Path
+          import os
+          import shutil
+          import sys
 
-          relocated="$RUNNER_TEMP/$(basename "$auth_creds_path")"
-          mv "$auth_creds_path" "$relocated"
+          if len(sys.argv) != 2:
+              raise SystemExit("Expected credentials file path argument")
+
+          src_path = Path(sys.argv[1]).resolve(strict=True)
+          runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
+          if runner_temp not in src_path.parents:
+              raise SystemExit(f"Expected auth-generated credentials inside RUNNER_TEMP, got {src_path}")
+
+          relocated = runner_temp / "gha-creds-relocated.json"
+          shutil.move(str(src_path), relocated)
+          print(relocated)
+          PY
+          )"
           {
             echo "GOOGLE_GHA_CREDS_PATH=$relocated"
             echo "GOOGLE_APPLICATION_CREDENTIALS=$relocated"
