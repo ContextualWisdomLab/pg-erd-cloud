@@ -923,34 +923,18 @@ EOS
 		echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
 		if [ "$attempt" -eq 1 ]; then
 			if [ ! -f "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" ]; then
-				echo "Error: first batch missing controller file ($target_path)" >&2
+				echo "Error: full-set scope missing controller file ($target_path)" >&2
 				exit 44
 			fi
 			if [ ! -f "$target_path/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java" ]; then
-				echo "Error: first batch missing playwright file ($target_path)" >&2
+				echo "Error: full-set scope missing playwright file ($target_path)" >&2
 				exit 45
 			fi
-			if [ -e "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java" ]; then
-				echo "Error: first batch leaked second-batch file ($target_path)" >&2
+			if [ ! -f "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java" ]; then
+				echo "Error: full-set scope missing service impl file ($target_path)" >&2
 				exit 46
 			fi
-			echo "scan ok with batched changed-file scope (batch 1)"
-			exit 0
-		fi
-		if [ "$attempt" -eq 2 ]; then
-			if [ -e "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" ]; then
-				echo "Error: second batch leaked first-batch controller ($target_path)" >&2
-				exit 47
-			fi
-			if [ -e "$target_path/sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java" ]; then
-				echo "Error: second batch leaked first-batch playwright file ($target_path)" >&2
-				exit 48
-			fi
-			if [ ! -f "$target_path/sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java" ]; then
-				echo "Error: second batch missing service impl file ($target_path)" >&2
-				exit 49
-			fi
-			echo "scan ok with batched changed-file scope (batch 2)"
+			echo "scan ok with full changed-file scope"
 			exit 0
 		fi
 		echo "Error: unexpected batch attempt $attempt" >&2
@@ -1051,6 +1035,7 @@ EOF
 	env_cmd+=(STRIX_LLM_FILE="$strix_llm_file")
 	printf '%s' 'dummy' >"$llm_api_key_file"
 	env_cmd+=(LLM_API_KEY_FILE="$llm_api_key_file")
+	env_cmd+=(STRIX_DISABLE_PR_SCOPING="0")
 	local llm_api_base_source="$raw_llm_api_base"
 	if [ -z "$llm_api_base_source" ] && [ -n "$initial_llm_api_base" ]; then
 		llm_api_base_source="$initial_llm_api_base"
@@ -1193,6 +1178,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$bin_dir:$PATH" \
+			STRIX_DISABLE_PR_SCOPING="0" \
 			FAKE_STRIX_CHILD_PID_FILE="$child_pid_file" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
@@ -1262,6 +1248,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$bin_dir:$PATH" \
+			STRIX_DISABLE_PR_SCOPING="0" \
 			FAKE_STRIX_CALL_COUNT_FILE="$call_count_file" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
@@ -1328,6 +1315,7 @@ EOF
 	set +e
 	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 		PATH="$tmp_dir:$PATH" \
+		STRIX_DISABLE_PR_SCOPING="0" \
 		STRIX_LLM_FILE="$strix_llm_file" \
 		LLM_API_KEY_FILE="$llm_api_key_file" \
 		STRIX_CALL_COUNT_FILE="$call_count_file" \
@@ -1368,6 +1356,7 @@ EOF
 	set +e
 	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 		PATH="$tmp_dir:$PATH" \
+		STRIX_DISABLE_PR_SCOPING="0" \
 		STRIX_LLM_FILE="$strix_llm_file" \
 		LLM_API_KEY_FILE="$llm_api_key_file" \
 		STRIX_FAIL_ON_MIN_SEVERITY="BOGUS" \
@@ -1424,6 +1413,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
+			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			LLM_API_BASE_FILE="$llm_api_base_file" \
@@ -1477,6 +1467,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
+			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			LLM_API_BASE_FILE="$llm_api_base_file" \
@@ -1524,6 +1515,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
+			STRIX_DISABLE_PR_SCOPING="0" \
 			FAKE_STRIX_CALL_LOG="$call_log" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
@@ -2258,10 +2250,10 @@ run_gate_case "pr-changed-scope-batched" \
 	"openai/gpt-4o-mini" \
 	"" \
 	"0" \
-	"Scoped pull request Strix scan to 3 changed file(s) across 2 batch(es)." \
-	"2" \
-	"openai/gpt-4o-mini|openai/gpt-4o-mini" \
-	"https://example.invalid|https://example.invalid" \
+	"Scoped pull request Strix scan to 3 changed file(s)." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
 	"vertex_ai" \
 	"__DEFAULT__" \
 	"" \
@@ -2273,9 +2265,7 @@ run_gate_case "pr-changed-scope-batched" \
 	"1200" \
 	"0" \
 	"pull_request" \
-	$'sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java\nsync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java\nsync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java' \
-	"" \
-	"2"
+	$'sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java\nsync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java\nsync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java'
 
 run_gate_case "pr-changed-scope-rebalanced" \
 	"vertex_ai/gemini-2.5-flash" \
