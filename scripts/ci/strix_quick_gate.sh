@@ -30,7 +30,7 @@ DEFAULT_PROVIDER=""
 LLM_API_BASE_FILE="${LLM_API_BASE_FILE:-}"
 STRIX_TRANSIENT_RETRY_PER_MODEL="${STRIX_TRANSIENT_RETRY_PER_MODEL:-0}"
 STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="${STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS:-3}"
-STRIX_FAIL_ON_MIN_SEVERITY="${STRIX_FAIL_ON_MIN_SEVERITY:-CRITICAL}"
+STRIX_FAIL_ON_MIN_SEVERITY="${STRIX_FAIL_ON_MIN_SEVERITY:-HIGH}"
 RUN_START_EPOCH="$(date +%s)"
 PREEXISTING_REPORT_DIRS=()
 REPO_NAME="${REPO_ROOT##*/}"
@@ -77,9 +77,14 @@ cleanup_runtime() {
 
 trap cleanup_runtime EXIT INT TERM
 
-STRIX_LLM="$(trim_whitespace "${STRIX_LLM:-}")"
+STRIX_LLM_FILE="${STRIX_LLM_FILE:-}"
+if [ -z "$STRIX_LLM_FILE" ] || [ ! -f "$STRIX_LLM_FILE" ] || [ -L "$STRIX_LLM_FILE" ]; then
+	echo "ERROR: STRIX_LLM_FILE must reference a regular file containing the model." >&2
+	exit 2
+fi
+STRIX_LLM="$(trim_whitespace "$(cat -- "$STRIX_LLM_FILE")")"
 if [ -z "$STRIX_LLM" ]; then
-	echo "ERROR: STRIX_LLM is required." >&2
+	echo "ERROR: STRIX_LLM_FILE must contain a non-empty model value." >&2
 	exit 2
 fi
 
@@ -153,6 +158,9 @@ import sys
 
 repo_root = Path(sys.argv[1]).resolve(strict=True)
 relative_path = Path(sys.argv[2].strip())
+relative_path_str = sys.argv[2].strip()
+if "\n" in relative_path_str or "\r" in relative_path_str:
+    raise SystemExit(1)
 if relative_path.is_absolute():
     raise SystemExit(1)
 if any(part in ('', '.', '..') for part in relative_path.parts):
@@ -425,10 +433,19 @@ is_scannable_changed_file() {
 	if [[ "$changed_file" == *.md || "$changed_file" == *.txt ]]; then
 		return 1
 	fi
+	if [[ "$changed_file" == .github/workflows/* || "$changed_file" == scripts/ci/* ]]; then
+		return 1
+	fi
 	if [[ "$changed_file" == */src/test/* || "$changed_file" == tests/* || "$changed_file" == */tests/* ]]; then
 		return 1
 	fi
+	if [[ "$changed_file" == */__tests__/* || "$changed_file" == *.test.ts || "$changed_file" == *.test.tsx || "$changed_file" == *.spec.ts || "$changed_file" == *.spec.tsx ]]; then
+		return 1
+	fi
 	if [[ "$changed_file" == pnpm-lock.yaml || "$changed_file" == package-lock.json || "$changed_file" == yarn.lock || "$changed_file" == uv.lock ]]; then
+		return 1
+	fi
+	if [[ "$changed_file" == infra/* ]]; then
 		return 1
 	fi
 	if [[ "$changed_file" == */ ]]; then
@@ -597,7 +614,9 @@ raw_location = raw_location.lstrip("./")
 if not raw_location:
     raise SystemExit(1)
 
-candidate = (repo_root / raw_location).resolve(strict=True)
+candidate = (repo_root / raw_location).resolve(strict=False)
+if not candidate.exists():
+    raise SystemExit(1)
 relative = candidate.relative_to(repo_root)
 print(relative.as_posix())
 PY
