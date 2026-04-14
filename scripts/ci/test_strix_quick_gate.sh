@@ -2464,8 +2464,15 @@ assert_vertex_path() {
 
 assert_vertex_extract() {
 	local label="$1" path="$2" expected="$3"
-	local actual
+	local actual rc
+	set +e
 	actual="$(extract_vertex_model_id "$path")"
+	rc=$?
+	set -e
+	if [ "$rc" -ne 0 ]; then
+		record_failure "extract_vertex_model_id($label) rc=$rc path='$path'"
+		return
+	fi
 	if [ "$actual" != "$expected" ]; then
 		echo "FAIL: extract_vertex_model_id($label): got '$actual' want '$expected'" >&2
 		FAILURES=$((FAILURES + 1))
@@ -2502,7 +2509,7 @@ assert_vertex_extract "plain-model-passthrough" "gemini-2.5-pro" "gemini-2.5-pro
 # Whitespace in paths — must be rejected (SAST word-splitting guard)
 assert_vertex_path "space-in-project" "projects/my proj/locations/us/models/foo" 1
 assert_vertex_path "tab-in-model-id" $'models/gemini\t2.5' 1
-assert_vertex_extract "space-passthrough" "models/my model" "models/my model"
+assert_vertex_path "space-in-model-id" "models/my model" 1
 
 # Endpoint only exists in excluded directories (.git/, node_modules/).
 # The grep --exclude-dir patterns must prevent matching, so the finding
