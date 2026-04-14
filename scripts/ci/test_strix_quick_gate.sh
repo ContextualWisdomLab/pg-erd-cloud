@@ -87,6 +87,7 @@ run_gate_case() {
 	local api_base_log="$tmp_dir/api_base.log"
 	local target_log="$tmp_dir/target.log"
 	local state_file="$tmp_dir/state.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 	local llm_api_base_file="$tmp_dir/llm_api_base.txt"
 	local output_log="$tmp_dir/output.log"
@@ -1036,7 +1037,6 @@ EOF
 		FAKE_STRIX_CALL_LOG="$call_log"
 		FAKE_STRIX_API_BASE_LOG="$api_base_log"
 		FAKE_STRIX_TARGET_LOG="$target_log"
-		STRIX_LLM="$initial_model"
 		STRIX_LLM_DEFAULT_PROVIDER="$default_provider"
 		FAKE_STRIX_STATE_FILE="$state_file"
 		STRIX_TRANSIENT_RETRY_PER_MODEL="$transient_retry_per_model"
@@ -1047,6 +1047,8 @@ EOF
 		STRIX_REPORTS_DIR="$repo_root_dir/strix_runs"
 		STRIX_TARGET_PATH="$effective_target_path"
 	)
+	printf '%s' "$initial_model" >"$strix_llm_file"
+	env_cmd+=(STRIX_LLM_FILE="$strix_llm_file")
 	printf '%s' 'dummy' >"$llm_api_key_file"
 	env_cmd+=(LLM_API_KEY_FILE="$llm_api_key_file")
 	local llm_api_base_source="$raw_llm_api_base"
@@ -1170,6 +1172,7 @@ run_timeout_cleanup_case() {
 	local fake_strix="$bin_dir/strix"
 	local child_pid_file="$tmp_dir/child.pid"
 	local output_log="$tmp_dir/output.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 
 	cat >"$fake_strix" <<'EOF'
@@ -1182,6 +1185,7 @@ printf '%s' "$child_pid" > "${FAKE_STRIX_CHILD_PID_FILE:?}"
 sleep 5
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'vertex_ai/timeout-cleanup-primary' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 
 	set +e
@@ -1190,7 +1194,7 @@ EOF
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$bin_dir:$PATH" \
 			FAKE_STRIX_CHILD_PID_FILE="$child_pid_file" \
-			STRIX_LLM="vertex_ai/timeout-cleanup-primary" \
+			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			STRIX_PROCESS_TIMEOUT_SECONDS="1" \
 			STRIX_VERTEX_FALLBACK_MODELS="" \
@@ -1239,6 +1243,7 @@ run_total_timeout_case() {
 	local fake_strix="$bin_dir/strix"
 	local output_log="$tmp_dir/output.log"
 	local call_count_file="$tmp_dir/calls.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 
 	cat >"$fake_strix" <<'EOF'
@@ -1249,6 +1254,7 @@ echo "1" >> "${FAKE_STRIX_CALL_COUNT_FILE:?}"
 sleep 5
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'vertex_ai/total-timeout-primary' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 
 	set +e
@@ -1257,7 +1263,7 @@ EOF
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$bin_dir:$PATH" \
 			FAKE_STRIX_CALL_COUNT_FILE="$call_count_file" \
-			STRIX_LLM="vertex_ai/total-timeout-primary" \
+			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			STRIX_PROCESS_TIMEOUT_SECONDS="10" \
 			STRIX_TOTAL_TIMEOUT_SECONDS="3" \
@@ -1302,6 +1308,7 @@ run_missing_config_case() {
 	local output_log="$tmp_dir/output.log"
 	local call_count_file="$tmp_dir/strix_calls"
 	local fake_strix="$tmp_dir/strix"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 
 	cat >"$fake_strix" <<'EOF'
@@ -1311,6 +1318,9 @@ echo "1" >> "${STRIX_CALL_COUNT_FILE:?}"
 exit 0
 EOF
 	chmod +x "$fake_strix"
+	if [ -n "$strix_llm" ]; then
+		printf '%s' "$strix_llm" >"$strix_llm_file"
+	fi
 	if [ -n "$llm_api_key" ]; then
 		printf '%s' "$llm_api_key" >"$llm_api_key_file"
 	fi
@@ -1318,7 +1328,7 @@ EOF
 	set +e
 	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 		PATH="$tmp_dir:$PATH" \
-		STRIX_LLM="$strix_llm" \
+		STRIX_LLM_FILE="$strix_llm_file" \
 		LLM_API_KEY_FILE="$llm_api_key_file" \
 		STRIX_CALL_COUNT_FILE="$call_count_file" \
 		bash "$GATE_SCRIPT" >"$output_log" 2>&1
@@ -1342,6 +1352,7 @@ run_invalid_min_fail_severity_case() {
 	tmp_dir="$(mktemp -d)"
 	local output_log="$tmp_dir/output.log"
 	local fake_strix="$tmp_dir/strix"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 
 	cat >"$fake_strix" <<'EOF'
@@ -1351,12 +1362,13 @@ echo "unexpected strix execution" >&2
 exit 99
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'vertex_ai/ready-primary' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 
 	set +e
 	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 		PATH="$tmp_dir:$PATH" \
-		STRIX_LLM="vertex_ai/ready-primary" \
+		STRIX_LLM_FILE="$strix_llm_file" \
 		LLM_API_KEY_FILE="$llm_api_key_file" \
 		STRIX_FAIL_ON_MIN_SEVERITY="BOGUS" \
 		bash "$GATE_SCRIPT" >"$output_log" 2>&1
@@ -1382,6 +1394,7 @@ run_stale_report_case() {
 	local output_log="$tmp_dir/output.log"
 	local fake_strix="$tmp_dir/strix"
 	local stale_report_dir="$repo_root_dir/strix_runs/stale/vulnerabilities"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 	local llm_api_base_file="$tmp_dir/llm_api_base.txt"
 
@@ -1402,6 +1415,7 @@ echo "Error: transport timeout"
 exit 1
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'openai/gpt-4o-mini' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
@@ -1410,7 +1424,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
-			STRIX_LLM="openai/gpt-4o-mini" \
+			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			LLM_API_BASE_FILE="$llm_api_base_file" \
 			STRIX_REPORTS_DIR="strix_runs" \
@@ -1432,6 +1446,7 @@ run_symlink_report_case() {
 	local output_log="$tmp_dir/output.log"
 	local fake_strix="$tmp_dir/strix"
 	local external_report_dir="$tmp_dir/external/vulnerabilities"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 	local llm_api_base_file="$tmp_dir/llm_api_base.txt"
 
@@ -1453,6 +1468,7 @@ echo "Error: transport timeout"
 exit 1
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'openai/gpt-4o-mini' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
@@ -1461,7 +1477,7 @@ EOF
 		cd "$repo_root_dir"
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
-			STRIX_LLM="openai/gpt-4o-mini" \
+			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			LLM_API_BASE_FILE="$llm_api_base_file" \
 			STRIX_REPORTS_DIR="strix_runs" \
@@ -1483,6 +1499,7 @@ run_unsafe_target_path_case() {
 	local output_log="$tmp_dir/output.log"
 	local fake_strix="$tmp_dir/strix"
 	local call_log="$tmp_dir/calls.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
 	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
 	local llm_api_base_file="$tmp_dir/llm_api_base.txt"
 
@@ -1498,6 +1515,7 @@ printf '%s\n' called >>"${FAKE_STRIX_CALL_LOG:?}"
 exit 0
 EOF
 	chmod +x "$fake_strix"
+	printf '%s' 'openai/gpt-4o-mini' >"$strix_llm_file"
 	printf '%s' 'dummy' >"$llm_api_key_file"
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
@@ -1507,7 +1525,7 @@ EOF
 		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
 			PATH="$tmp_dir:$PATH" \
 			FAKE_STRIX_CALL_LOG="$call_log" \
-			STRIX_LLM="openai/gpt-4o-mini" \
+			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			LLM_API_BASE_FILE="$llm_api_base_file" \
 			STRIX_TARGET_PATH="../../../../../etc/passwd" \
@@ -2303,6 +2321,27 @@ run_gate_case "success" \
 	"pull_request" \
 	"__SET_EMPTY__"
 
+run_gate_case "success" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"No scannable changed files in pull request; skipping Strix quick scan." \
+	"0" \
+	"" \
+	"" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	$'.github/workflows/strix.yml\nscripts/ci/strix_quick_gate.sh'
+
 run_gate_case "pr-baseline-critical-unchanged" \
 	"openai/gpt-4o-mini" \
 	"" \
@@ -2450,9 +2489,9 @@ run_gate_case "pr-critical-unmapped-other-workspace-repo" \
 	"pull_request" \
 	"sync-module-system/smart-crawling-playwright/src/main/java/org/empasy/sync/mcp/service/PlayWrightService.java"
 
-run_missing_config_case "missing-strix-llm" "" "dummy" "ERROR: STRIX_LLM is required."
+run_missing_config_case "missing-strix-llm" "" "dummy" "ERROR: STRIX_LLM_FILE must reference a regular file containing the model."
 run_missing_config_case "missing-llm-api-key" "vertex_ai/ready-primary" "" "ERROR: LLM_API_KEY_FILE must reference a regular file containing the API key."
-run_missing_config_case "whitespace-only-strix-llm" "   " "dummy" "ERROR: STRIX_LLM is required."
+run_missing_config_case "whitespace-only-strix-llm" "   " "dummy" "ERROR: STRIX_LLM_FILE must contain a non-empty model value."
 run_missing_config_case "whitespace-only-llm-api-key" "vertex_ai/ready-primary" $'\t  ' "ERROR: LLM_API_KEY_FILE must contain a non-empty API key."
 
 # ── Segment boundary enforcement for is_vertex_resource_path / extract_vertex_model_id ──
