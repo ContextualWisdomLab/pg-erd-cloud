@@ -584,17 +584,6 @@ for value in sorted(seen):
 PY
 	}
 
-	changed_file_is_in_pull_request_scope() {
-		local candidate="$1"
-		local changed_file
-		for changed_file in "${CHANGED_FILES[@]}"; do
-			if [ "$candidate" = "$changed_file" ]; then
-				return 0
-			fi
-		done
-		return 1
-	}
-
 	normalize_vulnerability_location() {
 		local raw_location="$1"
 		raw_location="$({
@@ -635,9 +624,6 @@ PY
 		fi
 
 		if [ -f "$REPO_ROOT/$raw_location" ] && [ ! -L "$REPO_ROOT/$raw_location" ]; then
-			if is_pull_request_event && ! changed_file_is_in_pull_request_scope "$raw_location"; then
-				return 1
-			fi
 			printf '%s\n' "$raw_location"
 			return 0
 		fi
@@ -952,6 +938,15 @@ PY
 ## move directly to fallback model evaluation instead of spending the remaining
 ## budget retrying the same slow model.
 is_transient_same_model_retry_error() {
+	if is_timeout_error; then
+		return 1
+	fi
+	if is_rate_limit_error; then
+		return 0
+	fi
+	if is_midstream_fallback_error; then
+		return 0
+	fi
 	return 1
 }
 
