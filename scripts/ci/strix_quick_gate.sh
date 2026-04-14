@@ -23,6 +23,7 @@ STRIX_REPORTS_DIR="$ACTIVE_REPORTS_DIR"
 STRIX_PROCESS_TIMEOUT_SECONDS="${STRIX_PROCESS_TIMEOUT_SECONDS:-1200}"
 STRIX_TOTAL_TIMEOUT_SECONDS="${STRIX_TOTAL_TIMEOUT_SECONDS:-0}"
 STRIX_PR_SCOPE_MAX_FILES_PER_BATCH="${STRIX_PR_SCOPE_MAX_FILES_PER_BATCH:-20}"
+STRIX_DISABLE_PR_SCOPING="${STRIX_DISABLE_PR_SCOPING:-1}"
 # shellcheck disable=SC2034  # consumed by sourced normalize_model helper
 DEFAULT_PROVIDER_RAW="${STRIX_LLM_DEFAULT_PROVIDER:-}"
 # shellcheck disable=SC2034  # consumed indirectly by sourced model helper functions
@@ -528,16 +529,13 @@ prepare_pull_request_scan_scope() {
 
 	CHANGED_FILES=("${scoped_changed_files[@]}")
 	local total_files="${#CHANGED_FILES[@]}"
-	local batch_count=$(((total_files + STRIX_PR_SCOPE_MAX_FILES_PER_BATCH - 1) / STRIX_PR_SCOPE_MAX_FILES_PER_BATCH))
-	local batch_start=0
-	while [ "$batch_start" -lt "$total_files" ]; do
-		PULL_REQUEST_SCOPE_FILE_BATCHES+=("$(printf '%s\n' "${CHANGED_FILES[@]:batch_start:STRIX_PR_SCOPE_MAX_FILES_PER_BATCH}")")
-		batch_start=$((batch_start + STRIX_PR_SCOPE_MAX_FILES_PER_BATCH))
-	done
-	printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
-	if [ "$batch_count" -gt 1 ]; then
-		printf " across %s batch(es)" "$batch_count" >&2
+	if [ "$STRIX_DISABLE_PR_SCOPING" = "1" ]; then
+		printf "Using full target path for pull request Strix scan with %s scannable changed file(s).\n" "$total_files" >&2
+		PULL_REQUEST_SCOPE_FILE_BATCHES=()
+		return 0
 	fi
+	PULL_REQUEST_SCOPE_FILE_BATCHES=("$(printf '%s\n' "${CHANGED_FILES[@]}")")
+	printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
 	printf ".\n" >&2
 	return 0
 }
