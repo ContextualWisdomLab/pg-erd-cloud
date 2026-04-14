@@ -146,6 +146,18 @@ jobs:
             echo "LLM_API_KEY_FILE=$llm_api_key_file" >> "$GITHUB_ENV"
           fi
 
+      - name: Prepare Strix model input file
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          STRIX_LLM_SECRET: ${{ secrets.STRIX_LLM }}
+        run: |
+          if [ -n "$STRIX_LLM_SECRET" ]; then
+            umask 077
+            strix_llm_file="$RUNNER_TEMP/strix_llm.txt"
+            printf '%s' "$STRIX_LLM_SECRET" > "$strix_llm_file"
+            echo "STRIX_LLM_FILE=$strix_llm_file" >> "$GITHUB_ENV"
+          fi
+
       - name: Prepare LLM API base input file
         if: steps.gate.outputs.enabled == 'true'
         env:
@@ -161,7 +173,7 @@ jobs:
       - name: Run Strix (quick)
         if: steps.gate.outputs.enabled == 'true'
         env:
-          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          STRIX_LLM_FILE: ${{ env.STRIX_LLM_FILE }}
           STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
           VERTEX_LOCATION: global
           LLM_API_KEY_FILE: ${{ env.LLM_API_KEY_FILE }}
