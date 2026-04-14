@@ -91,11 +91,11 @@ run_gate_case() {
 	local llm_api_base_file="$tmp_dir/llm_api_base.txt"
 	local output_log="$tmp_dir/output.log"
 
-	# Resolve target path: use custom if provided, else default to $repo_root_dir.
-	local effective_target_path="$repo_root_dir"
+	# Resolve target path: use repo-local relative defaults to mirror the real workflow.
+	local effective_target_path="."
 	if [ "$custom_target_path" = "__USE_SUBDIR_SRC__" ]; then
-		# Simulate STRIX_TARGET_PATH=./src by using $repo_root_dir/src.
-		effective_target_path="$repo_root_dir/src"
+		# Simulate STRIX_TARGET_PATH=./src with a repo-local relative path.
+		effective_target_path="./src"
 	elif [ -n "$custom_target_path" ]; then
 		effective_target_path="$custom_target_path"
 		# Ensure the custom target path exists
@@ -1043,7 +1043,6 @@ EOF
 		STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="$transient_retry_backoff_seconds"
 		STRIX_PROCESS_TIMEOUT_SECONDS="$process_timeout_seconds"
 		STRIX_TOTAL_TIMEOUT_SECONDS="$total_timeout_seconds"
-		STRIX_REPO_ROOT="$repo_root_dir"
 		STRIX_FAIL_ON_MIN_SEVERITY="$min_fail_severity"
 		STRIX_REPORTS_DIR="$repo_root_dir/strix_runs"
 		STRIX_TARGET_PATH="$effective_target_path"
@@ -1082,8 +1081,11 @@ EOF
 	elif [ -n "$changed_files_override" ]; then
 		env_cmd+=(STRIX_TEST_CHANGED_FILES_OVERRIDE="$changed_files_override")
 	fi
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE "${env_cmd[@]}" \
-		bash "$gate_under_test" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE "${env_cmd[@]}" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
@@ -1183,16 +1185,19 @@ EOF
 	printf '%s' 'dummy' >"$llm_api_key_file"
 
 	set +e
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
-		PATH="$bin_dir:$PATH" \
-		FAKE_STRIX_CHILD_PID_FILE="$child_pid_file" \
-		STRIX_LLM="vertex_ai/timeout-cleanup-primary" \
-		LLM_API_KEY_FILE="$llm_api_key_file" \
-		STRIX_PROCESS_TIMEOUT_SECONDS="1" \
-		STRIX_VERTEX_FALLBACK_MODELS="" \
-		STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
-		STRIX_TARGET_PATH="$repo_root_dir" \
-		bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+			PATH="$bin_dir:$PATH" \
+			FAKE_STRIX_CHILD_PID_FILE="$child_pid_file" \
+			STRIX_LLM="vertex_ai/timeout-cleanup-primary" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			STRIX_PROCESS_TIMEOUT_SECONDS="1" \
+			STRIX_VERTEX_FALLBACK_MODELS="" \
+			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+			STRIX_TARGET_PATH="." \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
@@ -1247,19 +1252,22 @@ EOF
 	printf '%s' 'dummy' >"$llm_api_key_file"
 
 	set +e
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
-		PATH="$bin_dir:$PATH" \
-		FAKE_STRIX_CALL_COUNT_FILE="$call_count_file" \
-		STRIX_LLM="vertex_ai/total-timeout-primary" \
-		LLM_API_KEY_FILE="$llm_api_key_file" \
-		STRIX_PROCESS_TIMEOUT_SECONDS="10" \
-		STRIX_TOTAL_TIMEOUT_SECONDS="3" \
-		STRIX_VERTEX_FALLBACK_MODELS="vertex_ai/fallback-one" \
-		STRIX_TRANSIENT_RETRY_PER_MODEL="2" \
-		STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="0" \
-		STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
-		STRIX_TARGET_PATH="$repo_root_dir" \
-		bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+			PATH="$bin_dir:$PATH" \
+			FAKE_STRIX_CALL_COUNT_FILE="$call_count_file" \
+			STRIX_LLM="vertex_ai/total-timeout-primary" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			STRIX_PROCESS_TIMEOUT_SECONDS="10" \
+			STRIX_TOTAL_TIMEOUT_SECONDS="3" \
+			STRIX_VERTEX_FALLBACK_MODELS="vertex_ai/fallback-one" \
+			STRIX_TRANSIENT_RETRY_PER_MODEL="2" \
+			STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS="0" \
+			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+			STRIX_TARGET_PATH="." \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
@@ -1398,13 +1406,16 @@ EOF
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
 	set +e
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
-		PATH="$tmp_dir:$PATH" \
-		STRIX_LLM="openai/gpt-4o-mini" \
-		LLM_API_KEY_FILE="$llm_api_key_file" \
-		LLM_API_BASE_FILE="$llm_api_base_file" \
-		STRIX_REPORTS_DIR="strix_runs" \
-		bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+			PATH="$tmp_dir:$PATH" \
+			STRIX_LLM="openai/gpt-4o-mini" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			LLM_API_BASE_FILE="$llm_api_base_file" \
+			STRIX_REPORTS_DIR="strix_runs" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
@@ -1446,13 +1457,16 @@ EOF
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
 	set +e
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
-		PATH="$tmp_dir:$PATH" \
-		STRIX_LLM="openai/gpt-4o-mini" \
-		LLM_API_KEY_FILE="$llm_api_key_file" \
-		LLM_API_BASE_FILE="$llm_api_base_file" \
-		STRIX_REPORTS_DIR="strix_runs" \
-		bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+			PATH="$tmp_dir:$PATH" \
+			STRIX_LLM="openai/gpt-4o-mini" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			LLM_API_BASE_FILE="$llm_api_base_file" \
+			STRIX_REPORTS_DIR="strix_runs" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
@@ -1488,14 +1502,17 @@ EOF
 	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
 
 	set +e
-	env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
-		PATH="$tmp_dir:$PATH" \
-		FAKE_STRIX_CALL_LOG="$call_log" \
-		STRIX_LLM="openai/gpt-4o-mini" \
-		LLM_API_KEY_FILE="$llm_api_key_file" \
-		LLM_API_BASE_FILE="$llm_api_base_file" \
-		STRIX_TARGET_PATH="../../../../../etc/passwd" \
-		bash "$repo_root_dir/scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE \
+			PATH="$tmp_dir:$PATH" \
+			FAKE_STRIX_CALL_LOG="$call_log" \
+			STRIX_LLM="openai/gpt-4o-mini" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			LLM_API_BASE_FILE="$llm_api_base_file" \
+			STRIX_TARGET_PATH="../../../../../etc/passwd" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
 	local rc=$?
 	set -e
 
