@@ -16,7 +16,7 @@ TARGET_PATH=""
 RAW_SCAN_MODE="${STRIX_SCAN_MODE:-quick}"
 SCAN_MODE=""
 ARTIFACT_REPORTS_DIR="$REPO_ROOT/strix_runs"
-STRIX_RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/strix-runtime.XXXXXX")"
+STRIX_RUNTIME_DIR="$(mktemp -d /tmp/strix-runtime.XXXXXX)"
 STRIX_LOG="$STRIX_RUNTIME_DIR/strix.log"
 ACTIVE_REPORTS_DIR="$STRIX_RUNTIME_DIR/reports"
 STRIX_REPORTS_DIR="$ACTIVE_REPORTS_DIR"
@@ -133,30 +133,16 @@ validate_raw_target_path_input() {
 		echo "ERROR: STRIX_TARGET_PATH contains unsupported path syntax: '$raw_target'." >&2
 		return 2
 	fi
-	python3 - "$REPO_ROOT" "$raw_target" <<'PY' || {
-from pathlib import Path
-import re
-import sys
-
-repo_root = Path(sys.argv[1]).resolve(strict=True)
-raw_target = sys.argv[2]
-if not re.fullmatch(r"[A-Za-z0-9_./-]+", raw_target):
-    raise SystemExit(1)
-if raw_target.startswith('~'):
-    raise SystemExit(1)
-candidate = Path(raw_target)
-if candidate.is_absolute():
-    resolved = candidate.resolve(strict=False)
-    resolved.relative_to(repo_root)
-else:
-    parts = [part for part in raw_target.split('/') if part not in ('', '.')]
-    if any(part == '..' for part in parts):
-        raise SystemExit(1)
-PY
+	case "$raw_target" in
+	. | ./ | src | ./src)
+		printf '%s\n' "$raw_target"
+		return 0
+		;;
+	*)
 		echo "ERROR: STRIX_TARGET_PATH contains unsupported path syntax: '$raw_target'." >&2
 		return 2
-	}
-	printf '%s\n' "$raw_target"
+		;;
+	esac
 }
 
 normalize_changed_file_path() {
