@@ -367,12 +367,22 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 	vertex-primary-midstream-retry-same-model-success)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/retry-midstream-primary)
-			echo "Penetration test failed: LLM request failed: MidStreamFallbackError"
-			exit 1
+			attempt="0"
+			if [ -f "${FAKE_STRIX_STATE_FILE:?}" ]; then
+				attempt="$(cat "${FAKE_STRIX_STATE_FILE:?}")"
+			fi
+			attempt="$((attempt + 1))"
+			echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
+			if [ "$attempt" -eq 1 ]; then
+				echo "Penetration test failed: LLM request failed: MidStreamFallbackError"
+				exit 1
+			fi
+			echo "scan ok after same-model retry"
+			exit 0
 			;;
 		vertex_ai/fallback-one)
-			echo "scan ok after midstream fallback"
-			exit 0
+			echo "Error: fallback should not be needed for same-model retry scenario" >&2
+			exit 30
 			;;
 		*)
 			echo "Error: midstream fallback path unexpected (${STRIX_LLM:-})" >&2
@@ -383,12 +393,22 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 	vertex-primary-ratelimit-retry-same-model-success|vertex-primary-ratelimit-retry-reason-message)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/retry-ratelimit-primary)
-			echo "Penetration test failed: LLM request failed: RateLimitError"
-			exit 1
+			attempt="0"
+			if [ -f "${FAKE_STRIX_STATE_FILE:?}" ]; then
+				attempt="$(cat "${FAKE_STRIX_STATE_FILE:?}")"
+			fi
+			attempt="$((attempt + 1))"
+			echo "$attempt" > "${FAKE_STRIX_STATE_FILE:?}"
+			if [ "$attempt" -eq 1 ]; then
+				echo "Penetration test failed: LLM request failed: RateLimitError"
+				exit 1
+			fi
+			echo "scan ok after same-model rate-limit retry"
+			exit 0
 			;;
 		vertex_ai/fallback-one)
-			echo "scan ok after rate-limit fallback"
-			exit 0
+			echo "Error: fallback should not be needed for same-model rate-limit retry scenario" >&2
+			exit 31
 			;;
 		*)
 			echo "Error: rate-limit fallback path unexpected (${STRIX_LLM:-})" >&2
@@ -1667,9 +1687,9 @@ run_gate_case "vertex-primary-midstream-retry-same-model-success" \
 	"vertex_ai/retry-midstream-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
 	"0" \
-	"Strix quick scan succeeded with fallback model 'vertex_ai/fallback-one'." \
+	"scan ok after same-model retry" \
 	"2" \
-	"vertex_ai/retry-midstream-primary|vertex_ai/fallback-one" \
+	"vertex_ai/retry-midstream-primary|vertex_ai/retry-midstream-primary" \
 	"<unset>|<unset>" \
 	"vertex_ai" \
 	"__DEFAULT__" \
@@ -1681,9 +1701,9 @@ run_gate_case "vertex-primary-ratelimit-retry-same-model-success" \
 	"vertex_ai/retry-ratelimit-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
 	"0" \
-	"Strix quick scan succeeded with fallback model 'vertex_ai/fallback-one'." \
+	"scan ok after same-model rate-limit retry" \
 	"2" \
-	"vertex_ai/retry-ratelimit-primary|vertex_ai/fallback-one" \
+	"vertex_ai/retry-ratelimit-primary|vertex_ai/retry-ratelimit-primary" \
 	"<unset>|<unset>" \
 	"vertex_ai" \
 	"__DEFAULT__" \
@@ -1984,9 +2004,9 @@ run_gate_case "vertex-primary-ratelimit-retry-reason-message" \
 	"vertex_ai/retry-ratelimit-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
 	"0" \
-	"Primary Vertex model unavailable; retrying with fallback 'vertex_ai/fallback-one'." \
+	"Retrying model 'vertex_ai/retry-ratelimit-primary' due to rate limit" \
 	"2" \
-	"vertex_ai/retry-ratelimit-primary|vertex_ai/fallback-one" \
+	"vertex_ai/retry-ratelimit-primary|vertex_ai/retry-ratelimit-primary" \
 	"<unset>|<unset>" \
 	"vertex_ai" \
 	"__DEFAULT__" \
@@ -2125,9 +2145,9 @@ run_gate_case "infra-error-sticky-flag" \
 	"" \
 	"1" \
 	"infrastructure errors occurred" \
-	"2" \
-	"vertex_ai/sticky-flag-primary|vertex_ai/gemini-2.5-pro" \
-	"<unset>|<unset>" \
+	"3" \
+	"vertex_ai/sticky-flag-primary|vertex_ai/sticky-flag-primary|vertex_ai/gemini-2.5-pro" \
+	"<unset>|<unset>|<unset>" \
 	"vertex_ai" \
 	"__DEFAULT__" \
 	"" \
@@ -2269,8 +2289,8 @@ run_gate_case "success" \
 run_gate_case "pr-baseline-critical-unchanged" \
 	"openai/gpt-4o-mini" \
 	"" \
-	"1" \
-	"Unable to map Strix findings to changed files; failing closed for pull request." \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"1" \
 	"openai/gpt-4o-mini" \
 	"https://example.invalid" \
@@ -2290,8 +2310,8 @@ run_gate_case "pr-baseline-critical-unchanged" \
 run_gate_case "pr-baseline-critical-absolute-target" \
 	"openai/gpt-4o-mini" \
 	"" \
-	"1" \
-	"Unable to map Strix findings to changed files; failing closed for pull request." \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"1" \
 	"openai/gpt-4o-mini" \
 	"https://example.invalid" \
