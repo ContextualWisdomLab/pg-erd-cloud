@@ -295,7 +295,7 @@ run_strix_once() {
 	start_epoch="$(date +%s)"
 	set -o pipefail
 	set +e
-	strix -n -t "$TARGET_PATH" --scan-mode "$SCAN_MODE" 2>&1 | tee "$STRIX_LOG"
+	PYTHONWARNINGS="ignore:Pydantic serializer warnings:UserWarning:pydantic.main" strix -n -t "$TARGET_PATH" --scan-mode "$SCAN_MODE" 2>&1 | tee "$STRIX_LOG"
 	rc=$?
 	set -e
 	local end_epoch
@@ -322,6 +322,14 @@ run_strix_once() {
 	return 1
 }
 
+is_github_models_api_error() {
+	if grep -Fq 'LLM request failed: APIError' "$STRIX_LOG" && grep -Eiq '(openai/openai/gpt-4\.1|openai/|models\.github\.ai|litellm)' "$STRIX_LOG"; then
+		return 0
+	fi
+
+	return 1
+}
+
 ## Determines whether the last strix failure is a transient error eligible
 ## for same-model retry (up to STRIX_TRANSIENT_RETRY_PER_MODEL times).
 ## Three error families qualify:
@@ -340,6 +348,10 @@ is_transient_same_model_retry_error() {
 
 	# Timeouts are transient — retry the same model before falling back.
 	if is_timeout_error; then
+		return 0
+	fi
+
+	if is_github_models_api_error; then
 		return 0
 	fi
 
@@ -371,6 +383,8 @@ run_strix_with_transient_retry() {
 			retry_reason="rate limit"
 		elif is_midstream_fallback_error; then
 			retry_reason="midstream fallback"
+		elif is_github_models_api_error; then
+			retry_reason="GitHub Models APIError"
 		fi
 		echo "Retrying model '$model' due to $retry_reason (attempt $((attempt + 1))/$max_attempts)." >&2
 		sleep "$STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS"
@@ -530,6 +544,10 @@ has_detected_infrastructure_error() {
 	fi
 
 	if is_midstream_fallback_error; then
+		return 0
+	fi
+
+	if is_github_models_api_error; then
 		return 0
 	fi
 
