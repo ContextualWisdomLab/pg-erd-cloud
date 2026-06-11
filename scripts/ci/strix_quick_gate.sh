@@ -253,7 +253,7 @@ capture_preexisting_report_dirs
 
 is_vertex_model() {
 	case "$1" in
-	vertex_ai/* | vertex_ai_beta/*)
+	vertex_ai/* | vertex_ai_beta/* | gemini/*)
 		return 0
 		;;
 	*)
