@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 
 const MAX_RENDERED_COLUMNS = 25
 
@@ -22,6 +22,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props
   return (
     <div className="tableNode">
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
       <div className="tableNode__title">
         <span>{data.title}</span>
         <span style={{ display: 'inline-flex', gap: 6 }}>
