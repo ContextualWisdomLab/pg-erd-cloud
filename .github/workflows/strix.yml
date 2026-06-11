@@ -73,6 +73,7 @@ jobs:
       - name: Fetch pull request head for trusted scan
         if: github.event_name == 'pull_request_target' || github.event.inputs.pr_number != ''
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.inputs.pr_number }}
           PR_BASE_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.inputs.pr_base_sha }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha }}
@@ -81,6 +82,7 @@ jobs:
             echo "::error::PR number and head SHA are required for trusted PR-scope Strix evidence."
             exit 1
           fi
+          gh auth setup-git
           if ! [[ "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
             echo "::error::PR head SHA must be a 40-character git SHA."
             exit 1

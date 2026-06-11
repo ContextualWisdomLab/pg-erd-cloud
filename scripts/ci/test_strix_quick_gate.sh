@@ -115,6 +115,20 @@ assert_strix_workflow_pr_trigger_hardened() {
 	assert_file_contains "$workflow_file" '[[ "$PR_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]' "strix workflow validates PR base SHA before trusted fetch"
 	assert_file_contains "$workflow_file" 'fetch --no-tags --depth=1 origin "$PR_BASE_SHA"' "strix workflow fetches manual PR-scope base commit for diffing"
 	assert_file_contains "$workflow_file" "refs/remotes/pull" "strix workflow verifies fetched PR head ref"
+	local pr_head_fetch_block
+	pr_head_fetch_block="$(
+		awk '
+			/- name: Fetch pull request head for trusted scan/ { in_block = 1 }
+			in_block && /- name: Self-test Strix gate script/ { exit }
+			in_block { print }
+		' "$workflow_file"
+	)"
+	if [[ "$pr_head_fetch_block" != *'GH_TOKEN: ${{ github.token }}'* ]]; then
+		record_failure "strix workflow passes GH_TOKEN to PR head fetch step"
+	fi
+	if [[ "$pr_head_fetch_block" != *"gh auth setup-git"* ]]; then
+		record_failure "strix workflow configures git credentials in PR head fetch step"
+	fi
 	assert_file_contains "$workflow_file" "for pr_head_fetch_attempt in 1 2 3 4 5 6" "strix workflow retries stale PR head ref propagation"
 	assert_file_contains "$workflow_file" "PR head ref did not resolve to expected commit" "strix workflow fails closed when PR head ref remains stale"
 	assert_file_contains "$workflow_file" "sleep 10" "strix workflow waits between stale PR head ref retries"
