@@ -102,11 +102,11 @@ jobs:
         if: steps.gate.outputs.enabled == 'true'
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
-          STRIX_LLM_DEFAULT_PROVIDER: vertex_ai
+          STRIX_LLM_DEFAULT_PROVIDER: gemini
           VERTEX_LOCATION: global
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           RAW_LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
-          STRIX_VERTEX_FALLBACK_MODELS: "vertex_ai/gemini-2.5-pro vertex_ai/gemini-2.5-flash"
+          STRIX_VERTEX_FALLBACK_MODELS: "gemini/gemini-2.5-pro gemini/gemini-2.5-flash"
           STRIX_TARGET_PATH: ./
           STRIX_REASONING_EFFORT: ${{ github.event_name == 'push' && 'low' || 'minimal' }}
           STRIX_LLM_MAX_RETRIES: 1
