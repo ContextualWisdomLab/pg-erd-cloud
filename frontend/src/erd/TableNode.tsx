@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 
 const MAX_RENDERED_COLUMNS = 25
 
@@ -22,6 +22,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props
   return (
     <div className="tableNode">
+      <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
         <span>{data.title}</span>
         <span style={{ display: 'inline-flex', gap: 6 }}>
@@ -32,16 +33,29 @@ function TableNode(props: NodeProps<TableNodeNode>) {
       <div className="tableNode__cols">
         {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => (
           <div key={c.column_name} className="tableNode__col">
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={`tgt-${c.column_name}`}
+              className="colHandle"
+            />
             <span className="tableNode__colName">{c.column_name}</span>
             <span className="tableNode__colType">{c.data_type}</span>
             {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
             {c.is_not_null ? <span className="tableNode__badge">NOT NULL</span> : null}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={`src-${c.column_name}`}
+              className="colHandle"
+            />
           </div>
         ))}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div className="tableNode__more">… {data.columns.length - MAX_RENDERED_COLUMNS} more</div>
         ) : null}
       </div>
+      <Handle type="source" position={Position.Bottom} />
     </div>
   )
 }

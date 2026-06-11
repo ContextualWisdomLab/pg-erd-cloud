@@ -164,3 +164,32 @@ button {
     border-bottom: 1px solid #e5e7eb;
   }
 }
+
+.tableNode__col {
+  position: relative;
+}
+
+.colHandle {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  top: 50%;
+}
+.colHandle:hover {
+  background: #034ea2;
+  border-color: #034ea2;
+}
+
+/* Fix target Handle position for table level */
+.react-flow__handle-top, .react-flow__handle-bottom {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  width: 6px;
+  height: 6px;
+}
+.react-flow__handle-top:hover, .react-flow__handle-bottom:hover {
+  background: #034ea2;
+  border-color: #034ea2;
+}

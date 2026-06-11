@@ -1,5 +1,6 @@
 import {
   Background,
+  MiniMap,
   Controls,
   ReactFlow,
   type Edge,
@@ -342,6 +343,7 @@ export default function App() {
           >
             <Background />
             <Controls />
+            <MiniMap />
           </ReactFlow>
         </div>
       </main>
