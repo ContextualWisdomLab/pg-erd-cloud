@@ -113,7 +113,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             claims = jwt.decode(
                 token,
                 jwk,
-                algorithms=[str(header.get("alg"))],
+                algorithms=["RS256"],
                 audience=settings.oidc_audience,
                 issuer=settings.oidc_issuer,
                 options={"verify_aud": bool(settings.oidc_audience)},
