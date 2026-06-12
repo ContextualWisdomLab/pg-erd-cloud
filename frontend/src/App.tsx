@@ -7,9 +7,11 @@ import {
   type NodeTypes,
   type ReactFlowInstance,
   useEdgesState,
-  useNodesState
-} from '@xyflow/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+  useNodesState,
+  addEdge,
+  type Connection as FlowConnection,
+} from "@xyflow/react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   getMe,
   createConnection,
@@ -18,187 +20,322 @@ import {
   getSnapshot,
   listConnections,
   listProjects,
-  listSnapshots
-} from './api'
-import TableNode from './erd/TableNode'
-import { snapshotToGraph, type TableNodeData } from './erd/convert'
-import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './erd/layoutConstants'
-import type { Connection, Project, SnapshotDetail } from './types'
+  listSnapshots,
+} from "./api";
+import TableNode from "./erd/TableNode";
+import { snapshotToGraph, type TableNodeData } from "./erd/convert";
+import { exportDDL } from "./erd/export";
+import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import type { Connection, Project, SnapshotDetail } from "./types";
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>(() => localStorage.getItem('devUser') || 'local')
-  const [me, setMe] = useState<{ subject: string; display_name: string | null } | null>(null)
-  const [projects, setProjects] = useState<Project[]>([])
-  const [projectName, setProjectName] = useState('demo')
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [devUser, setDevUser] = useState<string>(
+    () => localStorage.getItem("devUser") || "local",
+  );
+  const [me, setMe] = useState<{
+    subject: string;
+    display_name: string | null;
+  } | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectName, setProjectName] = useState("demo");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
 
-  const [connections, setConnections] = useState<Connection[]>([])
-  const [connName, setConnName] = useState('target-db')
-  const [dsn, setDsn] = useState('postgresql://postgres:postgres@localhost:5432/postgres')
-  const [selectedConnId, setSelectedConnId] = useState<string | null>(null)
-  const [schemaFilter, setSchemaFilter] = useState<string>('')
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connName, setConnName] = useState("target-db");
+  const [dsn, setDsn] = useState(
+    "postgresql://postgres:postgres@localhost:5432/postgres",
+  );
+  const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
+  const [schemaFilter, setSchemaFilter] = useState<string>("");
 
-  const [snapshotId, setSnapshotId] = useState<string | null>(null)
-  const [snapshot, setSnapshot] = useState<SnapshotDetail | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<SnapshotDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const reactFlowRef = useRef<ReactFlowInstance<Node<TableNodeData>, Edge> | null>(null)
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
+    [],
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const reactFlowRef = useRef<ReactFlowInstance<
+    Node<TableNodeData>,
+    Edge
+  > | null>(null);
 
-  const [isLayouting, setIsLayouting] = useState(false)
-  const [layoutMessage, setLayoutMessage] = useState<string>('')
-  const [undoPositions, setUndoPositions] = useState<Map<string, { x: number; y: number }> | null>(null)
+  const [isLayouting, setIsLayouting] = useState(false);
+  const [layoutMessage, setLayoutMessage] = useState<string>("");
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportDdlText, setExportDdlText] = useState("");
 
-  const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), [])
+  const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
+  const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
+  const [newTableName, setNewTableName] = useState("");
+  const [relLabel, setRelLabel] = useState("");
+
+  const [undoPositions, setUndoPositions] = useState<Map<
+    string,
+    { x: number; y: number }
+  > | null>(null);
+
+  const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+
+  const onConnect = useCallback(
+    (params: FlowConnection) => {
+      const newEdge: Edge = {
+        ...params,
+        id: `edge_${Date.now()}`,
+        animated: false,
+        label: "fk_new_relation",
+      };
+      // We could add it directly, but let's just add it then edit it.
+      setEdges((eds) => addEdge(newEdge, eds));
+      setEditingEdge(newEdge);
+      setRelLabel(newEdge.label as string);
+    },
+    [setEdges],
+  );
 
   useEffect(() => {
-    localStorage.setItem('devUser', devUser)
+    localStorage.setItem("devUser", devUser);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
-        setMe({ subject: m.subject, display_name: m.display_name })
-        setProjects(p)
-        setSelectedProjectId(p[0]?.project_space_uuid || null)
+        setMe({ subject: m.subject, display_name: m.display_name });
+        setProjects(p);
+        setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
-      .catch((e) => setError(String(e)))
-  }, [devUser])
+      .catch((e) => setError(String(e)));
+  }, [devUser]);
 
   useEffect(() => {
-    if (!selectedProjectId) return
+    if (!selectedProjectId) return;
     listConnections(selectedProjectId)
       .then((c) => {
-        setConnections(c)
-        if (c[0]) setSelectedConnId(c[0].db_connection_uuid)
+        setConnections(c);
+        if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
-      .catch((e) => setError(String(e)))
-  }, [selectedProjectId])
+      .catch((e) => setError(String(e)));
+  }, [selectedProjectId]);
 
   useEffect(() => {
-    if (!snapshotId) return
+    if (!snapshotId) return;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
         .then((s) => setSnapshot(s))
-        .catch((e) => setError(String(e)))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [snapshotId])
+        .catch((e) => setError(String(e)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [snapshotId]);
 
   const snapshotJsonKey = useMemo(() => {
-    return snapshot?.snapshot_json ? JSON.stringify(snapshot.snapshot_json) : ''
-  }, [snapshot?.snapshot_json])
+    return snapshot?.snapshot_json
+      ? JSON.stringify(snapshot.snapshot_json)
+      : "";
+  }, [snapshot?.snapshot_json]);
 
   const graph = useMemo(() => {
-    return snapshot?.snapshot_json ? snapshotToGraph(snapshot.snapshot_json) : null
-  }, [snapshotJsonKey])
+    return snapshot?.snapshot_json
+      ? snapshotToGraph(snapshot.snapshot_json)
+      : null;
+  }, [snapshotJsonKey]);
 
   useEffect(() => {
     if (!graph) {
-      setNodes([])
-      setEdges([])
-      setUndoPositions(null)
-      return
+      setNodes([]);
+      setEdges([]);
+      setUndoPositions(null);
+      return;
     }
 
-    setEdges(graph.edges)
+    setEdges(graph.edges);
 
     setNodes((prev) => {
-      const prevPos = new Map(prev.map((n) => [n.id, n.position]))
+      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
       return graph.nodes.map((n) => {
-        const position = prevPos.get(n.id)
-        return position ? { ...n, position } : n
-      })
-    })
-  }, [graph, setEdges, setNodes])
+        const position = prevPos.get(n.id);
+        return position ? { ...n, position } : n;
+      });
+    });
+  }, [graph, setEdges, setNodes]);
 
-  function snapshotNodePositions(currentNodes: Array<Node<TableNodeData>>): Map<string, { x: number; y: number }> {
-    const map = new Map<string, { x: number; y: number }>()
-    for (const n of currentNodes) map.set(n.id, { x: n.position.x, y: n.position.y })
-    return map
+  function snapshotNodePositions(
+    currentNodes: Array<Node<TableNodeData>>,
+  ): Map<string, { x: number; y: number }> {
+    const map = new Map<string, { x: number; y: number }>();
+    for (const n of currentNodes)
+      map.set(n.id, { x: n.position.x, y: n.position.y });
+    return map;
   }
 
   function applyPositions(
     currentNodes: Array<Node<TableNodeData>>,
-    positions: Map<string, { x: number; y: number }>
+    positions: Map<string, { x: number; y: number }>,
   ): Array<Node<TableNodeData>> {
     return currentNodes.map((n) => {
-      const p = positions.get(n.id)
-      return p ? { ...n, position: { x: p.x, y: p.y } } : n
-    })
+      const p = positions.get(n.id);
+      return p ? { ...n, position: { x: p.x, y: p.y } } : n;
+    });
   }
 
-  function computeSortedGridLayout(currentNodes: Array<Node<TableNodeData>>): Array<Node<TableNodeData>> {
+  function computeSortedGridLayout(
+    currentNodes: Array<Node<TableNodeData>>,
+  ): Array<Node<TableNodeData>> {
     const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = a.data?.title ?? a.id
-      const bTitle = b.data?.title ?? b.id
-      return aTitle.localeCompare(bTitle, 'en')
-    })
+      const aTitle = a.data?.title ?? a.id;
+      const bTitle = b.data?.title ?? b.id;
+      return aTitle.localeCompare(bTitle, "en");
+    });
 
     return sorted.map((n, i) => ({
       ...n,
-      position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP }
-    }))
+      position: {
+        x: (i % GRID_COLUMNS) * GRID_X_GAP,
+        y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP,
+      },
+    }));
   }
 
   async function onAutoLayout() {
-    if (nodes.length === 0 || isLayouting) return
-    setIsLayouting(true)
-    setLayoutMessage('')
+    if (nodes.length === 0 || isLayouting) return;
+    setIsLayouting(true);
+    setLayoutMessage("");
 
     // Capture current positions for a one-step undo.
-    setUndoPositions(snapshotNodePositions(nodes))
+    setUndoPositions(snapshotNodePositions(nodes));
 
     try {
       // Yield to the browser so the UI can reflect the loading state.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
 
-      const next = computeSortedGridLayout(nodes)
-      setNodes(next)
+      const next = computeSortedGridLayout(nodes);
+      setNodes(next);
 
       requestAnimationFrame(() => {
-        reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 })
-      })
+        reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 });
+      });
 
-      setLayoutMessage('정렬 완료')
+      setLayoutMessage("정렬 완료");
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.error('Auto-layout failed', error)
+        console.error("Auto-layout failed", error);
       }
-      setLayoutMessage('정렬에 실패했습니다. 다시 시도해 주세요.')
+      setLayoutMessage("정렬에 실패했습니다. 다시 시도해 주세요.");
     } finally {
-      setIsLayouting(false)
+      setIsLayouting(false);
     }
   }
 
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setEditingEdge(edge);
+    setRelLabel((edge.label as string) || "");
+  }, []);
+
+  function onRelSubmit() {
+    if (!editingEdge) return;
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id === editingEdge.id) {
+          return { ...e, label: relLabel.trim() };
+        }
+        return e;
+      }),
+    );
+    setEditingEdge(null);
+  }
+
+  function onRelCancel() {
+    setEditingEdge(null);
+  }
+
+  function onOpenExport() {
+    const ddl = exportDDL(nodes, edges);
+    setExportDdlText(ddl);
+    setIsExportModalOpen(true);
+  }
+
+  function onCloseExport() {
+    setIsExportModalOpen(false);
+  }
+
+  function onRelDelete() {
+    if (!editingEdge) return;
+    setEdges((eds) => eds.filter((e) => e.id !== editingEdge.id));
+    setEditingEdge(null);
+  }
+
+  function onOpenAddTable() {
+    setNewTableName("");
+    setIsAddTableModalOpen(true);
+  }
+
+  function onAddTableSubmit() {
+    if (!newTableName.trim()) return;
+    const newId = `new_table_${Date.now()}`;
+
+    // Create a new node with a basic 'id' column
+    const newNode: Node<TableNodeData> = {
+      id: newId,
+      type: "tableNode",
+      position: { x: 100, y: 100 }, // Initial drop position
+      data: {
+        title: newTableName.trim(),
+        columns: [
+          {
+            column_name: "id",
+            data_type: "integer",
+            is_not_null: true,
+            is_pk: true,
+          },
+        ],
+        badges: { pk: true, fk: false },
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setIsAddTableModalOpen(false);
+  }
+
+  function onAddTableCancel() {
+    setIsAddTableModalOpen(false);
+  }
+
   function onUndoLayout() {
-    if (!undoPositions || isLayouting) return
-    setNodes((prev) => applyPositions(prev, undoPositions))
-    setUndoPositions(null)
-    setLayoutMessage('되돌렸습니다')
+    if (!undoPositions || isLayouting) return;
+    setNodes((prev) => applyPositions(prev, undoPositions));
+    setUndoPositions(null);
+    setLayoutMessage("되돌렸습니다");
   }
 
   async function onCreateProject() {
-    setError(null)
-    const p = await createProject(projectName)
-    const next = [p, ...projects]
-    setProjects(next)
-    setSelectedProjectId(p.project_space_uuid)
+    setError(null);
+    const p = await createProject(projectName);
+    const next = [p, ...projects];
+    setProjects(next);
+    setSelectedProjectId(p.project_space_uuid);
   }
 
   async function onCreateConnection() {
-    if (!selectedProjectId) return
-    setError(null)
-    const c = await createConnection(selectedProjectId, connName, dsn)
-    const next = [c, ...connections]
-    setConnections(next)
-    setSelectedConnId(c.db_connection_uuid)
+    if (!selectedProjectId) return;
+    setError(null);
+    const c = await createConnection(selectedProjectId, connName, dsn);
+    const next = [c, ...connections];
+    setConnections(next);
+    setSelectedConnId(c.db_connection_uuid);
   }
 
   async function onCreateSnapshot() {
-    if (!selectedProjectId || !selectedConnId) return
-    setError(null)
-    const s = await createSnapshot(selectedProjectId, selectedConnId, schemaFilter.trim() || undefined)
-    setSnapshotId(s.schema_snapshot_uuid)
-    setSnapshot(null)
+    if (!selectedProjectId || !selectedConnId) return;
+    setError(null);
+    const s = await createSnapshot(
+      selectedProjectId,
+      selectedConnId,
+      schemaFilter.trim() || undefined,
+    );
+    setSnapshotId(s.schema_snapshot_uuid);
+    setSnapshot(null);
   }
 
   return (
@@ -217,8 +354,8 @@ export default function App() {
             onChange={(e) => setDevUser(e.target.value)}
             placeholder="local"
           />
-          <div style={{ fontSize: 12, color: '#4b5563' }}>
-            Subject: <code>{me?.subject || '—'}</code>
+          <div style={{ fontSize: 12, color: "#4b5563" }}>
+            Subject: <code>{me?.subject || "—"}</code>
           </div>
         </div>
 
@@ -227,7 +364,7 @@ export default function App() {
           <div className="row">
             <select
               id="project-select"
-              value={selectedProjectId || ''}
+              value={selectedProjectId || ""}
               onChange={(e) => setSelectedProjectId(e.target.value || null)}
               style={{ flex: 1, padding: 8 }}
             >
@@ -246,7 +383,11 @@ export default function App() {
         <div className="field">
           <label htmlFor="project-name">New project</label>
           <div className="row">
-            <input id="project-name" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+            <input
+              id="project-name"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+            />
             <button onClick={onCreateProject}>Create</button>
           </div>
         </div>
@@ -257,7 +398,7 @@ export default function App() {
           <label htmlFor="conn-select">Connection</label>
           <select
             id="conn-select"
-            value={selectedConnId || ''}
+            value={selectedConnId || ""}
             onChange={(e) => setSelectedConnId(e.target.value || null)}
             style={{ padding: 8 }}
           >
@@ -274,20 +415,35 @@ export default function App() {
 
         <div className="field">
           <label htmlFor="conn-name">New connection (DSN)</label>
-          <input id="conn-name" value={connName} onChange={(e) => setConnName(e.target.value)} placeholder="name" />
-          <input id="conn-dsn" value={dsn} onChange={(e) => setDsn(e.target.value)} placeholder="postgresql://..." />
+          <input
+            id="conn-name"
+            value={connName}
+            onChange={(e) => setConnName(e.target.value)}
+            placeholder="name"
+          />
+          <input
+            id="conn-dsn"
+            value={dsn}
+            onChange={(e) => setDsn(e.target.value)}
+            placeholder="postgresql://..."
+          />
           <button onClick={onCreateConnection}>Save connection</button>
         </div>
 
         <div className="field">
           <label htmlFor="schema-filter">Schema filter (optional)</label>
-          <input id="schema-filter" value={schemaFilter} onChange={(e) => setSchemaFilter(e.target.value)} placeholder="public" />
+          <input
+            id="schema-filter"
+            value={schemaFilter}
+            onChange={(e) => setSchemaFilter(e.target.value)}
+            placeholder="public"
+          />
         </div>
 
         <button onClick={onCreateSnapshot}>Reverse engineer → snapshot</button>
 
         <div style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
-          Snapshot: {snapshot?.status || '—'}
+          Snapshot: {snapshot?.status || "—"}
           {snapshot?.error_message ? (
             <div className="error" role="alert">
               {snapshot.error_message}
@@ -304,16 +460,22 @@ export default function App() {
 
       <main id="main" className="main" tabIndex={-1}>
         <div className="canvas">
-          <div className="canvasToolbar" role="toolbar" aria-label="ERD 캔버스 도구">
+          <div
+            className="canvasToolbar"
+            role="toolbar"
+            aria-label="ERD 캔버스 도구"
+          >
             <button
               type="button"
               onClick={onAutoLayout}
               disabled={nodes.length === 0 || isLayouting}
               aria-label="ERD 자동 정렬"
               aria-busy={isLayouting}
-              title={nodes.length === 0 ? '정렬할 항목이 없습니다' : '자동 정렬'}
+              title={
+                nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
+              }
             >
-              {isLayouting ? '정렬 중…' : '정렬'}
+              {isLayouting ? "정렬 중…" : "정렬"}
             </button>
             <button
               type="button"
@@ -334,17 +496,201 @@ export default function App() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onEdgeClick={onEdgeClick}
             nodeTypes={nodeTypes}
             fitView
             onInit={(instance) => {
-              reactFlowRef.current = instance
+              reactFlowRef.current = instance;
             }}
           >
             <Background />
             <Controls />
           </ReactFlow>
+
+          {isExportModalOpen && (
+            <div
+              className="modalOverlay"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 100,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className="modalContent"
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 8,
+                  width: 500,
+                  maxWidth: "90%",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                <h3>DDL 내보내기</h3>
+                <textarea
+                  readOnly
+                  value={exportDdlText}
+                  style={{
+                    width: "100%",
+                    height: 300,
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    padding: 8,
+                  }}
+                />
+                <div
+                  className="row"
+                  style={{ justifyContent: "flex-end", marginTop: 8 }}
+                >
+                  <button onClick={onCloseExport}>닫기</button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(exportDdlText);
+                      alert("복사되었습니다.");
+                    }}
+                    style={{ background: "#034ea2", color: "#fff" }}
+                  >
+                    복사하기
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingEdge && (
+            <div
+              className="modalOverlay"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 100,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className="modalContent"
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 8,
+                  width: 320,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                <h3>관계 설정</h3>
+                <div style={{ fontSize: 13, color: "#4b5563" }}>
+                  From: {editingEdge.source} <br />
+                  To: {editingEdge.target}
+                </div>
+                <div className="field">
+                  <label htmlFor="rel-label">제약조건 이름 (Label)</label>
+                  <input
+                    id="rel-label"
+                    value={relLabel}
+                    onChange={(e) => setRelLabel(e.target.value)}
+                    placeholder="fk_constraint_name"
+                    autoFocus
+                  />
+                </div>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between", marginTop: 8 }}
+                >
+                  <button
+                    onClick={onRelDelete}
+                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+                  >
+                    삭제
+                  </button>
+                  <div className="row">
+                    <button onClick={onRelCancel}>취소</button>
+                    <button
+                      onClick={onRelSubmit}
+                      style={{ background: "#034ea2", color: "#fff" }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isAddTableModalOpen && (
+            <div
+              className="modalOverlay"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 100,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className="modalContent"
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 8,
+                  width: 300,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                <h3>테이블 추가</h3>
+                <div className="field">
+                  <label htmlFor="new-table-name">테이블 이름</label>
+                  <input
+                    id="new-table-name"
+                    value={newTableName}
+                    onChange={(e) => setNewTableName(e.target.value)}
+                    placeholder="users"
+                    autoFocus
+                  />
+                </div>
+                <div
+                  className="row"
+                  style={{ justifyContent: "flex-end", marginTop: 8 }}
+                >
+                  <button onClick={onAddTableCancel}>취소</button>
+                  <button
+                    onClick={onAddTableSubmit}
+                    style={{ background: "#034ea2", color: "#fff" }}
+                  >
+                    저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
-  )
+  );
 }
