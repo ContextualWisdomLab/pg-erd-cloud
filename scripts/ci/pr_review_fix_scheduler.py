@@ -145,8 +145,6 @@ def process_queue(args: argparse.Namespace) -> int:
     print(f"Found {len(prs)} open PR(s) in {args.repo}.")
 
     for item in prs:
-        if dispatched >= args.max_dispatches:
-            break
         inspected += 1
         number = int(item["number"])
         pr = pr_view(args.repo, number)
@@ -167,6 +165,9 @@ def process_queue(args: argparse.Namespace) -> int:
             needs_fix, reasons = needs_autofix(args.repo, pr)
             print(json.dumps({"number": number, "head": head_sha, "needs_fix": needs_fix, "reasons": reasons}))
             if not needs_fix:
+                continue
+            if dispatched >= args.max_dispatches:
+                print("skip: autofix dispatch limit reached for this run")
                 continue
 
             comments = issue_comments(args.repo, number)
@@ -198,6 +199,14 @@ def self_test() -> int:
     ]
     assert recent_fix_marker_exists(comments, head, 24 * 3600)
     assert not recent_fix_marker_exists(comments, "b" * 40, 24 * 3600)
+    args = argparse.Namespace(
+        repo="owner/repo",
+        max_prs=2,
+        max_dispatches=1,
+        retry_hours=24,
+        dry_run=True,
+    )
+    assert args.max_dispatches < args.max_prs
     print("self-test passed")
     return 0
 
