@@ -6,10 +6,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+
+REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def run_json(args: list[str]) -> Any:
@@ -202,6 +207,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if not args.repo:
         parser.error("--repo is required")
+    if not REPO_RE.fullmatch(args.repo):
+        parser.error("--repo must be in OWNER/NAME form with safe GitHub name characters")
+    if args.pr_number < 1:
+        parser.error("--pr-number must be positive")
+    if not SHA_RE.fullmatch(args.head_sha):
+        parser.error("--head-sha must be a 40-character git SHA")
     return args
 
 
