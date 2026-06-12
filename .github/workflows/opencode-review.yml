@@ -3,16 +3,36 @@ name: OpenCode Review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      pr_base_ref:
+        description: Pull request base branch
+        required: true
+        type: string
+      pr_base_sha:
+        description: Pull request base SHA
+        required: true
+        type: string
+      pr_head_sha:
+        description: Pull request head SHA
+        required: true
+        type: string
 
 concurrency:
-  group: opencode-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: opencode-review-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
   cancel-in-progress: true
 
 jobs:
   opencode-review:
     if: >-
-      github.event.pull_request.draft != true
-      && github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name == 'pull_request'
+        && github.event.pull_request.draft != true
+        && github.event.pull_request.head.repo.full_name == github.repository)
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -26,13 +46,37 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Fetch PR base branch for OpenCode context
+      - name: Fetch PR refs for OpenCode context
         env:
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          PR_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || inputs.pr_base_ref }}
+          PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.pr_base_sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
         run: |
           set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::PR number must be numeric."
+            exit 1
+          fi
+          if ! [[ "$PR_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::PR base SHA must be a 40-character git SHA."
+            exit 1
+          fi
+          if ! [[ "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::PR head SHA must be a 40-character git SHA."
+            exit 1
+          fi
           git fetch --no-tags origin \
             "+refs/heads/${PR_BASE_REF}:refs/remotes/origin/${PR_BASE_REF}"
+          git cat-file -e "$PR_BASE_SHA^{commit}"
+          git fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head"
+          fetched_head_sha="$(git rev-parse "refs/remotes/pull/${PR_NUMBER}/head")"
+          if [ "$fetched_head_sha" != "$PR_HEAD_SHA" ]; then
+            echo "::error::Fetched PR head $fetched_head_sha did not match expected $PR_HEAD_SHA."
+            exit 1
+          fi
+          git checkout --detach --quiet "$PR_HEAD_SHA"
 
       - name: Configure git identity for OpenCode action
         run: |
@@ -69,9 +113,9 @@ jobs:
 
       - name: Prepare bounded OpenCode review evidence
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.pr_base_sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           OPENCODE_EVIDENCE_FILE: ${{ runner.temp }}/opencode-review-evidence.md
         run: |
           set -euo pipefail
@@ -291,8 +335,8 @@ jobs:
           OPENCODE_EVIDENCE_FILE: ${{ runner.temp }}/opencode-review-evidence.md
           OPENCODE_OUTPUT_FILE: ${{ runner.temp }}/opencode-review-primary.md
           OPENCODE_REVIEW_WORKDIR: ${{ runner.temp }}/opencode-review-project
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
@@ -378,8 +422,8 @@ jobs:
           OPENCODE_EVIDENCE_FILE: ${{ runner.temp }}/opencode-review-evidence.md
           OPENCODE_OUTPUT_FILE: ${{ runner.temp }}/opencode-review-fallback.md
           OPENCODE_REVIEW_WORKDIR: ${{ runner.temp }}/opencode-review-project
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
@@ -465,8 +509,8 @@ jobs:
           OPENCODE_EVIDENCE_FILE: ${{ runner.temp }}/opencode-review-evidence.md
           OPENCODE_OUTPUT_FILE: ${{ runner.temp }}/opencode-review-second-fallback.md
           OPENCODE_REVIEW_WORKDIR: ${{ runner.temp }}/opencode-review-project
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
@@ -545,8 +589,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           OPENCODE_PRIMARY_OUTCOME: ${{ steps.opencode_review_primary.outcome }}
@@ -688,8 +732,8 @@ jobs:
           GH_TOKEN: ${{ secrets.OPENCODE_APPROVE_TOKEN || secrets.GITHUB_TOKEN }}
           GH_REPOSITORY: ${{ github.repository }}
           OPENCODE_APP_TOKEN: ${{ steps.opencode_app_token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           OPENCODE_PRIMARY_OUTCOME: ${{ steps.opencode_review_primary.outcome }}
