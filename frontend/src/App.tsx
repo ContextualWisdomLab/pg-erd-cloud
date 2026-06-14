@@ -486,6 +486,25 @@ export default function App() {
             >
               되돌리기
             </button>
+            <button
+              type="button"
+              onClick={onOpenAddTable}
+              title="테이블 추가"
+              aria-label="테이블 추가"
+            >
+              테이블 추가
+            </button>
+            <button
+              type="button"
+              onClick={onOpenExport}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DDL 내보내기"
+              }
+              aria-label="DDL 내보내기"
+            >
+              DDL
+            </button>
             <div className="srOnly" aria-live="polite">
               {layoutMessage}
             </div>
