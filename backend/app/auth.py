@@ -129,10 +129,9 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             raise HTTPException(status_code=401, detail="token missing sub")
         return sub, str(name) if isinstance(name, str) else None
 
-    # Dev fallback (no OIDC configured)
-    dev_user = request.headers.get("X-Dev-User") or "local"
-    dev_user = dev_user.strip()[:128]
-    return f"dev:{dev_user}", dev_user
+    # In production, this fallback should be disabled.
+    # Instead, we should raise an authentication error.
+    raise HTTPException(status_code=401, detail="Authentication required")
 
 
 async def try_get_subject_for_rate_limit(request: Request) -> str | None:
