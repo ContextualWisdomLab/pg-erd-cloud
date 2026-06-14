@@ -247,17 +247,29 @@ jobs:
           Return a concise summary of changes made, or state that no safe change was made.
           EOF
           workspace_config_backup="${RUNNER_TEMP}/opencode-jsonc.backup"
+          workspace_prompt_backup="${RUNNER_TEMP}/autofix-prompt.backup"
           had_workspace_config=0
+          had_workspace_prompt=0
           if [ -f "$GITHUB_WORKSPACE/opencode.jsonc" ]; then
             cp "$GITHUB_WORKSPACE/opencode.jsonc" "$workspace_config_backup"
             had_workspace_config=1
           fi
+          if [ -f "$GITHUB_WORKSPACE/autofix-prompt.md" ]; then
+            cp "$GITHUB_WORKSPACE/autofix-prompt.md" "$workspace_prompt_backup"
+            had_workspace_prompt=1
+          fi
           cp "$OPENCODE_AUTOFIX_WORKDIR/opencode.jsonc" "$GITHUB_WORKSPACE/opencode.jsonc"
+          cp "$OPENCODE_AUTOFIX_WORKDIR/autofix-prompt.md" "$GITHUB_WORKSPACE/autofix-prompt.md"
           restore_workspace_config() {
             if [ "$had_workspace_config" = "1" ]; then
               cp "$workspace_config_backup" "$GITHUB_WORKSPACE/opencode.jsonc"
             else
               rm -f "$GITHUB_WORKSPACE/opencode.jsonc"
+            fi
+            if [ "$had_workspace_prompt" = "1" ]; then
+              cp "$workspace_prompt_backup" "$GITHUB_WORKSPACE/autofix-prompt.md"
+            else
+              rm -f "$GITHUB_WORKSPACE/autofix-prompt.md"
             fi
           }
           trap restore_workspace_config EXIT

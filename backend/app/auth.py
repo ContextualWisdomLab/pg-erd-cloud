@@ -28,6 +28,7 @@ class CurrentUser:
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+OIDC_ALLOWED_ALGORITHMS = ("RS256",)
 
 
 async def _get_oidc_config() -> dict:
@@ -108,15 +109,20 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         jwk = _pick_jwk(jwks, header.get("kid"))
         if jwk is None:
             raise HTTPException(status_code=401, detail="unknown signing key")
+        if header.get("alg") not in OIDC_ALLOWED_ALGORITHMS:
+            raise HTTPException(status_code=401, detail="unsupported token algorithm")
 
         try:
             claims = jwt.decode(
                 token,
                 jwk,
-                algorithms=[str(header.get("alg"))],
+                algorithms=list(OIDC_ALLOWED_ALGORITHMS),
                 audience=settings.oidc_audience,
                 issuer=settings.oidc_issuer,
-                options={"verify_aud": bool(settings.oidc_audience)},
+                options={
+                    "verify_aud": bool(settings.oidc_audience),
+                    "require_exp": True,
+                },
             )
         except Exception as err:
             raise HTTPException(
@@ -129,7 +135,10 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             raise HTTPException(status_code=401, detail="token missing sub")
         return sub, str(name) if isinstance(name, str) else None
 
-    # Dev fallback (no OIDC configured)
+    if not settings.auth_dev_fallback_enabled:
+        raise HTTPException(status_code=500, detail="OIDC configuration required")
+
+    # Explicitly enabled dev fallback (no OIDC configured).
     dev_user = request.headers.get("X-Dev-User") or "local"
     dev_user = dev_user.strip()[:128]
     return f"dev:{dev_user}", dev_user
