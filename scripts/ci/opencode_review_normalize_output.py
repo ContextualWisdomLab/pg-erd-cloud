@@ -56,7 +56,7 @@ def valid_control(
     for finding in findings:
         if not isinstance(finding, dict):
             return None
-        if not isinstance(finding.get("line"), int):
+        if not isinstance(finding.get("line"), int) or finding["line"] <= 0:
             return None
         for field in required_finding_fields:
             if not isinstance(finding.get(field), str) or not finding[field].strip():
