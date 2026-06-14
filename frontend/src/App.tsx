@@ -446,7 +446,7 @@ export default function App() {
           Snapshot: {snapshot?.status || "—"}
           {snapshot?.error_message ? (
             <div className="error" role="alert">
-              {snapshot.error_message}
+              {String(snapshot.error_message)}
             </div>
           ) : null}
         </div>
