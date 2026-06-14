@@ -109,7 +109,7 @@ if ! jq -e '
   )
   and all(.findings[];
     (.path | type == "string" and length > 0)
-    and (.line | type == "number")
+    and (.line | type == "number" and . > 0 and floor == .)
     and (.severity | type == "string" and length > 0)
     and (.title | type == "string" and length > 0)
     and (.problem | type == "string" and length > 0)
