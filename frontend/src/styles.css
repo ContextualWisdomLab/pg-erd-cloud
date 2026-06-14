@@ -126,6 +126,7 @@ button {
 }
 
 .tableNode__col {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto;
   column-gap: 8px;
@@ -165,10 +166,6 @@ button {
   }
 }
 
-.tableNode__col {
-  position: relative;
-}
-
 .colHandle {
   background: transparent;
   border: 1px solid #d1d5db;
@@ -176,13 +173,14 @@ button {
   width: 6px;
   height: 6px;
   top: 50%;
+  transform: translateY(-50%);
 }
 .colHandle:hover {
   background: #034ea2;
   border-color: #034ea2;
 }
 
-/* Fix target Handle position for table level */
+/* Style table-level top and bottom handles */
 .react-flow__handle-top, .react-flow__handle-bottom {
   background: transparent;
   border: 1px solid #d1d5db;

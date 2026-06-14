@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 
+import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
+
 const MAX_RENDERED_COLUMNS = 25
 
 type Column = {
@@ -36,7 +38,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             <Handle
               type="target"
               position={Position.Left}
-              id={`tgt-${c.column_name}`}
+              id={targetColumnHandleId(c.column_name)}
               className="colHandle"
             />
             <span className="tableNode__colName">{c.column_name}</span>
@@ -46,7 +48,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             <Handle
               type="source"
               position={Position.Right}
-              id={`src-${c.column_name}`}
+              id={sourceColumnHandleId(c.column_name)}
               className="colHandle"
             />
           </div>

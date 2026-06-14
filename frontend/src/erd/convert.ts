@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 
+import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 
 type SnapshotJson = {
@@ -76,8 +77,8 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
 
       if (rows.length === 1) {
         label = `${first.fk_constraint_name}: ${first.child_column_name} → ${first.parent_column_name}`
-        sourceHandle = `src-${first.child_column_name}`
-        targetHandle = `tgt-${first.parent_column_name}`
+        sourceHandle = sourceColumnHandleId(first.child_column_name)
+        targetHandle = targetColumnHandleId(first.parent_column_name)
       } else {
         label = `${first.fk_constraint_name} (${rows.length} cols)`
       }
