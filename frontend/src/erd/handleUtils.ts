@@ -1,10 +1,9 @@
 export function sanitizeHandleId(columnName: string): string {
-  const normalized = columnName.normalize('NFKC').trim()
-  const encoded = Array.from(normalized, (char) => {
-    return /[A-Za-z0-9_-]/.test(char) ? char : `_${char.codePointAt(0)?.toString(16) ?? '0'}_`
-  }).join('')
+  const encoded = Array.from(columnName, (char) => {
+    return char.codePointAt(0)?.toString(16).padStart(4, '0') ?? '0000'
+  }).join('-')
 
-  return encoded || 'column'
+  return `c-${encoded || 'empty'}`
 }
 
 export function sourceColumnHandleId(columnName: string): string {
