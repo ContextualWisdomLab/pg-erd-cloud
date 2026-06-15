@@ -1383,7 +1383,7 @@ jobs:
             local runs_json
 
             runs_json="$(mktemp)"
-            if ! gh api -X GET "repos/${GH_REPOSITORY}/actions/workflows/strix.yml/runs?event=pull_request_target&per_page=30" >"$runs_json"; then
+            if ! gh api -X GET "repos/${GH_REPOSITORY}/actions/workflows/strix.yml/runs?per_page=100" >"$runs_json"; then
               rm -f "$runs_json"
               return 1
             fi
@@ -1394,7 +1394,7 @@ jobs:
                   (.workflow_runs // [])
                   | map(
                       select((.head_sha // "") == $head_sha)
-                      | select((.event // "") == "pull_request_target")
+                      | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
                       | select((.status // "") == "completed")
                       | select((.conclusion // "" | ascii_upcase) as $c | ["FAILURE","TIMED_OUT","ACTION_REQUIRED","CANCELLED","STARTUP_FAILURE"] | index($c))
                       | "- Strix Security Scan/strix workflow run: " + (.conclusion // "unknown") + (if (.html_url // "") != "" then " (" + .html_url + ")" else "" end)
@@ -1407,7 +1407,7 @@ jobs:
                   (.workflow_runs // [])
                   | map(
                       select((.head_sha // "") == $head_sha)
-                      | select((.event // "") == "pull_request_target")
+                      | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
                       | select((.status // "") != "completed")
                       | "- Strix Security Scan/strix workflow run: " + (.status // "unknown") + (if (.html_url // "") != "" then " (" + .html_url + ")" else "" end)
                     )
@@ -1423,14 +1423,67 @@ jobs:
             rm -f "$runs_json"
           }
 
+          collect_current_head_strix_success_run_ids() {
+            local output_file="$1"
+
+            HEAD_SHA="$HEAD_SHA" gh run list \
+              --repo "$GH_REPOSITORY" \
+              --commit "$HEAD_SHA" \
+              --limit 100 \
+              --json databaseId,workflowName,status,conclusion,event,headSha \
+              --jq '
+                .[]
+                | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
+                | select((.headSha // "") == env.HEAD_SHA)
+                | select((.workflowName // "") == "Strix Security Scan" or (.workflowName // "") == "Strix")
+                | select((.status // "") == "completed")
+                | select((.conclusion // "" | ascii_downcase) == "success")
+                | ((.databaseId // "") | tostring)
+              ' >"$output_file"
+          }
+
+          filter_superseded_strix_failure_lines() {
+            local input_file="$1"
+            local output_file="$2"
+            local latest_success_run_id="$3"
+
+            if [ -z "$latest_success_run_id" ]; then
+              cat "$input_file" >"$output_file"
+              return 0
+            fi
+
+            awk -v latest_success_run_id="$latest_success_run_id" '
+              /Strix Security Scan/ {
+                line = $0
+                run_id = 0
+                if (line ~ /actions\/runs\/[0-9]+/) {
+                  sub(/^.*actions\/runs\//, "", line)
+                  sub(/[^0-9].*$/, "", line)
+                  run_id = line + 0
+                }
+                if (run_id > 0 && run_id < (latest_success_run_id + 0)) {
+                  next
+                }
+              }
+              { print }
+            ' "$input_file" >"$output_file"
+          }
+
           collect_failed_github_checks() {
             local output_file="$1"
             local owner="${GH_REPOSITORY%%/*}"
             local name="${GH_REPOSITORY#*/}"
             local rollup_file
             local strix_runs_file
+            local combined_file
+            local filtered_file
+            local strix_success_run_ids_file
+            local latest_strix_success_run_id
             rollup_file="$(mktemp)"
             strix_runs_file="$(mktemp)"
+            combined_file="$(mktemp)"
+            filtered_file="$(mktemp)"
+            strix_success_run_ids_file="$(mktemp)"
             # shellcheck disable=SC2016
             if ! gh api graphql \
               -f owner="$owner" \
@@ -1485,20 +1538,27 @@ jobs:
                   )
                 | .[]
               ' >"$rollup_file"; then
-              rm -f "$rollup_file" "$strix_runs_file"
+              rm -f "$rollup_file" "$strix_runs_file" "$combined_file" "$filtered_file" "$strix_success_run_ids_file"
               return 1
             fi
 
             if ! collect_current_head_strix_workflow_runs "$strix_runs_file" failed; then
-              rm -f "$rollup_file" "$strix_runs_file"
+              rm -f "$rollup_file" "$strix_runs_file" "$combined_file" "$filtered_file" "$strix_success_run_ids_file"
               return 1
             fi
             if grep -Fq -- "Strix Security Scan/strix:" "$rollup_file"; then
-              cat "$rollup_file" >"$output_file"
+              cat "$rollup_file" >"$combined_file"
             else
-              cat "$rollup_file" "$strix_runs_file" >"$output_file"
+              cat "$rollup_file" "$strix_runs_file" >"$combined_file"
             fi
-            rm -f "$rollup_file" "$strix_runs_file"
+            if collect_current_head_strix_success_run_ids "$strix_success_run_ids_file" && [ -s "$strix_success_run_ids_file" ]; then
+              latest_strix_success_run_id="$(sort -n "$strix_success_run_ids_file" | tail -n 1)"
+              filter_superseded_strix_failure_lines "$combined_file" "$filtered_file" "$latest_strix_success_run_id"
+              cat "$filtered_file" >"$output_file"
+            else
+              cat "$combined_file" >"$output_file"
+            fi
+            rm -f "$rollup_file" "$strix_runs_file" "$combined_file" "$filtered_file" "$strix_success_run_ids_file"
 
           }
 

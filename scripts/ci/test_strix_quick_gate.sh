@@ -386,6 +386,9 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "Strix model attempt and finding summary" "failed-check evidence collector summarizes every Strix model attempt"
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "Strix vulnerability report window" "failed-check evidence collector preserves Strix vulnerability report windows"
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "When Strix logs contain multiple" "failed-check evidence collector requires all model-reported vulnerabilities"
+	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "filter_superseded_strix_failures" "failed-check evidence collector ignores older Strix failures after newer current-head success"
+	assert_file_contains "$workflow_file" "collect_current_head_strix_success_run_ids" "opencode review workflow can find current-head Strix success evidence"
+	assert_file_contains "$workflow_file" "filter_superseded_strix_failure_lines" "opencode review workflow ignores older Strix failure lines after newer current-head success"
 	assert_file_contains "$workflow_file" "If bounded failed GitHub Check evidence is present, treat it as a blocker until diagnosed." "opencode review prompt forces failed-check diagnosis"
 	assert_file_contains "$workflow_file" "include every model-reported vulnerability as a separate evidence-backed finding" "opencode review prompt requires all Strix model findings"
 	assert_file_contains "$workflow_file" "Multiple Strix model reports must not be collapsed" "opencode review prompt prevents collapsing multiple Strix model reports"
@@ -567,6 +570,57 @@ EOF
 	rc=$?
 	set -e
 	assert_equals "0" "$rc" "failed-check review validator accepts Strix log-backed findings"
+
+	rm -rf "$tmp_dir"
+}
+
+assert_failed_check_evidence_ignores_superseded_strix_runs() {
+	local tmp_dir
+	local evidence_file
+	local rc
+	tmp_dir="$(mktemp -d)"
+	mkdir -p "$tmp_dir/bin"
+	evidence_file="$tmp_dir/evidence.md"
+
+	cat >"$tmp_dir/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$1" = "api" ] && [ "${2:-}" = "graphql" ]; then
+	printf 'check_run\tStrix Security Scan/strix\tfailure\thttps://github.com/example/repo/actions/runs/100/job/200\t100\t200\n'
+	exit 0
+fi
+
+if [ "$1" = "run" ] && [ "${2:-}" = "list" ]; then
+	case " $* " in
+	*"databaseId,workflowName,status,conclusion,url,event,headSha"*)
+		printf 'workflow_run\tStrix Security Scan\tfailure\thttps://github.com/example/repo/actions/runs/101\t101\t\n'
+		exit 0
+		;;
+	*"databaseId,workflowName,status,conclusion,event,headSha"*)
+		printf '102\n'
+		exit 0
+		;;
+	esac
+fi
+
+printf 'unexpected gh arguments: %s\n' "$*" >&2
+exit 1
+EOF
+	chmod +x "$tmp_dir/bin/gh"
+
+	set +e
+	PATH="$tmp_dir/bin:$PATH" \
+		GH_REPOSITORY="example/repo" \
+		PR_NUMBER="123" \
+		HEAD_SHA="abc123" \
+		bash "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "$evidence_file" >"$tmp_dir/out" 2>"$tmp_dir/err"
+	rc=$?
+	set -e
+
+	assert_equals "0" "$rc" "failed-check evidence collector accepts superseded stale Strix failures"
+	assert_file_contains "$evidence_file" "No completed failed GitHub Checks were present" "superseded Strix failures do not block current-head approval"
+	assert_file_not_contains "$evidence_file" "## Failed check:" "superseded Strix failures are removed from detailed evidence"
 
 	rm -rf "$tmp_dir"
 }
@@ -5017,6 +5071,8 @@ assert_opencode_review_normalizer_accepts_transcript_json
 assert_opencode_review_gate_rejects_line_zero_findings
 
 assert_opencode_failed_check_review_validator_rejects_unrelated_findings
+
+assert_failed_check_evidence_ignores_superseded_strix_runs
 
 run_pull_request_target_head_scope_case \
 	"pull-request-target-modified-file-uses-head-blob" \
