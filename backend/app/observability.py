@@ -214,4 +214,4 @@ def setup_observability(app: FastAPI) -> None:
             methods.add("GET")
         prime_http_metrics(methods=methods, routes=routes)
 
-    app.add_event_handler("startup", _prime_metrics_on_startup)
+    app.router.add_event_handler("startup", _prime_metrics_on_startup)
