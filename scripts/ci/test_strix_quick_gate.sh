@@ -2453,6 +2453,8 @@ EOF
 		echo 'class ChangedJwtUtil {}' >"$repo_root_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
 		mkdir -p "$repo_root_dir/frontend/src/app/labels/[slug]"
 		echo 'export default function Page() { return null }' >"$repo_root_dir/frontend/src/app/labels/[slug]/page.tsx"
+		mkdir -p "$repo_root_dir/.github/workflows"
+		echo 'name: OpenCode Review' >"$repo_root_dir/.github/workflows/opencode-review.yml"
 		mkdir -p "$repo_root_dir/src"
 		echo 'print("unsafe name")' >"$repo_root_dir/src/unsafe name.py"
 		mkdir -p "$repo_root_dir/backend/services"
