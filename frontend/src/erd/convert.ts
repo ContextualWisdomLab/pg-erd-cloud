@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 
+import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 
 type SnapshotJson = {
@@ -50,7 +51,14 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
   }
 
   const hasFk = new Set<number>()
-  const fkEdges: Array<{ id: string; source: string; target: string; label: string }> = []
+  const fkEdges: Array<{
+    id: string
+    source: string
+    target: string
+    sourceHandle?: string
+    targetHandle?: string
+    label: string
+  }> = []
 
   const fkRows = snapshot.fk_edges || []
   if (fkRows.length > 0) {
@@ -63,11 +71,19 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       const first = rows[0]
       const source = String(first.child_relation_oid)
       const target = String(first.parent_relation_oid)
-      const label =
-        rows.length === 1
-          ? `${first.fk_constraint_name}: ${first.child_column_name} → ${first.parent_column_name}`
-          : `${first.fk_constraint_name} (${rows.length} cols)`
-      fkEdges.push({ id: String(oid), source, target, label })
+      let sourceHandle: string | undefined = undefined
+      let targetHandle: string | undefined = undefined
+      let label = ''
+
+      if (rows.length === 1) {
+        label = `${first.fk_constraint_name}: ${first.child_column_name} → ${first.parent_column_name}`
+        sourceHandle = sourceColumnHandleId(first.child_column_name)
+        targetHandle = targetColumnHandleId(first.parent_column_name)
+      } else {
+        label = `${first.fk_constraint_name} (${rows.length} cols)`
+      }
+
+      fkEdges.push({ id: String(oid), source, target, sourceHandle, targetHandle, label })
     }
   } else {
     // Backward compat: infer FKs from constraints list only.
@@ -106,8 +122,11 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     id: e.id,
     source: e.source,
     target: e.target,
+    sourceHandle: e.sourceHandle,
+    targetHandle: e.targetHandle,
     label: e.label,
-    animated: false
+    animated: false,
+    type: 'smoothstep'
   }))
 
   return { nodes, edges }
