@@ -1220,6 +1220,42 @@ EOS
 		echo "Penetration test failed: LLM request failed: RateLimitError"
 		exit 1
 		;;
+	pr-primary-ratelimit-fallback-placeholder-secret)
+		case "${STRIX_LLM:-}" in
+		openai/gpt-5)
+			echo "Penetration test failed: LLM request failed: RateLimitError"
+			exit 1
+			;;
+		deepseek/deepseek-r1-0528)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities/vuln-0001.md" <<'EOS'
+# Hardcoded Secrets in Source Code
+
+**Severity:** CRITICAL
+
+## Code Analysis
+
+**Location 1:** `src/config/database.py` (line 15)
+  Hardcoded database password
+  ```
+      'password': 'dbpassword123'
+  ```
+
+**Location 2:** `src/services/payment_service.py` (line 5)
+  Hardcoded payment API key
+  ```
+  PAYMENT_API_KEY = 'sk_live_1234567890'
+  ```
+EOS
+			echo "Penetration test failed: placeholder hardcoded secrets"
+			exit 1
+			;;
+		*)
+			echo "Error: placeholder fallback path unexpected (${STRIX_LLM:-})" >&2
+			exit 27
+			;;
+		esac
+		;;
 	vertex-primary-hallucinated-endpoint-fallback-success|target-path-src-default-source-dirs)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/hallucination-primary)
@@ -1901,6 +1937,30 @@ Severity: CRITICAL
 Description: location data unavailable
 EOS
 		echo "Penetration test failed: unmapped critical finding"
+		exit 1
+		;;
+	pr-critical-placeholder-hardcoded-secret)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-placeholder-secret/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-pr-placeholder-secret/vulnerabilities/vuln-0001.md" <<'EOS'
+# Hardcoded Secrets in Source Code
+
+**Severity:** CRITICAL
+
+## Code Analysis
+
+**Location 1:** `src/config/database.py` (line 15)
+  Hardcoded database password
+  ```
+      'password': 'dbpassword123'
+  ```
+
+**Location 2:** `src/services/payment_service.py` (line 5)
+  Hardcoded payment API key
+  ```
+  PAYMENT_API_KEY = 'sk_live_1234567890'
+  ```
+EOS
+		echo "Penetration test failed: placeholder hardcoded secrets"
 		exit 1
 		;;
 	pr-baseline-critical-absolute-target)
@@ -5809,6 +5869,35 @@ run_gate_case_allow_provider_signal "vertex-all-ratelimited" \
 	"vertex_ai/ratelimit-primary|vertex_ai/fallback-one|vertex_ai/fallback-two" \
 	"<unset>|<unset>|<unset>"
 
+run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
+	"openai/gpt-5" \
+	"" \
+	"0" \
+	"Strix placeholder hardcoded-secret finding references only absent non-repository example paths; allowing pipeline continuation." \
+	"2" \
+	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"https://example.invalid|https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"backend/app/auth.py" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528"
+
 run_gate_case "vertex-primary-hallucinated-endpoint-fallback-success" \
 	"vertex_ai/hallucination-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
@@ -6935,6 +7024,27 @@ run_gate_case "pr-critical-unmapped" \
 	"" \
 	"1" \
 	"Unable to map Strix findings to changed files; failing closed for pull request." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
+
+run_gate_case "pr-critical-placeholder-hardcoded-secret" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix placeholder hardcoded-secret finding references only absent non-repository example paths; allowing pipeline continuation." \
 	"1" \
 	"openai/gpt-4o-mini" \
 	"https://example.invalid" \
