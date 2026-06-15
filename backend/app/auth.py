@@ -90,8 +90,9 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
 async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a request.
 
-    Uses OIDC bearer tokens when configured; otherwise falls back to a dev
-    header for local development.
+    Uses OIDC bearer tokens when configured. If OIDC is not configured, the
+    local development header is accepted only when the dev fallback flag is
+    explicitly enabled.
     """
 
     # OIDC mode (Casdoor etc.)
