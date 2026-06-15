@@ -1200,6 +1200,48 @@ EOS
 			;;
 		esac
 		;;
+	github-models-fallback-provider-signal-absent-source-baseline)
+		case "${STRIX_LLM:-}" in
+		openai/gpt-5)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
+			exit 1
+			;;
+		deepseek/deepseek-r1-0528)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0001.md" <<'EOS'
+# Cross-Site Scripting (XSS) Risk in User-Controlled Data Rendering
+
+**Severity:** HIGH
+
+## Code Analysis
+
+**Location 1:** `frontend/src/components/ProjectDisplay.jsx` (line 15)
+  Potential XSS risk when rendering project name
+
+**Location 2:** `frontend/src/components/MemberList.jsx` (line 22)
+  Potential XSS risk when rendering member subject
+EOS
+			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0002.md" <<'EOS'
+# Vulnerable Dependencies in Backend
+
+**Severity:** CRITICAL
+
+## Code Analysis
+
+**Location 1:** `backend/requirements.lock` (line 181)
+  Vulnerable cryptography package
+EOS
+			echo "Warning: fallback model emitted provider failure-signal output"
+			exit 2
+			;;
+		*)
+			echo "Error: GitHub Models provider-signal absent-source baseline path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
 	gemini-high-demand-retry-same-model-success)
 		case "${STRIX_LLM:-}" in
 		gemini/retry-high-demand-primary)
@@ -2416,6 +2458,8 @@ EOF
 		mkdir -p "$repo_root_dir/backend/services"
 		echo 'async def send_email(*args, **kwargs): return None' >"$repo_root_dir/backend/services/email_client.py"
 		echo 'def parse_eml(*args): return {}' >"$repo_root_dir/backend/services/email_parser.py"
+		mkdir -p "$repo_root_dir/backend"
+		echo 'cryptography==45.0.0' >"$repo_root_dir/backend/requirements.lock"
 		if [ -n "$current_pr_number" ]; then
 			cat >"$event_payload_file" <<EOF
 {
@@ -5596,6 +5640,36 @@ run_gate_case "github-models-fallback-provider-signal-baseline-only" \
 	"0" \
 	"pull_request" \
 	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528" \
+	"1"
+
+run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
+	"openai/gpt-5" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"2" \
+	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"MEDIUM" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
 	"" \
 	"" \
 	"0" \
