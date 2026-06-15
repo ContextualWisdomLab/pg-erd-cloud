@@ -16,6 +16,33 @@ from app.models import UserAccount
 from app.settings import settings
 
 
+def _parse_oidc_algorithms(raw: str) -> list[str]:
+    """Parse OIDC_ALGORITHMS into a non-empty allowlist.
+
+    Security note:
+    - JWT verification must *not* trust the token header's `alg`.
+    - We pass an explicit allowlist to the verifier.
+    """
+
+    # Normalize and deduplicate so env values like "rs256, RS256" behave
+    # predictably.
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        alg = part.strip().upper()
+        if not alg:
+            continue
+        # Defensive: never allow unsigned tokens.
+        if alg == "NONE":
+            continue
+        if alg in seen:
+            continue
+        seen.add(alg)
+        normalized.append(alg)
+
+    return normalized or ["RS256"]
+
+
 @dataclass(frozen=True)
 class CurrentUser:
     """Authenticated user identity used by API handlers."""
@@ -38,7 +65,9 @@ class VerifiedToken:
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
-OIDC_ALLOWED_ALGORITHMS = ("RS256",)
+OIDC_ALLOWED_ALGORITHMS = tuple(
+    _parse_oidc_algorithms(settings.oidc_algorithms)
+)
 _revoked_token_jtis: dict[str, dt.datetime] = {}
 
 
@@ -153,12 +182,24 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
         except Exception:  # noqa: BLE001
             raise HTTPException(status_code=401, detail="invalid token header")
 
+        header_alg_raw = header.get("alg")
+        if not isinstance(header_alg_raw, str) or not header_alg_raw:
+            raise HTTPException(status_code=401, detail="token missing alg")
+
+        # Normalize so equivalent-case values (e.g. "rs256" vs "RS256") don't
+        # fail the allowlist check.
+        header_alg = header_alg_raw.upper()
+
+        if header_alg not in OIDC_ALLOWED_ALGORITHMS:
+            raise HTTPException(
+                status_code=401,
+                detail="unsupported token algorithm",
+            )
+
         jwks = await _get_jwks()
         jwk = _pick_jwk(jwks, header.get("kid"))
         if jwk is None:
             raise HTTPException(status_code=401, detail="unknown signing key")
-        if header.get("alg") not in OIDC_ALLOWED_ALGORITHMS:
-            raise HTTPException(status_code=401, detail="unsupported token algorithm")
 
         try:
             claims = jwt.decode(

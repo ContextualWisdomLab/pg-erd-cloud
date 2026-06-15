@@ -8,6 +8,21 @@ from app import auth
 from app.settings import settings
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("RS256", ["RS256"]),
+        ("rs256, ES256", ["RS256", "ES256"]),
+        ("RS256, rs256", ["RS256"]),
+        ("none, RS256", ["RS256"]),
+        ("none", ["RS256"]),
+        (", , ", ["RS256"]),
+    ],
+)
+def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
+    assert auth._parse_oidc_algorithms(raw) == expected
+
+
 def make_request(headers: dict[str, str] | None = None) -> Request:
     return Request(
         {
@@ -30,6 +45,7 @@ def exp_claim() -> int:
 async def test_oidc_rejects_header_selected_algorithm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
     monkeypatch.setattr(
@@ -59,6 +75,7 @@ async def test_oidc_rejects_header_selected_algorithm(
 async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
     monkeypatch.setattr(

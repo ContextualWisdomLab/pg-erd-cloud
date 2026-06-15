@@ -29,8 +29,7 @@ services:
       # podman-compose (python) may leave a trailing '}' which breaks CORS.
       # If you run the frontend on a non-default port, set CORS_ORIGINS explicitly.
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      # Dev default only; override via .env in real deployments.
-      APP_SECRET: ${APP_SECRET:-dev-only-change-me}
+      APP_SECRET: ${APP_SECRET:?set in .env}
     depends_on:
       postgres:
         condition: service_healthy

@@ -104,5 +104,11 @@ class Settings(BaseSettings):
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
 
+    # Allowed JWT signing algorithms for OIDC verification.
+    # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
+    # NOTE: Do not trust the token header's alg; only accept algorithms from
+    # this allowlist.
+    oidc_algorithms: str = "RS256"
+
 
 settings = Settings()  # type: ignore[call-arg]
