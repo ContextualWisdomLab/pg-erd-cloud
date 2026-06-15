@@ -52,12 +52,23 @@ class CurrentUser:
     display_name: str | None
 
 
+@dataclass(frozen=True)
+class VerifiedToken:
+    """Verified OIDC token details needed by auth and logout flows."""
+
+    subject: str
+    display_name: str | None
+    jwt_id: str
+    expires_at: dt.datetime
+
+
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(
     _parse_oidc_algorithms(settings.oidc_algorithms)
 )
+_revoked_token_jtis: dict[str, dt.datetime] = {}
 
 
 async def _get_oidc_config() -> dict:
@@ -116,8 +127,45 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
     return None
 
 
-async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
-    """Extract (subject, display_name) from a request.
+def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
+    """Return the JWT expiry as an aware UTC datetime."""
+
+    exp = claims.get("exp")
+    if not isinstance(exp, int | float):
+        raise HTTPException(status_code=401, detail="token missing exp")
+    return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
+
+
+def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
+    """Drop expired token revocation entries from the in-memory cache."""
+
+    current = now or dt.datetime.now(dt.timezone.utc)
+    expired = [
+        jwt_id for jwt_id, expires_at in _revoked_token_jtis.items()
+        if expires_at <= current
+    ]
+    for jwt_id in expired:
+        _revoked_token_jtis.pop(jwt_id, None)
+
+
+def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
+    """Record a JWT ID as revoked until its natural expiry."""
+
+    if not jwt_id:
+        return
+    _prune_revoked_token_jtis()
+    _revoked_token_jtis[jwt_id] = expires_at
+
+
+def is_token_jti_revoked(jwt_id: str) -> bool:
+    """Return whether the JWT ID is currently revoked."""
+
+    _prune_revoked_token_jtis()
+    return jwt_id in _revoked_token_jtis
+
+
+async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
+    """Extract and verify OIDC token claims from a request.
 
     Uses OIDC bearer tokens when configured. If OIDC is not configured, auth
     fails closed.
@@ -163,6 +211,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
                 options={
                     "verify_aud": bool(settings.oidc_audience),
                     "require_exp": True,
+                    "require_jti": True,
                 },
             )
         except Exception as err:
@@ -171,12 +220,30 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             ) from err
 
         sub = claims.get("sub")
+        jwt_id = claims.get("jti")
         name = claims.get("name") or claims.get("preferred_username")
         if not isinstance(sub, str):
             raise HTTPException(status_code=401, detail="token missing sub")
-        return sub, str(name) if isinstance(name, str) else None
+        if not isinstance(jwt_id, str) or not jwt_id.strip():
+            raise HTTPException(status_code=401, detail="token missing jti")
+        expires_at = _jwt_expiry(cast(dict[str, Any], claims))
+        if is_token_jti_revoked(jwt_id):
+            raise HTTPException(status_code=401, detail="token revoked")
+        return VerifiedToken(
+            subject=sub,
+            display_name=str(name) if isinstance(name, str) else None,
+            jwt_id=jwt_id,
+            expires_at=expires_at,
+        )
 
     raise HTTPException(status_code=500, detail="OIDC configuration required")
+
+
+async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
+    """Extract (subject, display_name) from a verified request token."""
+
+    verified = await _get_verified_token_from_request(request)
+    return verified.subject, verified.display_name
 
 
 async def try_get_subject_for_rate_limit(request: Request) -> str | None:
@@ -233,3 +300,10 @@ async def get_current_user(
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
+
+
+async def revoke_current_request_token(request: Request) -> None:
+    """Revoke the current request token until its natural expiry."""
+
+    verified = await _get_verified_token_from_request(request)
+    revoke_token_jti(verified.jwt_id, verified.expires_at)

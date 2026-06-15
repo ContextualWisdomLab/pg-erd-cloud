@@ -40,7 +40,7 @@ services:
     command: >
       sh -lc "
       alembic upgrade head &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      exec hypercorn --config python:app.hypercorn_config app.main:app --bind 0.0.0.0:8000 --reload --access-logfile - --error-logfile -
       "
     restart: unless-stopped
 
@@ -50,6 +50,9 @@ services:
       dockerfile: Dockerfile
     container_name: erd_frontend
     environment:
+      # NOTE: Avoid nested ${VAR:-${OTHER:-default}} expressions here.
+      # podman-compose (python) may leave a trailing '}' which breaks API calls.
+      # If you run the backend on a non-default port, set VITE_API_BASE_URL explicitly.
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     depends_on:
       - backend
