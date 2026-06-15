@@ -32,7 +32,7 @@ async def create_snapshot(
 ) -> SnapshotOut:
     """Create a schema snapshot job for a project connection."""
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
 
     # Ensure connection belongs to this project
