@@ -1934,6 +1934,16 @@ evaluate_pull_request_findings() {
 	return 1
 }
 
+pull_request_findings_allow_current_change() {
+	case "$PR_FINDINGS_DECISION" in
+	allow_absent_placeholder_secret | allow_baseline | allow_manifest_only)
+		return 0
+		;;
+	esac
+
+	return 1
+}
+
 fallback_models_raw_for_model() {
 	local model="$1"
 
@@ -3074,7 +3084,7 @@ run_current_target_scan() {
 	fi
 
 	if evaluate_pull_request_findings; then
-		if [ "$PR_FINDINGS_DECISION" = "allow_absent_placeholder_secret" ]; then
+		if pull_request_findings_allow_current_change; then
 			return 0
 		fi
 		if [ "$strict_primary_provider_fallback" -eq 0 ]; then
@@ -3137,7 +3147,7 @@ run_current_target_scan() {
 		fi
 
 		if evaluate_pull_request_findings; then
-			if [ "$PR_FINDINGS_DECISION" = "allow_absent_placeholder_secret" ]; then
+			if pull_request_findings_allow_current_change; then
 				return 0
 			fi
 			if [ "$strict_fallback_provider_signal" -eq 0 ]; then

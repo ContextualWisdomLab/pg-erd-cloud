@@ -1175,6 +1175,30 @@ EOS
 			;;
 		esac
 		;;
+	github-models-fallback-provider-signal-baseline-only)
+		case "${STRIX_LLM:-}" in
+		openai/gpt-5)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
+			exit 1
+			;;
+		deepseek/deepseek-r1-0528)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: CRITICAL
+Location 1:
+sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java:5
+EOS
+			echo "Warning: fallback model emitted provider failure-signal output"
+			exit 2
+			;;
+		*)
+			echo "Error: GitHub Models provider-signal baseline-only path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
 	gemini-high-demand-retry-same-model-success)
 		case "${STRIX_LLM:-}" in
 		gemini/retry-high-demand-primary)
@@ -5549,6 +5573,36 @@ run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
 	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"1"
+
+run_gate_case "github-models-fallback-provider-signal-baseline-only" \
+	"openai/gpt-5" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"2" \
+	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528" \
 	"1"
 
 run_gate_case_allow_provider_signal "gemini-high-demand-retry-same-model-success" \
