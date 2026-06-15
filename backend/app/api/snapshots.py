@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,45 @@ from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
+
+
+def _snapshot_not_found(schema_snapshot_uuid: uuid.UUID) -> SnapshotDetailOut:
+    """Return the uniform snapshot-not-found response."""
+
+    return SnapshotDetailOut(
+        schema_snapshot_uuid=schema_snapshot_uuid,
+        status="not_found",
+        schema_filter=None,
+        error_message="snapshot not found",
+        snapshot_json=None,
+    )
+
+
+async def _get_authorized_snapshot(
+    session: AsyncSession,
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser,
+) -> SchemaSnapshot | None:
+    """Fetch a snapshot only after project membership has been checked."""
+
+    project_space_uuid = await session.scalar(
+        select(SchemaSnapshot.project_space_uuid).where(
+            SchemaSnapshot.schema_snapshot_uuid == schema_snapshot_uuid
+        )
+    )
+    if project_space_uuid is None:
+        return None
+
+    try:
+        await require_project_member(
+            session, project_space_uuid, user.user_account_uuid
+        )
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            return None
+        raise
+
+    return await session.get(SchemaSnapshot, schema_snapshot_uuid)
 
 
 @router.post("/by-project/{project_space_uuid}", response_model=SnapshotOut)
@@ -86,18 +125,9 @@ async def get_snapshot(
     session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
     """Get a snapshot's status and (if present) captured JSON."""
-    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
-        return SnapshotDetailOut(
-            schema_snapshot_uuid=schema_snapshot_uuid,
-            status="not_found",
-            schema_filter=None,
-            error_message="snapshot not found",
-            snapshot_json=None,
-        )
-    await require_project_member(
-        session, snap.project_space_uuid, user.user_account_uuid
-    )
+        return _snapshot_not_found(schema_snapshot_uuid)
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     return SnapshotDetailOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
@@ -117,12 +147,9 @@ async def export_snapshot_sql(
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a snapshot as PostgreSQL DDL (best-effort)."""
-    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
         return "-- snapshot not found\n"
-    await require_project_member(
-        session, snap.project_space_uuid, user.user_account_uuid
-    )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
