@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
+    auth_dev_fallback_enabled: bool = False
 
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.

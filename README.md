@@ -30,8 +30,8 @@ curl -X POST "http://localhost:8000/api/projects/<project_uuid>/share-links" \
 ## 인덱스 타입 지원 원칙
 
 PostgreSQL은 `CREATE INDEX ... USING <method>`의 `<method>`가
-기본(btree/hash/gist/gin/spgist/brin)뿐 아니라 **확장(extension)으로 추가된
-access method**도 될 수 있습니다.
+기본(btree/hash/gist/gin/spgist/brin)뿐 아니라 **확장(extension)으로 추가된 access method**도
+될 수 있습니다.
 
 따라서 본 프로젝트는 **고정된 목록을 하드코딩하지 않고**,
 
@@ -72,6 +72,13 @@ docker compose -f compose.prod.yaml up -d --build
 ```
 
 - Frontend: <http://localhost:8080>
+
+### Azure VMSS 상태 프로브(선택)
+
+VMSS Application Health Extension을 사용할 경우 `/healthz` 프로브 설정 예시는 아래 문서를
+참고하세요.
+
+- [Azure VMSS Application Health Extension 가이드](docs/azure-vmss-health-extension.md)
 
 ## 개발(비-Docker)
 

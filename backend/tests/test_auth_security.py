@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+import pytest
+from fastapi import HTTPException
+from starlette.requests import Request
+
+from app import auth
+from app.settings import settings
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("RS256", ["RS256"]),
+        ("rs256, ES256", ["RS256", "ES256"]),
+        ("RS256, rs256", ["RS256"]),
+        ("none, RS256", ["RS256"]),
+        ("none", ["RS256"]),
+        (", , ", ["RS256"]),
+    ],
+)
+def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
+    assert auth._parse_oidc_algorithms(raw) == expected
+
+
+def make_request(headers: dict[str, str] | None = None) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/me",
+            "headers": [
+                (name.lower().encode("latin1"), value.encode("latin1"))
+                for name, value in (headers or {}).items()
+            ],
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_oidc_rejects_header_selected_algorithm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "HS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    def fail_decode(*_: object, **__: object) -> dict:
+        raise AssertionError("jwt.decode must not run for unsupported algorithms")
+
+    monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer token"})
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "unsupported token algorithm"
+
+
+@pytest.mark.asyncio
+async def test_oidc_decode_uses_fixed_algorithm_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+
+    observed: dict[str, object] = {}
+
+    def fake_decode(*args: object, **kwargs: object) -> dict:
+        observed["args"] = args
+        observed["kwargs"] = kwargs
+        return {"sub": "user-1", "name": "User One"}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    subject, display_name = await auth._get_subject_from_request(
+        make_request({"Authorization": "Bearer token"})
+    )
+
+    assert subject == "user-1"
+    assert display_name == "User One"
+    assert observed["kwargs"] == {
+        "algorithms": ["RS256"],
+        "audience": "pg-erd",
+        "issuer": "https://issuer.example",
+        "options": {"verify_aud": True, "require_exp": True},
+    }
+
+
+@pytest.mark.asyncio
+async def test_dev_fallback_requires_explicit_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", None)
+    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", False)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(make_request({"X-Dev-User": "local"}))
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "OIDC configuration required"

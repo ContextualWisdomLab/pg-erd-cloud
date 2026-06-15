@@ -55,6 +55,9 @@ class CurrentUser:
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+OIDC_ALLOWED_ALGORITHMS = tuple(
+    _parse_oidc_algorithms(settings.oidc_algorithms)
+)
 
 
 async def _get_oidc_config() -> dict:
@@ -116,8 +119,9 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
 async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a request.
 
-    Uses OIDC bearer tokens when configured; otherwise falls back to a dev
-    header for local development.
+    Uses OIDC bearer tokens when configured. If OIDC is not configured, the
+    local development header is accepted only when the dev fallback flag is
+    explicitly enabled.
     """
 
     # OIDC mode (Casdoor etc.)
@@ -139,11 +143,10 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         # fail the allowlist check.
         header_alg = header_alg_raw.upper()
 
-        allowed_algs = _parse_oidc_algorithms(settings.oidc_algorithms)
-        if header_alg not in allowed_algs:
+        if header_alg not in OIDC_ALLOWED_ALGORITHMS:
             raise HTTPException(
                 status_code=401,
-                detail="token algorithm not allowed",
+                detail="unsupported token algorithm",
             )
 
         jwks = await _get_jwks()
@@ -155,10 +158,13 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             claims = jwt.decode(
                 token,
                 jwk,
-                algorithms=allowed_algs,
+                algorithms=list(OIDC_ALLOWED_ALGORITHMS),
                 audience=settings.oidc_audience,
                 issuer=settings.oidc_issuer,
-                options={"verify_aud": bool(settings.oidc_audience)},
+                options={
+                    "verify_aud": bool(settings.oidc_audience),
+                    "require_exp": True,
+                },
             )
         except Exception as err:
             raise HTTPException(
@@ -171,7 +177,10 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             raise HTTPException(status_code=401, detail="token missing sub")
         return sub, str(name) if isinstance(name, str) else None
 
-    # Dev fallback (no OIDC configured)
+    if not settings.auth_dev_fallback_enabled:
+        raise HTTPException(status_code=500, detail="OIDC configuration required")
+
+    # Explicitly enabled dev fallback (no OIDC configured).
     dev_user = request.headers.get("X-Dev-User") or "local"
     dev_user = dev_user.strip()[:128]
     return f"dev:{dev_user}", dev_user
