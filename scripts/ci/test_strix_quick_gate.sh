@@ -5888,7 +5888,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"1200" \
 	"0" \
 	"pull_request" \
-	"backend/app/auth.py" \
+	"backend/services/email_client.py" \
 	"" \
 	"" \
 	"0" \
