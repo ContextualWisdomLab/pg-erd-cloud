@@ -12,6 +12,7 @@ from app.models import (
     SchemaSnapshot,
     SchemaSnapshotData,
 )
+from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.pg_introspect.introspect import introspect_postgres
 from app.security import decrypt_text
 
@@ -36,6 +37,7 @@ async def handle_snapshot_job(
                 raise RuntimeError("db connection not found")
 
             dsn = decrypt_text(conn.dsn_ciphertext, conn.dsn_nonce)
+            validate_postgres_dsn_target(dsn)
             schema_filter = snapshot.schema_filter
 
     # Long-running IO: do it outside a DB transaction.

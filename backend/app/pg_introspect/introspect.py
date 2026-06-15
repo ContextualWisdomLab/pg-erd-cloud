@@ -5,6 +5,7 @@ import datetime as dt
 import asyncpg
 
 from app.pg_introspect import queries
+from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
 
 
@@ -12,6 +13,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
     # Note: avoid logging DSN.
+    validate_postgres_dsn_target(dsn)
     conn = await asyncpg.connect(dsn, timeout=10)
     try:
         version = await conn.fetchval("SHOW server_version")
