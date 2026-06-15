@@ -53,7 +53,7 @@ async def create_connection(
 ) -> ConnectionOut:
     """Create a DB connection for a project (encrypt DSN at rest)."""
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
