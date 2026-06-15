@@ -386,6 +386,10 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "Strix model attempt and finding summary" "failed-check evidence collector summarizes every Strix model attempt"
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "Strix vulnerability report window" "failed-check evidence collector preserves Strix vulnerability report windows"
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "When Strix logs contain multiple" "failed-check evidence collector requires all model-reported vulnerabilities"
+	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "filter_superseded_strix_failures" "failed-check evidence collector ignores older Strix failures after newer current-head success"
+	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" 'select((.name // "") != "opencode-review")' "failed-check evidence collector ignores stale OpenCode self-check failures"
+	assert_file_contains "$workflow_file" "collect_current_head_strix_success_run_ids" "opencode review workflow can find current-head Strix success evidence"
+	assert_file_contains "$workflow_file" "filter_superseded_strix_failure_lines" "opencode review workflow ignores older Strix failure lines after newer current-head success"
 	assert_file_contains "$workflow_file" "If bounded failed GitHub Check evidence is present, treat it as a blocker until diagnosed." "opencode review prompt forces failed-check diagnosis"
 	assert_file_contains "$workflow_file" "include every model-reported vulnerability as a separate evidence-backed finding" "opencode review prompt requires all Strix model findings"
 	assert_file_contains "$workflow_file" "Multiple Strix model reports must not be collapsed" "opencode review prompt prevents collapsing multiple Strix model reports"
@@ -567,6 +571,57 @@ EOF
 	rc=$?
 	set -e
 	assert_equals "0" "$rc" "failed-check review validator accepts Strix log-backed findings"
+
+	rm -rf "$tmp_dir"
+}
+
+assert_failed_check_evidence_ignores_superseded_strix_runs() {
+	local tmp_dir
+	local evidence_file
+	local rc
+	tmp_dir="$(mktemp -d)"
+	mkdir -p "$tmp_dir/bin"
+	evidence_file="$tmp_dir/evidence.md"
+
+	cat >"$tmp_dir/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$1" = "api" ] && [ "${2:-}" = "graphql" ]; then
+	printf 'check_run\tStrix Security Scan/strix\tfailure\thttps://github.com/example/repo/actions/runs/100/job/200\t100\t200\n'
+	exit 0
+fi
+
+if [ "$1" = "run" ] && [ "${2:-}" = "list" ]; then
+	case " $* " in
+	*"databaseId,workflowName,status,conclusion,url,event,headSha"*)
+		printf 'workflow_run\tStrix Security Scan\tfailure\thttps://github.com/example/repo/actions/runs/101\t101\t\n'
+		exit 0
+		;;
+	*"databaseId,workflowName,status,conclusion,event,headSha"*)
+		printf '102\n'
+		exit 0
+		;;
+	esac
+fi
+
+printf 'unexpected gh arguments: %s\n' "$*" >&2
+exit 1
+EOF
+	chmod +x "$tmp_dir/bin/gh"
+
+	set +e
+	PATH="$tmp_dir/bin:$PATH" \
+		GH_REPOSITORY="example/repo" \
+		PR_NUMBER="123" \
+		HEAD_SHA="abc123" \
+		bash "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" "$evidence_file" >"$tmp_dir/out" 2>"$tmp_dir/err"
+	rc=$?
+	set -e
+
+	assert_equals "0" "$rc" "failed-check evidence collector accepts superseded stale Strix failures"
+	assert_file_contains "$evidence_file" "No completed failed GitHub Checks were present" "superseded Strix failures do not block current-head approval"
+	assert_file_not_contains "$evidence_file" "## Failed check:" "superseded Strix failures are removed from detailed evidence"
 
 	rm -rf "$tmp_dir"
 }
@@ -1117,6 +1172,72 @@ EOS
 			;;
 		*)
 			echo "Error: GitHub Models provider-signal fallback path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
+	github-models-fallback-provider-signal-baseline-only)
+		case "${STRIX_LLM:-}" in
+		openai/gpt-5)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
+			exit 1
+			;;
+		deepseek/deepseek-r1-0528)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
+Severity: CRITICAL
+Location 1:
+sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/service/impl/SysUserServiceImpl.java:5
+EOS
+			echo "Warning: fallback model emitted provider failure-signal output"
+			exit 2
+			;;
+		*)
+			echo "Error: GitHub Models provider-signal baseline-only path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
+	github-models-fallback-provider-signal-absent-source-baseline)
+		case "${STRIX_LLM:-}" in
+		openai/gpt-5)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
+			exit 1
+			;;
+		deepseek/deepseek-r1-0528)
+			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0001.md" <<'EOS'
+# Cross-Site Scripting (XSS) Risk in User-Controlled Data Rendering
+
+**Severity:** HIGH
+
+## Code Analysis
+
+**Location 1:** `frontend/src/components/ProjectDisplay.jsx` (line 15)
+  Potential XSS risk when rendering project name
+
+**Location 2:** `frontend/src/components/MemberList.jsx` (line 22)
+  Potential XSS risk when rendering member subject
+EOS
+			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0002.md" <<'EOS'
+# Vulnerable Dependencies in Backend
+
+**Severity:** CRITICAL
+
+## Code Analysis
+
+**Location 1:** `backend/requirements.lock` (line 181)
+  Vulnerable cryptography package
+EOS
+			echo "Warning: fallback model emitted provider failure-signal output"
+			exit 2
+			;;
+		*)
+			echo "Error: GitHub Models provider-signal absent-source baseline path unexpected (${STRIX_LLM:-})" >&2
 			exit 38
 			;;
 		esac
@@ -2332,11 +2453,15 @@ EOF
 		echo 'class ChangedJwtUtil {}' >"$repo_root_dir/sync-module-system/smart-crawling-common/src/main/java/org/empasy/sync/common/system/util/JwtUtil.java"
 		mkdir -p "$repo_root_dir/frontend/src/app/labels/[slug]"
 		echo 'export default function Page() { return null }' >"$repo_root_dir/frontend/src/app/labels/[slug]/page.tsx"
+		mkdir -p "$repo_root_dir/.github/workflows"
+		echo 'name: OpenCode Review' >"$repo_root_dir/.github/workflows/opencode-review.yml"
 		mkdir -p "$repo_root_dir/src"
 		echo 'print("unsafe name")' >"$repo_root_dir/src/unsafe name.py"
 		mkdir -p "$repo_root_dir/backend/services"
 		echo 'async def send_email(*args, **kwargs): return None' >"$repo_root_dir/backend/services/email_client.py"
 		echo 'def parse_eml(*args): return {}' >"$repo_root_dir/backend/services/email_parser.py"
+		mkdir -p "$repo_root_dir/backend"
+		echo 'cryptography==45.0.0' >"$repo_root_dir/backend/requirements.lock"
 		if [ -n "$current_pr_number" ]; then
 			cat >"$event_payload_file" <<EOF
 {
@@ -5018,6 +5143,8 @@ assert_opencode_review_gate_rejects_line_zero_findings
 
 assert_opencode_failed_check_review_validator_rejects_unrelated_findings
 
+assert_failed_check_evidence_ignores_superseded_strix_runs
+
 run_pull_request_target_head_scope_case \
 	"pull-request-target-modified-file-uses-head-blob" \
 	"src/app.py" \
@@ -5495,6 +5622,66 @@ run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
 	"1"
 
+run_gate_case "github-models-fallback-provider-signal-baseline-only" \
+	"openai/gpt-5" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"2" \
+	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528" \
+	"1"
+
+run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
+	"openai/gpt-5" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"2" \
+	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"MEDIUM" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528" \
+	"1"
+
 run_gate_case_allow_provider_signal "gemini-high-demand-retry-same-model-success" \
 	"gemini/retry-high-demand-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
@@ -5888,7 +6075,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"1200" \
 	"0" \
 	"pull_request" \
-	"backend/app/auth.py" \
+	"backend/services/email_client.py" \
 	"" \
 	"" \
 	"0" \
