@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     app_secret: str
 
     cors_origins: str = "http://localhost:5173"
+    app_env: Literal["development", "test", "staging", "production"] = "production"
 
     # Rate limiting (FastAPI app layer, applied to /api/*)
     api_rate_limit_enabled: bool = True

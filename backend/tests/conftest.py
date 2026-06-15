@@ -14,4 +14,5 @@ os.environ.setdefault(
     "postgresql+asyncpg://test_user:test_password@127.0.0.1:5432/test_db",
 )
 os.environ.setdefault("APP_SECRET", "test-secret")
+os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("AUTH_DEV_FALLBACK_ENABLED", "true")

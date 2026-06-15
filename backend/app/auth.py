@@ -91,8 +91,8 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a request.
 
     Uses OIDC bearer tokens when configured. If OIDC is not configured, the
-    local development header is accepted only when the dev fallback flag is
-    explicitly enabled.
+    local development header is accepted only in the explicit development
+    environment when the dev fallback flag is enabled.
     """
 
     # OIDC mode (Casdoor etc.)
@@ -139,9 +139,25 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     if not settings.auth_dev_fallback_enabled:
         raise HTTPException(status_code=500, detail="OIDC configuration required")
 
-    # Explicitly enabled dev fallback (no OIDC configured).
-    dev_user = request.headers.get("X-Dev-User") or "local"
+    if settings.app_env != "development":
+        raise HTTPException(
+            status_code=403,
+            detail="Development authentication fallback not allowed",
+        )
+
+    # Explicitly enabled local fallback for development only.
+    dev_user = request.headers.get("X-Dev-User")
+    if dev_user is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Development authentication requires X-Dev-User header",
+        )
     dev_user = dev_user.strip()[:128]
+    if not dev_user:
+        raise HTTPException(
+            status_code=403,
+            detail="Development authentication requires non-empty X-Dev-User header",
+        )
     return f"dev:{dev_user}", dev_user
 
 
