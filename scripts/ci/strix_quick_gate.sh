@@ -3084,7 +3084,7 @@ run_current_target_scan() {
 	fi
 
 	if evaluate_pull_request_findings; then
-		if pull_request_findings_allow_current_change; then
+		if pull_request_findings_allow_current_change && [ "$strict_primary_provider_fallback" -eq 0 ]; then
 			return 0
 		fi
 		if [ "$strict_primary_provider_fallback" -eq 0 ]; then
@@ -3147,7 +3147,7 @@ run_current_target_scan() {
 		fi
 
 		if evaluate_pull_request_findings; then
-			if pull_request_findings_allow_current_change; then
+			if pull_request_findings_allow_current_change && [ "$strict_fallback_provider_signal" -eq 0 ]; then
 				return 0
 			fi
 			if [ "$strict_fallback_provider_signal" -eq 0 ]; then
@@ -3174,6 +3174,10 @@ run_current_target_scan() {
 			return 1
 		fi
 		done
+
+	if pull_request_findings_allow_current_change; then
+		return 0
+	fi
 
 	if should_fail_pull_request_infra_zero_findings; then
 		return 1
