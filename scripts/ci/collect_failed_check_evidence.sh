@@ -268,6 +268,9 @@ gh api graphql \
 		| map(
 			if .__typename == "CheckRun" then
 				select((.status // "") == "COMPLETED")
+				| select((.name // "") != "opencode-review")
+				| select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode PR Review")
+				| select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode Review")
 				| select((.conclusion // "" | ascii_upcase) as $c | ["FAILURE","TIMED_OUT","ACTION_REQUIRED","CANCELLED","STARTUP_FAILURE"] | index($c))
 				| [
 					"check_run",
@@ -278,7 +281,8 @@ gh api graphql \
 					((.databaseId // "") | tostring)
 				]
 			elif .__typename == "StatusContext" then
-				select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
+				select((.context // "") != "opencode-review")
+				| select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
 				| [
 					"status_context",
 					(.context // "status"),

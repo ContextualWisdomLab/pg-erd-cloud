@@ -1527,10 +1527,15 @@ jobs:
                 | map(
                     if .__typename == "CheckRun" then
                       select((.status // "") == "COMPLETED")
+                      | select((.name // "") != "opencode-review")
+                      | select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode PR Review")
+                      | select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode Review")
                       | select((.conclusion // "" | ascii_upcase) as $c | ["FAILURE","TIMED_OUT","ACTION_REQUIRED","CANCELLED","STARTUP_FAILURE"] | index($c))
                       | "- " + ((.checkSuite.workflowRun.workflow.name // "") + "/" + (.name // "check") | gsub("^/"; "")) + ": " + (.conclusion // "unknown") + (if (.detailsUrl // "") != "" then " (" + .detailsUrl + ")" else "" end)
                     elif .__typename == "StatusContext" then
-                      select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
+                      select((.context // "") != "opencode-review")
+                      | select((.context // "") != "OpenCode Review")
+                      | select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
                       | "- " + (.context // "status") + ": " + (.state // "unknown") + (if (.targetUrl // "") != "" then " (" + .targetUrl + ")" else "" end)
                     else
                       empty
