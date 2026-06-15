@@ -90,9 +90,8 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
 async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a request.
 
-    Uses OIDC bearer tokens when configured. If OIDC is not configured, the
-    local development header is accepted only when the dev fallback flag is
-    explicitly enabled.
+    Uses OIDC bearer tokens when configured. If OIDC is not configured, auth
+    fails closed.
     """
 
     # OIDC mode (Casdoor etc.)
@@ -136,13 +135,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             raise HTTPException(status_code=401, detail="token missing sub")
         return sub, str(name) if isinstance(name, str) else None
 
-    if not settings.auth_dev_fallback_enabled:
-        raise HTTPException(status_code=500, detail="OIDC configuration required")
-
-    # Explicitly enabled dev fallback (no OIDC configured).
-    dev_user = request.headers.get("X-Dev-User") or "local"
-    dev_user = dev_user.strip()[:128]
-    return f"dev:{dev_user}", dev_user
+    raise HTTPException(status_code=500, detail="OIDC configuration required")
 
 
 async def try_get_subject_for_rate_limit(request: Request) -> str | None:
