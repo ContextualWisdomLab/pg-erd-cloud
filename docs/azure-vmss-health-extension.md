@@ -26,10 +26,15 @@ Microsoft Learn 문서 기준으로, 확장은 아래 값을 설정합니다.
 > “health probe(예: Load Balancer probe)” 중
 > 하나의 원본만 상태 모니터링으로 사용할 수 있습니다.
 
-## 이 프로젝트 권장 설정(단순 Binary Health States)
+## 이 프로젝트 권장 설정(v2 기반 Binary Health States)
 
 가장 단순한 형태는 `/healthz`가 **항상 200을 반환**하도록 하고, VMSS 확장이 해당 경로를
 주기적으로 조회하도록 설정하는 방식입니다.
+
+`--version 2.0`을 사용하는 이유는 `gracePeriod`, `intervalInSeconds`,
+`numberOfProbes` 같은 세부 프로브 설정을 사용하기 위해서입니다. 응답 본문이
+`{"ApplicationHealthState":"..."}` 형태가 아니면 VMSS는 binary health behavior로
+처리합니다(HTTP 200 = Healthy, 그 외 = Unhealthy).
 
 ### 포트 선택
 
@@ -41,7 +46,7 @@ Microsoft Learn 문서 기준으로, 확장은 아래 값을 설정합니다.
 ### 예시 (Linux, Azure CLI)
 
 아래는 문서의 schema를 기반으로 한 예시입니다. 실제 환경에서는 포트/경로/유예 시간을
-서비스 특성에 맞게 조정하세요.
+서비스 특성에 맞게 조정하세요. `gracePeriod`는 초 단위입니다(예: `300` = 5분).
 
 `extension.json`:
 

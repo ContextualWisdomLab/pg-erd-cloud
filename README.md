@@ -77,7 +77,7 @@ docker compose -f compose.prod.yaml up -d --build
 VMSS Application Health Extension을 사용할 경우 `/healthz` 프로브 설정 예시는 아래 문서를
 참고하세요.
 
-- `docs/azure-vmss-health-extension.md`
+- [Azure VMSS Application Health Extension 가이드](docs/azure-vmss-health-extension.md)
 
 ## 개발(비-Docker)
 
