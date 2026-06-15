@@ -176,11 +176,52 @@ owner="${GH_REPOSITORY%%/*}"
 repo="${GH_REPOSITORY#*/}"
 failed_contexts="$(mktemp)"
 workflow_run_contexts="$(mktemp)"
-tmp_files=("$failed_contexts" "$workflow_run_contexts")
+strix_success_run_ids="$(mktemp)"
+tmp_files=("$failed_contexts" "$workflow_run_contexts" "$strix_success_run_ids")
 cleanup() {
 	rm -f "${tmp_files[@]}"
 }
 trap cleanup EXIT
+
+collect_current_head_strix_success_run_ids() {
+	local output_file="$1"
+
+	HEAD_SHA="$HEAD_SHA" gh run list \
+		--repo "$GH_REPOSITORY" \
+		--commit "$HEAD_SHA" \
+		--limit 100 \
+		--json databaseId,workflowName,status,conclusion,event,headSha \
+		--jq '
+			.[]
+			| select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
+			| select((.headSha // "") == env.HEAD_SHA)
+			| select((.workflowName // "") == "Strix Security Scan" or (.workflowName // "") == "Strix")
+			| select((.status // "") == "completed")
+			| select((.conclusion // "" | ascii_downcase) == "success")
+			| ((.databaseId // "") | tostring)
+		' >"$output_file"
+}
+
+filter_superseded_strix_failures() {
+	local contexts_file="$1"
+	local latest_success_run_id="$2"
+	local filtered_contexts
+
+	if [ -z "$latest_success_run_id" ]; then
+		return 0
+	fi
+
+	filtered_contexts="$(mktemp)"
+	tmp_files+=("$filtered_contexts")
+	awk -F '\t' -v latest_success_run_id="$latest_success_run_id" '
+		BEGIN { OFS = FS }
+		$2 ~ /Strix/ && $5 ~ /^[0-9]+$/ && ($5 + 0) < (latest_success_run_id + 0) {
+			next
+		}
+		{ print }
+	' "$contexts_file" >"$filtered_contexts"
+	cp "$filtered_contexts" "$contexts_file"
+}
 
 # shellcheck disable=SC2016
 gh api graphql \
@@ -227,6 +268,9 @@ gh api graphql \
 		| map(
 			if .__typename == "CheckRun" then
 				select((.status // "") == "COMPLETED")
+				| select((.name // "") != "opencode-review")
+				| select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode PR Review")
+				| select((.checkSuite.workflowRun.workflow.name // "") != "OpenCode Review")
 				| select((.conclusion // "" | ascii_upcase) as $c | ["FAILURE","TIMED_OUT","ACTION_REQUIRED","CANCELLED","STARTUP_FAILURE"] | index($c))
 				| [
 					"check_run",
@@ -237,7 +281,8 @@ gh api graphql \
 					((.databaseId // "") | tostring)
 				]
 			elif .__typename == "StatusContext" then
-				select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
+				select((.context // "") != "opencode-review")
+				| select((.state // "" | ascii_upcase) as $s | ["FAILURE","ERROR"] | index($s))
 				| [
 					"status_context",
 					(.context // "status"),
@@ -286,6 +331,11 @@ while IFS=$'\t' read -r kind label conclusion details_url run_id check_run_id; d
 	fi
 	printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$kind" "$label" "$conclusion" "$details_url" "$run_id" "$check_run_id" >>"$failed_contexts"
 done <"$workflow_run_contexts"
+
+if collect_current_head_strix_success_run_ids "$strix_success_run_ids" && [ -s "$strix_success_run_ids" ]; then
+	latest_strix_success_run_id="$(sort -n "$strix_success_run_ids" | tail -n 1)"
+	filter_superseded_strix_failures "$failed_contexts" "$latest_strix_success_run_id"
+fi
 
 {
 	printf '# Failed GitHub Check Evidence\n\n'
