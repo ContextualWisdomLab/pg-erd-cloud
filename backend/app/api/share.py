@@ -9,10 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
-from app.db import get_session
+from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
-from app.models import ProjectMember, SchemaSnapshot, SchemaSnapshotData, ShareLink
-
+from app.models import (
+    ProjectMember,
+    SchemaSnapshot,
+    SchemaSnapshotData,
+    ShareLink,
+)
 
 router = APIRouter(prefix="/api", tags=["share"])
 
@@ -54,7 +58,7 @@ async def create_share_link(
 @router.get("/share/{share_link_uuid}")
 async def get_share_link_info(
     share_link_uuid: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     """Return share link metadata and recent snapshots."""
     link = await session.get(ShareLink, share_link_uuid)
@@ -91,7 +95,7 @@ async def get_share_link_info(
 async def get_shared_snapshot(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     """Return a snapshot via a share link (no auth)."""
     link = await session.get(ShareLink, share_link_uuid)
@@ -123,7 +127,7 @@ async def get_shared_snapshot(
 async def export_shared_snapshot_sql(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a shared snapshot as SQL via a share link."""
     link = await session.get(ShareLink, share_link_uuid)

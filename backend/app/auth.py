@@ -28,6 +28,7 @@ class CurrentUser:
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+OIDC_ALLOWED_ALGORITHMS = ("RS256",)
 
 
 async def _get_oidc_config() -> dict:
@@ -89,8 +90,9 @@ def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
 async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a request.
 
-    Uses OIDC bearer tokens when configured; otherwise falls back to a dev
-    header for local development.
+    Uses OIDC bearer tokens when configured. If OIDC is not configured, the
+    local development header is accepted only when the dev fallback flag is
+    explicitly enabled.
     """
 
     # OIDC mode (Casdoor etc.)
@@ -108,18 +110,25 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
         jwk = _pick_jwk(jwks, header.get("kid"))
         if jwk is None:
             raise HTTPException(status_code=401, detail="unknown signing key")
+        if header.get("alg") not in OIDC_ALLOWED_ALGORITHMS:
+            raise HTTPException(status_code=401, detail="unsupported token algorithm")
 
         try:
             claims = jwt.decode(
                 token,
                 jwk,
-                algorithms=[str(header.get("alg"))],
+                algorithms=list(OIDC_ALLOWED_ALGORITHMS),
                 audience=settings.oidc_audience,
                 issuer=settings.oidc_issuer,
-                options={"verify_aud": bool(settings.oidc_audience)},
+                options={
+                    "verify_aud": bool(settings.oidc_audience),
+                    "require_exp": True,
+                },
             )
-        except Exception:  # noqa: BLE001
-            raise HTTPException(status_code=401, detail="token verification failed")
+        except Exception as err:
+            raise HTTPException(
+                status_code=401, detail="token verification failed"
+            ) from err
 
         sub = claims.get("sub")
         name = claims.get("name") or claims.get("preferred_username")
@@ -127,10 +136,29 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
             raise HTTPException(status_code=401, detail="token missing sub")
         return sub, str(name) if isinstance(name, str) else None
 
-    # Dev fallback (no OIDC configured)
+    if not settings.auth_dev_fallback_enabled:
+        raise HTTPException(status_code=500, detail="OIDC configuration required")
+
+    # Explicitly enabled dev fallback (no OIDC configured).
     dev_user = request.headers.get("X-Dev-User") or "local"
     dev_user = dev_user.strip()[:128]
     return f"dev:{dev_user}", dev_user
+
+
+async def try_get_subject_for_rate_limit(request: Request) -> str | None:
+    """Best-effort subject extraction for rate limiting.
+
+    This helper is intentionally lightweight:
+    - It must NOT touch the DB (unlike get_current_user).
+    - It must NOT change auth behavior. Missing/invalid auth returns None so
+      unauthenticated requests can still be limited by IP.
+    """
+
+    try:
+        subject, _ = await _get_subject_from_request(request)
+        return subject
+    except HTTPException:
+        return None
 
 
 async def _ensure_user(

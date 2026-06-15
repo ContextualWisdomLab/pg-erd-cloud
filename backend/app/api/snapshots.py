@@ -9,12 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
-from app.db import get_session
-from app.models import DbConnection, JobQueue, SchemaSnapshot, SchemaSnapshotData
+from app.db import get_read_session, get_session
+from app.models import (
+    DbConnection,
+    JobQueue,
+    SchemaSnapshot,
+    SchemaSnapshotData,
+)
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
-
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
@@ -27,7 +31,9 @@ async def create_snapshot(
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotOut:
     """Create a schema snapshot job for a project connection."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+    )
 
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
@@ -77,7 +83,7 @@ async def create_snapshot(
 async def get_snapshot(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
     """Get a snapshot's status and (if present) captured JSON."""
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
@@ -102,11 +108,13 @@ async def get_snapshot(
     )
 
 
-@router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
+@router.get(
+    "/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse
+)
 async def export_snapshot_sql(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a snapshot as PostgreSQL DDL (best-effort)."""
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
@@ -121,14 +129,18 @@ async def export_snapshot_sql(
     return snapshot_json_to_sql(data.snapshot_json)
 
 
-@router.get("/by-project/{project_space_uuid}", response_model=list[SnapshotOut])
+@router.get(
+    "/by-project/{project_space_uuid}", response_model=list[SnapshotOut]
+)
 async def list_snapshots(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[SnapshotOut]:
     """List snapshots for a project."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid
+    )
     rows = await session.execute(
         select(SchemaSnapshot)
         .where(SchemaSnapshot.project_space_uuid == project_space_uuid)

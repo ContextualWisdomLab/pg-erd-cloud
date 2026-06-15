@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
-    project_name: str = Field(min_length=1)
+    project_name: str = Field(min_length=1, max_length=255)
 
 
 class ProjectOut(BaseModel):
@@ -23,7 +23,10 @@ class ProjectMemberAddIn(BaseModel):
     """Request body for inviting/adding a project member."""
 
     member_subject: str = Field(
-        min_length=1, description="OIDC sub, or dev:<name> in dev mode"
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\s\x00-\x1F\x7F]+$",
+        description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
     project_role: Literal["viewer", "editor"] = Field(default="viewer")
@@ -40,9 +43,11 @@ class ProjectMemberOut(BaseModel):
 class ConnectionCreateIn(BaseModel):
     """Request body for creating a DB connection."""
 
-    conn_name: str = Field(min_length=1)
+    conn_name: str = Field(min_length=1, max_length=128)
     dsn: str = Field(
-        min_length=1, description="PostgreSQL connection string. Not logged."
+        min_length=1,
+        max_length=4096,
+        description="PostgreSQL connection string. Not logged.",
     )
 
 
@@ -58,7 +63,13 @@ class SnapshotCreateIn(BaseModel):
 
     db_connection_uuid: uuid.UUID
     schema_filter: str | None = Field(
-        default=None, description="If set, only introspect this schema"
+        default=None,
+        description=(
+            "If set, only introspect this schema (unquoted PostgreSQL identifier)"
+        ),
+        min_length=1,
+        max_length=63,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_$]{0,62}$",
     )
 
 

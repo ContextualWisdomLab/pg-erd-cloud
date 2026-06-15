@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 
 def _q(ident: str) -> str:
     """Quote a PostgreSQL identifier."""
@@ -47,7 +45,9 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
             constraints_by_oid.setdefault(oid, []).append(con)
 
     schemas: set[str] = {
-        t.get("schema_name") for t in tables if isinstance(t.get("schema_name"), str)
+        t.get("schema_name")
+        for t in tables
+        if isinstance(t.get("schema_name"), str)
     }
 
     lines: list[str] = []
@@ -65,7 +65,9 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
         oid = t.get("relation_oid")
         kind = t.get("relation_kind")
         if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
+            isinstance(schema, str)
+            and isinstance(name, str)
+            and isinstance(oid, int)
         ):
             continue
 
@@ -76,7 +78,8 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
 
         col_defs: list[str] = []
         for c in sorted(
-            cols_by_oid.get(oid, []), key=lambda x: int(x.get("column_position") or 0)
+            cols_by_oid.get(oid, []),
+            key=lambda x: int(x.get("column_position") or 0),
         ):
             col_name = c.get("column_name")
             data_type = c.get("data_type")
