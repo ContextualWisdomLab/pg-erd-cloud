@@ -41,6 +41,7 @@ def make_request(headers: dict[str, str] | None = None) -> Request:
 async def test_oidc_rejects_header_selected_algorithm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
     monkeypatch.setattr(
@@ -70,6 +71,7 @@ async def test_oidc_rejects_header_selected_algorithm(
 async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
     monkeypatch.setattr(
