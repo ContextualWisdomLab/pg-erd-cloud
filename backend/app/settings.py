@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
-    auth_dev_fallback_enabled: bool = False
+
+    # Optional allowlist for reverse-engineering database targets.
+    # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
+    db_introspection_allowed_hosts: str = ""
 
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.

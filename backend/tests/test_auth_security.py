@@ -104,11 +104,10 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
 
 @pytest.mark.asyncio
-async def test_dev_fallback_requires_explicit_opt_in(
+async def test_auth_fails_closed_without_oidc(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", False)
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(make_request({"X-Dev-User": "local"}))
