@@ -1,6 +1,8 @@
 import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
+import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
+
 const MAX_RENDERED_COLUMNS = 25;
 
 type Column = {
@@ -37,12 +39,24 @@ function TableNode(props: NodeProps<TableNodeNode>) {
       <div className="tableNode__cols">
         {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => (
           <div key={c.column_name} className="tableNode__col">
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={targetColumnHandleId(c.column_name)}
+              className="colHandle"
+            />
             <span className="tableNode__colName">{c.column_name}</span>
             <span className="tableNode__colType">{c.data_type}</span>
             {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
             {c.is_not_null ? (
               <span className="tableNode__badge">NOT NULL</span>
             ) : null}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={sourceColumnHandleId(c.column_name)}
+              className="colHandle"
+            />
           </div>
         ))}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
