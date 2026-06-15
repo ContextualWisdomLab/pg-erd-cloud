@@ -9,11 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
+from app.api.auth_routes import router as auth_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
+from app.csrf import make_csrf_middleware
 from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
@@ -78,14 +80,19 @@ app.middleware("http")(
     )
 )
 
+app.middleware("http")(make_csrf_middleware())
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         o.strip() for o in settings.cors_origins.split(",") if o.strip()
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Default to the strictest safe setting. Enable credentials only when you
+    # actually need cookie-based auth.
+    allow_credentials=False,
+    # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Dev-User"],
 )
 
 # Observability should be registered after other middleware so it can capture
@@ -117,3 +124,4 @@ app.include_router(connections_router)
 app.include_router(snapshots_router)
 app.include_router(me_router)
 app.include_router(share_router)
+app.include_router(auth_router)

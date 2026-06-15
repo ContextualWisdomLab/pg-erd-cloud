@@ -35,7 +35,8 @@ PostgreSQL은 `CREATE INDEX ... USING <method>`의 `<method>`가
 
 따라서 본 프로젝트는 **고정된 목록을 하드코딩하지 않고**,
 
-- `pg_am` + `pg_class.relam`로 “현재 DB에 실제로 존재하는 access method(amname)”를 수집
+- `pg_am` + `pg_class.relam`로 “현재 DB에 실제로 존재하는 access method
+  (amname)”를 수집
 - `pg_get_indexdef()`로 DDL을 **손실 없이** 보존
 
 하는 방식으로 “현존(해당 DB에 설치된) 인덱스 타입”을 폭넓게 지원합니다.
@@ -67,6 +68,20 @@ docker compose up -d --build
 
 ```bash
 cp .env.example .env
+
+# 프로덕션 스타일에서는 Docker secret 파일로 APP_SECRET을 주입합니다.
+# (이 파일은 커밋 금지: .gitignore에 **/secrets/** 포함)
+mkdir -p secrets
+python - <<'PY'
+import secrets
+
+with open('secrets/app_secret', 'w', encoding='utf-8') as f:
+    f.write(secrets.token_urlsafe(48) + "\n")
+PY
+
+# Restrict secret file permissions (owner read/write only)
+chmod 600 secrets/app_secret
+
 docker compose -f compose.prod.yaml up -d --build
 ```
 
@@ -89,8 +104,18 @@ python -m venv .venv && source .venv/bin/activate
 pip install -U pip
 pip install -e .
 alembic upgrade head
-uvicorn app.main:app --reload
+hypercorn --config python:app.hypercorn_config app.main:app \
+  --bind 0.0.0.0:8000 --reload \
+  --access-logfile - --error-logfile -
 ```
+
+#### 운영 팁
+
+- Hypercorn worker 수는 `HYPERCORN_WORKERS`(또는 `WEB_CONCURRENCY`)로 조절할 수
+  있습니다.
+- `APP_SECRET`은 앱 DB에 저장되는 DSN 암호화 키로 사용되므로, 변경 시 기존 데이터
+  복호화에 영향을 줄 수 있습니다. 가능하면 `APP_SECRET_FILE`(예:
+  `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요.
 
 ### Frontend
 
@@ -105,6 +130,7 @@ npm run dev
 - `.env`는 커밋 금지(이미 .gitignore에 포함).
 - 대상 DB 연결정보(DSN)는 **APP_SECRET** 기반으로 암호화하여 앱 DB에 저장합니다.
 - 역공학(리버스) 작업은 요청 경로에서 동기 대기하지 않고 job queue로 비동기 처리합니다.
+- API 보안 체크리스트(프로젝트 기준): [docs/api-security-checklist.md](docs/api-security-checklist.md)
 
 ## 로드맵(요약)
 
