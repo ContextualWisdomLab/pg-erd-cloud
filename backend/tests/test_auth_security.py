@@ -89,79 +89,13 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
 
 @pytest.mark.asyncio
-async def test_dev_fallback_requires_explicit_opt_in(
+async def test_auth_fails_closed_without_oidc(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", False)
-    monkeypatch.setattr(settings, "app_env", "development")
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(make_request({"X-Dev-User": "local"}))
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "OIDC configuration required"
-
-
-@pytest.mark.asyncio
-async def test_dev_fallback_rejects_non_development_environment(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", True)
-    monkeypatch.setattr(settings, "app_env", "production")
-
-    with pytest.raises(HTTPException) as exc_info:
-        await auth._get_subject_from_request(make_request({"X-Dev-User": "local"}))
-
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Development authentication fallback not allowed"
-
-
-@pytest.mark.asyncio
-async def test_dev_fallback_requires_explicit_user_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", True)
-    monkeypatch.setattr(settings, "app_env", "development")
-
-    with pytest.raises(HTTPException) as exc_info:
-        await auth._get_subject_from_request(make_request())
-
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Development authentication requires X-Dev-User header"
-
-
-@pytest.mark.asyncio
-async def test_dev_fallback_requires_non_empty_user_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", True)
-    monkeypatch.setattr(settings, "app_env", "development")
-
-    with pytest.raises(HTTPException) as exc_info:
-        await auth._get_subject_from_request(make_request({"X-Dev-User": "   "}))
-
-    assert exc_info.value.status_code == 403
-    assert (
-        exc_info.value.detail
-        == "Development authentication requires non-empty X-Dev-User header"
-    )
-
-
-@pytest.mark.asyncio
-async def test_dev_fallback_accepts_explicit_development_user(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(settings, "oidc_issuer", None)
-    monkeypatch.setattr(settings, "auth_dev_fallback_enabled", True)
-    monkeypatch.setattr(settings, "app_env", "development")
-
-    subject, display_name = await auth._get_subject_from_request(
-        make_request({"X-Dev-User": " local-dev "})
-    )
-
-    assert subject == "dev:local-dev"
-    assert display_name == "local-dev"
