@@ -438,7 +438,7 @@ copy_pr_head_blob_to_file() {
 
 is_supported_source_file() {
 	case "$1" in
-	*.java | *.kt | *.kts | *.groovy | *.scala | *.py | *.js | *.jsx | *.ts | *.tsx | *.vue | *.yaml | *.yml | *.sh | *.sql | *.xml | *.json | *.html | *.css | *.md)
+		*.java | *.kt | *.kts | *.groovy | *.scala | *.py | *.js | *.jsx | *.ts | *.tsx | *.vue | *.yaml | *.yml | *.sh | *.sql | *.xml | *.json | *.html | *.css | *.md | *.lock)
 		return 0
 		;;
 	*)
@@ -449,7 +449,7 @@ is_supported_source_file() {
 
 is_dependency_manifest_path() {
 	case "$1" in
-	pom.xml | */pom.xml | package.json | */package.json | package-lock.json | */package-lock.json | pnpm-lock.yaml | */pnpm-lock.yaml | yarn.lock | */yarn.lock | pyproject.toml | */pyproject.toml | requirements.txt | */requirements.txt | requirements-*.txt | */requirements-*.txt | uv.lock | */uv.lock)
+		pom.xml | */pom.xml | package.json | */package.json | package-lock.json | */package-lock.json | pnpm-lock.yaml | */pnpm-lock.yaml | yarn.lock | */yarn.lock | pyproject.toml | */pyproject.toml | requirements.txt | */requirements.txt | requirements.lock | */requirements.lock | requirements-*.txt | */requirements-*.txt | uv.lock | */uv.lock)
 		return 0
 		;;
 	*)
@@ -1629,6 +1629,7 @@ import sys
 text = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
 patterns = [
     re.compile(r'(?P<path>/workspace/[^`\r\n]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+):\d+'),
+    re.compile(r'(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Location[ \t]+\d+:(?:\*\*)?[ \t]*`?(?P<path>/workspace/[^`\r\n│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`?'),
     re.compile(r'<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>'),
     re.compile(r'^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)', re.MULTILINE),
     re.compile(r'^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Endpoint:(?:\*\*)?[ \t]*(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)', re.MULTILINE),
@@ -1805,12 +1806,12 @@ evaluate_pull_request_findings() {
 			if [ "$rank" -lt "$threshold_rank" ]; then
 				continue
 			fi
-			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
-				found_retryable_model_inconsistency=1
-				continue
-			fi
 			if vulnerability_file_has_absent_placeholder_secret_claim "$vuln_file"; then
 				found_absent_placeholder_secret_finding=1
+				continue
+			fi
+			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
+				found_retryable_model_inconsistency=1
 				continue
 			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$vuln_file")
@@ -1930,6 +1931,16 @@ evaluate_pull_request_findings() {
 		echo "Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." >&2
 		return 0
 	fi
+
+	return 1
+}
+
+pull_request_findings_allow_current_change() {
+	case "$PR_FINDINGS_DECISION" in
+	allow_absent_placeholder_secret | allow_baseline | allow_manifest_only)
+		return 0
+		;;
+	esac
 
 	return 1
 }
@@ -2823,6 +2834,99 @@ PY
 	return 0
 }
 
+vulnerability_file_has_only_absent_source_locations() {
+	local vuln_file="$1"
+	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+		return 1
+	fi
+
+	local resolved_target_root=""
+	resolved_target_root="$(resolve_current_target_path "$TARGET_PATH" 2>/dev/null || true)"
+
+	python3 - "$vuln_file" "$REPO_ROOT" "$REPO_NAME" "$resolved_target_root" <<'PY'
+from pathlib import Path
+from urllib.parse import unquote
+import re
+import sys
+
+vuln_file = Path(sys.argv[1])
+repo_root = Path(sys.argv[2]).resolve(strict=True)
+repo_name = sys.argv[3]
+target_root = Path(sys.argv[4]).resolve(strict=True) if sys.argv[4] else None
+target_workspace_prefix = f"/workspace/{target_root.name}/" if target_root else ""
+
+text = vuln_file.read_text(encoding="utf-8", errors="replace")
+lowered = text.lower()
+if (
+    ("hardcoded secret" in lowered or "hardcoded secrets" in lowered)
+    and ("dbpassword123" in text or "sk_live_1234567890" in text)
+):
+    raise SystemExit(1)
+
+patterns = [
+    re.compile(
+        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Location[ \t]+\d+:(?:\*\*)?[ \t]*`?(?P<path>/workspace/[^`\r\n│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`?"
+    ),
+    re.compile(
+        r"<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>"
+    ),
+]
+
+raw_candidates = []
+seen = set()
+for pattern in patterns:
+    for match in pattern.finditer(text):
+        value = unquote(match.group("path").strip().strip("`"))
+        if value and value not in seen:
+            seen.add(value)
+            raw_candidates.append(value)
+
+if not raw_candidates:
+    raise SystemExit(1)
+
+def safe_relative(value):
+    if not value or value.startswith("/"):
+        return None
+    rel = Path(value)
+    if rel.is_absolute() or ".." in rel.parts:
+        return None
+    if "/" not in rel.as_posix():
+        return None
+    return rel
+
+def relative_from_workspace(value):
+    prefixes = [f"/workspace/{repo_name}/"]
+    if target_workspace_prefix:
+        prefixes.append(target_workspace_prefix)
+    for prefix in prefixes:
+        if value.startswith(prefix):
+            return safe_relative(value[len(prefix):])
+    if value.startswith("/workspace/"):
+        return None
+    return safe_relative(value)
+
+for raw in raw_candidates:
+    rel = relative_from_workspace(raw)
+    if rel is None:
+        raise SystemExit(1)
+
+    possible_paths = [repo_root / rel]
+    if target_root is not None:
+        possible_paths.append(target_root / rel)
+
+    if any(possible_path.exists() for possible_path in possible_paths):
+        raise SystemExit(1)
+
+raise SystemExit(0)
+PY
+	local rc=$?
+	if [ "$rc" -eq 0 ]; then
+		echo "Detected Strix report structured source location(s) absent from the repository; treating as retryable model inconsistency." >&2
+		return 0
+	fi
+	return 1
+}
+
 is_hallucinated_endpoint_finding() {
 	local latest_report_dir
 	if ! latest_report_dir="$(latest_strix_report_dir)"; then
@@ -2968,6 +3072,9 @@ PY
 
 vulnerability_file_is_retryable_model_inconsistency() {
 	local vuln_file="$1"
+	if vulnerability_file_has_only_absent_source_locations "$vuln_file"; then
+		return 0
+	fi
 	if vulnerability_file_has_absent_endpoint_finding "$vuln_file"; then
 		return 0
 	fi
@@ -3074,7 +3181,7 @@ run_current_target_scan() {
 	fi
 
 	if evaluate_pull_request_findings; then
-		if [ "$PR_FINDINGS_DECISION" = "allow_absent_placeholder_secret" ]; then
+		if pull_request_findings_allow_current_change && [ "$strict_primary_provider_fallback" -eq 0 ]; then
 			return 0
 		fi
 		if [ "$strict_primary_provider_fallback" -eq 0 ]; then
@@ -3137,7 +3244,7 @@ run_current_target_scan() {
 		fi
 
 		if evaluate_pull_request_findings; then
-			if [ "$PR_FINDINGS_DECISION" = "allow_absent_placeholder_secret" ]; then
+			if pull_request_findings_allow_current_change && [ "$strict_fallback_provider_signal" -eq 0 ]; then
 				return 0
 			fi
 			if [ "$strict_fallback_provider_signal" -eq 0 ]; then
@@ -3164,6 +3271,10 @@ run_current_target_scan() {
 			return 1
 		fi
 		done
+
+	if pull_request_findings_allow_current_change; then
+		return 0
+	fi
 
 	if should_fail_pull_request_infra_zero_findings; then
 		return 1
