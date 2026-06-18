@@ -64,7 +64,15 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
   if (fkRows.length > 0) {
     const grouped = new Map<number, typeof fkRows>()
     for (const r of fkRows) {
-      grouped.set(r.fk_constraint_oid, [...(grouped.get(r.fk_constraint_oid) || []), r])
+      // ⚡ Bolt: Optimize O(n²) array spread bottleneck.
+      // Used to be `[...(grouped.get(id) || []), r]` which re-allocates array on every element.
+      // Replaced with O(n) array push for better performance with large schema sizes.
+      const arr = grouped.get(r.fk_constraint_oid)
+      if (arr) {
+        arr.push(r)
+      } else {
+        grouped.set(r.fk_constraint_oid, [r])
+      }
       hasFk.add(r.child_relation_oid)
     }
     for (const [oid, rows] of grouped.entries()) {
