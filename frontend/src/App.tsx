@@ -389,7 +389,13 @@ export default function App() {
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
             />
-            <button onClick={onCreateProject}>Create</button>
+            <button
+              onClick={onCreateProject}
+              disabled={!projectName.trim()}
+              title={!projectName.trim() ? "Enter project name" : "Create project"}
+            >
+              Create
+            </button>
           </div>
         </div>
 
@@ -427,8 +433,15 @@ export default function App() {
             value={dsn}
             onChange={(e) => setDsn(e.target.value)}
             placeholder="postgresql://..."
+            aria-label="Connection DSN"
           />
-          <button onClick={onCreateConnection}>Save connection</button>
+          <button
+            onClick={onCreateConnection}
+            disabled={!connName.trim() || !dsn.trim()}
+            title={!connName.trim() || !dsn.trim() ? "Enter connection name and DSN" : "Save connection"}
+          >
+            Save connection
+          </button>
         </div>
 
         <div className="field">
@@ -441,7 +454,13 @@ export default function App() {
           />
         </div>
 
-        <button onClick={onCreateSnapshot}>Reverse engineer → snapshot</button>
+        <button
+          onClick={onCreateSnapshot}
+          disabled={!selectedProjectId || !selectedConnId}
+          title={!selectedProjectId || !selectedConnId ? "Select project and connection" : "Create snapshot"}
+        >
+          Reverse engineer → snapshot
+        </button>
 
         <div style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
           Snapshot: {snapshot?.status || "—"}
