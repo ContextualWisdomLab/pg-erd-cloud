@@ -120,7 +120,7 @@ jobs:
           STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'openai/gpt-5' }}
           STRIX_OPENAI_API_KEY: ${{ secrets.STRIX_OPENAI_API_KEY }}
           STRIX_VERTEX_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
-          STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
+          STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN || github.token }}
         run: |
           strix_model="$(printf '%s' "$STRIX_MODEL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           case "$strix_model" in
@@ -138,7 +138,7 @@ jobs:
               sanitized_github_models_token="$(printf '%s' "$STRIX_GITHUB_MODELS_TOKEN" | tr -d '\r\n')"
               trimmed_github_models_token="$(printf '%s' "$sanitized_github_models_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
               if [ -z "$trimmed_github_models_token" ]; then
-                echo '::error::STRIX_GITHUB_MODELS_TOKEN is required for GitHub Models Strix scans.'
+                echo '::error::GitHub Models token material is required for Strix scans.'
                 exit 1
               fi
               ;;
@@ -179,7 +179,7 @@ jobs:
       - name: Mask LLM API key
         if: steps.gate.outputs.enabled == 'true'
         env:
-          LLM_API_KEY: ${{ steps.gate.outputs.provider_mode == 'github_models' && secrets.STRIX_GITHUB_MODELS_TOKEN || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
+          LLM_API_KEY: ${{ steps.gate.outputs.provider_mode == 'github_models' && (secrets.STRIX_GITHUB_MODELS_TOKEN || github.token) || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
         run: |
           # Sanitize CR/LF before masking to prevent broken ::add-mask::
           # commands and potential workflow command injection.
@@ -195,13 +195,13 @@ jobs:
       - name: Prepare LLM API key input file
         if: steps.gate.outputs.enabled == 'true'
         env:
-          LLM_API_KEY_SECRET: ${{ steps.gate.outputs.provider_mode == 'github_models' && secrets.STRIX_GITHUB_MODELS_TOKEN || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
+          LLM_API_KEY_SECRET: ${{ steps.gate.outputs.provider_mode == 'github_models' && (secrets.STRIX_GITHUB_MODELS_TOKEN || github.token) || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
           PROVIDER_MODE: ${{ steps.gate.outputs.provider_mode }}
         run: |
           sanitized="$(printf '%s' "$LLM_API_KEY_SECRET" | tr -d '\r\n')"
           trimmed="$(printf '%s' "$sanitized" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           if [ -z "$trimmed" ] && [ "$PROVIDER_MODE" = "github_models" ]; then
-            echo '::error::STRIX_GITHUB_MODELS_TOKEN is required for GitHub Models Strix scans.'
+            echo '::error::GitHub Models token material is required for Strix scans.'
             exit 1
           fi
           if [ -z "$trimmed" ] && [ "$PROVIDER_MODE" = "openai_direct" ]; then
