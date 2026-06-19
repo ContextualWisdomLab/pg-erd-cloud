@@ -1,3 +1,6 @@
 ## 2025-02-24 - Accessibility and Disabled States for Forms
 **Learning:** In forms without `<form>` elements (where input and buttons are siblings), adding explicit `<label>` tags is difficult without changing the design layout. In such cases, explicitly adding an `aria-label` attribute directly to the inputs (`<input>`) is essential so screen readers can distinguish between inputs (like `dsn` and `conn-name` inputs without standard `<label>` groupings). Disabled buttons should not rely on `title` because many browsers do not expose disabled-control tooltips.
 **Action:** When working on standalone functional forms with multiple inputs, ensure secondary inputs that lack a traditional wrapping label tag include an `aria-label`. Pair disabled buttons with visible helper text and `aria-describedby` so the disabled reason remains available to mouse, keyboard, and screen-reader users.
+## 2024-05-24 - [Replaced blocking alert with inline copy feedback]
+**Learning:** Native browser alerts for micro-interactions (like copying text) are disruptive to the user flow. Replacing them with temporary inline button text updates (`aria-live="polite"`) significantly improves both the experience and accessibility for screen readers.
+**Action:** Always prefer non-blocking inline feedback or toast notifications over `alert()` or `confirm()` dialogs for non-destructive actions.

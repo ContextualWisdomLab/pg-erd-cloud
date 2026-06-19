@@ -35,9 +35,7 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>(
-    () => localStorage.getItem("devUser") || "local",
-  );
+  const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<{
     subject: string;
     display_name: string | null;
@@ -50,7 +48,7 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [dsn, setDsn] = useState("");
+  const [isDsnPresent, setIsDsnPresent] = useState(false);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
@@ -66,11 +64,14 @@ export default function App() {
     Node<TableNodeData>,
     Edge
   > | null>(null);
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutMessage, setLayoutMessage] = useState<string>("");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
@@ -83,6 +84,14 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -101,7 +110,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    localStorage.setItem("devUser", devUser);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         setMe({ subject: m.subject, display_name: m.display_name });
@@ -144,7 +152,7 @@ export default function App() {
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
-    : !connName.trim() || !dsn.trim()
+    : !connName.trim() || !isDsnPresent
       ? "Enter connection name and DSN"
       : "";
   const createSnapshotHint =
@@ -269,7 +277,26 @@ export default function App() {
 
   function onCloseExport() {
     setIsExportModalOpen(false);
+    setIsCopied(false);
+    if (copyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(copyFeedbackTimeoutRef.current);
+      copyFeedbackTimeoutRef.current = null;
+    }
   }
+
+  const onCopyExportDdl = useCallback(() => {
+    navigator.clipboard.writeText(exportDdlText);
+    setIsCopied(true);
+
+    if (copyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(copyFeedbackTimeoutRef.current);
+    }
+
+    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setIsCopied(false);
+      copyFeedbackTimeoutRef.current = null;
+    }, 2000);
+  }, [exportDdlText]);
 
   function onDownloadSvg() {
     downloadText(
@@ -346,11 +373,17 @@ export default function App() {
 
   async function onCreateConnection() {
     if (!selectedProjectId) return;
+    const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
+    if (!connectionDsn) return;
     setError(null);
-    const c = await createConnection(selectedProjectId, connName, dsn);
+    const c = await createConnection(selectedProjectId, connName, connectionDsn);
     const next = [c, ...connections];
     setConnections(next);
     setSelectedConnId(c.db_connection_uuid);
+    if (dsnInputRef.current) {
+      dsnInputRef.current.value = "";
+    }
+    setIsDsnPresent(false);
   }
 
   async function onCreateSnapshot() {
@@ -463,14 +496,17 @@ export default function App() {
           />
           <input
             id="conn-dsn"
-            value={dsn}
-            onChange={(e) => setDsn(e.target.value)}
+            type="password"
+            ref={dsnInputRef}
+            onChange={(e) =>
+              setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
+            }
             placeholder="postgresql://..."
             aria-label="Connection DSN"
           />
           <button
             onClick={onCreateConnection}
-            disabled={!selectedProjectId || !connName.trim() || !dsn.trim()}
+            disabled={!selectedProjectId || !connName.trim() || !isDsnPresent}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
             }
@@ -664,13 +700,11 @@ export default function App() {
                 >
                   <button onClick={onCloseExport}>닫기</button>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(exportDdlText);
-                      alert("복사되었습니다.");
-                    }}
+                    onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
+                    aria-live="polite"
                   >
-                    복사하기
+                    {isCopied ? "복사 완료 ✓" : "복사하기"}
                   </button>
                 </div>
               </div>
