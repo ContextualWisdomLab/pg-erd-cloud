@@ -34,9 +34,17 @@ SELECT
   c.relname AS relation_name,
   c.relkind::text AS relation_kind,
   c.relispartition AS is_partition,
+  pg_catalog.pg_get_partkeydef(c.oid) AS partition_key,
+  pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound,
+  parent.oid AS partition_parent_oid,
+  parent_ns.nspname AS partition_parent_schema,
+  parent.relname AS partition_parent_name,
   rel_ts.spcname AS tablespace_name
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_catalog.pg_inherits inh ON inh.inhrelid = c.oid
+LEFT JOIN pg_catalog.pg_class parent ON parent.oid = inh.inhparent
+LEFT JOIN pg_catalog.pg_namespace parent_ns ON parent_ns.oid = parent.relnamespace
 LEFT JOIN pg_catalog.pg_tablespace rel_ts ON rel_ts.oid = c.reltablespace
 CROSS JOIN params p
 WHERE
