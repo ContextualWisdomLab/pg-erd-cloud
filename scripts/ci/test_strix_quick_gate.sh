@@ -187,7 +187,7 @@ assert_strix_workflow_pr_trigger_hardened() {
 	assert_file_contains "$workflow_file" "LLM_API_BASE_FILE" "strix workflow passes the GitHub Models API base through a trusted input file"
 	assert_file_not_contains "$workflow_file" '${{ secrets.STRIX_OPENAI_API_KEY || github.token }}' "strix workflow must not use fallback-secret syntax for LLM API keys"
 	assert_file_contains "$workflow_file" "openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" "strix workflow configures OpenAI-compatible DeepSeek GitHub Models fallback models"
-	assert_file_contains "$workflow_file" "printf 'openai/%s' \"\$github_model\"" "strix workflow routes non-OpenAI GitHub Models through LiteLLM's OpenAI-compatible provider"
+	assert_file_contains "$workflow_file" "printf 'openai/%s' \"\$github_model\"" "strix workflow routes GitHub Models through LiteLLM's OpenAI-compatible provider"
 	assert_file_not_contains "$workflow_file" "openai/gpt-4.1" "strix workflow must not fall back to GPT-4.1 or weaker review evidence"
 	assert_file_not_contains "$workflow_file" "openai/gpt-5-*" "strix workflow must not accept older GPT-5 variants when GPT-5.4 is required"
 	assert_file_contains "$workflow_file" "openai/gpt-5-mini* | openai/gpt-5-nano*" "strix workflow rejects mini and nano GPT-5 variants for security evidence"
@@ -7741,12 +7741,12 @@ run_gate_case "github-models-model-prefix-with-api-base-succeeds" \
 	"https://models.github.ai/inference"
 
 run_gate_case "github-models-openai-o3-api-base-succeeds" \
-	"openai/o3" \
+	"openai/openai/o3" \
 	"" \
 	"0" \
 	"scan ok" \
 	"1" \
-	"openai/o3" \
+	"openai/openai/o3" \
 	"https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference"

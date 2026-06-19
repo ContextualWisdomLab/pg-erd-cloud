@@ -268,14 +268,7 @@ jobs:
             openai/openai/gpt-5* | openai/openai/gpt-[6-9]* | openai/openai/gpt-[1-9][0-9]* | \
             github_models/*)
               github_model="${strix_model#github_models/}"
-              case "$github_model" in
-                openai/*)
-                  printf '%s' "$github_model" > "$strix_llm_file"
-                  ;;
-                *)
-                  printf 'openai/%s' "$github_model" > "$strix_llm_file"
-                  ;;
-              esac
+              printf 'openai/%s' "$github_model" > "$strix_llm_file"
               ;;
             openai/*)
               printf '%s' "$strix_model" > "$strix_llm_file"
