@@ -24,7 +24,7 @@ on:
 
 concurrency:
   group: opencode-review-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.pr_head_sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   opencode-review:
