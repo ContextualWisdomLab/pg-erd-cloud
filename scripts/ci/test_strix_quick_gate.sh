@@ -569,6 +569,36 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+assert_opencode_fallback_distinguishes_absent_strix_reports() {
+	local tmp_dir
+	local evidence_file
+	local output_file
+	tmp_dir="$(mktemp -d)"
+	evidence_file="$tmp_dir/failed-check-evidence.md"
+	output_file="$tmp_dir/fallback.out"
+
+	cat >"$evidence_file" <<'EOF'
+## Failed check: Strix Security Scan/strix
+
+No Strix vulnerability report windows were detected in the failed log.
+
+### Failed log excerpt
+
+```text
+strix Run Strix (quick) LLM CONNECTION FAILED
+strix Run Strix (quick) Error: litellm.APIError: APIError: DeepseekException - No access to model: /deepseek-r1-0528
+```
+EOF
+
+	bash "$REPO_ROOT/scripts/ci/emit_opencode_failed_check_fallback_findings.sh" \
+		"$evidence_file" "$REPO_ROOT" >"$output_file"
+
+	assert_file_contains "$output_file" "Strix provider access blocked current-head security evidence" "opencode fallback classifies no-report Strix failures as provider access blockers"
+	assert_file_not_contains "$output_file" "Strix provider signal left current-head security evidence incomplete" "opencode fallback must not treat a no-report sentence as a Strix report window"
+
+	rm -rf "$tmp_dir"
+}
+
 assert_opencode_failed_check_review_validator_rejects_unrelated_findings() {
 	local tmp_dir
 	local control_json
@@ -5210,6 +5240,8 @@ assert_opencode_review_normalizer_accepts_transcript_json
 assert_opencode_review_rejects_missing_structural_review_approval
 
 assert_opencode_review_gate_rejects_line_zero_findings
+
+assert_opencode_fallback_distinguishes_absent_strix_reports
 
 assert_opencode_failed_check_review_validator_rejects_unrelated_findings
 
