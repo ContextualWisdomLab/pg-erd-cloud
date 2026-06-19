@@ -36,3 +36,14 @@ def test_queries_capture_explicit_tablespaces() -> None:
     assert "LEFT JOIN pg_catalog.pg_tablespace rel_ts" in queries.RELATIONS_SQL
     assert "idx_ts.spcname AS index_tablespace_name" in queries.INDEXES_SQL
     assert "LEFT JOIN pg_catalog.pg_tablespace idx_ts" in queries.INDEXES_SQL
+
+
+def test_relations_query_captures_partition_metadata() -> None:
+    sql = queries.RELATIONS_SQL
+
+    assert "pg_catalog.pg_get_partkeydef(c.oid) AS partition_key" in sql
+    assert "pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound" in sql
+    assert "parent.oid AS partition_parent_oid" in sql
+    assert "parent_ns.nspname AS partition_parent_schema" in sql
+    assert "parent.relname AS partition_parent_name" in sql
+    assert "LEFT JOIN pg_catalog.pg_inherits inh ON inh.inhrelid = c.oid" in sql
