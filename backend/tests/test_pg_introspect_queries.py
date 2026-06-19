@@ -29,3 +29,10 @@ def test_indexes_query_captures_dynamic_index_method_metadata() -> None:
     assert "pg_catalog.pg_opclass" in sql
     assert "pg_catalog.pg_extension" in sql
     assert "pg_catalog.pg_get_indexdef(idx.oid) AS index_def" in sql
+
+
+def test_queries_capture_explicit_tablespaces() -> None:
+    assert "rel_ts.spcname AS tablespace_name" in queries.RELATIONS_SQL
+    assert "LEFT JOIN pg_catalog.pg_tablespace rel_ts" in queries.RELATIONS_SQL
+    assert "idx_ts.spcname AS index_tablespace_name" in queries.INDEXES_SQL
+    assert "LEFT JOIN pg_catalog.pg_tablespace idx_ts" in queries.INDEXES_SQL
