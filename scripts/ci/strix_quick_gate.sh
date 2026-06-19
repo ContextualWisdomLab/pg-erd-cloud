@@ -1874,6 +1874,11 @@ evaluate_pull_request_findings() {
 			return 1
 		fi
 		if [ "$rank" -ge "$threshold_rank" ]; then
+			if vulnerability_file_is_retryable_model_inconsistency "$STRIX_LOG"; then
+				found_retryable_model_inconsistency=1
+				PR_FINDINGS_DECISION="retry_model_inconsistency"
+				return 1
+			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
 				PR_FINDINGS_DECISION="block_unmapped"
@@ -2195,6 +2200,26 @@ if any(ch in str(target_cwd) for ch in ("\x00", "\n", "\r")):
 
 command = [resolved_strix_bin, "-n", "-t", ".", "--scan-mode", scan_mode]
 
+def output_from_timeout(exc):
+    partial = exc.output if exc.output is not None else exc.stdout
+    if not partial:
+        return ""
+    if isinstance(partial, bytes):
+        return partial.decode("utf-8", errors="replace")
+    return partial
+
+def signal_group(pgid, sig):
+    try:
+        os.killpg(pgid, sig)
+    except (PermissionError, ProcessLookupError):
+        pass
+
+def signal_process(process, sig):
+    try:
+        process.send_signal(sig)
+    except (PermissionError, ProcessLookupError):
+        pass
+
 try:
     process = subprocess.Popen(
         command,
@@ -2205,24 +2230,27 @@ try:
         env=child_env,
         start_new_session=True,
     )
+    try:
+        process_pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        process_pgid = process.pid
     output, _ = process.communicate(timeout=process_timeout)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
     raise SystemExit(process.returncode)
 except subprocess.TimeoutExpired:
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
+    signal_group(process_pgid, signal.SIGTERM)
+    signal_process(process, signal.SIGTERM)
     try:
         output, _ = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
+        signal_group(process_pgid, signal.SIGKILL)
+        signal_process(process, signal.SIGKILL)
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
+            output, _ = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired as exc:
+            output = output_from_timeout(exc)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
@@ -2878,6 +2906,12 @@ patterns = [
     ),
     re.compile(
         r"<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>"
+    ),
+    re.compile(
+        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
+    ),
+    re.compile(
+        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Endpoint:(?:\*\*)?[ \t]*(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
     ),
 ]
 
