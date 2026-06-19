@@ -1166,12 +1166,12 @@ jobs:
             }
 
             emit_known_missing_string_finding \
-              "github.event.inputs.strix_llm || 'openai/gpt-5'" \
-              "Strix PR scans must default to GitHub Models GPT-5" \
+              "github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528'" \
+              "Strix PR scans must default to the reachable GitHub Models DeepSeek R1 route" \
               ".github/workflows/strix.yml" \
               "scripts/ci/test_strix_quick_gate.sh"
             emit_known_missing_string_finding \
-              "STRIX_LLM must select GitHub Models openai/gpt-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model" \
+              "STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model" \
               "Strix unsupported-model errors must name the allowed providers" \
               ".github/workflows/strix.yml" \
               "scripts/ci/test_strix_quick_gate.sh"
