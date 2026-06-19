@@ -491,6 +491,7 @@ export default function App() {
           />
           <input
             id="conn-dsn"
+            type="password"
             value={dsn}
             onChange={(e) => setDsn(e.target.value)}
             placeholder="postgresql://..."
