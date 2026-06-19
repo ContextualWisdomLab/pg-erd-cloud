@@ -15,3 +15,17 @@ def test_columns_query_captures_postgresql_type_catalog_metadata() -> None:
     assert "pg_catalog.format_type(typ.typbasetype, typ.typtypmod)" in sql
     assert "pg_catalog.format_type(typ.typelem, -1)" in sql
     assert "a.attndims AS array_dimensions" in sql
+
+
+def test_indexes_query_captures_dynamic_index_method_metadata() -> None:
+    sql = queries.INDEXES_SQL
+
+    assert "tbl.oid AS relation_oid" in sql
+    assert "JOIN pg_catalog.pg_am am ON am.oid = idx.relam" in sql
+    assert "am.amname AS access_method" in sql
+    assert "am_ext.extname AS access_method_extension" in sql
+    assert "operator_classes" in sql
+    assert "operator_class_extensions" in sql
+    assert "pg_catalog.pg_opclass" in sql
+    assert "pg_catalog.pg_extension" in sql
+    assert "pg_catalog.pg_get_indexdef(idx.oid) AS index_def" in sql

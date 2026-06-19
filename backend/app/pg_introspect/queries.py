@@ -174,11 +174,15 @@ SELECT
   idx_ns.nspname AS index_schema_name,
   idx.relname AS index_name,
 
+  tbl.oid AS relation_oid,
   tbl.oid AS table_oid,
   tbl_ns.nspname AS table_schema_name,
   tbl.relname AS table_name,
 
   am.amname AS access_method,
+  am_ext.extname AS access_method_extension,
+  COALESCE(opclasses.operator_classes, ARRAY[]::text[]) AS operator_classes,
+  COALESCE(opclasses.operator_class_extensions, ARRAY[]::text[]) AS operator_class_extensions,
   ix.indisunique AS is_unique,
   ix.indisprimary AS is_primary,
   ix.indisvalid AS is_valid,
@@ -191,6 +195,35 @@ JOIN pg_catalog.pg_namespace idx_ns ON idx_ns.oid = idx.relnamespace
 JOIN pg_catalog.pg_class tbl ON tbl.oid = ix.indrelid
 JOIN pg_catalog.pg_namespace tbl_ns ON tbl_ns.oid = tbl.relnamespace
 JOIN pg_catalog.pg_am am ON am.oid = idx.relam
+LEFT JOIN LATERAL (
+  SELECT ext.extname
+  FROM pg_catalog.pg_depend dep
+  JOIN pg_catalog.pg_extension ext ON ext.oid = dep.refobjid
+  WHERE
+    dep.classid = 'pg_catalog.pg_am'::regclass
+    AND dep.objid = am.oid
+    AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
+    AND dep.deptype = 'e'
+  ORDER BY ext.extname
+  LIMIT 1
+) am_ext ON true
+LEFT JOIN LATERAL (
+  SELECT
+    array_agg(opc_ns.nspname || '.' || opc.opcname ORDER BY cls.ordinality) AS operator_classes,
+    COALESCE(
+      array_agg(DISTINCT ext.extname ORDER BY ext.extname) FILTER (WHERE ext.extname IS NOT NULL),
+      ARRAY[]::text[]
+    ) AS operator_class_extensions
+  FROM unnest(ix.indclass) WITH ORDINALITY AS cls(opclass_oid, ordinality)
+  JOIN pg_catalog.pg_opclass opc ON opc.oid = cls.opclass_oid
+  JOIN pg_catalog.pg_namespace opc_ns ON opc_ns.oid = opc.opcnamespace
+  LEFT JOIN pg_catalog.pg_depend dep
+    ON dep.classid = 'pg_catalog.pg_opclass'::regclass
+    AND dep.objid = opc.oid
+    AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
+    AND dep.deptype = 'e'
+  LEFT JOIN pg_catalog.pg_extension ext ON ext.oid = dep.refobjid
+) opclasses ON true
 CROSS JOIN params p
 WHERE
   tbl.relkind IN ('r','p','m')

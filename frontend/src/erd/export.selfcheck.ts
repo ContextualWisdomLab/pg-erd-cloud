@@ -28,13 +28,21 @@ const nodes: Array<Node<TableNodeData>> = [
 
 const edges: Edge[] = [{ id: 'fk', source: '2', target: '1', label: 'fk_orders_user', type: 'smoothstep' }];
 const snapshot = {
-  indexes: [{ relation_oid: 2, index_name: 'idx_orders_user_id', is_unique: false }],
+  indexes: [
+    {
+      table_oid: 2,
+      index_name: 'idx_orders_user_id',
+      access_method: 'gin',
+      operator_class_extensions: ['btree_gin'],
+      is_unique: false,
+    },
+  ],
 };
 
 const uml = exportPlantUml(nodes, edges, snapshot);
 const svg = exportDiagramSvg(nodes, edges, snapshot);
 
-for (const expected of ['public.users', 'fk_orders_user', 'idx_orders_user_id']) {
+for (const expected of ['public.users', 'fk_orders_user', 'idx_orders_user_id', 'gin:btree_gin']) {
   if (!uml.includes(expected) || !svg.includes(expected)) {
     throw new Error(`export self-check missing ${expected}`);
   }
