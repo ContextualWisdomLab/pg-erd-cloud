@@ -64,9 +64,8 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
   if (fkRows.length > 0) {
     const grouped = new Map<number, typeof fkRows>()
     for (const r of fkRows) {
-      // ⚡ Bolt: Optimize O(n²) array spread bottleneck.
-      // Used to be `[...(grouped.get(id) || []), r]` which re-allocates array on every element.
-      // Replaced with O(n) array push for better performance with large schema sizes.
+      // ponytail: previous array spreading copied each group on every row;
+      // pushing keeps grouping O(n), with O(1) amortized append per row.
       const arr = grouped.get(r.fk_constraint_oid)
       if (arr) {
         arr.push(r)
