@@ -1441,6 +1441,34 @@ EOS
 			;;
 		esac
 		;;
+	pr-stale-pr-scope-target-fallback-success)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/stale-pr-scope-target-primary)
+			scope_name="$(basename "$target_path")"
+			mkdir -p "$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities/vuln-0001.md" <<EOS
+# Insecure Hardcoded Secret in Development Configuration
+
+**Severity:** CRITICAL
+**Target:** /workspace/${scope_name}/backend/.env.example
+
+The .env file contains a weak app_secret value "insecure_dev_secret".
+EOS
+			echo "Severity: CRITICAL"
+			echo "Target: /workspace/${scope_name}/backend/.env.example"
+			echo "Penetration test failed: absent PR-scope target hardcoded secret"
+			exit 1
+			;;
+		vertex_ai/fallback-one)
+			echo "scan ok after absent pr-scope target fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: absent pr-scope target scenario unexpected model (${STRIX_LLM:-})" >&2
+			exit 30
+			;;
+		esac
+		;;
 	pr-stale-source-plus-real-finding-blocks)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/stale-source-primary)
@@ -6202,6 +6230,27 @@ run_gate_case "pr-stale-source-claim-fallback-success" \
 	"0" \
 	"pull_request" \
 	"backend/db/models.py"
+
+run_gate_case "pr-stale-pr-scope-target-fallback-success" \
+	"vertex_ai/stale-pr-scope-target-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after absent pr-scope target fallback" \
+	"2" \
+	"vertex_ai/stale-pr-scope-target-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"HIGH" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
 
 run_gate_case "pr-stale-source-plus-real-finding-blocks" \
 	"vertex_ai/stale-source-primary" \
