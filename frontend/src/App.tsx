@@ -50,9 +50,7 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [dsn, setDsn] = useState(
-    "postgresql://postgres:postgres@localhost:5432/postgres",
-  );
+  const [dsn, setDsn] = useState("");
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
