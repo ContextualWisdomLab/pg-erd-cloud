@@ -91,6 +91,11 @@ select:focus-visible {
   border-radius: 6px;
 }
 
+.field-hint {
+  color: #6b7280;
+  font-size: 12px;
+}
+
 .row {
   display: flex;
   gap: 8px;
