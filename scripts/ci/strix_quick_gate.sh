@@ -2191,6 +2191,26 @@ if any(ch in str(target_cwd) for ch in ("\x00", "\n", "\r")):
 
 command = [resolved_strix_bin, "-n", "-t", ".", "--scan-mode", scan_mode]
 
+def output_from_timeout(exc):
+    partial = exc.output if exc.output is not None else exc.stdout
+    if not partial:
+        return ""
+    if isinstance(partial, bytes):
+        return partial.decode("utf-8", errors="replace")
+    return partial
+
+def signal_group(pgid, sig):
+    try:
+        os.killpg(pgid, sig)
+    except (PermissionError, ProcessLookupError):
+        pass
+
+def signal_process(process, sig):
+    try:
+        process.send_signal(sig)
+    except (PermissionError, ProcessLookupError):
+        pass
+
 try:
     process = subprocess.Popen(
         command,
@@ -2201,24 +2221,27 @@ try:
         env=child_env,
         start_new_session=True,
     )
+    try:
+        process_pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        process_pgid = process.pid
     output, _ = process.communicate(timeout=process_timeout)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
     raise SystemExit(process.returncode)
 except subprocess.TimeoutExpired:
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
+    signal_group(process_pgid, signal.SIGTERM)
+    signal_process(process, signal.SIGTERM)
     try:
         output, _ = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
+        signal_group(process_pgid, signal.SIGKILL)
+        signal_process(process, signal.SIGKILL)
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
+            output, _ = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired as exc:
+            output = output_from_timeout(exc)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
