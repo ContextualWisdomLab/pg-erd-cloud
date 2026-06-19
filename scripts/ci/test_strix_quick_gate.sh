@@ -186,8 +186,8 @@ assert_strix_workflow_pr_trigger_hardened() {
 	assert_file_contains "$workflow_file" "https://models.github.ai/inference" "strix workflow routes GitHub Models scans to the inference endpoint"
 	assert_file_contains "$workflow_file" "LLM_API_BASE_FILE" "strix workflow passes the GitHub Models API base through a trusted input file"
 	assert_file_not_contains "$workflow_file" '${{ secrets.STRIX_OPENAI_API_KEY || github.token }}' "strix workflow must not use fallback-secret syntax for LLM API keys"
-	assert_file_contains "$workflow_file" "deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" "strix workflow configures reachable stronger-than-GPT-4.1 GitHub Models fallback models"
-	assert_file_contains "$workflow_file" '${strix_model#github_models/}' "strix workflow strips manual github_models routing prefix before passing model names to LiteLLM"
+	assert_file_contains "$workflow_file" "openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" "strix workflow configures OpenAI-compatible DeepSeek GitHub Models fallback models"
+	assert_file_contains "$workflow_file" "printf 'openai/%s' \"\$github_model\"" "strix workflow routes non-OpenAI GitHub Models through LiteLLM's OpenAI-compatible provider"
 	assert_file_not_contains "$workflow_file" "openai/gpt-4.1" "strix workflow must not fall back to GPT-4.1 or weaker review evidence"
 	assert_file_not_contains "$workflow_file" "openai/gpt-5-*" "strix workflow must not accept older GPT-5 variants when GPT-5.4 is required"
 	assert_file_contains "$workflow_file" "openai/gpt-5-mini* | openai/gpt-5-nano*" "strix workflow rejects mini and nano GPT-5 variants for security evidence"
@@ -795,7 +795,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			if [ "${FAKE_STRIX_SCENARIO:?}" = "github-models-fallback-success-deepseek-v3" ]; then
 				echo "LLM CONNECTION FAILED"
 				echo "Could not establish connection to the language model."
@@ -805,7 +805,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
-		deepseek/deepseek-v3-0324)
+		openai/deepseek/deepseek-v3-0324)
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
@@ -1120,7 +1120,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.BadRequestError: OpenAIException - Unavailable model: gpt-5"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			echo "scan ok after GitHub Models unavailable fallback"
 			exit 0
 			;;
@@ -1138,7 +1138,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			echo "scan ok after GitHub Models rate-limit fallback"
 			exit 0
 			;;
@@ -1156,7 +1156,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.BadRequestError: OpenAIException - Unavailable model: gpt-5"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
 Severity: CRITICAL
@@ -1166,7 +1166,7 @@ EOS
 			echo "Warning: fallback model emitted provider failure-signal output"
 			exit 2
 			;;
-		deepseek/deepseek-v3-0324)
+		openai/deepseek/deepseek-v3-0324)
 			echo "scan ok after second GitHub Models fallback"
 			exit 0
 			;;
@@ -1178,13 +1178,13 @@ EOS
 		;;
 	github-models-primary-deepseek-api-error-fallback-success)
 		case "${STRIX_LLM:-}" in
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			echo "LLM CONNECTION FAILED"
 			echo "Could not establish connection to the language model."
 			echo "Error: litellm.APIError: APIError: DeepseekException -"
 			exit 1
 			;;
-		deepseek/deepseek-v3-0324)
+		openai/deepseek/deepseek-v3-0324)
 			echo "scan ok after DeepSeek API fallback"
 			exit 0
 			;;
@@ -1202,7 +1202,7 @@ EOS
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
 Severity: CRITICAL
@@ -1226,7 +1226,7 @@ EOS
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0001.md" <<'EOS'
 # Cross-Site Scripting (XSS) Risk in User-Controlled Data Rendering
@@ -1365,7 +1365,7 @@ EOS
 			echo "Penetration test failed: LLM request failed: RateLimitError"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities/vuln-0001.md" <<'EOS'
 # Hardcoded Secrets in Source Code
@@ -5554,9 +5554,9 @@ run_gate_case "github-models-primary-unavailable-fallback-success" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5577,16 +5577,16 @@ run_gate_case "github-models-primary-unavailable-fallback-success" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-primary-ratelimit-fallback-success" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"4" \
-	"openai/gpt-5|openai/gpt-5|openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/gpt-5|openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5607,16 +5607,16 @@ run_gate_case "github-models-primary-ratelimit-fallback-success" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
 	"3" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
 	"https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5637,16 +5637,16 @@ run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-primary-deepseek-api-error-fallback-success" \
-	"deepseek/deepseek-r1-0528" \
+	"openai/deepseek/deepseek-r1-0528" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
 	"2" \
-	"deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5667,7 +5667,7 @@ run_gate_case "github-models-primary-deepseek-api-error-fallback-success" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-baseline-only" \
@@ -5676,7 +5676,7 @@ run_gate_case "github-models-fallback-provider-signal-baseline-only" \
 	"0" \
 	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5697,7 +5697,7 @@ run_gate_case "github-models-fallback-provider-signal-baseline-only" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528" \
+	"openai/deepseek/deepseek-r1-0528" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
@@ -5706,7 +5706,7 @@ run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
 	"0" \
 	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5727,7 +5727,7 @@ run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528" \
+	"openai/deepseek/deepseek-r1-0528" \
 	"1"
 
 run_gate_case_allow_provider_signal "gemini-high-demand-retry-same-model-success" \
@@ -6110,7 +6110,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"0" \
 	"Strix placeholder hardcoded-secret finding references only absent non-repository example paths; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://example.invalid|https://example.invalid" \
 	"vertex_ai" \
 	"__DEFAULT__" \
@@ -6131,7 +6131,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528"
+	"openai/deepseek/deepseek-r1-0528"
 
 run_gate_case "vertex-primary-hallucinated-endpoint-fallback-success" \
 	"vertex_ai/hallucination-primary" \
@@ -7753,11 +7753,11 @@ run_gate_case "github-models-fallback-requires-api-base" \
 
 run_gate_case "github-models-fallback-success" \
 	"vertex_ai/missing-primary" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"2" \
-	"vertex_ai/missing-primary|deepseek/deepseek-r1-0528" \
+	"vertex_ai/missing-primary|openai/deepseek/deepseek-r1-0528" \
 	"<unset>|https://models.github.ai/inference" \
 	"vertex_ai" \
 	"https://models.github.ai/inference" \
@@ -7787,11 +7787,11 @@ run_gate_case "github-models-fallback-success" \
 
 run_gate_case "github-models-fallback-success-deepseek-v3" \
 	"vertex_ai/missing-primary" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
 	"3" \
-	"vertex_ai/missing-primary|deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"vertex_ai/missing-primary|openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
 	"<unset>|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"vertex_ai" \
 	"https://models.github.ai/inference" \
