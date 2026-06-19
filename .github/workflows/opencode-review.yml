@@ -1034,25 +1034,12 @@ jobs:
 
           create_pull_review() {
             local event="$1" body="$2"
-            local review_payload_file
-            local review_status=0
-
-            review_payload_file="$(mktemp)"
             jq -n \
               --arg event "$event" \
               --arg body "$body" \
               --arg commit_id "$HEAD_SHA" \
-              '{event: $event, body: $body, commit_id: $commit_id}' >"$review_payload_file"
-            gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input "$review_payload_file" >/dev/null || review_status=$?
-            rm -f "$review_payload_file"
-            if [ "$review_status" -ne 0 ]; then
-              if [ "$event" = "APPROVE" ]; then
-                echo "::warning::OpenCode approved this PR, but the configured token could not submit a formal APPROVE review; recording approval in the overview comment."
-                update_review_overview "$event" "$body"
-                return 0
-              fi
-              return "$review_status"
-            fi
+              '{event: $event, body: $body, commit_id: $commit_id}' |
+              gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input - >/dev/null
             update_review_overview "$event" "$body"
           }
 
@@ -1439,7 +1426,7 @@ jobs:
           collect_current_head_strix_success_run_ids() {
             local output_file="$1"
 
-            GH_CURRENT_HEAD_SHA="$HEAD_SHA" gh run list \
+            HEAD_SHA="$HEAD_SHA" gh run list \
               --repo "$GH_REPOSITORY" \
               --commit "$HEAD_SHA" \
               --limit 100 \
@@ -1447,7 +1434,7 @@ jobs:
               --jq '
                 .[]
                 | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
-                | select((.headSha // "") == env.GH_CURRENT_HEAD_SHA)
+                | select((.headSha // "") == env.HEAD_SHA)
                 | select((.workflowName // "") == "Strix Security Scan" or (.workflowName // "") == "Strix")
                 | select((.status // "") == "completed")
                 | select((.conclusion // "" | ascii_downcase) == "success")

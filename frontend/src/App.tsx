@@ -124,11 +124,7 @@ export default function App() {
       getSnapshot(snapshotId)
         .then((s) => {
           setSnapshot(s);
-          if (
-            s.status === "succeeded" ||
-            s.status === "failed" ||
-            s.status === "not_found"
-          ) {
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
             clearInterval(timer);
           }
         })
