@@ -10,10 +10,12 @@ type Column = {
   data_type: string;
   is_not_null: boolean;
   is_pk?: boolean;
+  column_comment?: string | null;
 };
 
 type TableNodeData = {
   title: string;
+  comment?: string | null;
   columns: Column[];
   badges?: { pk?: boolean; fk?: boolean };
 };
@@ -26,7 +28,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
     <div className="tableNode">
       <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
-        <span>{data.title}</span>
+        <span className="tableNode__titleText">
+          <span>{data.title}</span>
+          {data.comment ? (
+            <span className="tableNode__titleComment">{data.comment}</span>
+          ) : null}
+        </span>
         <span style={{ display: "inline-flex", gap: 6 }}>
           {data.badges?.pk ? (
             <span className="tableNode__badge">PK</span>
@@ -45,7 +52,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               id={targetColumnHandleId(c.column_name)}
               className="colHandle"
             />
-            <span className="tableNode__colName">{c.column_name}</span>
+            <span className="tableNode__colIdentity">
+              <span className="tableNode__colName">{c.column_name}</span>
+              {c.column_comment ? (
+                <span className="tableNode__colComment">{c.column_comment}</span>
+              ) : null}
+            </span>
             <span className="tableNode__colType">{c.data_type}</span>
             {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
             {c.is_not_null ? (
@@ -89,6 +101,7 @@ function isSameRenderedColumns(
     if (a.data_type !== b.data_type) return false;
     if (a.is_not_null !== b.is_not_null) return false;
     if (a.is_pk !== b.is_pk) return false;
+    if (a.column_comment !== b.column_comment) return false;
   }
   return true;
 }
@@ -100,6 +113,7 @@ export default memo(TableNode, (prev, next) => {
   // reliably detect it. Prefer immutable updates from the graph producer.
   return (
     prev.data.title === next.data.title &&
+    prev.data.comment === next.data.comment &&
     isSameRenderedColumns(prev.data.columns, next.data.columns) &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk

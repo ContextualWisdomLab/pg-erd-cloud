@@ -4,8 +4,8 @@ import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 
 type SnapshotJson = {
-  relations: Array<{ relation_oid: number; relation_kind: string; schema_name: string; relation_name: string }>
-  columns: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean }>
+  relations: Array<{ relation_oid: number; relation_kind: string; schema_name: string; relation_name: string; relation_comment?: string | null }>
+  columns: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean; column_comment?: string | null }>
   constraints: Array<any>
   pk_columns?: Array<{ relation_oid: number; column_name: string }>
   fk_edges?: Array<{
@@ -21,7 +21,8 @@ type SnapshotJson = {
 
 export type TableNodeData = {
   title: string
-  columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean }>
+  comment?: string | null
+  columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null }>
   badges: {
     pk: boolean
     fk: boolean
@@ -41,7 +42,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
   for (const c of snapshot.columns) {
     const list = columnsByRel.get(c.relation_oid) || []
     const isPk = pkColsByRel.get(c.relation_oid)?.has(c.column_name) || false
-    list.push({ column_name: c.column_name, data_type: c.data_type, is_not_null: c.is_not_null, is_pk: isPk })
+    list.push({ column_name: c.column_name, data_type: c.data_type, is_not_null: c.is_not_null, is_pk: isPk, column_comment: c.column_comment })
     columnsByRel.set(c.relation_oid, list)
   }
 
@@ -116,6 +117,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
       data: {
         title: `${t.schema_name}.${t.relation_name}`,
+        comment: t.relation_comment,
         columns: cols,
         badges: {
           pk: hasPk.has(t.relation_oid),

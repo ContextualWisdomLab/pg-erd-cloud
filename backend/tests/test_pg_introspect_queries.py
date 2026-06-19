@@ -41,6 +41,7 @@ def test_queries_capture_explicit_tablespaces() -> None:
 def test_relations_query_captures_partition_metadata() -> None:
     sql = queries.RELATIONS_SQL
 
+    assert "pg_catalog.obj_description(c.oid, 'pg_class') AS relation_comment" in sql
     assert "pg_catalog.pg_get_partkeydef(c.oid) AS partition_key" in sql
     assert "pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound" in sql
     assert "parent.oid AS partition_parent_oid" in sql

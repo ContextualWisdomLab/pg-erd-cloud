@@ -10,7 +10,8 @@ const nodes: Array<Node<TableNodeData>> = [
     position: { x: 0, y: 0 },
     data: {
       title: 'public.users',
-      columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+      comment: 'application users',
+      columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true, column_comment: 'user id' }],
       badges: { pk: true, fk: false },
     },
   },
@@ -42,7 +43,7 @@ const snapshot = {
 const uml = exportPlantUml(nodes, edges, snapshot);
 const svg = exportDiagramSvg(nodes, edges, snapshot);
 
-for (const expected of ['public.users', 'fk_orders_user', 'idx_orders_user_id', 'gin:btree_gin']) {
+for (const expected of ['public.users', 'application users', 'fk_orders_user', 'idx_orders_user_id', 'gin:btree_gin', 'user id']) {
   if (!uml.includes(expected) || !svg.includes(expected)) {
     throw new Error(`export self-check missing ${expected}`);
   }
