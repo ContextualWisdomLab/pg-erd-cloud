@@ -64,6 +64,7 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
         name = t.get("relation_name")
         oid = t.get("relation_oid")
         kind = t.get("relation_kind")
+        tablespace = t.get("tablespace_name")
         if not (
             isinstance(schema, str)
             and isinstance(name, str)
@@ -107,7 +108,10 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
         for i, d in enumerate(all_defs):
             comma = "," if i < len(all_defs) - 1 else ""
             lines.append(f"  {d}{comma}")
-        lines.append(");")
+        table_options = (
+            f" TABLESPACE {_q(tablespace)}" if isinstance(tablespace, str) else ""
+        )
+        lines.append(f"){table_options};")
         lines.append("")
 
     # FKs after tables
@@ -139,9 +143,14 @@ def snapshot_json_to_sql(snapshot: dict) -> str:
         ix_def = ix.get("index_def")
         if not isinstance(ix_def, str):
             continue
-        if not ix_def.strip().endswith(";"):
-            ix_def = ix_def.strip() + ";"
-        lines.append(ix_def)
+        ix_def = ix_def.strip().rstrip(";")
+        index_tablespace = ix.get("index_tablespace_name")
+        if (
+            isinstance(index_tablespace, str)
+            and " TABLESPACE " not in ix_def.upper()
+        ):
+            ix_def = f"{ix_def} TABLESPACE {_q(index_tablespace)}"
+        lines.append(ix_def + ";")
 
     lines.append("")
     return "\n".join(lines)

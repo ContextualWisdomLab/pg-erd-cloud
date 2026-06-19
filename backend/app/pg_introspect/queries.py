@@ -33,9 +33,11 @@ SELECT
   c.oid AS relation_oid,
   c.relname AS relation_name,
   c.relkind::text AS relation_kind,
-  c.relispartition AS is_partition
+  c.relispartition AS is_partition,
+  rel_ts.spcname AS tablespace_name
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_catalog.pg_tablespace rel_ts ON rel_ts.oid = c.reltablespace
 CROSS JOIN params p
 WHERE
   c.relkind IN ('r','p','v','m')
@@ -178,6 +180,7 @@ SELECT
   tbl.oid AS table_oid,
   tbl_ns.nspname AS table_schema_name,
   tbl.relname AS table_name,
+  idx_ts.spcname AS index_tablespace_name,
 
   am.amname AS access_method,
   am_ext.extname AS access_method_extension,
@@ -195,6 +198,7 @@ JOIN pg_catalog.pg_namespace idx_ns ON idx_ns.oid = idx.relnamespace
 JOIN pg_catalog.pg_class tbl ON tbl.oid = ix.indrelid
 JOIN pg_catalog.pg_namespace tbl_ns ON tbl_ns.oid = tbl.relnamespace
 JOIN pg_catalog.pg_am am ON am.oid = idx.relam
+LEFT JOIN pg_catalog.pg_tablespace idx_ts ON idx_ts.oid = idx.reltablespace
 LEFT JOIN LATERAL (
   SELECT ext.extname
   FROM pg_catalog.pg_depend dep
