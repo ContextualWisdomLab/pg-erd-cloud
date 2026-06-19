@@ -124,7 +124,11 @@ export default function App() {
       getSnapshot(snapshotId)
         .then((s) => {
           setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+          if (
+            s.status === "succeeded" ||
+            s.status === "failed" ||
+            s.status === "not_found"
+          ) {
             clearInterval(timer);
           }
         })
@@ -137,9 +141,7 @@ export default function App() {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-    // Disable exhaustive-deps to prevent deep object reference issues
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot?.schema_snapshot_uuid, snapshot?.status]);
+  }, [snapshot?.snapshot_json]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
