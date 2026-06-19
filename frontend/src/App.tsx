@@ -68,6 +68,7 @@ export default function App() {
   const [layoutMessage, setLayoutMessage] = useState<string>("");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
@@ -626,11 +627,13 @@ export default function App() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(exportDdlText);
-                      alert("복사되었습니다.");
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
                     }}
                     style={{ background: "#034ea2", color: "#fff" }}
+                    aria-live="polite"
                   >
-                    복사하기
+                    {isCopied ? "복사 완료 ✓" : "복사하기"}
                   </button>
                 </div>
               </div>
