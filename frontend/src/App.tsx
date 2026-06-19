@@ -139,6 +139,14 @@ export default function App() {
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
   }, [snapshotJsonKey]);
+  const createProjectHint = projectName.trim() ? "" : "Enter project name";
+  const createConnectionHint = !selectedProjectId
+    ? "Select a project first"
+    : !connName.trim() || !dsn.trim()
+      ? "Enter connection name and DSN"
+      : "";
+  const createSnapshotHint =
+    selectedProjectId && selectedConnId ? "" : "Select project and connection";
 
   useEffect(() => {
     if (!graph) {
@@ -389,8 +397,21 @@ export default function App() {
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
             />
-            <button onClick={onCreateProject}>Create</button>
+            <button
+              onClick={onCreateProject}
+              disabled={!projectName.trim()}
+              aria-describedby={
+                createProjectHint ? "create-project-hint" : undefined
+              }
+            >
+              Create
+            </button>
           </div>
+          {createProjectHint ? (
+            <span id="create-project-hint" className="field-hint">
+              {createProjectHint}
+            </span>
+          ) : null}
         </div>
 
         <hr />
@@ -427,8 +448,22 @@ export default function App() {
             value={dsn}
             onChange={(e) => setDsn(e.target.value)}
             placeholder="postgresql://..."
+            aria-label="Connection DSN"
           />
-          <button onClick={onCreateConnection}>Save connection</button>
+          <button
+            onClick={onCreateConnection}
+            disabled={!selectedProjectId || !connName.trim() || !dsn.trim()}
+            aria-describedby={
+              createConnectionHint ? "create-connection-hint" : undefined
+            }
+          >
+            Save connection
+          </button>
+          {createConnectionHint ? (
+            <span id="create-connection-hint" className="field-hint">
+              {createConnectionHint}
+            </span>
+          ) : null}
         </div>
 
         <div className="field">
@@ -441,7 +476,20 @@ export default function App() {
           />
         </div>
 
-        <button onClick={onCreateSnapshot}>Reverse engineer → snapshot</button>
+        <button
+          onClick={onCreateSnapshot}
+          disabled={!selectedProjectId || !selectedConnId}
+          aria-describedby={
+            createSnapshotHint ? "create-snapshot-hint" : undefined
+          }
+        >
+          Reverse engineer → snapshot
+        </button>
+        {createSnapshotHint ? (
+          <span id="create-snapshot-hint" className="field-hint">
+            {createSnapshotHint}
+          </span>
+        ) : null}
 
         <div style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
           Snapshot: {snapshot?.status || "—"}
