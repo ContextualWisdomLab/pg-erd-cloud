@@ -53,6 +53,12 @@ first_existing_line() {
 	printf '1'
 }
 
+has_strix_vulnerability_report_window() {
+	local strix_evidence_file="$1"
+
+	grep -Eq '^### Strix vulnerability report window[[:space:]]' "$strix_evidence_file"
+}
+
 derive_location_from_report() {
 	local title="$1"
 	local endpoint="$2"
@@ -313,7 +319,7 @@ emit_strix_report_findings() {
 	local line
 	local source_detail
 
-	if ! grep -Fq "Strix vulnerability report window" "$strix_evidence_file"; then
+	if ! has_strix_vulnerability_report_window "$strix_evidence_file"; then
 		return 0
 	fi
 
@@ -360,16 +366,16 @@ emit_strix_provider_failure_finding() {
 	fi
 
 	finding_index=$((finding_index + 1))
-	if grep -Fq "Strix vulnerability report window" "$strix_evidence_file"; then
+	if has_strix_vulnerability_report_window "$strix_evidence_file"; then
 		printf '### %s. HIGH %s:%s - Strix provider signal left current-head security evidence incomplete\n' "$finding_index" "$path" "$line"
 		printf -- '- Problem: Strix produced one or more vulnerability report windows, then the failed log still reported provider infrastructure/failure-signal output such as LLM CONNECTION FAILED, RateLimitError, budget-limit, "Below-threshold findings detected", "Unable to map Strix findings", or fallback provider signal.\n'
 		printf -- '- Root cause: The scanner evidence is incomplete even after model reports were emitted; OpenCode must include every model report above and must not approve until a clean current-head Strix run or equivalent manual evidence exists.\n'
 		printf -- '- Fix: Re-run Strix after GitHub Models capacity recovers or run an explicitly configured manual provider evidence scan with valid credentials; keep %s:%s aligned with the approved fallback model list.\n' "$path" "$line"
 		printf -- '- Regression test: Keep failed-check evidence and validation covering provider-signal failures after vulnerability reports so partial reports cannot be downgraded to approval.\n\n'
 	else
-		printf '### %s. HIGH %s:%s - Strix provider quota blocked current-head security evidence\n' "$finding_index" "$path" "$line"
-		printf -- '- Problem: Strix failed before producing vulnerability reports. The failed log reported LLM CONNECTION FAILED, RateLimitError or Too many requests for the primary model, budget-limit output for the DeepSeek fallbacks, and Configured model and fallback models were unavailable.\n'
-		printf -- '- Root cause: The configured GitHub Models primary/fallback provider capacity or budget was exhausted for this run; no Strix Vulnerability Report window was produced, so there is no application source line to patch from this evidence.\n'
+		printf '### %s. HIGH %s:%s - Strix provider access blocked current-head security evidence\n' "$finding_index" "$path" "$line"
+		printf -- '- Problem: Strix failed before producing vulnerability reports. The failed log reported provider setup or access failure such as LLM CONNECTION FAILED, no_access, RateLimitError, Too many requests, budget-limit output, or unavailable configured fallback models.\n'
+		printf -- '- Root cause: The configured provider credentials, model access, capacity, or budget could not produce Strix evidence for this run; no Strix Vulnerability Report window was produced, so there is no application source line to patch from this evidence.\n'
 		printf -- '- Fix: Do not approve from this failed scan. Re-run Strix after GitHub Models quota recovers or run an explicitly configured manual provider evidence scan with valid credentials; keep the configured fallback line at %s:%s aligned with the approved model list.\n' "$path" "$line"
 		printf -- '- Regression test: Keep the failed-check evidence collector preserving RateLimitError, budget-limit, provider infrastructure, and unavailable-model lines so OpenCode reviews can distinguish external provider blockers from code vulnerabilities.\n\n'
 	fi
