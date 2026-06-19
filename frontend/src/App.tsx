@@ -22,6 +22,7 @@ import {
   listConnections,
   listProjects,
   listSnapshots,
+  setDevUserHeader,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
@@ -35,9 +36,7 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>(
-    () => localStorage.getItem("devUser") || "local",
-  );
+  const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<{
     subject: string;
     display_name: string | null;
@@ -111,7 +110,7 @@ export default function App() {
   );
 
   useEffect(() => {
-    localStorage.setItem("devUser", devUser);
+    setDevUserHeader(devUser);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         setMe({ subject: m.subject, display_name: m.display_name });

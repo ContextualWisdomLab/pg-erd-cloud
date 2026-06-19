@@ -2,25 +2,27 @@ import type { Connection, Project, Snapshot, SnapshotDetail } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
-const CSRF_STORAGE_KEY = 'csrfToken'
+let csrfTokenValue: string | null = null
+let devUserHeaderValue = 'local'
+
+export function setDevUserHeader(devUser: string): void {
+  devUserHeaderValue = devUser.trim() || 'local'
+}
 
 function csrfToken(): string {
-  const existing = localStorage.getItem(CSRF_STORAGE_KEY)
-  if (existing && existing.length >= 16) return existing
+  if (csrfTokenValue && csrfTokenValue.length >= 16) return csrfTokenValue
 
-  const token =
+  csrfTokenValue =
     typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) =>
           byte.toString(16).padStart(2, '0')
         ).join('')
-  localStorage.setItem(CSRF_STORAGE_KEY, token)
-  return token
+  return csrfTokenValue
 }
 
 function devHeaders(): Record<string, string> {
-  const devUser = localStorage.getItem('devUser')
-  return devUser ? { 'X-Dev-User': devUser } : {}
+  return devUserHeaderValue ? { 'X-Dev-User': devUserHeaderValue } : {}
 }
 
 function jsonHeaders(): Record<string, string> {
