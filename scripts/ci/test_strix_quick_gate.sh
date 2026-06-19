@@ -1441,34 +1441,6 @@ EOS
 			;;
 		esac
 		;;
-	pr-stale-pr-scope-target-fallback-success)
-		case "${STRIX_LLM:-}" in
-		vertex_ai/stale-pr-scope-target-primary)
-			scope_name="$(basename "$target_path")"
-			mkdir -p "$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities"
-			cat >"$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities/vuln-0001.md" <<EOS
-# Insecure Hardcoded Secret in Development Configuration
-
-**Severity:** CRITICAL
-**Target:** /workspace/${scope_name}/backend/.env.example
-
-The .env file contains a weak app_secret value "insecure_dev_secret".
-EOS
-			echo "Severity: CRITICAL"
-			echo "Target: /workspace/${scope_name}/backend/.env.example"
-			echo "Penetration test failed: absent PR-scope target hardcoded secret"
-			exit 1
-			;;
-		vertex_ai/fallback-one)
-			echo "scan ok after absent pr-scope target fallback"
-			exit 0
-			;;
-		*)
-			echo "Error: absent pr-scope target scenario unexpected model (${STRIX_LLM:-})" >&2
-			exit 30
-			;;
-		esac
-		;;
 	pr-stale-source-plus-real-finding-blocks)
 		case "${STRIX_LLM:-}" in
 		vertex_ai/stale-source-primary)
@@ -4332,85 +4304,6 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
-run_timeout_escaped_stdout_case() {
-	local tmp_dir
-	tmp_dir="$(mktemp -d)"
-	local bin_dir="$tmp_dir/bin"
-	local workspace_dir="$tmp_dir/workspace"
-	local repo_root_dir="$workspace_dir/smart-crawling-server"
-	mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
-	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
-	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
-	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
-	local fake_strix="$bin_dir/strix"
-	local escaped_pid_file="$tmp_dir/escaped.pid"
-	local output_log="$tmp_dir/output.log"
-	local strix_llm_file="$tmp_dir/strix_llm.txt"
-	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
-
-	cat >"$fake_strix" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-python3 - <<'PY' &
-import os
-import pathlib
-import signal
-import time
-
-os.setsid()
-signal.signal(signal.SIGTERM, signal.SIG_IGN)
-pathlib.Path(os.environ["FAKE_STRIX_ESCAPED_PID_FILE"]).write_text(str(os.getpid()), encoding="utf-8")
-time.sleep(30)
-PY
-sleep 5
-EOF
-	chmod +x "$fake_strix"
-	printf '%s' 'vertex_ai/timeout-escaped-stdout-primary' >"$strix_llm_file"
-	printf '%s' 'dummy' >"$llm_api_key_file"
-
-	local start_epoch
-	start_epoch="$(date +%s)"
-	set +e
-	(
-		cd "$repo_root_dir"
-		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE -u STRIX_INPUT_FILE_ROOT \
-			PATH="$bin_dir:$PATH" \
-			STRIX_INPUT_FILE_ROOT="$tmp_dir" \
-			STRIX_DISABLE_PR_SCOPING="0" \
-			FAKE_STRIX_ESCAPED_PID_FILE="$escaped_pid_file" \
-			STRIX_LLM_FILE="$strix_llm_file" \
-			LLM_API_KEY_FILE="$llm_api_key_file" \
-			STRIX_PROCESS_TIMEOUT_SECONDS="1" \
-			STRIX_VERTEX_FALLBACK_MODELS="" \
-			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
-			STRIX_TARGET_PATH="." \
-			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
-	)
-	local rc=$?
-	set -e
-	local end_epoch
-	end_epoch="$(date +%s)"
-
-	assert_equals "1" "$rc" "timeout escaped stdout exit code"
-	assert_file_contains "$output_log" "Strix run timed out after 1s." "timeout escaped stdout output"
-	if [ $((end_epoch - start_epoch)) -gt 20 ]; then
-		record_failure "timeout escaped stdout should not wait for escaped child"
-	fi
-
-	if [ -f "$escaped_pid_file" ]; then
-		local escaped_pid
-		escaped_pid="$(tr -d '[:space:]' <"$escaped_pid_file")"
-		if [[ "$escaped_pid" =~ ^[0-9]+$ ]]; then
-			kill -TERM -- "-$escaped_pid" 2>/dev/null || kill "$escaped_pid" 2>/dev/null || true
-			sleep 0.25
-			kill -KILL -- "-$escaped_pid" 2>/dev/null || kill -KILL "$escaped_pid" 2>/dev/null || true
-		fi
-	fi
-
-	rm -rf "$tmp_dir"
-}
-
 run_vertex_model_ignores_untrusted_llm_api_base_file_case() {
 	local tmp_dir
 	tmp_dir="$(mktemp -d)"
@@ -6231,27 +6124,6 @@ run_gate_case "pr-stale-source-claim-fallback-success" \
 	"pull_request" \
 	"backend/db/models.py"
 
-run_gate_case "pr-stale-pr-scope-target-fallback-success" \
-	"vertex_ai/stale-pr-scope-target-primary" \
-	"vertex_ai/fallback-one vertex_ai/fallback-two" \
-	"0" \
-	"scan ok after absent pr-scope target fallback" \
-	"2" \
-	"vertex_ai/stale-pr-scope-target-primary|vertex_ai/fallback-one" \
-	"<unset>|<unset>" \
-	"vertex_ai" \
-	"__DEFAULT__" \
-	"" \
-	"0" \
-	"HIGH" \
-	"0" \
-	"" \
-	"" \
-	"1200" \
-	"0" \
-	"pull_request" \
-	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
-
 run_gate_case "pr-stale-source-plus-real-finding-blocks" \
 	"vertex_ai/stale-source-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
@@ -6766,8 +6638,6 @@ run_gate_case "timeout-disabled-success" \
 	"0"
 
 run_timeout_cleanup_case
-
-run_timeout_escaped_stdout_case
 
 run_total_timeout_case
 

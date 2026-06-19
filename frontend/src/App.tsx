@@ -137,7 +137,9 @@ export default function App() {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshot?.snapshot_json]);
+    // Disable exhaustive-deps to prevent deep object reference issues
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot?.schema_snapshot_uuid, snapshot?.status]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
