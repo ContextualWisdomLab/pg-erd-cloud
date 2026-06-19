@@ -22,7 +22,6 @@ import {
   listConnections,
   listProjects,
   listSnapshots,
-  setDevUserHeader,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
@@ -49,7 +48,7 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [dsn, setDsn] = useState("");
+  const [isDsnPresent, setIsDsnPresent] = useState(false);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
@@ -66,6 +65,7 @@ export default function App() {
     Edge
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutMessage, setLayoutMessage] = useState<string>("");
@@ -110,7 +110,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    setDevUserHeader(devUser);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         setMe({ subject: m.subject, display_name: m.display_name });
@@ -153,7 +152,7 @@ export default function App() {
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
-    : !connName.trim() || !dsn.trim()
+    : !connName.trim() || !isDsnPresent
       ? "Enter connection name and DSN"
       : "";
   const createSnapshotHint =
@@ -374,11 +373,17 @@ export default function App() {
 
   async function onCreateConnection() {
     if (!selectedProjectId) return;
+    const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
+    if (!connectionDsn) return;
     setError(null);
-    const c = await createConnection(selectedProjectId, connName, dsn);
+    const c = await createConnection(selectedProjectId, connName, connectionDsn);
     const next = [c, ...connections];
     setConnections(next);
     setSelectedConnId(c.db_connection_uuid);
+    if (dsnInputRef.current) {
+      dsnInputRef.current.value = "";
+    }
+    setIsDsnPresent(false);
   }
 
   async function onCreateSnapshot() {
@@ -492,14 +497,16 @@ export default function App() {
           <input
             id="conn-dsn"
             type="password"
-            value={dsn}
-            onChange={(e) => setDsn(e.target.value)}
+            ref={dsnInputRef}
+            onChange={(e) =>
+              setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
+            }
             placeholder="postgresql://..."
             aria-label="Connection DSN"
           />
           <button
             onClick={onCreateConnection}
-            disabled={!selectedProjectId || !connName.trim() || !dsn.trim()}
+            disabled={!selectedProjectId || !connName.trim() || !isDsnPresent}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
             }
