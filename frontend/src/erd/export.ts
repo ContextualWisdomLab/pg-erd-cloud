@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from './convert';
 
 type SnapshotJson = {
-  relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string }>
+  relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
   columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean }>
   indexes?: Array<{
     relation_oid?: number
@@ -109,6 +109,15 @@ function indexLabel(ix: NonNullable<SnapshotJson['indexes']>[number]): string {
   return `${ix.index_name}${method}${ix.is_unique ? ' unique' : ''}${ix.is_primary ? ' primary' : ''}`;
 }
 
+function columnLabel(col: TableNodeData['columns'][number]): string {
+  return `${col.column_name}${col.column_comment ? ` (${col.column_comment})` : ''}`;
+}
+
+function tableLabel(node: Node<TableNodeData>): string {
+  const title = node.data.title || node.id;
+  return `${title}${node.data.comment ? ` (${node.data.comment})` : ''}`;
+}
+
 export function exportPlantUml(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -118,9 +127,9 @@ export function exportPlantUml(
   const lines = ['@startuml', 'hide circle', 'skinparam linetype ortho', ''];
 
   for (const node of nodes) {
-    lines.push(`entity "${plantText(node.data.title || node.id)}" as ${plantAlias(node.id)} {`);
+    lines.push(`entity "${plantText(tableLabel(node))}" as ${plantAlias(node.id)} {`);
     for (const col of node.data.columns || []) {
-      lines.push(`  ${col.is_pk ? '*' : ''}${plantText(col.column_name)} : ${plantText(col.data_type)}${col.is_not_null ? ' <<not null>>' : ''}`);
+      lines.push(`  ${col.is_pk ? '*' : ''}${plantText(columnLabel(col))} : ${plantText(col.data_type)}${col.is_not_null ? ' <<not null>>' : ''}`);
     }
     for (const ix of indexes.get(node.id) || []) {
       lines.push(`  <<index>> ${plantText(indexLabel(ix))}`);
@@ -189,10 +198,10 @@ export function exportDiagramSvg(
     const height = heights.get(node.id) || headerHeight;
     parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" fill="#fff" stroke="#cbd5e1"/>`);
     parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" rx="8" fill="#e0f2fe" stroke="#cbd5e1"/>`);
-    parts.push(`<text x="${x + 12}" y="${y + 22}" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#0f172a">${escapeXml(node.data.title || node.id)}</text>`);
+    parts.push(`<text x="${x + 12}" y="${y + 22}" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#0f172a">${escapeXml(tableLabel(node))}</text>`);
     let rowY = y + headerHeight + 16;
     for (const col of node.data.columns || []) {
-      parts.push(`<text x="${x + 12}" y="${rowY}" font-family="ui-monospace, monospace" font-size="11" fill="#111827">${col.is_pk ? '* ' : ''}${escapeXml(col.column_name)}: ${escapeXml(col.data_type)}${col.is_not_null ? ' not null' : ''}</text>`);
+      parts.push(`<text x="${x + 12}" y="${rowY}" font-family="ui-monospace, monospace" font-size="11" fill="#111827">${col.is_pk ? '* ' : ''}${escapeXml(columnLabel(col))}: ${escapeXml(col.data_type)}${col.is_not_null ? ' not null' : ''}</text>`);
       rowY += rowHeight;
     }
     const tableIndexes = indexes.get(node.id) || [];

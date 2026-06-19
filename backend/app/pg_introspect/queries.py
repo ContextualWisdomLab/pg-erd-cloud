@@ -33,6 +33,7 @@ SELECT
   c.oid AS relation_oid,
   c.relname AS relation_name,
   c.relkind::text AS relation_kind,
+  pg_catalog.obj_description(c.oid, 'pg_class') AS relation_comment,
   c.relispartition AS is_partition,
   pg_catalog.pg_get_partkeydef(c.oid) AS partition_key,
   pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound,

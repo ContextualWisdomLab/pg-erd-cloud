@@ -374,6 +374,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "MODEL: github-models/deepseek/deepseek-r1-0528" "opencode review falls back to a reachable DeepSeek R1 reasoning model"
 	assert_file_contains "$workflow_file" "MODEL: github-models/deepseek/deepseek-v3-0324" "opencode review has a second reachable DeepSeek V3 fallback model"
 	assert_file_contains "$workflow_file" "Publish bounded OpenCode review comment" "opencode review workflow publishes the agent control comment for the approval gate"
+	assert_file_contains "$workflow_file" "cancel-in-progress: false" "opencode review duplicate current-head dispatches queue instead of leaving cancelled required checks"
 	assert_file_contains "$workflow_file" "statusCheckRollup" "opencode review workflow reads current-head GitHub Checks before approval"
 	assert_file_contains "$workflow_file" "OPENCODE_FAILED_CHECK_EVIDENCE_FILE" "opencode review workflow persists failed-check evidence across review and approval steps"
 	assert_file_contains "$workflow_file" "collect_failed_check_evidence.sh" "opencode review workflow collects failed check logs and annotations"
@@ -395,6 +396,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$REPO_ROOT/scripts/ci/collect_failed_check_evidence.sh" 'select((.name // "") != "opencode-review")' "failed-check evidence collector ignores stale OpenCode self-check failures"
 	assert_file_contains "$workflow_file" "collect_current_head_strix_success_run_ids" "opencode review workflow can find current-head Strix success evidence"
 	assert_file_contains "$workflow_file" "filter_superseded_strix_failure_lines" "opencode review workflow ignores older Strix failure lines after newer current-head success"
+	assert_file_contains "$workflow_file" "GitHub Checks statusCheckRollup could not be read after waiting for peer checks before diagnosing OpenCode action outcome." "opencode review waits for peer checks before model-failure review state"
 	assert_file_contains "$workflow_file" "If bounded failed GitHub Check evidence is present, treat it as a blocker until diagnosed." "opencode review prompt forces failed-check diagnosis"
 	assert_file_contains "$workflow_file" "include every model-reported vulnerability as a separate evidence-backed finding" "opencode review prompt requires all Strix model findings"
 	assert_file_contains "$workflow_file" "Multiple Strix model reports must not be collapsed" "opencode review prompt prevents collapsing multiple Strix model reports"
@@ -3347,6 +3349,7 @@ run_pull_request_target_changed_context_scope_uses_pr_head_case() {
 	local changed_file="backend/api/emails.py"
 	local context_file="backend/core/config.py"
 	local requirements_file="backend/requirements.txt"
+	local pyproject_file="backend/pyproject.toml"
 
 	cat >"$fake_strix" <<'EOF'
 #!/usr/bin/env bash
@@ -3380,19 +3383,31 @@ if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_BASE_CONTEXT:?}" "$context_file"; then
 	exit 69
 fi
 
-requirements_file="$target_path/${FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE:?}"
-if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS:?}" "$requirements_file"; then
-	echo "Error: changed filtered backend context did not use PR head content" >&2
-	cat -- "$requirements_file" >&2
+	requirements_file="$target_path/${FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE:?}"
+	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS:?}" "$requirements_file"; then
+		echo "Error: changed filtered backend context did not use PR head content" >&2
+		cat -- "$requirements_file" >&2
 	exit 72
 fi
 if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS:?}" "$requirements_file"; then
-	echo "Error: changed filtered backend context leaked trusted base content" >&2
-	cat -- "$requirements_file" >&2
-	exit 73
-fi
+		echo "Error: changed filtered backend context leaked trusted base content" >&2
+		cat -- "$requirements_file" >&2
+		exit 73
+	fi
 
-if [ "$attempt" -eq 1 ]; then
+	pyproject_file="$target_path/${FAKE_STRIX_EXPECTED_PYPROJECT_FILE:?}"
+	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_PYPROJECT:?}" "$pyproject_file"; then
+		echo "Error: backend pyproject context did not use expected content" >&2
+		cat -- "$pyproject_file" >&2
+		exit 74
+	fi
+	if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_PYPROJECT:?}" "$pyproject_file"; then
+		echo "Error: backend pyproject context leaked unexpected content" >&2
+		cat -- "$pyproject_file" >&2
+		exit 75
+	fi
+
+	if [ "$attempt" -eq 1 ]; then
 	changed_file="$target_path/${FAKE_STRIX_EXPECTED_CHANGED_FILE:?}"
 	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_CONTENT:?}" "$changed_file"; then
 		echo "Error: PR head changed file content was not scanned" >&2
@@ -3419,6 +3434,7 @@ EOF
 		printf '%s\n' 'BASE_CHANGED_CONTENT_SHOULD_NOT_BE_SCANNED' >"$changed_file"
 		printf '%s\n' 'BASE_CONTEXT_SHOULD_NOT_BE_SCANNED' >"$context_file"
 		printf '%s\n' 'BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED' >"$requirements_file"
+		printf '%s\n' 'BASE_PYPROJECT_SHOULD_BE_SCANNED' >"$pyproject_file"
 		git add .
 		git commit -qm 'base commit'
 	)
@@ -3429,6 +3445,7 @@ EOF
 		printf '%s\n' 'HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED' >"$changed_file"
 		printf '%s\n' 'HEAD_CONTEXT_SHOULD_BE_SCANNED' >"$context_file"
 		printf '%s\n' 'HEAD_REQUIREMENTS_SHOULD_BE_SCANNED' >"$requirements_file"
+		printf '%s\n' 'HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED' >"$pyproject_file"
 		git add .
 		git commit -qm 'head commit'
 	)
@@ -3449,11 +3466,14 @@ EOF
 			FAKE_STRIX_EXPECTED_CHANGED_FILE="$changed_file" \
 			FAKE_STRIX_EXPECTED_CONTEXT_FILE="$context_file" \
 			FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE="$requirements_file" \
+			FAKE_STRIX_EXPECTED_PYPROJECT_FILE="$pyproject_file" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTEXT="HEAD_CONTEXT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS="HEAD_REQUIREMENTS_SHOULD_BE_SCANNED" \
+			FAKE_STRIX_EXPECTED_PYPROJECT="BASE_PYPROJECT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTEXT="BASE_CONTEXT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS="BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED" \
+			FAKE_STRIX_UNEXPECTED_PYPROJECT="HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_STATE_FILE="$state_file" \
 			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \
@@ -3484,11 +3504,14 @@ EOF
 			FAKE_STRIX_EXPECTED_CHANGED_FILE="$changed_file" \
 			FAKE_STRIX_EXPECTED_CONTEXT_FILE="$context_file" \
 			FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE="$requirements_file" \
+			FAKE_STRIX_EXPECTED_PYPROJECT_FILE="$pyproject_file" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTEXT="HEAD_CONTEXT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS="HEAD_REQUIREMENTS_SHOULD_BE_SCANNED" \
+			FAKE_STRIX_EXPECTED_PYPROJECT="HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTEXT="BASE_CONTEXT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS="BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED" \
+			FAKE_STRIX_UNEXPECTED_PYPROJECT="BASE_PYPROJECT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_STATE_FILE="$state_file" \
 			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \
