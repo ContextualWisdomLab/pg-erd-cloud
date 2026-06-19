@@ -186,8 +186,8 @@ assert_strix_workflow_pr_trigger_hardened() {
 	assert_file_contains "$workflow_file" "https://models.github.ai/inference" "strix workflow routes GitHub Models scans to the inference endpoint"
 	assert_file_contains "$workflow_file" "LLM_API_BASE_FILE" "strix workflow passes the GitHub Models API base through a trusted input file"
 	assert_file_not_contains "$workflow_file" '${{ secrets.STRIX_OPENAI_API_KEY || github.token }}' "strix workflow must not use fallback-secret syntax for LLM API keys"
-	assert_file_contains "$workflow_file" "deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" "strix workflow configures reachable stronger-than-GPT-4.1 GitHub Models fallback models"
-	assert_file_contains "$workflow_file" '${strix_model#github_models/}' "strix workflow strips manual github_models routing prefix before passing model names to LiteLLM"
+	assert_file_contains "$workflow_file" "openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" "strix workflow configures OpenAI-compatible DeepSeek GitHub Models fallback models"
+	assert_file_contains "$workflow_file" "printf 'openai/%s' \"\$github_model\"" "strix workflow routes GitHub Models through LiteLLM's OpenAI-compatible provider"
 	assert_file_not_contains "$workflow_file" "openai/gpt-4.1" "strix workflow must not fall back to GPT-4.1 or weaker review evidence"
 	assert_file_not_contains "$workflow_file" "openai/gpt-5-*" "strix workflow must not accept older GPT-5 variants when GPT-5.4 is required"
 	assert_file_contains "$workflow_file" "openai/gpt-5-mini* | openai/gpt-5-nano*" "strix workflow rejects mini and nano GPT-5 variants for security evidence"
@@ -329,6 +329,9 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "CodeGraph MCP tools" "opencode review prompt requires CodeGraph-backed review evidence"
 	assert_file_contains "$workflow_file" "general-purpose and meticulous" "opencode review prompt requires a general-purpose meticulous review"
 	assert_file_contains "$workflow_file" "use CodeGraph MCP for structural checks, DeepWiki for repo docs, Context7 for current library/API docs, and web_search for bounded external lookups" "opencode review prompt directs the agent to use all configured MCP sources"
+	assert_file_contains "$workflow_file" "Structural exploration is mandatory for every PR" "opencode review prompt requires structural exploration for every PR"
+	assert_file_contains "$workflow_file" "Copilot Review" "opencode review prompt follows Copilot Review-style overview formatting"
+	assert_file_contains "$workflow_file" "CodeRabbitAI" "opencode review prompt follows CodeRabbitAI-style actionable findings"
 	assert_file_contains "$workflow_file" "Inspect changed files and focused hunks directly when MCP evidence is insufficient." "opencode review allows focused direct source inspection when MCP evidence is insufficient"
 	assert_file_contains "$workflow_file" "Never return raw tool-call markup, tool-call JSON, or MCP call syntax in the review body" "opencode review prompt forbids raw tool-call transcripts as final review output"
 	assert_file_contains "$workflow_file" "Do not spend the session listing every changed path before reviewing" "opencode review prompt prevents fallback sessions from exhausting steps on file listing"
@@ -346,6 +349,8 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "opencode_review_normalize_output.py" "opencode review model steps normalize transcript-embedded JSON output"
 	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "decoder.raw_decode" "opencode review normalizer scans transcript text for JSON objects"
 	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "valid_control" "opencode review normalizer accepts only current-run control JSON"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "admits_missing_structural_review" "opencode review normalizer rejects approvals that admit missing structural review"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_approve_gate.sh" "--check-structural-approval" "opencode approval gate rejects approvals that admit missing structural review"
 	assert_file_contains "$workflow_file" "opencode run" "opencode review workflow runs the bounded OpenCode agent path"
 	assert_file_contains "$workflow_file" 'opencode run "$(cat "$prompt_file")"' "opencode review passes the prompt as the positional message before file attachments"
 	assert_file_contains "$workflow_file" "--agent ci-review" "opencode review workflow forces the compact CI review agent"
@@ -480,6 +485,51 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+assert_opencode_review_rejects_missing_structural_review_approval() {
+	local tmp_dir
+	local comment_file
+	local transcript_file
+	local rc
+	local gate_result
+	tmp_dir="$(mktemp -d)"
+	comment_file="$tmp_dir/opencode-comment.md"
+	transcript_file="$tmp_dir/opencode-transcript.md"
+
+	cat >"$comment_file" <<'EOF'
+<!-- opencode-review-gate head_sha=abc123 run_id=42 run_attempt=1 -->
+
+<!-- opencode-review-control-v1
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers were found.","summary":"Structural exploration was not possible because evidence was truncated.","findings":[]}
+-->
+EOF
+
+	set +e
+	gate_result="$(
+		bash "$REPO_ROOT/scripts/ci/opencode_review_approve_gate.sh" \
+			"abc123" "42" "1" "$comment_file"
+	)"
+	rc=$?
+	set -e
+
+	assert_equals "4" "$rc" "opencode approval gate rejects missing structural review approvals"
+	assert_equals "NO_CONCLUSION" "$gate_result" "missing structural review gate result"
+
+	cat >"$transcript_file" <<'EOF'
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers were found.","summary":"Structural exploration was not possible because evidence was truncated.","findings":[]}
+EOF
+
+	set +e
+	python3 "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" \
+		"abc123" "42" "1" "$transcript_file" >"$tmp_dir/normalize.out" 2>"$tmp_dir/normalize.err"
+	rc=$?
+	set -e
+
+	assert_equals "4" "$rc" "opencode normalizer rejects missing structural review approvals"
+	assert_file_contains "$tmp_dir/normalize.err" "NO_CONCLUSION" "opencode normalizer reports no conclusion for missing structural review approvals"
+
+	rm -rf "$tmp_dir"
+}
+
 assert_opencode_review_gate_rejects_line_zero_findings() {
 	local tmp_dir
 	local output_file
@@ -515,6 +565,36 @@ EOF
 
 	assert_equals "4" "$rc" "opencode normalizer rejects line zero findings"
 	assert_file_contains "$tmp_dir/normalize.err" "NO_CONCLUSION" "opencode normalizer reports no valid conclusion for line zero findings"
+
+	rm -rf "$tmp_dir"
+}
+
+assert_opencode_fallback_distinguishes_absent_strix_reports() {
+	local tmp_dir
+	local evidence_file
+	local output_file
+	tmp_dir="$(mktemp -d)"
+	evidence_file="$tmp_dir/failed-check-evidence.md"
+	output_file="$tmp_dir/fallback.out"
+
+	cat >"$evidence_file" <<'EOF'
+## Failed check: Strix Security Scan/strix
+
+No Strix vulnerability report windows were detected in the failed log.
+
+### Failed log excerpt
+
+```text
+strix Run Strix (quick) LLM CONNECTION FAILED
+strix Run Strix (quick) Error: litellm.APIError: APIError: DeepseekException - No access to model: /deepseek-r1-0528
+```
+EOF
+
+	bash "$REPO_ROOT/scripts/ci/emit_opencode_failed_check_fallback_findings.sh" \
+		"$evidence_file" "$REPO_ROOT" >"$output_file"
+
+	assert_file_contains "$output_file" "Strix provider access blocked current-head security evidence" "opencode fallback classifies no-report Strix failures as provider access blockers"
+	assert_file_not_contains "$output_file" "Strix provider signal left current-head security evidence incomplete" "opencode fallback must not treat a no-report sentence as a Strix report window"
 
 	rm -rf "$tmp_dir"
 }
@@ -767,7 +847,7 @@ printf '%s\n' "$target_path" >> "${FAKE_STRIX_TARGET_LOG:?}"
 STRIX_REPORTS_DIR="${STRIX_REPORTS_DIR:-strix_runs}"
 
 case "${FAKE_STRIX_SCENARIO:?}" in
-	success|runtime-env-forwarding|vertex-primary-success-timing-message|direct-openai-gpt-does-not-require-github-models-api-base)
+	success|runtime-env-forwarding|vertex-primary-success-timing-message|direct-openai-gpt-does-not-require-github-models-api-base|github-models-openai-o3-api-base-succeeds)
 		echo "scan ok"
 		exit 0
 		;;
@@ -795,7 +875,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			if [ "${FAKE_STRIX_SCENARIO:?}" = "github-models-fallback-success-deepseek-v3" ]; then
 				echo "LLM CONNECTION FAILED"
 				echo "Could not establish connection to the language model."
@@ -805,7 +885,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
-		deepseek/deepseek-v3-0324)
+		openai/deepseek/deepseek-v3-0324)
 			echo "scan ok with GitHub Models fallback"
 			exit 0
 			;;
@@ -1120,7 +1200,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.BadRequestError: OpenAIException - Unavailable model: gpt-5"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			echo "scan ok after GitHub Models unavailable fallback"
 			exit 0
 			;;
@@ -1138,7 +1218,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			echo "scan ok after GitHub Models rate-limit fallback"
 			exit 0
 			;;
@@ -1156,7 +1236,7 @@ case "${FAKE_STRIX_SCENARIO:?}" in
 			echo "Error: litellm.BadRequestError: OpenAIException - Unavailable model: gpt-5"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
 Severity: CRITICAL
@@ -1166,12 +1246,30 @@ EOS
 			echo "Warning: fallback model emitted provider failure-signal output"
 			exit 2
 			;;
-		deepseek/deepseek-v3-0324)
+		openai/deepseek/deepseek-v3-0324)
 			echo "scan ok after second GitHub Models fallback"
 			exit 0
 			;;
 		*)
 			echo "Error: GitHub Models provider-signal fallback path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
+	github-models-primary-deepseek-api-error-fallback-success)
+		case "${STRIX_LLM:-}" in
+		openai/deepseek/deepseek-r1-0528)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.APIError: APIError: DeepseekException -"
+			exit 1
+			;;
+		openai/deepseek/deepseek-v3-0324)
+			echo "scan ok after DeepSeek API fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: GitHub Models DeepSeek API fallback path unexpected (${STRIX_LLM:-})" >&2
 			exit 38
 			;;
 		esac
@@ -1184,7 +1282,7 @@ EOS
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-baseline-provider-signal/vulnerabilities/vuln-0001.md" <<'EOS'
 Severity: CRITICAL
@@ -1208,7 +1306,7 @@ EOS
 			echo "Error: litellm.RateLimitError: RateLimitError: OpenAIException - Too many requests."
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-pr-absent-source-baseline/vulnerabilities/vuln-0001.md" <<'EOS'
 # Cross-Site Scripting (XSS) Risk in User-Controlled Data Rendering
@@ -1347,7 +1445,7 @@ EOS
 			echo "Penetration test failed: LLM request failed: RateLimitError"
 			exit 1
 			;;
-		deepseek/deepseek-r1-0528)
+		openai/deepseek/deepseek-r1-0528)
 			mkdir -p "$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities"
 			cat >"$STRIX_REPORTS_DIR/fake-placeholder-secret/vulnerabilities/vuln-0001.md" <<'EOS'
 # Hardcoded Secrets in Source Code
@@ -1437,6 +1535,34 @@ EOS
 			;;
 		*)
 			echo "Error: stale-source scenario unexpected model (${STRIX_LLM:-})" >&2
+			exit 30
+			;;
+		esac
+		;;
+	pr-stale-pr-scope-target-fallback-success)
+		case "${STRIX_LLM:-}" in
+		vertex_ai/stale-pr-scope-target-primary)
+			scope_name="$(basename "$target_path")"
+			mkdir -p "$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities"
+			cat >"$STRIX_REPORTS_DIR/fake-stale-pr-scope-target/vulnerabilities/vuln-0001.md" <<EOS
+# Insecure Hardcoded Secret in Development Configuration
+
+**Severity:** CRITICAL
+**Target:** /workspace/${scope_name}/backend/.env.example
+
+The .env file contains a weak app_secret value "insecure_dev_secret".
+EOS
+			echo "Severity: CRITICAL"
+			echo "Target: /workspace/${scope_name}/backend/.env.example"
+			echo "Penetration test failed: absent PR-scope target hardcoded secret"
+			exit 1
+			;;
+		vertex_ai/fallback-one)
+			echo "scan ok after absent pr-scope target fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: absent pr-scope target scenario unexpected model (${STRIX_LLM:-})" >&2
 			exit 30
 			;;
 		esac
@@ -1758,6 +1884,17 @@ EOS
 	provider-denied-success-signal)
 		echo "Denied: provider credentials were rejected"
 		exit 0
+		;;
+	pr-baseline-denied-text-allows)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-baseline-denied/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-baseline-denied/vulnerabilities/vuln-0001.md" <<'EOS'
+**Severity:** HIGH
+**Target:** backend/app/permissions.py
+
+The permission helper raises `project access denied` for unauthorized project access.
+EOS
+		echo "Penetration test failed: baseline project access denied finding"
+		exit 1
 		;;
 	bare-timeout-with-provider-marker)
 		# Emit bare "Connection timed out" alongside a provider marker so
@@ -2509,6 +2646,9 @@ class WorkspaceRunnerConfig:
         EncryptedString, nullable=True
     )
 EOS
+	elif [ "$scenario" = "pr-baseline-denied-text-allows" ]; then
+		mkdir -p "$repo_root_dir/backend/app"
+		echo 'async def require_project_member(): raise Exception("project access denied")' >"$repo_root_dir/backend/app/permissions.py"
 	elif [ "$scenario" = "pr-stale-source-plus-real-finding-blocks" ]; then
 		mkdir -p "$repo_root_dir/backend/db" "$repo_root_dir/backend/api"
 		cat >"$repo_root_dir/backend/db/models.py" <<'EOS'
@@ -2856,19 +2996,26 @@ if [ -x "$scoped_file" ]; then
 	echo "Error: PR head scoped file must be copied as non-executable data" >&2
 	exit 64
 fi
-unchanged_file="$target_path/${FAKE_STRIX_EXPECTED_UNCHANGED_FILE:?}"
-if [ ! -f "$unchanged_file" ]; then
-	echo "Error: full PR head scoped file missing ($unchanged_file)" >&2
-	exit 65
-fi
-if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_UNCHANGED_CONTENT:?}" "$unchanged_file"; then
-	echo "Error: full PR head scoped file did not contain head-tree content" >&2
-	cat -- "$unchanged_file" >&2
-	exit 66
-fi
-if [ -x "$unchanged_file" ]; then
-	echo "Error: full PR head scoped file must be copied as non-executable data" >&2
-	exit 67
+unchanged_relative="${FAKE_STRIX_EXPECTED_UNCHANGED_FILE:-}"
+if [ -n "$unchanged_relative" ]; then
+	unchanged_file="$target_path/$unchanged_relative"
+	if [ ! -f "$unchanged_file" ]; then
+		echo "Error: full PR head scoped file missing ($unchanged_file)" >&2
+		exit 65
+	fi
+	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_UNCHANGED_CONTENT:?}" "$unchanged_file"; then
+		echo "Error: full PR head scoped file did not contain head-tree content" >&2
+		cat -- "$unchanged_file" >&2
+		exit 66
+	fi
+	if [ -x "$unchanged_file" ]; then
+		echo "Error: full PR head scoped file must be copied as non-executable data" >&2
+		exit 67
+	fi
+elif [ -e "$target_path/docs/full-scope-context.md" ]; then
+	echo "Error: bounded PR scope included unchanged head tree file" >&2
+	cat -- "$target_path/docs/full-scope-context.md" >&2
+	exit 68
 fi
 echo "scan ok with PR head content"
 EOF
@@ -2912,6 +3059,10 @@ EOF
 	if [ "$base_content" != "__ABSENT__" ]; then
 		unexpected_base_content="$base_content"
 	fi
+	local expected_unchanged_file=""
+	if [ "$disable_pr_scoping" = "1" ]; then
+		expected_unchanged_file="docs/full-scope-context.md"
+	fi
 
 	set +e
 	(
@@ -2926,7 +3077,7 @@ EOF
 			FAKE_STRIX_EXPECTED_CHANGED_FILE="$changed_file" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="$head_content" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTENT="$unexpected_base_content" \
-			FAKE_STRIX_EXPECTED_UNCHANGED_FILE="docs/full-scope-context.md" \
+			FAKE_STRIX_EXPECTED_UNCHANGED_FILE="$expected_unchanged_file" \
 			FAKE_STRIX_EXPECTED_UNCHANGED_CONTENT="HEAD_FULL_SCOPE_CONTEXT_SHOULD_BE_SCANNED" \
 			STRIX_DISABLE_PR_SCOPING="$disable_pr_scoping" \
 			STRIX_LLM_FILE="$strix_llm_file" \
@@ -3162,7 +3313,7 @@ EOF
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTEXT="UNTRUSTED_HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTEXT="TRUSTED_BASE_CONTEXT_SHOULD_NOT_BE_SCANNED" \
-			STRIX_DISABLE_PR_SCOPING="0" \
+			STRIX_DISABLE_PR_SCOPING="1" \
 			STRIX_LLM_FILE="$strix_llm_file" \
 			LLM_API_KEY_FILE="$llm_api_key_file" \
 			STRIX_TARGET_PATH="." \
@@ -3620,63 +3771,63 @@ if [ ! -f "$target_path/backend/services/threading_service.py" ]; then
 	echo "Error: threading backend context missing from frontend email PR scope" >&2
 	exit 78
 fi
-if ! grep -Fq -- 'HEAD_EMAIL_API_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/api/emails.py"; then
-	echo "Error: email API backend context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_EMAIL_API_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/api/emails.py"; then
+	echo "Error: email API backend context did not use trusted base content" >&2
 	cat -- "$target_path/backend/api/emails.py" >&2
 	exit 79
 fi
-if grep -Fq -- 'BASE_EMAIL_API_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/api/emails.py"; then
-	echo "Error: email API backend context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_EMAIL_API_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/api/emails.py"; then
+	echo "Error: email API backend context leaked PR head content" >&2
 	cat -- "$target_path/backend/api/emails.py" >&2
 	exit 87
 fi
-if ! grep -Fq -- 'HEAD_AUTH_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/api/auth.py"; then
-	echo "Error: auth backend context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_AUTH_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/api/auth.py"; then
+	echo "Error: auth backend context did not use trusted base content" >&2
 	cat -- "$target_path/backend/api/auth.py" >&2
 	exit 82
 fi
-if grep -Fq -- 'BASE_AUTH_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/api/auth.py"; then
-	echo "Error: auth backend context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_AUTH_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/api/auth.py"; then
+	echo "Error: auth backend context leaked PR head content" >&2
 	cat -- "$target_path/backend/api/auth.py" >&2
 	exit 88
 fi
-if ! grep -Fq -- 'HEAD_EMAIL_MODEL_SHOULD_BE_SCANNED' "$target_path/backend/db/models.py"; then
-	echo "Error: email model backend context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_EMAIL_MODEL_SHOULD_BE_SCANNED' "$target_path/backend/db/models.py"; then
+	echo "Error: email model backend context did not use trusted base content" >&2
 	cat -- "$target_path/backend/db/models.py" >&2
 	exit 83
 fi
-if grep -Fq -- 'BASE_EMAIL_MODEL_SHOULD_NOT_BE_SCANNED' "$target_path/backend/db/models.py"; then
-	echo "Error: email model backend context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_EMAIL_MODEL_SHOULD_NOT_BE_SCANNED' "$target_path/backend/db/models.py"; then
+	echo "Error: email model backend context leaked PR head content" >&2
 	cat -- "$target_path/backend/db/models.py" >&2
 	exit 89
 fi
-if ! grep -Fq -- 'HEAD_CONFIG_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/core/config.py"; then
-	echo "Error: backend config context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_CONFIG_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/core/config.py"; then
+	echo "Error: backend config context did not use trusted base content" >&2
 	cat -- "$target_path/backend/core/config.py" >&2
 	exit 84
 fi
-if grep -Fq -- 'BASE_CONFIG_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/core/config.py"; then
-	echo "Error: backend config context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_CONFIG_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/core/config.py"; then
+	echo "Error: backend config context leaked PR head content" >&2
 	cat -- "$target_path/backend/core/config.py" >&2
 	exit 90
 fi
-if ! grep -Fq -- 'HEAD_ROUTER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/main.py"; then
-	echo "Error: backend router registration context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_ROUTER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/main.py"; then
+	echo "Error: backend router registration context did not use trusted base content" >&2
 	cat -- "$target_path/backend/main.py" >&2
 	exit 85
 fi
-if grep -Fq -- 'BASE_ROUTER_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/main.py"; then
-	echo "Error: backend router registration context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_ROUTER_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/backend/main.py"; then
+	echo "Error: backend router registration context leaked PR head content" >&2
 	cat -- "$target_path/backend/main.py" >&2
 	exit 91
 fi
-if ! grep -Fq -- 'HEAD_THREADING_SERVICE_SHOULD_BE_SCANNED' "$target_path/backend/services/threading_service.py"; then
-	echo "Error: threading backend context did not use PR head content" >&2
+if ! grep -Fq -- 'BASE_THREADING_SERVICE_SHOULD_BE_SCANNED' "$target_path/backend/services/threading_service.py"; then
+	echo "Error: threading backend context did not use trusted base content" >&2
 	cat -- "$target_path/backend/services/threading_service.py" >&2
 	exit 86
 fi
-if grep -Fq -- 'BASE_THREADING_SERVICE_SHOULD_NOT_BE_SCANNED' "$target_path/backend/services/threading_service.py"; then
-	echo "Error: threading backend context leaked trusted base content" >&2
+if grep -Fq -- 'HEAD_THREADING_SERVICE_SHOULD_NOT_BE_SCANNED' "$target_path/backend/services/threading_service.py"; then
+	echo "Error: threading backend context leaked PR head content" >&2
 	cat -- "$target_path/backend/services/threading_service.py" >&2
 	exit 92
 fi
@@ -3694,12 +3845,12 @@ EOF
 		git config user.email 'strix-test@example.invalid'
 		mkdir -p "$(dirname -- "$changed_file")" backend/api backend/core backend/db backend/services
 		printf '%s\n' 'BASE_FRONTEND_EMAIL_FLOW_SHOULD_NOT_BE_SCANNED' >"$changed_file"
-		printf '%s\n' 'BASE_EMAIL_API_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/api/emails.py
-		printf '%s\n' 'BASE_AUTH_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/api/auth.py
-		printf '%s\n' 'BASE_CONFIG_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/core/config.py
-		printf '%s\n' 'BASE_EMAIL_MODEL_SHOULD_NOT_BE_SCANNED' >backend/db/models.py
-		printf '%s\n' 'BASE_ROUTER_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/main.py
-		printf '%s\n' 'BASE_THREADING_SERVICE_SHOULD_NOT_BE_SCANNED' >backend/services/threading_service.py
+		printf '%s\n' 'BASE_EMAIL_API_CONTEXT_SHOULD_BE_SCANNED' >backend/api/emails.py
+		printf '%s\n' 'BASE_AUTH_CONTEXT_SHOULD_BE_SCANNED' >backend/api/auth.py
+		printf '%s\n' 'BASE_CONFIG_CONTEXT_SHOULD_BE_SCANNED' >backend/core/config.py
+		printf '%s\n' 'BASE_EMAIL_MODEL_SHOULD_BE_SCANNED' >backend/db/models.py
+		printf '%s\n' 'BASE_ROUTER_CONTEXT_SHOULD_BE_SCANNED' >backend/main.py
+		printf '%s\n' 'BASE_THREADING_SERVICE_SHOULD_BE_SCANNED' >backend/services/threading_service.py
 		git add .
 		git commit -qm 'base commit'
 	)
@@ -3708,12 +3859,12 @@ EOF
 	(
 	cd "$repo_root_dir"
 	printf '%s\n' 'HEAD_FRONTEND_EMAIL_FLOW_SHOULD_BE_SCANNED' >"$changed_file"
-	printf '%s\n' 'HEAD_EMAIL_API_CONTEXT_SHOULD_BE_SCANNED' >backend/api/emails.py
-	printf '%s\n' 'HEAD_AUTH_CONTEXT_SHOULD_BE_SCANNED' >backend/api/auth.py
-	printf '%s\n' 'HEAD_CONFIG_CONTEXT_SHOULD_BE_SCANNED' >backend/core/config.py
-	printf '%s\n' 'HEAD_EMAIL_MODEL_SHOULD_BE_SCANNED' >backend/db/models.py
-	printf '%s\n' 'HEAD_ROUTER_CONTEXT_SHOULD_BE_SCANNED' >backend/main.py
-	printf '%s\n' 'HEAD_THREADING_SERVICE_SHOULD_BE_SCANNED' >backend/services/threading_service.py
+	printf '%s\n' 'HEAD_EMAIL_API_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/api/emails.py
+	printf '%s\n' 'HEAD_AUTH_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/api/auth.py
+	printf '%s\n' 'HEAD_CONFIG_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/core/config.py
+	printf '%s\n' 'HEAD_EMAIL_MODEL_SHOULD_NOT_BE_SCANNED' >backend/db/models.py
+	printf '%s\n' 'HEAD_ROUTER_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/main.py
+	printf '%s\n' 'HEAD_THREADING_SERVICE_SHOULD_NOT_BE_SCANNED' >backend/services/threading_service.py
 	git add .
 	git commit -qm 'head commit'
 	)
@@ -3850,7 +4001,7 @@ run_pull_request_target_aborts_on_pr_head_blob_failure_case() {
 	local fake_git_fail_command="$5"
 	local disable_pr_scoping="${6-0}"
 	local expected_exit="1"
-	if [ "$fake_git_fail_command" = "ls-tree" ] || [ "$fake_git_fail_command" = "cat-file" ] || [ "$fake_git_fail_command" = "diff" ] || [ "$disable_pr_scoping" = "1" ]; then
+	if [ "$fake_git_fail_command" = "ls-tree" ] || [ "$fake_git_fail_command" = "cat-file" ] || [ "$fake_git_fail_command" = "show" ] || [ "$fake_git_fail_command" = "diff" ] || [ "$disable_pr_scoping" = "1" ]; then
 		expected_exit="2"
 	fi
 	local expected_message="pull request changed file could not be read from PR head; failing closed"
@@ -4300,6 +4451,85 @@ EOF
 		break
 	done
 	assert_pid_not_running "$child_pid_file" "timeout cleanup child process"
+
+	rm -rf "$tmp_dir"
+}
+
+run_timeout_escaped_stdout_case() {
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	local bin_dir="$tmp_dir/bin"
+	local workspace_dir="$tmp_dir/workspace"
+	local repo_root_dir="$workspace_dir/smart-crawling-server"
+	mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
+	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	local fake_strix="$bin_dir/strix"
+	local escaped_pid_file="$tmp_dir/escaped.pid"
+	local output_log="$tmp_dir/output.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
+	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
+
+	cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 - <<'PY' &
+import os
+import pathlib
+import signal
+import time
+
+os.setsid()
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+pathlib.Path(os.environ["FAKE_STRIX_ESCAPED_PID_FILE"]).write_text(str(os.getpid()), encoding="utf-8")
+time.sleep(30)
+PY
+sleep 5
+EOF
+	chmod +x "$fake_strix"
+	printf '%s' 'vertex_ai/timeout-escaped-stdout-primary' >"$strix_llm_file"
+	printf '%s' 'dummy' >"$llm_api_key_file"
+
+	local start_epoch
+	start_epoch="$(date +%s)"
+	set +e
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE -u STRIX_INPUT_FILE_ROOT \
+			PATH="$bin_dir:$PATH" \
+			STRIX_INPUT_FILE_ROOT="$tmp_dir" \
+			STRIX_DISABLE_PR_SCOPING="0" \
+			FAKE_STRIX_ESCAPED_PID_FILE="$escaped_pid_file" \
+			STRIX_LLM_FILE="$strix_llm_file" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			STRIX_PROCESS_TIMEOUT_SECONDS="1" \
+			STRIX_VERTEX_FALLBACK_MODELS="" \
+			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+			STRIX_TARGET_PATH="." \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
+	local rc=$?
+	set -e
+	local end_epoch
+	end_epoch="$(date +%s)"
+
+	assert_equals "1" "$rc" "timeout escaped stdout exit code"
+	assert_file_contains "$output_log" "Strix run timed out after 1s." "timeout escaped stdout output"
+	if [ $((end_epoch - start_epoch)) -gt 20 ]; then
+		record_failure "timeout escaped stdout should not wait for escaped child"
+	fi
+
+	if [ -f "$escaped_pid_file" ]; then
+		local escaped_pid
+		escaped_pid="$(tr -d '[:space:]' <"$escaped_pid_file")"
+		if [[ "$escaped_pid" =~ ^[0-9]+$ ]]; then
+			kill -TERM -- "-$escaped_pid" 2>/dev/null || kill "$escaped_pid" 2>/dev/null || true
+			sleep 0.25
+			kill -KILL -- "-$escaped_pid" 2>/dev/null || kill -KILL "$escaped_pid" 2>/dev/null || true
+		fi
+	fi
 
 	rm -rf "$tmp_dir"
 }
@@ -5139,7 +5369,11 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback
 
 assert_opencode_review_normalizer_accepts_transcript_json
 
+assert_opencode_review_rejects_missing_structural_review_approval
+
 assert_opencode_review_gate_rejects_line_zero_findings
+
+assert_opencode_fallback_distinguishes_absent_strix_reports
 
 assert_opencode_failed_check_review_validator_rejects_unrelated_findings
 
@@ -5238,14 +5472,14 @@ run_pull_request_target_aborts_on_pr_head_blob_failure_case \
 	"src/new_module.py" \
 	"__ABSENT__" \
 	"HEAD_CONTENT_SHOULD_NOT_BECOME_PARTIAL_SCAN_INPUT" \
-	"cat-file"
+	"show"
 
 run_pull_request_target_aborts_on_pr_head_blob_failure_case \
 	"pull-request-target-modified-file-pr-head-blob-read-failure" \
 	"src/existing.py" \
 	"BASE_CONTENT_MUST_NOT_BE_USED_AFTER_HEAD_READ_FAILURE" \
 	"HEAD_CONTENT_SHOULD_NOT_BECOME_PARTIAL_SCAN_INPUT" \
-	"cat-file"
+	"show"
 
 run_pull_request_target_irregular_head_entry_fails_closed_case \
 	"pull-request-target-symlink-head-entry-fails-closed" \
@@ -5536,9 +5770,9 @@ run_gate_case "github-models-primary-unavailable-fallback-success" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5559,16 +5793,16 @@ run_gate_case "github-models-primary-unavailable-fallback-success" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-primary-ratelimit-fallback-success" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"4" \
-	"openai/gpt-5|openai/gpt-5|openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/gpt-5|openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5589,16 +5823,16 @@ run_gate_case "github-models-primary-ratelimit-fallback-success" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"openai/gpt-5" \
 	"" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
 	"3" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
 	"https://models.github.ai/inference|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5619,7 +5853,37 @@ run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
+	"1"
+
+run_gate_case "github-models-primary-deepseek-api-error-fallback-success" \
+	"openai/deepseek/deepseek-r1-0528" \
+	"" \
+	"0" \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"2" \
+	"openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-baseline-only" \
@@ -5628,7 +5892,7 @@ run_gate_case "github-models-fallback-provider-signal-baseline-only" \
 	"0" \
 	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5649,7 +5913,7 @@ run_gate_case "github-models-fallback-provider-signal-baseline-only" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528" \
+	"openai/deepseek/deepseek-r1-0528" \
 	"1"
 
 run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
@@ -5658,7 +5922,7 @@ run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
 	"0" \
 	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://models.github.ai/inference|https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference" \
@@ -5679,7 +5943,7 @@ run_gate_case "github-models-fallback-provider-signal-absent-source-baseline" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528" \
+	"openai/deepseek/deepseek-r1-0528" \
 	"1"
 
 run_gate_case_allow_provider_signal "gemini-high-demand-retry-same-model-success" \
@@ -6047,6 +6311,27 @@ run_gate_case "provider-denied-success-signal" \
 	"" \
 	"1"
 
+run_gate_case "pr-baseline-denied-text-allows" \
+	"vertex_ai/baseline-denied-text-primary" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"1" \
+	"vertex_ai/baseline-denied-text-primary" \
+	"<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"HIGH" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"backend/services/email_client.py"
+
 run_gate_case_allow_provider_signal "vertex-all-ratelimited" \
 	"vertex_ai/ratelimit-primary" \
 	"vertex_ai/fallback-one vertex_ai/fallback-two" \
@@ -6062,7 +6347,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"0" \
 	"Strix placeholder hardcoded-secret finding references only absent non-repository example paths; allowing pipeline continuation." \
 	"2" \
-	"openai/gpt-5|deepseek/deepseek-r1-0528" \
+	"openai/gpt-5|openai/deepseek/deepseek-r1-0528" \
 	"https://example.invalid|https://example.invalid" \
 	"vertex_ai" \
 	"__DEFAULT__" \
@@ -6083,7 +6368,7 @@ run_gate_case "pr-primary-ratelimit-fallback-placeholder-secret" \
 	"" \
 	"" \
 	"__SAME_AS_FALLBACK_MODELS__" \
-	"deepseek/deepseek-r1-0528"
+	"openai/deepseek/deepseek-r1-0528"
 
 run_gate_case "vertex-primary-hallucinated-endpoint-fallback-success" \
 	"vertex_ai/hallucination-primary" \
@@ -6123,6 +6408,27 @@ run_gate_case "pr-stale-source-claim-fallback-success" \
 	"0" \
 	"pull_request" \
 	"backend/db/models.py"
+
+run_gate_case "pr-stale-pr-scope-target-fallback-success" \
+	"vertex_ai/stale-pr-scope-target-primary" \
+	"vertex_ai/fallback-one vertex_ai/fallback-two" \
+	"0" \
+	"scan ok after absent pr-scope target fallback" \
+	"2" \
+	"vertex_ai/stale-pr-scope-target-primary|vertex_ai/fallback-one" \
+	"<unset>|<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"HIGH" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
 
 run_gate_case "pr-stale-source-plus-real-finding-blocks" \
 	"vertex_ai/stale-source-primary" \
@@ -6638,6 +6944,8 @@ run_gate_case "timeout-disabled-success" \
 	"0"
 
 run_timeout_cleanup_case
+
+run_timeout_escaped_stdout_case
 
 run_total_timeout_case
 
@@ -7660,7 +7968,7 @@ run_gate_case "github-models-model-prefix-requires-api-base" \
 	""
 
 run_gate_case "github-models-api-base-rejected-for-direct-openai" \
-	"openai/o4-mini" \
+	"openai/gpt-4.1" \
 	"" \
 	"2" \
 	"LLM_API_BASE may route through GitHub Models only when STRIX_LLM uses a GitHub Models model prefix" \
@@ -7692,6 +8000,17 @@ run_gate_case "github-models-model-prefix-with-api-base-succeeds" \
 	"openai" \
 	"https://models.github.ai/inference"
 
+run_gate_case "github-models-openai-o3-api-base-succeeds" \
+	"openai/openai/o3" \
+	"" \
+	"0" \
+	"scan ok" \
+	"1" \
+	"openai/openai/o3" \
+	"https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference"
+
 run_gate_case "github-models-fallback-requires-api-base" \
 	"vertex_ai/missing-primary" \
 	"openai/openai/gpt-5.4" \
@@ -7705,11 +8024,11 @@ run_gate_case "github-models-fallback-requires-api-base" \
 
 run_gate_case "github-models-fallback-success" \
 	"vertex_ai/missing-primary" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-r1-0528' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-r1-0528' in [0-9]+s\\." \
 	"2" \
-	"vertex_ai/missing-primary|deepseek/deepseek-r1-0528" \
+	"vertex_ai/missing-primary|openai/deepseek/deepseek-r1-0528" \
 	"<unset>|https://models.github.ai/inference" \
 	"vertex_ai" \
 	"https://models.github.ai/inference" \
@@ -7739,11 +8058,11 @@ run_gate_case "github-models-fallback-success" \
 
 run_gate_case "github-models-fallback-success-deepseek-v3" \
 	"vertex_ai/missing-primary" \
-	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"openai/deepseek/deepseek-r1-0528 openai/deepseek/deepseek-v3-0324" \
 	"0" \
-	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"REGEX:Strix quick scan succeeded with fallback model 'openai/deepseek/deepseek-v3-0324' in [0-9]+s\\." \
 	"3" \
-	"vertex_ai/missing-primary|deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"vertex_ai/missing-primary|openai/deepseek/deepseek-r1-0528|openai/deepseek/deepseek-v3-0324" \
 	"<unset>|https://models.github.ai/inference|https://models.github.ai/inference" \
 	"vertex_ai" \
 	"https://models.github.ai/inference" \
