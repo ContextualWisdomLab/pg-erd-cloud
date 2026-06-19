@@ -1593,18 +1593,14 @@ PY
 		return 0
 	fi
 	local build_scope_rc=0
-	if pull_request_head_blob_required; then
-		build_pull_request_head_tree_scope_dir || build_scope_rc=$?
-	else
-		build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
-	fi
+	build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
 	if [ "$build_scope_rc" -ne 0 ]; then
 		return 2
 	fi
 	TARGET_PATH="$LAST_PULL_REQUEST_SCOPE_DIR"
 	TARGET_PATH_IS_INTERNAL_PR_SCOPE=1
 	if pull_request_head_blob_required; then
-		printf "Materialized full PR-head scope for Strix scan; %s scannable changed file(s) retained for findings attribution.\n" "$total_files" >&2
+		printf "Scoped pull_request_target Strix scan to %s changed file(s) using PR-head blobs.\n" "$total_files" >&2
 	else
 		printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
 		printf ".\n" >&2
