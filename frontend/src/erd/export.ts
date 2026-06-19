@@ -5,8 +5,12 @@ type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string }>
   columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean }>
   indexes?: Array<{
-    relation_oid: number
+    relation_oid?: number
+    table_oid?: number
     index_name: string
+    access_method?: string
+    access_method_extension?: string | null
+    operator_class_extensions?: string[]
     is_unique?: boolean
     is_primary?: boolean
     index_def?: string
@@ -87,10 +91,22 @@ function plantText(value: unknown): string {
 function indexesByRelation(snapshot?: SnapshotJson | null): Map<string, SnapshotJson['indexes']> {
   const map = new Map<string, SnapshotJson['indexes']>();
   for (const ix of snapshot?.indexes || []) {
-    const key = String(ix.relation_oid);
+    const oid = ix.relation_oid ?? ix.table_oid;
+    if (typeof oid !== 'number') continue;
+    const key = String(oid);
     map.set(key, [...(map.get(key) || []), ix]);
   }
   return map;
+}
+
+function indexLabel(ix: NonNullable<SnapshotJson['indexes']>[number]): string {
+  const extensions = new Set(
+    [ix.access_method_extension, ...(ix.operator_class_extensions || [])].filter(Boolean),
+  );
+  const method = ix.access_method
+    ? ` [${ix.access_method}${extensions.size ? `:${[...extensions].join(',')}` : ''}]`
+    : '';
+  return `${ix.index_name}${method}${ix.is_unique ? ' unique' : ''}${ix.is_primary ? ' primary' : ''}`;
 }
 
 export function exportPlantUml(
@@ -107,7 +123,7 @@ export function exportPlantUml(
       lines.push(`  ${col.is_pk ? '*' : ''}${plantText(col.column_name)} : ${plantText(col.data_type)}${col.is_not_null ? ' <<not null>>' : ''}`);
     }
     for (const ix of indexes.get(node.id) || []) {
-      lines.push(`  <<index>> ${plantText(ix.index_name)}${ix.is_unique ? ' unique' : ''}${ix.is_primary ? ' primary' : ''}`);
+      lines.push(`  <<index>> ${plantText(indexLabel(ix))}`);
     }
     lines.push('}', '');
   }
@@ -185,7 +201,7 @@ export function exportDiagramSvg(
       rowY += rowHeight;
     }
     for (const ix of tableIndexes.slice(0, 8)) {
-      parts.push(`<text x="${x + 12}" y="${rowY}" font-family="ui-monospace, monospace" font-size="11" fill="#334155">${escapeXml(ix.index_name)}${ix.is_unique ? ' unique' : ''}</text>`);
+      parts.push(`<text x="${x + 12}" y="${rowY}" font-family="ui-monospace, monospace" font-size="11" fill="#334155">${escapeXml(indexLabel(ix))}</text>`);
       rowY += rowHeight;
     }
   }
