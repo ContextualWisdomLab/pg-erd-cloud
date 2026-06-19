@@ -45,9 +45,7 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [dsn, setDsn] = useState(
-    "postgresql://postgres:postgres@localhost:5432/postgres",
-  );
+  const [dsn, setDsn] = useState("");
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
@@ -122,23 +120,22 @@ export default function App() {
     if (!snapshotId) return;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
-        .then((s) => setSnapshot(s))
+        .then((s) => {
+          setSnapshot(s);
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+            clearInterval(timer);
+          }
+        })
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
   }, [snapshotId]);
 
-  const snapshotJsonKey = useMemo(() => {
-    return snapshot?.snapshot_json
-      ? JSON.stringify(snapshot.snapshot_json)
-      : "";
-  }, [snapshot?.snapshot_json]);
-
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshotJsonKey]);
+  }, [snapshot]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
