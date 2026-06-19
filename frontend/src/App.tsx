@@ -25,7 +25,12 @@ import {
 } from "./api";
 import TableNode from "./erd/TableNode";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
-import { exportDDL } from "./erd/export";
+import {
+  downloadText,
+  exportDDL,
+  exportDiagramSvg,
+  exportPlantUml,
+} from "./erd/export";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
 
@@ -45,9 +50,7 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [dsn, setDsn] = useState(
-    "postgresql://postgres:postgres@localhost:5432/postgres",
-  );
+  const [dsn, setDsn] = useState("");
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
@@ -132,23 +135,22 @@ export default function App() {
     if (!snapshotId) return;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
-        .then((s) => setSnapshot(s))
+        .then((s) => {
+          setSnapshot(s);
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+            clearInterval(timer);
+          }
+        })
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
   }, [snapshotId]);
 
-  const snapshotJsonKey = useMemo(() => {
-    return snapshot?.snapshot_json
-      ? JSON.stringify(snapshot.snapshot_json)
-      : "";
-  }, [snapshot?.snapshot_json]);
-
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshotJsonKey]);
+  }, [snapshot?.snapshot_json]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
@@ -278,6 +280,10 @@ export default function App() {
   function onCloseExport() {
     setIsExportModalOpen(false);
     setIsCopied(false);
+    if (copyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(copyFeedbackTimeoutRef.current);
+      copyFeedbackTimeoutRef.current = null;
+    }
   }
 
   const onCopyExportDdl = useCallback(() => {
@@ -293,6 +299,22 @@ export default function App() {
       copyFeedbackTimeoutRef.current = null;
     }, 2000);
   }, [exportDdlText]);
+
+  function onDownloadSvg() {
+    downloadText(
+      "pg-erd-diagram.svg",
+      exportDiagramSvg(nodes, edges, snapshot?.snapshot_json),
+      "image/svg+xml",
+    );
+  }
+
+  function onDownloadUml() {
+    downloadText(
+      "pg-erd-diagram.puml",
+      exportPlantUml(nodes, edges, snapshot?.snapshot_json),
+      "text/plain",
+    );
+  }
 
   function onRelDelete() {
     if (!editingEdge) return;
@@ -578,6 +600,28 @@ export default function App() {
               aria-label="DDL 내보내기"
             >
               DDL
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadSvg}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
+              }
+              aria-label="SVG 그림 내보내기"
+            >
+              SVG
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadUml}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
+              }
+              aria-label="PlantUML 내보내기"
+            >
+              UML
             </button>
             <div className="srOnly" aria-live="polite">
               {layoutMessage}

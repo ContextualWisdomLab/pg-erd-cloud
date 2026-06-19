@@ -520,6 +520,8 @@ is_preexisting_report_dir() {
 is_github_models_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
+	openai/o[1-9]* | \
+	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -533,6 +535,8 @@ is_github_models_api_compatible_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
 	openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
+	openai/o[1-9]* | \
+	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -1589,18 +1593,14 @@ PY
 		return 0
 	fi
 	local build_scope_rc=0
-	if pull_request_head_blob_required; then
-		build_pull_request_head_tree_scope_dir || build_scope_rc=$?
-	else
-		build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
-	fi
+	build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
 	if [ "$build_scope_rc" -ne 0 ]; then
 		return 2
 	fi
 	TARGET_PATH="$LAST_PULL_REQUEST_SCOPE_DIR"
 	TARGET_PATH_IS_INTERNAL_PR_SCOPE=1
 	if pull_request_head_blob_required; then
-		printf "Materialized full PR-head scope for Strix scan; %s scannable changed file(s) retained for findings attribution.\n" "$total_files" >&2
+		printf "Scoped pull_request_target Strix scan to %s changed file(s) using PR-head blobs.\n" "$total_files" >&2
 	else
 		printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
 		printf ".\n" >&2
@@ -2425,6 +2425,11 @@ is_github_models_unavailable_model_error() {
 		return 0
 	fi
 
+	if grep -Eiq 'DeepseekException' "$STRIX_LOG" &&
+		grep -Eiq '(litellm\.APIError|APIError|LLM CONNECTION FAILED|Could not establish connection to the language model)' "$STRIX_LOG"; then
+		return 0
+	fi
+
 	return 1
 }
 
@@ -2524,7 +2529,7 @@ LLM_PROVIDER_ONLY_REGEX='(litellm|openai|anthropic|VertexAI|Vertex_ai|vertex\.ai
 # was interrupted or incomplete.  Used as a guard to prevent the
 # below-threshold override from silently passing an aborted scan.
 has_detected_infrastructure_error() {
-	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$)' "$STRIX_LOG"; then
+	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$).*(provider|model|LLM|credential|quota|rate|connection|stream|incomplete scan)' "$STRIX_LOG"; then
 		return 0
 	fi
 
