@@ -137,7 +137,7 @@ export default function App() {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshot]);
+  }, [snapshot?.snapshot_json]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
