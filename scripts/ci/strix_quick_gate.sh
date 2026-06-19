@@ -520,8 +520,6 @@ is_preexisting_report_dir() {
 is_github_models_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
-	openai/o[1-9]* | \
-	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -535,8 +533,6 @@ is_github_models_api_compatible_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
 	openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
-	openai/o[1-9]* | \
-	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -1593,14 +1589,18 @@ PY
 		return 0
 	fi
 	local build_scope_rc=0
-	build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
+	if pull_request_head_blob_required; then
+		build_pull_request_head_tree_scope_dir || build_scope_rc=$?
+	else
+		build_pull_request_scope_dir "${CHANGED_FILES[@]}" || build_scope_rc=$?
+	fi
 	if [ "$build_scope_rc" -ne 0 ]; then
 		return 2
 	fi
 	TARGET_PATH="$LAST_PULL_REQUEST_SCOPE_DIR"
 	TARGET_PATH_IS_INTERNAL_PR_SCOPE=1
 	if pull_request_head_blob_required; then
-		printf "Scoped pull_request_target Strix scan to %s changed file(s) using PR-head blobs.\n" "$total_files" >&2
+		printf "Materialized full PR-head scope for Strix scan; %s scannable changed file(s) retained for findings attribution.\n" "$total_files" >&2
 	else
 		printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
 		printf ".\n" >&2
@@ -1870,11 +1870,6 @@ evaluate_pull_request_findings() {
 			return 1
 		fi
 		if [ "$rank" -ge "$threshold_rank" ]; then
-			if vulnerability_file_is_retryable_model_inconsistency "$STRIX_LOG"; then
-				found_retryable_model_inconsistency=1
-				PR_FINDINGS_DECISION="retry_model_inconsistency"
-				return 1
-			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
 				PR_FINDINGS_DECISION="block_unmapped"
@@ -2196,26 +2191,6 @@ if any(ch in str(target_cwd) for ch in ("\x00", "\n", "\r")):
 
 command = [resolved_strix_bin, "-n", "-t", ".", "--scan-mode", scan_mode]
 
-def output_from_timeout(exc):
-    partial = exc.output if exc.output is not None else exc.stdout
-    if not partial:
-        return ""
-    if isinstance(partial, bytes):
-        return partial.decode("utf-8", errors="replace")
-    return partial
-
-def signal_group(pgid, sig):
-    try:
-        os.killpg(pgid, sig)
-    except (PermissionError, ProcessLookupError):
-        pass
-
-def signal_process(process, sig):
-    try:
-        process.send_signal(sig)
-    except (PermissionError, ProcessLookupError):
-        pass
-
 try:
     process = subprocess.Popen(
         command,
@@ -2226,27 +2201,24 @@ try:
         env=child_env,
         start_new_session=True,
     )
-    try:
-        process_pgid = os.getpgid(process.pid)
-    except ProcessLookupError:
-        process_pgid = process.pid
     output, _ = process.communicate(timeout=process_timeout)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
     raise SystemExit(process.returncode)
 except subprocess.TimeoutExpired:
-    signal_group(process_pgid, signal.SIGTERM)
-    signal_process(process, signal.SIGTERM)
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
     try:
         output, _ = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
-        signal_group(process_pgid, signal.SIGKILL)
-        signal_process(process, signal.SIGKILL)
         try:
-            output, _ = process.communicate(timeout=5)
-        except subprocess.TimeoutExpired as exc:
-            output = output_from_timeout(exc)
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        output, _ = process.communicate()
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
@@ -2425,11 +2397,6 @@ is_github_models_unavailable_model_error() {
 		return 0
 	fi
 
-	if grep -Eiq 'DeepseekException' "$STRIX_LOG" &&
-		grep -Eiq '(litellm\.APIError|APIError|LLM CONNECTION FAILED|Could not establish connection to the language model)' "$STRIX_LOG"; then
-		return 0
-	fi
-
 	return 1
 }
 
@@ -2529,7 +2496,7 @@ LLM_PROVIDER_ONLY_REGEX='(litellm|openai|anthropic|VertexAI|Vertex_ai|vertex\.ai
 # was interrupted or incomplete.  Used as a guard to prevent the
 # below-threshold override from silently passing an aborted scan.
 has_detected_infrastructure_error() {
-	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$).*(provider|model|LLM|credential|quota|rate|connection|stream|incomplete scan)' "$STRIX_LOG"; then
+	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$)' "$STRIX_LOG"; then
 		return 0
 	fi
 
@@ -2902,12 +2869,6 @@ patterns = [
     ),
     re.compile(
         r"<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>"
-    ),
-    re.compile(
-        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
-    ),
-    re.compile(
-        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Endpoint:(?:\*\*)?[ \t]*(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
     ),
 ]
 

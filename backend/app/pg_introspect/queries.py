@@ -65,26 +65,6 @@ SELECT
   a.attnum AS column_position,
   a.attname AS column_name,
   pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
-  typ.oid AS type_oid,
-  typ_ns.nspname AS type_schema,
-  typ.typname AS type_name,
-  typ.typtype::text AS type_kind,
-  typ.typcategory::text AS type_category,
-  CASE
-    WHEN typ.typtype = 'd'
-    THEN pg_catalog.format_type(typ.typbasetype, typ.typtypmod)
-    ELSE NULL
-  END AS domain_base_type,
-  base_typ_ns.nspname AS domain_base_schema,
-  base_typ.typname AS domain_base_name,
-  CASE
-    WHEN typ.typcategory = 'A'
-    THEN pg_catalog.format_type(typ.typelem, -1)
-    ELSE NULL
-  END AS array_element_type,
-  elem_typ_ns.nspname AS array_element_schema,
-  elem_typ.typname AS array_element_name,
-  a.attndims AS array_dimensions,
   a.attnotnull AS is_not_null,
   a.atthasdef AS has_default,
   pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
@@ -92,16 +72,6 @@ SELECT
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-JOIN pg_catalog.pg_type typ ON typ.oid = a.atttypid
-JOIN pg_catalog.pg_namespace typ_ns ON typ_ns.oid = typ.typnamespace
-LEFT JOIN pg_catalog.pg_type base_typ
-  ON base_typ.oid = typ.typbasetype AND typ.typtype = 'd'
-LEFT JOIN pg_catalog.pg_namespace base_typ_ns
-  ON base_typ_ns.oid = base_typ.typnamespace
-LEFT JOIN pg_catalog.pg_type elem_typ
-  ON elem_typ.oid = typ.typelem AND typ.typcategory = 'A'
-LEFT JOIN pg_catalog.pg_namespace elem_typ_ns
-  ON elem_typ_ns.oid = elem_typ.typnamespace
 LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
 CROSS JOIN params p
 WHERE

@@ -25,17 +25,14 @@ import {
 } from "./api";
 import TableNode from "./erd/TableNode";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
-import {
-  downloadText,
-  exportDDL,
-  exportDiagramSvg,
-  exportPlantUml,
-} from "./erd/export";
+import { exportDDL } from "./erd/export";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>("local");
+  const [devUser, setDevUser] = useState<string>(
+    () => localStorage.getItem("devUser") || "local",
+  );
   const [me, setMe] = useState<{
     subject: string;
     display_name: string | null;
@@ -48,7 +45,9 @@ export default function App() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connName, setConnName] = useState("target-db");
-  const [isDsnPresent, setIsDsnPresent] = useState(false);
+  const [dsn, setDsn] = useState(
+    "postgresql://postgres:postgres@localhost:5432/postgres",
+  );
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
   const [schemaFilter, setSchemaFilter] = useState<string>("");
 
@@ -64,8 +63,6 @@ export default function App() {
     Node<TableNodeData>,
     Edge
   > | null>(null);
-  const copyFeedbackTimeoutRef = useRef<number | null>(null);
-  const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutMessage, setLayoutMessage] = useState<string>("");
@@ -85,14 +82,6 @@ export default function App() {
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
 
-  useEffect(() => {
-    return () => {
-      if (copyFeedbackTimeoutRef.current !== null) {
-        window.clearTimeout(copyFeedbackTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const onConnect = useCallback(
     (params: FlowConnection) => {
       const newEdge: Edge = {
@@ -110,6 +99,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    localStorage.setItem("devUser", devUser);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         setMe({ subject: m.subject, display_name: m.display_name });
@@ -133,26 +123,27 @@ export default function App() {
     if (!snapshotId) return;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
-        .then((s) => {
-          setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-            clearInterval(timer);
-          }
-        })
+        .then((s) => setSnapshot(s))
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
   }, [snapshotId]);
 
+  const snapshotJsonKey = useMemo(() => {
+    return snapshot?.snapshot_json
+      ? JSON.stringify(snapshot.snapshot_json)
+      : "";
+  }, [snapshot?.snapshot_json]);
+
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshot?.snapshot_json]);
+  }, [snapshotJsonKey]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
-    : !connName.trim() || !isDsnPresent
+    : !connName.trim() || !dsn.trim()
       ? "Enter connection name and DSN"
       : "";
   const createSnapshotHint =
@@ -277,41 +268,6 @@ export default function App() {
 
   function onCloseExport() {
     setIsExportModalOpen(false);
-    setIsCopied(false);
-    if (copyFeedbackTimeoutRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimeoutRef.current);
-      copyFeedbackTimeoutRef.current = null;
-    }
-  }
-
-  const onCopyExportDdl = useCallback(() => {
-    navigator.clipboard.writeText(exportDdlText);
-    setIsCopied(true);
-
-    if (copyFeedbackTimeoutRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimeoutRef.current);
-    }
-
-    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
-      setIsCopied(false);
-      copyFeedbackTimeoutRef.current = null;
-    }, 2000);
-  }, [exportDdlText]);
-
-  function onDownloadSvg() {
-    downloadText(
-      "pg-erd-diagram.svg",
-      exportDiagramSvg(nodes, edges, snapshot?.snapshot_json),
-      "image/svg+xml",
-    );
-  }
-
-  function onDownloadUml() {
-    downloadText(
-      "pg-erd-diagram.puml",
-      exportPlantUml(nodes, edges, snapshot?.snapshot_json),
-      "text/plain",
-    );
   }
 
   function onRelDelete() {
@@ -373,17 +329,11 @@ export default function App() {
 
   async function onCreateConnection() {
     if (!selectedProjectId) return;
-    const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
-    if (!connectionDsn) return;
     setError(null);
-    const c = await createConnection(selectedProjectId, connName, connectionDsn);
+    const c = await createConnection(selectedProjectId, connName, dsn);
     const next = [c, ...connections];
     setConnections(next);
     setSelectedConnId(c.db_connection_uuid);
-    if (dsnInputRef.current) {
-      dsnInputRef.current.value = "";
-    }
-    setIsDsnPresent(false);
   }
 
   async function onCreateSnapshot() {
@@ -496,17 +446,14 @@ export default function App() {
           />
           <input
             id="conn-dsn"
-            type="password"
-            ref={dsnInputRef}
-            onChange={(e) =>
-              setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
-            }
+            value={dsn}
+            onChange={(e) => setDsn(e.target.value)}
             placeholder="postgresql://..."
             aria-label="Connection DSN"
           />
           <button
             onClick={onCreateConnection}
-            disabled={!selectedProjectId || !connName.trim() || !isDsnPresent}
+            disabled={!selectedProjectId || !connName.trim() || !dsn.trim()}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
             }
@@ -608,28 +555,6 @@ export default function App() {
             >
               DDL
             </button>
-            <button
-              type="button"
-              onClick={onDownloadSvg}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
-              }
-              aria-label="SVG 그림 내보내기"
-            >
-              SVG
-            </button>
-            <button
-              type="button"
-              onClick={onDownloadUml}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
-              }
-              aria-label="PlantUML 내보내기"
-            >
-              UML
-            </button>
             <div className="srOnly" aria-live="polite">
               {layoutMessage}
             </div>
@@ -700,7 +625,11 @@ export default function App() {
                 >
                   <button onClick={onCloseExport}>닫기</button>
                   <button
-                    onClick={onCopyExportDdl}
+                    onClick={() => {
+                      navigator.clipboard.writeText(exportDdlText);
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
                   >
