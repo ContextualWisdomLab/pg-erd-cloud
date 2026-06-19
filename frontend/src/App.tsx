@@ -63,6 +63,7 @@ export default function App() {
     Node<TableNodeData>,
     Edge
   > | null>(null);
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutMessage, setLayoutMessage] = useState<string>("");
@@ -81,6 +82,14 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -268,7 +277,22 @@ export default function App() {
 
   function onCloseExport() {
     setIsExportModalOpen(false);
+    setIsCopied(false);
   }
+
+  const onCopyExportDdl = useCallback(() => {
+    navigator.clipboard.writeText(exportDdlText);
+    setIsCopied(true);
+
+    if (copyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(copyFeedbackTimeoutRef.current);
+    }
+
+    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setIsCopied(false);
+      copyFeedbackTimeoutRef.current = null;
+    }, 2000);
+  }, [exportDdlText]);
 
   function onRelDelete() {
     if (!editingEdge) return;
@@ -625,11 +649,7 @@ export default function App() {
                 >
                   <button onClick={onCloseExport}>닫기</button>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(exportDdlText);
-                      setIsCopied(true);
-                      setTimeout(() => setIsCopied(false), 2000);
-                    }}
+                    onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
                   >
