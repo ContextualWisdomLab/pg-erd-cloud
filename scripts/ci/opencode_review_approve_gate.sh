@@ -6,6 +6,12 @@ if [ $# -ne 4 ] && [ $# -ne 5 ]; then
   exit 64
 fi
 
+SCRIPT_DIR="$(
+  CDPATH=''
+  cd -P -- "$(dirname -- "$0")"
+  pwd -P
+)"
+NORMALIZER="$SCRIPT_DIR/opencode_review_normalize_output.py"
 EXPECTED_HEAD_SHA="$1"
 EXPECTED_RUN_ID="$2"
 EXPECTED_RUN_ATTEMPT="$3"
@@ -121,6 +127,11 @@ if ! jq -e '
     and ((.suggested_diff | ascii_downcase) as $d | (($d | startswith("n/a")) | not) and (($d | startswith("cannot provide diff")) | not))
   )
 ' "$TMP_JSON" >/dev/null; then
+  echo "NO_CONCLUSION"
+  exit 4
+fi
+
+if ! python3 "$NORMALIZER" --check-structural-approval "$TMP_JSON" >/dev/null; then
   echo "NO_CONCLUSION"
   exit 4
 fi

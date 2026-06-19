@@ -329,6 +329,9 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "CodeGraph MCP tools" "opencode review prompt requires CodeGraph-backed review evidence"
 	assert_file_contains "$workflow_file" "general-purpose and meticulous" "opencode review prompt requires a general-purpose meticulous review"
 	assert_file_contains "$workflow_file" "use CodeGraph MCP for structural checks, DeepWiki for repo docs, Context7 for current library/API docs, and web_search for bounded external lookups" "opencode review prompt directs the agent to use all configured MCP sources"
+	assert_file_contains "$workflow_file" "Structural exploration is mandatory for every PR" "opencode review prompt requires structural exploration for every PR"
+	assert_file_contains "$workflow_file" "Copilot Review" "opencode review prompt follows Copilot Review-style overview formatting"
+	assert_file_contains "$workflow_file" "CodeRabbitAI" "opencode review prompt follows CodeRabbitAI-style actionable findings"
 	assert_file_contains "$workflow_file" "Inspect changed files and focused hunks directly when MCP evidence is insufficient." "opencode review allows focused direct source inspection when MCP evidence is insufficient"
 	assert_file_contains "$workflow_file" "Never return raw tool-call markup, tool-call JSON, or MCP call syntax in the review body" "opencode review prompt forbids raw tool-call transcripts as final review output"
 	assert_file_contains "$workflow_file" "Do not spend the session listing every changed path before reviewing" "opencode review prompt prevents fallback sessions from exhausting steps on file listing"
@@ -346,6 +349,8 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "opencode_review_normalize_output.py" "opencode review model steps normalize transcript-embedded JSON output"
 	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "decoder.raw_decode" "opencode review normalizer scans transcript text for JSON objects"
 	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "valid_control" "opencode review normalizer accepts only current-run control JSON"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "admits_missing_structural_review" "opencode review normalizer rejects approvals that admit missing structural review"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_approve_gate.sh" "--check-structural-approval" "opencode approval gate rejects approvals that admit missing structural review"
 	assert_file_contains "$workflow_file" "opencode run" "opencode review workflow runs the bounded OpenCode agent path"
 	assert_file_contains "$workflow_file" 'opencode run "$(cat "$prompt_file")"' "opencode review passes the prompt as the positional message before file attachments"
 	assert_file_contains "$workflow_file" "--agent ci-review" "opencode review workflow forces the compact CI review agent"
@@ -476,6 +481,51 @@ EOF
 
 	assert_equals "0" "$rc" "normalized OpenCode transcript passes approval gate"
 	assert_equals "APPROVE" "$gate_result" "normalized OpenCode transcript gate result"
+
+	rm -rf "$tmp_dir"
+}
+
+assert_opencode_review_rejects_missing_structural_review_approval() {
+	local tmp_dir
+	local comment_file
+	local transcript_file
+	local rc
+	local gate_result
+	tmp_dir="$(mktemp -d)"
+	comment_file="$tmp_dir/opencode-comment.md"
+	transcript_file="$tmp_dir/opencode-transcript.md"
+
+	cat >"$comment_file" <<'EOF'
+<!-- opencode-review-gate head_sha=abc123 run_id=42 run_attempt=1 -->
+
+<!-- opencode-review-control-v1
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers were found.","summary":"Structural exploration was not possible because evidence was truncated.","findings":[]}
+-->
+EOF
+
+	set +e
+	gate_result="$(
+		bash "$REPO_ROOT/scripts/ci/opencode_review_approve_gate.sh" \
+			"abc123" "42" "1" "$comment_file"
+	)"
+	rc=$?
+	set -e
+
+	assert_equals "4" "$rc" "opencode approval gate rejects missing structural review approvals"
+	assert_equals "NO_CONCLUSION" "$gate_result" "missing structural review gate result"
+
+	cat >"$transcript_file" <<'EOF'
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers were found.","summary":"Structural exploration was not possible because evidence was truncated.","findings":[]}
+EOF
+
+	set +e
+	python3 "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" \
+		"abc123" "42" "1" "$transcript_file" >"$tmp_dir/normalize.out" 2>"$tmp_dir/normalize.err"
+	rc=$?
+	set -e
+
+	assert_equals "4" "$rc" "opencode normalizer rejects missing structural review approvals"
+	assert_file_contains "$tmp_dir/normalize.err" "NO_CONCLUSION" "opencode normalizer reports no conclusion for missing structural review approvals"
 
 	rm -rf "$tmp_dir"
 }
@@ -5156,6 +5206,8 @@ assert_strix_child_target_uses_constant_argument
 assert_opencode_review_uses_codegraph_and_gpt5_fallback
 
 assert_opencode_review_normalizer_accepts_transcript_json
+
+assert_opencode_review_rejects_missing_structural_review_approval
 
 assert_opencode_review_gate_rejects_line_zero_findings
 
