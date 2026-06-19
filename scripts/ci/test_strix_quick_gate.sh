@@ -1176,6 +1176,24 @@ EOS
 			;;
 		esac
 		;;
+	github-models-primary-deepseek-api-error-fallback-success)
+		case "${STRIX_LLM:-}" in
+		deepseek/deepseek-r1-0528)
+			echo "LLM CONNECTION FAILED"
+			echo "Could not establish connection to the language model."
+			echo "Error: litellm.APIError: APIError: DeepseekException -"
+			exit 1
+			;;
+		deepseek/deepseek-v3-0324)
+			echo "scan ok after DeepSeek API fallback"
+			exit 0
+			;;
+		*)
+			echo "Error: GitHub Models DeepSeek API fallback path unexpected (${STRIX_LLM:-})" >&2
+			exit 38
+			;;
+		esac
+		;;
 	github-models-fallback-provider-signal-baseline-only)
 		case "${STRIX_LLM:-}" in
 		openai/gpt-5)
@@ -5612,6 +5630,36 @@ run_gate_case "github-models-fallback-provider-signal-tries-next" \
 	"0" \
 	"pull_request" \
 	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java" \
+	"" \
+	"" \
+	"0" \
+	"" \
+	"" \
+	"" \
+	"__SAME_AS_FALLBACK_MODELS__" \
+	"deepseek/deepseek-r1-0528 deepseek/deepseek-v3-0324" \
+	"1"
+
+run_gate_case "github-models-primary-deepseek-api-error-fallback-success" \
+	"deepseek/deepseek-r1-0528" \
+	"" \
+	"0" \
+	"REGEX:Strix quick scan succeeded with fallback model 'deepseek/deepseek-v3-0324' in [0-9]+s\\." \
+	"2" \
+	"deepseek/deepseek-r1-0528|deepseek/deepseek-v3-0324" \
+	"https://models.github.ai/inference|https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"" \
+	"" \
 	"" \
 	"" \
 	"0" \

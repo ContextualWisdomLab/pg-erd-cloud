@@ -2397,6 +2397,11 @@ is_github_models_unavailable_model_error() {
 		return 0
 	fi
 
+	if grep -Eiq 'DeepseekException' "$STRIX_LOG" &&
+		grep -Eiq '(litellm\.APIError|APIError|LLM CONNECTION FAILED|Could not establish connection to the language model)' "$STRIX_LOG"; then
+		return 0
+	fi
+
 	return 1
 }
 
