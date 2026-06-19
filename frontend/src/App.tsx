@@ -139,6 +139,14 @@ export default function App() {
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
   }, [snapshotJsonKey]);
+  const createProjectHint = projectName.trim() ? "" : "Enter project name";
+  const createConnectionHint = !selectedProjectId
+    ? "Select a project first"
+    : !connName.trim() || !dsn.trim()
+      ? "Enter connection name and DSN"
+      : "";
+  const createSnapshotHint =
+    selectedProjectId && selectedConnId ? "" : "Select project and connection";
 
   useEffect(() => {
     if (!graph) {
@@ -392,11 +400,18 @@ export default function App() {
             <button
               onClick={onCreateProject}
               disabled={!projectName.trim()}
-              title={!projectName.trim() ? "Enter project name" : "Create project"}
+              aria-describedby={
+                createProjectHint ? "create-project-hint" : undefined
+              }
             >
               Create
             </button>
           </div>
+          {createProjectHint ? (
+            <span id="create-project-hint" className="field-hint">
+              {createProjectHint}
+            </span>
+          ) : null}
         </div>
 
         <hr />
@@ -437,11 +452,18 @@ export default function App() {
           />
           <button
             onClick={onCreateConnection}
-            disabled={!connName.trim() || !dsn.trim()}
-            title={!connName.trim() || !dsn.trim() ? "Enter connection name and DSN" : "Save connection"}
+            disabled={!selectedProjectId || !connName.trim() || !dsn.trim()}
+            aria-describedby={
+              createConnectionHint ? "create-connection-hint" : undefined
+            }
           >
             Save connection
           </button>
+          {createConnectionHint ? (
+            <span id="create-connection-hint" className="field-hint">
+              {createConnectionHint}
+            </span>
+          ) : null}
         </div>
 
         <div className="field">
@@ -457,10 +479,17 @@ export default function App() {
         <button
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId}
-          title={!selectedProjectId || !selectedConnId ? "Select project and connection" : "Create snapshot"}
+          aria-describedby={
+            createSnapshotHint ? "create-snapshot-hint" : undefined
+          }
         >
           Reverse engineer → snapshot
         </button>
+        {createSnapshotHint ? (
+          <span id="create-snapshot-hint" className="field-hint">
+            {createSnapshotHint}
+          </span>
+        ) : null}
 
         <div style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
           Snapshot: {snapshot?.status || "—"}
