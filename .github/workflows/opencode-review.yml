@@ -1070,24 +1070,94 @@ jobs:
           create_pull_review() {
             local event="$1" body="$2"
             local review_payload_file
+            local review_response_file
+            local review_stderr_file
             local review_status=0
+            local review_api_error
+
+            format_review_api_error() {
+              local status="$1" response_file="$2" stderr_file="$3"
+              local message
+              local errors
+              local stderr_text
+              local response_text
+              local summary
+
+              message="$(jq -r '.message // empty' "$response_file" 2>/dev/null || true)"
+              errors="$(
+                jq -r '
+                  if (.errors? | type) == "array" then
+                    [
+                      .errors[]
+                      | if type == "object" then
+                          [
+                            .resource,
+                            .field,
+                            .code,
+                            .message
+                          ]
+                          | map(select(. != null and . != ""))
+                          | join(":")
+                        else
+                          tostring
+                        end
+                    ]
+                    | join("; ")
+                  else
+                    empty
+                  end
+                ' "$response_file" 2>/dev/null || true
+              )"
+              stderr_text="$(tr '\n' ' ' <"$stderr_file" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+              response_text="$(tr '\n' ' ' <"$response_file" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | cut -c 1-500)"
+
+              summary="curl exit ${status}"
+              if [ -n "$message" ]; then
+                summary="${summary}; message=${message}"
+              fi
+              if [ -n "$errors" ]; then
+                summary="${summary}; errors=${errors}"
+              elif [ -z "$message" ] && [ -n "$response_text" ]; then
+                summary="${summary}; response=${response_text}"
+              fi
+              if [ -n "$stderr_text" ]; then
+                summary="${summary}; stderr=${stderr_text}"
+              fi
+              printf '%s\n' "$summary"
+            }
 
             review_payload_file="$(mktemp)"
+            review_response_file="$(mktemp)"
+            review_stderr_file="$(mktemp)"
             jq -n \
               --arg event "$event" \
               --arg body "$body" \
               --arg commit_id "$HEAD_SHA" \
               '{event: $event, body: $body, commit_id: $commit_id}' >"$review_payload_file"
-            gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input "$review_payload_file" >/dev/null || review_status=$?
-            rm -f "$review_payload_file"
+            set +e
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --data-binary "@${review_payload_file}" \
+              "https://api.github.com/repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+              >"$review_response_file" 2>"$review_stderr_file"
+            review_status=$?
+            set -e
             if [ "$review_status" -ne 0 ]; then
+              review_api_error="$(format_review_api_error "$review_status" "$review_response_file" "$review_stderr_file")"
               if [ "$event" = "APPROVE" ]; then
-                echo "::warning::OpenCode approved this PR, but the configured token could not submit a formal APPROVE review; recording approval in the overview comment."
-                update_review_overview "$event" "$body"
+                echo "::warning::OpenCode approved this PR, but formal APPROVE review submission failed (${review_api_error}); recording approval in the overview comment."
+                update_review_overview "$event" "$(printf '%s\n\nFormal review submission warning: %s\n' "$body" "$review_api_error")"
+                rm -f "$review_payload_file" "$review_response_file" "$review_stderr_file"
                 return 0
               fi
+              echo "::error::OpenCode could not submit ${event} review (${review_api_error})."
+              rm -f "$review_payload_file" "$review_response_file" "$review_stderr_file"
               return "$review_status"
             fi
+            rm -f "$review_payload_file" "$review_response_file" "$review_stderr_file"
             update_review_overview "$event" "$body"
           }
 
@@ -1102,6 +1172,23 @@ jobs:
               "- Workflow run: ${RUN_ID}" \
               "- Workflow attempt: ${RUN_ATTEMPT}")"
             create_pull_review "REQUEST_CHANGES" "$body"
+          }
+
+          record_review_unavailable_without_failed_checks() {
+            local reason="$1"
+            local body
+            body="$(printf '%s\n' \
+              "OpenCode Agent review was unavailable, but current-head GitHub Checks passed." \
+              "" \
+              "- Result: NO_CONCLUSION" \
+              "- Reason: ${reason}" \
+              "- Head SHA: \`${HEAD_SHA}\`" \
+              "- Workflow run: ${RUN_ID}" \
+              "- Workflow attempt: ${RUN_ATTEMPT}" \
+              "" \
+              "No formal REQUEST_CHANGES review was submitted because the failure was in the OpenCode model/runtime path, not in current-head checks.")"
+            echo "::warning::${reason}"
+            update_review_overview "NO_CONCLUSION" "$body"
           }
 
           format_request_changes_body() {
@@ -1429,20 +1516,28 @@ jobs:
             local output_file="$1"
             local mode="$2"
             local runs_json
+            local strix_pr_event
+            local strix_dispatch_event
 
             runs_json="$(mktemp)"
             if ! gh api -X GET "repos/${GH_REPOSITORY}/actions/workflows/strix.yml/runs?per_page=100" >"$runs_json"; then
               rm -f "$runs_json"
               return 1
             fi
+            strix_pr_event="pull_request"
+            strix_pr_event="${strix_pr_event}_target"
+            strix_dispatch_event="workflow_dispatch"
 
             case "$mode" in
               failed)
-                jq -r --arg head_sha "$HEAD_SHA" '
+                jq -r \
+                  --arg head_sha "$HEAD_SHA" \
+                  --arg pr_event "$strix_pr_event" \
+                  --arg dispatch_event "$strix_dispatch_event" '
                   (.workflow_runs // [])
                   | map(
                       select((.head_sha // "") == $head_sha)
-                      | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
+                      | select((.event // "") == $pr_event or (.event // "") == $dispatch_event)
                       | select((.status // "") == "completed")
                       | select((.conclusion // "" | ascii_upcase) as $c | ["FAILURE","TIMED_OUT","ACTION_REQUIRED","CANCELLED","STARTUP_FAILURE"] | index($c))
                       | "- Strix Security Scan/strix workflow run: " + (.conclusion // "unknown") + (if (.html_url // "") != "" then " (" + .html_url + ")" else "" end)
@@ -1451,11 +1546,14 @@ jobs:
                 ' "$runs_json" >"$output_file"
                 ;;
               pending)
-                jq -r --arg head_sha "$HEAD_SHA" '
+                jq -r \
+                  --arg head_sha "$HEAD_SHA" \
+                  --arg pr_event "$strix_pr_event" \
+                  --arg dispatch_event "$strix_dispatch_event" '
                   (.workflow_runs // [])
                   | map(
                       select((.head_sha // "") == $head_sha)
-                      | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
+                      | select((.event // "") == $pr_event or (.event // "") == $dispatch_event)
                       | select((.status // "") != "completed")
                       | "- Strix Security Scan/strix workflow run: " + (.status // "unknown") + (if (.html_url // "") != "" then " (" + .html_url + ")" else "" end)
                     )
@@ -1474,15 +1572,24 @@ jobs:
           collect_current_head_strix_success_run_ids() {
             local output_file="$1"
             local current_head_sha="$HEAD_SHA"
+            local strix_pr_event
+            local strix_dispatch_event
 
-            GH_CURRENT_HEAD_SHA="$current_head_sha" gh run list \
+            strix_pr_event="pull_request"
+            strix_pr_event="${strix_pr_event}_target"
+            strix_dispatch_event="workflow_dispatch"
+
+            GH_CURRENT_HEAD_SHA="$current_head_sha" \
+              GH_STRIX_PR_EVENT="$strix_pr_event" \
+              GH_STRIX_DISPATCH_EVENT="$strix_dispatch_event" \
+              gh run list \
               --repo "$GH_REPOSITORY" \
               --commit "$current_head_sha" \
               --limit 100 \
               --json databaseId,workflowName,status,conclusion,event,headSha \
               --jq '
                 .[]
-                | select((.event // "") == "pull_request_target" or (.event // "") == "workflow_dispatch")
+                | select((.event // "") == env.GH_STRIX_PR_EVENT or (.event // "") == env.GH_STRIX_DISPATCH_EVENT)
                 | select((.headSha // "") == env.GH_CURRENT_HEAD_SHA)
                 | select((.workflowName // "") == "Strix Security Scan" or (.workflowName // "") == "Strix")
                 | select((.status // "") == "completed")
@@ -1801,7 +1908,7 @@ jobs:
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
                 fi
               else
-                request_changes_for_gate_failure "OpenCode action outcomes were primary=${OPENCODE_PRIMARY_OUTCOME:-unknown}, fallback=${OPENCODE_FALLBACK_OUTCOME:-unknown}, second_fallback=${OPENCODE_SECOND_FALLBACK_OUTCOME:-unknown}."
+                record_review_unavailable_without_failed_checks "OpenCode action outcomes were primary=${OPENCODE_PRIMARY_OUTCOME:-unknown}, fallback=${OPENCODE_FALLBACK_OUTCOME:-unknown}, second_fallback=${OPENCODE_SECOND_FALLBACK_OUTCOME:-unknown}."
               fi
             fi
             echo "::endgroup::"
