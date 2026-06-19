@@ -1885,6 +1885,17 @@ EOS
 		echo "Denied: provider credentials were rejected"
 		exit 0
 		;;
+	pr-baseline-denied-text-allows)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-baseline-denied/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-baseline-denied/vulnerabilities/vuln-0001.md" <<'EOS'
+**Severity:** HIGH
+**Target:** backend/app/permissions.py
+
+The permission helper raises `project access denied` for unauthorized project access.
+EOS
+		echo "Penetration test failed: baseline project access denied finding"
+		exit 1
+		;;
 	bare-timeout-with-provider-marker)
 		# Emit bare "Connection timed out" alongside a provider marker so
 		# is_timeout_error() matches the Tier 3 branch gated on
@@ -2635,6 +2646,9 @@ class WorkspaceRunnerConfig:
         EncryptedString, nullable=True
     )
 EOS
+	elif [ "$scenario" = "pr-baseline-denied-text-allows" ]; then
+		mkdir -p "$repo_root_dir/backend/app"
+		echo 'async def require_project_member(): raise Exception("project access denied")' >"$repo_root_dir/backend/app/permissions.py"
 	elif [ "$scenario" = "pr-stale-source-plus-real-finding-blocks" ]; then
 		mkdir -p "$repo_root_dir/backend/db" "$repo_root_dir/backend/api"
 		cat >"$repo_root_dir/backend/db/models.py" <<'EOS'
@@ -6285,6 +6299,27 @@ run_gate_case "provider-denied-success-signal" \
 	"__SAME_AS_FALLBACK_MODELS__" \
 	"" \
 	"1"
+
+run_gate_case "pr-baseline-denied-text-allows" \
+	"vertex_ai/baseline-denied-text-primary" \
+	"" \
+	"0" \
+	"Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." \
+	"1" \
+	"vertex_ai/baseline-denied-text-primary" \
+	"<unset>" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"HIGH" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"backend/services/email_client.py"
 
 run_gate_case_allow_provider_signal "vertex-all-ratelimited" \
 	"vertex_ai/ratelimit-primary" \
