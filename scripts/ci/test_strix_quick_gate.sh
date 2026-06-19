@@ -3349,6 +3349,7 @@ run_pull_request_target_changed_context_scope_uses_pr_head_case() {
 	local changed_file="backend/api/emails.py"
 	local context_file="backend/core/config.py"
 	local requirements_file="backend/requirements.txt"
+	local pyproject_file="backend/pyproject.toml"
 
 	cat >"$fake_strix" <<'EOF'
 #!/usr/bin/env bash
@@ -3382,19 +3383,31 @@ if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_BASE_CONTEXT:?}" "$context_file"; then
 	exit 69
 fi
 
-requirements_file="$target_path/${FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE:?}"
-if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS:?}" "$requirements_file"; then
-	echo "Error: changed filtered backend context did not use PR head content" >&2
-	cat -- "$requirements_file" >&2
+	requirements_file="$target_path/${FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE:?}"
+	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS:?}" "$requirements_file"; then
+		echo "Error: changed filtered backend context did not use PR head content" >&2
+		cat -- "$requirements_file" >&2
 	exit 72
 fi
 if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS:?}" "$requirements_file"; then
-	echo "Error: changed filtered backend context leaked trusted base content" >&2
-	cat -- "$requirements_file" >&2
-	exit 73
-fi
+		echo "Error: changed filtered backend context leaked trusted base content" >&2
+		cat -- "$requirements_file" >&2
+		exit 73
+	fi
 
-if [ "$attempt" -eq 1 ]; then
+	pyproject_file="$target_path/${FAKE_STRIX_EXPECTED_PYPROJECT_FILE:?}"
+	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_PYPROJECT:?}" "$pyproject_file"; then
+		echo "Error: backend pyproject context did not use expected content" >&2
+		cat -- "$pyproject_file" >&2
+		exit 74
+	fi
+	if grep -Fq -- "${FAKE_STRIX_UNEXPECTED_PYPROJECT:?}" "$pyproject_file"; then
+		echo "Error: backend pyproject context leaked unexpected content" >&2
+		cat -- "$pyproject_file" >&2
+		exit 75
+	fi
+
+	if [ "$attempt" -eq 1 ]; then
 	changed_file="$target_path/${FAKE_STRIX_EXPECTED_CHANGED_FILE:?}"
 	if ! grep -Fq -- "${FAKE_STRIX_EXPECTED_HEAD_CONTENT:?}" "$changed_file"; then
 		echo "Error: PR head changed file content was not scanned" >&2
@@ -3421,6 +3434,7 @@ EOF
 		printf '%s\n' 'BASE_CHANGED_CONTENT_SHOULD_NOT_BE_SCANNED' >"$changed_file"
 		printf '%s\n' 'BASE_CONTEXT_SHOULD_NOT_BE_SCANNED' >"$context_file"
 		printf '%s\n' 'BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED' >"$requirements_file"
+		printf '%s\n' 'BASE_PYPROJECT_SHOULD_BE_SCANNED' >"$pyproject_file"
 		git add .
 		git commit -qm 'base commit'
 	)
@@ -3431,6 +3445,7 @@ EOF
 		printf '%s\n' 'HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED' >"$changed_file"
 		printf '%s\n' 'HEAD_CONTEXT_SHOULD_BE_SCANNED' >"$context_file"
 		printf '%s\n' 'HEAD_REQUIREMENTS_SHOULD_BE_SCANNED' >"$requirements_file"
+		printf '%s\n' 'HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED' >"$pyproject_file"
 		git add .
 		git commit -qm 'head commit'
 	)
@@ -3451,11 +3466,14 @@ EOF
 			FAKE_STRIX_EXPECTED_CHANGED_FILE="$changed_file" \
 			FAKE_STRIX_EXPECTED_CONTEXT_FILE="$context_file" \
 			FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE="$requirements_file" \
+			FAKE_STRIX_EXPECTED_PYPROJECT_FILE="$pyproject_file" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTEXT="HEAD_CONTEXT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS="HEAD_REQUIREMENTS_SHOULD_BE_SCANNED" \
+			FAKE_STRIX_EXPECTED_PYPROJECT="BASE_PYPROJECT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTEXT="BASE_CONTEXT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS="BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED" \
+			FAKE_STRIX_UNEXPECTED_PYPROJECT="HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_STATE_FILE="$state_file" \
 			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \
@@ -3486,11 +3504,14 @@ EOF
 			FAKE_STRIX_EXPECTED_CHANGED_FILE="$changed_file" \
 			FAKE_STRIX_EXPECTED_CONTEXT_FILE="$context_file" \
 			FAKE_STRIX_EXPECTED_REQUIREMENTS_FILE="$requirements_file" \
+			FAKE_STRIX_EXPECTED_PYPROJECT_FILE="$pyproject_file" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTENT="HEAD_CHANGED_CONTENT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_CONTEXT="HEAD_CONTEXT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_EXPECTED_HEAD_REQUIREMENTS="HEAD_REQUIREMENTS_SHOULD_BE_SCANNED" \
+			FAKE_STRIX_EXPECTED_PYPROJECT="HEAD_PYPROJECT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_CONTEXT="BASE_CONTEXT_SHOULD_NOT_BE_SCANNED" \
 			FAKE_STRIX_UNEXPECTED_BASE_REQUIREMENTS="BASE_REQUIREMENTS_SHOULD_NOT_BE_SCANNED" \
+			FAKE_STRIX_UNEXPECTED_PYPROJECT="BASE_PYPROJECT_SHOULD_BE_SCANNED" \
 			FAKE_STRIX_STATE_FILE="$state_file" \
 			STRIX_DISABLE_PR_SCOPING="0" \
 			STRIX_LLM_FILE="$strix_llm_file" \

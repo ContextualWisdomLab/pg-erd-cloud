@@ -5,6 +5,22 @@ import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
 
 const MAX_RENDERED_COLUMNS = 25;
 
+const HTML_TEXT_ESCAPE_RE = /[&<>"']/g;
+const HTML_TEXT_REPLACEMENTS: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeHtmlText(value: string): string {
+  return value.replace(
+    HTML_TEXT_ESCAPE_RE,
+    (char) => HTML_TEXT_REPLACEMENTS[char] ?? char,
+  );
+}
+
 type Column = {
   column_name: string;
   data_type: string;
@@ -31,7 +47,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         <span className="tableNode__titleText">
           <span>{data.title}</span>
           {data.comment ? (
-            <span className="tableNode__titleComment">{data.comment}</span>
+            <span className="tableNode__titleComment">
+              {escapeHtmlText(data.comment)}
+            </span>
           ) : null}
         </span>
         <span style={{ display: "inline-flex", gap: 6 }}>
@@ -55,7 +73,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             <span className="tableNode__colIdentity">
               <span className="tableNode__colName">{c.column_name}</span>
               {c.column_comment ? (
-                <span className="tableNode__colComment">{c.column_comment}</span>
+                <span className="tableNode__colComment">
+                  {escapeHtmlText(c.column_comment)}
+                </span>
               ) : null}
             </span>
             <span className="tableNode__colType">{c.data_type}</span>
