@@ -520,6 +520,7 @@ is_preexisting_report_dir() {
 is_github_models_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
+	openai/o[1-9]* | \
 	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
@@ -534,6 +535,7 @@ is_github_models_api_compatible_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
 	openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
+	openai/o[1-9]* | \
 	openai/deepseek/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0

@@ -767,7 +767,7 @@ printf '%s\n' "$target_path" >> "${FAKE_STRIX_TARGET_LOG:?}"
 STRIX_REPORTS_DIR="${STRIX_REPORTS_DIR:-strix_runs}"
 
 case "${FAKE_STRIX_SCENARIO:?}" in
-	success|runtime-env-forwarding|vertex-primary-success-timing-message|direct-openai-gpt-does-not-require-github-models-api-base)
+	success|runtime-env-forwarding|vertex-primary-success-timing-message|direct-openai-gpt-does-not-require-github-models-api-base|github-models-openai-o3-api-base-succeeds)
 		echo "scan ok"
 		exit 0
 		;;
@@ -7708,7 +7708,7 @@ run_gate_case "github-models-model-prefix-requires-api-base" \
 	""
 
 run_gate_case "github-models-api-base-rejected-for-direct-openai" \
-	"openai/o4-mini" \
+	"openai/gpt-4.1" \
 	"" \
 	"2" \
 	"LLM_API_BASE may route through GitHub Models only when STRIX_LLM uses a GitHub Models model prefix" \
@@ -7736,6 +7736,17 @@ run_gate_case "github-models-model-prefix-with-api-base-succeeds" \
 	"scan ok" \
 	"1" \
 	"openai/gpt-5" \
+	"https://models.github.ai/inference" \
+	"openai" \
+	"https://models.github.ai/inference"
+
+run_gate_case "github-models-openai-o3-api-base-succeeds" \
+	"openai/o3" \
+	"" \
+	"0" \
+	"scan ok" \
+	"1" \
+	"openai/o3" \
 	"https://models.github.ai/inference" \
 	"openai" \
 	"https://models.github.ai/inference"
