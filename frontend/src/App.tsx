@@ -122,23 +122,22 @@ export default function App() {
     if (!snapshotId) return;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
-        .then((s) => setSnapshot(s))
+        .then((s) => {
+          setSnapshot(s);
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+            clearInterval(timer);
+          }
+        })
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
   }, [snapshotId]);
 
-  const snapshotJsonKey = useMemo(() => {
-    return snapshot?.snapshot_json
-      ? JSON.stringify(snapshot.snapshot_json)
-      : "";
-  }, [snapshot?.snapshot_json]);
-
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
       ? snapshotToGraph(snapshot.snapshot_json)
       : null;
-  }, [snapshotJsonKey]);
+  }, [snapshot?.snapshot_json]);
   const createProjectHint = projectName.trim() ? "" : "Enter project name";
   const createConnectionHint = !selectedProjectId
     ? "Select a project first"
