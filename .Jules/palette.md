@@ -4,3 +4,6 @@
 ## 2024-05-24 - [Replaced blocking alert with inline copy feedback]
 **Learning:** Native browser alerts for micro-interactions (like copying text) are disruptive to the user flow. Replacing them with temporary inline button text updates (`aria-live="polite"`) significantly improves both the experience and accessibility for screen readers.
 **Action:** Always prefer non-blocking inline feedback or toast notifications over `alert()` or `confirm()` dialogs for non-destructive actions.
+## 2026-06-20 - Adding async operation loading states to critical UX paths
+**Learning:** This app requires manual yielding to the browser during compute-heavy or async events (like `onAutoLayout` with `requestAnimationFrame`). For typical network requests, standard state flags for disabling/progressing buttons with `aria-busy` provides sufficient UX feedback without freezing the UI.
+**Action:** When adding new network operations in this stack, consistently use dedicated loading state flags and apply `aria-busy` attributes paired with disabled logic to inform the user.
