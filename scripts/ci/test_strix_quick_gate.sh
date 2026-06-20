@@ -80,9 +80,11 @@ assert_workflow_uses_are_sha_pinned() {
 
 assert_strix_pr_scope_includes_deployment_context() {
 	assert_file_contains "$GATE_SCRIPT" "needs_deployment_context=0" "strix gate tracks deployment-context scoped PRs"
-	assert_file_contains "$GATE_SCRIPT" ".github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/next.config.ts | docker-compose*.yml | render.yaml" "strix gate recognizes deployment and CI files"
+	assert_file_contains "$GATE_SCRIPT" ".github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/Dockerfile.prod | frontend/next.config.ts | compose*.yaml | compose*.yml | docker-compose*.yml | render.yaml" "strix gate recognizes deployment and CI files"
+	assert_file_contains "$GATE_SCRIPT" "frontend/Dockerfile.prod" "strix gate includes production frontend image context"
 	assert_file_contains "$GATE_SCRIPT" "frontend/package-lock.json" "strix gate includes frontend dependency lock context"
 	assert_file_contains "$GATE_SCRIPT" "frontend/postcss.config.mjs" "strix gate includes frontend build config context"
+	assert_file_contains "$GATE_SCRIPT" "compose.prod.yaml" "strix gate includes production compose context"
 	assert_file_contains "$GATE_SCRIPT" "VERSION" "strix gate includes release version context for workflow scans"
 }
 
@@ -299,6 +301,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 
 	assert_file_contains "$workflow_file" "Initialize CodeGraph index for OpenCode" "opencode review workflow initializes CodeGraph before review"
 	assert_file_contains "$workflow_file" "workflow_dispatch:" "opencode review workflow keeps manual scheduler dispatch support"
+	assert_file_not_contains "$workflow_file" "pull_request_target" "opencode review workflow avoids misleading trusted-trigger literals"
 	assert_file_contains "$workflow_file" "pr_number:" "opencode review workflow accepts manual PR number input"
 	assert_file_contains "$workflow_file" "pr_base_ref:" "opencode review workflow accepts manual PR base ref input"
 	assert_file_contains "$workflow_file" "pr_base_sha:" "opencode review workflow accepts manual PR base SHA input"
@@ -363,7 +366,13 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "OpenCode comment gate result: %s (exit %s)" "opencode review publish step logs invalid control output status"
 	assert_file_contains "$workflow_file" "<!-- opencode-review-overview -->" "opencode review publishes a durable Review Overview marker"
 	assert_file_contains "$workflow_file" "## OpenCode Review Overview" "opencode review publishes a visible Review Overview heading"
+	assert_file_contains "$workflow_file" "OpenCode Agent review was unavailable, but current-head GitHub Checks passed." "opencode review does not submit blocking reviews for model/runtime failures after checks pass"
+	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because the failure was in the OpenCode model/runtime path" "opencode review explains non-blocking model/runtime failures"
 	assert_file_contains "$workflow_file" 'gh api -X PATCH "repos/${GH_REPOSITORY}/issues/comments/${overview_comment_id}"' "opencode review updates an existing Review Overview comment instead of duplicating it"
+	assert_file_contains "$workflow_file" "format_review_api_error" "opencode review approval helper formats formal review API failures"
+	assert_file_contains "$workflow_file" "curl --fail-with-body --silent --show-error" "opencode review approval helper preserves formal review API response bodies"
+	assert_file_contains "$workflow_file" "formal APPROVE review submission failed" "opencode review approval warning includes formal review submission failure context"
+	assert_file_contains "$workflow_file" "Formal review submission warning:" "opencode review overview records formal review submission failures durably"
 	assert_file_not_contains "$workflow_file" 'gh api -X DELETE "repos/${GH_REPOSITORY}/issues/comments/${comment_id}"' "opencode review must not delete Review Overview gate evidence"
 	assert_file_not_contains "$workflow_file" '--file "$OPENCODE_EVIDENCE_FILE"' "opencode review must not attach evidence content to GitHub Models requests"
 	assert_file_not_contains "$workflow_file" "opencode github run" "opencode review workflow must not use the oversized GitHub agent prompt path"
@@ -2197,6 +2206,20 @@ Severity: CRITICAL
 Description: location data unavailable
 EOS
 		echo "Penetration test failed: unmapped critical finding"
+		exit 1
+		;;
+	pr-incomplete-codebase-pr-scope)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-incomplete-codebase/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-pr-incomplete-codebase/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Incomplete Codebase Prevents Comprehensive Security Assessment
+Severity: HIGH
+
+The provided codebase appears incomplete. The frontend directory contains
+configuration files but no actual source code files. Other directories contain
+CI/CD scripts but no application code. This prevents comprehensive security
+assessment and prevented thorough security testing.
+EOS
+		echo "Penetration test failed: incomplete bounded PR-scope codebase"
 		exit 1
 		;;
 	pr-critical-placeholder-hardcoded-secret)
@@ -7557,6 +7580,30 @@ run_gate_case "pr-critical-unmapped" \
 	"0" \
 	"pull_request" \
 	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
+
+run_gate_case "pr-incomplete-codebase-pr-scope" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"HIGH" \
+	"0" \
+	"__PR_SCOPE__" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
+	"" \
+	"" \
+	"0"
 
 run_gate_case "pr-critical-placeholder-hardcoded-secret" \
 	"openai/gpt-4o-mini" \

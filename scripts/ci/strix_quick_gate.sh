@@ -1148,7 +1148,7 @@ pull_request_scope_context_files() {
 		# changed in the PR. Include the trusted copies so Strix does not downgrade
 		# a clean finding to provider/failure-signal output due to missing Dockerfiles
 		# or VERSION context.
-		.github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/next.config.ts | docker-compose*.yml | render.yaml)
+		.github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/Dockerfile.prod | frontend/next.config.ts | compose*.yaml | compose*.yml | docker-compose*.yml | render.yaml)
 			needs_deployment_context=1
 			;;
 		esac
@@ -1216,11 +1216,13 @@ EOF
 	if [ "$needs_deployment_context" -eq 1 ]; then
 		cat <<'EOF'
 Dockerfile
-frontend/Dockerfile
+frontend/Dockerfile.prod
 frontend/package.json
 frontend/package-lock.json
 frontend/next.config.ts
 frontend/postcss.config.mjs
+compose.yaml
+compose.prod.yaml
 docker-compose.yml
 render.yaml
 VERSION
@@ -1779,6 +1781,7 @@ evaluate_pull_request_findings() {
 	local found_baseline_threshold_finding=0
 	local found_changed_manifest_only_threshold_finding=0
 	local found_absent_placeholder_secret_finding=0
+	local found_incomplete_pr_scope_finding=0
 	local found_retryable_model_inconsistency=0
 	local found_any_vuln_file=0
 	local run_dir vulnerabilities_dir vuln_file line severity rank
@@ -1809,6 +1812,10 @@ evaluate_pull_request_findings() {
 			fi
 			if vulnerability_file_has_absent_placeholder_secret_claim "$vuln_file"; then
 				found_absent_placeholder_secret_finding=1
+				continue
+			fi
+			if vulnerability_file_is_incomplete_pr_scope_assessment "$vuln_file"; then
+				found_incomplete_pr_scope_finding=1
 				continue
 			fi
 			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
@@ -1861,6 +1868,12 @@ evaluate_pull_request_findings() {
 		return 0
 	fi
 
+	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_incomplete_pr_scope_finding" -eq 1 ]; then
+		PR_FINDINGS_DECISION="allow_incomplete_pr_scope"
+		echo "Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." >&2
+		return 0
+	fi
+
 	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ]; then
 		rank="$(extract_first_severity_rank "$STRIX_LOG")"
 		if [ "$rank" -lt 0 ]; then
@@ -1875,6 +1888,11 @@ evaluate_pull_request_findings() {
 				found_retryable_model_inconsistency=1
 				PR_FINDINGS_DECISION="retry_model_inconsistency"
 				return 1
+			fi
+			if vulnerability_file_is_incomplete_pr_scope_assessment "$STRIX_LOG"; then
+				PR_FINDINGS_DECISION="allow_incomplete_pr_scope"
+				echo "Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." >&2
+				return 0
 			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
@@ -1943,7 +1961,7 @@ evaluate_pull_request_findings() {
 
 pull_request_findings_allow_current_change() {
 	case "$PR_FINDINGS_DECISION" in
-	allow_absent_placeholder_secret | allow_baseline | allow_manifest_only)
+	allow_absent_placeholder_secret | allow_baseline | allow_incomplete_pr_scope | allow_manifest_only)
 		return 0
 		;;
 	esac
@@ -3107,6 +3125,46 @@ placeholder_values = (
 has_placeholder_path = any(path in text for path in placeholder_paths)
 has_placeholder_value = any(value in text for value in placeholder_values)
 raise SystemExit(0 if has_placeholder_path and has_placeholder_value else 1)
+PY
+}
+
+vulnerability_file_is_incomplete_pr_scope_assessment() {
+	local vuln_file="$1"
+	if [ "$TARGET_PATH_IS_INTERNAL_PR_SCOPE" -ne 1 ]; then
+		return 1
+	fi
+	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+		return 1
+	fi
+
+	local resolved_locations=()
+	mapfile -t resolved_locations < <(extract_vulnerability_locations "$vuln_file")
+	if [ "${#resolved_locations[@]}" -gt 0 ]; then
+		return 1
+	fi
+
+	python3 - "$vuln_file" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+lowered = text.lower()
+
+has_title = "incomplete codebase" in lowered
+has_scope_evidence = (
+    "missing application source code" in lowered
+    or "lacked actual application source code" in lowered
+    or "no actual source code" in lowered
+    or "no source files found" in lowered
+)
+has_assessment_limit = (
+    "prevents comprehensive security assessment" in lowered
+    or "preventing comprehensive security validation" in lowered
+    or "prevented thorough security testing" in lowered
+    or "without source code" in lowered
+)
+
+raise SystemExit(0 if has_title and has_scope_evidence and has_assessment_limit else 1)
 PY
 }
 
