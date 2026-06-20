@@ -1130,6 +1130,7 @@ is_scannable_changed_file() {
 
 pull_request_scope_context_files() {
 	local needs_backend_python=0
+	local needs_frontend_app_api_context=0
 	local needs_frontend_email_api_context=0
 	local needs_deployment_context=0
 	local changed_file normalized_changed_file
@@ -1138,6 +1139,13 @@ pull_request_scope_context_files() {
 		case "$normalized_changed_file" in
 		backend/*.py | backend/*/*.py | backend/*/*/*.py | backend/*/*/*/*.py)
 			needs_backend_python=1
+			;;
+		# The React app shell and API client call security-sensitive backend
+		# routes; include the trusted auth, permission, CSRF, and schema context
+		# so PR-scoped scans can evaluate those calls instead of treating the
+		# backend as missing.
+		frontend/src/App.tsx | frontend/src/api.ts)
+			needs_frontend_app_api_context=1
 			;;
 		# The app shell, email components, threading URL builder, and API client can
 		# shape frontend email retrieval flows; include backend auth context with them.
@@ -1199,6 +1207,26 @@ backend/services/imap_worker.py
 backend/services/llm_provider_urls.py
 backend/services/text_safety.py
 backend/services/threading_service.py
+EOF
+	fi
+
+	if [ "$needs_frontend_app_api_context" -eq 1 ]; then
+		cat <<'EOF'
+frontend/src/api.ts
+backend/app/main.py
+backend/app/api/auth_routes.py
+backend/app/api/connections.py
+backend/app/api/me.py
+backend/app/api/projects.py
+backend/app/api/snapshots.py
+backend/app/auth.py
+backend/app/csrf.py
+backend/app/db.py
+backend/app/models.py
+backend/app/permissions.py
+backend/app/rate_limit.py
+backend/app/schemas.py
+backend/app/security.py
 EOF
 	fi
 
