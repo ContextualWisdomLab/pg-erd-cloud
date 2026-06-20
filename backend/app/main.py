@@ -15,7 +15,7 @@ from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
-from app.csrf import make_csrf_middleware
+from app.csrf import CSRF_HEADER_NAME, make_csrf_middleware
 from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
@@ -61,6 +61,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 
+CORS_ALLOW_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "X-Dev-User",
+    CSRF_HEADER_NAME,
+]
+
 _rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
 )
@@ -92,7 +99,7 @@ app.add_middleware(
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Dev-User", "X-CSRF-Token"],
+    allow_headers=CORS_ALLOW_HEADERS,
 )
 
 # Observability should be registered after other middleware so it can capture
