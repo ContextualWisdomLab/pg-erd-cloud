@@ -1,4 +1,5 @@
-import type { Connection, Project, Snapshot, SnapshotDetail } from './types'
+import { snapshotDetailFromResponse } from './types'
+import type { Connection, Project, Snapshot, SnapshotDetail, SnapshotDetailResponse } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -91,5 +92,6 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
 export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
   const r = await fetch(`${API_BASE}/api/snapshots/${snapshotId}`, { credentials: 'include', headers: devHeaders() })
   if (!r.ok) throw new Error(`getSnapshot failed: ${r.status}`)
-  return r.json()
+  const response = (await r.json()) as SnapshotDetailResponse
+  return snapshotDetailFromResponse(response)
 }
