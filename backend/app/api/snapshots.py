@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -143,17 +143,18 @@ async def get_snapshot(
 )
 async def export_snapshot_sql(
     schema_snapshot_uuid: uuid.UUID,
+    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
-    """Export a snapshot as PostgreSQL DDL (best-effort)."""
+    """Export a snapshot as dialect-specific SQL DDL (best-effort)."""
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
         return "-- snapshot not found\n"
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json)
+    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
 
 
 @router.get(

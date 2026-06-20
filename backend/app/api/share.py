@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -127,6 +127,7 @@ async def get_shared_snapshot(
 async def export_shared_snapshot_sql(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
+    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a shared snapshot as SQL via a share link."""
@@ -145,4 +146,4 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json)
+    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
