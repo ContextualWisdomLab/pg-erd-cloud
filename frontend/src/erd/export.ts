@@ -2,31 +2,10 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { TableNodeData } from './convert';
+import type { SnapshotJson } from '../types';
 
-type SnapshotJson = {
-  relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
-  columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean; example_value?: string | number | boolean | null }>
-  indexes?: Array<{
-    relation_oid?: number
-    table_oid?: number
-    index_name: string
-    access_method?: string
-    access_method_extension?: string | null
-    operator_class_extensions?: string[]
-    is_unique?: boolean
-    is_primary?: boolean
-    index_def?: string
-  }>
-  fk_edges?: Array<{
-    fk_constraint_oid: number
-    fk_constraint_name: string
-    child_relation_oid: number
-    parent_relation_oid: number
-    child_column_name: string
-    parent_column_name: string
-    column_ordinal: number
-  }>
-}
+
+
 
 type SnapshotIndex = NonNullable<SnapshotJson['indexes']>[number];
 
