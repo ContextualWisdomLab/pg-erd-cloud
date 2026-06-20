@@ -50,6 +50,19 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
         fk_edges = await conn.fetch(
             queries.FK_EDGES_SQL, schema_name, include_system
         )
+        citus_distributed_tables = []
+        has_citus = await conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'citus')"
+        )
+        if has_citus:
+            try:
+                citus_distributed_tables = await conn.fetch(
+                    queries.CITUS_DISTRIBUTED_TABLES_SQL,
+                    schema_name,
+                    include_system,
+                )
+            except asyncpg.UndefinedTableError:
+                citus_distributed_tables = []
 
         snapshot = {
             "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -62,6 +75,9 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             "indexes": [dict(r) for r in indexes],
             "pk_columns": [dict(r) for r in pk_columns],
             "fk_edges": [dict(r) for r in fk_edges],
+            "citus_distributed_tables": [
+                dict(r) for r in citus_distributed_tables
+            ],
         }
 
         return sanitize_for_storage(snapshot)  # type: ignore[return-value]

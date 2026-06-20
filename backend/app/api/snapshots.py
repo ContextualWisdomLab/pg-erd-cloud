@@ -19,11 +19,14 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
+from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
     LlmProviderError,
+    generate_index_design_llm_draft,
     generate_reversing_llm_draft,
 )
+from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
@@ -117,6 +120,7 @@ async def create_snapshot(
     session.add(job)
 
     await session.commit()
+    await enqueue_job_signal(job.job_queue_uuid, job.run_after)
     return SnapshotOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
         status=snap.status,
@@ -192,6 +196,37 @@ async def export_snapshot_reversing_spec(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     return generate_reversing_spec(data.snapshot_json, mode=mode)
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/index-design.md",
+    response_class=PlainTextResponse,
+)
+async def export_snapshot_index_design(
+    schema_snapshot_uuid: uuid.UUID,
+    mode: str = Query(
+        "markdown", pattern="^(markdown|llm-prompt|llm-draft)$"
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Export table/index design guidance or an LLM prompt."""
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "# ERD Index Design\n\nSnapshot not found.\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "# ERD Index Design\n\nSnapshot data not found.\n"
+    if mode == "llm-draft":
+        try:
+            return await generate_index_design_llm_draft(data.snapshot_json)
+        except LlmConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LlmProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="LLM provider request failed"
+            ) from exc
+    return generate_index_design_spec(data.snapshot_json, mode=mode)
 
 
 @router.get(

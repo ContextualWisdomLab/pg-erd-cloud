@@ -42,6 +42,22 @@ def _tablespace_clause(tablespace: object) -> str:
     return f" TABLESPACE {_q(tablespace)}" if isinstance(tablespace, str) else ""
 
 
+_CREATE_INDEX_RE = re.compile(
+    r"^CREATE\s+(UNIQUE\s+)?INDEX\s+(?!CONCURRENTLY\b)",
+    flags=re.IGNORECASE,
+)
+
+
+def _index_def_with_concurrently(index_def: str) -> str:
+    """Add CONCURRENTLY to a PostgreSQL CREATE INDEX statement."""
+
+    def replacement(match: re.Match[str]) -> str:
+        unique = match.group(1) or ""
+        return f"CREATE {unique}INDEX CONCURRENTLY "
+
+    return _CREATE_INDEX_RE.sub(replacement, index_def, count=1)
+
+
 def _normalize_type_text(data_type: str) -> str:
     return re.sub(r"\s+", " ", data_type.strip().lower())
 
@@ -306,12 +322,13 @@ def _render_foreign_keys(constraints: list[dict], lines: list[str]) -> None:
 
 def _render_indexes_pg(indexes: list[dict], lines: list[str]) -> None:
     if indexes:
-        lines.append("-- Indexes")
+        lines.append("-- Indexes (CONCURRENTLY; run outside a transaction)")
     for ix in indexes:
         ix_def = ix.get("index_def")
         if not isinstance(ix_def, str):
             continue
         ix_def = ix_def.strip().rstrip(";")
+        ix_def = _index_def_with_concurrently(ix_def)
         table_options = _tablespace_clause(ix.get("index_tablespace_name"))
         if table_options and " TABLESPACE " not in ix_def.upper():
             ix_def = f"{ix_def}{table_options}"
