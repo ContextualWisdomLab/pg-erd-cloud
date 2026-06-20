@@ -1,4 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
+import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { TableNodeData } from './convert';
 
@@ -31,6 +32,26 @@ type SnapshotIndex = NonNullable<SnapshotJson['indexes']>[number];
 
 type DisplayIndex = SnapshotIndex | IndexRecommendation;
 
+const SQL_IDENTIFIER_QUOTE_RE = /"/g;
+const SQL_ACCESS_METHOD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SQL_DATA_TYPE_RE = /^[A-Za-z0-9_ .,[\]()]+$/;
+const PLANT_TEXT_ESCAPE_RE = /[\\\r\n]/g;
+
+function quoteSqlIdentifier(value: unknown): string {
+  const text = String(value ?? '').trim() || 'unnamed';
+  return `"${text.replace(SQL_IDENTIFIER_QUOTE_RE, '""')}"`;
+}
+
+function sqlAccessMethod(value: unknown): string {
+  const text = String(value ?? '').trim();
+  return SQL_ACCESS_METHOD_RE.test(text) ? text : 'btree';
+}
+
+function sqlDataType(value: unknown): string {
+  const text = String(value ?? '').trim();
+  return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
+}
+
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
@@ -40,11 +61,12 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Export tables
   for (const node of nodes) {
     const tableTitle = node.data.title || node.id;
-    ddl += `CREATE TABLE "${tableTitle}" (\n`;
+    ddl += `CREATE TABLE ${quoteSqlIdentifier(tableTitle)} (\n`;
 
     const cols = node.data.columns || [];
     const colLines = cols.map((c) => {
-      let line = `  "${c.column_name}" ${c.data_type}`;
+      const columnName = quoteSqlIdentifier(c.column_name);
+      let line = `  ${columnName} ${sqlDataType(c.data_type)}`;
       if (c.is_not_null) {
         line += ' NOT NULL';
       }
@@ -52,7 +74,9 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     });
 
     // Handle primary keys
-    const pkCols = cols.filter(c => c.is_pk).map(c => `"${c.column_name}"`);
+    const pkCols = cols
+      .filter(c => c.is_pk)
+      .map(c => quoteSqlIdentifier(c.column_name));
     if (pkCols.length > 0) {
       colLines.push(`  PRIMARY KEY (${pkCols.join(', ')})`);
     }
@@ -68,11 +92,13 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
 
     if (sourceNode && targetNode) {
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
-      ddl += `ALTER TABLE "${sourceNode.data.title || sourceNode.id}"\n`;
-      ddl += `  ADD CONSTRAINT "${constraintName}"\n`;
+      const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
+      const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
+      ddl += `ALTER TABLE ${sourceTable}\n`;
+      ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
       // For simplicity in UI without detailed column mapping we just put placeholder comments
       ddl += `  FOREIGN KEY (/* source columns */)\n`;
-      ddl += `  REFERENCES "${targetNode.data.title || targetNode.id}" (/* target columns */);\n\n`;
+      ddl += `  REFERENCES ${targetTable} (/* target columns */);\n\n`;
     }
   }
 
@@ -85,9 +111,14 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
         continue;
       }
       emittedIndexes.add(index.index_name);
-      const cols = index.columns.map((column) => `"${column}"`).join(', ');
+      const cols = index.columns
+        .map((column) => quoteSqlIdentifier(column))
+        .join(', ');
+      const indexName = quoteSqlIdentifier(index.index_name);
+      const quotedTable = quoteSqlIdentifier(tableTitle);
+      const accessMethod = sqlAccessMethod(index.access_method);
       indexLines.push(
-        `CREATE INDEX "${index.index_name}" ON "${tableTitle}" USING ${index.access_method} (${cols});`,
+        `CREATE INDEX ${indexName} ON ${quotedTable} USING ${accessMethod} (${cols});`,
       );
     }
   }
@@ -100,13 +131,20 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   return ddl;
 }
 
+const XML_ESCAPE_RE = /[&<>"']/g;
+const XML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
 function escapeXml(value: unknown): string {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
+  return String(value ?? '').replace(
+    XML_ESCAPE_RE,
+    (char) => XML_ESCAPES[char] ?? char,
+  );
 }
 
 function plantAlias(id: string): string {
@@ -114,7 +152,10 @@ function plantAlias(id: string): string {
 }
 
 function plantText(value: unknown): string {
-  return String(value ?? '').replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', ' ');
+  return escapeXml(value).replace(
+    PLANT_TEXT_ESCAPE_RE,
+    (char) => (char === '\\' ? '\\\\' : ' '),
+  );
 }
 
 function indexesByRelation(snapshot?: SnapshotJson | null): Map<string, SnapshotJson['indexes']> {
@@ -153,7 +194,9 @@ function columnLabel(col: TableNodeData['columns'][number]): string {
 
 function tableLabel(node: Node<TableNodeData>): string {
   const title = node.data.title || node.id;
-  return `${title}${node.data.comment ? ` (${node.data.comment})` : ''}`;
+  const comment = node.data.comment ? ` (${node.data.comment})` : '';
+  const group = node.data.businessGroup ? ` [${node.data.businessGroup.name}]` : '';
+  return `${title}${group}${comment}`;
 }
 
 export function exportPlantUml(
@@ -236,8 +279,14 @@ export function exportDiagramSvg(
     const x = node.position.x + offsetX;
     const y = node.position.y + offsetY;
     const height = heights.get(node.id) || headerHeight;
+    const groupColor = node.data.businessGroup
+      ? normalizeBusinessGroupColor(node.data.businessGroup.color)
+      : '#e0f2fe';
     parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" fill="#fff" stroke="#cbd5e1"/>`);
-    parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" rx="8" fill="#e0f2fe" stroke="#cbd5e1"/>`);
+    parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" rx="8" fill="${escapeXml(groupColor)}" fill-opacity="${node.data.businessGroup ? '0.18' : '1'}" stroke="#cbd5e1"/>`);
+    if (node.data.businessGroup) {
+      parts.push(`<rect x="${x}" y="${y}" width="6" height="${height}" rx="3" fill="${escapeXml(groupColor)}"/>`);
+    }
     parts.push(`<text x="${x + 12}" y="${y + 22}" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#0f172a">${escapeXml(tableLabel(node))}</text>`);
     let rowY = y + headerHeight + 16;
     for (const col of node.data.columns || []) {

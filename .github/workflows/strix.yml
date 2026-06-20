@@ -24,11 +24,13 @@ on:
       strix_llm:
         description: Optional Strix model override for manual evidence runs
         required: false
-        default: github_models/deepseek/deepseek-r1-0528
+        default: github_models/deepseek/deepseek-v3-0324
         type: string
 
 concurrency:
-  group: strix-${{ github.repository }}
+  group: strix-${{ github.repository }}-${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha || github.sha }}
+  # Key by scanned head so a newer pending PR evidence run cannot cancel
+  # another PR's pending evidence before GitHub allocates a runner.
   # cancel-in-progress deliberately disabled: an attacker could force-push
   # a benign commit to cancel an in-progress scan of a malicious commit.
   cancel-in-progress: false
@@ -117,7 +119,7 @@ jobs:
       - name: Gate Strix secrets
         id: gate
         env:
-          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528' }}
+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324' }}
           STRIX_OPENAI_API_KEY: ${{ secrets.STRIX_OPENAI_API_KEY }}
           STRIX_VERTEX_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN || github.token }}
@@ -164,7 +166,7 @@ jobs:
               fi
               ;;
             *)
-              echo '::error::STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
+              echo '::error::STRIX_LLM must select GitHub Models DeepSeek V3/R1, OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
               exit 1
               ;;
           esac
@@ -252,7 +254,7 @@ jobs:
       - name: Prepare Strix model input file
         if: steps.gate.outputs.enabled == 'true'
         env:
-          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528' }}
+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324' }}
         run: |
           umask 077
           strix_llm_file="$RUNNER_TEMP/strix_llm.txt"
@@ -283,7 +285,7 @@ jobs:
               printf '%s' "$strix_model" > "$strix_llm_file"
               ;;
             *)
-              echo '::error::STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
+              echo '::error::STRIX_LLM must select GitHub Models DeepSeek V3/R1, OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
               exit 1
               ;;
           esac

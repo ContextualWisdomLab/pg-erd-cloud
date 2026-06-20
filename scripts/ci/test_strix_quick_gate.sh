@@ -93,7 +93,7 @@ assert_strix_workflow_pr_trigger_hardened() {
 
 	assert_file_contains "$workflow_file" "branches: [master]" "strix workflow scans the protected default branch"
 	assert_file_contains "$workflow_file" "pull_request_target:" "strix workflow uses trusted PR trigger"
-	assert_file_contains "$workflow_file" 'group: strix-${{ github.repository }}' "strix workflow serializes scans per repository for GitHub Models quota"
+	assert_file_contains "$workflow_file" "github.event.pull_request.head.sha || github.event.inputs.pr_head_sha || github.sha" "strix workflow keys concurrency by scanned head so pending PR evidence is not cross-cancelled"
 	assert_file_contains "$workflow_file" "cancel-in-progress: false" "strix workflow never cancels in-progress security evidence"
 	assert_file_contains "$workflow_file" "models: read" "strix workflow grants only the GitHub Models read permission needed for Strix"
 	assert_file_contains "$workflow_file" "Materialize trusted workspace" "strix workflow materializes trusted workspace"
@@ -153,9 +153,9 @@ assert_strix_workflow_pr_trigger_hardened() {
 	assert_file_not_contains "$workflow_file" "STRIX_TOTAL_TIMEOUT_SECONDS:" "strix workflow must not expose total timeout env names in GitHub logs"
 	assert_file_not_contains "$workflow_file" "STRIX_PR_SCOPE_MAX_FILES_PER_BATCH" "strix workflow must not split Strix PR evidence into separate scanner runs"
 	assert_file_not_contains "$workflow_file" "secrets.STRIX_LLM == 'vertex_ai/gemini-3.1-pro-preview-customtools' && 'vertex_ai/gemini-2.5-flash'" "strix workflow must not quarantine the approved Vertex preview model after organization secret visibility is fixed"
-	assert_file_contains "$workflow_file" "github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528'" "strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek R1 route"
+	assert_file_contains "$workflow_file" "github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324'" "strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek V3 route"
 	assert_file_not_contains "$workflow_file" "secrets.STRIX_LLM ||" "strix workflow must not let the legacy STRIX_LLM secret override PR defaults"
-	assert_file_contains "$workflow_file" "STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model" "strix workflow rejects unsupported model inputs"
+	assert_file_contains "$workflow_file" "STRIX_LLM must select GitHub Models DeepSeek V3/R1, OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model" "strix workflow rejects unsupported model inputs"
 	assert_file_contains "$workflow_file" "vertex_ai/gemini-3.1-pro-preview-customtools | vertex_ai/gemini-2.5-flash)" "strix workflow accepts only exact approved organization Vertex AI models"
 	assert_file_contains "$workflow_file" 'STRIX_VERTEX_FALLBACK_MODELS: ""' "strix workflow disables silent Vertex fallbacks so timeout-class failures fail closed"
 	assert_file_contains "$workflow_file" 'STRIX_FAIL_ON_PROVIDER_SIGNAL: "1"' "strix workflow fails closed on timeout, fatal, warning, denied, or provider failure signals"
@@ -311,6 +311,8 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "inputs.pr_head_sha" "opencode review workflow uses dispatch PR head SHA inputs"
 	assert_file_contains "$workflow_file" "|| github.event_name == 'workflow_dispatch'" "opencode review workflow allows scheduler-triggered dispatch runs"
 	assert_file_contains "$workflow_file" '[[ "$PR_NUMBER" =~ ^[0-9]+$ ]]' "opencode review workflow validates manual PR number"
+	assert_file_contains "$workflow_file" '[[ "$PR_BASE_REF" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]]' "opencode review workflow allowlists PR base ref characters before fetch"
+	assert_file_contains "$workflow_file" 'git check-ref-format --branch "$PR_BASE_REF"' "opencode review workflow validates PR base ref with git before fetch"
 	assert_file_contains "$workflow_file" '[[ "$PR_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]' "opencode review workflow validates manual PR base SHA"
 	assert_file_contains "$workflow_file" '[[ "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]' "opencode review workflow validates manual PR head SHA"
 	assert_file_contains "$workflow_file" '+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head' "opencode review workflow fetches the explicit PR head ref"
@@ -320,6 +322,13 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "Prepare isolated OpenCode review workspace" "opencode review workflow isolates from the large project AGENTS.md"
 	assert_file_contains "$workflow_file" 'cd "$OPENCODE_REVIEW_WORKDIR"' "opencode review runs from the isolated OpenCode workspace"
 	assert_file_contains "$workflow_file" 'PR_MERGE_BASE="$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")"' "opencode review evidence diffs use the PR merge base"
+	assert_file_contains "$workflow_file" "contents: read" "opencode review workflow does not grant repository contents write permission"
+	assert_file_not_contains "$workflow_file" "contents: write" "opencode review workflow keeps repository contents read-only"
+	assert_file_contains "$workflow_file" 'emit_file_prefix "$focused_hunks_file" 18000' "opencode review evidence keeps enough focused hunk context for multi-file PRs"
+	assert_file_contains "$workflow_file" 'head -c 24000 "$OPENCODE_EVIDENCE_FILE"' "opencode review prompt includes enough bounded PR evidence for fallback models"
+	assert_file_contains "$workflow_file" "The checked-out repository root is available through the GITHUB_WORKSPACE environment variable" "opencode review prompt tells fallback agents where to read source files"
+	assert_file_contains "$workflow_file" "read repository files from that root before concluding any changed file is unavailable" "opencode review runtime prompt prevents false missing-file review blockers"
+	assert_file_contains "$workflow_file" "source checkout plus bounded evidence are insufficient to inspect the changed files" "opencode review only blocks approval when source inspection is actually insufficient"
 	assert_file_matches "$workflow_file" 'uses:[[:space:]]+actions/checkout@[0-9a-fA-F]{40}([[:space:]]|$)' "opencode review workflow pins checkout to a full commit SHA"
 	assert_workflow_uses_are_sha_pinned "$workflow_file" "opencode review workflow"
 	assert_file_contains "$workflow_file" "@colbymchenry/codegraph@0.9.9" "opencode review workflow pins the CodeGraph package"
@@ -342,6 +351,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "timeout 1200 opencode run" "opencode review primary model has a bounded extended timeout for larger workflow diffs"
 	assert_file_contains "$workflow_file" '"ci-review-fallback"' "opencode review workflow declares a dedicated fallback agent"
 	assert_file_contains "$workflow_file" '"steps": 12' "opencode review fallback agent has enough bounded steps to conclude after MCP inspection"
+	assert_file_contains "$workflow_file" '"output": 12000' "opencode review fallback models have enough output budget for parseable control blocks"
 	assert_file_contains "$workflow_file" '"read": "allow"' "opencode review allows read-only file inspection"
 	assert_file_contains "$workflow_file" '"grep": "allow"' "opencode review allows focused literal searches"
 	assert_file_contains "$workflow_file" "Bounded evidence follows as untrusted PR metadata" "opencode review prompt includes bounded PR metadata in the model prompt"
@@ -368,6 +378,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "## OpenCode Review Overview" "opencode review publishes a visible Review Overview heading"
 	assert_file_contains "$workflow_file" "OpenCode Agent review was unavailable, but current-head GitHub Checks passed." "opencode review does not submit blocking reviews for model/runtime failures after checks pass"
 	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because the failure was in the OpenCode model/runtime path" "opencode review explains non-blocking model/runtime failures"
+	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because Strix cancellation is missing security evidence, not a source-code finding." "opencode review does not submit source-code changes for cancelled Strix evidence without logs"
 	assert_file_contains "$workflow_file" 'gh api -X PATCH "repos/${GH_REPOSITORY}/issues/comments/${overview_comment_id}"' "opencode review updates an existing Review Overview comment instead of duplicating it"
 	assert_file_contains "$workflow_file" "format_review_api_error" "opencode review approval helper formats formal review API failures"
 	assert_file_contains "$workflow_file" "curl --fail-with-body --silent --show-error" "opencode review approval helper preserves formal review API response bodies"
@@ -637,8 +648,8 @@ Model github-models/openai/gpt-5 Vulnerabilities 1
 
 ### Failed log excerpt
 
-FAIL: strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek R1 route (missing 'github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528'')
-FAIL: strix workflow rejects unsupported model inputs (missing 'STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model')
+FAIL: strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek V3 route (missing 'github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324'')
+FAIL: strix workflow rejects unsupported model inputs (missing 'STRIX_LLM must select GitHub Models DeepSeek V3/R1, OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model')
 FAIL: opencode review tries GitHub Models GPT-5 first (missing 'MODEL: github-models/openai/gpt-5')
 EOF
 	cat >"$control_json" <<'EOF'
@@ -654,7 +665,7 @@ EOF
 	assert_file_contains "$tmp_dir/bad.out" "FAILED_CHECK_EVIDENCE_NOT_REFERENCED" "failed-check validator explains unrelated finding rejection"
 
 	cat >"$control_json" <<'EOF'
-{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"REQUEST_CHANGES","reason":"Strix Security Scan/strix failed","summary":"Strix Security Scan/strix failed in Self-test Strix gate script because the trusted workflow is missing expected model evidence strings.","findings":[{"path":".github/workflows/strix.yml","line":120,"severity":"HIGH","title":"Strix workflow default is not visible to trusted self-test","problem":"Strix Security Scan/strix failed in Self-test Strix gate script: strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek R1 route (missing 'github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528''); strix workflow rejects unsupported model inputs (missing 'STRIX_LLM must select GitHub Models DeepSeek R1 or OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model'); opencode review tries GitHub Models GPT-5 first (missing 'MODEL: github-models/openai/gpt-5').","root_cause":"The failed check evidence shows Self-test Strix gate script could not find github.event.inputs.strix_llm, STRIX_LLM must select, and MODEL: github-models/openai/gpt-5 in trusted-base files.","fix_direction":"Update the workflow lines that provide the Strix model default and OpenCode model env so the trusted self-test can find those exact strings.","regression_test_direction":"Keep the static self-test assertions for all three missing strings.","suggested_diff":"diff --git a/.github/workflows/strix.yml b/.github/workflows/strix.yml\n--- a/.github/workflows/strix.yml\n+++ b/.github/workflows/strix.yml\n@@ -120 +120 @@\n-          STRIX_MODEL: old\n+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-r1-0528' }}"}]}
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"REQUEST_CHANGES","reason":"Strix Security Scan/strix failed","summary":"Strix Security Scan/strix failed in Self-test Strix gate script because the trusted workflow is missing expected model evidence strings.","findings":[{"path":".github/workflows/strix.yml","line":120,"severity":"HIGH","title":"Strix workflow default is not visible to trusted self-test","problem":"Strix Security Scan/strix failed in Self-test Strix gate script: strix workflow defaults PR Strix scans to the reachable GitHub Models DeepSeek V3 route (missing 'github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324''); strix workflow rejects unsupported model inputs (missing 'STRIX_LLM must select GitHub Models DeepSeek V3/R1, OpenAI GPT-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model'); opencode review tries GitHub Models GPT-5 first (missing 'MODEL: github-models/openai/gpt-5').","root_cause":"The failed check evidence shows Self-test Strix gate script could not find github.event.inputs.strix_llm, STRIX_LLM must select, and MODEL: github-models/openai/gpt-5 in trusted-base files.","fix_direction":"Update the workflow lines that provide the Strix model default and OpenCode model env so the trusted self-test can find those exact strings.","regression_test_direction":"Keep the static self-test assertions for all three missing strings.","suggested_diff":"diff --git a/.github/workflows/strix.yml b/.github/workflows/strix.yml\n--- a/.github/workflows/strix.yml\n+++ b/.github/workflows/strix.yml\n@@ -120 +120 @@\n-          STRIX_MODEL: old\n+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'github_models/deepseek/deepseek-v3-0324' }}"}]}
 EOF
 	set +e
 	bash "$REPO_ROOT/scripts/ci/validate_opencode_failed_check_review.sh" \
@@ -1466,15 +1477,15 @@ EOS
 ## Code Analysis
 
 **Location 1:** `src/config/database.py` (line 15)
-  Hardcoded database password
+  Placeholder database marker
   ```
-      'password': 'dbpassword123'
+      'fixture_value': 'STRIX_PLACEHOLDER_DB_MARKER'
   ```
 
 **Location 2:** `src/services/payment_service.py` (line 5)
-  Hardcoded payment API key
+  Placeholder payment marker
   ```
-  PAYMENT_API_KEY = 'sk_live_1234567890'
+  PAYMENT_FIXTURE_VALUE = 'STRIX_PLACEHOLDER_PAYMENT_MARKER'
   ```
 EOS
 			echo "Penetration test failed: placeholder hardcoded secrets"
@@ -2208,6 +2219,34 @@ EOS
 		echo "Penetration test failed: unmapped critical finding"
 		exit 1
 		;;
+	pr-strix-runtime-artifact-finding)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-strix-runtime-artifact/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-strix-runtime-artifact/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Information Disclosure in Runtime Log Files
+Severity: HIGH
+Target: /workspace/strix-pr-scope.LBwvvN/strix_runs/strix-pr-scope-lbwvvn_36f6/events.jsonl
+
+Detailed runtime logs containing trace IDs, span IDs, internal paths, and system
+metadata are stored in events.jsonl.
+EOS
+		echo "Penetration test failed: generated Strix runtime artifact finding"
+		exit 1
+		;;
+	pr-workflow-integrity-checksum-finding)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-workflow-integrity-checksum/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-workflow-integrity-checksum/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Hardcoded Secret in GitHub Workflow
+Severity: CRITICAL
+Endpoint: .github/workflows/opencode-review.yml
+
+A hardcoded SHA256 hash was found in the GitHub workflow file.
+
+Location 1: .github/workflows/opencode-review.yml:97
+  OPENCODE_SHA256: <public-release-checksum>
+EOS
+		echo "Penetration test failed: workflow integrity checksum finding"
+		exit 1
+		;;
 	pr-incomplete-codebase-pr-scope)
 		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-incomplete-codebase/vulnerabilities"
 		cat >"$STRIX_REPORTS_DIR/fake-pr-incomplete-codebase/vulnerabilities/vuln-0001.md" <<'EOS'
@@ -2232,15 +2271,15 @@ EOS
 ## Code Analysis
 
 **Location 1:** `src/config/database.py` (line 15)
-  Hardcoded database password
+  Placeholder database marker
   ```
-      'password': 'dbpassword123'
+      'fixture_value': 'STRIX_PLACEHOLDER_DB_MARKER'
   ```
 
 **Location 2:** `src/services/payment_service.py` (line 5)
-  Hardcoded payment API key
+  Placeholder payment marker
   ```
-  PAYMENT_API_KEY = 'sk_live_1234567890'
+  PAYMENT_FIXTURE_VALUE = 'STRIX_PLACEHOLDER_PAYMENT_MARKER'
   ```
 EOS
 		echo "Penetration test failed: placeholder hardcoded secrets"
@@ -3756,6 +3795,150 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+run_pull_request_target_frontend_app_security_context_scope_case() {
+	local changed_file="frontend/src/App.tsx"
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	local bin_dir="$tmp_dir/bin"
+	local repo_root_dir="$tmp_dir/repo"
+	mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
+	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+	local fake_strix="$bin_dir/strix"
+	local output_log="$tmp_dir/output.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
+	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
+
+	cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+target_path=""
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "-t" ] && [ "$#" -ge 2 ]; then
+		target_path="$2"
+		break
+	fi
+	shift
+done
+
+if ! grep -Fq -- 'HEAD_APP_SHELL_SHOULD_BE_SCANNED' "$target_path/frontend/src/App.tsx"; then
+	echo "Error: frontend app PR-head content was not scanned" >&2
+	cat -- "$target_path/frontend/src/App.tsx" >&2
+	exit 93
+fi
+
+for context_file in \
+	frontend/src/api.ts \
+	frontend/index.html \
+	frontend/serve-static.mjs \
+	backend/app/main.py \
+	backend/app/security_headers.py \
+	backend/tests/test_security_headers.py
+do
+	if [ ! -f "$target_path/$context_file" ]; then
+		echo "Error: frontend app security context missing: $context_file" >&2
+		exit 94
+	fi
+done
+
+if ! grep -Fq -- 'BASE_API_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/src/api.ts"; then
+	echo "Error: frontend API context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/src/api.ts" >&2
+	exit 95
+fi
+if ! grep -Fq -- 'BASE_HTML_CSP_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/index.html"; then
+	echo "Error: frontend HTML CSP context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/index.html" >&2
+	exit 96
+fi
+if ! grep -Fq -- 'BASE_STATIC_HEADER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/serve-static.mjs"; then
+	echo "Error: static frontend header context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/serve-static.mjs" >&2
+	exit 97
+fi
+if ! grep -Fq -- 'BASE_BACKEND_HEADER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/app/security_headers.py"; then
+	echo "Error: backend security-header context did not use trusted base content" >&2
+	cat -- "$target_path/backend/app/security_headers.py" >&2
+	exit 98
+fi
+if ! grep -Fq -- 'BASE_BACKEND_HEADER_TEST_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/tests/test_security_headers.py"; then
+	echo "Error: backend security-header test context did not use trusted base content" >&2
+	cat -- "$target_path/backend/tests/test_security_headers.py" >&2
+	exit 99
+fi
+if grep -R -Fq -- 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/frontend/src/api.ts" "$target_path/frontend/index.html" "$target_path/frontend/serve-static.mjs" "$target_path/backend/app/security_headers.py" "$target_path/backend/tests/test_security_headers.py"; then
+	echo "Error: trusted frontend app context leaked PR head content" >&2
+	exit 100
+fi
+
+echo "scan ok with frontend app security header context"
+EOF
+	chmod +x "$fake_strix"
+	printf '%s' 'gemini/test-model' >"$strix_llm_file"
+	printf '%s' 'dummy' >"$llm_api_key_file"
+
+	(
+		cd "$repo_root_dir"
+		git init -q
+		git config user.name 'Strix Test'
+		git config user.email 'strix-test@example.invalid'
+		mkdir -p frontend/src backend/app backend/tests
+		printf '%s\n' 'BASE_APP_SHELL_SHOULD_NOT_BE_SCANNED' >"$changed_file"
+		printf '%s\n' 'BASE_API_CONTEXT_SHOULD_BE_SCANNED' >frontend/src/api.ts
+		printf '%s\n' 'BASE_HTML_CSP_CONTEXT_SHOULD_BE_SCANNED' >frontend/index.html
+		printf '%s\n' 'BASE_STATIC_HEADER_CONTEXT_SHOULD_BE_SCANNED' >frontend/serve-static.mjs
+		printf '%s\n' 'BASE_MAIN_CONTEXT_SHOULD_BE_SCANNED' >backend/app/main.py
+		printf '%s\n' 'BASE_BACKEND_HEADER_CONTEXT_SHOULD_BE_SCANNED' >backend/app/security_headers.py
+		printf '%s\n' 'BASE_BACKEND_HEADER_TEST_CONTEXT_SHOULD_BE_SCANNED' >backend/tests/test_security_headers.py
+		git add .
+		git commit -qm 'base commit'
+	)
+	local base_sha
+	base_sha="$(git -C "$repo_root_dir" rev-parse HEAD)"
+	(
+		cd "$repo_root_dir"
+		printf '%s\n' 'HEAD_APP_SHELL_SHOULD_BE_SCANNED' >"$changed_file"
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/src/api.ts
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/index.html
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/serve-static.mjs
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/app/security_headers.py
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/tests/test_security_headers.py
+		git add .
+		git commit -qm 'head commit'
+	)
+	local head_sha
+	head_sha="$(git -C "$repo_root_dir" rev-parse HEAD)"
+	git -C "$repo_root_dir" checkout -q "$base_sha"
+
+	set +e
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_PATH \
+			PATH="$bin_dir:$PATH" \
+			STRIX_INPUT_FILE_ROOT="$tmp_dir" \
+			GITHUB_EVENT_NAME="pull_request_target" \
+			PR_BASE_SHA="$base_sha" \
+			PR_HEAD_SHA="$head_sha" \
+			STRIX_TEST_CHANGED_FILES_OVERRIDE="$changed_file" \
+			STRIX_DISABLE_PR_SCOPING="0" \
+			STRIX_LLM_FILE="$strix_llm_file" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			STRIX_TARGET_PATH="." \
+			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
+	local rc=$?
+	set -e
+
+	assert_equals "0" "$rc" "case=pull-request-target-frontend-app-security-context exit code"
+	assert_file_contains "$output_log" "scan ok with frontend app security header context" "case=pull-request-target-frontend-app-security-context output"
+
+	rm -rf "$tmp_dir"
+}
+
 run_pull_request_target_frontend_email_context_scope_case() {
 	local changed_file="${1:?changed file is required}"
 	local case_name="pull-request-target-frontend-email-context:$changed_file"
@@ -5130,6 +5313,79 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+run_required_input_file_symlink_escape_fails_closed_case() {
+	local file_env="$1"
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	local repo_root_dir="$tmp_dir/workspace/smart-crawling-server"
+	local allowed_input_dir="$tmp_dir/runner-temp"
+	local outside_dir="$tmp_dir/outside"
+	local symlink_dir="$allowed_input_dir/link-to-outside"
+	local output_log="$tmp_dir/output.log"
+	local fake_strix="$tmp_dir/strix"
+	local call_log="$tmp_dir/calls.log"
+	local strix_llm_file="$allowed_input_dir/strix_llm.txt"
+	local llm_api_key_file="$allowed_input_dir/llm_api_key.txt"
+	local llm_api_base_file="$allowed_input_dir/llm_api_base.txt"
+	local outside_file="$outside_dir/${file_env}.txt"
+
+	mkdir -p "$repo_root_dir/scripts/ci" "$allowed_input_dir" "$outside_dir"
+	ln -s "$outside_dir" "$symlink_dir"
+	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+	cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'called\n' >"${FAKE_STRIX_CALL_LOG:?}"
+exit 0
+EOF
+	chmod +x "$fake_strix"
+	printf '%s' 'openai/gpt-4o-mini' >"$strix_llm_file"
+	printf '%s' 'dummy' >"$llm_api_key_file"
+	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
+	case "$file_env" in
+	STRIX_LLM_FILE)
+		printf '%s' 'openai/gpt-4o-mini' >"$outside_file"
+		strix_llm_file="$symlink_dir/${file_env}.txt"
+		;;
+	LLM_API_KEY_FILE)
+		printf '%s' 'dummy' >"$outside_file"
+		llm_api_key_file="$symlink_dir/${file_env}.txt"
+		;;
+	*)
+		record_failure "unsupported required input file env: $file_env"
+		rm -rf "$tmp_dir"
+		return
+		;;
+	esac
+
+	set +e
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE -u STRIX_INPUT_FILE_ROOT \
+			PATH="$tmp_dir:$PATH" \
+			RUNNER_TEMP="$allowed_input_dir" \
+			FAKE_STRIX_CALL_LOG="$call_log" \
+			STRIX_DISABLE_PR_SCOPING="0" \
+			STRIX_LLM_FILE="$strix_llm_file" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			LLM_API_BASE_FILE="$llm_api_base_file" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
+	local rc=$?
+	set -e
+
+	assert_equals "2" "$rc" "case=$file_env-symlink-escape-input-root exit code"
+	assert_file_contains "$output_log" "$file_env must be inside the trusted input file root" "case=$file_env-symlink-escape-input-root output"
+	if [ -f "$call_log" ]; then
+		record_failure "case=$file_env-symlink-escape-input-root should reject before invoking strix"
+	fi
+
+	rm -rf "$tmp_dir"
+}
+
 run_input_file_root_override_takes_precedence_over_runner_temp_case() {
 	local tmp_dir
 	tmp_dir="$(mktemp -d)"
@@ -5497,6 +5753,7 @@ run_pull_request_target_full_head_context_scope_case
 
 run_pull_request_target_changed_context_scope_uses_pr_head_case
 run_pull_request_target_changed_backend_context_scope_case
+run_pull_request_target_frontend_app_security_context_scope_case
 
 run_pull_request_target_frontend_email_context_scope_case \
 	"frontend/src/components/EmailDetail.tsx"
@@ -6072,7 +6329,7 @@ run_gate_case_allow_provider_signal "gemini-zero-findings-timeout-fallback-allow
 	"__DEFAULT__" \
 	"" \
 	"0" \
-	"CRITICAL" \
+	"MEDIUM" \
 	"0" \
 	"" \
 	"" \
@@ -6944,6 +7201,8 @@ run_gate_case_allow_provider_signal "infra-error-sticky-flag" \
 run_invalid_min_fail_severity_case
 run_required_input_file_outside_input_root_fails_closed_case "STRIX_LLM_FILE"
 run_required_input_file_outside_input_root_fails_closed_case "LLM_API_KEY_FILE"
+run_required_input_file_symlink_escape_fails_closed_case "STRIX_LLM_FILE"
+run_required_input_file_symlink_escape_fails_closed_case "LLM_API_KEY_FILE"
 run_vertex_model_ignores_untrusted_llm_api_base_file_case
 run_llm_api_base_file_outside_input_root_fails_closed_case
 run_pr_scoped_llm_api_base_file_config_failure_exits_2_case
@@ -7580,6 +7839,48 @@ run_gate_case "pr-critical-unmapped" \
 	"0" \
 	"pull_request" \
 	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
+
+run_gate_case "pr-strix-runtime-artifact-finding" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	"sync-module-system/smart-crawling-biz/src/main/java/org/empasy/sync/modules/system/controller/SysPositionController.java"
+
+run_gate_case "pr-workflow-integrity-checksum-finding" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
+	"0" \
+	"" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml"
 
 run_gate_case "pr-incomplete-codebase-pr-scope" \
 	"openai/gpt-4o-mini" \
