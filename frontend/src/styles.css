@@ -419,6 +419,42 @@ button {
   border-color: #034ea2;
 }
 
+.emptyState {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 32px;
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
+  pointer-events: none;
+  z-index: 5;
+  max-width: 320px;
+}
+
+.emptyState__icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.emptyState__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.emptyState__desc {
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
 /* Style table-level top and bottom handles */
 .react-flow__handle-top, .react-flow__handle-bottom {
   background: transparent;

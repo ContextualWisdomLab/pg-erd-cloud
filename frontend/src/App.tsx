@@ -846,6 +846,32 @@ export default function App() {
             <MiniMap />
           </ReactFlow>
 
+          {nodes.length === 0 && (
+            <div className="emptyState" role="status" aria-live="polite">
+              {isCreatingSnapshot ||
+              (snapshot?.status &&
+                !["succeeded", "failed", "not_found"].includes(
+                  snapshot.status,
+                )) ? (
+                <>
+                  <div className="emptyState__icon">⏳</div>
+                  <div className="emptyState__title">스냅샷 생성 중...</div>
+                  <div className="emptyState__desc">
+                    데이터베이스에서 스키마를 가져오고 있습니다. 잠시만 기다려주세요.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="emptyState__icon">🗂️</div>
+                  <div className="emptyState__title">ERD 캔버스가 비어 있습니다</div>
+                  <div className="emptyState__desc">
+                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {isExportModalOpen && (
             <div
               className="modalOverlay"
