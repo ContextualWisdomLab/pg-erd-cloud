@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import ipaddress
 import socket
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from app.settings import settings
 
@@ -11,6 +12,14 @@ POSTGRES_SCHEMES = {"postgres", "postgresql"}
 
 class DsnTargetError(ValueError):
     """Raised when a PostgreSQL DSN points at a disallowed network target."""
+
+
+@dataclass(frozen=True)
+class ValidatedDsnTarget:
+    """Connection target values that were checked for restricted IP ranges."""
+
+    hosts: tuple[str, ...]
+    port: int | None
 
 
 def _configured_allowed_hosts() -> tuple[str, ...]:
@@ -38,6 +47,9 @@ def _validate_allowed_host(host: str) -> None:
 
 
 def _is_restricted_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+
     return (
         ip.is_private
         or ip.is_loopback
@@ -53,6 +65,14 @@ def _parse_ip_literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Addres
         return ipaddress.ip_address(host.strip("[]"))
     except ValueError:
         return None
+
+
+def _connection_host_for_ip(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> str:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return str(ip.ipv4_mapped)
+    return str(ip)
 
 
 def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
@@ -72,7 +92,81 @@ def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ip
     return resolved
 
 
-def validate_postgres_dsn_target(dsn: str) -> None:
+def _parse_query_params(query: str) -> dict[str, list[str]]:
+    params: dict[str, list[str]] = {}
+    for key, value in parse_qsl(query, keep_blank_values=True):
+        params.setdefault(key.lower(), []).append(value)
+    return params
+
+
+def _split_query_host_values(values: list[str], parameter: str) -> list[str]:
+    hosts: list[str] = []
+    for value in values:
+        for host in value.split(","):
+            normalized = host.strip()
+            if not normalized:
+                raise DsnTargetError(f"database DSN query {parameter} is invalid")
+            hosts.append(normalized)
+    return hosts
+
+
+def _validate_query_ports(values: list[str]) -> int | None:
+    if not values:
+        return None
+
+    first_port: int | None = None
+    for value in values:
+        for port_value in value.split(","):
+            normalized = port_value.strip()
+            if not normalized:
+                raise DsnTargetError("database DSN query port is invalid")
+            try:
+                port = int(normalized)
+            except ValueError as err:
+                raise DsnTargetError("database DSN query port is invalid") from err
+            if port < 1 or port > 65535:
+                raise DsnTargetError("database DSN query port is invalid")
+            if first_port is None:
+                first_port = port
+    return first_port
+
+
+def _unique_hosts(hosts: list[str]) -> tuple[str, ...]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for host in hosts:
+        if host in seen:
+            continue
+        seen.add(host)
+        unique.append(host)
+    return tuple(unique)
+
+
+def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[str, ...]:
+    normalized = h.lower().rstrip(".")
+
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        raise DsnTargetError("database host must not be localhost")
+
+    _validate_allowed_host(normalized)
+
+    literal_ip = _parse_ip_literal(normalized)
+    if literal_ip is not None:
+        if _is_restricted_ip(literal_ip):
+            raise DsnTargetError("database host resolves to a restricted IP range")
+        return (_connection_host_for_ip(literal_ip),)
+
+    if is_hostaddr:
+        raise DsnTargetError("database DSN query hostaddr is invalid")
+
+    resolved_ips = _resolved_ips(normalized, port)
+    for ip in resolved_ips:
+        if _is_restricted_ip(ip):
+            raise DsnTargetError("database host resolves to a restricted IP range")
+    return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
+
+
+def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     """Reject PostgreSQL DSNs that could target internal network resources."""
 
     parsed = urlparse(dsn)
@@ -86,19 +180,31 @@ def validate_postgres_dsn_target(dsn: str) -> None:
         port = parsed.port
     except ValueError as err:
         raise DsnTargetError("database DSN port is invalid") from err
-    normalized_host = host.lower().rstrip(".")
+    query = _parse_query_params(parsed.query)
 
-    if normalized_host == "localhost" or normalized_host.endswith(".localhost"):
-        raise DsnTargetError("database host must not be localhost")
+    port_override = _validate_query_ports(query.get("port", []))
+    if port_override is not None:
+        port = port_override
 
-    _validate_allowed_host(normalized_host)
+    primary_hosts = _validated_ip_hosts(host, False, port)
+    query_hosts = [
+        _validated_ip_hosts(query_host, False, port)
+        for query_host in _split_query_host_values(query.get("host", []), "host")
+    ]
+    query_hostaddrs = [
+        _validated_ip_hosts(query_hostaddr, True, port)
+        for query_hostaddr in _split_query_host_values(
+            query.get("hostaddr", []), "hostaddr"
+        )
+    ]
 
-    literal_ip = _parse_ip_literal(normalized_host)
-    if literal_ip is not None:
-        if _is_restricted_ip(literal_ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
-        return
+    connection_host_groups = query_hosts + query_hostaddrs
+    if not connection_host_groups:
+        connection_host_groups = [primary_hosts]
 
-    for ip in _resolved_ips(normalized_host, port):
-        if _is_restricted_ip(ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
+    return ValidatedDsnTarget(
+        hosts=_unique_hosts(
+            [host for group in connection_host_groups for host in group]
+        ),
+        port=port,
+    )
