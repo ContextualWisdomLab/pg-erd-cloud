@@ -107,8 +107,86 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
-        "options": {"verify_aud": True, "require_exp": True, "require_jti": True},
+        "options": {
+            "verify_aud": True,
+            "require_aud": True,
+            "require_iss": True,
+            "require_exp": True,
+            "require_jti": True,
+            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+        },
     }
+
+
+@pytest.mark.parametrize(
+    ("header", "detail"),
+    [
+        ({"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"}, "unsupported token type"),
+        (
+            {"kid": "key-1", "alg": "RS256", "cty": "JWT"},
+            "unsupported token content type",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_oidc_rejects_unsupported_header_types(
+    monkeypatch: pytest.MonkeyPatch, header: dict[str, str], detail: str
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: header)
+
+    async def fail_jwks() -> dict:
+        raise AssertionError("JWKS must not load for unsupported token headers")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer token"})
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == detail
+
+
+@pytest.mark.asyncio
+async def test_oidc_refreshes_jwks_when_kid_is_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "new-key", "alg": "RS256"}
+    )
+
+    refresh_calls: list[bool] = []
+
+    async def fake_jwks(force_refresh: bool = False) -> dict:
+        refresh_calls.append(force_refresh)
+        if force_refresh:
+            return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+        return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
+
+    observed: dict[str, object] = {}
+
+    def fake_decode(*args: object, **kwargs: object) -> dict:
+        observed["key"] = args[1]
+        observed["kwargs"] = kwargs
+        return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    subject, display_name = await auth._get_subject_from_request(
+        make_request({"Authorization": "Bearer token"})
+    )
+
+    assert subject == "user-1"
+    assert display_name == "User One"
+    assert refresh_calls == [False, True]
+    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
 
 
 @pytest.mark.asyncio

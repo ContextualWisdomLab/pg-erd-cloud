@@ -64,8 +64,15 @@ class VerifiedToken:
 
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
-_oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(
+    0, tz=dt.timezone.utc
+)
+_oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
+OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
+OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
+OIDC_JWT_LEEWAY_SECONDS = 60
+OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 _revoked_token_jtis: dict[str, dt.datetime] = {}
 
 
@@ -74,9 +81,9 @@ async def _get_oidc_config() -> dict:
     if not settings.oidc_issuer:
         raise RuntimeError("OIDC is disabled")
 
-    global _oidc_config, _oidc_expires_at
+    global _oidc_config, _oidc_config_expires_at
     now = dt.datetime.now(dt.timezone.utc)
-    if _oidc_config is not None and now < _oidc_expires_at:
+    if _oidc_config is not None and now < _oidc_config_expires_at:
         return cast(dict, _oidc_config)
 
     async with httpx.AsyncClient(timeout=5) as client:
@@ -87,21 +94,20 @@ async def _get_oidc_config() -> dict:
         config = cast(dict[str, Any], r.json())
 
     _oidc_config = config
-    _oidc_expires_at = now + dt.timedelta(minutes=10)
+    _oidc_config_expires_at = now + OIDC_CONFIG_CACHE_TTL
     return cast(dict, config)
 
 
-async def _get_jwks() -> dict:
+async def _get_jwks(force_refresh: bool = False) -> dict:
     """Fetch and cache the OIDC JWKS (signing keys)."""
     config = await _get_oidc_config()
     jwks_uri = config.get("jwks_uri")
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    global _oidc_jwks, _oidc_expires_at
-    # Share same TTL as config.
+    global _oidc_jwks, _oidc_jwks_expires_at
     now = dt.datetime.now(dt.timezone.utc)
-    if _oidc_jwks is not None and now < _oidc_expires_at:
+    if not force_refresh and _oidc_jwks is not None and now < _oidc_jwks_expires_at:
         return cast(dict, _oidc_jwks)
 
     async with httpx.AsyncClient(timeout=5) as client:
@@ -109,6 +115,7 @@ async def _get_jwks() -> dict:
         r.raise_for_status()
         jwks = cast(dict[str, Any], r.json())
     _oidc_jwks = jwks
+    _oidc_jwks_expires_at = now + OIDC_JWKS_CACHE_TTL
     return cast(dict, jwks)
 
 
@@ -132,6 +139,27 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
     if not isinstance(exp, int | float):
         raise HTTPException(status_code=401, detail="token missing exp")
     return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
+
+
+def _validate_jwt_header(header: dict[str, Any]) -> str:
+    """Validate JOSE header fields before signature verification."""
+
+    token_type = header.get("typ")
+    if token_type is not None:
+        if (
+            not isinstance(token_type, str)
+            or token_type.strip().lower() not in OIDC_ALLOWED_TOKEN_TYPES
+        ):
+            raise HTTPException(status_code=401, detail="unsupported token type")
+
+    content_type = header.get("cty")
+    if content_type is not None:
+        raise HTTPException(status_code=401, detail="unsupported token content type")
+
+    header_alg_raw = header.get("alg")
+    if not isinstance(header_alg_raw, str) or not header_alg_raw:
+        raise HTTPException(status_code=401, detail="token missing alg")
+    return header_alg_raw.upper()
 
 
 def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
@@ -181,13 +209,7 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
         except Exception:  # noqa: BLE001
             raise HTTPException(status_code=401, detail="invalid token header")
 
-        header_alg_raw = header.get("alg")
-        if not isinstance(header_alg_raw, str) or not header_alg_raw:
-            raise HTTPException(status_code=401, detail="token missing alg")
-
-        # Normalize so equivalent-case values (e.g. "rs256" vs "RS256") don't
-        # fail the allowlist check.
-        header_alg = header_alg_raw.upper()
+        header_alg = _validate_jwt_header(cast(dict[str, Any], header))
 
         if header_alg not in OIDC_ALLOWED_ALGORITHMS:
             raise HTTPException(
@@ -197,6 +219,9 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
 
         jwks = await _get_jwks()
         jwk = _pick_jwk(jwks, header.get("kid"))
+        if jwk is None:
+            jwks = await _get_jwks(force_refresh=True)
+            jwk = _pick_jwk(jwks, header.get("kid"))
         if jwk is None:
             raise HTTPException(status_code=401, detail="unknown signing key")
 
@@ -209,8 +234,11 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
                 issuer=settings.oidc_issuer,
                 options={
                     "verify_aud": bool(settings.oidc_audience),
+                    "require_aud": bool(settings.oidc_audience),
+                    "require_iss": True,
                     "require_exp": True,
                     "require_jti": True,
+                    "leeway": OIDC_JWT_LEEWAY_SECONDS,
                 },
             )
         except Exception as err:
