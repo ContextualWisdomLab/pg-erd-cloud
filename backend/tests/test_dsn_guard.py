@@ -22,10 +22,28 @@ def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]
         "postgresql://user:pass@10.0.0.8:5432/app",
         "postgresql://user:pass@169.254.169.254:5432/app",
         "postgresql://user:pass@[::1]:5432/app",
+        "postgresql://user:pass@db.example.com/app?host=127.0.0.1",
+        "postgresql://user:pass@db.example.com/app?hostaddr=169.254.169.254",
+        "postgresql://user:pass@db.example.com/app?host=127.0.0.1&port=5432",
+        "postgresql://user:pass@db.example.com:1234/app?host=localhost",
     ],
 )
-def test_dsn_guard_rejects_restricted_ip_literals(dsn: str) -> None:
-    with pytest.raises(DsnTargetError, match="restricted IP"):
+def test_dsn_guard_rejects_restricted_ip_literals(
+    monkeypatch: pytest.MonkeyPatch, dsn: str
+) -> None:
+    # Need to mock resolve if it passes literal check and tries to resolve db.example.com
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
+    )
+    # also we need to allow db.example.com for query tests
+    monkeypatch.setattr(
+        settings,
+        "db_introspection_allowed_hosts",
+        "127.0.0.1,10.0.0.8,169.254.169.254,::1,db.example.com,*.trusted.example.com",
+    )
+    with pytest.raises(DsnTargetError, match="restricted IP|localhost"):
         validate_postgres_dsn_target(dsn)
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from app.settings import settings
 
@@ -86,19 +86,33 @@ def validate_postgres_dsn_target(dsn: str) -> None:
         port = parsed.port
     except ValueError as err:
         raise DsnTargetError("database DSN port is invalid") from err
-    normalized_host = host.lower().rstrip(".")
+    query = parse_qs(parsed.query)
 
-    if normalized_host == "localhost" or normalized_host.endswith(".localhost"):
-        raise DsnTargetError("database host must not be localhost")
+    port_override = query.get("port", [])
+    if port_override:
+        try:
+            port = int(port_override[0])
+        except ValueError as err:
+            raise DsnTargetError("database DSN query port is invalid") from err
 
-    _validate_allowed_host(normalized_host)
+    hosts_to_check = [host]
+    hosts_to_check.extend(query.get("host", []))
+    hosts_to_check.extend(query.get("hostaddr", []))
 
-    literal_ip = _parse_ip_literal(normalized_host)
-    if literal_ip is not None:
-        if _is_restricted_ip(literal_ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
-        return
+    for h in hosts_to_check:
+        normalized = h.lower().rstrip(".")
 
-    for ip in _resolved_ips(normalized_host, port):
-        if _is_restricted_ip(ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
+        if normalized == "localhost" or normalized.endswith(".localhost"):
+            raise DsnTargetError("database host must not be localhost")
+
+        _validate_allowed_host(normalized)
+
+        literal_ip = _parse_ip_literal(normalized)
+        if literal_ip is not None:
+            if _is_restricted_ip(literal_ip):
+                raise DsnTargetError("database host resolves to a restricted IP range")
+            continue
+
+        for ip in _resolved_ips(normalized, port):
+            if _is_restricted_ip(ip):
+                raise DsnTargetError("database host resolves to a restricted IP range")
