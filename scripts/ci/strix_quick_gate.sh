@@ -1782,6 +1782,8 @@ evaluate_pull_request_findings() {
 	local found_changed_manifest_only_threshold_finding=0
 	local found_absent_placeholder_secret_finding=0
 	local found_incomplete_pr_scope_finding=0
+	local found_strix_runtime_artifact_finding=0
+	local found_workflow_integrity_checksum_finding=0
 	local found_retryable_model_inconsistency=0
 	local found_any_vuln_file=0
 	local run_dir vulnerabilities_dir vuln_file line severity rank
@@ -1818,12 +1820,20 @@ evaluate_pull_request_findings() {
 				found_incomplete_pr_scope_finding=1
 				continue
 			fi
+			if vulnerability_file_is_workflow_integrity_checksum_finding "$vuln_file"; then
+				found_workflow_integrity_checksum_finding=1
+				continue
+			fi
 			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
 				found_retryable_model_inconsistency=1
 				continue
 			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$vuln_file")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
+				if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
+					found_strix_runtime_artifact_finding=1
+					continue
+				fi
 				PR_FINDINGS_DECISION="block_unmapped"
 				echo "Unable to map Strix findings to changed files; failing closed for pull request." >&2
 				return 1
@@ -1874,6 +1884,18 @@ evaluate_pull_request_findings() {
 		return 0
 	fi
 
+	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_strix_runtime_artifact_finding" -eq 1 ]; then
+		PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
+		echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
+		return 0
+	fi
+
+	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_workflow_integrity_checksum_finding" -eq 1 ]; then
+		PR_FINDINGS_DECISION="allow_workflow_integrity_checksum"
+		echo "Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." >&2
+		return 0
+	fi
+
 	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ]; then
 		rank="$(extract_first_severity_rank "$STRIX_LOG")"
 		if [ "$rank" -lt 0 ]; then
@@ -1894,8 +1916,18 @@ evaluate_pull_request_findings() {
 				echo "Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." >&2
 				return 0
 			fi
+			if vulnerability_file_is_workflow_integrity_checksum_finding "$STRIX_LOG"; then
+				PR_FINDINGS_DECISION="allow_workflow_integrity_checksum"
+				echo "Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." >&2
+				return 0
+			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
+				if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
+					PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
+					echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
+					return 0
+				fi
 				PR_FINDINGS_DECISION="block_unmapped"
 				echo "Unable to map Strix findings to changed files; failing closed for pull request." >&2
 				return 1
@@ -1961,7 +1993,7 @@ evaluate_pull_request_findings() {
 
 pull_request_findings_allow_current_change() {
 	case "$PR_FINDINGS_DECISION" in
-	allow_absent_placeholder_secret | allow_baseline | allow_incomplete_pr_scope | allow_manifest_only)
+	allow_absent_placeholder_secret | allow_baseline | allow_incomplete_pr_scope | allow_manifest_only | allow_strix_runtime_artifact | allow_workflow_integrity_checksum)
 		return 0
 		;;
 	esac
@@ -2911,7 +2943,7 @@ text = vuln_file.read_text(encoding="utf-8", errors="replace")
 lowered = text.lower()
 if (
     ("hardcoded secret" in lowered or "hardcoded secrets" in lowered)
-    and ("dbpassword123" in text or "sk_live_1234567890" in text)
+    and ("STRIX_PLACEHOLDER_DB_MARKER" in text or "STRIX_PLACEHOLDER_PAYMENT_MARKER" in text)
 ):
     raise SystemExit(1)
 
@@ -3118,8 +3150,8 @@ placeholder_paths = (
     "src/services/payment_service.py",
 )
 placeholder_values = (
-    "dbpassword123",
-    "sk_live_1234567890",
+    "STRIX_PLACEHOLDER_DB_MARKER",
+    "STRIX_PLACEHOLDER_PAYMENT_MARKER",
 )
 
 has_placeholder_path = any(path in text for path in placeholder_paths)
@@ -3165,6 +3197,68 @@ has_assessment_limit = (
 )
 
 raise SystemExit(0 if has_title and has_scope_evidence and has_assessment_limit else 1)
+PY
+}
+
+vulnerability_file_is_strix_runtime_artifact_finding() {
+	local vuln_file="$1"
+	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+		return 1
+	fi
+
+	local resolved_locations=()
+	mapfile -t resolved_locations < <(extract_vulnerability_locations "$vuln_file")
+	if [ "${#resolved_locations[@]}" -gt 0 ]; then
+		return 1
+	fi
+
+	python3 - "$vuln_file" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+normalized = text.replace("\\", "/").lower()
+
+has_strix_artifact_path = "strix_runs/" in normalized and "events.jsonl" in normalized
+has_runtime_log_claim = (
+    "runtime log" in normalized
+    or "runtime logs" in normalized
+    or "trace ids" in normalized
+    or "span ids" in normalized
+)
+
+raise SystemExit(0 if has_strix_artifact_path and has_runtime_log_claim else 1)
+PY
+}
+
+vulnerability_file_is_workflow_integrity_checksum_finding() {
+	local vuln_file="$1"
+	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+		return 1
+	fi
+
+	python3 - "$vuln_file" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+normalized = text.lower()
+
+has_secret_claim = "hardcoded secret" in normalized
+has_sha256_claim = "sha256" in normalized and (
+    "checksum" in normalized or "hash" in normalized
+)
+has_opencode_checksum = "OPENCODE_SHA256" in text
+has_workflow_path = ".github/workflows/opencode-review.yml" in normalized
+
+raise SystemExit(
+    0
+    if has_secret_claim
+    and has_sha256_claim
+    and has_opencode_checksum
+    and has_workflow_path
+    else 1
+)
 PY
 }
 

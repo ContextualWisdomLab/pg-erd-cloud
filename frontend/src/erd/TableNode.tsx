@@ -1,25 +1,10 @@
-import { memo } from "react";
+import { memo, type CSSProperties } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
+import { normalizeBusinessGroupColor } from "./businessGroups";
 import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
 
 const MAX_RENDERED_COLUMNS = 25;
-
-const HTML_TEXT_ESCAPE_RE = /[&<>"']/g;
-const HTML_TEXT_REPLACEMENTS: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtmlText(value: string): string {
-  return value.replace(
-    HTML_TEXT_ESCAPE_RE,
-    (char) => HTML_TEXT_REPLACEMENTS[char] ?? char,
-  );
-}
 
 type Column = {
   column_name: string;
@@ -34,6 +19,7 @@ type TableNodeData = {
   title: string;
   comment?: string | null;
   columns: Column[];
+  businessGroup?: { id: string; name: string; color: string } | null;
   indexes?: Array<{
     index_name: string;
     columns: string[];
@@ -53,19 +39,38 @@ function formatExample(value: Column["example_value"]): string | null {
 
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
+  const groupColor = data.businessGroup
+    ? normalizeBusinessGroupColor(data.businessGroup.color)
+    : undefined;
+  const style = data.businessGroup
+    ? ({
+        "--table-group-color": groupColor,
+      } as CSSProperties)
+    : undefined;
+
+  // User-supplied labels/comments are rendered as React text nodes; do not
+  // switch these fields to raw HTML rendering.
   return (
-    <div className="tableNode">
+    <div
+      className={`tableNode${data.businessGroup ? " tableNode--grouped" : ""}`}
+      style={style}
+    >
       <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
         <span className="tableNode__titleText">
           <span>{data.title}</span>
           {data.comment ? (
             <span className="tableNode__titleComment">
-              {escapeHtmlText(data.comment)}
+              {data.comment}
             </span>
           ) : null}
         </span>
         <span style={{ display: "inline-flex", gap: 6 }}>
+          {data.businessGroup ? (
+            <span className="tableNode__groupBadge">
+              {data.businessGroup.name}
+            </span>
+          ) : null}
           {data.badges?.pk ? (
             <span className="tableNode__badge">PK</span>
           ) : null}
@@ -89,12 +94,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 <span className="tableNode__colName">{c.column_name}</span>
                 {c.column_comment ? (
                   <span className="tableNode__colComment">
-                    {escapeHtmlText(c.column_comment)}
+                    {c.column_comment}
                   </span>
                 ) : null}
                 {example ? (
                   <span className="tableNode__colExample">
-                    e.g. {escapeHtmlText(example)}
+                    e.g. {example}
                   </span>
                 ) : null}
               </span>
@@ -178,6 +183,9 @@ export default memo(TableNode, (prev, next) => {
     prev.data.comment === next.data.comment &&
     isSameRenderedColumns(prev.data.columns, next.data.columns) &&
     prev.data.indexes === next.data.indexes &&
+    prev.data.businessGroup?.id === next.data.businessGroup?.id &&
+    prev.data.businessGroup?.name === next.data.businessGroup?.name &&
+    prev.data.businessGroup?.color === next.data.businessGroup?.color &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk
   );
