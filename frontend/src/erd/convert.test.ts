@@ -122,8 +122,23 @@ describe('snapshotToGraph', () => {
       ],
       columns: [],
       constraints: [
-        { constraint_type: 'p', relation_oid: 1, constraint_oid: 99, constraint_name: 'pk_1', schema_name: 'public', relation_name: 'users' } as any,
-        { constraint_type: 'f', relation_oid: 2, foreign_relation_oid: 1, constraint_oid: 100, constraint_name: 'fk_user_old', schema_name: 'public', relation_name: 'posts' } as any
+        {
+          constraint_oid: 99,
+          constraint_name: 'users_pkey',
+          constraint_type: 'p',
+          schema_name: 'public',
+          relation_oid: 1,
+          relation_name: 'users'
+        },
+        {
+          constraint_oid: 100,
+          constraint_name: 'fk_user_old',
+          constraint_type: 'f',
+          schema_name: 'public',
+          relation_oid: 2,
+          relation_name: 'posts',
+          foreign_relation_oid: 1
+        }
       ]
     }
 
