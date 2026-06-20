@@ -321,7 +321,7 @@ def _render_indexes_pg(indexes: list[dict], lines: list[str]) -> None:
 def _render_table_columns_pg(
     oid: int,
     cols_by_oid: dict[int, list[dict]],
-    source_dialect: str,
+    source_dialect: DdlDialect,
 ) -> list[str]:
     col_defs: list[str] = []
     for c in sorted(
