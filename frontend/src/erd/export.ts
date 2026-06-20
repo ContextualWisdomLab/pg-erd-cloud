@@ -4,9 +4,6 @@ import type { IndexRecommendation } from './cardinality';
 import type { TableNodeData } from './convert';
 import type { SnapshotJson } from '../types';
 
-
-
-
 type SnapshotIndex = NonNullable<SnapshotJson['indexes']>[number];
 
 type DisplayIndex = SnapshotIndex | IndexRecommendation;

@@ -6,9 +6,6 @@ import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 import type { SnapshotJson } from '../types'
 
-
-
-
 export type TableNodeData = {
   title: string
   comment?: string | null
