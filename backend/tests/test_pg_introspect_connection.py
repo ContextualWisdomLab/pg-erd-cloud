@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 
 from app.pg_introspect import introspect
-from app.settings import settings
 
 
 def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]:
@@ -43,7 +42,6 @@ async def test_introspection_connects_to_validated_ip(
         "getaddrinfo",
         lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
     )
-    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
     monkeypatch.setattr(introspect.asyncpg, "connect", fake_connect)
 
     await introspect.introspect_postgres(

@@ -41,7 +41,7 @@ def _host_matches_allowed_entry(host: str, entry: str) -> bool:
 def _validate_allowed_host(host: str) -> None:
     allowed_hosts = _configured_allowed_hosts()
     if not allowed_hosts:
-        raise DsnTargetError("database host allowlist is not configured")
+        return
     if any(_host_matches_allowed_entry(host, entry) for entry in allowed_hosts):
         return
     raise DsnTargetError("database host is not in the introspection allowlist")

@@ -1,10 +1,6 @@
-## 2026-06-19 - Endless Polling in React Components
-**Learning:** React `useEffect` with `setInterval` for polling can easily become a performance bottleneck (unnecessary network calls, state updates, and potential memory leaks) if the termination condition isn't handled correctly when the polled job reaches a terminal state.
-**Action:** Always ensure polling mechanisms have a clean exit strategy by clearing intervals once a terminal state (like `succeeded`, `failed`, or `not_found`) is reached.
+# ⚡ Bolt Learnings
 
-## 2026-06-19 - Expensive useMemo Keys
-**Learning:** Using `JSON.stringify` on large data objects as a dependency for `useMemo` is an expensive hack to prevent re-renders, causing severe performance issues as the data size grows.
-**Action:** Rely on proper reference management and stop unnecessary state updates (like fixing endless polling) instead of using deep stringification hacks for `useMemo` dependencies.
-## 2026-06-20 - O(N^2) loops for finding items in export
-**Learning:** Nested array `.find()` iterations within loops parsing graph connections result in O(N^2) complexity, significantly degrading UI performance for large outputs.
-**Action:** Always pre-compute a lookup `Map` in O(N) when multiple specific node lookups are needed within iterative processes.
+## 2025-02-14 - Optimize synchronous socket DNS resolution
+
+**Learning:** Using `socket.getaddrinfo()` directly in an asynchronous context blocks the event loop, causing performance degradation under load as it runs synchronously.
+**Action:** Use `asyncio.get_running_loop().getaddrinfo()` to perform non-blocking DNS resolution within an asynchronous application like FastAPI.
