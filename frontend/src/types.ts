@@ -15,8 +15,19 @@ export type SnapshotJson = {
     constraint_oid: number
     constraint_name: string
     constraint_type: string
-    relation_oid?: number
-    foreign_relation_oid?: number
+    schema_name: string
+    relation_oid: number
+    relation_name: string
+    foreign_relation_oid?: number | null
+    foreign_schema_name?: string | null
+    foreign_relation_name?: string | null
+    constrained_attnums?: number[] | null
+    referenced_attnums?: number[] | null
+    fk_on_update?: string | null
+    fk_on_delete?: string | null
+    fk_match_type?: string | null
+    constraint_def?: string | null
+    check_expr?: string | null
   }>
   pk_columns?: Array<{ relation_oid: number; column_name: string }>
   fk_edges?: Array<{
