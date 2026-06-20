@@ -29,6 +29,9 @@ type SnapshotJson = {
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
+  // Bolt: Use map for O(1) node lookup instead of O(N) array find
+  const nodesById = new Map(nodes.map(n => [n.id, n]));
+
   // Export tables
   for (const node of nodes) {
     const tableTitle = node.data.title || node.id;
@@ -55,8 +58,8 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
 
   // Export foreign keys
   for (const edge of edges) {
-    const sourceNode = nodes.find(n => n.id === edge.source);
-    const targetNode = nodes.find(n => n.id === edge.target);
+    const sourceNode = nodesById.get(edge.source);
+    const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
@@ -151,6 +154,8 @@ export function exportDiagramSvg(
   edges: Edge[],
   snapshot?: SnapshotJson | null,
 ): string {
+  // Bolt: Use map for O(1) node lookup instead of O(N) array find
+  const nodesById = new Map(nodes.map(n => [n.id, n]));
   const width = 280;
   const headerHeight = 34;
   const rowHeight = 22;
@@ -178,8 +183,8 @@ export function exportDiagramSvg(
   ];
 
   for (const edge of edges) {
-    const source = nodes.find((n) => n.id === edge.source);
-    const target = nodes.find((n) => n.id === edge.target);
+    const source = nodesById.get(edge.source);
+    const target = nodesById.get(edge.target);
     if (!source || !target) continue;
     const sx = source.position.x + offsetX + width;
     const sy = source.position.y + offsetY + (heights.get(source.id) || headerHeight) / 2;
