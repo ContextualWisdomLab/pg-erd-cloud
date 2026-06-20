@@ -12,8 +12,7 @@ from app.models import (
     SchemaSnapshot,
     SchemaSnapshotData,
 )
-from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
-from app.pg_introspect.introspect import introspect_postgres
+from app.db_introspect import introspect_database
 from app.security import decrypt_text
 
 
@@ -37,12 +36,11 @@ async def handle_snapshot_job(
                 raise RuntimeError("db connection not found")
 
             dsn = decrypt_text(conn.dsn_ciphertext, conn.dsn_nonce)
-            validate_postgres_dsn_target(dsn)
             schema_filter = snapshot.schema_filter
 
     # Long-running IO: do it outside a DB transaction.
     try:
-        data = await introspect_postgres(dsn, schema_filter)
+        data = await introspect_database(dsn, schema_filter)
     except Exception as e:  # noqa: BLE001
         async with session_factory() as session:
             async with session.begin():

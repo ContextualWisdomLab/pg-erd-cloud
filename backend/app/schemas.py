@@ -47,7 +47,9 @@ class ConnectionCreateIn(BaseModel):
     dsn: str = Field(
         min_length=1,
         max_length=4096,
-        description="PostgreSQL connection string. Not logged.",
+        description=(
+            "PostgreSQL or Snowflake connection string. Not logged."
+        ),
     )
 
 
@@ -65,7 +67,7 @@ class SnapshotCreateIn(BaseModel):
     schema_filter: str | None = Field(
         default=None,
         description=(
-            "If set, only introspect this schema (unquoted PostgreSQL identifier)"
+            "If set, only introspect this schema (unquoted database identifier)"
         ),
         min_length=1,
         max_length=63,

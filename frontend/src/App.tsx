@@ -526,7 +526,7 @@ export default function App() {
             onChange={(e) =>
               setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
             }
-            placeholder="postgresql://..."
+            placeholder="postgresql://... or snowflake://..."
             aria-label="Connection DSN"
           />
           <button
