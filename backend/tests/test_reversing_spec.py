@@ -32,6 +32,7 @@ def _snapshot() -> dict:
                 "column_name": "id",
                 "data_type": "integer",
                 "is_not_null": True,
+                "example_value": "1001",
                 "column_comment": "User id",
             },
             {
@@ -40,6 +41,7 @@ def _snapshot() -> dict:
                 "column_name": "email",
                 "data_type": "text",
                 "is_not_null": True,
+                "example_value": "user@example.com",
             },
             {
                 "relation_oid": 2,
@@ -47,6 +49,7 @@ def _snapshot() -> dict:
                 "column_name": "user_id",
                 "data_type": "integer",
                 "is_not_null": True,
+                "example_value": "1001",
             },
         ],
         "constraints": [
@@ -85,7 +88,8 @@ def test_generate_reversing_markdown_includes_entities_and_relationships() -> No
 
     assert "# DB Reversing Specification" in markdown
     assert "### public.users" in markdown
-    assert "| id | integer | yes | - | User id |" in markdown
+    assert "| id | integer | yes | - | 1001 | User id |" in markdown
+    assert "| email | text | yes | - | user@example.com | - |" in markdown
     assert "users_pkey (p): PRIMARY KEY (id)" in markdown
     assert "users_email_idx [unique, method=btree]" in markdown
     assert "public.orders.user_id -> public.users.id" in markdown
@@ -101,4 +105,5 @@ def test_generate_reversing_llm_prompt_contains_compact_json_summary() -> None:
     summary = json.loads(payload)
     assert summary["source_dialect"] == "postgresql"
     assert summary["objects"][0]["name"] == "public.users"
+    assert summary["objects"][0]["columns"][1]["example"] == "user@example.com"
     assert summary["relationships"][0]["constraint"] == "orders_user_id_fkey"
