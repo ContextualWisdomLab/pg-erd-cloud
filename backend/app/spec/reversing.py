@@ -63,6 +63,7 @@ def _compact_snapshot_summary(snapshot: dict) -> dict:
                     "type": column.get("data_type"),
                     "not_null": column.get("is_not_null") is True,
                     "default": column.get("default_expr"),
+                    "example": column.get("example_value"),
                     "comment": column.get("column_comment"),
                 }
             )
@@ -206,8 +207,8 @@ def generate_reversing_markdown(snapshot: dict) -> str:
         lines.extend(
             [
                 "",
-                "| Column | Type | Required | Default | Comment |",
-                "| --- | --- | --- | --- | --- |",
+                "| Column | Type | Required | Default | Example | Comment |",
+                "| --- | --- | --- | --- | --- | --- |",
             ]
         )
         for column in obj.get("columns", []):
@@ -221,6 +222,7 @@ def generate_reversing_markdown(snapshot: dict) -> str:
                         _escape_cell(column.get("type")),
                         _bool_text(column.get("not_null")),
                         _escape_cell(column.get("default")),
+                        _escape_cell(column.get("example")),
                         _escape_cell(column.get("comment")),
                     ]
                 )

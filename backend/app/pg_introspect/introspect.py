@@ -5,6 +5,7 @@ import datetime as dt
 import asyncpg
 
 from app.pg_introspect import queries
+from app.pg_introspect.column_examples import add_column_examples
 from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
 
@@ -48,7 +49,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             "schema_filter": schema_filter,
             "schemas": [dict(r) for r in schemas],
             "relations": [dict(r) for r in relations],
-            "columns": [dict(r) for r in columns],
+            "columns": add_column_examples([dict(r) for r in columns]),
             "constraints": [dict(r) for r in constraints],
             "indexes": [dict(r) for r in indexes],
             "pk_columns": [dict(r) for r in pk_columns],
