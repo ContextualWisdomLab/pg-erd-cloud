@@ -108,6 +108,13 @@ class Settings(BaseSettings):
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
 
+    # Optional OpenAI-compatible chat-completions provider for live reversing
+    # spec drafts. Leave unset to keep all reversing spec generation local.
+    llm_api_base_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str | None = None
+    llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
+
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
     # NOTE: Do not trust the token header's alg; only accept algorithms from

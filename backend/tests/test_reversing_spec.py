@@ -94,6 +94,7 @@ def test_generate_reversing_markdown_includes_entities_and_relationships() -> No
     assert "users_email_idx [unique, method=btree]" in markdown
     assert "public.orders.user_id -> public.users.id" in markdown
     assert "/reversing-spec.md?mode=llm-prompt" in markdown
+    assert "/reversing-spec.md?mode=llm-draft" in markdown
 
 
 def test_generate_reversing_llm_prompt_contains_compact_json_summary() -> None:

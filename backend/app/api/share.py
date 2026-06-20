@@ -17,6 +17,11 @@ from app.models import (
     SchemaSnapshotData,
     ShareLink,
 )
+from app.spec.llm import (
+    LlmConfigurationError,
+    LlmProviderError,
+    generate_reversing_llm_draft,
+)
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
@@ -157,7 +162,9 @@ async def export_shared_snapshot_sql(
 async def export_shared_snapshot_reversing_spec(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
+    mode: str = Query(
+        "markdown", pattern="^(markdown|llm-prompt|llm-draft)$"
+    ),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a shared snapshot as a DB reversing spec or LLM prompt."""
@@ -176,4 +183,13 @@ async def export_shared_snapshot_reversing_spec(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    if mode == "llm-draft":
+        try:
+            return await generate_reversing_llm_draft(data.snapshot_json)
+        except LlmConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LlmProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="LLM provider request failed"
+            ) from exc
     return generate_reversing_spec(data.snapshot_json, mode=mode)
