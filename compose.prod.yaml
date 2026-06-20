@@ -1,4 +1,24 @@
 services:
+  traefik:
+    image: traefik:v3.5.4@sha256:4df0a50fcf71b454c0d7ad17675776dc8d37359deae3291895bdaa008c1b9972
+    container_name: erd_traefik
+    command:
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
+      - --entryPoints.web.address=:8080
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --providers.file.watch=true
+      - --accesslog=true
+      - --log.level=INFO
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
     container_name: erd_postgres
@@ -25,7 +45,7 @@ services:
     env_file: ./.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-8080}}
+      CORS_ORIGINS: http://localhost:8080
       APP_SECRET_FILE: /run/secrets/app_secret
     secrets:
       - app_secret
@@ -48,8 +68,8 @@ services:
     container_name: erd_frontend
     depends_on:
       - backend
-    ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    expose:
+      - "8080"
     restart: unless-stopped
 
 volumes:
