@@ -92,7 +92,7 @@ app.add_middleware(
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Dev-User"],
+    allow_headers=["Authorization", "Content-Type", "X-Dev-User", "X-CSRF-Token"],
 )
 
 # Observability should be registered after other middleware so it can capture
