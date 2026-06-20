@@ -348,7 +348,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "Never return raw tool-call markup, tool-call JSON, or MCP call syntax in the review body" "opencode review prompt forbids raw tool-call transcripts as final review output"
 	assert_file_contains "$workflow_file" "Do not spend the session listing every changed path before reviewing" "opencode review prompt prevents fallback sessions from exhausting steps on file listing"
 	assert_file_contains "$workflow_file" "always return a final control block instead of a progress summary" "opencode review prompt requires a gate conclusion instead of a progress summary"
-	assert_file_contains "$workflow_file" "timeout 1200 opencode run" "opencode review primary model has a bounded extended timeout for larger workflow diffs"
+	assert_file_contains "$workflow_file" "timeout --kill-after=30s 1200 opencode run" "opencode review primary model has a bounded extended timeout for larger workflow diffs"
 	assert_file_contains "$workflow_file" '"ci-review-fallback"' "opencode review workflow declares a dedicated fallback agent"
 	assert_file_contains "$workflow_file" '"steps": 12' "opencode review fallback agent has enough bounded steps to conclude after MCP inspection"
 	assert_file_contains "$workflow_file" '"output": 12000' "opencode review fallback models have enough output budget for parseable control blocks"
@@ -2259,6 +2259,20 @@ CI/CD scripts but no application code. This prevents comprehensive security
 assessment and prevented thorough security testing.
 EOS
 		echo "Penetration test failed: incomplete bounded PR-scope codebase"
+		exit 1
+		;;
+	pr-missing-backend-code-pr-scope)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-missing-backend-code/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-pr-missing-backend-code/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Missing Backend Code in Security Review
+Severity: CRITICAL
+Target: /workspace/strix-pr-scope.CiSMSO
+
+The bounded pull-request scope includes only workflow files and no backend code.
+Because the backend source is absent from this PR-scope target, the scanner
+cannot complete the requested backend security assessment.
+EOS
+		echo "Penetration test failed: missing backend code in bounded PR-scope"
 		exit 1
 		;;
 	pr-critical-placeholder-hardcoded-secret)
@@ -7895,6 +7909,30 @@ run_gate_case "pr-incomplete-codebase-pr-scope" \
 	"" \
 	"0" \
 	"HIGH" \
+	"0" \
+	"__PR_SCOPE__" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
+	"" \
+	"" \
+	"0"
+
+run_gate_case "pr-missing-backend-code-pr-scope" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
 	"0" \
 	"__PR_SCOPE__" \
 	"" \
