@@ -22,7 +22,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: erd_backend
-    env_file: ./.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
       # NOTE: Avoid nested ${VAR:-${OTHER:-default}} expressions here.

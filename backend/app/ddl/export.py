@@ -98,7 +98,9 @@ def _postgres_type_to_snowflake(column: dict) -> str:
             return f"NUMBER({precision},0)"
         return "NUMBER"
 
-    varchar = re.match(r"^(character varying|varchar)\s*(?:\((\d+)\))?$", normalized)
+    varchar = re.match(
+        r"^(character varying|varchar)\s*(?:\((\d+)\))?$", normalized
+    )
     if varchar:
         return f"VARCHAR({varchar.group(2)})" if varchar.group(2) else "VARCHAR"
 
@@ -164,15 +166,23 @@ def _snowflake_type_to_postgres(column: dict) -> str:
 
     varchar = re.match(r"^(varchar|string|text)\s*(?:\((\d+)\))?$", normalized)
     if varchar:
-        return f"character varying({varchar.group(2)})" if varchar.group(2) else "text"
+        return (
+            f"character varying({varchar.group(2)})"
+            if varchar.group(2)
+            else "text"
+        )
 
     char = re.match(r"^(char|character)\s*(?:\((\d+)\))?$", normalized)
     if char:
         return f"character({char.group(2)})" if char.group(2) else "character"
 
-    if normalized.startswith("timestamp_tz") or normalized.startswith("timestamp_ltz"):
+    if normalized.startswith("timestamp_tz") or normalized.startswith(
+        "timestamp_ltz"
+    ):
         return "timestamp with time zone"
-    if normalized.startswith("timestamp_ntz") or normalized.startswith("timestamp"):
+    if normalized.startswith("timestamp_ntz") or normalized.startswith(
+        "timestamp"
+    ):
         return "timestamp without time zone"
 
     return "text"
@@ -268,98 +278,9 @@ def _constraint_column_names(
     return names
 
 
-def _render_schemas(tables: list[dict], lines: list[str]) -> None:
-    schemas: set[str] = set()
-    for table in tables:
-        schema_name = table.get("schema_name")
-        if isinstance(schema_name, str):
-            schemas.add(schema_name)
-
-    for s in sorted(schemas):
-        lines.append(f"CREATE SCHEMA IF NOT EXISTS {_q(s)};")
-    if schemas:
-        lines.append("")
-
-
-def _render_foreign_keys(constraints: list[dict], lines: list[str]) -> None:
-    fk_cons = [c for c in constraints if c.get("constraint_type") == "f"]
-    if fk_cons:
-        lines.append("-- Foreign keys")
-    for con in fk_cons:
-        schema = con.get("schema_name")
-        table = con.get("relation_name")
-        cname = con.get("constraint_name")
-        cdef = con.get("constraint_def")
-        if not (
-            isinstance(schema, str)
-            and isinstance(table, str)
-            and isinstance(cname, str)
-            and isinstance(cdef, str)
-        ):
-            continue
-        lines.append(
-            f"ALTER TABLE {_qname(schema, table)} ADD CONSTRAINT {_q(cname)} {cdef};"
-        )
-    if fk_cons:
-        lines.append("")
-
-
-def _render_indexes_pg(indexes: list[dict], lines: list[str]) -> None:
-    if indexes:
-        lines.append("-- Indexes")
-    for ix in indexes:
-        ix_def = ix.get("index_def")
-        if not isinstance(ix_def, str):
-            continue
-        ix_def = ix_def.strip().rstrip(";")
-        table_options = _tablespace_clause(ix.get("index_tablespace_name"))
-        if table_options and " TABLESPACE " not in ix_def.upper():
-            ix_def = f"{ix_def}{table_options}"
-        lines.append(ix_def + ";")
-
-
-def _render_table_columns_pg(
-    oid: int,
-    cols_by_oid: dict[int, list[dict]],
-    source_dialect: DdlDialect,
-) -> list[str]:
-    col_defs: list[str] = []
-    for c in sorted(
-        cols_by_oid.get(oid, []),
-        key=lambda x: int(x.get("column_position") or 0),
-    ):
-        col_name = c.get("column_name")
-        if not isinstance(col_name, str):
-            continue
-        data_type = _mapped_data_type(c, source_dialect, "postgresql")
-        parts = [f"{_q(col_name)} {data_type}"]
-        if c.get("has_default"):
-            default_clause = _column_default_clause(c.get("default_expr"), "postgresql")
-            if default_clause:
-                parts.append(default_clause)
-        if c.get("is_not_null") is True:
-            parts.append("NOT NULL")
-        col_defs.append(" ".join(parts))
-    return col_defs
-
-
-def _render_table_constraints_pg(
-    oid: int,
-    constraints_by_oid: dict[int, list[dict]],
-) -> list[str]:
-    table_cons: list[str] = []
-    for con in constraints_by_oid.get(oid, []):
-        ctype = con.get("constraint_type")
-        if ctype not in ("p", "u", "c"):
-            continue
-        cname = con.get("constraint_name")
-        cdef = con.get("constraint_def")
-        if isinstance(cname, str) and isinstance(cdef, str):
-            table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
-    return table_cons
-
-
-def snapshot_json_to_sql(snapshot: dict, target_dialect: str = "postgresql") -> str:
+def snapshot_json_to_sql(
+    snapshot: dict, target_dialect: str = "postgresql"
+) -> str:
     target = _normalize_dialect(target_dialect)
     if target == "snowflake":
         return _snapshot_json_to_snowflake_sql(snapshot)
@@ -389,9 +310,19 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
     cols_by_oid = _group_by_relation(columns)
     constraints_by_oid = _group_by_relation(constraints)
 
+    schemas: set[str] = set()
+    for table in tables:
+        schema_name = table.get("schema_name")
+        if isinstance(schema_name, str):
+            schemas.add(schema_name)
+
     lines: list[str] = []
     lines.append("-- Generated by pg-erd-cloud (MVP)\n")
-    _render_schemas(tables, lines)
+
+    for s in sorted(schemas):
+        lines.append(f"CREATE SCHEMA IF NOT EXISTS {_q(s)};")
+    if schemas:
+        lines.append("")
 
     # CREATE TABLE + inline constraints (PK/UNIQUE/CHECK)
     for t in tables:
@@ -406,7 +337,9 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
         partition_parent_name = t.get("partition_parent_name")
         is_partition = t.get("is_partition") is True
         if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
+            isinstance(schema, str)
+            and isinstance(name, str)
+            and isinstance(oid, int)
         ):
             continue
 
@@ -433,9 +366,35 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
                 f"-- NOTE: {_qname(schema, name)} is partitioned; partition definition not included in MVP export"
             )
 
-        col_defs = _render_table_columns_pg(oid, cols_by_oid, source_dialect)
+        col_defs: list[str] = []
+        for c in sorted(
+            cols_by_oid.get(oid, []),
+            key=lambda x: int(x.get("column_position") or 0),
+        ):
+            col_name = c.get("column_name")
+            if not isinstance(col_name, str):
+                continue
+            data_type = _mapped_data_type(c, source_dialect, "postgresql")
+            parts = [f"{_q(col_name)} {data_type}"]
+            if c.get("has_default"):
+                default_clause = _column_default_clause(
+                    c.get("default_expr"), "postgresql"
+                )
+                if default_clause:
+                    parts.append(default_clause)
+            if c.get("is_not_null") is True:
+                parts.append("NOT NULL")
+            col_defs.append(" ".join(parts))
 
-        table_cons = _render_table_constraints_pg(oid, constraints_by_oid)
+        table_cons: list[str] = []
+        for con in constraints_by_oid.get(oid, []):
+            ctype = con.get("constraint_type")
+            if ctype not in ("p", "u", "c"):
+                continue
+            cname = con.get("constraint_name")
+            cdef = con.get("constraint_def")
+            if isinstance(cname, str) and isinstance(cdef, str):
+                table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
 
         all_defs = col_defs + table_cons
         lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
@@ -451,10 +410,39 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
         lines.append("")
 
     # FKs after tables
-    _render_foreign_keys(constraints, lines)
+    fk_cons = [c for c in constraints if c.get("constraint_type") == "f"]
+    if fk_cons:
+        lines.append("-- Foreign keys")
+    for con in fk_cons:
+        schema = con.get("schema_name")
+        table = con.get("relation_name")
+        cname = con.get("constraint_name")
+        cdef = con.get("constraint_def")
+        if not (
+            isinstance(schema, str)
+            and isinstance(table, str)
+            and isinstance(cname, str)
+            and isinstance(cdef, str)
+        ):
+            continue
+        lines.append(
+            f"ALTER TABLE {_qname(schema, table)} ADD CONSTRAINT {_q(cname)} {cdef};"
+        )
+    if fk_cons:
+        lines.append("")
 
     # Indexes (use saved pg_get_indexdef output)
-    _render_indexes_pg(indexes, lines)
+    if indexes:
+        lines.append("-- Indexes")
+    for ix in indexes:
+        ix_def = ix.get("index_def")
+        if not isinstance(ix_def, str):
+            continue
+        ix_def = ix_def.strip().rstrip(";")
+        table_options = _tablespace_clause(ix.get("index_tablespace_name"))
+        if table_options and " TABLESPACE " not in ix_def.upper():
+            ix_def = f"{ix_def}{table_options}"
+        lines.append(ix_def + ";")
 
     lines.append("")
     return "\n".join(lines)
@@ -472,16 +460,28 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     cols_by_oid = _group_by_relation(columns)
     constraints_by_oid = _group_by_relation(constraints)
 
+    schemas: set[str] = set()
+    for table in tables:
+        schema_name = table.get("schema_name")
+        if isinstance(schema_name, str):
+            schemas.add(schema_name)
+
     lines: list[str] = []
     lines.append("-- Generated by pg-erd-cloud (MVP) for Snowflake\n")
-    _render_schemas(tables, lines)
+
+    for s in sorted(schemas):
+        lines.append(f"CREATE SCHEMA IF NOT EXISTS {_q(s)};")
+    if schemas:
+        lines.append("")
 
     for t in tables:
         schema = t.get("schema_name")
         name = t.get("relation_name")
         oid = t.get("relation_oid")
         if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
+            isinstance(schema, str)
+            and isinstance(name, str)
+            and isinstance(oid, int)
         ):
             continue
 
@@ -547,7 +547,26 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
             )
         lines.append("")
 
-    _render_foreign_keys(constraints, lines)
+    fk_cons = [c for c in constraints if c.get("constraint_type") == "f"]
+    if fk_cons:
+        lines.append("-- Foreign keys")
+    for con in fk_cons:
+        schema = con.get("schema_name")
+        table = con.get("relation_name")
+        cname = con.get("constraint_name")
+        cdef = con.get("constraint_def")
+        if not (
+            isinstance(schema, str)
+            and isinstance(table, str)
+            and isinstance(cname, str)
+            and isinstance(cdef, str)
+        ):
+            continue
+        lines.append(
+            f"ALTER TABLE {_qname(schema, table)} ADD CONSTRAINT {_q(cname)} {cdef};"
+        )
+    if fk_cons:
+        lines.append("")
 
     if indexes:
         lines.append("-- Indexes")

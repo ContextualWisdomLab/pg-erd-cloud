@@ -8,24 +8,7 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 type SnapshotJson = {
   relations: Array<{ relation_oid: number; relation_kind: string; schema_name: string; relation_name: string; relation_comment?: string | null }>
   columns: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
-  constraints: Array<{
-    constraint_oid: number
-    constraint_name: string
-    constraint_type: string
-    schema_name: string
-    relation_oid: number
-    relation_name: string
-    foreign_relation_oid?: number | null
-    foreign_schema_name?: string | null
-    foreign_relation_name?: string | null
-    constrained_attnums?: number[] | null
-    referenced_attnums?: number[] | null
-    fk_on_update?: string | null
-    fk_on_delete?: string | null
-    fk_match_type?: string | null
-    constraint_def?: string | null
-    check_expr?: string | null
-  }>
+  constraints: Array<any>
   pk_columns?: Array<{ relation_oid: number; column_name: string }>
   fk_edges?: Array<{
     fk_constraint_oid: number
