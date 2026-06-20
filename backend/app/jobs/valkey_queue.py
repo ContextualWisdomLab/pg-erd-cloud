@@ -105,13 +105,13 @@ async def _client() -> Any:
     return redis_asyncio.from_url(settings.valkey_url)
 
 
-async def _close_client(client: Any) -> Any:
+async def _close_client(client: Any) -> None:
     close = getattr(client, "aclose", None) or getattr(client, "close", None)
     if close is None:
-        return
+        return None
     result = close()
     if hasattr(result, "__await__"):
-        return await result
+        _ = await result
     return None
 
 
