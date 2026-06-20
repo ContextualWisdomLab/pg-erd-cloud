@@ -72,3 +72,7 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+      - name: Test
+        working-directory: frontend
+        run: npm run test
