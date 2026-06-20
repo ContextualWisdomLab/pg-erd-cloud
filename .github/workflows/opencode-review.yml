@@ -2101,6 +2101,50 @@ jobs:
                 create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
               fi
               ;;
+            NO_CONCLUSION)
+              failed_check_review_body_file="$(mktemp)"
+              failed_checks_file="$(mktemp)"
+              pending_checks_file="$(mktemp)"
+              set +e
+              wait_for_peer_github_checks "$pending_checks_file"
+              pending_wait_status=$?
+              set -e
+              if [ "$pending_wait_status" -eq 1 ]; then
+                request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read before recording OpenCode NO_CONCLUSION."
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ "$pending_wait_status" -ne 0 ]; then
+                build_pending_check_body "$pending_checks_file" "$failed_check_review_body_file"
+                create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              if ! collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file"; then
+                request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read after OpenCode returned NO_CONCLUSION."
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ -s "$failed_checks_file" ]; then
+                failed_check_evidence_file="$(mktemp)"
+                if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                  echo "::endgroup::"
+                  exit 0
+                fi
+                if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
+                  printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
+                fi
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
+                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                else
+                  build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
+                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                fi
+              else
+                no_conclusion_reason="$(jq -r '.reason // "OpenCode returned NO_CONCLUSION."' "$control_json" 2>/dev/null || printf 'OpenCode returned NO_CONCLUSION.')"
+                record_review_unavailable_without_failed_checks "Approval gate result was NO_CONCLUSION. ${no_conclusion_reason}"
+              fi
+              ;;
             *)
               request_changes_for_gate_failure "Approval gate result was ${gate_result:-empty}."
               ;;
