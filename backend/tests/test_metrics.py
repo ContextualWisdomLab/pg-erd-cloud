@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY
 
 from app.metrics import (
