@@ -78,6 +78,57 @@ def test_dsn_guard_rejects_invalid_query_overrides(
         validate_postgres_dsn_target(dsn)
 
 
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        "postgresql://user:pass@[::ffff:10.0.0.8]:5432/app",
+        "postgresql://user:pass@[::ffff:127.0.0.1]:5432/app",
+        "postgresql://user:pass@[::ffff:169.254.169.254]:5432/app",
+        "postgresql://user:pass@db.example.com/app?hostaddr=::ffff:10.0.0.8",
+    ],
+)
+def test_dsn_guard_rejects_ipv4_mapped_restricted_addresses(
+    monkeypatch: pytest.MonkeyPatch, dsn: str
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
+    )
+    monkeypatch.setattr(
+        settings,
+        "db_introspection_allowed_hosts",
+        "",
+    )
+
+    with pytest.raises(DsnTargetError, match="restricted IP"):
+        validate_postgres_dsn_target(dsn)
+
+
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        "postgresql://user:pass@[::ffff:93.184.216.34]:5432/app",
+        "postgresql://user:pass@db.example.com/app?hostaddr=::ffff:93.184.216.34",
+    ],
+)
+def test_dsn_guard_allows_public_ipv4_mapped_addresses(
+    monkeypatch: pytest.MonkeyPatch, dsn: str
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
+    )
+    monkeypatch.setattr(
+        settings,
+        "db_introspection_allowed_hosts",
+        "",
+    )
+
+    validate_postgres_dsn_target(dsn)
+
+
 def test_dsn_guard_rejects_localhost() -> None:
     with pytest.raises(DsnTargetError, match="localhost"):
         validate_postgres_dsn_target("postgresql://user:pass@localhost:5432/app")

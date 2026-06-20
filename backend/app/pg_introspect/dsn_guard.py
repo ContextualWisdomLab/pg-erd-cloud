@@ -38,6 +38,9 @@ def _validate_allowed_host(host: str) -> None:
 
 
 def _is_restricted_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+
     return (
         ip.is_private
         or ip.is_loopback
