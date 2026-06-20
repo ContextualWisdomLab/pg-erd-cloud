@@ -3,7 +3,7 @@ import type { TableNodeData } from './convert';
 
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
-  columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean }>
+  columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean; example_value?: string | number | boolean | null }>
   indexes?: Array<{
     relation_oid?: number
     table_oid?: number
@@ -113,7 +113,11 @@ function indexLabel(ix: NonNullable<SnapshotJson['indexes']>[number]): string {
 }
 
 function columnLabel(col: TableNodeData['columns'][number]): string {
-  return `${col.column_name}${col.column_comment ? ` (${col.column_comment})` : ''}`;
+  const comment = col.column_comment ? ` (${col.column_comment})` : '';
+  const example = col.example_value === null || col.example_value === undefined
+    ? ''
+    : ` [e.g. ${String(col.example_value)}]`;
+  return `${col.column_name}${comment}${example}`;
 }
 
 function tableLabel(node: Node<TableNodeData>): string {

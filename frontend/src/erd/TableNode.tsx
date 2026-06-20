@@ -27,6 +27,7 @@ type Column = {
   is_not_null: boolean;
   is_pk?: boolean;
   column_comment?: string | null;
+  example_value?: string | number | boolean | null;
 };
 
 type TableNodeData = {
@@ -37,6 +38,12 @@ type TableNodeData = {
 };
 
 type TableNodeNode = Node<TableNodeData, "tableNode">;
+
+function formatExample(value: Column["example_value"]): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
 
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
@@ -62,35 +69,43 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         </span>
       </div>
       <div className="tableNode__cols">
-        {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => (
-          <div key={c.column_name} className="tableNode__col">
-            <Handle
-              type="target"
-              position={Position.Left}
-              id={targetColumnHandleId(c.column_name)}
-              className="colHandle"
-            />
-            <span className="tableNode__colIdentity">
-              <span className="tableNode__colName">{c.column_name}</span>
-              {c.column_comment ? (
-                <span className="tableNode__colComment">
-                  {escapeHtmlText(c.column_comment)}
-                </span>
+        {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => {
+          const example = formatExample(c.example_value);
+          return (
+            <div key={c.column_name} className="tableNode__col">
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={targetColumnHandleId(c.column_name)}
+                className="colHandle"
+              />
+              <span className="tableNode__colIdentity">
+                <span className="tableNode__colName">{c.column_name}</span>
+                {c.column_comment ? (
+                  <span className="tableNode__colComment">
+                    {escapeHtmlText(c.column_comment)}
+                  </span>
+                ) : null}
+                {example ? (
+                  <span className="tableNode__colExample">
+                    e.g. {escapeHtmlText(example)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="tableNode__colType">{c.data_type}</span>
+              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
+              {c.is_not_null ? (
+                <span className="tableNode__badge">NOT NULL</span>
               ) : null}
-            </span>
-            <span className="tableNode__colType">{c.data_type}</span>
-            {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
-            {c.is_not_null ? (
-              <span className="tableNode__badge">NOT NULL</span>
-            ) : null}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={sourceColumnHandleId(c.column_name)}
-              className="colHandle"
-            />
-          </div>
-        ))}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={sourceColumnHandleId(c.column_name)}
+                className="colHandle"
+              />
+            </div>
+          );
+        })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div className="tableNode__more">
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
@@ -122,6 +137,7 @@ function isSameRenderedColumns(
     if (a.is_not_null !== b.is_not_null) return false;
     if (a.is_pk !== b.is_pk) return false;
     if (a.column_comment !== b.column_comment) return false;
+    if (a.example_value !== b.example_value) return false;
   }
   return true;
 }
