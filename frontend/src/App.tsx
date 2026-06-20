@@ -368,12 +368,13 @@ export default function App() {
   }
 
   async function onCreateProject() {
+    const nextProjectName = projectName.trim();
+    if (!nextProjectName || isCreatingProject) return;
     setError(null);
     setIsCreatingProject(true);
     try {
-      const p = await createProject(projectName);
-      const next = [p, ...projects];
-      setProjects(next);
+      const p = await createProject(nextProjectName);
+      setProjects((prev) => [p, ...prev]);
       setSelectedProjectId(p.project_space_uuid);
     } finally {
       setIsCreatingProject(false);
@@ -381,15 +382,19 @@ export default function App() {
   }
 
   async function onCreateConnection() {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || isCreatingConnection) return;
+    const nextConnectionName = connName.trim();
     const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
-    if (!connectionDsn) return;
+    if (!nextConnectionName || !connectionDsn) return;
     setError(null);
     setIsCreatingConnection(true);
     try {
-      const c = await createConnection(selectedProjectId, connName, connectionDsn);
-      const next = [c, ...connections];
-      setConnections(next);
+      const c = await createConnection(
+        selectedProjectId,
+        nextConnectionName,
+        connectionDsn,
+      );
+      setConnections((prev) => [c, ...prev]);
       setSelectedConnId(c.db_connection_uuid);
       if (dsnInputRef.current) {
         dsnInputRef.current.value = "";
@@ -401,7 +406,7 @@ export default function App() {
   }
 
   async function onCreateSnapshot() {
-    if (!selectedProjectId || !selectedConnId) return;
+    if (!selectedProjectId || !selectedConnId || isCreatingSnapshot) return;
     setError(null);
     setIsCreatingSnapshot(true);
     try {
@@ -526,7 +531,12 @@ export default function App() {
           />
           <button
             onClick={onCreateConnection}
-            disabled={!selectedProjectId || !connName.trim() || !isDsnPresent || isCreatingConnection}
+            disabled={
+              !selectedProjectId ||
+              !connName.trim() ||
+              !isDsnPresent ||
+              isCreatingConnection
+            }
             aria-busy={isCreatingConnection}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
