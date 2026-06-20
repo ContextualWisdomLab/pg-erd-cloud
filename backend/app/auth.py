@@ -86,10 +86,12 @@ async def _get_oidc_config() -> dict:
     if _oidc_config is not None and now < _oidc_config_expires_at:
         return cast(dict, _oidc_config)
 
-    async with httpx.AsyncClient(timeout=5) as client:
+    async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(
             f"{settings.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
         )
+        if r.is_redirect:
+            raise RuntimeError("OIDC configuration endpoint must not redirect")
         r.raise_for_status()
         config = cast(dict[str, Any], r.json())
 
@@ -110,8 +112,10 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not force_refresh and _oidc_jwks is not None and now < _oidc_jwks_expires_at:
         return cast(dict, _oidc_jwks)
 
-    async with httpx.AsyncClient(timeout=5) as client:
+    async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(jwks_uri)
+        if r.is_redirect:
+            raise RuntimeError("OIDC JWKS endpoint must not redirect")
         r.raise_for_status()
         jwks = cast(dict[str, Any], r.json())
     _oidc_jwks = jwks

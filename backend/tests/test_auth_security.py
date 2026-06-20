@@ -43,6 +43,134 @@ def exp_claim() -> int:
     return int(auth.dt.datetime.now(auth.dt.timezone.utc).timestamp()) + 300
 
 
+class _FakeHttpResponse:
+    def __init__(self, payload: dict[str, object], is_redirect: bool = False) -> None:
+        self._payload = payload
+        self.is_redirect = is_redirect
+        self.raise_for_status_called = False
+
+    def raise_for_status(self) -> None:
+        self.raise_for_status_called = True
+
+    def json(self) -> dict[str, object]:
+        return self._payload
+
+
+@pytest.mark.asyncio
+async def test_oidc_config_fetch_disables_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
+    observed: dict[str, object] = {}
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            observed.update(kwargs)
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> _FakeHttpResponse:
+            observed["url"] = url
+            return response
+
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example/")
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(auth, "_oidc_config", None)
+    monkeypatch.setattr(
+        auth,
+        "_oidc_config_expires_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+
+    config = await auth._get_oidc_config()
+
+    assert config == {"jwks_uri": "https://issuer.example/jwks"}
+    assert observed["timeout"] == 5
+    assert observed["follow_redirects"] is False
+    assert observed["url"] == "https://issuer.example/.well-known/openid-configuration"
+    assert response.raise_for_status_called is True
+
+
+@pytest.mark.asyncio
+async def test_oidc_config_rejects_redirect_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"}, True)
+
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs: object) -> None:
+            return None
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, _url: str) -> _FakeHttpResponse:
+            return response
+
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(auth, "_oidc_config", None)
+    monkeypatch.setattr(
+        auth,
+        "_oidc_config_expires_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+
+    with pytest.raises(RuntimeError, match="must not redirect"):
+        await auth._get_oidc_config()
+
+    assert response.raise_for_status_called is False
+
+
+@pytest.mark.asyncio
+async def test_jwks_fetch_disables_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = _FakeHttpResponse({"keys": []})
+    observed: dict[str, object] = {}
+
+    async def fake_config() -> dict[str, object]:
+        return {"jwks_uri": "https://issuer.example/jwks"}
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            observed.update(kwargs)
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> _FakeHttpResponse:
+            observed["url"] = url
+            return response
+
+    monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(auth, "_oidc_jwks", None)
+    monkeypatch.setattr(
+        auth,
+        "_oidc_jwks_expires_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+
+    jwks = await auth._get_jwks()
+
+    assert jwks == {"keys": []}
+    assert observed["timeout"] == 5
+    assert observed["follow_redirects"] is False
+    assert observed["url"] == "https://issuer.example/jwks"
+    assert response.raise_for_status_called is True
+
+
 @pytest.mark.asyncio
 async def test_oidc_rejects_header_selected_algorithm(
     monkeypatch: pytest.MonkeyPatch,
