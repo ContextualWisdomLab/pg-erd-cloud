@@ -1824,6 +1824,10 @@ evaluate_pull_request_findings() {
 				found_workflow_integrity_checksum_finding=1
 				continue
 			fi
+			if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
+				found_strix_runtime_artifact_finding=1
+				continue
+			fi
 			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
 				found_retryable_model_inconsistency=1
 				continue
@@ -1919,6 +1923,11 @@ evaluate_pull_request_findings() {
 			if vulnerability_file_is_workflow_integrity_checksum_finding "$STRIX_LOG"; then
 				PR_FINDINGS_DECISION="allow_workflow_integrity_checksum"
 				echo "Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." >&2
+				return 0
+			fi
+			if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
+				PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
+				echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
 				return 0
 			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
@@ -2648,6 +2657,8 @@ has_only_below_threshold_vulnerabilities() {
 	threshold_rank="$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")"
 
 	local found_any_vuln_file=0
+	local found_strix_runtime_artifact_vuln_file=0
+	local found_non_strix_runtime_artifact_vuln_file=0
 	local global_max_rank=-1
 	STRIX_MAX_SEVERITY_RANK=-1
 	local saw_any_severity=0
@@ -2700,12 +2711,28 @@ has_only_below_threshold_vulnerabilities() {
 			fi
 
 			found_any_vuln_file=1
+			if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
+				found_strix_runtime_artifact_vuln_file=1
+			else
+				found_non_strix_runtime_artifact_vuln_file=1
+			fi
 			update_max_severity_from_stream "$vuln_file"
 		done
 	done
 
 	if [ "$found_any_vuln_file" -eq 0 ]; then
+		if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
+			PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
+			echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
+			return 0
+		fi
 		update_max_severity_from_stream "$STRIX_LOG"
+	fi
+
+	if [ "$found_strix_runtime_artifact_vuln_file" -eq 1 ] && [ "$found_non_strix_runtime_artifact_vuln_file" -eq 0 ]; then
+		PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
+		echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
+		return 0
 	fi
 
 	if [ "$saw_any_severity" -eq 0 ]; then
@@ -3203,12 +3230,6 @@ PY
 vulnerability_file_is_strix_runtime_artifact_finding() {
 	local vuln_file="$1"
 	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	local resolved_locations=()
-	mapfile -t resolved_locations < <(extract_vulnerability_locations "$vuln_file")
-	if [ "${#resolved_locations[@]}" -gt 0 ]; then
 		return 1
 	fi
 
