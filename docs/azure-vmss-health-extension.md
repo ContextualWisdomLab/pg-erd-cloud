@@ -39,8 +39,9 @@ Microsoft Learn 문서 기준으로, 확장은 아래 값을 설정합니다.
 ### 포트 선택
 
 - **권장:** public/ingress가 바라보는 포트에서 `/healthz`가 200이 되도록 구성
-  - (컨테이너 기준) `frontend/nginx.conf`에 `/healthz`를 백엔드로 proxy하도록 추가되어 있음
-  - 따라서 프론트 포트(예: 8080)로도 `/healthz` 확인 가능
+  - (컨테이너 기준) `deploy/traefik/dynamic.yaml`에서 `/healthz`를 백엔드로
+    라우팅함
+  - 따라서 Traefik edge 포트(예: 8080)로도 `/healthz` 확인 가능
 - 대안: VM/인스턴스에서 백엔드 포트(예: 8000)를 직접 프로브하도록 네트워크를 열어두는 방식
 
 ### 예시 (Linux, Azure CLI)
