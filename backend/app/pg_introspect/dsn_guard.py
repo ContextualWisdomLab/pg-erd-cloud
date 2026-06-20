@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import ipaddress
 import socket
@@ -40,7 +41,7 @@ def _host_matches_allowed_entry(host: str, entry: str) -> bool:
 def _validate_allowed_host(host: str) -> None:
     allowed_hosts = _configured_allowed_hosts()
     if not allowed_hosts:
-        return
+        raise DsnTargetError("database host allowlist is not configured")
     if any(_host_matches_allowed_entry(host, entry) for entry in allowed_hosts):
         return
     raise DsnTargetError("database host is not in the introspection allowlist")
@@ -75,9 +76,10 @@ def _connection_host_for_ip(
     return str(ip)
 
 
-def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+async def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
     try:
-        addrinfo = socket.getaddrinfo(host, port or 5432, type=socket.SOCK_STREAM)
+        loop = asyncio.get_running_loop()
+        addrinfo = await loop.getaddrinfo(host, port or 5432, type=socket.SOCK_STREAM)
     except socket.gaierror as err:
         raise DsnTargetError("database host could not be resolved") from err
 
@@ -142,7 +144,7 @@ def _unique_hosts(hosts: list[str]) -> tuple[str, ...]:
     return tuple(unique)
 
 
-def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[str, ...]:
+async def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[str, ...]:
     normalized = h.lower().rstrip(".")
 
     if normalized == "localhost" or normalized.endswith(".localhost"):
@@ -159,14 +161,14 @@ def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[st
     if is_hostaddr:
         raise DsnTargetError("database DSN query hostaddr is invalid")
 
-    resolved_ips = _resolved_ips(normalized, port)
+    resolved_ips = await _resolved_ips(normalized, port)
     for ip in resolved_ips:
         if _is_restricted_ip(ip):
             raise DsnTargetError("database host resolves to a restricted IP range")
     return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
 
 
-def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
+async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     """Reject PostgreSQL DSNs that could target internal network resources."""
 
     parsed = urlparse(dsn)
@@ -186,17 +188,13 @@ def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     if port_override is not None:
         port = port_override
 
-    primary_hosts = _validated_ip_hosts(host, False, port)
-    query_hosts = [
-        _validated_ip_hosts(query_host, False, port)
-        for query_host in _split_query_host_values(query.get("host", []), "host")
-    ]
-    query_hostaddrs = [
-        _validated_ip_hosts(query_hostaddr, True, port)
-        for query_hostaddr in _split_query_host_values(
-            query.get("hostaddr", []), "hostaddr"
-        )
-    ]
+    primary_hosts = await _validated_ip_hosts(host, False, port)
+    query_hosts = []
+    for query_host in _split_query_host_values(query.get("host", []), "host"):
+        query_hosts.append(await _validated_ip_hosts(query_host, False, port))
+    query_hostaddrs = []
+    for query_hostaddr in _split_query_host_values(query.get("hostaddr", []), "hostaddr"):
+        query_hostaddrs.append(await _validated_ip_hosts(query_hostaddr, True, port))
 
     connection_host_groups = query_hosts + query_hostaddrs
     if not connection_host_groups:

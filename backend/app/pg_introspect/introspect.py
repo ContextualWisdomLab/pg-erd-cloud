@@ -14,7 +14,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
     # Note: avoid logging DSN.
-    target = validate_postgres_dsn_target(dsn)
+    target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
