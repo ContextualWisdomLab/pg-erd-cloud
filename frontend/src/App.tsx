@@ -202,11 +202,16 @@ export default function App() {
     () => parsePositiveInteger(cardinalityRowCount),
     [cardinalityRowCount],
   );
+
+  const nodesById = useMemo(() => {
+    return new Map(nodes.map(n => [n.id, n]));
+  }, [nodes]);
+
   const cardinalityNode = useMemo(() => {
     return (
-      nodes.find((node) => node.id === cardinalityTableId) ?? nodes[0] ?? null
+      nodesById.get(cardinalityTableId) ?? nodes[0] ?? null
     );
-  }, [cardinalityTableId, nodes]);
+  }, [cardinalityTableId, nodesById, nodes]);
   const cardinalityColumns = useMemo<CardinalityColumnInput[]>(() => {
     if (!cardinalityNode) return [];
     return cardinalityNode.data.columns.map((column) => ({
@@ -423,7 +428,7 @@ export default function App() {
   }
 
   function onCardinalityTableChange(tableId: string) {
-    const nextNode = nodes.find((node) => node.id === tableId);
+    const nextNode = nodesById.get(tableId);
     if (!nextNode) return;
     setCardinalityTableId(tableId);
     initializeCardinalityInputs(nextNode);
