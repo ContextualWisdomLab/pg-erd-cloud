@@ -1,4 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
+import type { IndexRecommendation } from './cardinality';
 import type { TableNodeData } from './convert';
 
 type SnapshotJson = {
@@ -25,6 +26,10 @@ type SnapshotJson = {
     column_ordinal: number
   }>
 }
+
+type SnapshotIndex = NonNullable<SnapshotJson['indexes']>[number];
+
+type DisplayIndex = SnapshotIndex | IndexRecommendation;
 
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
@@ -71,6 +76,27 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     }
   }
 
+  const emittedIndexes = new Set<string>();
+  const indexLines: string[] = [];
+  for (const node of nodes) {
+    const tableTitle = node.data.title || node.id;
+    for (const index of node.data.indexes || []) {
+      if (emittedIndexes.has(index.index_name) || index.columns.length === 0) {
+        continue;
+      }
+      emittedIndexes.add(index.index_name);
+      const cols = index.columns.map((column) => `"${column}"`).join(', ');
+      indexLines.push(
+        `CREATE INDEX "${index.index_name}" ON "${tableTitle}" USING ${index.access_method} (${cols});`,
+      );
+    }
+  }
+  if (indexLines.length > 0) {
+    ddl += '-- Indexes\n';
+    ddl += indexLines.join('\n');
+    ddl += '\n\n';
+  }
+
   return ddl;
 }
 
@@ -102,14 +128,19 @@ function indexesByRelation(snapshot?: SnapshotJson | null): Map<string, Snapshot
   return map;
 }
 
-function indexLabel(ix: NonNullable<SnapshotJson['indexes']>[number]): string {
-  const extensions = new Set(
-    [ix.access_method_extension, ...(ix.operator_class_extensions || [])].filter(Boolean),
-  );
+function indexLabel(ix: DisplayIndex): string {
+  const extensions = 'operator_class_extensions' in ix
+    ? new Set(
+        [ix.access_method_extension, ...(ix.operator_class_extensions || [])].filter(Boolean),
+      )
+    : new Set<string>();
   const method = ix.access_method
     ? ` [${ix.access_method}${extensions.size ? `:${[...extensions].join(',')}` : ''}]`
     : '';
-  return `${ix.index_name}${method}${ix.is_unique ? ' unique' : ''}${ix.is_primary ? ' primary' : ''}`;
+  const columns = 'columns' in ix ? ` (${ix.columns.join(', ')})` : '';
+  const unique = 'is_unique' in ix && ix.is_unique ? ' unique' : '';
+  const primary = 'is_primary' in ix && ix.is_primary ? ' primary' : '';
+  return `${ix.index_name}${method}${columns}${unique}${primary}`;
 }
 
 function columnLabel(col: TableNodeData['columns'][number]): string {
@@ -138,7 +169,7 @@ export function exportPlantUml(
     for (const col of node.data.columns || []) {
       lines.push(`  ${col.is_pk ? '*' : ''}${plantText(columnLabel(col))} : ${plantText(col.data_type)}${col.is_not_null ? ' <<not null>>' : ''}`);
     }
-    for (const ix of indexes.get(node.id) || []) {
+    for (const ix of [...(indexes.get(node.id) || []), ...(node.data.indexes || [])]) {
       lines.push(`  <<index>> ${plantText(indexLabel(ix))}`);
     }
     lines.push('}', '');
@@ -168,7 +199,7 @@ export function exportDiagramSvg(
   const heights = new Map(
     nodes.map((node) => {
       // ponytail: cap rendered index rows; add full index export when the canvas carries index nodes.
-      const indexRows = Math.min(indexes.get(node.id)?.length || 0, 8);
+      const indexRows = Math.min((indexes.get(node.id)?.length || 0) + (node.data.indexes?.length || 0), 8);
       return [node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0))];
     }),
   );
@@ -213,7 +244,10 @@ export function exportDiagramSvg(
       parts.push(`<text x="${x + 12}" y="${rowY}" font-family="ui-monospace, monospace" font-size="11" fill="#111827">${col.is_pk ? '* ' : ''}${escapeXml(columnLabel(col))}: ${escapeXml(col.data_type)}${col.is_not_null ? ' not null' : ''}</text>`);
       rowY += rowHeight;
     }
-    const tableIndexes = indexes.get(node.id) || [];
+    const tableIndexes: DisplayIndex[] = [
+      ...(indexes.get(node.id) || []),
+      ...(node.data.indexes || []),
+    ];
     if (tableIndexes.length > 0) {
       parts.push(`<text x="${x + 12}" y="${rowY}" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#475569">Indexes</text>`);
       rowY += rowHeight;

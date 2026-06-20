@@ -34,6 +34,12 @@ type TableNodeData = {
   title: string;
   comment?: string | null;
   columns: Column[];
+  indexes?: Array<{
+    index_name: string;
+    columns: string[];
+    access_method: string;
+    strength?: string;
+  }>;
   badges?: { pk?: boolean; fk?: boolean };
 };
 
@@ -111,6 +117,26 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
+        {data.indexes?.length ? (
+          <div className="tableNode__indexes" aria-label="추천 인덱스">
+            <div className="tableNode__indexHeading">Indexes</div>
+            {data.indexes.slice(0, 4).map((index) => (
+              <div key={index.index_name} className="tableNode__index">
+                <span className="tableNode__indexName">
+                  {index.index_name}
+                </span>
+                <span className="tableNode__indexCols">
+                  ({index.columns.join(", ")})
+                </span>
+              </div>
+            ))}
+            {data.indexes.length > 4 ? (
+              <div className="tableNode__more">
+                … {data.indexes.length - 4} more indexes
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -151,6 +177,7 @@ export default memo(TableNode, (prev, next) => {
     prev.data.title === next.data.title &&
     prev.data.comment === next.data.comment &&
     isSameRenderedColumns(prev.data.columns, next.data.columns) &&
+    prev.data.indexes === next.data.indexes &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk
   );

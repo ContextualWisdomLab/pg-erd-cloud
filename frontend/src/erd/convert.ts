@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 
+import type { IndexRecommendation } from './cardinality'
 import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 
@@ -23,6 +24,7 @@ export type TableNodeData = {
   title: string
   comment?: string | null
   columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
+  indexes?: IndexRecommendation[]
   badges: {
     pk: boolean
     fk: boolean
