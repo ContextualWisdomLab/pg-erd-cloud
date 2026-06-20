@@ -524,7 +524,7 @@ jobs:
 
       - name: Run OpenCode PR Review (GPT-5)
         id: opencode_review_primary
-        timeout-minutes: 60
+        timeout-minutes: 25
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -576,7 +576,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 1200 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 1200 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review \
             --model "$MODEL" \
@@ -635,7 +635,7 @@ jobs:
       - name: Run OpenCode PR Review fallback (DeepSeek R1)
         id: opencode_review_fallback
         if: steps.opencode_review_primary.outputs.review_status != 'success'
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -687,7 +687,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 300 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 300 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review-fallback \
             --model "$MODEL" \
@@ -746,7 +746,7 @@ jobs:
       - name: Run OpenCode PR Review fallback (DeepSeek V3)
         id: opencode_review_second_fallback
         if: steps.opencode_review_primary.outputs.review_status != 'success' && steps.opencode_review_fallback.outputs.review_status != 'success'
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -798,7 +798,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 300 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 300 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review-fallback \
             --model "$MODEL" \
@@ -1526,7 +1526,7 @@ jobs:
             } >"$prompt_file"
 
             cd "$OPENCODE_REVIEW_WORKDIR"
-            if ! timeout 600 opencode run "$(cat "$prompt_file")" \
+            if ! timeout --kill-after=30s 600 opencode run "$(cat "$prompt_file")" \
               --pure \
               --agent ci-review-fallback \
               --model "$MODEL" \
