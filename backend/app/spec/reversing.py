@@ -277,6 +277,8 @@ def generate_reversing_markdown(snapshot: dict) -> str:
             "for an approved LLM provider. The prompt includes only schema metadata",
             "from this snapshot and asks the model to mark unsupported business",
             "meaning as assumptions.",
+            "When a provider is configured, `/reversing-spec.md?mode=llm-draft`",
+            "asks the provider to generate a Markdown draft directly.",
             "",
         ]
     )

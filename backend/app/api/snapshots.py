@@ -19,6 +19,11 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.llm import (
+    LlmConfigurationError,
+    LlmProviderError,
+    generate_reversing_llm_draft,
+)
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
@@ -164,7 +169,9 @@ async def export_snapshot_sql(
 )
 async def export_snapshot_reversing_spec(
     schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
+    mode: str = Query(
+        "markdown", pattern="^(markdown|llm-prompt|llm-draft)$"
+    ),
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
@@ -175,6 +182,15 @@ async def export_snapshot_reversing_spec(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    if mode == "llm-draft":
+        try:
+            return await generate_reversing_llm_draft(data.snapshot_json)
+        except LlmConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LlmProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="LLM provider request failed"
+            ) from exc
     return generate_reversing_spec(data.snapshot_json, mode=mode)
 
 
