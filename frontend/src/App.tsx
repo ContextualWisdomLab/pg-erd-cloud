@@ -56,6 +56,10 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<SnapshotDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isCreatingConnection, setIsCreatingConnection] = useState(false);
+  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
     [],
   );
@@ -364,38 +368,58 @@ export default function App() {
   }
 
   async function onCreateProject() {
+    const nextProjectName = projectName.trim();
+    if (!nextProjectName || isCreatingProject) return;
     setError(null);
-    const p = await createProject(projectName);
-    const next = [p, ...projects];
-    setProjects(next);
-    setSelectedProjectId(p.project_space_uuid);
+    setIsCreatingProject(true);
+    try {
+      const p = await createProject(nextProjectName);
+      setProjects((prev) => [p, ...prev]);
+      setSelectedProjectId(p.project_space_uuid);
+    } finally {
+      setIsCreatingProject(false);
+    }
   }
 
   async function onCreateConnection() {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || isCreatingConnection) return;
+    const nextConnectionName = connName.trim();
     const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
-    if (!connectionDsn) return;
+    if (!nextConnectionName || !connectionDsn) return;
     setError(null);
-    const c = await createConnection(selectedProjectId, connName, connectionDsn);
-    const next = [c, ...connections];
-    setConnections(next);
-    setSelectedConnId(c.db_connection_uuid);
-    if (dsnInputRef.current) {
-      dsnInputRef.current.value = "";
+    setIsCreatingConnection(true);
+    try {
+      const c = await createConnection(
+        selectedProjectId,
+        nextConnectionName,
+        connectionDsn,
+      );
+      setConnections((prev) => [c, ...prev]);
+      setSelectedConnId(c.db_connection_uuid);
+      if (dsnInputRef.current) {
+        dsnInputRef.current.value = "";
+      }
+      setIsDsnPresent(false);
+    } finally {
+      setIsCreatingConnection(false);
     }
-    setIsDsnPresent(false);
   }
 
   async function onCreateSnapshot() {
-    if (!selectedProjectId || !selectedConnId) return;
+    if (!selectedProjectId || !selectedConnId || isCreatingSnapshot) return;
     setError(null);
-    const s = await createSnapshot(
-      selectedProjectId,
-      selectedConnId,
-      schemaFilter.trim() || undefined,
-    );
-    setSnapshotId(s.schema_snapshot_uuid);
-    setSnapshot(null);
+    setIsCreatingSnapshot(true);
+    try {
+      const s = await createSnapshot(
+        selectedProjectId,
+        selectedConnId,
+        schemaFilter.trim() || undefined,
+      );
+      setSnapshotId(s.schema_snapshot_uuid);
+      setSnapshot(null);
+    } finally {
+      setIsCreatingSnapshot(false);
+    }
   }
 
   return (
@@ -450,12 +474,13 @@ export default function App() {
             />
             <button
               onClick={onCreateProject}
-              disabled={!projectName.trim()}
+              disabled={!projectName.trim() || isCreatingProject}
+              aria-busy={isCreatingProject}
               aria-describedby={
                 createProjectHint ? "create-project-hint" : undefined
               }
             >
-              Create
+              {isCreatingProject ? "Creating…" : "Create"}
             </button>
           </div>
           {createProjectHint ? (
@@ -506,12 +531,18 @@ export default function App() {
           />
           <button
             onClick={onCreateConnection}
-            disabled={!selectedProjectId || !connName.trim() || !isDsnPresent}
+            disabled={
+              !selectedProjectId ||
+              !connName.trim() ||
+              !isDsnPresent ||
+              isCreatingConnection
+            }
+            aria-busy={isCreatingConnection}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
             }
           >
-            Save connection
+            {isCreatingConnection ? "Saving…" : "Save connection"}
           </button>
           {createConnectionHint ? (
             <span id="create-connection-hint" className="field-hint">
@@ -532,12 +563,13 @@ export default function App() {
 
         <button
           onClick={onCreateSnapshot}
-          disabled={!selectedProjectId || !selectedConnId}
+          disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
+          aria-busy={isCreatingSnapshot}
           aria-describedby={
             createSnapshotHint ? "create-snapshot-hint" : undefined
           }
         >
-          Reverse engineer → snapshot
+          {isCreatingSnapshot ? "Starting…" : "Reverse engineer → snapshot"}
         </button>
         {createSnapshotHint ? (
           <span id="create-snapshot-hint" className="field-hint">
