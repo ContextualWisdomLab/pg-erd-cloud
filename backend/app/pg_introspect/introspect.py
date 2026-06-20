@@ -15,13 +15,15 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
 
     # Note: avoid logging DSN.
     target = validate_postgres_dsn_target(dsn)
-    connect_kwargs: dict[str, object] = {
-        "host": target.hosts[0] if len(target.hosts) == 1 else target.hosts,
-        "timeout": 10,
-    }
+    connect_host: str | list[str] = (
+        target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
+    )
     if target.port is not None:
-        connect_kwargs["port"] = target.port
-    conn = await asyncpg.connect(dsn, **connect_kwargs)
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, port=target.port, timeout=10
+        )
+    else:
+        conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
