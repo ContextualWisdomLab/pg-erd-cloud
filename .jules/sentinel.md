@@ -8,7 +8,7 @@
 **Learning:** Security validations on URLs/DSNs must account for how the underlying driver actually parses and connects to the URL, not just standard parsing mechanisms. Query parameters that can override connection properties are a common SSRF vector in database drivers.
 **Prevention:** Always parse the query string of a DSN and validate any potential overrides (e.g., `host`, `hostaddr`, `port`) against the same security constraints (allowlists, restricted IPs) as the primary hostname.
 
-## 2024-06-20 - [SSRF Bypass via IPv4-mapped IPv6 Addresses]
+## 2026-06-20 - [SSRF Bypass via IPv4-mapped IPv6 Addresses]
 **Vulnerability:** The DSN guard validated IPv4 and IPv6 addresses against restricted ranges (e.g. `is_private`, `is_loopback`). However, standard IPv6 addresses can encode IPv4 addresses using an IPv4-mapped format (e.g. `::ffff:192.168.1.1`). Python's `ipaddress` library evaluates IPv4-mapped IPv6 addresses differently than their native IPv4 counterparts when checking properties like `is_private`. This allowed an attacker to bypass SSRF protections by supplying an IPv4-mapped IPv6 address for a restricted internal IPv4 target.
 **Learning:** Security validations involving IP address ranges must correctly normalize IP representations. The `ipaddress` module requires explicitly unwrapping `ipv4_mapped` addresses on IPv6 objects to properly apply IPv4 classification rules.
 **Prevention:** Before evaluating restrictions (`is_private`, `is_loopback`, etc.) on an IP address object, always check if it is an instance of `IPv6Address` and unwrap it using its `ipv4_mapped` property if it exists.

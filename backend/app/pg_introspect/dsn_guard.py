@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import ipaddress
 import socket
 from urllib.parse import parse_qsl, urlparse
@@ -11,6 +12,14 @@ POSTGRES_SCHEMES = {"postgres", "postgresql"}
 
 class DsnTargetError(ValueError):
     """Raised when a PostgreSQL DSN points at a disallowed network target."""
+
+
+@dataclass(frozen=True)
+class ValidatedDsnTarget:
+    """Connection target values that were checked for restricted IP ranges."""
+
+    hosts: tuple[str, ...]
+    port: int | None
 
 
 def _configured_allowed_hosts() -> tuple[str, ...]:
@@ -56,6 +65,14 @@ def _parse_ip_literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Addres
         return ipaddress.ip_address(host.strip("[]"))
     except ValueError:
         return None
+
+
+def _connection_host_for_ip(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> str:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return str(ip.ipv4_mapped)
+    return str(ip)
 
 
 def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
@@ -114,7 +131,42 @@ def _validate_query_ports(values: list[str]) -> int | None:
     return first_port
 
 
-def validate_postgres_dsn_target(dsn: str) -> None:
+def _unique_hosts(hosts: list[str]) -> tuple[str, ...]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for host in hosts:
+        if host in seen:
+            continue
+        seen.add(host)
+        unique.append(host)
+    return tuple(unique)
+
+
+def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[str, ...]:
+    normalized = h.lower().rstrip(".")
+
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        raise DsnTargetError("database host must not be localhost")
+
+    _validate_allowed_host(normalized)
+
+    literal_ip = _parse_ip_literal(normalized)
+    if literal_ip is not None:
+        if _is_restricted_ip(literal_ip):
+            raise DsnTargetError("database host resolves to a restricted IP range")
+        return (_connection_host_for_ip(literal_ip),)
+
+    if is_hostaddr:
+        raise DsnTargetError("database DSN query hostaddr is invalid")
+
+    resolved_ips = _resolved_ips(normalized, port)
+    for ip in resolved_ips:
+        if _is_restricted_ip(ip):
+            raise DsnTargetError("database host resolves to a restricted IP range")
+    return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
+
+
+def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     """Reject PostgreSQL DSNs that could target internal network resources."""
 
     parsed = urlparse(dsn)
@@ -134,35 +186,25 @@ def validate_postgres_dsn_target(dsn: str) -> None:
     if port_override is not None:
         port = port_override
 
-    hosts_to_check: list[tuple[str, bool]] = [(host, False)]
-    hosts_to_check.extend(
-        (query_host, False)
+    primary_hosts = _validated_ip_hosts(host, False, port)
+    query_hosts = [
+        _validated_ip_hosts(query_host, False, port)
         for query_host in _split_query_host_values(query.get("host", []), "host")
-    )
-    hosts_to_check.extend(
-        (query_hostaddr, True)
+    ]
+    query_hostaddrs = [
+        _validated_ip_hosts(query_hostaddr, True, port)
         for query_hostaddr in _split_query_host_values(
             query.get("hostaddr", []), "hostaddr"
         )
+    ]
+
+    connection_host_groups = query_hosts + query_hostaddrs
+    if not connection_host_groups:
+        connection_host_groups = [primary_hosts]
+
+    return ValidatedDsnTarget(
+        hosts=_unique_hosts(
+            [host for group in connection_host_groups for host in group]
+        ),
+        port=port,
     )
-
-    for h, is_hostaddr in hosts_to_check:
-        normalized = h.lower().rstrip(".")
-
-        if normalized == "localhost" or normalized.endswith(".localhost"):
-            raise DsnTargetError("database host must not be localhost")
-
-        _validate_allowed_host(normalized)
-
-        literal_ip = _parse_ip_literal(normalized)
-        if literal_ip is not None:
-            if _is_restricted_ip(literal_ip):
-                raise DsnTargetError("database host resolves to a restricted IP range")
-            continue
-
-        if is_hostaddr:
-            raise DsnTargetError("database DSN query hostaddr is invalid")
-
-        for ip in _resolved_ips(normalized, port):
-            if _is_restricted_ip(ip):
-                raise DsnTargetError("database host resolves to a restricted IP range")
