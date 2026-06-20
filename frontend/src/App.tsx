@@ -24,6 +24,14 @@ import {
   listSnapshots,
 } from "./api";
 import TableNode from "./erd/TableNode";
+import {
+  buildIndexRecommendations,
+  calculateCardinalityRatio,
+  parsePositiveInteger,
+  type CardinalityColumnInput,
+  type CardinalityStrength,
+  type IndexRecommendation,
+} from "./erd/cardinality";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
 import {
   downloadText,
@@ -33,6 +41,27 @@ import {
 } from "./erd/export";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function strengthLabel(strength: CardinalityStrength): string {
+  if (strength === "recommended") return "추천";
+  if (strength === "consider") return "검토";
+  return "보류";
+}
+
+function isSameIndexRecommendation(
+  a: IndexRecommendation,
+  b: IndexRecommendation,
+): boolean {
+  return (
+    a.index_name === b.index_name ||
+    (a.columns.length === b.columns.length &&
+      a.columns.every((column, index) => column === b.columns[index]))
+  );
+}
 
 export default function App() {
   const [devUser, setDevUser] = useState<string>("local");
@@ -81,6 +110,14 @@ export default function App() {
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [relLabel, setRelLabel] = useState("");
+  const [isCardinalityModalOpen, setIsCardinalityModalOpen] = useState(false);
+  const [cardinalityTableId, setCardinalityTableId] = useState("");
+  const [cardinalityRowCount, setCardinalityRowCount] = useState("100000");
+  const [cardinalityDistinctCounts, setCardinalityDistinctCounts] = useState<
+    Record<string, string>
+  >({});
+  const [cardinalityColumnSelections, setCardinalityColumnSelections] =
+    useState<Record<string, boolean>>({});
 
   const [undoPositions, setUndoPositions] = useState<Map<
     string,
@@ -161,6 +198,42 @@ export default function App() {
       : "";
   const createSnapshotHint =
     selectedProjectId && selectedConnId ? "" : "Select project and connection";
+  const cardinalityRowCountNumber = useMemo(
+    () => parsePositiveInteger(cardinalityRowCount),
+    [cardinalityRowCount],
+  );
+  const cardinalityNode = useMemo(() => {
+    return (
+      nodes.find((node) => node.id === cardinalityTableId) ?? nodes[0] ?? null
+    );
+  }, [cardinalityTableId, nodes]);
+  const cardinalityColumns = useMemo<CardinalityColumnInput[]>(() => {
+    if (!cardinalityNode) return [];
+    return cardinalityNode.data.columns.map((column) => ({
+      columnName: column.column_name,
+      isSelected: cardinalityColumnSelections[column.column_name] ?? false,
+      distinctCount: parsePositiveInteger(
+        cardinalityDistinctCounts[column.column_name] ?? "",
+      ),
+    }));
+  }, [
+    cardinalityColumnSelections,
+    cardinalityDistinctCounts,
+    cardinalityNode,
+  ]);
+  const cardinalityRecommendations = useMemo(
+    () =>
+      buildIndexRecommendations({
+        tableName: cardinalityNode?.data.title ?? "",
+        rowCount: cardinalityRowCountNumber,
+        columns: cardinalityColumns,
+      }),
+    [cardinalityColumns, cardinalityNode?.data.title, cardinalityRowCountNumber],
+  );
+  const appliedCardinalityIndexes = useMemo(
+    () => cardinalityNode?.data.indexes ?? [],
+    [cardinalityNode?.data.indexes],
+  );
 
   useEffect(() => {
     if (!graph) {
@@ -327,6 +400,81 @@ export default function App() {
   function onOpenAddTable() {
     setNewTableName("");
     setIsAddTableModalOpen(true);
+  }
+
+  function initializeCardinalityInputs(node: Node<TableNodeData>) {
+    const selections: Record<string, boolean> = {};
+    const distinctCounts: Record<string, string> = {};
+    for (const column of node.data.columns) {
+      selections[column.column_name] = !column.is_pk;
+      distinctCounts[column.column_name] = "";
+    }
+    setCardinalityColumnSelections(selections);
+    setCardinalityDistinctCounts(distinctCounts);
+  }
+
+  function onOpenCardinalityWizard() {
+    const firstNode = nodes[0];
+    if (!firstNode) return;
+    setCardinalityTableId(firstNode.id);
+    setCardinalityRowCount("100000");
+    initializeCardinalityInputs(firstNode);
+    setIsCardinalityModalOpen(true);
+  }
+
+  function onCardinalityTableChange(tableId: string) {
+    const nextNode = nodes.find((node) => node.id === tableId);
+    if (!nextNode) return;
+    setCardinalityTableId(tableId);
+    initializeCardinalityInputs(nextNode);
+  }
+
+  function onCardinalityColumnToggle(columnName: string, isSelected: boolean) {
+    setCardinalityColumnSelections((prev) => ({
+      ...prev,
+      [columnName]: isSelected,
+    }));
+  }
+
+  function onCardinalityDistinctCountChange(
+    columnName: string,
+    value: string,
+  ) {
+    if (!/^\d*$/.test(value)) return;
+    setCardinalityDistinctCounts((prev) => ({
+      ...prev,
+      [columnName]: value,
+    }));
+  }
+
+  function onApplyCardinalityRecommendation(
+    recommendation: IndexRecommendation,
+  ) {
+    if (!cardinalityNode || recommendation.strength === "skip") return;
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        if (node.id !== cardinalityNode.id) return node;
+        const existing = node.data.indexes ?? [];
+        if (
+          existing.some((index) =>
+            isSameIndexRecommendation(index, recommendation),
+          )
+        ) {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            indexes: [...existing, recommendation],
+          },
+        };
+      }),
+    );
+  }
+
+  function onCloseCardinalityWizard() {
+    setIsCardinalityModalOpen(false);
   }
 
   function onAddTableSubmit() {
@@ -631,6 +779,19 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenCardinalityWizard}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0
+                  ? "계산할 테이블이 없습니다"
+                  : "인덱스 카디널리티 계산"
+              }
+              aria-label="인덱스 카디널리티 계산"
+            >
+              카디널리티
+            </button>
+            <button
+              type="button"
               onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
@@ -805,6 +966,188 @@ export default function App() {
                       저장
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCardinalityModalOpen && cardinalityNode && (
+            <div className="modalOverlay">
+              <div
+                className="modalContent cardinalityWizard"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cardinality-title"
+              >
+                <div className="modalHeader">
+                  <h3 id="cardinality-title">인덱스 카디널리티</h3>
+                  <button
+                    type="button"
+                    onClick={onCloseCardinalityWizard}
+                    aria-label="카디널리티 계산 닫기"
+                  >
+                    닫기
+                  </button>
+                </div>
+
+                <div className="cardinalityWizard__controls">
+                  <div className="field">
+                    <label htmlFor="cardinality-table">테이블</label>
+                    <select
+                      id="cardinality-table"
+                      value={cardinalityNode.id}
+                      onChange={(event) =>
+                        onCardinalityTableChange(event.target.value)
+                      }
+                    >
+                      {nodes.map((node) => (
+                        <option key={node.id} value={node.id}>
+                          {node.data.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="cardinality-row-count">행 수</label>
+                    <input
+                      id="cardinality-row-count"
+                      inputMode="numeric"
+                      min="1"
+                      type="number"
+                      value={cardinalityRowCount}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (/^\d*$/.test(value)) {
+                          setCardinalityRowCount(value);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="cardinalityWizard__columns">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">사용</th>
+                        <th scope="col">컬럼</th>
+                        <th scope="col">Distinct</th>
+                        <th scope="col">비율</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cardinalityNode.data.columns.map((column, index) => {
+                        const distinctCount = parsePositiveInteger(
+                          cardinalityDistinctCounts[column.column_name] ?? "",
+                        );
+                        const ratio =
+                          cardinalityRowCountNumber !== null &&
+                          distinctCount !== null
+                            ? calculateCardinalityRatio(
+                                cardinalityRowCountNumber,
+                                distinctCount,
+                              )
+                            : null;
+                        const inputId = `cardinality-${index}`;
+                        return (
+                          <tr key={column.column_name}>
+                            <td>
+                              <input
+                                aria-label={`${column.column_name} 사용`}
+                                checked={
+                                  cardinalityColumnSelections[
+                                    column.column_name
+                                  ] ?? false
+                                }
+                                onChange={(event) =>
+                                  onCardinalityColumnToggle(
+                                    column.column_name,
+                                    event.target.checked,
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                            </td>
+                            <td>
+                              <span className="cardinalityWizard__columnIdentity">
+                                <label htmlFor={inputId}>
+                                  {column.column_name}
+                                </label>
+                                <span>{column.data_type}</span>
+                              </span>
+                            </td>
+                            <td>
+                              <input
+                                id={inputId}
+                                inputMode="numeric"
+                                min="1"
+                                type="number"
+                                value={
+                                  cardinalityDistinctCounts[
+                                    column.column_name
+                                  ] ?? ""
+                                }
+                                onChange={(event) =>
+                                  onCardinalityDistinctCountChange(
+                                    column.column_name,
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>{ratio === null ? "—" : formatPercent(ratio)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="cardinalityWizard__recommendations">
+                  <h4>추천 결과</h4>
+                  {cardinalityRowCountNumber === null ? (
+                    <div className="field-hint">Rows 값을 입력하세요.</div>
+                  ) : null}
+                  {cardinalityRowCountNumber !== null &&
+                  cardinalityRecommendations.length === 0 ? (
+                    <div className="field-hint">
+                      사용할 컬럼과 distinct 값을 선택하세요.
+                    </div>
+                  ) : null}
+                  {cardinalityRecommendations.map((recommendation) => {
+                    const isApplied = appliedCardinalityIndexes.some((index) =>
+                      isSameIndexRecommendation(index, recommendation),
+                    );
+                    return (
+                      <div
+                        className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
+                        key={`${recommendation.index_name}-${recommendation.columns.join("-")}`}
+                      >
+                        <div>
+                          <div className="cardinalityRecommendation__title">
+                            <span>{strengthLabel(recommendation.strength)}</span>
+                            <strong>{recommendation.index_name}</strong>
+                          </div>
+                          <div className="field-hint">
+                            {recommendation.columns.join(", ")} ·{" "}
+                            {formatPercent(recommendation.cardinality_ratio)} ·{" "}
+                            {recommendation.reason}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={
+                            recommendation.strength === "skip" || isApplied
+                          }
+                          onClick={() =>
+                            onApplyCardinalityRecommendation(recommendation)
+                          }
+                        >
+                          {isApplied ? "적용됨" : "적용"}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

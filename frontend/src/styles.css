@@ -58,9 +58,11 @@ select:focus-visible {
   right: 12px;
   z-index: 10;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 8px;
+  max-width: calc(100% - 24px);
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
@@ -86,6 +88,12 @@ select:focus-visible {
 }
 
 .field input {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.field select {
   padding: 8px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
@@ -191,9 +199,190 @@ button {
   padding: 1px 6px;
 }
 
+.tableNode__more {
+  color: #6b7280;
+  font-size: 11px;
+  padding-top: 4px;
+}
+
+.tableNode__indexes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.tableNode__indexHeading {
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.tableNode__index {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.tableNode__indexName {
+  color: #111827;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableNode__indexCols {
+  color: #047857;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .error {
   color: #b91c1c;
   font-size: 13px;
+}
+
+.modalOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modalContent {
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.modalHeader h3 {
+  margin: 0;
+}
+
+.cardinalityWizard {
+  width: min(760px, 96vw);
+  padding: 20px;
+}
+
+.cardinalityWizard__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.cardinalityWizard__columns {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.cardinalityWizard__columns table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+}
+
+.cardinalityWizard__columns th,
+.cardinalityWizard__columns td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.cardinalityWizard__columns th:first-child,
+.cardinalityWizard__columns td:first-child {
+  width: 52px;
+  text-align: center;
+}
+
+.cardinalityWizard__columnIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardinalityWizard__columnIdentity span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.cardinalityWizard__columns input[type="number"] {
+  width: 140px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.cardinalityWizard__recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cardinalityWizard__recommendations h4 {
+  margin: 0;
+}
+
+.cardinalityRecommendation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.cardinalityRecommendation--recommended {
+  border-left-color: #047857;
+}
+
+.cardinalityRecommendation--consider {
+  border-left-color: #b45309;
+}
+
+.cardinalityRecommendation--skip {
+  border-left-color: #6b7280;
+}
+
+.cardinalityRecommendation__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.cardinalityRecommendation__title span {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cardinalityRecommendation__title strong {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 767px) {
@@ -205,6 +394,14 @@ button {
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
+  }
+
+  .cardinalityWizard__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .cardinalityRecommendation {
+    grid-template-columns: 1fr;
   }
 }
 
