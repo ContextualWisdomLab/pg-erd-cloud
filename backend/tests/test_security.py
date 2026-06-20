@@ -2,49 +2,48 @@ from __future__ import annotations
 
 import pytest
 
-from app.security import redact_dsn, encrypt_text, decrypt_text
+from app.security import decrypt_text, encrypt_text, redact_dsn
 
 
 @pytest.mark.parametrize(
     ("dsn", "expected"),
     [
-        # Happy path - typical format
         ("postgresql://user:password@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-
-        # Missing @
         ("postgresql://localhost:5432/dbname", "***"),
-
-        # Missing ://
         ("user:password@localhost:5432/dbname", "***"),
-
-        # No credentials or host
         ("invalid", "***"),
-
-        # Empty string
         ("", "***"),
-
-        # Username only (no password)
         ("postgresql://user@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-
-        # Special characters in password
         ("postgresql://user:p@ssw0rd!@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-
-        # Multiple @ symbols (e.g. in password)
         ("postgresql://user:p@ssw@rd!@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-
-        # Different scheme
+        ("postgresql://user:pass@word@localhost/db", "postgresql://***@localhost/db"),
         ("mysql://user:password@host:3306/db", "mysql://***@host:3306/db"),
-    ]
+        ("mysql://user:pass@remote.host:3306/db", "mysql://***@remote.host:3306/db"),
+    ],
 )
 def test_redact_dsn(dsn: str, expected: str) -> None:
     assert redact_dsn(dsn) == expected
 
 
-def test_encrypt_decrypt_roundtrip() -> None:
-    plaintext = "super secret database password"
+def test_encrypt_decrypt_text() -> None:
+    plaintext = "super secret password 123"
     blob = encrypt_text(plaintext)
 
     assert blob.ciphertext != plaintext.encode("utf-8")
+    assert decrypt_text(blob.ciphertext, blob.nonce) == plaintext
 
-    decrypted = decrypt_text(blob.ciphertext, blob.nonce)
-    assert decrypted == plaintext
+
+def test_encrypt_decrypt_empty_string() -> None:
+    plaintext = ""
+    blob = encrypt_text(plaintext)
+
+    assert decrypt_text(blob.ciphertext, blob.nonce) == plaintext
+
+
+def test_encrypt_text_nonces_are_unique() -> None:
+    plaintext = "test"
+    blob1 = encrypt_text(plaintext)
+    blob2 = encrypt_text(plaintext)
+
+    assert blob1.nonce != blob2.nonce
+    assert blob1.ciphertext != blob2.ciphertext

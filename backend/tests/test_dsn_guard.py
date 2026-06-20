@@ -31,7 +31,8 @@ def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]
         "postgresql://user:pass@db.example.com/app?hostaddr=93.184.216.34,169.254.169.254",
     ],
 )
-def test_dsn_guard_rejects_restricted_ip_literals(
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_restricted_ip_literals(
     monkeypatch: pytest.MonkeyPatch, dsn: str
 ) -> None:
     # Need to mock resolve if it passes literal check and tries to resolve db.example.com
@@ -47,7 +48,7 @@ def test_dsn_guard_rejects_restricted_ip_literals(
         "127.0.0.1,10.0.0.8,169.254.169.254,::1,::ffff:192.168.1.1,93.184.216.34,db.example.com,*.trusted.example.com",
     )
     with pytest.raises(DsnTargetError, match="restricted IP|localhost"):
-        validate_postgres_dsn_target(dsn)
+        await validate_postgres_dsn_target(dsn)
 
 
 @pytest.mark.parametrize(
@@ -61,7 +62,8 @@ def test_dsn_guard_rejects_restricted_ip_literals(
         "postgresql://user:pass@db.example.com/app?port=70000",
     ],
 )
-def test_dsn_guard_rejects_invalid_query_overrides(
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_invalid_query_overrides(
     monkeypatch: pytest.MonkeyPatch, dsn: str
 ) -> None:
     monkeypatch.setattr(
@@ -76,7 +78,7 @@ def test_dsn_guard_rejects_invalid_query_overrides(
     )
 
     with pytest.raises(DsnTargetError, match="query"):
-        validate_postgres_dsn_target(dsn)
+        await validate_postgres_dsn_target(dsn)
 
 
 @pytest.mark.parametrize(
@@ -88,7 +90,8 @@ def test_dsn_guard_rejects_invalid_query_overrides(
         "postgresql://user:pass@db.example.com/app?hostaddr=::ffff:10.0.0.8",
     ],
 )
-def test_dsn_guard_rejects_ipv4_mapped_restricted_addresses(
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_ipv4_mapped_restricted_addresses(
     monkeypatch: pytest.MonkeyPatch, dsn: str
 ) -> None:
     monkeypatch.setattr(
@@ -99,11 +102,11 @@ def test_dsn_guard_rejects_ipv4_mapped_restricted_addresses(
     monkeypatch.setattr(
         settings,
         "db_introspection_allowed_hosts",
-        "",
+        "::ffff:10.0.0.8,::ffff:127.0.0.1,::ffff:169.254.169.254,db.example.com",
     )
 
     with pytest.raises(DsnTargetError, match="restricted IP"):
-        validate_postgres_dsn_target(dsn)
+        await validate_postgres_dsn_target(dsn)
 
 
 @pytest.mark.parametrize(
@@ -113,7 +116,8 @@ def test_dsn_guard_rejects_ipv4_mapped_restricted_addresses(
         "postgresql://user:pass@db.example.com/app?hostaddr=::ffff:93.184.216.34",
     ],
 )
-def test_dsn_guard_allows_public_ipv4_mapped_addresses(
+@pytest.mark.asyncio
+async def test_dsn_guard_allows_public_ipv4_mapped_addresses(
     monkeypatch: pytest.MonkeyPatch, dsn: str
 ) -> None:
     monkeypatch.setattr(
@@ -124,34 +128,39 @@ def test_dsn_guard_allows_public_ipv4_mapped_addresses(
     monkeypatch.setattr(
         settings,
         "db_introspection_allowed_hosts",
-        "",
+        "::ffff:93.184.216.34,db.example.com",
     )
 
-    target = validate_postgres_dsn_target(dsn)
+    target = await validate_postgres_dsn_target(dsn)
     assert target.hosts == ("93.184.216.34",)
 
 
-def test_dsn_guard_rejects_localhost() -> None:
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_localhost() -> None:
     with pytest.raises(DsnTargetError, match="localhost"):
-        validate_postgres_dsn_target("postgresql://user:pass@localhost:5432/app")
+        await validate_postgres_dsn_target("postgresql://user:pass@localhost:5432/app")
 
 
-def test_dsn_guard_rejects_missing_host() -> None:
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_missing_host() -> None:
     with pytest.raises(DsnTargetError, match="include a host"):
-        validate_postgres_dsn_target("postgresql:///app")
+        await validate_postgres_dsn_target("postgresql:///app")
 
 
-def test_dsn_guard_rejects_disallowed_scheme() -> None:
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_disallowed_scheme() -> None:
     with pytest.raises(DsnTargetError, match="postgres"):
-        validate_postgres_dsn_target("mysql://user:pass@db.example.com/app")
+        await validate_postgres_dsn_target("mysql://user:pass@db.example.com/app")
 
 
-def test_dsn_guard_rejects_invalid_port() -> None:
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_invalid_port() -> None:
     with pytest.raises(DsnTargetError, match="port"):
-        validate_postgres_dsn_target("postgresql://user:pass@db.example.com:bad/app")
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com:bad/app")
 
 
-def test_dsn_guard_rejects_dns_to_restricted_ip(
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_dns_to_restricted_ip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -159,12 +168,14 @@ def test_dsn_guard_rejects_dns_to_restricted_ip(
         "getaddrinfo",
         lambda *_args, **_kwargs: fake_addrinfo("10.0.0.9"),
     )
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
 
     with pytest.raises(DsnTargetError, match="restricted IP"):
-        validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
 
 
-def test_dsn_guard_allows_public_resolved_host(
+@pytest.mark.asyncio
+async def test_dsn_guard_allows_public_resolved_host(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -172,15 +183,17 @@ def test_dsn_guard_allows_public_resolved_host(
         "getaddrinfo",
         lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
     )
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
 
-    target = validate_postgres_dsn_target(
+    target = await validate_postgres_dsn_target(
         "postgresql://user:pass@db.example.com/app"
     )
     assert target.hosts == ("93.184.216.34",)
     assert target.port is None
 
 
-def test_dsn_guard_returns_validated_connection_ip_and_port(
+@pytest.mark.asyncio
+async def test_dsn_guard_returns_validated_connection_ip_and_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -188,8 +201,9 @@ def test_dsn_guard_returns_validated_connection_ip_and_port(
         "getaddrinfo",
         lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
     )
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
 
-    target = validate_postgres_dsn_target(
+    target = await validate_postgres_dsn_target(
         "postgresql://user:pass@db.example.com:6543/app"
     )
 
@@ -197,7 +211,18 @@ def test_dsn_guard_returns_validated_connection_ip_and_port(
     assert target.port == 6543
 
 
-def test_dsn_guard_enforces_configured_allowlist(
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_unconfigured_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "")
+
+    with pytest.raises(DsnTargetError, match="allowlist is not configured"):
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+
+
+@pytest.mark.asyncio
+async def test_dsn_guard_enforces_configured_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -211,10 +236,10 @@ def test_dsn_guard_enforces_configured_allowlist(
         "db.example.com,*.trusted.example.com",
     )
 
-    validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
-    validate_postgres_dsn_target(
+    await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+    await validate_postgres_dsn_target(
         "postgresql://user:pass@app.trusted.example.com/app"
     )
 
     with pytest.raises(DsnTargetError, match="allowlist"):
-        validate_postgres_dsn_target("postgresql://user:pass@other.example.com/app")
+        await validate_postgres_dsn_target("postgresql://user:pass@other.example.com/app")
