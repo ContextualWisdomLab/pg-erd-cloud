@@ -3794,6 +3794,150 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+run_pull_request_target_frontend_app_security_context_scope_case() {
+	local changed_file="frontend/src/App.tsx"
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	local bin_dir="$tmp_dir/bin"
+	local repo_root_dir="$tmp_dir/repo"
+	mkdir -p "$bin_dir" "$repo_root_dir/scripts/ci"
+	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+	local fake_strix="$bin_dir/strix"
+	local output_log="$tmp_dir/output.log"
+	local strix_llm_file="$tmp_dir/strix_llm.txt"
+	local llm_api_key_file="$tmp_dir/llm_api_key.txt"
+
+	cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+target_path=""
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "-t" ] && [ "$#" -ge 2 ]; then
+		target_path="$2"
+		break
+	fi
+	shift
+done
+
+if ! grep -Fq -- 'HEAD_APP_SHELL_SHOULD_BE_SCANNED' "$target_path/frontend/src/App.tsx"; then
+	echo "Error: frontend app PR-head content was not scanned" >&2
+	cat -- "$target_path/frontend/src/App.tsx" >&2
+	exit 93
+fi
+
+for context_file in \
+	frontend/src/api.ts \
+	frontend/index.html \
+	frontend/serve-static.mjs \
+	backend/app/main.py \
+	backend/app/security_headers.py \
+	backend/tests/test_security_headers.py
+do
+	if [ ! -f "$target_path/$context_file" ]; then
+		echo "Error: frontend app security context missing: $context_file" >&2
+		exit 94
+	fi
+done
+
+if ! grep -Fq -- 'BASE_API_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/src/api.ts"; then
+	echo "Error: frontend API context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/src/api.ts" >&2
+	exit 95
+fi
+if ! grep -Fq -- 'BASE_HTML_CSP_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/index.html"; then
+	echo "Error: frontend HTML CSP context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/index.html" >&2
+	exit 96
+fi
+if ! grep -Fq -- 'BASE_STATIC_HEADER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/frontend/serve-static.mjs"; then
+	echo "Error: static frontend header context did not use trusted base content" >&2
+	cat -- "$target_path/frontend/serve-static.mjs" >&2
+	exit 97
+fi
+if ! grep -Fq -- 'BASE_BACKEND_HEADER_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/app/security_headers.py"; then
+	echo "Error: backend security-header context did not use trusted base content" >&2
+	cat -- "$target_path/backend/app/security_headers.py" >&2
+	exit 98
+fi
+if ! grep -Fq -- 'BASE_BACKEND_HEADER_TEST_CONTEXT_SHOULD_BE_SCANNED' "$target_path/backend/tests/test_security_headers.py"; then
+	echo "Error: backend security-header test context did not use trusted base content" >&2
+	cat -- "$target_path/backend/tests/test_security_headers.py" >&2
+	exit 99
+fi
+if grep -R -Fq -- 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' "$target_path/frontend/src/api.ts" "$target_path/frontend/index.html" "$target_path/frontend/serve-static.mjs" "$target_path/backend/app/security_headers.py" "$target_path/backend/tests/test_security_headers.py"; then
+	echo "Error: trusted frontend app context leaked PR head content" >&2
+	exit 100
+fi
+
+echo "scan ok with frontend app security header context"
+EOF
+	chmod +x "$fake_strix"
+	printf '%s' 'gemini/test-model' >"$strix_llm_file"
+	printf '%s' 'dummy' >"$llm_api_key_file"
+
+	(
+		cd "$repo_root_dir"
+		git init -q
+		git config user.name 'Strix Test'
+		git config user.email 'strix-test@example.invalid'
+		mkdir -p frontend/src backend/app backend/tests
+		printf '%s\n' 'BASE_APP_SHELL_SHOULD_NOT_BE_SCANNED' >"$changed_file"
+		printf '%s\n' 'BASE_API_CONTEXT_SHOULD_BE_SCANNED' >frontend/src/api.ts
+		printf '%s\n' 'BASE_HTML_CSP_CONTEXT_SHOULD_BE_SCANNED' >frontend/index.html
+		printf '%s\n' 'BASE_STATIC_HEADER_CONTEXT_SHOULD_BE_SCANNED' >frontend/serve-static.mjs
+		printf '%s\n' 'BASE_MAIN_CONTEXT_SHOULD_BE_SCANNED' >backend/app/main.py
+		printf '%s\n' 'BASE_BACKEND_HEADER_CONTEXT_SHOULD_BE_SCANNED' >backend/app/security_headers.py
+		printf '%s\n' 'BASE_BACKEND_HEADER_TEST_CONTEXT_SHOULD_BE_SCANNED' >backend/tests/test_security_headers.py
+		git add .
+		git commit -qm 'base commit'
+	)
+	local base_sha
+	base_sha="$(git -C "$repo_root_dir" rev-parse HEAD)"
+	(
+		cd "$repo_root_dir"
+		printf '%s\n' 'HEAD_APP_SHELL_SHOULD_BE_SCANNED' >"$changed_file"
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/src/api.ts
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/index.html
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >frontend/serve-static.mjs
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/app/security_headers.py
+		printf '%s\n' 'HEAD_CONTEXT_SHOULD_NOT_BE_SCANNED' >backend/tests/test_security_headers.py
+		git add .
+		git commit -qm 'head commit'
+	)
+	local head_sha
+	head_sha="$(git -C "$repo_root_dir" rev-parse HEAD)"
+	git -C "$repo_root_dir" checkout -q "$base_sha"
+
+	set +e
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_PATH \
+			PATH="$bin_dir:$PATH" \
+			STRIX_INPUT_FILE_ROOT="$tmp_dir" \
+			GITHUB_EVENT_NAME="pull_request_target" \
+			PR_BASE_SHA="$base_sha" \
+			PR_HEAD_SHA="$head_sha" \
+			STRIX_TEST_CHANGED_FILES_OVERRIDE="$changed_file" \
+			STRIX_DISABLE_PR_SCOPING="0" \
+			STRIX_LLM_FILE="$strix_llm_file" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			STRIX_TARGET_PATH="." \
+			STRIX_REPORTS_DIR="$repo_root_dir/strix_runs" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
+	local rc=$?
+	set -e
+
+	assert_equals "0" "$rc" "case=pull-request-target-frontend-app-security-context exit code"
+	assert_file_contains "$output_log" "scan ok with frontend app security header context" "case=pull-request-target-frontend-app-security-context output"
+
+	rm -rf "$tmp_dir"
+}
+
 run_pull_request_target_frontend_email_context_scope_case() {
 	local changed_file="${1:?changed file is required}"
 	local case_name="pull-request-target-frontend-email-context:$changed_file"
@@ -5168,6 +5312,79 @@ EOF
 	rm -rf "$tmp_dir"
 }
 
+run_required_input_file_symlink_escape_fails_closed_case() {
+	local file_env="$1"
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	local repo_root_dir="$tmp_dir/workspace/smart-crawling-server"
+	local allowed_input_dir="$tmp_dir/runner-temp"
+	local outside_dir="$tmp_dir/outside"
+	local symlink_dir="$allowed_input_dir/link-to-outside"
+	local output_log="$tmp_dir/output.log"
+	local fake_strix="$tmp_dir/strix"
+	local call_log="$tmp_dir/calls.log"
+	local strix_llm_file="$allowed_input_dir/strix_llm.txt"
+	local llm_api_key_file="$allowed_input_dir/llm_api_key.txt"
+	local llm_api_base_file="$allowed_input_dir/llm_api_base.txt"
+	local outside_file="$outside_dir/${file_env}.txt"
+
+	mkdir -p "$repo_root_dir/scripts/ci" "$allowed_input_dir" "$outside_dir"
+	ln -s "$outside_dir" "$symlink_dir"
+	cp "$GATE_SCRIPT" "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+	cp "$REPO_ROOT/scripts/ci/strix_model_utils.sh" "$repo_root_dir/scripts/ci/strix_model_utils.sh"
+	chmod +x "$repo_root_dir/scripts/ci/strix_quick_gate.sh"
+
+	cat >"$fake_strix" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'called\n' >"${FAKE_STRIX_CALL_LOG:?}"
+exit 0
+EOF
+	chmod +x "$fake_strix"
+	printf '%s' 'openai/gpt-4o-mini' >"$strix_llm_file"
+	printf '%s' 'dummy' >"$llm_api_key_file"
+	printf '%s' 'https://example.invalid/generateContent' >"$llm_api_base_file"
+	case "$file_env" in
+	STRIX_LLM_FILE)
+		printf '%s' 'openai/gpt-4o-mini' >"$outside_file"
+		strix_llm_file="$symlink_dir/${file_env}.txt"
+		;;
+	LLM_API_KEY_FILE)
+		printf '%s' 'dummy' >"$outside_file"
+		llm_api_key_file="$symlink_dir/${file_env}.txt"
+		;;
+	*)
+		record_failure "unsupported required input file env: $file_env"
+		rm -rf "$tmp_dir"
+		return
+		;;
+	esac
+
+	set +e
+	(
+		cd "$repo_root_dir"
+		env -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u STRIX_TEST_CHANGED_FILES_OVERRIDE -u STRIX_INPUT_FILE_ROOT \
+			PATH="$tmp_dir:$PATH" \
+			RUNNER_TEMP="$allowed_input_dir" \
+			FAKE_STRIX_CALL_LOG="$call_log" \
+			STRIX_DISABLE_PR_SCOPING="0" \
+			STRIX_LLM_FILE="$strix_llm_file" \
+			LLM_API_KEY_FILE="$llm_api_key_file" \
+			LLM_API_BASE_FILE="$llm_api_base_file" \
+			bash "./scripts/ci/strix_quick_gate.sh" >"$output_log" 2>&1
+	)
+	local rc=$?
+	set -e
+
+	assert_equals "2" "$rc" "case=$file_env-symlink-escape-input-root exit code"
+	assert_file_contains "$output_log" "$file_env must be inside the trusted input file root" "case=$file_env-symlink-escape-input-root output"
+	if [ -f "$call_log" ]; then
+		record_failure "case=$file_env-symlink-escape-input-root should reject before invoking strix"
+	fi
+
+	rm -rf "$tmp_dir"
+}
+
 run_input_file_root_override_takes_precedence_over_runner_temp_case() {
 	local tmp_dir
 	tmp_dir="$(mktemp -d)"
@@ -5535,6 +5752,7 @@ run_pull_request_target_full_head_context_scope_case
 
 run_pull_request_target_changed_context_scope_uses_pr_head_case
 run_pull_request_target_changed_backend_context_scope_case
+run_pull_request_target_frontend_app_security_context_scope_case
 
 run_pull_request_target_frontend_email_context_scope_case \
 	"frontend/src/components/EmailDetail.tsx"
@@ -6982,6 +7200,8 @@ run_gate_case_allow_provider_signal "infra-error-sticky-flag" \
 run_invalid_min_fail_severity_case
 run_required_input_file_outside_input_root_fails_closed_case "STRIX_LLM_FILE"
 run_required_input_file_outside_input_root_fails_closed_case "LLM_API_KEY_FILE"
+run_required_input_file_symlink_escape_fails_closed_case "STRIX_LLM_FILE"
+run_required_input_file_symlink_escape_fails_closed_case "LLM_API_KEY_FILE"
 run_vertex_model_ignores_untrusted_llm_api_base_file_case
 run_llm_api_base_file_outside_input_root_fails_closed_case
 run_pr_scoped_llm_api_base_file_config_failure_exits_2_case

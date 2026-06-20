@@ -83,16 +83,17 @@ except OSError as exc:
     print(f"ERROR: {label} could not be canonicalized: {exc}", file=sys.stderr)
     raise SystemExit(2)
 
+# Follow symlinks first, then require the final input path to stay under the
+# trusted runner temp root. This prevents symlink-component path escapes such as
+# "$RUNNER_TEMP/link-to-outside/secret.txt".
+if not resolved_input.is_relative_to(resolved_root):
+    print(f"ERROR: {label} must be inside the trusted input file root.", file=sys.stderr)
+    raise SystemExit(2)
 if not resolved_root.is_dir():
     print("ERROR: STRIX_INPUT_FILE_ROOT or RUNNER_TEMP must reference a trusted input file root.", file=sys.stderr)
     raise SystemExit(2)
 if not resolved_input.is_file():
     print(f"ERROR: {label} must reference a regular file.", file=sys.stderr)
-    raise SystemExit(2)
-try:
-    resolved_input.relative_to(resolved_root)
-except ValueError:
-    print(f"ERROR: {label} must be inside the trusted input file root.", file=sys.stderr)
     raise SystemExit(2)
 
 print(resolved_input)
@@ -1213,6 +1214,8 @@ EOF
 	if [ "$needs_frontend_app_api_context" -eq 1 ]; then
 		cat <<'EOF'
 frontend/src/api.ts
+frontend/index.html
+frontend/serve-static.mjs
 backend/app/main.py
 backend/app/api/auth_routes.py
 backend/app/api/connections.py
@@ -1227,6 +1230,8 @@ backend/app/permissions.py
 backend/app/rate_limit.py
 backend/app/schemas.py
 backend/app/security.py
+backend/app/security_headers.py
+backend/tests/test_security_headers.py
 EOF
 	fi
 
