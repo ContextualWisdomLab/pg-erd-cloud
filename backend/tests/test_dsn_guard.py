@@ -126,7 +126,8 @@ def test_dsn_guard_allows_public_ipv4_mapped_addresses(
         "",
     )
 
-    validate_postgres_dsn_target(dsn)
+    target = validate_postgres_dsn_target(dsn)
+    assert target.hosts == ("93.184.216.34",)
 
 
 def test_dsn_guard_rejects_localhost() -> None:
@@ -171,7 +172,28 @@ def test_dsn_guard_allows_public_resolved_host(
         lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
     )
 
-    validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+    target = validate_postgres_dsn_target(
+        "postgresql://user:pass@db.example.com/app"
+    )
+    assert target.hosts == ("93.184.216.34",)
+    assert target.port is None
+
+
+def test_dsn_guard_returns_validated_connection_ip_and_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: fake_addrinfo("93.184.216.34"),
+    )
+
+    target = validate_postgres_dsn_target(
+        "postgresql://user:pass@db.example.com:6543/app"
+    )
+
+    assert target.hosts == ("93.184.216.34",)
+    assert target.port == 6543
 
 
 def test_dsn_guard_enforces_configured_allowlist(

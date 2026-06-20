@@ -14,8 +14,14 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
     # Note: avoid logging DSN.
-    validate_postgres_dsn_target(dsn)
-    conn = await asyncpg.connect(dsn, timeout=10)
+    target = validate_postgres_dsn_target(dsn)
+    connect_kwargs: dict[str, object] = {
+        "host": target.hosts[0] if len(target.hosts) == 1 else target.hosts,
+        "timeout": 10,
+    }
+    if target.port is not None:
+        connect_kwargs["port"] = target.port
+    conn = await asyncpg.connect(dsn, **connect_kwargs)
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
