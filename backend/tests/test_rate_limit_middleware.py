@@ -190,3 +190,50 @@ def test_rate_limit_trusts_x_forwarded_for_when_enabled() -> None:
         ).status_code
         == 200
     )
+
+
+def test_share_prefix_can_have_tighter_public_limit() -> None:
+    general_limiter = InMemoryFixedWindowRateLimiter(max_keys=100)
+    share_limiter = InMemoryFixedWindowRateLimiter(max_keys=100)
+    general_policy = RateLimitPolicy(
+        enabled=True,
+        requests=10,
+        window_seconds=60.0,
+        route_prefix="/api",
+        trust_x_forwarded_for=False,
+    )
+    share_policy = RateLimitPolicy(
+        enabled=True,
+        requests=1,
+        window_seconds=60.0,
+        route_prefix="/api/share",
+        trust_x_forwarded_for=False,
+    )
+
+    app = FastAPI()
+    app.middleware("http")(
+        make_rate_limit_middleware(
+            limiter=general_limiter,
+            policy=general_policy,
+            get_subject=_no_subject,
+        )
+    )
+    app.middleware("http")(
+        make_rate_limit_middleware(
+            limiter=share_limiter,
+            policy=share_policy,
+        )
+    )
+
+    @app.get("/api/share/{share_link_uuid}")
+    def share(share_link_uuid: str) -> dict[str, bool]:
+        return {"ok": bool(share_link_uuid)}
+
+    @app.get("/api/projects")
+    def projects() -> dict[str, bool]:
+        return {"ok": True}
+
+    client = TestClient(app)
+    assert client.get("/api/share/abc").status_code == 200
+    assert client.get("/api/share/abc").status_code == 429
+    assert client.get("/api/projects").status_code == 200

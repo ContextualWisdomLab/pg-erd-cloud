@@ -17,6 +17,7 @@ from app.models import (
     SchemaSnapshotData,
     ShareLink,
 )
+from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
 
@@ -147,3 +148,32 @@ async def export_shared_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+
+
+@router.get(
+    "/share/{share_link_uuid}/snapshots/{schema_snapshot_uuid}/reversing-spec.md",
+    response_class=PlainTextResponse,
+)
+async def export_shared_snapshot_reversing_spec(
+    share_link_uuid: uuid.UUID,
+    schema_snapshot_uuid: uuid.UUID,
+    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Export a shared snapshot as a DB reversing spec or LLM prompt."""
+    link = await session.get(ShareLink, share_link_uuid)
+    if link is None:
+        raise HTTPException(status_code=404, detail="share link not found")
+    if link.expires_at is not None and link.expires_at <= dt.datetime.now(
+        dt.timezone.utc
+    ):
+        raise HTTPException(status_code=410, detail="share link expired")
+
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    return generate_reversing_spec(data.snapshot_json, mode=mode)

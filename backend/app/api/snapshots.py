@@ -19,6 +19,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
@@ -155,6 +156,26 @@ async def export_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/reversing-spec.md",
+    response_class=PlainTextResponse,
+)
+async def export_snapshot_reversing_spec(
+    schema_snapshot_uuid: uuid.UUID,
+    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Export a snapshot as a DB reversing spec or LLM prompt."""
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "# DB Reversing Specification\n\nSnapshot not found.\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    return generate_reversing_spec(data.snapshot_json, mode=mode)
 
 
 @router.get(
