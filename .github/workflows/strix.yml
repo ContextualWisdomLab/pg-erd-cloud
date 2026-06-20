@@ -28,7 +28,9 @@ on:
         type: string
 
 concurrency:
-  group: strix-${{ github.repository }}
+  group: strix-${{ github.repository }}-${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha || github.sha }}
+  # Key by scanned head so a newer pending PR evidence run cannot cancel
+  # another PR's pending evidence before GitHub allocates a runner.
   # cancel-in-progress deliberately disabled: an attacker could force-push
   # a benign commit to cancel an in-progress scan of a malicious commit.
   cancel-in-progress: false
