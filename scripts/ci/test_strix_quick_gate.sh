@@ -93,7 +93,7 @@ assert_strix_workflow_pr_trigger_hardened() {
 
 	assert_file_contains "$workflow_file" "branches: [master]" "strix workflow scans the protected default branch"
 	assert_file_contains "$workflow_file" "pull_request_target:" "strix workflow uses trusted PR trigger"
-	assert_file_contains "$workflow_file" 'group: strix-${{ github.repository }}' "strix workflow serializes scans per repository for GitHub Models quota"
+	assert_file_contains "$workflow_file" "github.event.pull_request.head.sha || github.event.inputs.pr_head_sha || github.sha" "strix workflow keys concurrency by scanned head so pending PR evidence is not cross-cancelled"
 	assert_file_contains "$workflow_file" "cancel-in-progress: false" "strix workflow never cancels in-progress security evidence"
 	assert_file_contains "$workflow_file" "models: read" "strix workflow grants only the GitHub Models read permission needed for Strix"
 	assert_file_contains "$workflow_file" "Materialize trusted workspace" "strix workflow materializes trusted workspace"
@@ -378,6 +378,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "## OpenCode Review Overview" "opencode review publishes a visible Review Overview heading"
 	assert_file_contains "$workflow_file" "OpenCode Agent review was unavailable, but current-head GitHub Checks passed." "opencode review does not submit blocking reviews for model/runtime failures after checks pass"
 	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because the failure was in the OpenCode model/runtime path" "opencode review explains non-blocking model/runtime failures"
+	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because Strix cancellation is missing security evidence, not a source-code finding." "opencode review does not submit source-code changes for cancelled Strix evidence without logs"
 	assert_file_contains "$workflow_file" 'gh api -X PATCH "repos/${GH_REPOSITORY}/issues/comments/${overview_comment_id}"' "opencode review updates an existing Review Overview comment instead of duplicating it"
 	assert_file_contains "$workflow_file" "format_review_api_error" "opencode review approval helper formats formal review API failures"
 	assert_file_contains "$workflow_file" "curl --fail-with-body --silent --show-error" "opencode review approval helper preserves formal review API response bodies"
