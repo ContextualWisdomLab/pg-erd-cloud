@@ -23,6 +23,7 @@ dependencies = [
   "cryptography>=46.0.7",
   "httpx>=0.28.1",
   "python-jose[cryptography]>=3.5.0",
+  "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

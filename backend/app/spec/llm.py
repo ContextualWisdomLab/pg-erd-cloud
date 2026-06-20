@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from app.settings import settings
+from app.spec.index_design import generate_index_design_llm_prompt
 from app.spec.reversing import generate_reversing_llm_prompt
 
 
@@ -47,20 +48,44 @@ async def generate_reversing_llm_draft(
 ) -> str:
     """Generate a DB reversing spec with a configured chat-completions provider."""
 
+    return await _generate_llm_draft(
+        prompt=generate_reversing_llm_prompt(snapshot),
+        system_content=(
+            "You write concise database reverse-engineering specifications "
+            "from schema metadata. Do not invent facts."
+        ),
+        client=client,
+    )
+
+
+async def generate_index_design_llm_draft(
+    snapshot: dict, client: httpx.AsyncClient | None = None
+) -> str:
+    """Generate table/index design guidance with a configured LLM provider."""
+
+    return await _generate_llm_draft(
+        prompt=generate_index_design_llm_prompt(snapshot),
+        system_content=(
+            "You write concise PostgreSQL table and index design guidance "
+            "from schema metadata and workload evidence. Do not invent facts."
+        ),
+        client=client,
+    )
+
+
+async def _generate_llm_draft(
+    *,
+    prompt: str,
+    system_content: str,
+    client: httpx.AsyncClient | None,
+) -> str:
     base_url = _required_setting(settings.llm_api_base_url, "LLM_API_BASE_URL")
     api_key = _required_setting(settings.llm_api_key, "LLM_API_KEY")
     model = _required_setting(settings.llm_model, "LLM_MODEL")
-    prompt = generate_reversing_llm_prompt(snapshot)
     request_json = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You write concise database reverse-engineering "
-                    "specifications from schema metadata. Do not invent facts."
-                ),
-            },
+            {"role": "system", "content": system_content},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.2,
@@ -69,7 +94,6 @@ async def generate_reversing_llm_draft(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-
     owns_client = client is None
     if client is None:
         client = httpx.AsyncClient(timeout=settings.llm_timeout_seconds)

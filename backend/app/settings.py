@@ -100,6 +100,16 @@ class Settings(BaseSettings):
     # Optional shared token for /metrics when OIDC isn't configured.
     observability_metrics_token: str | None = None
 
+    # Optional Valkey-backed queue signal path. The relational job_queue table
+    # remains the source of truth; Valkey reduces polling/lock pressure by
+    # carrying due job IDs for workers to claim.
+    job_queue_backend: Literal["database", "valkey"] = "database"
+    valkey_url: str | None = None
+    valkey_sentinel_hosts: str | None = None
+    valkey_sentinel_master: str | None = None
+    valkey_queue_key: str = "pg-erd-cloud:job-queue"
+    valkey_lock_ttl_seconds: int = Field(300, ge=1)
+
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None

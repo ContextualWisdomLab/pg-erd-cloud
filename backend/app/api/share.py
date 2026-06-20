@@ -20,8 +20,10 @@ from app.models import (
 from app.spec.llm import (
     LlmConfigurationError,
     LlmProviderError,
+    generate_index_design_llm_draft,
     generate_reversing_llm_draft,
 )
+from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
@@ -193,3 +195,43 @@ async def export_shared_snapshot_reversing_spec(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     return generate_reversing_spec(data.snapshot_json, mode=mode)
+
+
+@router.get(
+    "/share/{share_link_uuid}/snapshots/{schema_snapshot_uuid}/index-design.md",
+    response_class=PlainTextResponse,
+)
+async def export_shared_snapshot_index_design(
+    share_link_uuid: uuid.UUID,
+    schema_snapshot_uuid: uuid.UUID,
+    mode: str = Query(
+        "markdown", pattern="^(markdown|llm-prompt|llm-draft)$"
+    ),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Export shared table/index design guidance or an LLM prompt."""
+    link = await session.get(ShareLink, share_link_uuid)
+    if link is None:
+        raise HTTPException(status_code=404, detail="share link not found")
+    if link.expires_at is not None and link.expires_at <= dt.datetime.now(
+        dt.timezone.utc
+    ):
+        raise HTTPException(status_code=410, detail="share link expired")
+
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "# ERD Index Design\n\nSnapshot data not found.\n"
+    if mode == "llm-draft":
+        try:
+            return await generate_index_design_llm_draft(data.snapshot_json)
+        except LlmConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LlmProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="LLM provider request failed"
+            ) from exc
+    return generate_index_design_spec(data.snapshot_json, mode=mode)

@@ -48,3 +48,14 @@ def test_relations_query_captures_partition_metadata() -> None:
     assert "parent_ns.nspname AS partition_parent_schema" in sql
     assert "parent.relname AS partition_parent_name" in sql
     assert "LEFT JOIN pg_catalog.pg_inherits inh ON inh.inhrelid = c.oid" in sql
+
+
+def test_citus_query_captures_distributed_table_metadata() -> None:
+    sql = queries.CITUS_DISTRIBUTED_TABLES_SQL
+
+    assert "pg_catalog.pg_dist_partition" in sql
+    assert "pg_catalog.pg_dist_colocation" in sql
+    assert "pg_catalog.pg_dist_shard" in sql
+    assert "p.partkey::text AS distribution_key" in sql
+    assert "co.replicationfactor AS replication_factor" in sql
+    assert "COUNT(sh.shardid)::int AS shard_count" in sql

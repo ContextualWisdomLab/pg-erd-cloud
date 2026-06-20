@@ -44,9 +44,27 @@ def test_snapshot_export_preserves_index_tablespace() -> None:
     )
 
     assert (
-        'CREATE INDEX events_id_idx ON public.events USING btree (id) TABLESPACE "fast_space";'
+        'CREATE INDEX CONCURRENTLY events_id_idx ON public.events USING btree (id) TABLESPACE "fast_space";'
         in sql
     )
+
+
+def test_snapshot_export_preserves_unique_index_with_concurrently() -> None:
+    sql = snapshot_json_to_sql(
+        {
+            "indexes": [
+                {
+                    "index_def": "CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)",
+                }
+            ]
+        }
+    )
+
+    assert (
+        "CREATE UNIQUE INDEX CONCURRENTLY users_email_key ON public.users USING btree (email);"
+        in sql
+    )
+    assert "CREATE UNIQUE INDEX CONCURRENTLY CONCURRENTLY" not in sql
 
 
 def test_snapshot_export_preserves_partition_parent_and_child() -> None:

@@ -174,13 +174,13 @@ describe('exportDDL', () => {
 
     const ddl = exportDDL(nodes, []);
     expect(ddl).toContain('-- Indexes');
-    expect(ddl).toContain('CREATE INDEX "idx_users_email" ON "public.users" USING btree ("email");');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_users_email" ON "public.users" USING btree ("email");');
 
     // Using string match to ensure it only appears once
-    const matches = ddl.match(/CREATE INDEX "idx_users_email"/g);
+    const matches = ddl.match(/CREATE INDEX CONCURRENTLY "idx_users_email"/g);
     expect(matches?.length).toBe(1);
 
-    expect(ddl).toContain('CREATE INDEX "idx_users_status" ON "public.users" USING btree ("status");');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_users_status" ON "public.users" USING btree ("status");');
     expect(ddl).not.toContain('idx_empty');
   });
 
@@ -229,7 +229,7 @@ describe('exportDDL', () => {
     const ddl = exportDDL(nodes, []);
     expect(ddl).toContain('CREATE TABLE "User ""Account"""');
     expect(ddl).toContain('"email ""address""" text');
-    expect(ddl).toContain('CREATE INDEX "idx_""user""_account" ON "User ""Account""" USING btree ("email ""address""");');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_""user""_account" ON "User ""Account""" USING btree ("email ""address""");');
   });
 
   it('should correctly fallback invalid sql data types or access methods', () => {
@@ -261,6 +261,6 @@ describe('exportDDL', () => {
     expect(ddl).toContain('"invalid_type" text');
     expect(ddl).toContain('"valid_type" integer');
     // sqlAccessMethod invalid input fallback is 'btree'
-    expect(ddl).toContain('CREATE INDEX "idx_invalid_method" ON "public.data" USING btree ("invalid_type");');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_invalid_method" ON "public.data" USING btree ("invalid_type");');
   });
 });
