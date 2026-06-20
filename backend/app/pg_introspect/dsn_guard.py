@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from app.settings import settings
 
@@ -75,6 +75,45 @@ def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ip
     return resolved
 
 
+def _parse_query_params(query: str) -> dict[str, list[str]]:
+    params: dict[str, list[str]] = {}
+    for key, value in parse_qsl(query, keep_blank_values=True):
+        params.setdefault(key.lower(), []).append(value)
+    return params
+
+
+def _split_query_host_values(values: list[str], parameter: str) -> list[str]:
+    hosts: list[str] = []
+    for value in values:
+        for host in value.split(","):
+            normalized = host.strip()
+            if not normalized:
+                raise DsnTargetError(f"database DSN query {parameter} is invalid")
+            hosts.append(normalized)
+    return hosts
+
+
+def _validate_query_ports(values: list[str]) -> int | None:
+    if not values:
+        return None
+
+    first_port: int | None = None
+    for value in values:
+        for port_value in value.split(","):
+            normalized = port_value.strip()
+            if not normalized:
+                raise DsnTargetError("database DSN query port is invalid")
+            try:
+                port = int(normalized)
+            except ValueError as err:
+                raise DsnTargetError("database DSN query port is invalid") from err
+            if port < 1 or port > 65535:
+                raise DsnTargetError("database DSN query port is invalid")
+            if first_port is None:
+                first_port = port
+    return first_port
+
+
 def validate_postgres_dsn_target(dsn: str) -> None:
     """Reject PostgreSQL DSNs that could target internal network resources."""
 
@@ -89,20 +128,25 @@ def validate_postgres_dsn_target(dsn: str) -> None:
         port = parsed.port
     except ValueError as err:
         raise DsnTargetError("database DSN port is invalid") from err
-    query = parse_qs(parsed.query)
+    query = _parse_query_params(parsed.query)
 
-    port_override = query.get("port", [])
-    if port_override:
-        try:
-            port = int(port_override[0])
-        except ValueError as err:
-            raise DsnTargetError("database DSN query port is invalid") from err
+    port_override = _validate_query_ports(query.get("port", []))
+    if port_override is not None:
+        port = port_override
 
-    hosts_to_check = [host]
-    hosts_to_check.extend(query.get("host", []))
-    hosts_to_check.extend(query.get("hostaddr", []))
+    hosts_to_check: list[tuple[str, bool]] = [(host, False)]
+    hosts_to_check.extend(
+        (query_host, False)
+        for query_host in _split_query_host_values(query.get("host", []), "host")
+    )
+    hosts_to_check.extend(
+        (query_hostaddr, True)
+        for query_hostaddr in _split_query_host_values(
+            query.get("hostaddr", []), "hostaddr"
+        )
+    )
 
-    for h in hosts_to_check:
+    for h, is_hostaddr in hosts_to_check:
         normalized = h.lower().rstrip(".")
 
         if normalized == "localhost" or normalized.endswith(".localhost"):
@@ -115,6 +159,9 @@ def validate_postgres_dsn_target(dsn: str) -> None:
             if _is_restricted_ip(literal_ip):
                 raise DsnTargetError("database host resolves to a restricted IP range")
             continue
+
+        if is_hostaddr:
+            raise DsnTargetError("database DSN query hostaddr is invalid")
 
         for ip in _resolved_ips(normalized, port):
             if _is_restricted_ip(ip):
