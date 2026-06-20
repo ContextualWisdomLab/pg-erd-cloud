@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { snapshotToGraph } from './convert'
 
+type SnapshotInput = Parameters<typeof snapshotToGraph>[0]
+
 describe('snapshotToGraph', () => {
   it('converts relations to nodes and columns', () => {
-    const snapshot: any = {
+    const snapshot: SnapshotInput = {
       relations: [
         { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users', relation_comment: 'User accounts' }
       ],
@@ -32,7 +34,7 @@ describe('snapshotToGraph', () => {
   })
 
   it('identifies primary keys correctly', () => {
-    const snapshot: any = {
+    const snapshot: SnapshotInput = {
       relations: [
         { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' }
       ],
@@ -54,7 +56,7 @@ describe('snapshotToGraph', () => {
   })
 
   it('identifies foreign keys correctly via fk_edges', () => {
-    const snapshot: any = {
+    const snapshot: SnapshotInput = {
       relations: [
         { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' },
         { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'posts' }
@@ -88,12 +90,12 @@ describe('snapshotToGraph', () => {
       label: 'fk_user: user_id → id'
     })
 
-    expect(graph.nodes.find((n: any) => n.id === '2')?.data.badges.fk).toBe(true)
-    expect(graph.nodes.find((n: any) => n.id === '1')?.data.badges.fk).toBe(false)
+    expect(graph.nodes.find((n) => n.id === '2')?.data.badges.fk).toBe(true)
+    expect(graph.nodes.find((n) => n.id === '1')?.data.badges.fk).toBe(false)
   })
 
   it('identifies composite foreign keys correctly via fk_edges', () => {
-    const snapshot: any = {
+    const snapshot: SnapshotInput = {
       relations: [
         { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'orgs' },
         { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'users' }
@@ -113,7 +115,7 @@ describe('snapshotToGraph', () => {
   })
 
   it('falls back to constraints if fk_edges is empty or not provided', () => {
-    const snapshot: any = {
+    const snapshot: SnapshotInput = {
       relations: [
         { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' },
         { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'posts' }
@@ -128,9 +130,9 @@ describe('snapshotToGraph', () => {
     const graph = snapshotToGraph(snapshot)
 
     // node 1 is PK
-    expect(graph.nodes.find((n: any) => n.id === '1')?.data.badges.pk).toBe(true)
+    expect(graph.nodes.find((n) => n.id === '1')?.data.badges.pk).toBe(true)
     // node 2 is FK
-    expect(graph.nodes.find((n: any) => n.id === '2')?.data.badges.fk).toBe(true)
+    expect(graph.nodes.find((n) => n.id === '2')?.data.badges.fk).toBe(true)
 
     expect(graph.edges).toHaveLength(1)
     expect(graph.edges[0]).toMatchObject({
