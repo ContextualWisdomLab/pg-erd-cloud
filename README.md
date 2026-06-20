@@ -64,8 +64,7 @@ docker compose up -d --build
 
 ## 실행(프로덕션 스타일, Docker)
 
-Traefik을 edge router로 사용합니다. `/api/*`와 `/healthz`는 백엔드로 라우팅하고,
-나머지 경로는 정적 빌드된 프론트엔드 SPA로 라우팅합니다.
+프론트는 정적 빌드 + nginx로 서빙하며, `/api/*`는 백엔드로 프록시합니다.
 
 ```bash
 cp .env.example .env
@@ -86,8 +85,7 @@ chmod 600 secrets/app_secret
 docker compose -f compose.prod.yaml up -d --build
 ```
 
-- App entrypoint: <http://localhost:8080> (`TRAEFIK_HTTP_PORT`로 변경 가능)
-- Health: <http://localhost:8080/healthz>
+- Frontend: <http://localhost:8080>
 
 ### Azure VMSS 상태 프로브(선택)
 

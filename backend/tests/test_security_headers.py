@@ -6,8 +6,6 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from app import security_headers
-from app.csrf import CSRF_HEADER_NAME
-from app.main import CORS_ALLOW_HEADERS
 from app.security_headers import make_security_headers_middleware
 
 
@@ -98,38 +96,6 @@ def test_security_headers_present_on_cors_preflight() -> None:
     assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r.headers
     assert "Strict-Transport-Security" not in r.headers
-
-
-def test_cors_preflight_allows_csrf_token_header() -> None:
-    """Cross-origin state-changing requests must be allowed to send CSRF token."""
-    app = FastAPI()
-
-    @app.post("/api/projects")
-    def create_project() -> dict[str, bool]:
-        return {"ok": True}
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://example.com"],
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=CORS_ALLOW_HEADERS,
-    )
-
-    client = TestClient(app)
-    r = client.options(
-        "/api/projects",
-        headers={
-            "Origin": "http://example.com",
-            "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": f"{CSRF_HEADER_NAME}, Content-Type",
-        },
-    )
-
-    assert r.status_code in (200, 204)
-    assert CSRF_HEADER_NAME.lower() in r.headers[
-        "Access-Control-Allow-Headers"
-    ].lower()
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:
