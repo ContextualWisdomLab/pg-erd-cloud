@@ -1,0 +1,4 @@
+## 2025-06-20 - [CORS Misconfiguration Breaking CSRF Defense]
+**Vulnerability:** The `X-CSRF-Token` custom header was required by the CSRF middleware but was missing from the CORS `allow_headers` list in `CORSMiddleware`.
+**Learning:** Security mechanisms that rely on custom headers must be explicitly coordinated with CORS configuration. When a custom header like `X-CSRF-Token` is not allowed by CORS, cross-origin requests fail at the preflight stage (`OPTIONS` request), breaking the legitimate workflow of the frontend while appearing to be a security feature working as intended.
+**Prevention:** Whenever introducing a new security-related custom header (like CSRF tokens or custom auth headers), always verify that it is added to the backend's explicit CORS `allow_headers` allowlist, otherwise cross-origin integrations will break.
