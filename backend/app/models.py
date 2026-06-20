@@ -77,7 +77,7 @@ class ProjectMember(Base):
 
 
 class DbConnection(Base):
-    """Encrypted PostgreSQL DSN belonging to a project."""
+    """Encrypted database DSN belonging to a project."""
 
     __tablename__ = "db_connection"
 
