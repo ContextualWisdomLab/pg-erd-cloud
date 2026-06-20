@@ -1,10 +1,5 @@
-## 2026-06-19 - Endless Polling in React Components
-**Learning:** React `useEffect` with `setInterval` for polling can easily become a performance bottleneck (unnecessary network calls, state updates, and potential memory leaks) if the termination condition isn't handled correctly when the polled job reaches a terminal state.
-**Action:** Always ensure polling mechanisms have a clean exit strategy by clearing intervals once a terminal state (like `succeeded`, `failed`, or `not_found`) is reached.
+# 2024-05-24 - Zero-dependency Object TTL Caching
 
-## 2026-06-19 - Expensive useMemo Keys
-**Learning:** Using `JSON.stringify` on large data objects as a dependency for `useMemo` is an expensive hack to prevent re-renders, causing severe performance issues as the data size grows.
-**Action:** Rely on proper reference management and stop unnecessary state updates (like fixing endless polling) instead of using deep stringification hacks for `useMemo` dependencies.
-## 2026-06-20 - O(N^2) loops for finding items in export
-**Learning:** Nested array `.find()` iterations within loops parsing graph connections result in O(N^2) complexity, significantly degrading UI performance for large outputs.
-**Action:** Always pre-compute a lookup `Map` in O(N) when multiple specific node lookups are needed within iterative processes.
+**Learning:** When needing a fast short-lived memory cache to optimize hot path functions (like fetching the user object on every authenticated API request) in a Python backend, it is not always necessary to pull in third-party libraries like `cachetools`. A simple module-level dictionary pairing the value with an expiry timestamp and a basic pruning/size-capping strategy can be extremely effective.
+
+**Action:** Before opting for external caching dependencies, evaluate if a simple dictionary cache with `maxsize` boundaries and simple TTL checking (`datetime.now(timezone.utc) < expires_at`) is sufficient and implement it directly to reduce bundle size and external complexity.

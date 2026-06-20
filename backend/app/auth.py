@@ -65,9 +65,7 @@ class VerifiedToken:
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
 _oidc_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
-OIDC_ALLOWED_ALGORITHMS = tuple(
-    _parse_oidc_algorithms(settings.oidc_algorithms)
-)
+OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 _revoked_token_jtis: dict[str, dt.datetime] = {}
 
 
@@ -141,7 +139,8 @@ def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
 
     current = now or dt.datetime.now(dt.timezone.utc)
     expired = [
-        jwt_id for jwt_id, expires_at in _revoked_token_jtis.items()
+        jwt_id
+        for jwt_id, expires_at in _revoked_token_jtis.items()
         if expires_at <= current
     ]
     for jwt_id in expired:
@@ -262,34 +261,54 @@ async def try_get_subject_for_rate_limit(request: Request) -> str | None:
         return None
 
 
+_user_cache: dict[str, tuple[CurrentUser, dt.datetime]] = {}
+USER_CACHE_MAX_SIZE = 1000
+USER_CACHE_TTL = dt.timedelta(minutes=5)
+
+
 async def _ensure_user(
     session: AsyncSession, subject: str, display_name: str | None
 ) -> CurrentUser:
     """Get or create a UserAccount for the given OIDC subject."""
+    now = dt.datetime.now(dt.timezone.utc)
+    cached = _user_cache.get(subject)
+    if cached is not None:
+        user, expires_at = cached
+        if now < expires_at:
+            return user
+        else:
+            del _user_cache[subject]
+
     row = await session.execute(
         select(UserAccount).where(UserAccount.oidc_subject == subject)
     )
     existing = row.scalars().first()
     if existing is not None:
-        return CurrentUser(
+        user = CurrentUser(
             user_account_uuid=existing.user_account_uuid,
             subject=existing.oidc_subject,
             display_name=existing.display_name,
         )
+    else:
+        user_account = UserAccount(
+            user_account_uuid=uuid.uuid4(),
+            oidc_subject=subject,
+            display_name=display_name,
+            created_at=now,
+        )
+        session.add(user_account)
+        await session.flush()
+        user = CurrentUser(
+            user_account_uuid=user_account.user_account_uuid,
+            subject=user_account.oidc_subject,
+            display_name=user_account.display_name,
+        )
 
-    user = UserAccount(
-        user_account_uuid=uuid.uuid4(),
-        oidc_subject=subject,
-        display_name=display_name,
-        created_at=dt.datetime.now(dt.timezone.utc),
-    )
-    session.add(user)
-    await session.flush()
-    return CurrentUser(
-        user_account_uuid=user.user_account_uuid,
-        subject=user.oidc_subject,
-        display_name=user.display_name,
-    )
+    if len(_user_cache) >= USER_CACHE_MAX_SIZE:
+        _user_cache.clear()
+
+    _user_cache[subject] = (user, now + USER_CACHE_TTL)
+    return user
 
 
 async def get_current_user(
