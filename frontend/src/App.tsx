@@ -25,6 +25,12 @@ import {
 } from "./api";
 import TableNode from "./erd/TableNode";
 import {
+  BUSINESS_GROUP_COLORS,
+  DEFAULT_BUSINESS_GROUP_COLOR,
+  uniqueBusinessGroupId,
+  type BusinessGroup,
+} from "./erd/businessGroups";
+import {
   buildIndexRecommendations,
   calculateCardinalityRatio,
   parsePositiveInteger,
@@ -118,6 +124,12 @@ export default function App() {
   >({});
   const [cardinalityColumnSelections, setCardinalityColumnSelections] =
     useState<Record<string, boolean>>({});
+  const [businessGroups, setBusinessGroups] = useState<BusinessGroup[]>([]);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState<string>(
+    DEFAULT_BUSINESS_GROUP_COLOR,
+  );
 
   const [undoPositions, setUndoPositions] = useState<Map<
     string,
@@ -477,6 +489,63 @@ export default function App() {
     setIsCardinalityModalOpen(false);
   }
 
+  function onOpenGroupManager() {
+    if (nodes.length === 0) return;
+    setIsGroupModalOpen(true);
+  }
+
+  function onCloseGroupManager() {
+    setIsGroupModalOpen(false);
+  }
+
+  function onCreateBusinessGroup() {
+    const name = newGroupName.trim();
+    if (!name) return;
+    const nextGroup: BusinessGroup = {
+      id: uniqueBusinessGroupId(name, businessGroups),
+      name,
+      color: newGroupColor,
+    };
+    setBusinessGroups((groups) => [...groups, nextGroup]);
+    setNewGroupName("");
+  }
+
+  function onAssignBusinessGroup(nodeId: string, groupId: string) {
+    const group = businessGroups.find((candidate) => candidate.id === groupId);
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                businessGroup: group ?? null,
+              },
+            }
+          : node,
+      ),
+    );
+  }
+
+  function onDeleteBusinessGroup(groupId: string) {
+    setBusinessGroups((groups) =>
+      groups.filter((group) => group.id !== groupId),
+    );
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.data.businessGroup?.id === groupId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                businessGroup: null,
+              },
+            }
+          : node,
+      ),
+    );
+  }
+
   function onAddTableSubmit() {
     if (!newTableName.trim()) return;
     const newId = `new_table_${Date.now()}`;
@@ -779,6 +848,17 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenGroupManager}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "묶을 테이블이 없습니다" : "업무 그룹"
+              }
+              aria-label="업무 그룹"
+            >
+              그룹
+            </button>
+            <button
+              type="button"
               onClick={onOpenCardinalityWizard}
               disabled={nodes.length === 0}
               title={
@@ -965,6 +1045,113 @@ export default function App() {
                     >
                       저장
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isGroupModalOpen && (
+            <div className="modalOverlay">
+              <div
+                className="modalContent groupManager"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="group-manager-title"
+              >
+                <div className="modalHeader">
+                  <h3 id="group-manager-title">업무 그룹</h3>
+                  <button
+                    type="button"
+                    onClick={onCloseGroupManager}
+                    aria-label="업무 그룹 닫기"
+                  >
+                    닫기
+                  </button>
+                </div>
+
+                <div className="groupManager__create">
+                  <div className="field">
+                    <label htmlFor="business-group-name">그룹 이름</label>
+                    <input
+                      id="business-group-name"
+                      value={newGroupName}
+                      onChange={(event) => setNewGroupName(event.target.value)}
+                      placeholder="Billing"
+                    />
+                  </div>
+                  <div
+                    className="groupManager__swatches"
+                    role="radiogroup"
+                    aria-label="그룹 색상"
+                  >
+                    {BUSINESS_GROUP_COLORS.map((color) => (
+                      <button
+                        type="button"
+                        aria-label={`색상 ${color}`}
+                        aria-pressed={newGroupColor === color}
+                        className="groupManager__swatch"
+                        key={color}
+                        onClick={() => setNewGroupColor(color)}
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onCreateBusinessGroup}
+                    disabled={!newGroupName.trim()}
+                  >
+                    추가
+                  </button>
+                </div>
+
+                <div className="groupManager__section">
+                  <h4>그룹</h4>
+                  {businessGroups.length === 0 ? (
+                    <div className="field-hint">등록된 그룹이 없습니다.</div>
+                  ) : (
+                    <div className="groupManager__list">
+                      {businessGroups.map((group) => (
+                        <div className="groupManager__group" key={group.id}>
+                          <span
+                            className="groupManager__dot"
+                            style={{ background: group.color }}
+                          />
+                          <strong>{group.name}</strong>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteBusinessGroup(group.id)}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="groupManager__section">
+                  <h4>테이블 배정</h4>
+                  <div className="groupManager__assignments">
+                    {nodes.map((node) => (
+                      <label className="groupManager__assignment" key={node.id}>
+                        <span>{node.data.title}</span>
+                        <select
+                          value={node.data.businessGroup?.id ?? ""}
+                          onChange={(event) =>
+                            onAssignBusinessGroup(node.id, event.target.value)
+                          }
+                        >
+                          <option value="">없음</option>
+                          {businessGroups.map((group) => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>
