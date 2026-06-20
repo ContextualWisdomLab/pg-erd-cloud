@@ -195,6 +195,85 @@ def is_token_jti_revoked(jwt_id: str) -> bool:
     return jwt_id in _revoked_token_jtis
 
 
+def _bearer_token_from_request(request: Request) -> str:
+    """Return the bearer token from a request or fail authentication."""
+
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    return auth.split(" ", 1)[1].strip()
+
+
+async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
+    """Validate the JOSE header, signing key, and claims signature."""
+
+    try:
+        header = cast(dict[str, Any], jwt.get_unverified_header(token))
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=401, detail="invalid token header")
+
+    header_alg = _validate_jwt_header(header)
+    if header_alg not in OIDC_ALLOWED_ALGORITHMS:
+        raise HTTPException(
+            status_code=401,
+            detail="unsupported token algorithm",
+        )
+
+    jwks = await _get_jwks()
+    jwk = _pick_jwk(jwks, header.get("kid"))
+    if jwk is None:
+        jwks = await _get_jwks(force_refresh=True)
+        jwk = _pick_jwk(jwks, header.get("kid"))
+    if jwk is None:
+        raise HTTPException(status_code=401, detail="unknown signing key")
+
+    try:
+        claims = jwt.decode(
+            token,
+            jwk,
+            algorithms=list(OIDC_ALLOWED_ALGORITHMS),
+            audience=settings.oidc_audience,
+            issuer=settings.oidc_issuer,
+            options={
+                "verify_aud": bool(settings.oidc_audience),
+                "require_aud": bool(settings.oidc_audience),
+                "require_iss": True,
+                "require_exp": True,
+                "require_jti": True,
+                "leeway": OIDC_JWT_LEEWAY_SECONDS,
+            },
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=401, detail="token verification failed"
+        ) from err
+
+    return cast(dict[str, Any], claims)
+
+
+def _verified_token_from_claims(claims: dict[str, Any]) -> VerifiedToken:
+    """Validate decoded claims and return the request auth identity."""
+
+    sub = claims.get("sub")
+    jwt_id = claims.get("jti")
+    name = claims.get("name") or claims.get("preferred_username")
+    if not isinstance(sub, str):
+        raise HTTPException(status_code=401, detail="token missing sub")
+    if not isinstance(jwt_id, str) or not jwt_id.strip():
+        raise HTTPException(status_code=401, detail="token missing jti")
+
+    expires_at = _jwt_expiry(claims)
+    if is_token_jti_revoked(jwt_id):
+        raise HTTPException(status_code=401, detail="token revoked")
+
+    return VerifiedToken(
+        subject=sub,
+        display_name=str(name) if isinstance(name, str) else None,
+        jwt_id=jwt_id,
+        expires_at=expires_at,
+    )
+
+
 async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
     """Extract and verify OIDC token claims from a request.
 
@@ -204,68 +283,9 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
 
     # OIDC mode (Casdoor etc.)
     if settings.oidc_issuer:
-        auth = request.headers.get("Authorization", "")
-        if not auth.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="missing bearer token")
-        token = auth.split(" ", 1)[1].strip()
-        try:
-            header = jwt.get_unverified_header(token)
-        except Exception:  # noqa: BLE001
-            raise HTTPException(status_code=401, detail="invalid token header")
-
-        header_alg = _validate_jwt_header(cast(dict[str, Any], header))
-
-        if header_alg not in OIDC_ALLOWED_ALGORITHMS:
-            raise HTTPException(
-                status_code=401,
-                detail="unsupported token algorithm",
-            )
-
-        jwks = await _get_jwks()
-        jwk = _pick_jwk(jwks, header.get("kid"))
-        if jwk is None:
-            jwks = await _get_jwks(force_refresh=True)
-            jwk = _pick_jwk(jwks, header.get("kid"))
-        if jwk is None:
-            raise HTTPException(status_code=401, detail="unknown signing key")
-
-        try:
-            claims = jwt.decode(
-                token,
-                jwk,
-                algorithms=list(OIDC_ALLOWED_ALGORITHMS),
-                audience=settings.oidc_audience,
-                issuer=settings.oidc_issuer,
-                options={
-                    "verify_aud": bool(settings.oidc_audience),
-                    "require_aud": bool(settings.oidc_audience),
-                    "require_iss": True,
-                    "require_exp": True,
-                    "require_jti": True,
-                    "leeway": OIDC_JWT_LEEWAY_SECONDS,
-                },
-            )
-        except Exception as err:
-            raise HTTPException(
-                status_code=401, detail="token verification failed"
-            ) from err
-
-        sub = claims.get("sub")
-        jwt_id = claims.get("jti")
-        name = claims.get("name") or claims.get("preferred_username")
-        if not isinstance(sub, str):
-            raise HTTPException(status_code=401, detail="token missing sub")
-        if not isinstance(jwt_id, str) or not jwt_id.strip():
-            raise HTTPException(status_code=401, detail="token missing jti")
-        expires_at = _jwt_expiry(cast(dict[str, Any], claims))
-        if is_token_jti_revoked(jwt_id):
-            raise HTTPException(status_code=401, detail="token revoked")
-        return VerifiedToken(
-            subject=sub,
-            display_name=str(name) if isinstance(name, str) else None,
-            jwt_id=jwt_id,
-            expires_at=expires_at,
-        )
+        token = _bearer_token_from_request(request)
+        claims = await _decode_verified_oidc_token(token)
+        return _verified_token_from_claims(claims)
 
     raise HTTPException(status_code=500, detail="OIDC configuration required")
 
