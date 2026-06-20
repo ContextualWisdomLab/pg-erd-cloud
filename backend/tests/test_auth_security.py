@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -186,3 +188,61 @@ async def test_auth_fails_closed_without_oidc(
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "OIDC configuration required"
+
+
+class _FakeScalarResult:
+    def __init__(self, user: object | None) -> None:
+        self._user = user
+
+    def first(self) -> object | None:
+        return self._user
+
+
+class _FakeExecuteResult:
+    def __init__(self, user: object | None) -> None:
+        self._user = user
+
+    def scalars(self) -> _FakeScalarResult:
+        return _FakeScalarResult(self._user)
+
+
+class _FakeSession:
+    def __init__(self, user: object | None) -> None:
+        self._user = user
+        self.execute_calls = 0
+        self.added: list[object] = []
+        self.flush_calls = 0
+
+    async def execute(self, _statement: object) -> _FakeExecuteResult:
+        self.execute_calls += 1
+        return _FakeExecuteResult(self._user)
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def flush(self) -> None:
+        self.flush_calls += 1
+
+
+class _ExistingUser:
+    def __init__(self) -> None:
+        self.user_account_uuid = uuid.uuid4()
+        self.oidc_subject = "subject-1"
+        self.display_name = "User One"
+
+
+@pytest.mark.asyncio
+async def test_ensure_user_reuses_short_lived_cache() -> None:
+    auth._user_cache.clear()
+    try:
+        session = _FakeSession(_ExistingUser())
+
+        first = await auth._ensure_user(session, "subject-1", "User One")
+        second = await auth._ensure_user(session, "subject-1", "Changed")
+
+        assert first == second
+        assert session.execute_calls == 1
+        assert session.added == []
+        assert session.flush_calls == 0
+    finally:
+        auth._user_cache.clear()
