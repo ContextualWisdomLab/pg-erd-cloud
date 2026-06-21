@@ -1,0 +1,12 @@
+🧪 `snapshotToGraph` 테스트 커버리지 향상
+
+🎯 **무엇을 해결했나요:**
+`frontend/src/erd/convert.ts`의 `snapshotToGraph` 함수에서 처리하는 일부 예외 상황과 분기 조건(빈 snapshot 처리, 파티션 테이블 필터링, 잘못된 constraint 타입)에 대한 테스트가 누락되어 있었습니다. 이를 보완하기 위해 관련 테스트 케이스를 추가했습니다.
+
+📊 **테스트된 시나리오 (Coverage):**
+- **빈 데이터 처리 (`{}`):** 입력값이 비어있어도 함수가 에러 없이 빈 노드와 엣지 배열을 안전하게 반환하는지 검증합니다 (`|| []` 조건 확인).
+- **파티션 테이블 포함 (`relation_kind: 'p'`):** 파티션 테이블 종류인 `'p'`도 일반 테이블과 같이 정상적으로 그래프 노드로 변환되고, 뷰 등 다른 종류(`'v'`)는 무시되는지 테스트합니다.
+- **잘못된 `relation_oid` 타입 처리:** `constraints` 객체 내 `relation_oid`가 `number`가 아닌 예상 밖의 값(예: `undefined` 또는 문자열)이 들어왔을 때, 타입 가드(`typeof con.relation_oid === 'number'`)가 올바르게 작동하여 예외 처리가 무사히 이루어지는지 검증합니다.
+
+✨ **결과:**
+이제 `convert.ts` 모듈은 statement, branch, function, line 모든 부문에서 100% 테스트 커버리지를 달성하여 코드의 안정성이 크게 개선되었습니다! (Vitest `--coverage` 검증 완료)

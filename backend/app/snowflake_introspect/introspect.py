@@ -152,6 +152,27 @@ def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
             raise ValueError(f"unsupported Snowflake DSN query parameter: {key}")
         if not value:
             raise ValueError(f"Snowflake DSN query parameter is blank: {key}")
+
+        if normalized == "authenticator":
+            # Prevent SSRF: only allow known safe authenticator values or Okta URLs
+            auth_lower = value.lower()
+            safe_auths = {
+                "snowflake",
+                "snowflake_jwt",
+                "externalbrowser",
+                "oauth",
+                "username_password_mfa",
+            }
+            if auth_lower not in safe_auths:
+                if not auth_lower.startswith("https://"):
+                    raise ValueError("unsupported Snowflake authenticator value")
+                parsed_auth = urlparse(auth_lower)
+                if not parsed_auth.hostname or not (
+                    parsed_auth.hostname.endswith(".okta.com") or
+                    parsed_auth.hostname.endswith(".oktapreview.com")
+                ):
+                    raise ValueError("unsupported Snowflake authenticator URL")
+
         query[normalized] = value
 
     return SnowflakeDsnConfig(
@@ -414,15 +435,9 @@ def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
     ]
 
     relations = []
+    table_row_by_key = {_table_key(row): row for row in table_rows}
     for schema, table in relation_keys:
-        row = next(
-            (
-                table_row
-                for table_row in table_rows
-                if _table_key(table_row) == (schema, table)
-            ),
-            {},
-        )
+        row = table_row_by_key.get((schema, table), {})
         relations.append(
             {
                 "schema_name": schema,
