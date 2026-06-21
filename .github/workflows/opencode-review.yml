@@ -1344,6 +1344,24 @@ jobs:
               "- Workflow attempt: ${RUN_ATTEMPT}" >"$body_file"
           }
 
+          create_pull_review_with_payload() {
+            local event="$1" body="$2" review_payload_file="$3" fallback_body_file="$4"
+            local gh_error_file
+            gh_error_file="$(mktemp)"
+            if ! gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input "$review_payload_file" >/dev/null 2>"$gh_error_file"; then
+              warn_gh_publication_failure "pull review inline comments" "$gh_error_file"
+              rm -f "$gh_error_file"
+              if [ -s "$fallback_body_file" ]; then
+                create_pull_review "$event" "$(cat "$fallback_body_file")"
+              else
+                update_review_overview "$event" "$body"
+              fi
+              return 0
+            fi
+            rm -f "$gh_error_file"
+            update_review_overview "$event" "$body"
+          }
+
           request_changes_for_gate_failure() {
             local reason="$1"
             local body
@@ -1424,7 +1442,7 @@ jobs:
                     + "- Root cause: " + (.value.root_cause // "") + "\n"
                     + "- Fix: " + (.value.fix_direction // "") + "\n"
                     + "- Regression test: " + (.value.regression_test_direction // "") + "\n"
-                    + "- Suggested diff:\n```diff\n" + (.value.suggested_diff // "") + "\n```"
+                    + "- Suggested diff: posted in this finding'\''s inline review thread."
                   )
                 | join("\n\n")
               ' "$control_json"
@@ -1443,6 +1461,65 @@ jobs:
               printf -- '- Workflow run: %s\n' "$RUN_ID"
               printf -- '- Workflow attempt: %s\n' "$RUN_ATTEMPT"
             } >"$body_file"
+          }
+
+          build_request_changes_review_payload() {
+            local control_json="$1"
+            local body_file="$2"
+            local payload_file="$3"
+
+            # shellcheck disable=SC2016
+            jq -n               --rawfile body "$body_file"               --slurpfile control "$control_json"               --arg commit_id "$HEAD_SHA" '
+                def text($value): ($value // "" | tostring);
+                {
+                  event: "REQUEST_CHANGES",
+                  body: $body,
+                  commit_id: $commit_id,
+                  comments: [
+                    (($control[0].findings // [])[] | {
+                      path: text(.path),
+                      line: (.line | tonumber),
+                      side: "RIGHT",
+                      body: (
+                        "### " + (text(.severity) | ascii_upcase) + " " + text(.title) + "\n\n"
+                        + "- Location: `" + text(.path) + ":" + ((.line // 0) | tostring) + "`\n"
+                        + "- Problem: " + text(.problem) + "\n"
+                        + "- Root cause: " + text(.root_cause) + "\n"
+                        + "- Fix: " + text(.fix_direction) + "\n"
+                        + "- Regression test: " + text(.regression_test_direction) + "\n\n"
+                        + "#### Suggested diff\n```diff\n" + text(.suggested_diff) + "\n```"
+                      )
+                    })
+                  ]
+                }
+              ' >"$payload_file"
+          }
+
+          build_inline_comment_failure_body() {
+            local body_file="$1"
+            local output_file="$2"
+
+            {
+              cat "$body_file"
+              printf '\n## Inline comment publishing failed\n\n'
+              printf 'GitHub did not accept the inline review comments for the cited finding lines, so OpenCode did not copy suggested diffs into this PR-level body. Re-run the review after the findings are anchored to changed diff lines, or inspect the workflow log/control JSON and apply the changes manually.\n'
+            } >"$output_file"
+          }
+
+          publish_request_changes_from_control() {
+            local control_json="$1"
+            local body_file
+            local payload_file
+            local fallback_body_file
+
+            body_file="$(mktemp)"
+            payload_file="$(mktemp)"
+            fallback_body_file="$(mktemp)"
+            format_request_changes_body "$control_json" "$body_file"
+            build_request_changes_review_payload "$control_json" "$body_file" "$payload_file"
+            build_inline_comment_failure_body "$body_file" "$fallback_body_file"
+            create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$body_file")" "$payload_file" "$fallback_body_file"
+            rm -f "$body_file" "$payload_file" "$fallback_body_file"
           }
 
           emit_line_specific_fallback_findings() {
@@ -1652,6 +1729,8 @@ jobs:
             local failed_checks_file="$1"
             local evidence_file="$2"
             local body_file="$3"
+            local review_payload_file="${4:-}"
+            local fallback_body_file="${5:-}"
             local prompt_file
             local opencode_json_file
             local opencode_export_file
@@ -1723,6 +1802,12 @@ jobs:
               return 1
             fi
             format_request_changes_body "$control_json" "$body_file"
+            if [ -n "$review_payload_file" ]; then
+              build_request_changes_review_payload "$control_json" "$body_file" "$review_payload_file"
+            fi
+            if [ -n "$fallback_body_file" ]; then
+              build_inline_comment_failure_body "$body_file" "$fallback_body_file"
+            fi
           }
 
           collect_current_head_strix_workflow_runs() {
@@ -2084,7 +2169,7 @@ jobs:
             pending_checks_file=""
             # shellcheck disable=SC2329
             cleanup_failed_outcome_files() {
-              rm -f "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$pending_checks_file"
+              rm -f "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$pending_checks_file"
             }
             trap cleanup_failed_outcome_files EXIT
             if collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file" && [ -s "$failed_checks_file" ]; then
@@ -2094,8 +2179,8 @@ jobs:
                 if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
-                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
@@ -2121,8 +2206,8 @@ jobs:
                   if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                     printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                   fi
-                  if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                    create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                  if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                    create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                   else
                     build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                     create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
@@ -2154,10 +2239,12 @@ jobs:
           failed_checks_file=""
           failed_check_evidence_file=""
           failed_check_review_body_file=""
+          failed_check_review_payload_file=""
+          failed_check_inline_failure_body_file=""
           pending_checks_file=""
           # shellcheck disable=SC2329
           cleanup_approval_files() {
-            rm -f "$tmp_body" "$control_json" "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$pending_checks_file"
+            rm -f "$tmp_body" "$control_json" "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$pending_checks_file"
           }
           trap cleanup_approval_files EXIT
           printf '%s\n' "$comment_body" >"$tmp_body"
@@ -2216,8 +2303,8 @@ jobs:
                 if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
-                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
@@ -2256,6 +2343,8 @@ jobs:
               ;;
             REQUEST_CHANGES)
               failed_check_review_body_file="$(mktemp)"
+              failed_check_review_payload_file="$(mktemp)"
+              failed_check_inline_failure_body_file="$(mktemp)"
               failed_checks_file="$(mktemp)"
               if ! collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file"; then
                 request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read before validating OpenCode REQUEST_CHANGES against current-head failed checks."
@@ -2273,21 +2362,21 @@ jobs:
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
                 if scripts/ci/validate_opencode_failed_check_review.sh "$control_json" "$failed_checks_file" "$failed_check_evidence_file"; then
-                  format_request_changes_body "$control_json" "$failed_check_review_body_file"
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
-                elif run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                  publish_request_changes_from_control "$control_json"
+                elif run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
                 fi
               else
-                format_request_changes_body "$control_json" "$failed_check_review_body_file"
-                create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                publish_request_changes_from_control "$control_json"
               fi
               ;;
             NO_CONCLUSION)
               failed_check_review_body_file="$(mktemp)"
+              failed_check_review_payload_file="$(mktemp)"
+              failed_check_inline_failure_body_file="$(mktemp)"
               failed_checks_file="$(mktemp)"
               pending_checks_file="$(mktemp)"
               set +e
@@ -2319,8 +2408,8 @@ jobs:
                 if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
-                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
