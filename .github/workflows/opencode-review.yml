@@ -604,6 +604,11 @@ jobs:
           <opencode-evidence>
           $(head -c 24000 "$OPENCODE_EVIDENCE_FILE")
           </opencode-evidence>
+          Use CodeGraph for blast-radius, call graph, and test-coverage questions before broad local reads.
+          Prefer deletion, stdlib/native platform features, and already-installed dependencies before proposing new code or packages, but do not simplify away trust-boundary validation, data-loss handling, security, accessibility, or required tests.
+          For Korean prose, preserve facts, identifiers, numbers, and quotes while removing only formulaic filler or translationese.
+          When Strix evidence supports it, name the concrete CWE/KISA-style class such as injection, auth/authz, secrets, crypto, path traversal/file upload, XSS/CSRF/SSRF, error disclosure, or debug/deployment config; do not invent a category without evidence.
+          Before APPROVE, the summary must include at least one exact changed file path inspected as changed-file evidence. Never approve with a reason or summary that says no changes, no files, or no actionable changes were found when bounded evidence lists changed files; that control block is invalid.
           First line exactly:
           <!-- opencode-review-gate head_sha=${HEAD_SHA} run_id=${RUN_ID} run_attempt=${RUN_ATTEMPT} -->
           Then exactly one control block:
@@ -715,6 +720,11 @@ jobs:
           <opencode-evidence>
           $(head -c 24000 "$OPENCODE_EVIDENCE_FILE")
           </opencode-evidence>
+          Use CodeGraph for blast-radius, call graph, and test-coverage questions before broad local reads.
+          Prefer deletion, stdlib/native platform features, and already-installed dependencies before proposing new code or packages, but do not simplify away trust-boundary validation, data-loss handling, security, accessibility, or required tests.
+          For Korean prose, preserve facts, identifiers, numbers, and quotes while removing only formulaic filler or translationese.
+          When Strix evidence supports it, name the concrete CWE/KISA-style class such as injection, auth/authz, secrets, crypto, path traversal/file upload, XSS/CSRF/SSRF, error disclosure, or debug/deployment config; do not invent a category without evidence.
+          Before APPROVE, the summary must include at least one exact changed file path inspected as changed-file evidence. Never approve with a reason or summary that says no changes, no files, or no actionable changes were found when bounded evidence lists changed files; that control block is invalid.
           First line exactly:
           <!-- opencode-review-gate head_sha=${HEAD_SHA} run_id=${RUN_ID} run_attempt=${RUN_ATTEMPT} -->
           Then exactly one control block:
@@ -826,6 +836,11 @@ jobs:
           <opencode-evidence>
           $(head -c 24000 "$OPENCODE_EVIDENCE_FILE")
           </opencode-evidence>
+          Use CodeGraph for blast-radius, call graph, and test-coverage questions before broad local reads.
+          Prefer deletion, stdlib/native platform features, and already-installed dependencies before proposing new code or packages, but do not simplify away trust-boundary validation, data-loss handling, security, accessibility, or required tests.
+          For Korean prose, preserve facts, identifiers, numbers, and quotes while removing only formulaic filler or translationese.
+          When Strix evidence supports it, name the concrete CWE/KISA-style class such as injection, auth/authz, secrets, crypto, path traversal/file upload, XSS/CSRF/SSRF, error disclosure, or debug/deployment config; do not invent a category without evidence.
+          Before APPROVE, the summary must include at least one exact changed file path inspected as changed-file evidence. Never approve with a reason or summary that says no changes, no files, or no actionable changes were found when bounded evidence lists changed files; that control block is invalid.
           First line exactly:
           <!-- opencode-review-gate head_sha=${HEAD_SHA} run_id=${RUN_ID} run_attempt=${RUN_ATTEMPT} -->
           Then exactly one control block:
@@ -2169,6 +2184,8 @@ jobs:
             failed_checks_file="$(mktemp)"
             failed_check_evidence_file="$(mktemp)"
             failed_check_review_body_file="$(mktemp)"
+            failed_check_review_payload_file="$(mktemp)"
+            failed_check_inline_failure_body_file="$(mktemp)"
             pending_checks_file=""
             # shellcheck disable=SC2329
             cleanup_failed_outcome_files() {

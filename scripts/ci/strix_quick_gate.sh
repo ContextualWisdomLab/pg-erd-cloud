@@ -3241,28 +3241,33 @@ import sys
 
 text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
 lowered = text.lower()
+normalized = " ".join(lowered.split())
 
 has_title = (
-    "incomplete codebase" in lowered
-    or "missing backend code" in lowered
-    or "missing application code" in lowered
+    "incomplete codebase" in normalized
+    or "incomplete repository state" in normalized
+    or "missing backend code" in normalized
+    or "missing application code" in normalized
 )
 has_scope_evidence = (
-    "missing application source code" in lowered
-    or "lacked actual application source code" in lowered
-    or "missing backend code" in lowered
-    or "missing backend source" in lowered
-    or "no actual source code" in lowered
-    or "no backend code" in lowered
-    or "no source files found" in lowered
+    "missing application source code" in normalized
+    or "missing source code" in normalized
+    or "lacked actual application source code" in normalized
+    or "missing backend code" in normalized
+    or "missing backend source" in normalized
+    or "no actual source code" in normalized
+    or "no backend code" in normalized
+    or "no source files found" in normalized
+    or "source directories referenced in configuration files were not present" in normalized
 )
 has_assessment_limit = (
-    "prevents comprehensive security assessment" in lowered
-    or "preventing comprehensive security validation" in lowered
-    or "prevented thorough security testing" in lowered
-    or "security review" in lowered
-    or "security assessment" in lowered
-    or "without source code" in lowered
+    "full security assessment" in normalized
+    or "prevents comprehensive security assessment" in normalized
+    or "preventing comprehensive security validation" in normalized
+    or "prevented thorough security testing" in normalized
+    or "security review" in normalized
+    or "security assessment" in normalized
+    or "without source code" in normalized
 )
 
 raise SystemExit(0 if has_title and has_scope_evidence and has_assessment_limit else 1)
