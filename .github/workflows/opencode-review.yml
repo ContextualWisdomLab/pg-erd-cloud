@@ -1349,7 +1349,10 @@ jobs:
             local gh_error_file
             gh_error_file="$(mktemp)"
             if ! gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input "$review_payload_file" >/dev/null 2>"$gh_error_file"; then
-              warn_gh_publication_failure "pull review inline comments" "$gh_error_file"
+              echo "::warning::OpenCode could not submit pull review inline comments; falling back to body-only ${event} review."
+              if [ -s "$gh_error_file" ]; then
+                sed -E 's/[[:space:]]+/ /g; s/^/::warning::GitHub API: /' "$gh_error_file" || true
+              fi
               rm -f "$gh_error_file"
               if [ -s "$fallback_body_file" ]; then
                 create_pull_review "$event" "$(cat "$fallback_body_file")"
