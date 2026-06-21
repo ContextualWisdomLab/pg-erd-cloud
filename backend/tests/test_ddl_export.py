@@ -253,3 +253,10 @@ def test_snapshot_export_can_target_postgresql_from_snowflake_snapshot() -> None
     assert '  "EVENT_ID" numeric(38,0) NOT NULL,' in sql
     assert '  "PAYLOAD" jsonb,' in sql
     assert '  "CREATED_AT" timestamp without time zone' in sql
+
+def test_snapshot_source_dialect_fallback() -> None:
+    from app.ddl.export import _snapshot_source_dialect
+
+    assert _snapshot_source_dialect({"source_dialect": "invalid"}) == "postgresql"
+    assert _snapshot_source_dialect({"dialect": "unknown"}) == "postgresql"
+    assert _snapshot_source_dialect({}) == "postgresql"

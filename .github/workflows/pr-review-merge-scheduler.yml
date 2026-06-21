@@ -3,7 +3,7 @@ name: PR Review Merge Scheduler
 on:
   schedule:
     # Keep the queue moving without overlapping long OpenCode review runs.
-    - cron: "17 */2 * * *"
+    - cron: "17 */1 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
