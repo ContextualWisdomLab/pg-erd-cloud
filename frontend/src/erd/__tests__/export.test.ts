@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { exportDDL } from '../export';
+import { describe, it, expect, vi } from 'vitest';
+import { exportDDL, exportPlantUml, exportDiagramSvg, downloadText } from '../export';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
 
@@ -262,5 +262,148 @@ describe('exportDDL', () => {
     expect(ddl).toContain('"valid_type" integer');
     // sqlAccessMethod invalid input fallback is 'btree'
     expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_invalid_method" ON "public.data" USING btree ("invalid_type");');
+  });
+});
+
+describe('exportPlantUml', () => {
+  it('should export basic table and columns to PlantUML', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'name', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const uml = exportPlantUml(nodes, []);
+    expect(uml).toContain('@startuml');
+    expect(uml).toContain('entity "public.users" as T_1 {');
+    expect(uml).toContain('*id : integer <<not null>>');
+    expect(uml).toContain('name : text');
+    expect(uml).toContain('}');
+    expect(uml).toContain('@enduml');
+  });
+
+  it('should export foreign key edges to PlantUML', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: { title: 'users', columns: [], badges: { pk: false, fk: false } },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: { title: 'posts', columns: [], badges: { pk: false, fk: false } },
+      },
+    ];
+    const edges: Edge[] = [
+      { id: 'e1', source: '2', target: '1', label: 'fk_user' },
+    ];
+
+    const uml = exportPlantUml(nodes, edges);
+    expect(uml).toContain('T_2 --> T_1 : fk_user');
+  });
+});
+
+describe('exportDiagramSvg', () => {
+  it('should export nodes and edges to SVG', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 10, y: 10 },
+        data: {
+          title: 'public.users',
+          columns: [{ column_name: 'id', data_type: 'int', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 200, y: 10 },
+        data: {
+          title: 'public.posts',
+          businessGroup: { id: 'bg1', name: 'Sales', color: '#ff0000' },
+          columns: [{ column_name: 'user_id', data_type: 'int', is_not_null: true, is_pk: false }],
+          badges: { pk: false, fk: true },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      { id: 'e1', source: '2', target: '1', label: 'fk_user' },
+    ];
+
+    const svg = exportDiagramSvg(nodes, edges);
+    expect(svg).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
+    expect(svg).toContain('public.users');
+    expect(svg).toContain('* id: int not null');
+    expect(svg).toContain('public.posts [Sales]');
+    expect(svg).toContain('user_id: int not null');
+    expect(svg).toContain('fk_user');
+    expect(svg).toContain('</svg>');
+  });
+});
+
+
+describe('downloadText', () => {
+  it('should create object URL and trigger download', () => {
+    // Setup a minimal mock for document and URL within the scope of this test
+    // that doesn't leak or completely replace the global object if already present
+
+    // We only mock what we need. Note: In vitest with jsdom/happy-dom, document exists.
+    // If we're in pure node, document might not exist.
+    const originalCreateObjectURL = global.URL?.createObjectURL;
+    const originalRevokeObjectURL = global.URL?.revokeObjectURL;
+
+    const createObjUrl = vi.fn().mockReturnValue('blob:test');
+    const revokeObjUrl = vi.fn();
+
+    // Using Object.defineProperty to safely mock the methods, even if readonly
+    Object.defineProperty(global.URL, 'createObjectURL', { value: createObjUrl, configurable: true });
+    Object.defineProperty(global.URL, 'revokeObjectURL', { value: revokeObjUrl, configurable: true });
+
+    const mockClick = vi.fn();
+    const mockLink = { href: '', download: '', click: mockClick };
+
+    // Mock the DOM interaction
+    let createElementSpy;
+    if (typeof document !== 'undefined') {
+      createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
+    } else {
+      // Very basic fallback if document doesn't exist
+      global.document = { createElement: vi.fn().mockReturnValue(mockLink) } as any;
+    }
+
+    downloadText('test.sql', 'SELECT 1;');
+
+    expect(createObjUrl).toHaveBeenCalled();
+    if (createElementSpy) {
+        expect(createElementSpy).toHaveBeenCalledWith('a');
+        createElementSpy.mockRestore();
+    }
+    expect(mockLink.download).toBe('test.sql');
+    expect(mockLink.href).toBe('blob:test');
+    expect(mockClick).toHaveBeenCalled();
+    expect(revokeObjUrl).toHaveBeenCalledWith('blob:test');
+
+    // Clean up our mocks
+    if (originalCreateObjectURL !== undefined) {
+        Object.defineProperty(global.URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
+    }
+    if (originalRevokeObjectURL !== undefined) {
+        Object.defineProperty(global.URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
+    }
   });
 });
