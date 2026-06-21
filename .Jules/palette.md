@@ -10,3 +10,6 @@
 ## 2026-06-20 - [Canvas Empty States]
 **Learning:** In canvas-based applications (like React Flow ERDs), an empty canvas can look like a broken state or a loading delay if no guidance is provided. When no nodes are present, users need immediate visual feedback explaining *why* it's empty (e.g., waiting for reverse engineering) or *what* to do next (e.g., "Create a snapshot" or "Add a table").
 **Action:** Always implement an empty state for infinite canvas components that clearly distinguishes between 'loading/generating' and 'ready for interaction' to reduce user confusion.
+## 2026-06-21 - Disabled button visual feedback
+**Learning:** By default, buttons missing `:disabled` pseudo-class styling lack visual cues and keep a pointer cursor, leading to user confusion about interactivity.
+**Action:** Always ensure disabled buttons have reduced opacity, a not-allowed cursor, and optionally a different background/text color to clearly distinguish them from active buttons.
