@@ -19,6 +19,9 @@ from app.settings import settings
         ("none, RS256", ["RS256"]),
         ("none", ["RS256"]),
         (", , ", ["RS256"]),
+        ("HS256, RS256", ["RS256"]),
+        ("RS256, hs256", ["RS256"]),
+        ("HS256, HS384, HS512", ["RS256"]),
     ],
 )
 def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
