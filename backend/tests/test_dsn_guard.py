@@ -13,7 +13,14 @@ from app.settings import settings
 
 
 def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]:
-    return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 5432)) for ip in ips]
+    return [
+        (socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 5432))
+        for ip in ips
+    ]
+
+
+def test_unique_hosts_returns_empty_tuple_for_empty_list() -> None:
+    assert _unique_hosts([]) == ()
 
 
 @pytest.mark.parametrize(
@@ -157,9 +164,7 @@ async def test_dsn_guard_rejects_disallowed_scheme() -> None:
 @pytest.mark.asyncio
 async def test_dsn_guard_rejects_invalid_port() -> None:
     with pytest.raises(DsnTargetError, match="port"):
-        await validate_postgres_dsn_target(
-            "postgresql://user:pass@db.example.com:bad/app"
-        )
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com:bad/app")
 
 
 @pytest.mark.asyncio
@@ -245,14 +250,7 @@ async def test_dsn_guard_enforces_configured_allowlist(
     )
 
     with pytest.raises(DsnTargetError, match="allowlist"):
-        await validate_postgres_dsn_target(
-            "postgresql://user:pass@other.example.com/app"
-        )
-
-
-def test_unique_hosts_empty_list() -> None:
-    assert _unique_hosts([]) == ()
-
+        await validate_postgres_dsn_target("postgresql://user:pass@other.example.com/app")
 
 @pytest.mark.asyncio
 async def test_dsn_guard_rejects_unresolvable_host(
