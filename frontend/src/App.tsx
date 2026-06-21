@@ -998,6 +998,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="export-ddl-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -1009,9 +1012,10 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>DDL 내보내기</h3>
+                <h3 id="export-ddl-title">DDL 내보내기</h3>
                 <textarea
                   readOnly
+                  aria-label="DDL Export"
                   value={exportDdlText}
                   style={{
                     width: "100%",
@@ -1056,6 +1060,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-rel-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -1066,7 +1073,7 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>관계 설정</h3>
+                <h3 id="edit-rel-title">관계 설정</h3>
                 <div style={{ fontSize: 13, color: "#4b5563" }}>
                   From: {editingEdge.source} <br />
                   To: {editingEdge.target}
@@ -1412,6 +1419,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-table-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -1422,7 +1432,7 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>테이블 추가</h3>
+                <h3 id="add-table-title">테이블 추가</h3>
                 <div className="field">
                   <label htmlFor="new-table-name">테이블 이름</label>
                   <input
