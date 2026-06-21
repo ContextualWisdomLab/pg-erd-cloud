@@ -390,7 +390,6 @@ def _generate_tables_pg(
     source_dialect: DdlDialect,
     lines: list[str],
 ) -> None:
-    # CREATE TABLE + inline constraints (PK/UNIQUE/CHECK)
     for t in tables:
         schema = t.get("schema_name")
         name = t.get("relation_name")

@@ -47,6 +47,13 @@ def _get_route_template(request: Request) -> str:
 
 
 def _get_client_ip(request: Request) -> str:
+    if settings.api_rate_limit_trust_x_forwarded_for:
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            ip = xff.split(",", 1)[0].strip()
+            if ip:
+                return ip
+
     client = request.client
     if client is None:
         return "unknown"

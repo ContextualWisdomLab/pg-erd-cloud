@@ -32,10 +32,21 @@ class RateLimitPolicy:
     requests: int
     window_seconds: float
     route_prefix: str = "/api"
+    trust_x_forwarded_for: bool = False
 
 
-def _get_client_ip(request: Request) -> str:
+def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
     global _last_unknown_ip_log_at
+
+    if trust_x_forwarded_for:
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            # Use the left-most value (original client), trimming whitespace.
+            # This header is user-controllable unless sanitized by a trusted
+            # proxy/ingress. Keep default trust off.
+            ip = xff.split(",", 1)[0].strip()
+            if ip:
+                return ip
 
     client = request.client
     if client is None:
@@ -68,7 +79,9 @@ class InMemoryFixedWindowRateLimiter:
         # key -> (window_id, count)
         self._buckets: dict[str, tuple[int, int]] = {}
 
-    async def hit(self, *, key: str, policy: RateLimitPolicy) -> tuple[bool, int]:
+    async def hit(
+        self, *, key: str, policy: RateLimitPolicy
+    ) -> tuple[bool, int]:
         """Record a hit and return (allowed, retry_after_seconds)."""
         if policy.window_seconds <= 0:
             # Treat as disabled to avoid division by zero.
@@ -86,14 +99,22 @@ class InMemoryFixedWindowRateLimiter:
         async with self._lock:
             # Best-effort eviction to cap memory.
             # Prefer removing expired windows first, then evict oldest entries.
-            if key not in self._buckets and len(self._buckets) >= self._max_keys:
+            if (
+                key not in self._buckets
+                and len(self._buckets) >= self._max_keys
+            ):
                 expired_keys = [
-                    k for k, (wid, _) in self._buckets.items() if wid != window_id
+                    k
+                    for k, (wid, _) in self._buckets.items()
+                    if wid != window_id
                 ]
                 for k in expired_keys:
                     self._buckets.pop(k, None)
 
-                while key not in self._buckets and len(self._buckets) >= self._max_keys:
+                while (
+                    key not in self._buckets
+                    and len(self._buckets) >= self._max_keys
+                ):
                     oldest_key = next(iter(self._buckets))
                     self._buckets.pop(oldest_key, None)
 
@@ -115,7 +136,9 @@ def make_rate_limit_middleware(
     limiter: InMemoryFixedWindowRateLimiter,
     policy: RateLimitPolicy,
     get_subject: SubjectGetter | None = None,
-) -> Callable[[Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]]:
+) -> Callable[
+    [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
+]:
     """Create a FastAPI/Starlette http middleware implementing rate limiting."""
 
     async def middleware(
@@ -137,7 +160,9 @@ def make_rate_limit_middleware(
                 # Never fail requests due to key derivation.
                 subject = None
 
-        ip = _get_client_ip(request)
+        ip = _get_client_ip(
+            request, trust_x_forwarded_for=policy.trust_x_forwarded_for
+        )
         key = f"ip:{ip}"
         if subject:
             key = f"{key}|sub:{subject}"
