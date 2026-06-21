@@ -480,3 +480,30 @@ async def test_oidc_decode_rejects_invalid_header(
 
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == "invalid token header"
+
+
+@pytest.mark.asyncio
+async def test_oidc_decode_rejects_jwt_decode_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+
+    def fail_decode(*_args: object, **_kwargs: object) -> dict:
+        raise auth.jwt.PyJWTError("mocked decoding error")
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._decode_verified_oidc_token("Bearer token")
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "token verification failed"
