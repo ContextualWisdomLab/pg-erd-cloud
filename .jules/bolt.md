@@ -8,3 +8,6 @@
 ## 2026-06-20 - O(N^2) loops for finding items in export
 **Learning:** Nested array `.find()` iterations within loops parsing graph connections result in O(N^2) complexity, significantly degrading UI performance for large outputs.
 **Action:** Always pre-compute a lookup `Map` in O(N) when multiple specific node lookups are needed within iterative processes.
+## 2024-05-24 - Optimize repetitive lookup using memoized Map
+**Learning:** When a list of objects is subject to frequent lookups by ID within a component (e.g., node assignment operations inside `onAssignBusinessGroup`), O(N) array `.find` calls can degrade performance. Using `useMemo` to pre-calculate a Map of `{id: object}` reduces lookups to O(1) and prevents unnecessary recomputation when the underlying array doesn't change.
+**Action:** Replace `Array.find` inside frequent handlers with a `Map.get` initialized via `useMemo` when looking up items from a stable array.

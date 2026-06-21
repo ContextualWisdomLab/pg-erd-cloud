@@ -231,6 +231,10 @@ export default function App() {
     return new Map(nodes.map(n => [n.id, n]));
   }, [nodes]);
 
+  const businessGroupsById = useMemo(() => {
+    return new Map(businessGroups.map((g) => [g.id, g]));
+  }, [businessGroups]);
+
   const cardinalityNode = useMemo(() => {
     return (
       nodesById.get(cardinalityTableId) ?? nodes[0] ?? null
@@ -528,7 +532,7 @@ export default function App() {
   }
 
   function onAssignBusinessGroup(nodeId: string, groupId: string) {
-    const group = businessGroups.find((candidate) => candidate.id === groupId);
+    const group = businessGroupsById.get(groupId);
     setNodes((currentNodes) =>
       currentNodes.map((node) =>
         node.id === nodeId
