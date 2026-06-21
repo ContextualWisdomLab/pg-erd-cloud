@@ -34,9 +34,7 @@ def test_normalize_route_label_valid() -> None:
 def test_prime_http_metrics() -> None:
     """Metrics should be primed in the registry to expose expected series."""
     # Run the prime function with dummy data.
-    prime_http_metrics(
-        methods={"GET", "POST"}, routes={"/test/route", "invalid"}
-    )
+    prime_http_metrics(methods={"GET", "POST"}, routes={"/test/route", "invalid"})
 
     # Check counters.
     # '/test/route' -> '/test/route'
@@ -71,6 +69,54 @@ def test_prime_http_metrics() -> None:
         {"method": "GET", "route": "/test/route"},
     )
     assert get_hist_sum == 0.0
+
+
+def test_prime_http_metrics_empty() -> None:
+    """Priming with empty methods or routes should not crash and not add unwanted metrics."""
+    # Clear labels that might have been set by other tests
+    try:
+        from app.metrics import HTTP_REQUESTS_TOTAL, HTTP_REQUEST_DURATION_SECONDS
+
+        HTTP_REQUESTS_TOTAL.clear()
+        HTTP_REQUEST_DURATION_SECONDS.clear()
+    except AttributeError:
+        pass
+
+    prime_http_metrics(methods=set(), routes=set())
+
+    # Ensure nothing was primed unexpectedly
+    val = REGISTRY.get_sample_value(
+        "http_requests_total",
+        {"method": "GET", "route": "unmatched", "status": "200"},
+    )
+    assert val is None
+
+
+def test_prime_http_metrics_combinations() -> None:
+    """Priming should correctly handle multiple methods and routes (Cartesian product)."""
+    prime_http_metrics(methods={"GET", "DELETE"}, routes={"/a", "/b"})
+
+    # Check all combinations are primed
+    for method in ["GET", "DELETE"]:
+        for route in ["/a", "/b"]:
+            count = REGISTRY.get_sample_value(
+                "http_requests_total",
+                {"method": method, "route": route, "status": "200"},
+            )
+            assert count == 0.0
+
+            hist_count = REGISTRY.get_sample_value(
+                "http_request_duration_seconds_count",
+                {"method": method, "route": route},
+            )
+            assert hist_count == 0.0
+
+    # Ensure un-primed combinations remain None
+    unprimed = REGISTRY.get_sample_value(
+        "http_requests_total",
+        {"method": "POST", "route": "/a", "status": "200"},
+    )
+    assert unprimed is None
 
 
 def test_render_metrics() -> None:
