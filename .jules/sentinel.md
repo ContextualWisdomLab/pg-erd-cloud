@@ -1,14 +1,4 @@
-## 2025-06-20 - [CORS Misconfiguration Breaking CSRF Defense]
-**Vulnerability:** The `X-CSRF-Token` custom header was required by the CSRF middleware but was missing from the CORS `allow_headers` list in `CORSMiddleware`.
-**Learning:** Security mechanisms that rely on custom headers must be explicitly coordinated with CORS configuration. When a custom header like `X-CSRF-Token` is not allowed by CORS, cross-origin requests fail at the preflight stage (`OPTIONS` request), breaking the legitimate workflow of the frontend while appearing to be a security feature working as intended.
-**Prevention:** Whenever introducing a new security-related custom header (like CSRF tokens or custom auth headers), always verify that it is added to the backend's explicit CORS `allow_headers` allowlist, otherwise cross-origin integrations will break.
-
-## 2026-06-20 - [SSRF Bypass via DSN Query Parameters]
-**Vulnerability:** `asyncpg` (and underlying `libpq`) respects connection parameters provided in the DSN query string (e.g., `?host=...` and `?hostaddr=...`). The `validate_postgres_dsn_target` function only checked `parsed.hostname`, allowing an attacker to provide a valid domain in the hostname but point the actual connection to an internal IP (like `127.0.0.1` or `169.254.169.254`) via the query string, resulting in an SSRF bypass.
-**Learning:** Security validations on URLs/DSNs must account for how the underlying driver actually parses and connects to the URL, not just standard parsing mechanisms. Query parameters that can override connection properties are a common SSRF vector in database drivers.
-**Prevention:** Always parse the query string of a DSN and validate any potential overrides (e.g., `host`, `hostaddr`, `port`) against the same security constraints (allowlists, restricted IPs) as the primary hostname.
-
-## 2026-06-20 - [SSRF Bypass via IPv4-mapped IPv6 Addresses]
-**Vulnerability:** The DSN guard validated IPv4 and IPv6 addresses against restricted ranges (e.g. `is_private`, `is_loopback`). However, standard IPv6 addresses can encode IPv4 addresses using an IPv4-mapped format (e.g. `::ffff:192.168.1.1`). Python's `ipaddress` library evaluates IPv4-mapped IPv6 addresses differently than their native IPv4 counterparts when checking properties like `is_private`. This allowed an attacker to bypass SSRF protections by supplying an IPv4-mapped IPv6 address for a restricted internal IPv4 target.
-**Learning:** Security validations involving IP address ranges must correctly normalize IP representations. The `ipaddress` module requires explicitly unwrapping `ipv4_mapped` addresses on IPv6 objects to properly apply IPv4 classification rules.
-**Prevention:** Before evaluating restrictions (`is_private`, `is_loopback`, etc.) on an IP address object, always check if it is an instance of `IPv6Address` and unwrap it using its `ipv4_mapped` property if it exists.
+## 2025-02-28 - Snowflake DSN Authenticator SSRF
+**Vulnerability:** The Snowflake DSN parser accepted arbitrary URLs in the `authenticator` query parameter without validation, leading to potential SSRF (Server-Side Request Forgery). The connector would make HTTP POST requests to this URL.
+**Learning:** Third-party database connectors often accept extensive configuration parameters (like custom auth endpoints) that can be manipulated by malicious users if passed directly from user input (like a connection string).
+**Prevention:** Strictly validate any URL or "custom endpoint" parameters in user-supplied connection strings against a safe allowlist (like `.okta.com` for Snowflake) or known safe constants.
