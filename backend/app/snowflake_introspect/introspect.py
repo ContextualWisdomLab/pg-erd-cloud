@@ -204,10 +204,7 @@ def _fetch_dicts(cursor: Any, sql: str, params: tuple[object, ...] = ()) -> list
     if not rows:
         return []
     if isinstance(rows[0], dict):
-        return [
-            {str(key).lower(): value for key, value in row.items()}
-            for row in rows
-        ]
+        return [{str(key).lower(): value for key, value in row.items()} for row in rows]
 
     columns = [str(description[0]).lower() for description in cursor.description]
     return [dict(zip(columns, row)) for row in rows]
@@ -278,6 +275,138 @@ def _constraint_def(
     return f"FOREIGN KEY ({quoted_cols})"
 
 
+def _build_primary_key(
+    name: str,
+    schema: str,
+    table: str,
+    relation_oid: int,
+    columns: list[str],
+    constrained_attnums: list[int],
+    constraint_oid: int,
+) -> tuple[dict, list[dict]]:
+    constraint = {
+        "constraint_oid": constraint_oid,
+        "constraint_name": name,
+        "constraint_type": "p",
+        "schema_name": schema,
+        "relation_oid": relation_oid,
+        "relation_name": table,
+        "foreign_relation_oid": None,
+        "foreign_schema_name": None,
+        "foreign_relation_name": None,
+        "constrained_attnums": constrained_attnums,
+        "referenced_attnums": [],
+        "constraint_def": _constraint_def("p", columns, None, None, []),
+        "check_expr": None,
+    }
+
+    pk_columns = []
+    for ordinal, column in enumerate(columns, start=1):
+        pk_columns.append(
+            {
+                "constraint_oid": constraint_oid,
+                "constraint_name": name,
+                "schema_name": schema,
+                "relation_oid": relation_oid,
+                "relation_name": table,
+                "column_ordinal": ordinal,
+                "column_name": column,
+            }
+        )
+    return constraint, pk_columns
+
+
+def _build_unique_constraint(
+    name: str,
+    schema: str,
+    table: str,
+    relation_oid: int,
+    columns: list[str],
+    constrained_attnums: list[int],
+    constraint_oid: int,
+) -> dict:
+    return {
+        "constraint_oid": constraint_oid,
+        "constraint_name": name,
+        "constraint_type": "u",
+        "schema_name": schema,
+        "relation_oid": relation_oid,
+        "relation_name": table,
+        "foreign_relation_oid": None,
+        "foreign_schema_name": None,
+        "foreign_relation_name": None,
+        "constrained_attnums": constrained_attnums,
+        "referenced_attnums": [],
+        "constraint_def": _constraint_def("u", columns, None, None, []),
+        "check_expr": None,
+    }
+
+
+def _build_foreign_key(
+    name: str,
+    schema: str,
+    table: str,
+    relation_oid: int,
+    columns: list[str],
+    constrained_attnums: list[int],
+    constraint_oid: int,
+    referenced_schema: str | None,
+    referenced_table: str | None,
+    referenced_columns: list[str],
+    foreign_relation_oid: int | None,
+    sorted_rows: list[dict],
+) -> tuple[dict, list[dict]]:
+    constraint = {
+        "constraint_oid": constraint_oid,
+        "constraint_name": name,
+        "constraint_type": "f",
+        "schema_name": schema,
+        "relation_oid": relation_oid,
+        "relation_name": table,
+        "foreign_relation_oid": foreign_relation_oid,
+        "foreign_schema_name": referenced_schema,
+        "foreign_relation_name": referenced_table,
+        "constrained_attnums": constrained_attnums,
+        "referenced_attnums": [],
+        "constraint_def": _constraint_def(
+            "f",
+            columns,
+            referenced_schema,
+            referenced_table,
+            referenced_columns,
+        ),
+        "check_expr": None,
+    }
+
+    fk_edges = []
+    if referenced_schema and referenced_table:
+        for ordinal, row in enumerate(sorted_rows, start=1):
+            child_column = _str_or_none(row.get("column_name"))
+            parent_column = _str_or_none(row.get("referenced_column_name"))
+            if not (child_column and parent_column):
+                continue
+            fk_edges.append(
+                {
+                    "fk_constraint_oid": constraint_oid,
+                    "fk_constraint_name": name,
+                    "child_schema_name": schema,
+                    "child_relation_oid": relation_oid,
+                    "child_relation_name": table,
+                    "parent_schema_name": referenced_schema,
+                    "parent_relation_oid": foreign_relation_oid,
+                    "parent_relation_name": referenced_table,
+                    "column_ordinal": ordinal,
+                    "child_column_name": child_column,
+                    "parent_column_name": parent_column,
+                    "fk_on_update": None,
+                    "fk_on_delete": None,
+                    "fk_match_type": None,
+                }
+            )
+
+    return constraint, fk_edges
+
+
 def _build_constraints(
     rows: list[dict],
     relation_ids: dict[tuple[str, str], int],
@@ -316,12 +445,9 @@ def _build_constraints(
             if isinstance(row.get("column_name"), str)
         ]
         attnums = [
-            column_positions.get((schema, table), {}).get(column)
-            for column in columns
+            column_positions.get((schema, table), {}).get(column) for column in columns
         ]
-        constrained_attnums = [
-            attnum for attnum in attnums if isinstance(attnum, int)
-        ]
+        constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
         referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
         referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
         referenced_columns = [
@@ -335,67 +461,47 @@ def _build_constraints(
             else None
         )
 
-        constraints.append(
-            {
-                "constraint_oid": len(constraints) + 1,
-                "constraint_name": name,
-                "constraint_type": ctype,
-                "schema_name": schema,
-                "relation_oid": relation_oid,
-                "relation_name": table,
-                "foreign_relation_oid": foreign_relation_oid,
-                "foreign_schema_name": referenced_schema,
-                "foreign_relation_name": referenced_table,
-                "constrained_attnums": constrained_attnums,
-                "referenced_attnums": [],
-                "constraint_def": _constraint_def(
-                    ctype,
-                    columns,
-                    referenced_schema,
-                    referenced_table,
-                    referenced_columns,
-                ),
-                "check_expr": None,
-            }
-        )
-
+        constraint_oid = len(constraints) + 1
         if ctype == "p":
-            for ordinal, column in enumerate(columns, start=1):
-                pk_columns.append(
-                    {
-                        "constraint_oid": len(constraints),
-                        "constraint_name": name,
-                        "schema_name": schema,
-                        "relation_oid": relation_oid,
-                        "relation_name": table,
-                        "column_ordinal": ordinal,
-                        "column_name": column,
-                    }
-                )
-        elif ctype == "f" and referenced_schema and referenced_table:
-            for ordinal, row in enumerate(sorted_rows, start=1):
-                child_column = _str_or_none(row.get("column_name"))
-                parent_column = _str_or_none(row.get("referenced_column_name"))
-                if not (child_column and parent_column):
-                    continue
-                fk_edges.append(
-                    {
-                        "fk_constraint_oid": len(constraints),
-                        "fk_constraint_name": name,
-                        "child_schema_name": schema,
-                        "child_relation_oid": relation_oid,
-                        "child_relation_name": table,
-                        "parent_schema_name": referenced_schema,
-                        "parent_relation_oid": foreign_relation_oid,
-                        "parent_relation_name": referenced_table,
-                        "column_ordinal": ordinal,
-                        "child_column_name": child_column,
-                        "parent_column_name": parent_column,
-                        "fk_on_update": None,
-                        "fk_on_delete": None,
-                        "fk_match_type": None,
-                    }
-                )
+            constraint, new_pk_columns = _build_primary_key(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+            )
+            constraints.append(constraint)
+            pk_columns.extend(new_pk_columns)
+        elif ctype == "u":
+            constraint = _build_unique_constraint(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+            )
+            constraints.append(constraint)
+        elif ctype == "f":
+            constraint, new_fk_edges = _build_foreign_key(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+                referenced_schema,
+                referenced_table,
+                referenced_columns,
+                foreign_relation_oid,
+                sorted_rows,
+            )
+            constraints.append(constraint)
+            fk_edges.extend(new_fk_edges)
 
     return constraints, pk_columns, fk_edges
 
