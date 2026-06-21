@@ -1,3 +1,7 @@
+## 2025-02-28 - Snowflake DSN Authenticator SSRF
+**Vulnerability:** The Snowflake DSN parser accepted arbitrary URLs in the `authenticator` query parameter without validation, leading to potential SSRF (Server-Side Request Forgery). The connector would make HTTP POST requests to this URL.
+**Learning:** Third-party database connectors often accept extensive configuration parameters (like custom auth endpoints) that can be manipulated by malicious users if passed directly from user input (like a connection string).
+**Prevention:** Strictly validate any URL or "custom endpoint" parameters in user-supplied connection strings against a safe allowlist (like `.okta.com` for Snowflake) or known safe constants.
 ## 2025-06-20 - [CORS Misconfiguration Breaking CSRF Defense]
 **Vulnerability:** The `X-CSRF-Token` custom header was required by the CSRF middleware but was missing from the CORS `allow_headers` list in `CORSMiddleware`.
 **Learning:** Security mechanisms that rely on custom headers must be explicitly coordinated with CORS configuration. When a custom header like `X-CSRF-Token` is not allowed by CORS, cross-origin requests fail at the preflight stage (`OPTIONS` request), breaking the legitimate workflow of the frontend while appearing to be a security feature working as intended.
