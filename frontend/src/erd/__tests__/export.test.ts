@@ -364,15 +364,15 @@ describe('downloadText', () => {
 
     // We only mock what we need. Note: In vitest with jsdom/happy-dom, document exists.
     // If we're in pure node, document might not exist.
-    const originalCreateObjectURL = global.URL?.createObjectURL;
-    const originalRevokeObjectURL = global.URL?.revokeObjectURL;
+    const originalCreateObjectURL = globalThis.URL?.createObjectURL;
+    const originalRevokeObjectURL = globalThis.URL?.revokeObjectURL;
 
     const createObjUrl = vi.fn().mockReturnValue('blob:test');
     const revokeObjUrl = vi.fn();
 
     // Using Object.defineProperty to safely mock the methods, even if readonly
-    Object.defineProperty(global.URL, 'createObjectURL', { value: createObjUrl, configurable: true });
-    Object.defineProperty(global.URL, 'revokeObjectURL', { value: revokeObjUrl, configurable: true });
+    Object.defineProperty(globalThis.URL, 'createObjectURL', { value: createObjUrl, configurable: true });
+    Object.defineProperty(globalThis.URL, 'revokeObjectURL', { value: revokeObjUrl, configurable: true });
 
     const mockClick = vi.fn();
     const mockLink = { href: '', download: '', click: mockClick };
@@ -383,7 +383,7 @@ describe('downloadText', () => {
       createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
     } else {
       // Very basic fallback if document doesn't exist
-      global.document = { createElement: vi.fn().mockReturnValue(mockLink) } as any;
+      (globalThis as any).document = { createElement: vi.fn().mockReturnValue(mockLink) } as any;
     }
 
     downloadText('test.sql', 'SELECT 1;');
@@ -400,10 +400,10 @@ describe('downloadText', () => {
 
     // Clean up our mocks
     if (originalCreateObjectURL !== undefined) {
-        Object.defineProperty(global.URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
+        Object.defineProperty(globalThis.URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
     }
     if (originalRevokeObjectURL !== undefined) {
-        Object.defineProperty(global.URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
+        Object.defineProperty(globalThis.URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
     }
   });
 });
