@@ -400,27 +400,15 @@ def _build_constraints(
     return constraints, pk_columns, fk_edges
 
 
-def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
-    config = _parse_snowflake_dsn(dsn)
-    effective_schema = schema_filter or config.schema
-    query_params = (effective_schema, effective_schema)
-
-    conn = _connect(**config.connect_kwargs())
-    cursor = conn.cursor()
-    try:
-        version_rows = _fetch_dicts(cursor, VERSION_SQL)
-        schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, query_params)
-        table_rows = _fetch_dicts(cursor, TABLES_SQL, query_params)
-        column_rows = _fetch_dicts(cursor, COLUMNS_SQL, query_params)
-        constraint_rows = _fetch_dicts(
-            cursor, CONSTRAINT_COLUMNS_SQL, query_params
-        )
-    finally:
-        try:
-            cursor.close()
-        finally:
-            conn.close()
-
+def _build_snapshot(
+    config: SnowflakeDsnConfig,
+    effective_schema: str | None,
+    version_rows: list[dict],
+    schema_rows: list[dict],
+    table_rows: list[dict],
+    column_rows: list[dict],
+    constraint_rows: list[dict],
+) -> dict:
     relation_keys = sorted({_table_key(row) for row in table_rows})
     relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
     column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
@@ -519,6 +507,38 @@ def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
         "fk_edges": fk_edges,
     }
     return sanitize_for_storage(snapshot)  # type: ignore[return-value]
+
+
+def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
+    config = _parse_snowflake_dsn(dsn)
+    effective_schema = schema_filter or config.schema
+    query_params = (effective_schema, effective_schema)
+
+    conn = _connect(**config.connect_kwargs())
+    cursor = conn.cursor()
+    try:
+        version_rows = _fetch_dicts(cursor, VERSION_SQL)
+        schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, query_params)
+        table_rows = _fetch_dicts(cursor, TABLES_SQL, query_params)
+        column_rows = _fetch_dicts(cursor, COLUMNS_SQL, query_params)
+        constraint_rows = _fetch_dicts(
+            cursor, CONSTRAINT_COLUMNS_SQL, query_params
+        )
+    finally:
+        try:
+            cursor.close()
+        finally:
+            conn.close()
+
+    return _build_snapshot(
+        config,
+        effective_schema,
+        version_rows,
+        schema_rows,
+        table_rows,
+        column_rows,
+        constraint_rows,
+    )
 
 
 async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:

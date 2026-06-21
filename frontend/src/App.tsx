@@ -64,17 +64,6 @@ function strengthLabel(strength: CardinalityStrength): string {
   return "보류";
 }
 
-function isSameIndexRecommendation(
-  a: IndexRecommendation,
-  b: IndexRecommendation,
-): boolean {
-  return (
-    a.index_name === b.index_name ||
-    (a.columns.length === b.columns.length &&
-      a.columns.every((column, index) => column === b.columns[index]))
-  );
-}
-
 export default function App() {
   const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<{
@@ -226,9 +215,8 @@ export default function App() {
     () => parsePositiveInteger(cardinalityRowCount),
     [cardinalityRowCount],
   );
-
   const businessGroupsById = useMemo(() => {
-    return new Map(businessGroups.map((g) => [g.id, g]));
+    return new Map(businessGroups.map((group) => [group.id, group]));
   }, [businessGroups]);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
@@ -265,6 +253,16 @@ export default function App() {
     () => cardinalityNode?.data.indexes ?? [],
     [cardinalityNode?.data.indexes],
   );
+
+  const appliedCardinalitySignatures = useMemo(() => {
+    const names = new Set<string>();
+    const columns = new Set<string>();
+    for (const index of appliedCardinalityIndexes) {
+      if (index.index_name) names.add(index.index_name);
+      if (index.columns && index.columns.length > 0) columns.add(index.columns.join(","));
+    }
+    return { names, columns };
+  }, [appliedCardinalityIndexes]);
 
   useEffect(() => {
     if (!graph) {
@@ -482,17 +480,32 @@ export default function App() {
     recommendation: IndexRecommendation,
   ) {
     if (!cardinalityNode || recommendation.strength === "skip") return;
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        if (node.id !== cardinalityNode.id) return node;
-        const existing = node.data.indexes ?? [];
-        if (
-          existing.some((index) =>
-            isSameIndexRecommendation(index, recommendation),
-          )
-        ) {
-          return node;
+    setNodes((currentNodes) => {
+      const targetNode = currentNodes.find((n) => n.id === cardinalityNode.id);
+      if (!targetNode) return currentNodes;
+
+      const existing = targetNode.data.indexes ?? [];
+
+      const appliedIndexNames = new Set<string>();
+      const appliedColumns = new Set<string>();
+      for (const idx of existing) {
+        if (idx.index_name) appliedIndexNames.add(idx.index_name);
+        if (idx.columns && idx.columns.length > 0) {
+          appliedColumns.add(idx.columns.join(","));
         }
+      }
+
+      const recColumns = recommendation.columns?.join(",") ?? "";
+
+      if (
+        (recommendation.index_name && appliedIndexNames.has(recommendation.index_name)) ||
+        (recColumns && appliedColumns.has(recColumns))
+      ) {
+        return currentNodes;
+      }
+
+      return currentNodes.map((node) => {
+        if (node.id !== cardinalityNode.id) return node;
         return {
           ...node,
           data: {
@@ -500,8 +513,8 @@ export default function App() {
             indexes: [...existing, recommendation],
           },
         };
-      }),
-    );
+      });
+    });
   }
 
   function onCloseCardinalityWizard() {
@@ -988,6 +1001,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="export-ddl-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -999,9 +1015,10 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>DDL 내보내기</h3>
+                <h3 id="export-ddl-title">DDL 내보내기</h3>
                 <textarea
                   readOnly
+                  aria-label="DDL Export"
                   value={exportDdlText}
                   style={{
                     width: "100%",
@@ -1046,6 +1063,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-rel-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -1056,7 +1076,7 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>관계 설정</h3>
+                <h3 id="edit-rel-title">관계 설정</h3>
                 <div style={{ fontSize: 13, color: "#4b5563" }}>
                   From: {editingEdge.source} <br />
                   To: {editingEdge.target}
@@ -1346,9 +1366,9 @@ export default function App() {
                     </div>
                   ) : null}
                   {cardinalityRecommendations.map((recommendation) => {
-                    const isApplied = appliedCardinalityIndexes.some((index) =>
-                      isSameIndexRecommendation(index, recommendation),
-                    );
+                    const isApplied =
+                      (recommendation.index_name && appliedCardinalitySignatures.names.has(recommendation.index_name)) ||
+                      (recommendation.columns && recommendation.columns.length > 0 && appliedCardinalitySignatures.columns.has(recommendation.columns.join(",")));
                     return (
                       <div
                         className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
@@ -1402,6 +1422,9 @@ export default function App() {
             >
               <div
                 className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-table-title"
                 style={{
                   background: "#fff",
                   padding: 20,
@@ -1412,7 +1435,7 @@ export default function App() {
                   gap: 12,
                 }}
               >
-                <h3>테이블 추가</h3>
+                <h3 id="add-table-title">테이블 추가</h3>
                 <div className="field">
                   <label htmlFor="new-table-name">테이블 이름</label>
                   <input
