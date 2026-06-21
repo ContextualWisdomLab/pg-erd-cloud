@@ -238,6 +238,45 @@ jobs:
             printf '\n\n[Prompt evidence truncated after %s of %s bytes. Full failed-check evidence is copied to failed-check-evidence.md in the OpenCode review workspace when present.]\n' "$max_bytes" "$byte_count"
           }
 
+
+          emit_changed_docs_tree_evidence() {
+            local docs_dir tree_count shown_count
+            local -a docs_dirs=()
+
+            mapfile -t docs_dirs < <(
+              git diff --name-only --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA" -- 'docs/**' |
+                awk -F/ 'NF >= 2 { print $1 "/" $2 }' |
+                sort -u
+            )
+
+            if [ "${#docs_dirs[@]}" -eq 0 ]; then
+              printf 'No changed docs/ directories were detected.\n'
+              return 0
+            fi
+
+            printf 'Use this current-head tree evidence before accepting or rejecting claims that repository docs, images, mockups, or reference assets are missing.\n\n'
+            for docs_dir in "${docs_dirs[@]}"; do
+              printf '### `%s`\n\n' "$docs_dir"
+              printf 'Changed paths under this docs directory:\n\n'
+              git diff --name-status --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA" -- "$docs_dir" |
+                sed 's/^/- /'
+              printf '\nCurrent-head tree under this docs directory, capped at 160 paths:\n\n'
+              tree_count="$(git ls-tree -r --name-only HEAD -- "$docs_dir" | wc -l | tr -d '[:space:]')"
+              shown_count=0
+              while IFS= read -r tree_path; do
+                printf -- '- `%s`\n' "$tree_path"
+                shown_count=$((shown_count + 1))
+                if [ "$shown_count" -ge 160 ]; then
+                  break
+                fi
+              done < <(git ls-tree -r --name-only HEAD -- "$docs_dir")
+              if [ "$tree_count" -gt "$shown_count" ]; then
+                printf -- '- [tree truncated after %s of %s paths]\n' "$shown_count" "$tree_count"
+              fi
+              printf '\n'
+            done
+          }
+
           {
             printf '# OpenCode bounded PR review evidence\n\n'
             printf -- '- PR: #%s\n' "$PR_NUMBER"
@@ -264,6 +303,8 @@ jobs:
 
             printf '## Changed files\n\n'
             git diff --name-status "$PR_MERGE_BASE" "$PR_HEAD_SHA"
+            printf '\n## Changed docs repository tree evidence\n\n'
+            emit_changed_docs_tree_evidence
             printf '\n## Diff stat\n\n'
             git diff --stat --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA"
             printf '\n## Focused changed hunks\n\n'
@@ -284,6 +325,8 @@ jobs:
 
             printf '\n## Review inspection contract\n\n'
             printf 'Use the local checkout for exact source and diff inspection.\n'
+            printf 'Do not claim repository docs, images, or reference assets are unavailable, missing, or absent unless the changed docs repository tree evidence proves it.\n'
+            printf 'Treat unavailable external MCP sources as source limitations, not repository facts.\n'
             printf 'Do not run a broad full-diff read into the model context; inspect changed files and focused hunks only.\n'
             printf 'If direct file reads fail but focused changed hunks are present above, review those hunks; do not return file-inaccessible findings for paths shown in this evidence.\n'
           } >"$OPENCODE_EVIDENCE_FILE"
@@ -1174,6 +1217,133 @@ jobs:
             update_review_overview "$event" "$body"
           }
 
+
+          collect_unresolved_human_review_threads() {
+            local output_file="$1"
+            local owner="${GH_REPOSITORY%%/*}"
+            local name="${GH_REPOSITORY#*/}"
+            local review_threads_query
+
+            read -r -d '' review_threads_query <<'GRAPHQL' || true
+          query($owner:String!,$name:String!,$number:Int!) {
+            repository(owner:$owner,name:$name) {
+              pullRequest(number:$number) {
+                reviewThreads(first: 100) {
+                  nodes {
+                    isResolved
+                    isOutdated
+                    path
+                    line
+                    startLine
+                    comments(first: 100) {
+                      nodes {
+                        author {
+                          login
+                        }
+                        body
+                        createdAt
+                        url
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          GRAPHQL
+            gh api graphql \
+              -f owner="$owner" \
+              -f name="$name" \
+              -F number="$PR_NUMBER" \
+              -f query="$review_threads_query" \
+              --jq '
+                [
+                  (.data.repository.pullRequest.reviewThreads.nodes // [])
+                  | .[]
+                  | select((.isResolved // false) == false)
+                  | select((.isOutdated // false) == false)
+                  | {
+                      path: (.path // "unknown"),
+                      line: (.line // .startLine // "unknown"),
+                      comments: [
+                        (.comments.nodes // [])
+                        | .[]
+                        | (.author.login // "") as $author
+                        | select($author != "")
+                        | select(($author | test("\\[bot\\]$")) | not)
+                        | select($author != "opencode-agent")
+                        | select($author != "github-actions")
+                        | {
+                            author: $author,
+                            body: (.body // ""),
+                            createdAt: (.createdAt // ""),
+                            url: (.url // "")
+                          }
+                      ]
+                    }
+                  | select((.comments | length) > 0)
+                ] as $threads
+                | if ($threads | length) == 0 then
+                    empty
+                  else
+                    "## Latest unresolved human review thread evidence",
+                    "",
+                    ($threads[] |
+                      "### `\(.path)` line \(.line)",
+                      (.comments[-1] |
+                        "- Latest human comment: @\(.author) at \(.createdAt)",
+                        "- Comment URL: \(.url)",
+                        "- Comment excerpt: \((.body | gsub("\r"; "") | split("\n") | map(select(length > 0)) | .[0:8] | join(" / ") | .[0:600]))"
+                      ),
+                      ""
+                    )
+                  end
+              ' >"$output_file"
+          }
+
+          build_unresolved_human_threads_body() {
+            local evidence_file="$1" body_file="$2"
+
+            {
+              printf '%s\n' \
+                "OpenCode reviewed the current-head evidence but found unresolved human review threads before approval." \
+                "" \
+                "- Problem: OpenCode reached an APPROVE control result, but the approval step found unresolved, non-outdated human review thread evidence on the current pull request." \
+                "- Root cause: Human review feedback can arrive after bounded model evidence is prepared, so the approval step must re-query GitHub immediately before publishing an approval." \
+                "- Fix: Address or resolve the listed human review thread(s), then re-run OpenCode on the current head." \
+                "- Regression test: Keep the approval gate querying reviewThreads(first: 100) after model output and before create_pull_review APPROVE." \
+                "" \
+                "## Review thread evidence" \
+                ""
+              sed -n '1,240p' "$evidence_file"
+              printf '%s\n' \
+                "" \
+                "- Result: REQUEST_CHANGES" \
+                "- Reason: unresolved human review thread(s) were present before approval." \
+                "- Head SHA: \`${HEAD_SHA}\`" \
+                "- Workflow run: ${RUN_ID}" \
+                "- Workflow attempt: ${RUN_ATTEMPT}"
+            } >"$body_file"
+          }
+
+          build_human_thread_lookup_failure_body() {
+            local body_file="$1"
+
+            printf '%s\n' \
+              "OpenCode reviewed the current-head evidence but could not verify unresolved human review threads before approval." \
+              "" \
+              "- Problem: GitHub reviewThreads could not be read for the current pull request immediately before approval." \
+              "- Root cause: OpenCode cannot safely approve without verifying whether newer unresolved human review feedback exists." \
+              "- Fix: Re-run OpenCode after GitHub reviewThreads are readable." \
+              "- Regression test: Keep the approval gate failing closed when reviewThreads(first: 100) lookup fails." \
+              "" \
+              "- Result: REQUEST_CHANGES" \
+              "- Reason: unresolved human review thread state could not be verified for current head \`${HEAD_SHA}\`." \
+              "- Head SHA: \`${HEAD_SHA}\`" \
+              "- Workflow run: ${RUN_ID}" \
+              "- Workflow attempt: ${RUN_ATTEMPT}" >"$body_file"
+          }
+
           request_changes_for_gate_failure() {
             local reason="$1"
             local body
@@ -2055,6 +2225,21 @@ jobs:
                 echo "::endgroup::"
                 exit 0
               fi
+              unresolved_human_threads_file="$(mktemp)"
+              human_thread_review_body_file="$(mktemp)"
+              if ! collect_unresolved_human_review_threads "$unresolved_human_threads_file"; then
+                build_human_thread_lookup_failure_body "$human_thread_review_body_file"
+                create_pull_review "REQUEST_CHANGES" "$(cat "$human_thread_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ -s "$unresolved_human_threads_file" ]; then
+                build_unresolved_human_threads_body "$unresolved_human_threads_file" "$human_thread_review_body_file"
+                create_pull_review "REQUEST_CHANGES" "$(cat "$human_thread_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              rm -f "$unresolved_human_threads_file" "$human_thread_review_body_file"
               summary="$(jq -r '.summary' "$control_json")"
               reason="$(jq -r '.reason' "$control_json")"
               body="$(printf '%s\n' \
