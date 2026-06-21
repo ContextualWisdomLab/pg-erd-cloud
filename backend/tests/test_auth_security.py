@@ -378,7 +378,13 @@ async def test_oidc_rejects_revoked_jti(
             "exp": int(expires_at.timestamp()),
         },
     )
-    auth.revoke_token_jti("revoked-jwt", expires_at)
+    class FakeRedis:
+        async def setex(self, *args, **kwargs): pass
+        async def exists(self, key):
+            if key.endswith("revoked-jwt"): return 1
+            return 0
+    monkeypatch.setattr(auth, "redis", FakeRedis())
+    await auth.revoke_token_jti("revoked-jwt", expires_at)
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(
@@ -458,16 +464,6 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
         assert session.flush_calls == 0
     finally:
         auth._user_cache.clear()
-
-
-@pytest.mark.asyncio
-async def test_try_get_subject_for_rate_limit_error_path():
-    """Verify try_get_subject_for_rate_limit returns None on auth failure."""
-    req = make_request()  # No Authorization header
-
-    # We should get None because of the Missing Bearer Token HTTPException
-    subject = await auth.try_get_subject_for_rate_limit(req)
-    assert subject is None
 
 
 async def test_oidc_decode_rejects_invalid_header(

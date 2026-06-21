@@ -477,81 +477,6 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
     return "\n".join(lines)
 
 
-def _render_table_columns_snowflake(
-    oid: int,
-    cols_by_oid: dict[int, list[dict]],
-    source_dialect: DdlDialect,
-) -> list[str]:
-    col_defs: list[str] = []
-    for c in sorted(
-        cols_by_oid.get(oid, []),
-        key=lambda x: int(x.get("column_position") or 0),
-    ):
-        col_name = c.get("column_name")
-        if not isinstance(col_name, str):
-            continue
-        parts = [
-            f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"
-        ]
-        if c.get("has_default"):
-            default_clause = _column_default_clause(c.get("default_expr"), "snowflake")
-            if default_clause:
-                parts.append(default_clause)
-        if c.get("is_not_null") is True:
-            parts.append("NOT NULL")
-        col_defs.append(" ".join(parts))
-    return col_defs
-
-
-def _render_table_constraints_snowflake(
-    oid: int,
-    constraints_by_oid: dict[int, list[dict]],
-    cols_by_oid: dict[int, list[dict]],
-) -> tuple[list[str], list[str]]:
-    table_cons: list[str] = []
-    skipped_checks: list[str] = []
-    for con in constraints_by_oid.get(oid, []):
-        ctype = con.get("constraint_type")
-        cname = con.get("constraint_name")
-        cdef = con.get("constraint_def")
-        if not (isinstance(cname, str) and isinstance(cdef, str)):
-            continue
-        if ctype in ("p", "u"):
-            col_names = _constraint_column_names(con, cols_by_oid)
-            if col_names:
-                keyword = "PRIMARY KEY" if ctype == "p" else "UNIQUE"
-                quoted_cols = ", ".join(_q(name) for name in col_names)
-                table_cons.append(f"CONSTRAINT {_q(cname)} {keyword} ({quoted_cols})")
-            else:
-                table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
-        elif ctype == "c":
-            skipped_checks.append(cname)
-    return table_cons, skipped_checks
-
-
-def _render_indexes_snowflake(indexes: list[dict], lines: list[str]) -> None:
-    if indexes:
-        lines.append("-- Indexes")
-    for ix in indexes:
-        if not isinstance(ix, dict):
-            continue
-        ix_name = ix.get("index_name")
-        table_schema = ix.get("table_schema_name")
-        table_name = ix.get("table_name")
-        if (
-            isinstance(ix_name, str)
-            and isinstance(table_schema, str)
-            and isinstance(table_name, str)
-        ):
-            lines.append(
-                f"-- NOTE: PostgreSQL index {_q(ix_name)} on {_qname(table_schema, table_name)} is not emitted for Snowflake; consider clustering/search optimization as needed."
-            )
-        else:
-            lines.append(
-                "-- NOTE: PostgreSQL index metadata is not emitted for Snowflake."
-            )
-
-
 def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     """Generate Snowflake DDL from a captured PostgreSQL/Snowflake snapshot."""
 
@@ -577,8 +502,47 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
         ):
             continue
 
-        col_defs = _render_table_columns_snowflake(oid, cols_by_oid, source_dialect)
-        table_cons, skipped_checks = _render_table_constraints_snowflake(oid, constraints_by_oid, cols_by_oid)
+        col_defs: list[str] = []
+        for c in sorted(
+            cols_by_oid.get(oid, []),
+            key=lambda x: int(x.get("column_position") or 0),
+        ):
+            col_name = c.get("column_name")
+            if not isinstance(col_name, str):
+                continue
+            parts = [
+                f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"
+            ]
+            if c.get("has_default"):
+                default_clause = _column_default_clause(
+                    c.get("default_expr"), "snowflake"
+                )
+                if default_clause:
+                    parts.append(default_clause)
+            if c.get("is_not_null") is True:
+                parts.append("NOT NULL")
+            col_defs.append(" ".join(parts))
+
+        table_cons: list[str] = []
+        skipped_checks: list[str] = []
+        for con in constraints_by_oid.get(oid, []):
+            ctype = con.get("constraint_type")
+            cname = con.get("constraint_name")
+            cdef = con.get("constraint_def")
+            if not (isinstance(cname, str) and isinstance(cdef, str)):
+                continue
+            if ctype in ("p", "u"):
+                col_names = _constraint_column_names(con, cols_by_oid)
+                if col_names:
+                    keyword = "PRIMARY KEY" if ctype == "p" else "UNIQUE"
+                    quoted_cols = ", ".join(_q(name) for name in col_names)
+                    table_cons.append(
+                        f"CONSTRAINT {_q(cname)} {keyword} ({quoted_cols})"
+                    )
+                else:
+                    table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
+            elif ctype == "c":
+                skipped_checks.append(cname)
 
         all_defs = col_defs + table_cons
         lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
@@ -602,7 +566,26 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
 
     _render_foreign_keys(constraints, lines)
 
-    _render_indexes_snowflake(indexes, lines)
+    if indexes:
+        lines.append("-- Indexes")
+    for ix in indexes:
+        if not isinstance(ix, dict):
+            continue
+        ix_name = ix.get("index_name")
+        table_schema = ix.get("table_schema_name")
+        table_name = ix.get("table_name")
+        if (
+            isinstance(ix_name, str)
+            and isinstance(table_schema, str)
+            and isinstance(table_name, str)
+        ):
+            lines.append(
+                f"-- NOTE: PostgreSQL index {_q(ix_name)} on {_qname(table_schema, table_name)} is not emitted for Snowflake; consider clustering/search optimization as needed."
+            )
+        else:
+            lines.append(
+                "-- NOTE: PostgreSQL index metadata is not emitted for Snowflake."
+            )
 
     lines.append("")
     return "\n".join(lines)

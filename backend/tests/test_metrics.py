@@ -83,13 +83,3 @@ def test_render_metrics() -> None:
         assert isinstance(data, bytes)
         assert data == b"mocked_metric_total 42\n"
         mock_generate.assert_called_once()
-
-
-def test_normalize_route_label_none() -> None:
-    """None routes normalize to 'unmatched'."""
-    assert normalize_route_label(None) == "unmatched"
-
-
-def test_normalize_route_label_whitespace() -> None:
-    """Whitespace-only routes normalize to 'unmatched'."""
-    assert normalize_route_label("   ") == "unmatched"

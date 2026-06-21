@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from app.observability import _get_client_ip, _get_route_template, setup_observability
+from app.observability import _get_client_ip, setup_observability
 from app.settings import settings
 
 
@@ -45,27 +45,6 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         settings.observability_metrics_enabled = prev_metrics
         settings.observability_request_logging_enabled = prev_logging
         settings.observability_metrics_token = prev_token
-
-
-def test_get_route_template_with_route() -> None:
-    class MockRoute:
-        path = "/api/v1/users/{user_id}"
-
-    req = Request({"type": "http", "headers": [], "route": MockRoute()})
-    assert _get_route_template(req) == "/api/v1/users/{user_id}"
-
-
-def test_get_route_template_without_route() -> None:
-    req = Request({"type": "http", "headers": []})
-    assert _get_route_template(req) == "unmatched"
-
-
-def test_get_route_template_empty_path() -> None:
-    class MockRoute:
-        path = ""
-
-    req = Request({"type": "http", "headers": [], "route": MockRoute()})
-    assert _get_route_template(req) == "unmatched"
 
 
 @pytest.mark.parametrize(

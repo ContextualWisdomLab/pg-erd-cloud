@@ -123,7 +123,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           </div>
         ) : null}
         {data.indexes?.length ? (
-          <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
+          <div className="tableNode__indexes" aria-label="추천 인덱스">
             <div className="tableNode__indexHeading">Indexes</div>
             {data.indexes.slice(0, 4).map((index) => (
               <div key={index.index_name} className="tableNode__index">
