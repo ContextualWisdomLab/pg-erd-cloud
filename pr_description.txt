@@ -1,0 +1,8 @@
+🎯 **What:** The `_get_route_template` function in `backend/app/observability.py` was missing tests. This PR adds unit tests to verify its behavior for different request scopes.
+
+📊 **Coverage:** Three new tests have been added:
+  - `test_get_route_template_with_route`: Happy path where the route is correctly resolved and returned.
+  - `test_get_route_template_without_route`: Edge case where no route exists in the request scope.
+  - `test_get_route_template_empty_path`: Edge case where a route exists but has an empty path string.
+
+✨ **Result:** Test coverage for `backend/app/observability.py` is improved, ensuring the label extraction logic remains reliable.

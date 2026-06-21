@@ -32,9 +32,7 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         unauth = client.get("/metrics")
         assert unauth.status_code == 403
 
-        wrong = client.get(
-            "/metrics", headers={"X-Metrics-Token": "wrong-token"}
-        )
+        wrong = client.get("/metrics", headers={"X-Metrics-Token": "wrong-token"})
         assert wrong.status_code == 403
 
         m = client.get("/metrics", headers={"X-Metrics-Token": "test-token"})
@@ -45,3 +43,42 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         settings.observability_metrics_enabled = prev_metrics
         settings.observability_request_logging_enabled = prev_logging
         settings.observability_metrics_token = prev_token
+
+
+def test_get_route_template_with_route() -> None:
+    from app.observability import _get_route_template
+
+    class MockRoute:
+        path = "/api/v1/users/{user_id}"
+
+    class MockRequest:
+        def __init__(self):
+            self.scope = {"route": MockRoute()}
+
+    req = MockRequest()
+    assert _get_route_template(req) == "/api/v1/users/{user_id}"  # type: ignore
+
+
+def test_get_route_template_without_route() -> None:
+    from app.observability import _get_route_template
+
+    class MockRequest:
+        def __init__(self):
+            self.scope = {}
+
+    req = MockRequest()
+    assert _get_route_template(req) == "unmatched"  # type: ignore
+
+
+def test_get_route_template_empty_path() -> None:
+    from app.observability import _get_route_template
+
+    class MockRoute:
+        path = ""
+
+    class MockRequest:
+        def __init__(self):
+            self.scope = {"route": MockRoute()}
+
+    req = MockRequest()
+    assert _get_route_template(req) == "unmatched"  # type: ignore
