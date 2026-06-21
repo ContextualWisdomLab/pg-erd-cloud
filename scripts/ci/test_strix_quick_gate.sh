@@ -425,7 +425,8 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "Failed-check findings must be line-specific and concrete" "opencode review prompt requires line-specific failed-check findings"
 	assert_file_contains "$workflow_file" "never use line 0" "opencode review prompt forbids non-specific line 0 findings"
 	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_approve_gate.sh" '.line | type == "number" and . > 0 and floor == .' "opencode approval gate rejects line zero findings"
-	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" 'finding["line"] <= 0' "opencode normalizer rejects line zero findings"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "isinstance(line, bool)" "opencode normalizer rejects boolean line findings"
+	assert_file_contains "$REPO_ROOT/scripts/ci/opencode_review_normalize_output.py" "line <= 0" "opencode normalizer rejects line zero findings"
 	assert_file_contains "$workflow_file" "validate_opencode_failed_check_review.sh" "opencode approval gate validates request-changes reviews against failed-check evidence"
 	assert_file_contains "$REPO_ROOT/scripts/ci/validate_opencode_failed_check_review.sh" "FAILED_CHECK_EVIDENCE_NOT_REFERENCED" "failed-check review validator rejects unrelated speculative findings"
 	assert_file_contains "$REPO_ROOT/scripts/ci/validate_opencode_failed_check_review.sh" "github(?:_|-)models" "failed-check review validator extracts both github_models and github-models model prefixes"
@@ -495,7 +496,7 @@ assert_opencode_review_normalizer_accepts_transcript_json() {
 	cat >"$output_file" <<'EOF'
 OpenCode transcript text before the review control block.
 
-{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers found in the current bounded evidence.","summary":"Reviewed current head evidence and no blocking review findings were identified.","findings":[]}
+{"head_sha":"abc123","run_id":"42","run_attempt":"1","result":"APPROVE","reason":"No blockers found after inspecting .github/workflows/opencode-review.yml.","summary":"Reviewed scripts/ci/opencode_review_normalize_output.py and current head evidence; no blocking review findings were identified.","findings":[]}
 EOF
 
 	set +e
@@ -2274,6 +2275,20 @@ CI/CD scripts but no application code. This prevents comprehensive security
 assessment and prevented thorough security testing.
 EOS
 		echo "Penetration test failed: incomplete bounded PR-scope codebase"
+		exit 1
+		;;
+	pr-incomplete-repository-state-pr-scope)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-incomplete-repository-state/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-pr-incomplete-repository-state/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Incomplete Repository State Prevents Full Security Assessment
+Severity: CRITICAL
+
+The security review was unable to assess critical components due to missing
+source code in the provided repository. The backend and frontend source
+directories referenced in configuration files were not present, limiting the
+scope of the security review.
+EOS
+		echo "Penetration test failed: incomplete repository state in bounded PR-scope"
 		exit 1
 		;;
 	pr-missing-backend-code-pr-scope)
@@ -7926,6 +7941,30 @@ run_gate_case "pr-incomplete-codebase-pr-scope" \
 	"" \
 	"0" \
 	"HIGH" \
+	"0" \
+	"__PR_SCOPE__" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
+	"" \
+	"" \
+	"0"
+
+run_gate_case "pr-incomplete-repository-state-pr-scope" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
 	"0" \
 	"__PR_SCOPE__" \
 	"" \
