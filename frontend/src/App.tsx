@@ -215,6 +215,9 @@ export default function App() {
     () => parsePositiveInteger(cardinalityRowCount),
     [cardinalityRowCount],
   );
+  const businessGroupsById = useMemo(() => {
+    return new Map(businessGroups.map((group) => [group.id, group]));
+  }, [businessGroups]);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
   // Using nodes.find() for single lookups is O(N) but avoids Map construction overhead, providing ~10x speedup and reducing GC pressure.
@@ -540,7 +543,7 @@ export default function App() {
   }
 
   function onAssignBusinessGroup(nodeId: string, groupId: string) {
-    const group = businessGroups.find((candidate) => candidate.id === groupId);
+    const group = businessGroupsById.get(groupId);
     setNodes((currentNodes) =>
       currentNodes.map((node) =>
         node.id === nodeId
