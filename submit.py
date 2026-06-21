@@ -9,5 +9,5 @@ submit(
 
 ✅ **Verification:** Ran `ruff check` and `ruff format` to ensure code styling compliance. Re-ran the pytest suite in `backend/` and confirmed all 92 backend tests are passing successfully.
 
-✨ **Result:** Improved modularity and readability of the codebase without changing the functionality."""
+✨ **Result:** Improved modularity and readability of the codebase without changing the functionality.""",
 )

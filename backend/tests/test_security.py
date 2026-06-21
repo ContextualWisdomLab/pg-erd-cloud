@@ -8,14 +8,26 @@ from app.security import decrypt_text, encrypt_text, redact_dsn
 @pytest.mark.parametrize(
     ("dsn", "expected"),
     [
-        ("postgresql://user:password@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
+        (
+            "postgresql://user:password@localhost:5432/dbname",
+            "postgresql://***@localhost:5432/dbname",
+        ),
         ("postgresql://localhost:5432/dbname", "***"),
         ("user:password@localhost:5432/dbname", "***"),
         ("invalid", "***"),
         ("", "***"),
-        ("postgresql://user@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-        ("postgresql://user:p@ssw0rd!@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
-        ("postgresql://user:p@ssw@rd!@localhost:5432/dbname", "postgresql://***@localhost:5432/dbname"),
+        (
+            "postgresql://user@localhost:5432/dbname",
+            "postgresql://***@localhost:5432/dbname",
+        ),
+        (
+            "postgresql://user:p@ssw0rd!@localhost:5432/dbname",
+            "postgresql://***@localhost:5432/dbname",
+        ),
+        (
+            "postgresql://user:p@ssw@rd!@localhost:5432/dbname",
+            "postgresql://***@localhost:5432/dbname",
+        ),
         ("postgresql://user:pass@word@localhost/db", "postgresql://***@localhost/db"),
         ("mysql://user:password@host:3306/db", "mysql://***@host:3306/db"),
         ("mysql://user:pass@remote.host:3306/db", "mysql://***@remote.host:3306/db"),

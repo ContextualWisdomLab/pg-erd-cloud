@@ -17,9 +17,7 @@ class FakeCursor:
         self._rows: list[tuple[object, ...]] = []
         self.closed = False
 
-    def execute(
-        self, sql: str, params: Sequence[object] = ()
-    ) -> None:
+    def execute(self, sql: str, params: Sequence[object] = ()) -> None:
         rows = fake_rows_for_query(sql, params)
         columns = list(rows[0].keys()) if rows else ["empty"]
         self.description = [(column,) for column in columns]
@@ -44,9 +42,7 @@ class FakeConnection:
         self.closed = True
 
 
-def fake_rows_for_query(
-    sql: str, params: Sequence[object]
-) -> list[dict[str, object]]:
+def fake_rows_for_query(sql: str, params: Sequence[object]) -> list[dict[str, object]]:
     schema_filter = params[0] if params else None
     assert schema_filter in (None, "PUBLIC")
 
@@ -199,9 +195,7 @@ async def test_introspect_snowflake_builds_common_snapshot(
         captured_kwargs.update(kwargs)
         return FakeConnection()
 
-    monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._connect", fake_connect
-    )
+    monkeypatch.setattr("app.snowflake_introspect.introspect._connect", fake_connect)
 
     snapshot = await introspect_snowflake(
         "snowflake://user:pass@acct/APP_DB/PUBLIC?warehouse=COMPUTE_WH&role=ANALYST",

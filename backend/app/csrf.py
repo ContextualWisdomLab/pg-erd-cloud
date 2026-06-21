@@ -13,18 +13,15 @@ MIN_CSRF_TOKEN_LENGTH = 16
 def make_csrf_middleware(
     route_prefix: str = "/api",
     header_name: str = CSRF_HEADER_NAME,
-) -> Callable[
-    [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
-]:
+) -> Callable[[Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]]:
     """Require a non-simple CSRF header for state-changing API requests."""
 
     async def middleware(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        if (
-            request.method.upper() in SAFE_METHODS
-            or not request.url.path.startswith(route_prefix)
+        if request.method.upper() in SAFE_METHODS or not request.url.path.startswith(
+            route_prefix
         ):
             return await call_next(request)
 

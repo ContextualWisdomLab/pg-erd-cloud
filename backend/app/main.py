@@ -107,9 +107,7 @@ app.middleware("http")(make_csrf_middleware())
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        o.strip() for o in settings.cors_origins.split(",") if o.strip()
-    ],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     # Default to the strictest safe setting. Enable credentials only when you
     # actually need cookie-based auth.
     allow_credentials=False,

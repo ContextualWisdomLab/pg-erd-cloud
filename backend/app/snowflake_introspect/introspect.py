@@ -183,10 +183,7 @@ def _fetch_dicts(cursor: Any, sql: str, params: tuple[object, ...] = ()) -> list
     if not rows:
         return []
     if isinstance(rows[0], dict):
-        return [
-            {str(key).lower(): value for key, value in row.items()}
-            for row in rows
-        ]
+        return [{str(key).lower(): value for key, value in row.items()} for row in rows]
 
     columns = [str(description[0]).lower() for description in cursor.description]
     return [dict(zip(columns, row)) for row in rows]
@@ -295,12 +292,9 @@ def _build_constraints(
             if isinstance(row.get("column_name"), str)
         ]
         attnums = [
-            column_positions.get((schema, table), {}).get(column)
-            for column in columns
+            column_positions.get((schema, table), {}).get(column) for column in columns
         ]
-        constrained_attnums = [
-            attnum for attnum in attnums if isinstance(attnum, int)
-        ]
+        constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
         referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
         referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
         referenced_columns = [
@@ -391,9 +385,7 @@ def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
         schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, query_params)
         table_rows = _fetch_dicts(cursor, TABLES_SQL, query_params)
         column_rows = _fetch_dicts(cursor, COLUMNS_SQL, query_params)
-        constraint_rows = _fetch_dicts(
-            cursor, CONSTRAINT_COLUMNS_SQL, query_params
-        )
+        constraint_rows = _fetch_dicts(cursor, CONSTRAINT_COLUMNS_SQL, query_params)
     finally:
         try:
             cursor.close()

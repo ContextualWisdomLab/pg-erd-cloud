@@ -249,7 +249,10 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 @pytest.mark.parametrize(
     ("header", "detail"),
     [
-        ({"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"}, "unsupported token type"),
+        (
+            {"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"},
+            "unsupported token type",
+        ),
         (
             {"kid": "key-1", "alg": "RS256", "cty": "JWT"},
             "unsupported token content type",

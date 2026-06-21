@@ -34,9 +34,7 @@ def test_normalize_route_label_valid() -> None:
 def test_prime_http_metrics() -> None:
     """Metrics should be primed in the registry to expose expected series."""
     # Run the prime function with dummy data.
-    prime_http_metrics(
-        methods={"GET", "POST"}, routes={"/test/route", "invalid"}
-    )
+    prime_http_metrics(methods={"GET", "POST"}, routes={"/test/route", "invalid"})
 
     # Check counters.
     # '/test/route' -> '/test/route'
