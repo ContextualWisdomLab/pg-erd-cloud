@@ -38,9 +38,6 @@ def test_rate_limit_applies_to_api_prefix_and_returns_429() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    limiter._buckets.clear()
-
-    limiter._buckets.clear()
     client = TestClient(app)
     assert client.get("/api/ping").status_code == 200
     assert client.get("/api/ping").status_code == 200
@@ -73,7 +70,6 @@ def test_rate_limit_does_not_apply_outside_api_prefix() -> None:
     def healthz() -> dict[str, bool]:
         return {"ok": True}
 
-    limiter._buckets.clear()
     client = TestClient(app)
     for _ in range(5):
         assert client.get("/healthz").status_code == 200
@@ -105,16 +101,23 @@ def test_rate_limit_separates_by_subject_when_provided() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    limiter._buckets.clear()
     client = TestClient(app)
 
     # subject A: first ok, second blocked
-    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
-    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
+    assert (
+        client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
+    )
+    assert (
+        client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
+    )
 
     # subject B: independent key -> first ok
-    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
-    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
+    assert (
+        client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
+    )
+    assert (
+        client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
+    )
 
 
 def test_rate_limit_disabled_allows_all_requests() -> None:
@@ -140,7 +143,6 @@ def test_rate_limit_disabled_allows_all_requests() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    limiter._buckets.clear()
     client = TestClient(app)
     for _ in range(5):
         assert client.get("/api/ping").status_code == 200
@@ -169,18 +171,23 @@ def test_rate_limit_trusts_x_forwarded_for_when_enabled() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    limiter._buckets.clear()
     client = TestClient(app)
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
+        client.get(
+            "/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}
+        ).status_code
         == 200
     )
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
+        client.get(
+            "/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}
+        ).status_code
         == 429
     )
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "2.2.2.2"}).status_code
+        client.get(
+            "/api/ping", headers={"X-Forwarded-For": "2.2.2.2"}
+        ).status_code
         == 200
     )
 
@@ -226,8 +233,6 @@ def test_share_prefix_can_have_tighter_public_limit() -> None:
     def projects() -> dict[str, bool]:
         return {"ok": True}
 
-    general_limiter._buckets.clear()
-    share_limiter._buckets.clear()
     client = TestClient(app)
     assert client.get("/api/share/abc").status_code == 200
     assert client.get("/api/share/abc").status_code == 429
