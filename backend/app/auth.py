@@ -35,7 +35,8 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
         # Defensive: never allow unsigned tokens.
         if alg == "NONE":
             continue
-        # Defensive: never allow symmetric algorithms to prevent public key HMAC forgery.
+        # Verification uses provider JWKS, so reject symmetric algorithms to
+        # avoid public-key-as-HMAC-secret confusion.
         if alg.startswith("HS"):
             continue
         if alg in seen:
@@ -89,18 +90,6 @@ async def _get_oidc_config() -> dict:
     if _oidc_config is not None and now < _oidc_config_expires_at:
         return cast(dict, _oidc_config)
 
-    from app.pg_introspect.dsn_guard import _is_restricted_ip, _resolved_ips, DsnTargetError
-    from urllib.parse import urlparse
-    parsed = urlparse(settings.oidc_issuer)
-    try:
-        if parsed.hostname:
-            resolved_ips = await _resolved_ips(parsed.hostname, parsed.port or 443)
-            for ip in resolved_ips:
-                if _is_restricted_ip(ip):
-                    raise RuntimeError("OIDC issuer host resolves to a restricted IP range")
-    except DsnTargetError:
-        pass # DNS resolution errors are handled by httpx later
-
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(
             f"{settings.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
@@ -126,18 +115,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     now = dt.datetime.now(dt.timezone.utc)
     if not force_refresh and _oidc_jwks is not None and now < _oidc_jwks_expires_at:
         return cast(dict, _oidc_jwks)
-
-    from app.pg_introspect.dsn_guard import _is_restricted_ip, _resolved_ips, DsnTargetError
-    from urllib.parse import urlparse
-    parsed = urlparse(jwks_uri)
-    try:
-        if parsed.hostname:
-            resolved_ips = await _resolved_ips(parsed.hostname, parsed.port or 443)
-            for ip in resolved_ips:
-                if _is_restricted_ip(ip):
-                    raise RuntimeError("OIDC JWKS URI host resolves to a restricted IP range")
-    except DsnTargetError:
-        pass # DNS resolution errors are handled by httpx later
 
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(jwks_uri)
