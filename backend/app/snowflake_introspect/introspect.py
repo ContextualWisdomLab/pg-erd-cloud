@@ -414,15 +414,9 @@ def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
     ]
 
     relations = []
+    table_row_by_key = {_table_key(row): row for row in table_rows}
     for schema, table in relation_keys:
-        row = next(
-            (
-                table_row
-                for table_row in table_rows
-                if _table_key(table_row) == (schema, table)
-            ),
-            {},
-        )
+        row = table_row_by_key.get((schema, table), {})
         relations.append(
             {
                 "schema_name": schema,
