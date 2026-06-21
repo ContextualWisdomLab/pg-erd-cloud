@@ -266,6 +266,38 @@ describe('exportDDL', () => {
 });
 
 describe('exportPlantUml', () => {
+  it('should export basic plantuml layout with correct headers', () => {
+    const puml = exportPlantUml([], []);
+    expect(puml).toContain('@startuml');
+    expect(puml).toContain('hide circle');
+    expect(puml).toContain('skinparam linetype ortho');
+    expect(puml).toContain('@enduml');
+  });
+
+  it('should export nullable columns without not-null markers', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'email', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('entity "public.users" as T_1 {');
+    expect(puml).toContain('*id : integer <<not null>>');
+    expect(puml).toContain('  email : text');
+    expect(puml).toContain('}');
+  });
+
   it('should export nodes and edges to PlantUML format', () => {
     const nodes: Node<TableNodeData>[] = [
       {
