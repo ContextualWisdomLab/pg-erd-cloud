@@ -11,3 +11,6 @@
 ## 2024-05-24 - Optimize repetitive lookup using memoized Map
 **Learning:** When a list of objects is subject to frequent lookups by ID within a component (e.g., node assignment operations inside `onAssignBusinessGroup`), O(N) array `.find` calls can degrade performance. Using `useMemo` to pre-calculate a Map of `{id: object}` reduces lookups to O(1) and prevents unnecessary recomputation when the underlying array doesn't change.
 **Action:** Replace `Array.find` inside frequent handlers with a `Map.get` initialized via `useMemo` when looking up items from a stable array.
+## 2024-06-21 - [Avoid Map Creation on High-Frequency React Arrays]
+**Learning:** React Flow updates the `nodes` array extremely frequently (e.g., during dragging). Creating a `Map` (like `nodesById`) using a `useMemo` that depends on this array forces a full O(N) iteration, memory allocation, and GC on every single micro-update.
+**Action:** For standard node lookups in a typically sized ERD (10-500 tables), prefer an O(N) `Array.prototype.find()` without allocating intermediate memory structures over building and looking up a `Map`.
