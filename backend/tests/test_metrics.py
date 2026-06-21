@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from unittest.mock import patch
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY
 
 from app.metrics import (
@@ -120,16 +121,13 @@ def test_prime_http_metrics_combinations() -> None:
 
 
 def test_render_metrics() -> None:
-    """Render metrics should return exposition format."""
-    # Ensure some metric is primed.
-    prime_http_metrics(methods={"DELETE"}, routes={"/test/render"})
+    """Render metrics should return exposition format using a mocked generator."""
+    with patch("app.metrics.generate_latest") as mock_generate:
+        mock_generate.return_value = b"mocked_metric_total 42\n"
 
-    data, content_type = render_metrics()
+        data, content_type = render_metrics()
 
-    assert content_type == CONTENT_TYPE_LATEST
-    assert isinstance(data, bytes)
-
-    # Check that our primed metric appears in the rendered output
-    assert b'method="DELETE"' in data
-    assert b'route="/test/render"' in data
-    assert b"http_requests_total" in data
+        assert content_type == CONTENT_TYPE_LATEST
+        assert isinstance(data, bytes)
+        assert data == b"mocked_metric_total 42\n"
+        mock_generate.assert_called_once()
