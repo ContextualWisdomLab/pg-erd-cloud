@@ -457,6 +457,20 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
         auth._user_cache.clear()
 
 
+async def test_oidc_decode_rejects_invalid_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def mock_get_unverified_header(token):
+        raise Exception("Invalid header")
+
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("invalid_token")
+
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
+
 @pytest.mark.asyncio
 async def test_oidc_catches_jwt_decode_error(
     monkeypatch: pytest.MonkeyPatch,
