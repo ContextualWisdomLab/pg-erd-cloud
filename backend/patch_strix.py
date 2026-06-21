@@ -1,27 +1,16 @@
-from __future__ import annotations
+with open("backend/app/sanitize.py", "r") as f:
+    content = f.read()
 
-import base64
-from collections.abc import Mapping
-
-
-def strip_nul(value: str) -> str:
-    """Remove NUL (0x00) characters from a string."""
-    if not isinstance(value, str):
-        return value
-
-    # PostgreSQL text/json rejects NUL(0x00). Remove it.
-    return value.replace("\x00", "")
-
-
+strix_patch = """
 MAX_RECURSION_DEPTH = 10
 MAX_INPUT_SIZE = 10_000  # 10KB
 
 def sanitize_for_storage(obj: object, depth: int = 0) -> object:
-    """Recursively sanitize strings for DB storage.
+    \"\"\"Recursively sanitize strings for DB storage.
 
     - Removes NUL chars from *all* strings.
     - Converts bytes/memoryview to safe text (best-effort UTF-8; fallback base64).
-    """
+    \"\"\"
 
     if depth > MAX_RECURSION_DEPTH:
         raise ValueError("Maximum recursion depth exceeded")
@@ -35,7 +24,7 @@ def sanitize_for_storage(obj: object, depth: int = 0) -> object:
 
     if isinstance(obj, str):
         # Remove path traversal sequences
-        clean = obj.replace("../", "").replace("..\\", "")
+        clean = obj.replace("../", "").replace("..\\\\", "")
         return strip_nul(clean)
 
     if isinstance(obj, memoryview):
@@ -60,3 +49,10 @@ def sanitize_for_storage(obj: object, depth: int = 0) -> object:
         }
 
     return obj
+"""
+
+import re
+content = re.sub(r'def sanitize_for_storage\(obj: object\) -> object:.*?(?=\n\n|\Z)', strix_patch.strip(), content, flags=re.DOTALL)
+
+with open("backend/app/sanitize.py", "w") as f:
+    f.write(content)
