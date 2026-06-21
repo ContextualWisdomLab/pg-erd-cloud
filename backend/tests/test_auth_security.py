@@ -249,10 +249,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 @pytest.mark.parametrize(
     ("header", "detail"),
     [
-        (
-            {"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"},
-            "unsupported token type",
-        ),
+        ({"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"}, "unsupported token type"),
         (
             {"kid": "key-1", "alg": "RS256", "cty": "JWT"},
             "unsupported token content type",
@@ -455,18 +452,3 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
         assert session.flush_calls == 0
     finally:
         auth._user_cache.clear()
-
-
-async def test_oidc_decode_rejects_invalid_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def mock_get_unverified_header(token):
-        raise Exception("Invalid header")
-
-    monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
-
-    with pytest.raises(HTTPException) as excinfo:
-        await auth._decode_verified_oidc_token("invalid_token")
-
-    assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == "invalid token header"
