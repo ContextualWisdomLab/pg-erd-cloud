@@ -157,4 +157,60 @@ describe('snapshotToGraph', () => {
       label: 'fk_user_old'
     })
   })
+
+  it('handles empty or missing snapshot properties gracefully', () => {
+    const snapshot: SnapshotInput = {}
+
+    const graph = snapshotToGraph(snapshot)
+
+    expect(graph.nodes).toHaveLength(0)
+    expect(graph.edges).toHaveLength(0)
+  })
+
+  it('filters out non-table relations', () => {
+    const snapshot: SnapshotInput = {
+      relations: [
+        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' },
+        { relation_oid: 2, relation_kind: 'v', schema_name: 'public', relation_name: 'users_view' },
+        { relation_oid: 3, relation_kind: 'p', schema_name: 'public', relation_name: 'users_part' }
+      ]
+    }
+
+    const graph = snapshotToGraph(snapshot)
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.nodes[0].id).toBe('1')
+    expect(graph.nodes[1].id).toBe('3')
+  })
+
+  it('handles constraints with non-number relation_oid', () => {
+    const snapshot: SnapshotInput = {
+      relations: [
+        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' }
+      ],
+      constraints: [
+        {
+          constraint_oid: 99,
+          constraint_name: 'users_pkey',
+          constraint_type: 'p',
+          schema_name: 'public',
+          relation_name: 'users'
+        } as any,
+        {
+          constraint_oid: 100,
+          constraint_name: 'fk_user_old',
+          constraint_type: 'f',
+          schema_name: 'public',
+          relation_name: 'posts',
+          foreign_relation_oid: 1
+        } as any
+      ]
+    }
+
+    const graph = snapshotToGraph(snapshot)
+
+    expect(graph.nodes[0].data.badges.pk).toBe(false)
+    expect(graph.nodes[0].data.badges.fk).toBe(false)
+    expect(graph.edges).toHaveLength(1)
+  })
+
 })
