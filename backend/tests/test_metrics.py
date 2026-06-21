@@ -34,9 +34,7 @@ def test_normalize_route_label_valid() -> None:
 def test_prime_http_metrics() -> None:
     """Metrics should be primed in the registry to expose expected series."""
     # Run the prime function with dummy data.
-    prime_http_metrics(
-        methods={"GET", "POST"}, routes={"/test/route", "invalid"}
-    )
+    prime_http_metrics(methods={"GET", "POST"}, routes={"/test/route", "invalid"})
 
     # Check counters.
     # '/test/route' -> '/test/route'
@@ -87,3 +85,13 @@ def test_render_metrics() -> None:
     assert b'method="DELETE"' in data
     assert b'route="/test/render"' in data
     assert b"http_requests_total" in data
+
+
+def test_normalize_route_label_none() -> None:
+    """None routes normalize to 'unmatched'."""
+    assert normalize_route_label(None) == "unmatched"
+
+
+def test_normalize_route_label_whitespace() -> None:
+    """Whitespace-only routes normalize to 'unmatched'."""
+    assert normalize_route_label("   ") == "unmatched"
