@@ -67,7 +67,7 @@ for (const expected of ['public.users', 'application users', 'public.orders [Sal
   }
 }
 
-if (!ddl.includes('CREATE INDEX "idx_orders_user_id_cardinality"')) {
+if (!ddl.includes('CREATE INDEX CONCURRENTLY "idx_orders_user_id_cardinality"')) {
   throw new Error('export self-check missing applied index DDL');
 }
 

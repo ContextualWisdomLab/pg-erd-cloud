@@ -1,0 +1,416 @@
+import { describe, it, expect } from 'vitest';
+import { exportDDL, exportPlantUml } from '../export';
+import type { Node, Edge } from '@xyflow/react';
+import type { TableNodeData } from '../convert';
+
+describe('exportDDL', () => {
+  it('should export basic table DDL with primary key', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'name', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+    const edges: Edge[] = [];
+
+    const ddl = exportDDL(nodes, edges);
+    expect(ddl).toContain('CREATE TABLE "public.users"');
+    expect(ddl).toContain('"id" integer NOT NULL');
+    expect(ddl).toContain('"name" text');
+    expect(ddl).toContain('PRIMARY KEY ("id")');
+  });
+
+  it('should export table without primary key', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.events',
+          columns: [
+            { column_name: 'event_name', data_type: 'varchar(255)', is_not_null: true, is_pk: false },
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+    const edges: Edge[] = [];
+
+    const ddl = exportDDL(nodes, edges);
+    expect(ddl).toContain('CREATE TABLE "public.events"');
+    expect(ddl).toContain('"event_name" varchar(255) NOT NULL');
+    expect(ddl).not.toContain('PRIMARY KEY');
+  });
+
+  it('should format foreign keys correctly', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.posts',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+          badges: { pk: true, fk: true },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'fk1',
+        source: '2', // source is the table with foreign key
+        target: '1', // target is the referenced table
+        label: 'fk_posts_users',
+      },
+      {
+        id: 'fk2',
+        source: '2',
+        target: '1',
+        // missing label to test auto generated constraint name fallback
+      }
+    ];
+
+    const ddl = exportDDL(nodes, edges);
+    expect(ddl).toContain('ALTER TABLE "public.posts"');
+    expect(ddl).toContain('ADD CONSTRAINT "fk_posts_users"');
+    expect(ddl).toContain('ADD CONSTRAINT "fk_2_1"');
+    expect(ddl).toContain('REFERENCES "public.users"');
+  });
+
+  it('should not throw if foreign key source or target is missing', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'fk1',
+        source: '1',
+        target: '2', // Target node '2' does not exist
+        label: 'fk_missing_target',
+      },
+      {
+        id: 'fk2',
+        source: '3', // Source node '3' does not exist
+        target: '1',
+        label: 'fk_missing_source',
+      }
+    ];
+
+    const ddl = exportDDL(nodes, edges);
+    expect(ddl).not.toContain('fk_missing_target');
+    expect(ddl).not.toContain('fk_missing_source');
+  });
+
+  it('should export indexes correctly and not emit duplicate index names', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'email', data_type: 'text', is_not_null: true, is_pk: false },
+            { column_name: 'status', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          indexes: [
+            {
+              index_name: 'idx_users_email',
+              columns: ['email'],
+              access_method: 'btree',
+            },
+            {
+              index_name: 'idx_users_email', // Duplicate should be skipped
+              columns: ['email'],
+              access_method: 'btree',
+            },
+            {
+              index_name: 'idx_users_status',
+              columns: ['status'],
+              // test default access method fallback
+            },
+            {
+              index_name: 'idx_empty',
+              columns: [], // should skip empty columns
+            }
+          ] as any[],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, []);
+    expect(ddl).toContain('-- Indexes');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_users_email" ON "public.users" USING btree ("email");');
+
+    // Using string match to ensure it only appears once
+    const matches = ddl.match(/CREATE INDEX CONCURRENTLY "idx_users_email"/g);
+    expect(matches?.length).toBe(1);
+
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_users_status" ON "public.users" USING btree ("status");');
+    expect(ddl).not.toContain('idx_empty');
+  });
+
+  it('should fallback to node.id for table name if title is not provided', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'fallback_table',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: '', // empty title
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, []);
+    expect(ddl).toContain('CREATE TABLE "fallback_table"');
+  });
+
+  it('should correctly quote sql identifiers', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'User "Account"',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'email "address"', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          indexes: [
+            {
+              index_name: 'idx_"user"_account',
+              columns: ['email "address"'],
+              access_method: 'btree',
+            }
+          ] as any[],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, []);
+    expect(ddl).toContain('CREATE TABLE "User ""Account"""');
+    expect(ddl).toContain('"email ""address""" text');
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_""user""_account" ON "User ""Account""" USING btree ("email ""address""");');
+  });
+
+  it('should correctly fallback invalid sql data types or access methods', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.data',
+          columns: [
+            { column_name: 'valid_type', data_type: 'integer', is_not_null: false, is_pk: false },
+            { column_name: 'invalid_type', data_type: 'drop table users;', is_not_null: false, is_pk: false },
+          ],
+          indexes: [
+            {
+              index_name: 'idx_invalid_method',
+              columns: ['invalid_type'],
+              access_method: 'delete from users', // invalid access method
+            }
+          ] as any[],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, []);
+    // sqlDataType invalid input fallback is 'text'
+    expect(ddl).toContain('"invalid_type" text');
+    expect(ddl).toContain('"valid_type" integer');
+    // sqlAccessMethod invalid input fallback is 'btree'
+    expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_invalid_method" ON "public.data" USING btree ("invalid_type");');
+  });
+});
+
+
+describe('exportPlantUml', () => {
+  it('should export basic plantuml layout with correct headers', () => {
+    const puml = exportPlantUml([], []);
+    expect(puml).toContain('@startuml');
+    expect(puml).toContain('hide circle');
+    expect(puml).toContain('skinparam linetype ortho');
+    expect(puml).toContain('@enduml');
+  });
+
+  it('should export tables with columns and properties', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'email', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('entity "public.users" as T_1 {');
+    expect(puml).toContain('*id : integer <<not null>>');
+    expect(puml).toContain('  email : text');
+    expect(puml).toContain('}');
+  });
+
+  it('should export relationships between tables', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.posts',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '1',
+        target: '2',
+        label: 'author_id',
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, edges);
+    expect(puml).toContain('T_1 --> T_2 : author_id');
+  });
+
+  it('should format index correctly from node data', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [],
+          indexes: [
+            {
+              index_name: 'idx_email',
+              columns: ['email'],
+              access_method: 'btree',
+              is_unique: true,
+            } as any
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('<<index>> idx_email [btree] (email) unique');
+  });
+
+  it('should format labels correctly for comments and business groups', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'user_node',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          comment: 'Store user data',
+          businessGroup: { id: 'group_1', name: 'Core', color: '#fff' },
+          columns: [
+            {
+              column_name: 'age',
+              data_type: 'int',
+              is_not_null: false,
+              is_pk: false,
+              column_comment: 'User age',
+              example_value: 25,
+            }
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('entity "users [Core] (Store user data)" as T_user_node {');
+    expect(puml).toContain('age (User age) [e.g. 25] : int');
+  });
+
+  it('should escape special characters in plantuml', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'my<bad>table',
+          columns: [
+            { column_name: 'col\\n1', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    // < > are escaped to &lt; &gt;
+    expect(puml).toContain('entity "my&lt;bad&gt;table" as T_1 {');
+    // backslash is replaced by \\, but inside string literal it is double backslash
+    expect(puml).toContain('  col\\\\n1 : text');
+  });
+});

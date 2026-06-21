@@ -7,3 +7,9 @@
 ## 2026-06-20 - Adding async operation loading states to critical UX paths
 **Learning:** This app requires manual yielding to the browser during compute-heavy or async events (like `onAutoLayout` with `requestAnimationFrame`). For typical network requests, standard state flags for disabling/progressing buttons with `aria-busy` provides sufficient UX feedback without freezing the UI.
 **Action:** When adding new network operations in this stack, consistently use dedicated loading state flags and apply `aria-busy` attributes paired with disabled logic to inform the user.
+## 2026-06-20 - [Canvas Empty States]
+**Learning:** In canvas-based applications (like React Flow ERDs), an empty canvas can look like a broken state or a loading delay if no guidance is provided. When no nodes are present, users need immediate visual feedback explaining *why* it's empty (e.g., waiting for reverse engineering) or *what* to do next (e.g., "Create a snapshot" or "Add a table").
+**Action:** Always implement an empty state for infinite canvas components that clearly distinguishes between 'loading/generating' and 'ready for interaction' to reduce user confusion.
+## 2026-06-21 - Disabled button visual feedback
+**Learning:** By default, buttons missing `:disabled` pseudo-class styling lack visual cues and keep a pointer cursor, leading to user confusion about interactivity.
+**Action:** Always ensure disabled buttons have reduced opacity, a not-allowed cursor, and optionally a different background/text color to clearly distinguish them from active buttons.

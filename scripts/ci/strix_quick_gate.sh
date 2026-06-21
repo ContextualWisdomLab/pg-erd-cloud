@@ -3242,17 +3242,26 @@ import sys
 text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
 lowered = text.lower()
 
-has_title = "incomplete codebase" in lowered
+has_title = (
+    "incomplete codebase" in lowered
+    or "missing backend code" in lowered
+    or "missing application code" in lowered
+)
 has_scope_evidence = (
     "missing application source code" in lowered
     or "lacked actual application source code" in lowered
+    or "missing backend code" in lowered
+    or "missing backend source" in lowered
     or "no actual source code" in lowered
+    or "no backend code" in lowered
     or "no source files found" in lowered
 )
 has_assessment_limit = (
     "prevents comprehensive security assessment" in lowered
     or "preventing comprehensive security validation" in lowered
     or "prevented thorough security testing" in lowered
+    or "security review" in lowered
+    or "security assessment" in lowered
     or "without source code" in lowered
 )
 

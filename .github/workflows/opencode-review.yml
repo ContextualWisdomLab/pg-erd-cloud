@@ -238,6 +238,45 @@ jobs:
             printf '\n\n[Prompt evidence truncated after %s of %s bytes. Full failed-check evidence is copied to failed-check-evidence.md in the OpenCode review workspace when present.]\n' "$max_bytes" "$byte_count"
           }
 
+
+          emit_changed_docs_tree_evidence() {
+            local docs_dir tree_count shown_count
+            local -a docs_dirs=()
+
+            mapfile -t docs_dirs < <(
+              git diff --name-only --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA" -- 'docs/**' |
+                awk -F/ 'NF >= 2 { print $1 "/" $2 }' |
+                sort -u
+            )
+
+            if [ "${#docs_dirs[@]}" -eq 0 ]; then
+              printf 'No changed docs/ directories were detected.\n'
+              return 0
+            fi
+
+            printf 'Use this current-head tree evidence before accepting or rejecting claims that repository docs, images, mockups, or reference assets are missing.\n\n'
+            for docs_dir in "${docs_dirs[@]}"; do
+              printf '### `%s`\n\n' "$docs_dir"
+              printf 'Changed paths under this docs directory:\n\n'
+              git diff --name-status --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA" -- "$docs_dir" |
+                sed 's/^/- /'
+              printf '\nCurrent-head tree under this docs directory, capped at 160 paths:\n\n'
+              tree_count="$(git ls-tree -r --name-only HEAD -- "$docs_dir" | wc -l | tr -d '[:space:]')"
+              shown_count=0
+              while IFS= read -r tree_path; do
+                printf -- '- `%s`\n' "$tree_path"
+                shown_count=$((shown_count + 1))
+                if [ "$shown_count" -ge 160 ]; then
+                  break
+                fi
+              done < <(git ls-tree -r --name-only HEAD -- "$docs_dir")
+              if [ "$tree_count" -gt "$shown_count" ]; then
+                printf -- '- [tree truncated after %s of %s paths]\n' "$shown_count" "$tree_count"
+              fi
+              printf '\n'
+            done
+          }
+
           {
             printf '# OpenCode bounded PR review evidence\n\n'
             printf -- '- PR: #%s\n' "$PR_NUMBER"
@@ -264,6 +303,8 @@ jobs:
 
             printf '## Changed files\n\n'
             git diff --name-status "$PR_MERGE_BASE" "$PR_HEAD_SHA"
+            printf '\n## Changed docs repository tree evidence\n\n'
+            emit_changed_docs_tree_evidence
             printf '\n## Diff stat\n\n'
             git diff --stat --find-renames "$PR_MERGE_BASE" "$PR_HEAD_SHA"
             printf '\n## Focused changed hunks\n\n'
@@ -284,6 +325,8 @@ jobs:
 
             printf '\n## Review inspection contract\n\n'
             printf 'Use the local checkout for exact source and diff inspection.\n'
+            printf 'Do not claim repository docs, images, or reference assets are unavailable, missing, or absent unless the changed docs repository tree evidence proves it.\n'
+            printf 'Treat unavailable external MCP sources as source limitations, not repository facts.\n'
             printf 'Do not run a broad full-diff read into the model context; inspect changed files and focused hunks only.\n'
             printf 'If direct file reads fail but focused changed hunks are present above, review those hunks; do not return file-inaccessible findings for paths shown in this evidence.\n'
           } >"$OPENCODE_EVIDENCE_FILE"
@@ -524,7 +567,7 @@ jobs:
 
       - name: Run OpenCode PR Review (GPT-5)
         id: opencode_review_primary
-        timeout-minutes: 60
+        timeout-minutes: 25
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -576,7 +619,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 1200 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 1200 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review \
             --model "$MODEL" \
@@ -635,7 +678,7 @@ jobs:
       - name: Run OpenCode PR Review fallback (DeepSeek R1)
         id: opencode_review_fallback
         if: steps.opencode_review_primary.outputs.review_status != 'success'
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -687,7 +730,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 300 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 300 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review-fallback \
             --model "$MODEL" \
@@ -746,7 +789,7 @@ jobs:
       - name: Run OpenCode PR Review fallback (DeepSeek V3)
         id: opencode_review_second_fallback
         if: steps.opencode_review_primary.outputs.review_status != 'success' && steps.opencode_review_fallback.outputs.review_status != 'success'
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -798,7 +841,7 @@ jobs:
           opencode_json_file="${OPENCODE_OUTPUT_FILE}.jsonl"
           opencode_export_file="${OPENCODE_OUTPUT_FILE}.session.json"
           set +e
-          timeout 300 opencode run "$(cat "$prompt_file")" \
+          timeout --kill-after=30s 300 opencode run "$(cat "$prompt_file")" \
             --pure \
             --agent ci-review-fallback \
             --model "$MODEL" \
@@ -1174,6 +1217,154 @@ jobs:
             update_review_overview "$event" "$body"
           }
 
+
+          collect_unresolved_human_review_threads() {
+            local output_file="$1"
+            local owner="${GH_REPOSITORY%%/*}"
+            local name="${GH_REPOSITORY#*/}"
+            local review_threads_query
+
+            read -r -d '' review_threads_query <<'GRAPHQL' || true
+          query($owner:String!,$name:String!,$number:Int!) {
+            repository(owner:$owner,name:$name) {
+              pullRequest(number:$number) {
+                reviewThreads(first: 100) {
+                  nodes {
+                    isResolved
+                    isOutdated
+                    path
+                    line
+                    startLine
+                    comments(first: 100) {
+                      nodes {
+                        author {
+                          login
+                        }
+                        body
+                        createdAt
+                        url
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          GRAPHQL
+            gh api graphql \
+              -f owner="$owner" \
+              -f name="$name" \
+              -F number="$PR_NUMBER" \
+              -f query="$review_threads_query" \
+              --jq '
+                [
+                  (.data.repository.pullRequest.reviewThreads.nodes // [])
+                  | .[]
+                  | select((.isResolved // false) == false)
+                  | select((.isOutdated // false) == false)
+                  | {
+                      path: (.path // "unknown"),
+                      line: (.line // .startLine // "unknown"),
+                      comments: [
+                        (.comments.nodes // [])
+                        | .[]
+                        | (.author.login // "") as $author
+                        | select($author != "")
+                        | select(($author | test("\\[bot\\]$")) | not)
+                        | select($author != "opencode-agent")
+                        | select($author != "github-actions")
+                        | {
+                            author: $author,
+                            body: (.body // ""),
+                            createdAt: (.createdAt // ""),
+                            url: (.url // "")
+                          }
+                      ]
+                    }
+                  | select((.comments | length) > 0)
+                ] as $threads
+                | if ($threads | length) == 0 then
+                    empty
+                  else
+                    "## Latest unresolved human review thread evidence",
+                    "",
+                    ($threads[] |
+                      "### `\(.path)` line \(.line)",
+                      (.comments[-1] |
+                        "- Latest human comment: @\(.author) at \(.createdAt)",
+                        "- Comment URL: \(.url)",
+                        "- Comment excerpt: \((.body | gsub("\r"; "") | split("\n") | map(select(length > 0)) | .[0:8] | join(" / ") | .[0:600]))"
+                      ),
+                      ""
+                    )
+                  end
+              ' >"$output_file"
+          }
+
+          build_unresolved_human_threads_body() {
+            local evidence_file="$1" body_file="$2"
+
+            {
+              printf '%s\n' \
+                "OpenCode reviewed the current-head evidence but found unresolved human review threads before approval." \
+                "" \
+                "- Problem: OpenCode reached an APPROVE control result, but the approval step found unresolved, non-outdated human review thread evidence on the current pull request." \
+                "- Root cause: Human review feedback can arrive after bounded model evidence is prepared, so the approval step must re-query GitHub immediately before publishing an approval." \
+                "- Fix: Address or resolve the listed human review thread(s), then re-run OpenCode on the current head." \
+                "- Regression test: Keep the approval gate querying reviewThreads(first: 100) after model output and before create_pull_review APPROVE." \
+                "" \
+                "## Review thread evidence" \
+                ""
+              sed -n '1,240p' "$evidence_file"
+              printf '%s\n' \
+                "" \
+                "- Result: REQUEST_CHANGES" \
+                "- Reason: unresolved human review thread(s) were present before approval." \
+                "- Head SHA: \`${HEAD_SHA}\`" \
+                "- Workflow run: ${RUN_ID}" \
+                "- Workflow attempt: ${RUN_ATTEMPT}"
+            } >"$body_file"
+          }
+
+          build_human_thread_lookup_failure_body() {
+            local body_file="$1"
+
+            printf '%s\n' \
+              "OpenCode reviewed the current-head evidence but could not verify unresolved human review threads before approval." \
+              "" \
+              "- Problem: GitHub reviewThreads could not be read for the current pull request immediately before approval." \
+              "- Root cause: OpenCode cannot safely approve without verifying whether newer unresolved human review feedback exists." \
+              "- Fix: Re-run OpenCode after GitHub reviewThreads are readable." \
+              "- Regression test: Keep the approval gate failing closed when reviewThreads(first: 100) lookup fails." \
+              "" \
+              "- Result: REQUEST_CHANGES" \
+              "- Reason: unresolved human review thread state could not be verified for current head \`${HEAD_SHA}\`." \
+              "- Head SHA: \`${HEAD_SHA}\`" \
+              "- Workflow run: ${RUN_ID}" \
+              "- Workflow attempt: ${RUN_ATTEMPT}" >"$body_file"
+          }
+
+          create_pull_review_with_payload() {
+            local event="$1" body="$2" review_payload_file="$3" fallback_body_file="$4"
+            local gh_error_file
+            gh_error_file="$(mktemp)"
+            if ! gh api -X POST "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --input "$review_payload_file" >/dev/null 2>"$gh_error_file"; then
+              echo "::warning::OpenCode could not submit pull review inline comments; falling back to body-only ${event} review."
+              if [ -s "$gh_error_file" ]; then
+                sed -E 's/[[:space:]]+/ /g; s/^/::warning::GitHub API: /' "$gh_error_file" || true
+              fi
+              rm -f "$gh_error_file"
+              if [ -s "$fallback_body_file" ]; then
+                create_pull_review "$event" "$(cat "$fallback_body_file")"
+              else
+                update_review_overview "$event" "$body"
+              fi
+              return 0
+            fi
+            rm -f "$gh_error_file"
+            update_review_overview "$event" "$body"
+          }
+
           request_changes_for_gate_failure() {
             local reason="$1"
             local body
@@ -1204,6 +1395,36 @@ jobs:
             update_review_overview "NO_CONCLUSION" "$body"
           }
 
+          failed_checks_are_only_cancelled_strix() {
+            local failed_checks_file="$1"
+
+            [ -s "$failed_checks_file" ] || return 1
+            ! grep -Ev '^[[:space:]]*$|^- Strix Security Scan/strix( workflow run)?: [Cc][Aa][Nn][Cc][Ee][Ll][Ll][Ee][Dd]([[:space:]]|\(|$)' "$failed_checks_file" >/dev/null
+          }
+
+          record_cancelled_strix_no_conclusion_if_only_failure() {
+            local failed_checks_file="$1"
+            local body
+
+            failed_checks_are_only_cancelled_strix "$failed_checks_file" || return 1
+            body="$(printf '%s\n' \
+              "OpenCode Agent could not approve because Strix was cancelled before producing scanner evidence." \
+              "" \
+              "- Result: NO_CONCLUSION" \
+              "- Reason: current-head Strix Security Scan was cancelled before logs or vulnerability reports were available for \`${HEAD_SHA}\`." \
+              "- Head SHA: \`${HEAD_SHA}\`" \
+              "- Workflow run: ${RUN_ID}" \
+              "- Workflow attempt: ${RUN_ATTEMPT}" \
+              "" \
+              "Cancelled Strix evidence:" \
+              "$(cat "$failed_checks_file")" \
+              "" \
+              "No formal REQUEST_CHANGES review was submitted because Strix cancellation is missing security evidence, not a source-code finding.")"
+            echo "::warning::Current-head Strix was cancelled without scanner evidence; leaving OpenCode at NO_CONCLUSION."
+            update_review_overview "NO_CONCLUSION" "$body"
+            return 0
+          }
+
           format_request_changes_body() {
             local control_json="$1"
             local body_file="$2"
@@ -1224,7 +1445,7 @@ jobs:
                     + "- Root cause: " + (.value.root_cause // "") + "\n"
                     + "- Fix: " + (.value.fix_direction // "") + "\n"
                     + "- Regression test: " + (.value.regression_test_direction // "") + "\n"
-                    + "- Suggested diff:\n```diff\n" + (.value.suggested_diff // "") + "\n```"
+                    + "- Suggested diff: posted in this finding'\''s inline review thread."
                   )
                 | join("\n\n")
               ' "$control_json"
@@ -1243,6 +1464,65 @@ jobs:
               printf -- '- Workflow run: %s\n' "$RUN_ID"
               printf -- '- Workflow attempt: %s\n' "$RUN_ATTEMPT"
             } >"$body_file"
+          }
+
+          build_request_changes_review_payload() {
+            local control_json="$1"
+            local body_file="$2"
+            local payload_file="$3"
+
+            # shellcheck disable=SC2016
+            jq -n               --rawfile body "$body_file"               --slurpfile control "$control_json"               --arg commit_id "$HEAD_SHA" '
+                def text($value): ($value // "" | tostring);
+                {
+                  event: "REQUEST_CHANGES",
+                  body: $body,
+                  commit_id: $commit_id,
+                  comments: [
+                    (($control[0].findings // [])[] | {
+                      path: text(.path),
+                      line: (.line | tonumber),
+                      side: "RIGHT",
+                      body: (
+                        "### " + (text(.severity) | ascii_upcase) + " " + text(.title) + "\n\n"
+                        + "- Location: `" + text(.path) + ":" + ((.line // 0) | tostring) + "`\n"
+                        + "- Problem: " + text(.problem) + "\n"
+                        + "- Root cause: " + text(.root_cause) + "\n"
+                        + "- Fix: " + text(.fix_direction) + "\n"
+                        + "- Regression test: " + text(.regression_test_direction) + "\n\n"
+                        + "#### Suggested diff\n```diff\n" + text(.suggested_diff) + "\n```"
+                      )
+                    })
+                  ]
+                }
+              ' >"$payload_file"
+          }
+
+          build_inline_comment_failure_body() {
+            local body_file="$1"
+            local output_file="$2"
+
+            {
+              cat "$body_file"
+              printf '\n## Inline comment publishing failed\n\n'
+              printf 'GitHub did not accept the inline review comments for the cited finding lines, so OpenCode did not copy suggested diffs into this PR-level body. Re-run the review after the findings are anchored to changed diff lines, or inspect the workflow log/control JSON and apply the changes manually.\n'
+            } >"$output_file"
+          }
+
+          publish_request_changes_from_control() {
+            local control_json="$1"
+            local body_file
+            local payload_file
+            local fallback_body_file
+
+            body_file="$(mktemp)"
+            payload_file="$(mktemp)"
+            fallback_body_file="$(mktemp)"
+            format_request_changes_body "$control_json" "$body_file"
+            build_request_changes_review_payload "$control_json" "$body_file" "$payload_file"
+            build_inline_comment_failure_body "$body_file" "$fallback_body_file"
+            create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$body_file")" "$payload_file" "$fallback_body_file"
+            rm -f "$body_file" "$payload_file" "$fallback_body_file"
           }
 
           emit_line_specific_fallback_findings() {
@@ -1452,6 +1732,8 @@ jobs:
             local failed_checks_file="$1"
             local evidence_file="$2"
             local body_file="$3"
+            local review_payload_file="${4:-}"
+            local fallback_body_file="${5:-}"
             local prompt_file
             local opencode_json_file
             local opencode_export_file
@@ -1496,7 +1778,7 @@ jobs:
             } >"$prompt_file"
 
             cd "$OPENCODE_REVIEW_WORKDIR"
-            if ! timeout 600 opencode run "$(cat "$prompt_file")" \
+            if ! timeout --kill-after=30s 600 opencode run "$(cat "$prompt_file")" \
               --pure \
               --agent ci-review-fallback \
               --model "$MODEL" \
@@ -1523,6 +1805,12 @@ jobs:
               return 1
             fi
             format_request_changes_body "$control_json" "$body_file"
+            if [ -n "$review_payload_file" ]; then
+              build_request_changes_review_payload "$control_json" "$body_file" "$review_payload_file"
+            fi
+            if [ -n "$fallback_body_file" ]; then
+              build_inline_comment_failure_body "$body_file" "$fallback_body_file"
+            fi
           }
 
           collect_current_head_strix_workflow_runs() {
@@ -1884,18 +2172,22 @@ jobs:
             pending_checks_file=""
             # shellcheck disable=SC2329
             cleanup_failed_outcome_files() {
-              rm -f "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$pending_checks_file"
+              rm -f "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$pending_checks_file"
             }
             trap cleanup_failed_outcome_files EXIT
             if collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file" && [ -s "$failed_checks_file" ]; then
-              if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
-                printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
-              fi
-              if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+              if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                :
               else
-                build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
-                create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
+                  printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
+                fi
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
+                else
+                  build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
+                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                fi
               fi
             else
               pending_checks_file="$(mktemp)"
@@ -1911,14 +2203,18 @@ jobs:
               elif ! collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file"; then
                 request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read after peer checks completed before diagnosing OpenCode action outcome."
               elif [ -s "$failed_checks_file" ]; then
-                if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
-                  printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
-                fi
-                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                  :
                 else
-                  build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                  if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
+                    printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
+                  fi
+                  if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                    create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
+                  else
+                    build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
+                    create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                  fi
                 fi
               else
                 record_review_unavailable_without_failed_checks "OpenCode action outcomes were primary=${OPENCODE_PRIMARY_OUTCOME:-unknown}, fallback=${OPENCODE_FALLBACK_OUTCOME:-unknown}, second_fallback=${OPENCODE_SECOND_FALLBACK_OUTCOME:-unknown}."
@@ -1946,10 +2242,12 @@ jobs:
           failed_checks_file=""
           failed_check_evidence_file=""
           failed_check_review_body_file=""
+          failed_check_review_payload_file=""
+          failed_check_inline_failure_body_file=""
           pending_checks_file=""
           # shellcheck disable=SC2329
           cleanup_approval_files() {
-            rm -f "$tmp_body" "$control_json" "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$pending_checks_file"
+            rm -f "$tmp_body" "$control_json" "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file" "$pending_checks_file"
           }
           trap cleanup_approval_files EXIT
           printf '%s\n' "$comment_body" >"$tmp_body"
@@ -2001,11 +2299,15 @@ jobs:
               if [ -s "$failed_checks_file" ]; then
                 failed_check_evidence_file="$(mktemp)"
                 failed_check_review_body_file="$(mktemp)"
+                if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                  echo "::endgroup::"
+                  exit 0
+                fi
                 if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
-                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
@@ -2013,6 +2315,21 @@ jobs:
                 echo "::endgroup::"
                 exit 0
               fi
+              unresolved_human_threads_file="$(mktemp)"
+              human_thread_review_body_file="$(mktemp)"
+              if ! collect_unresolved_human_review_threads "$unresolved_human_threads_file"; then
+                build_human_thread_lookup_failure_body "$human_thread_review_body_file"
+                create_pull_review "REQUEST_CHANGES" "$(cat "$human_thread_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ -s "$unresolved_human_threads_file" ]; then
+                build_unresolved_human_threads_body "$unresolved_human_threads_file" "$human_thread_review_body_file"
+                create_pull_review "REQUEST_CHANGES" "$(cat "$human_thread_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              rm -f "$unresolved_human_threads_file" "$human_thread_review_body_file"
               summary="$(jq -r '.summary' "$control_json")"
               reason="$(jq -r '.reason' "$control_json")"
               body="$(printf '%s\n' \
@@ -2029,6 +2346,8 @@ jobs:
               ;;
             REQUEST_CHANGES)
               failed_check_review_body_file="$(mktemp)"
+              failed_check_review_payload_file="$(mktemp)"
+              failed_check_inline_failure_body_file="$(mktemp)"
               failed_checks_file="$(mktemp)"
               if ! collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file"; then
                 request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read before validating OpenCode REQUEST_CHANGES against current-head failed checks."
@@ -2038,21 +2357,69 @@ jobs:
 
               if [ -s "$failed_checks_file" ]; then
                 failed_check_evidence_file="$(mktemp)"
+                if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                  echo "::endgroup::"
+                  exit 0
+                fi
                 if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
                   printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
                 fi
                 if scripts/ci/validate_opencode_failed_check_review.sh "$control_json" "$failed_checks_file" "$failed_check_evidence_file"; then
-                  format_request_changes_body "$control_json" "$failed_check_review_body_file"
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
-                elif run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"; then
-                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                  publish_request_changes_from_control "$control_json"
+                elif run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
                 else
                   build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
                   create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
                 fi
               else
-                format_request_changes_body "$control_json" "$failed_check_review_body_file"
+                publish_request_changes_from_control "$control_json"
+              fi
+              ;;
+            NO_CONCLUSION)
+              failed_check_review_body_file="$(mktemp)"
+              failed_check_review_payload_file="$(mktemp)"
+              failed_check_inline_failure_body_file="$(mktemp)"
+              failed_checks_file="$(mktemp)"
+              pending_checks_file="$(mktemp)"
+              set +e
+              wait_for_peer_github_checks "$pending_checks_file"
+              pending_wait_status=$?
+              set -e
+              if [ "$pending_wait_status" -eq 1 ]; then
+                request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read before recording OpenCode NO_CONCLUSION."
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ "$pending_wait_status" -ne 0 ]; then
+                build_pending_check_body "$pending_checks_file" "$failed_check_review_body_file"
                 create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                echo "::endgroup::"
+                exit 0
+              fi
+              if ! collect_github_checks_with_retry collect_failed_github_checks "$failed_checks_file"; then
+                request_changes_for_gate_failure "GitHub Checks statusCheckRollup could not be read after OpenCode returned NO_CONCLUSION."
+                echo "::endgroup::"
+                exit 0
+              fi
+              if [ -s "$failed_checks_file" ]; then
+                failed_check_evidence_file="$(mktemp)"
+                if record_cancelled_strix_no_conclusion_if_only_failure "$failed_checks_file"; then
+                  echo "::endgroup::"
+                  exit 0
+                fi
+                if ! scripts/ci/collect_failed_check_evidence.sh "$failed_check_evidence_file"; then
+                  printf "Failed GitHub Check evidence could not be collected for current head \`%s\`.\n" "$HEAD_SHA" >"$failed_check_evidence_file"
+                fi
+                if run_failed_check_diagnosis "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"; then
+                  create_pull_review_with_payload "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")" "$failed_check_review_payload_file" "$failed_check_inline_failure_body_file"
+                else
+                  build_failed_check_fallback_body "$failed_checks_file" "$failed_check_evidence_file" "$failed_check_review_body_file"
+                  create_pull_review "REQUEST_CHANGES" "$(cat "$failed_check_review_body_file")"
+                fi
+              else
+                no_conclusion_reason="$(jq -r '.reason // "OpenCode returned NO_CONCLUSION."' "$control_json" 2>/dev/null || printf 'OpenCode returned NO_CONCLUSION.')"
+                record_review_unavailable_without_failed_checks "Approval gate result was NO_CONCLUSION. ${no_conclusion_reason}"
               fi
               ;;
             *)

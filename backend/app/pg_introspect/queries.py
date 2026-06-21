@@ -254,6 +254,52 @@ ORDER BY tbl_ns.nspname, tbl.relname, idx.relname;
 """
 
 
+CITUS_DISTRIBUTED_TABLES_SQL = """
+WITH params AS (
+  SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system
+)
+SELECT
+  tbl.oid AS relation_oid,
+  ns.nspname AS schema_name,
+  tbl.relname AS relation_name,
+  p.partmethod::text AS distribution_method,
+  p.partkey::text AS distribution_key,
+  p.colocationid AS colocation_id,
+  p.repmodel::text AS replication_model,
+  co.shardcount AS configured_shard_count,
+  co.replicationfactor AS replication_factor,
+  COUNT(sh.shardid)::int AS shard_count
+FROM pg_catalog.pg_dist_partition p
+JOIN pg_catalog.pg_class tbl ON tbl.oid = p.logicalrelid
+JOIN pg_catalog.pg_namespace ns ON ns.oid = tbl.relnamespace
+LEFT JOIN pg_catalog.pg_dist_colocation co ON co.colocationid = p.colocationid
+LEFT JOIN pg_catalog.pg_dist_shard sh ON sh.logicalrelid = p.logicalrelid
+CROSS JOIN params prm
+WHERE
+  (prm.schema_name IS NULL OR ns.nspname = prm.schema_name)
+  AND (
+    prm.include_system
+    OR (
+      ns.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND ns.nspname NOT LIKE 'pg_toast%'
+      AND ns.nspname NOT LIKE 'pg_temp_%'
+      AND ns.nspname NOT LIKE 'pg_toast_temp_%'
+    )
+  )
+GROUP BY
+  tbl.oid,
+  ns.nspname,
+  tbl.relname,
+  p.partmethod,
+  p.partkey,
+  p.colocationid,
+  p.repmodel,
+  co.shardcount,
+  co.replicationfactor
+ORDER BY ns.nspname, tbl.relname;
+"""
+
+
 PK_COLUMNS_SQL = """
 WITH params AS (
   SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system

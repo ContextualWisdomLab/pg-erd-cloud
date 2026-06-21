@@ -93,7 +93,7 @@ assert_strix_workflow_pr_trigger_hardened() {
 
 	assert_file_contains "$workflow_file" "branches: [master]" "strix workflow scans the protected default branch"
 	assert_file_contains "$workflow_file" "pull_request_target:" "strix workflow uses trusted PR trigger"
-	assert_file_contains "$workflow_file" 'group: strix-${{ github.repository }}' "strix workflow serializes scans per repository for GitHub Models quota"
+	assert_file_contains "$workflow_file" "github.event.pull_request.head.sha || github.event.inputs.pr_head_sha || github.sha" "strix workflow keys concurrency by scanned head so pending PR evidence is not cross-cancelled"
 	assert_file_contains "$workflow_file" "cancel-in-progress: false" "strix workflow never cancels in-progress security evidence"
 	assert_file_contains "$workflow_file" "models: read" "strix workflow grants only the GitHub Models read permission needed for Strix"
 	assert_file_contains "$workflow_file" "Materialize trusted workspace" "strix workflow materializes trusted workspace"
@@ -348,7 +348,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "Never return raw tool-call markup, tool-call JSON, or MCP call syntax in the review body" "opencode review prompt forbids raw tool-call transcripts as final review output"
 	assert_file_contains "$workflow_file" "Do not spend the session listing every changed path before reviewing" "opencode review prompt prevents fallback sessions from exhausting steps on file listing"
 	assert_file_contains "$workflow_file" "always return a final control block instead of a progress summary" "opencode review prompt requires a gate conclusion instead of a progress summary"
-	assert_file_contains "$workflow_file" "timeout 1200 opencode run" "opencode review primary model has a bounded extended timeout for larger workflow diffs"
+	assert_file_contains "$workflow_file" "timeout --kill-after=30s 1200 opencode run" "opencode review primary model has a bounded extended timeout for larger workflow diffs"
 	assert_file_contains "$workflow_file" '"ci-review-fallback"' "opencode review workflow declares a dedicated fallback agent"
 	assert_file_contains "$workflow_file" '"steps": 12' "opencode review fallback agent has enough bounded steps to conclude after MCP inspection"
 	assert_file_contains "$workflow_file" '"output": 12000' "opencode review fallback models have enough output budget for parseable control blocks"
@@ -378,6 +378,7 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_contains "$workflow_file" "## OpenCode Review Overview" "opencode review publishes a visible Review Overview heading"
 	assert_file_contains "$workflow_file" "OpenCode Agent review was unavailable, but current-head GitHub Checks passed." "opencode review does not submit blocking reviews for model/runtime failures after checks pass"
 	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because the failure was in the OpenCode model/runtime path" "opencode review explains non-blocking model/runtime failures"
+	assert_file_contains "$workflow_file" "No formal REQUEST_CHANGES review was submitted because Strix cancellation is missing security evidence, not a source-code finding." "opencode review does not submit source-code changes for cancelled Strix evidence without logs"
 	assert_file_contains "$workflow_file" 'gh api -X PATCH "repos/${GH_REPOSITORY}/issues/comments/${overview_comment_id}"' "opencode review updates an existing Review Overview comment instead of duplicating it"
 	assert_file_contains "$workflow_file" "format_review_api_error" "opencode review approval helper formats formal review API failures"
 	assert_file_contains "$workflow_file" "curl --fail-with-body --silent --show-error" "opencode review approval helper preserves formal review API response bodies"
@@ -466,6 +467,21 @@ assert_opencode_review_uses_codegraph_and_gpt5_fallback() {
 	assert_file_not_contains "$opencode_config" "gpt-4.1" "opencode config must not define GPT-4.1 fallback"
 	assert_file_not_contains "$opencode_config" "gpt-5-chat" "opencode config must not define unavailable GPT-5 chat fallback"
 	assert_file_not_contains "$opencode_config" "gpt-5-mini" "opencode config must not define unavailable GPT-5 mini fallback"
+}
+
+assert_opencode_review_posts_suggested_diffs_inline() {
+	local workflow_file="$REPO_ROOT/.github/workflows/opencode-review.yml"
+
+	assert_file_contains "$workflow_file" "create_pull_review_with_payload" "opencode review can post custom review payloads"
+	assert_file_contains "$workflow_file" "comments: [" "opencode review payload includes inline review comments"
+	assert_file_contains "$workflow_file" '#### Suggested diff\n```diff\n' "opencode review puts suggested diffs inside inline review comments"
+	assert_file_contains "$workflow_file" "GitHub did not accept the inline review comments" "opencode review explains anchor failures instead of copying diffs to the PR body"
+	assert_file_contains "$workflow_file" "publish_request_changes_from_control" "opencode review REQUEST_CHANGES path publishes findings from the control JSON"
+
+	if awk '/format_request_changes_body\(\)/,/build_request_changes_review_payload\(\)/ { print }' "$workflow_file" |
+		grep -Fq '```diff'; then
+		record_failure "opencode review PR-level REQUEST_CHANGES body must not contain fenced suggested diffs"
+	fi
 }
 
 assert_opencode_review_normalizer_accepts_transcript_json() {
@@ -2258,6 +2274,20 @@ CI/CD scripts but no application code. This prevents comprehensive security
 assessment and prevented thorough security testing.
 EOS
 		echo "Penetration test failed: incomplete bounded PR-scope codebase"
+		exit 1
+		;;
+	pr-missing-backend-code-pr-scope)
+		mkdir -p "$STRIX_REPORTS_DIR/fake-pr-missing-backend-code/vulnerabilities"
+		cat >"$STRIX_REPORTS_DIR/fake-pr-missing-backend-code/vulnerabilities/vuln-0001.md" <<'EOS'
+Title: Missing Backend Code in Security Review
+Severity: CRITICAL
+Target: /workspace/strix-pr-scope.CiSMSO
+
+The bounded pull-request scope includes only workflow files and no backend code.
+Because the backend source is absent from this PR-scope target, the scanner
+cannot complete the requested backend security assessment.
+EOS
+		echo "Penetration test failed: missing backend code in bounded PR-scope"
 		exit 1
 		;;
 	pr-critical-placeholder-hardcoded-secret)
@@ -5668,6 +5698,8 @@ assert_strix_child_target_uses_constant_argument
 
 assert_opencode_review_uses_codegraph_and_gpt5_fallback
 
+assert_opencode_review_posts_suggested_diffs_inline
+
 assert_opencode_review_normalizer_accepts_transcript_json
 
 assert_opencode_review_rejects_missing_structural_review_approval
@@ -7894,6 +7926,30 @@ run_gate_case "pr-incomplete-codebase-pr-scope" \
 	"" \
 	"0" \
 	"HIGH" \
+	"0" \
+	"__PR_SCOPE__" \
+	"" \
+	"1200" \
+	"0" \
+	"pull_request" \
+	".github/workflows/opencode-review.yml" \
+	"" \
+	"" \
+	"0"
+
+run_gate_case "pr-missing-backend-code-pr-scope" \
+	"openai/gpt-4o-mini" \
+	"" \
+	"0" \
+	"Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." \
+	"1" \
+	"openai/gpt-4o-mini" \
+	"https://example.invalid" \
+	"vertex_ai" \
+	"__DEFAULT__" \
+	"" \
+	"0" \
+	"CRITICAL" \
 	"0" \
 	"__PR_SCOPE__" \
 	"" \

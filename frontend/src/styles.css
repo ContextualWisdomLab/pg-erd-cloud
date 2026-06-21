@@ -118,6 +118,13 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}
+
 .tableNode {
   width: 280px;
   border: 1px solid #d1d5db;
@@ -529,6 +536,63 @@ button {
 .colHandle:hover {
   background: #034ea2;
   border-color: #034ea2;
+}
+
+.emptyState {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: min(320px, calc(100% - 32px));
+  background: rgba(255, 255, 255, 0.94);
+  padding: 24px;
+  border-radius: 8px;
+  border: 2px dashed #d1d5db;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.emptyState__mark {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 2px solid #034ea2;
+  background:
+    linear-gradient(#034ea2, #034ea2) 10px 12px / 20px 2px no-repeat,
+    linear-gradient(#034ea2, #034ea2) 10px 19px / 20px 2px no-repeat,
+    linear-gradient(#034ea2, #034ea2) 10px 26px / 14px 2px no-repeat;
+}
+
+.emptyState__mark--busy {
+  border-radius: 50%;
+  border-color: #d1d5db;
+  border-top-color: #034ea2;
+  background: none;
+  animation: emptyStateSpin 900ms linear infinite;
+}
+
+.emptyState__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.emptyState__desc {
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+@keyframes emptyStateSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Style table-level top and bottom handles */

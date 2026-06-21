@@ -42,7 +42,7 @@ def test_snapshot_export_preserves_index_tablespace() -> None:
     )
 
     assert (
-        'CREATE INDEX events_id_idx ON public.events USING btree (id) TABLESPACE "fast_space";'
+        'CREATE INDEX CONCURRENTLY events_id_idx ON public.events USING btree (id) TABLESPACE "fast_space";'
         in sql
     )
 

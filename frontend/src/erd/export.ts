@@ -118,7 +118,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
       const quotedTable = quoteSqlIdentifier(tableTitle);
       const accessMethod = sqlAccessMethod(index.access_method);
       indexLines.push(
-        `CREATE INDEX ${indexName} ON ${quotedTable} USING ${accessMethod} (${cols});`,
+        `CREATE INDEX CONCURRENTLY ${indexName} ON ${quotedTable} USING ${accessMethod} (${cols});`,
       );
     }
   }
