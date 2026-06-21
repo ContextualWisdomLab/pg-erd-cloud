@@ -76,9 +76,7 @@ OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
 OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
-import redis.asyncio as redis_client
-redis = redis_client.from_url(settings.valkey_url) if settings.valkey_url else None
-REVOCATION_KEY_PREFIX = "revoked:"
+_revoked_token_jtis: dict[str, dt.datetime] = {}
 
 
 async def _get_oidc_config() -> dict:
@@ -90,18 +88,6 @@ async def _get_oidc_config() -> dict:
     now = dt.datetime.now(dt.timezone.utc)
     if _oidc_config is not None and now < _oidc_config_expires_at:
         return cast(dict, _oidc_config)
-
-    from app.pg_introspect.dsn_guard import _is_restricted_ip, _resolved_ips, DsnTargetError
-    from urllib.parse import urlparse
-    parsed = urlparse(settings.oidc_issuer)
-    try:
-        if parsed.hostname:
-            resolved_ips = await _resolved_ips(parsed.hostname, parsed.port or 443)
-            for ip in resolved_ips:
-                if _is_restricted_ip(ip):
-                    raise RuntimeError("OIDC issuer host resolves to a restricted IP range")
-    except DsnTargetError:
-        pass # DNS resolution errors are handled by httpx later
 
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(
@@ -128,18 +114,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     now = dt.datetime.now(dt.timezone.utc)
     if not force_refresh and _oidc_jwks is not None and now < _oidc_jwks_expires_at:
         return cast(dict, _oidc_jwks)
-
-    from app.pg_introspect.dsn_guard import _is_restricted_ip, _resolved_ips, DsnTargetError
-    from urllib.parse import urlparse
-    parsed = urlparse(jwks_uri)
-    try:
-        if parsed.hostname:
-            resolved_ips = await _resolved_ips(parsed.hostname, parsed.port or 443)
-            for ip in resolved_ips:
-                if _is_restricted_ip(ip):
-                    raise RuntimeError("OIDC JWKS URI host resolves to a restricted IP range")
-    except DsnTargetError:
-        pass # DNS resolution errors are handled by httpx later
 
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(jwks_uri)
@@ -195,29 +169,33 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     return header_alg_raw.upper()
 
 
+def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
+    """Drop expired token revocation entries from the in-memory cache."""
+
+    current = now or dt.datetime.now(dt.timezone.utc)
+    expired = [
+        jwt_id
+        for jwt_id, expires_at in _revoked_token_jtis.items()
+        if expires_at <= current
+    ]
+    for jwt_id in expired:
+        _revoked_token_jtis.pop(jwt_id, None)
 
 
-
-async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
+def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
     if not jwt_id:
         return
-    ttl = (expires_at - dt.datetime.now(dt.timezone.utc)).total_seconds()
-    if ttl > 0 and redis is not None:
-        await redis.setex(
-            f"{REVOCATION_KEY_PREFIX}{jwt_id}",
-            int(ttl),
-            "1"
-        )
+    _prune_revoked_token_jtis()
+    _revoked_token_jtis[jwt_id] = expires_at
 
 
-async def is_token_jti_revoked(jwt_id: str) -> bool:
+def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    if redis is None:
-        return False
-    return bool(await redis.exists(f"{REVOCATION_KEY_PREFIX}{jwt_id}"))
+    _prune_revoked_token_jtis()
+    return jwt_id in _revoked_token_jtis
 
 
 def _bearer_token_from_request(request: Request) -> str:
@@ -276,7 +254,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     return cast(dict[str, Any], claims)
 
 
-async def _verified_token_from_claims(claims: dict[str, Any]) -> VerifiedToken:
+def _verified_token_from_claims(claims: dict[str, Any]) -> VerifiedToken:
     """Validate decoded claims and return the request auth identity."""
 
     sub = claims.get("sub")
@@ -288,7 +266,7 @@ async def _verified_token_from_claims(claims: dict[str, Any]) -> VerifiedToken:
         raise HTTPException(status_code=401, detail="token missing jti")
 
     expires_at = _jwt_expiry(claims)
-    if await is_token_jti_revoked(jwt_id):
+    if is_token_jti_revoked(jwt_id):
         raise HTTPException(status_code=401, detail="token revoked")
 
     return VerifiedToken(
@@ -310,7 +288,7 @@ async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
     if settings.oidc_issuer:
         token = _bearer_token_from_request(request)
         claims = await _decode_verified_oidc_token(token)
-        return await _verified_token_from_claims(claims)
+        return _verified_token_from_claims(claims)
 
     raise HTTPException(status_code=500, detail="OIDC configuration required")
 
@@ -402,4 +380,4 @@ async def revoke_current_request_token(request: Request) -> None:
     """Revoke the current request token until its natural expiry."""
 
     verified = await _get_verified_token_from_request(request)
-    await revoke_token_jti(verified.jwt_id, verified.expires_at)
+    revoke_token_jti(verified.jwt_id, verified.expires_at)

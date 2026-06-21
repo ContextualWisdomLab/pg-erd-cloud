@@ -4,7 +4,11 @@ import socket
 
 import pytest
 
-from app.pg_introspect.dsn_guard import DsnTargetError, validate_postgres_dsn_target
+from app.pg_introspect.dsn_guard import (
+    DsnTargetError,
+    _unique_hosts,
+    validate_postgres_dsn_target,
+)
 from app.settings import settings
 
 
@@ -13,6 +17,10 @@ def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]
         (socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 5432))
         for ip in ips
     ]
+
+
+def test_unique_hosts_returns_empty_tuple_for_empty_list() -> None:
+    assert _unique_hosts([]) == ()
 
 
 @pytest.mark.parametrize(

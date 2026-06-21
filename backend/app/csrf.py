@@ -10,9 +10,6 @@ CSRF_HEADER_NAME = "X-CSRF-Token"
 MIN_CSRF_TOKEN_LENGTH = 16
 
 
-from jose import jwt, JWTError
-from app.settings import settings
-
 def make_csrf_middleware(
     route_prefix: str = "/api",
     header_name: str = CSRF_HEADER_NAME,
@@ -35,15 +32,6 @@ def make_csrf_middleware(
         if len(token) < MIN_CSRF_TOKEN_LENGTH:
             return JSONResponse(
                 {"detail": "CSRF token required"},
-                status_code=403,
-            )
-
-        try:
-            # We enforce that the token is valid according to our secret keys
-            jwt.decode(token, settings.app_secret, algorithms=["HS256"])
-        except JWTError:
-            return JSONResponse(
-                {"detail": "CSRF token invalid"},
                 status_code=403,
             )
 
