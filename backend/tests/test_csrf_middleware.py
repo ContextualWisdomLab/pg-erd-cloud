@@ -47,8 +47,11 @@ async def test_csrf_rejects_state_changing_api_without_token() -> None:
 async def test_csrf_allows_state_changing_api_with_token() -> None:
     middleware = make_csrf_middleware()
 
+    from jose import jwt
+    from app.settings import settings
+    valid_token = jwt.encode({"session_id": "test"}, settings.app_secret, algorithm="HS256")
     response = await middleware(
-        make_request("POST", "/api/projects", {CSRF_HEADER_NAME: "x" * 16}),
+        make_request("POST", "/api/projects", {CSRF_HEADER_NAME: valid_token}),
         ok_response,
     )
 
