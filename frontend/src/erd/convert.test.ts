@@ -157,4 +157,25 @@ describe('snapshotToGraph', () => {
       label: 'fk_user_old'
     })
   })
+
+  it('handles an empty snapshot object', () => {
+    const snapshot: SnapshotInput = {}
+    const graph = snapshotToGraph(snapshot)
+    expect(graph.nodes).toHaveLength(0)
+    expect(graph.edges).toHaveLength(0)
+  })
+
+  it('handles a snapshot with empty arrays', () => {
+    const snapshot: SnapshotInput = {
+      relations: [],
+      columns: [],
+      constraints: [],
+      pk_columns: [],
+      fk_edges: [],
+      indexes: []
+    }
+    const graph = snapshotToGraph(snapshot)
+    expect(graph.nodes).toHaveLength(0)
+    expect(graph.edges).toHaveLength(0)
+  })
 })
