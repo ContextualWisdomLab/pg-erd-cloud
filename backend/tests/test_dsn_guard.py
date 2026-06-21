@@ -243,3 +243,24 @@ async def test_dsn_guard_enforces_configured_allowlist(
 
     with pytest.raises(DsnTargetError, match="allowlist"):
         await validate_postgres_dsn_target("postgresql://user:pass@other.example.com/app")
+
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_unresolvable_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_gaierror(*args, **kwargs):
+        raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        raise_gaierror,
+    )
+    monkeypatch.setattr(
+        settings,
+        "db_introspection_allowed_hosts",
+        "db.example.com",
+    )
+
+    with pytest.raises(DsnTargetError, match="database host could not be resolved"):
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")

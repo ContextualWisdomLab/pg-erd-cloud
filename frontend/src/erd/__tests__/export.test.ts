@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportDDL } from '../export';
+import { exportDDL, exportPlantUml } from '../export';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
 
@@ -262,5 +262,155 @@ describe('exportDDL', () => {
     expect(ddl).toContain('"valid_type" integer');
     // sqlAccessMethod invalid input fallback is 'btree'
     expect(ddl).toContain('CREATE INDEX CONCURRENTLY "idx_invalid_method" ON "public.data" USING btree ("invalid_type");');
+  });
+});
+
+
+describe('exportPlantUml', () => {
+  it('should export basic plantuml layout with correct headers', () => {
+    const puml = exportPlantUml([], []);
+    expect(puml).toContain('@startuml');
+    expect(puml).toContain('hide circle');
+    expect(puml).toContain('skinparam linetype ortho');
+    expect(puml).toContain('@enduml');
+  });
+
+  it('should export tables with columns and properties', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'email', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('entity "public.users" as T_1 {');
+    expect(puml).toContain('*id : integer <<not null>>');
+    expect(puml).toContain('  email : text');
+    expect(puml).toContain('}');
+  });
+
+  it('should export relationships between tables', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.posts',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '1',
+        target: '2',
+        label: 'author_id',
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, edges);
+    expect(puml).toContain('T_1 --> T_2 : author_id');
+  });
+
+  it('should format index correctly from node data', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [],
+          indexes: [
+            {
+              index_name: 'idx_email',
+              columns: ['email'],
+              access_method: 'btree',
+              is_unique: true,
+            } as any
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('<<index>> idx_email [btree] (email) unique');
+  });
+
+  it('should format labels correctly for comments and business groups', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'user_node',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          comment: 'Store user data',
+          businessGroup: { id: 'group_1', name: 'Core', color: '#fff' },
+          columns: [
+            {
+              column_name: 'age',
+              data_type: 'int',
+              is_not_null: false,
+              is_pk: false,
+              column_comment: 'User age',
+              example_value: 25,
+            }
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    expect(puml).toContain('entity "users [Core] (Store user data)" as T_user_node {');
+    expect(puml).toContain('age (User age) [e.g. 25] : int');
+  });
+
+  it('should escape special characters in plantuml', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'my<bad>table',
+          columns: [
+            { column_name: 'col\\n1', data_type: 'text', is_not_null: false, is_pk: false },
+          ],
+          badges: { pk: false, fk: false },
+        },
+      },
+    ];
+
+    const puml = exportPlantUml(nodes, []);
+    // < > are escaped to &lt; &gt;
+    expect(puml).toContain('entity "my&lt;bad&gt;table" as T_1 {');
+    // backslash is replaced by \\, but inside string literal it is double backslash
+    expect(puml).toContain('  col\\\\n1 : text');
   });
 });
