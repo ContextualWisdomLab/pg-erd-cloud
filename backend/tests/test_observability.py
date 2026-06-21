@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
-from app.observability import setup_observability
+from app.observability import _get_client_ip, _get_route_template, setup_observability
 from app.settings import settings
 
 
@@ -46,39 +48,82 @@ def test_request_id_header_and_metrics_endpoint() -> None:
 
 
 def test_get_route_template_with_route() -> None:
-    from app.observability import _get_route_template
-
     class MockRoute:
         path = "/api/v1/users/{user_id}"
 
-    class MockRequest:
-        def __init__(self):
-            self.scope = {"route": MockRoute()}
-
-    req = MockRequest()
-    assert _get_route_template(req) == "/api/v1/users/{user_id}"  # type: ignore
+    req = Request({"type": "http", "headers": [], "route": MockRoute()})
+    assert _get_route_template(req) == "/api/v1/users/{user_id}"
 
 
 def test_get_route_template_without_route() -> None:
-    from app.observability import _get_route_template
-
-    class MockRequest:
-        def __init__(self):
-            self.scope = {}
-
-    req = MockRequest()
-    assert _get_route_template(req) == "unmatched"  # type: ignore
+    req = Request({"type": "http", "headers": []})
+    assert _get_route_template(req) == "unmatched"
 
 
 def test_get_route_template_empty_path() -> None:
-    from app.observability import _get_route_template
-
     class MockRoute:
         path = ""
 
-    class MockRequest:
-        def __init__(self):
-            self.scope = {"route": MockRoute()}
+    req = Request({"type": "http", "headers": [], "route": MockRoute()})
+    assert _get_route_template(req) == "unmatched"
 
-    req = MockRequest()
-    assert _get_route_template(req) == "unmatched"  # type: ignore
+
+@pytest.mark.parametrize(
+    ("trust_xff", "headers", "client", "expected_ip"),
+    [
+        # trust_xff=False, client missing
+        (False, [], None, "unknown"),
+        # trust_xff=False, client present
+        (False, [], ("192.168.1.1", 12345), "192.168.1.1"),
+        # trust_xff=False, client missing host (None)
+        (False, [], (None, 12345), "unknown"),
+        # trust_xff=False, client host empty string
+        (False, [], ("", 12345), "unknown"),
+        # trust_xff=False, X-Forwarded-For is ignored
+        (
+            False,
+            [(b"x-forwarded-for", b"10.0.0.1")],
+            ("192.168.1.1", 12345),
+            "192.168.1.1",
+        ),
+        # trust_xff=True, single IP
+        (True, [(b"x-forwarded-for", b"10.0.0.1")], ("192.168.1.1", 12345), "10.0.0.1"),
+        # trust_xff=True, multiple IPs (takes the first one)
+        (
+            True,
+            [(b"x-forwarded-for", b"10.0.0.1, 10.0.0.2")],
+            ("192.168.1.1", 12345),
+            "10.0.0.1",
+        ),
+        # trust_xff=True, empty XFF value falls back to client
+        (True, [(b"x-forwarded-for", b"")], ("192.168.1.1", 12345), "192.168.1.1"),
+        # trust_xff=True, whitespace XFF value falls back to client
+        (True, [(b"x-forwarded-for", b" , ")], ("192.168.1.1", 12345), "192.168.1.1"),
+        # trust_xff=True, XFF not present falls back to client
+        (True, [], ("192.168.1.1", 12345), "192.168.1.1"),
+        # trust_xff=True, XFF not present and client missing falls back to unknown
+        (True, [], None, "unknown"),
+    ],
+)
+def test_get_client_ip(
+    trust_xff: bool,
+    headers: list[tuple[bytes, bytes]],
+    client: tuple[str | None, int] | None,
+    expected_ip: str,
+) -> None:
+    """_get_client_ip should extract IP correctly based on headers and trust settings."""
+    # Temporarily set the setting for the test
+    prev_trust = settings.api_rate_limit_trust_x_forwarded_for
+    settings.api_rate_limit_trust_x_forwarded_for = trust_xff
+    try:
+        scope: dict[str, object] = {
+            "type": "http",
+            "headers": headers,
+        }
+        if client is not None:
+            scope["client"] = client
+
+        req = Request(scope)
+        assert _get_client_ip(req) == expected_ip
+    finally:
+        settings.api_rate_limit_trust_x_forwarded_for = prev_trust
