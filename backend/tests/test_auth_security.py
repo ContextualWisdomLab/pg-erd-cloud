@@ -457,6 +457,16 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
         auth._user_cache.clear()
 
 
+@pytest.mark.asyncio
+async def test_try_get_subject_for_rate_limit_error_path():
+    """Verify try_get_subject_for_rate_limit returns None on auth failure."""
+    req = make_request()  # No Authorization header
+
+    # We should get None because of the Missing Bearer Token HTTPException
+    subject = await auth.try_get_subject_for_rate_limit(req)
+    assert subject is None
+
+
 async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
