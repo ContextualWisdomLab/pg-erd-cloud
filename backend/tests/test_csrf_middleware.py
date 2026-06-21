@@ -7,9 +7,7 @@ from starlette.responses import Response
 from app.csrf import CSRF_HEADER_NAME, make_csrf_middleware
 
 
-def make_request(
-    method: str, path: str, headers: dict[str, str] | None = None
-) -> Request:
+def make_request(method: str, path: str, headers: dict[str, str] | None = None) -> Request:
     return Request(
         {
             "type": "http",

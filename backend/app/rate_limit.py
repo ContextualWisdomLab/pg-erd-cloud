@@ -32,21 +32,10 @@ class RateLimitPolicy:
     requests: int
     window_seconds: float
     route_prefix: str = "/api"
-    trust_x_forwarded_for: bool = False
 
 
-def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
+def _get_client_ip(request: Request) -> str:
     global _last_unknown_ip_log_at
-
-    if trust_x_forwarded_for:
-        xff = request.headers.get("X-Forwarded-For")
-        if xff:
-            # Use the left-most value (original client), trimming whitespace.
-            # This header is user-controllable unless sanitized by a trusted
-            # proxy/ingress. Keep default trust off.
-            ip = xff.split(",", 1)[0].strip()
-            if ip:
-                return ip
 
     client = request.client
     if client is None:
@@ -148,7 +137,7 @@ def make_rate_limit_middleware(
                 # Never fail requests due to key derivation.
                 subject = None
 
-        ip = _get_client_ip(request, trust_x_forwarded_for=policy.trust_x_forwarded_for)
+        ip = _get_client_ip(request)
         key = f"ip:{ip}"
         if subject:
             key = f"{key}|sub:{subject}"

@@ -84,7 +84,6 @@ class Settings(BaseSettings):
     api_rate_limit_enabled: bool = True
     api_rate_limit_requests: int = Field(120, ge=1)
     api_rate_limit_window_seconds: float = Field(60.0, gt=0.0)
-    api_rate_limit_trust_x_forwarded_for: bool = False
     api_rate_limit_max_keys: int = Field(10_000, ge=1)
     share_link_rate_limit_enabled: bool = True
     share_link_rate_limit_requests: int = Field(30, ge=1)

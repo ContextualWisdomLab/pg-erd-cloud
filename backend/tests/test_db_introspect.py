@@ -7,10 +7,7 @@ from app import db_introspect
 
 def test_detect_dsn_dialect_supports_postgresql_and_snowflake() -> None:
     assert db_introspect.detect_dsn_dialect("postgresql://u:p@db/app") == "postgresql"
-    assert (
-        db_introspect.detect_dsn_dialect("postgresql+asyncpg://u:p@db/app")
-        == "postgresql"
-    )
+    assert db_introspect.detect_dsn_dialect("postgresql+asyncpg://u:p@db/app") == "postgresql"
     assert db_introspect.detect_dsn_dialect("snowflake://u:p@acct/DB") == "snowflake"
 
 

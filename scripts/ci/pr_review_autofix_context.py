@@ -52,9 +52,7 @@ def pr_view(repo: str, number: int) -> dict[str, Any]:
 
 
 def current_reviews(repo: str, number: int, head_sha: str) -> list[dict[str, Any]]:
-    pages = run_json(
-        ["api", f"repos/{repo}/pulls/{number}/reviews", "--paginate", "--slurp"]
-    )
+    pages = run_json(["api", f"repos/{repo}/pulls/{number}/reviews", "--paginate", "--slurp"])
     reviews = [review for page in pages for review in page]
     current: list[dict[str, Any]] = []
     for review in reviews:
@@ -62,10 +60,7 @@ def current_reviews(repo: str, number: int, head_sha: str) -> list[dict[str, Any
         commit_id = str(review.get("commit_id") or "")
         if commit_id != head_sha and head_sha not in body:
             continue
-        if str(review.get("state") or "").upper() not in {
-            "CHANGES_REQUESTED",
-            "APPROVED",
-        }:
+        if str(review.get("state") or "").upper() not in {"CHANGES_REQUESTED", "APPROVED"}:
             continue
         current.append(review)
     return current[-8:]
@@ -139,9 +134,7 @@ def check_summary(status_rollup: list[dict[str, Any]] | None) -> list[str]:
 def write_context(repo: str, number: int, head_sha: str, output: Path) -> None:
     pr = pr_view(repo, number)
     if pr["headRefOid"] != head_sha:
-        raise RuntimeError(
-            f"live head {pr['headRefOid']} does not match expected {head_sha}"
-        )
+        raise RuntimeError(f"live head {pr['headRefOid']} does not match expected {head_sha}")
 
     reviews = current_reviews(repo, number, head_sha)
     threads = review_threads(repo, number)
@@ -215,9 +208,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     if not args.repo:
         parser.error("--repo is required")
     if not REPO_RE.fullmatch(args.repo):
-        parser.error(
-            "--repo must be in OWNER/NAME form with safe GitHub name characters"
-        )
+        parser.error("--repo must be in OWNER/NAME form with safe GitHub name characters")
     if args.pr_number < 1:
         parser.error("--pr-number must be positive")
     if not SHA_RE.fullmatch(args.head_sha):

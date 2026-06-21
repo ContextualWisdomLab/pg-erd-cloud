@@ -173,7 +173,9 @@ class JobQueue(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+    __table_args__ = (
+        Index("ix_job_queue__status_run_after", "status", "run_after"),
+    )
 
 
 class ShareLink(Base):
@@ -193,7 +195,9 @@ class ShareLink(Base):
         UUID(as_uuid=True),
         ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
     )
-    permission_kind: Mapped[str] = mapped_column(Text())  # viewer/editor (MVP: viewer)
+    permission_kind: Mapped[str] = mapped_column(
+        Text()
+    )  # viewer/editor (MVP: viewer)
     expires_at: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

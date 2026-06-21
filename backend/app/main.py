@@ -76,7 +76,6 @@ _rate_limit_policy = RateLimitPolicy(
     requests=settings.api_rate_limit_requests,
     window_seconds=settings.api_rate_limit_window_seconds,
     route_prefix="/api",
-    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 _share_link_rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.share_link_rate_limit_max_keys
@@ -86,7 +85,6 @@ _share_link_rate_limit_policy = RateLimitPolicy(
     requests=settings.share_link_rate_limit_requests,
     window_seconds=settings.share_link_rate_limit_window_seconds,
     route_prefix="/api/share",
-    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 
 app.middleware("http")(
