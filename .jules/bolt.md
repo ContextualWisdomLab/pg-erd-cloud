@@ -8,3 +8,7 @@
 ## 2026-06-20 - O(N^2) loops for finding items in export
 **Learning:** Nested array `.find()` iterations within loops parsing graph connections result in O(N^2) complexity, significantly degrading UI performance for large outputs.
 **Action:** Always pre-compute a lookup `Map` in O(N) when multiple specific node lookups are needed within iterative processes.
+## 2024-05-24 - Optimize O(N*M) lookups to O(1) Sets in React state mapping
+- **Learning**: Using `array.some(...)` inside `array.map(...)` can become a significant performance bottleneck (O(N*M)) when dealing with large sets of recommendations or nodes.
+- **Action**: Always pre-compute a `Set` or dictionary outside the mapping loop for fast O(1) signature-based lookups.
+- **Safety**: When moving logic into a state updater callback like `setNodes((currentNodes) => ...)`, make sure to evaluate any validation checks (like checking if an index is already applied) **inside** the callback to prevent stale closures. Avoid unchecked properties like `columns.join` if `columns` could be undefined.
