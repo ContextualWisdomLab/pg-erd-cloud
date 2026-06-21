@@ -49,7 +49,9 @@ def _normalize_type_text(data_type: str) -> str:
 def _postgres_type_to_snowflake(column: dict) -> str:
     base_type = column.get("domain_base_type")
     if isinstance(base_type, str):
-        return _postgres_type_to_snowflake({**column, "data_type": base_type})
+        new_col = {**column, "data_type": base_type}
+        new_col.pop("domain_base_type", None)
+        return _postgres_type_to_snowflake(new_col)
 
     data_type = column.get("data_type")
     if not isinstance(data_type, str):
