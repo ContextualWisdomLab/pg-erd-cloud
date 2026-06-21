@@ -458,10 +458,10 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_optional_subject_from_request_error_path():
-    """Verify get_optional_subject_from_request returns None on auth failure."""
+async def test_try_get_subject_for_rate_limit_error_path():
+    """Verify try_get_subject_for_rate_limit returns None on auth failure."""
     req = make_request()  # No Authorization header
 
     # We should get None because of the Missing Bearer Token HTTPException
-    subject = await auth.get_optional_subject_from_request(req)
+    subject = await auth.try_get_subject_for_rate_limit(req)
     assert subject is None

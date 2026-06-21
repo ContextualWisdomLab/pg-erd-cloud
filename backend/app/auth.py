@@ -297,7 +297,7 @@ async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     return verified.subject, verified.display_name
 
 
-async def get_optional_subject_from_request(request: Request) -> str | None:
+async def try_get_subject_for_rate_limit(request: Request) -> str | None:
     """Best-effort subject extraction for rate limiting.
 
     This helper is intentionally lightweight:
