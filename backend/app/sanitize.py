@@ -34,7 +34,5 @@ def sanitize_for_storage(obj: object) -> object:
     if isinstance(obj, tuple):
         return tuple(sanitize_for_storage(v) for v in obj)
     if isinstance(obj, Mapping):
-        return {
-            strip_nul(str(k)): sanitize_for_storage(v) for k, v in obj.items()
-        }
+        return {strip_nul(str(k)): sanitize_for_storage(v) for k, v in obj.items()}
     return obj

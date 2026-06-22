@@ -490,9 +490,7 @@ def _render_table_columns_snowflake(
         col_name = c.get("column_name")
         if not isinstance(col_name, str):
             continue
-        parts = [
-            f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"
-        ]
+        parts = [f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"]
         if c.get("has_default"):
             default_clause = _column_default_clause(c.get("default_expr"), "snowflake")
             if default_clause:
@@ -578,7 +576,9 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
             continue
 
         col_defs = _render_table_columns_snowflake(oid, cols_by_oid, source_dialect)
-        table_cons, skipped_checks = _render_table_constraints_snowflake(oid, constraints_by_oid, cols_by_oid)
+        table_cons, skipped_checks = _render_table_constraints_snowflake(
+            oid, constraints_by_oid, cols_by_oid
+        )
 
         all_defs = col_defs + table_cons
         lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")

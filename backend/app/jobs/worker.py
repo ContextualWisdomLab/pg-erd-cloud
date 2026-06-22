@@ -25,9 +25,7 @@ from app.settings import settings
 
 _logger = logging.getLogger(__name__)
 
-Handler: TypeAlias = Callable[
-    [Callable[[], AsyncSession], JobQueue], Awaitable[None]
-]
+Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
 
 
 def _mark_job_running(job: JobQueue) -> JobQueue:
@@ -39,14 +37,10 @@ def _mark_job_running(job: JobQueue) -> JobQueue:
         try:
             wait_s = (job.started_at - job.run_after).total_seconds()
             if wait_s >= 0:
-                JOB_QUEUE_WAIT_SECONDS.labels(job_type=job.job_type).observe(
-                    wait_s
-                )
+                JOB_QUEUE_WAIT_SECONDS.labels(job_type=job.job_type).observe(wait_s)
         except Exception:  # noqa: BLE001
             # Never fail job claiming due to metrics.
-            _logger.debug(
-                "job queue wait metric observation failed", exc_info=True
-            )
+            _logger.debug("job queue wait metric observation failed", exc_info=True)
     return job
 
 
@@ -91,14 +85,16 @@ async def claim_one_job(session: AsyncSession) -> JobQueue | None:
 
     # Transaction: claim a queued job using SKIP LOCKED (non-blocking)
     # We use raw SQL to leverage FOR UPDATE SKIP LOCKED reliably.
-    row = await session.execute(text("""
+    row = await session.execute(
+        text("""
             SELECT job_queue_uuid
             FROM job_queue
             WHERE status = 'queued' AND run_after <= now()
             ORDER BY run_after ASC
             FOR UPDATE SKIP LOCKED
             LIMIT 1
-            """))
+            """)
+    )
     job_id = row.scalar_one_or_none()
     if job_id is None:
         return None
