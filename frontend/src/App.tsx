@@ -1456,7 +1456,6 @@ export default function App() {
                   <button onClick={onAddTableCancel}>취소</button>
                   <button
                     onClick={onAddTableSubmit}
-                    disabled={!newTableName.trim()}
                     style={{ background: "#034ea2", color: "#fff" }}
                   >
                     저장

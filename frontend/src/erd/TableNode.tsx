@@ -72,10 +72,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             </span>
           ) : null}
           {data.badges?.pk ? (
-            <span className="tableNode__badge">PK</span>
+            <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span>
           ) : null}
           {data.badges?.fk ? (
-            <span className="tableNode__badge">FK</span>
+            <span className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</span>
           ) : null}
         </span>
       </div>
@@ -104,9 +104,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
+              {c.is_pk ? <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span> : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge">NOT NULL</span>
+                <span className="tableNode__badge" title="Not Null" aria-label="Not Null">NOT NULL</span>
               ) : null}
               <Handle
                 type="source"
