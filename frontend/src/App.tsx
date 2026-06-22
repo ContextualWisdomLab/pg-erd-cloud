@@ -1445,11 +1445,6 @@ export default function App() {
                     id="new-table-name"
                     value={newTableName}
                     onChange={(e) => setNewTableName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newTableName.trim()) {
-                        onAddTableSubmit();
-                      }
-                    }}
                     placeholder="users"
                     autoFocus
                   />
@@ -1458,11 +1453,8 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button type="button" onClick={onAddTableCancel}>
-                    취소
-                  </button>
+                  <button onClick={onAddTableCancel}>취소</button>
                   <button
-                    type="button"
                     onClick={onAddTableSubmit}
                     disabled={!newTableName.trim()}
                     style={{ background: "#034ea2", color: "#fff" }}
