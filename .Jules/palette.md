@@ -28,3 +28,6 @@
 ## 2026-06-22 - Further STRIX Intersections
 **Learning:** STRIX flags files for even tangential input validation issues (like accepting non-numeric or malformed data). My change strictly scoped to the `disabled` state on the "Add Table" button still triggered the STRIX CI check in `App.tsx` because STRIX was already aware of an underlying "MEDIUM" vulnerability (`Insufficient Input Validation in ERD Application`) on the `newTableName` variable, which the UX change interacted with.
 **Action:** The simplest resolution when blocked by pre-existing STRIX vulnerabilities that I am not allowed to fix is to choose an entirely different component/file (like `TableNode.tsx`) for the UX enhancement, rather than repeatedly fighting the scanner on an inherently vulnerable file.
+## 2026-06-22 - Hyper-Isolated UX Scope
+**Learning:** Even grouping similar micro-UX changes (like adding `aria-label`s to multiple distinct badge types in the same file) will trigger the repository's boundary-enforcement CI if tasked with implementing "ONE" improvement. The CI demands absolute adherence to a single action scope.
+**Action:** When strictly tasked with ONE improvement, pick a single element (e.g., just the Primary Key badge) to modify, rather than sweeping similar elements within a component.
