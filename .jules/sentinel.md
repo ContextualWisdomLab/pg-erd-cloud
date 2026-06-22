@@ -13,3 +13,6 @@
 ## 2026-06-22 - Token Revocation Cache and Project Members Access
 **Learning:** The token revocation mechanism used an in-memory dictionary `_revoked_token_jtis` that doesn't persist across application restarts. This could allow revoked tokens to become valid again after a service restart until their natural expiration. Also, the `list_project_members` endpoint did not properly check authorization, potentially allowing low-privilege users (e.g. viewers) to enumerate all project members.
 **Action:** Always implement persistent storage (e.g. database or Redis) for revoked tokens to ensure revocation survives application restarts. Also, ensure appropriate role-based access controls are strictly applied for viewing members in project spaces.
+## 2026-06-22 - IDOR in Project Members List
+**Learning:** The `/api/projects/{project_space_uuid}/members` endpoint exposed the full list of members and their roles to any user with `viewer` access. This excessive visibility could facilitate enumeration and social engineering attacks.
+**Action:** Implemented stricter role-based access control (RBAC) on the endpoint to require a minimum `editor` role to view project members, mitigating the IDOR risk.
