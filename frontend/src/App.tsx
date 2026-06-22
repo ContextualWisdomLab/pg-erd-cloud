@@ -814,22 +814,11 @@ export default function App() {
             id="schema-filter"
             value={schemaFilter}
             onChange={(e) => setSchemaFilter(e.target.value)}
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                selectedProjectId &&
-                selectedConnId &&
-                !isCreatingSnapshot
-              ) {
-                onCreateSnapshot();
-              }
-            }}
             placeholder="public"
           />
         </div>
 
         <button
-          type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
           aria-busy={isCreatingSnapshot}
