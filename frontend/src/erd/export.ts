@@ -164,7 +164,13 @@ function indexesByRelation(snapshot?: SnapshotJson | null): Map<string, Snapshot
     const oid = ix.relation_oid ?? ix.table_oid;
     if (typeof oid !== 'number') continue;
     const key = String(oid);
-    map.set(key, [...(map.get(key) || []), ix]);
+    // ⚡ Bolt: Optimize array spread to O(1) amortized push, avoiding O(N^2) complexity and excessive GC when grouping indexes by relation.
+    const list = map.get(key);
+    if (list) {
+      list.push(ix);
+    } else {
+      map.set(key, [ix]);
+    }
   }
   return map;
 }
