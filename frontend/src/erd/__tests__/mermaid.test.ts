@@ -171,4 +171,70 @@ describe('exportMermaid', () => {
     const result = exportMermaid(nodes, edges);
     expect(result).toContain('    integer user_id FK\n');
   });
+  it('sanitizes titles, labels, and column names to prevent XSS', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public."users"<script>alert(1)</script>',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'i\'d', data_type: 'integer', is_not_null: true, is_pk: true }
+          ]
+        }
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.\'posts\'\n',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'user\r_id', data_type: 'integer', is_not_null: true, is_pk: false }
+          ]
+        }
+      }
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        label: 'fk_user_"id"<>',
+        type: 'smoothstep'
+      }
+    ];
+    const result = exportMermaid(nodes, edges);
+
+    // Check that quotes and newlines were removed
+    expect(result).not.toContain('<script>');
+    expect(result).toContain('  "public.usersscriptalert(1)/script" {\n');
+    expect(result).toContain('    integer id PK\n');
+    expect(result).toContain('  "public.posts" {\n');
+    expect(result).toContain('    integer user_id FK\n');
+    expect(result).toContain('  "public.usersscriptalert(1)/script" ||--o{ "public.posts" : "fk_user_id"\n');
+  });
+
+  it('handles empty titles or missing labels safely', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: '', // empty title
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: '', data_type: 'integer', is_not_null: true, is_pk: true }
+          ]
+        }
+      }
+    ];
+    const result = exportMermaid(nodes, []);
+    expect(result).toContain('  "" {\n');
+    expect(result).toContain('    integer  PK\n');
+  });
 });

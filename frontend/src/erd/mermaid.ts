@@ -2,6 +2,12 @@ import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sanitizeHandleId } from "./handleUtils";
 
+function sanitizeString(str: string): string {
+  if (!str) return "";
+  // Remove quotes, newlines, and angle brackets to prevent XSS and formatting issues in Mermaid
+  return str.replace(/["'\n\r<>]/g, "");
+}
+
 export function exportMermaid(
   nodes: Node<TableNodeData>[],
   edges: Edge[]
@@ -13,7 +19,7 @@ export function exportMermaid(
   }
 
   for (const node of nodes) {
-    const title = node.data.title;
+    const title = sanitizeString(node.data.title);
     output += `  "${title}" {\n`;
 
     for (const col of node.data.columns) {
@@ -32,7 +38,7 @@ export function exportMermaid(
 
       // Mermaid data types should be alphanumeric without spaces
       const safeType = col.data_type.replace(/[^a-zA-Z0-9_]/g, "_");
-      output += `    ${safeType} ${col.column_name}${modifiers}\n`;
+      output += `    ${safeType} ${sanitizeString(col.column_name)}${modifiers}\n`;
     }
     output += "  }\n";
   }
@@ -42,7 +48,7 @@ export function exportMermaid(
     const targetNode = nodes.find((n) => n.id === edge.target);
 
     if (sourceNode && targetNode) {
-      output += `  "${targetNode.data.title}" ||--o{ "${sourceNode.data.title}" : "${edge.label || "rel"}"\n`;
+      output += `  "${sanitizeString(targetNode.data.title)}" ||--o{ "${sanitizeString(sourceNode.data.title)}" : "${sanitizeString(String(edge.label || "rel"))}"\n`;
     }
   }
 
