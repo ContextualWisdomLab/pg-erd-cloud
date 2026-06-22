@@ -4,8 +4,8 @@ import { sanitizeHandleId } from "./handleUtils";
 
 function sanitizeString(str: string): string {
   if (!str) return "";
-  // Remove quotes, newlines, and angle brackets to prevent XSS and formatting issues in Mermaid
-  return str.replace(/["'\n\r<>]/g, "");
+  // Aggressively remove quotes, newlines, angle brackets, and curly braces to prevent XSS and formatting issues in Mermaid
+  return str.replace(/["'`\n\r<>{}]/g, "");
 }
 
 export function exportMermaid(
