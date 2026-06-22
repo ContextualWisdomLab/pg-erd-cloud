@@ -22,3 +22,6 @@
 ## 2026-06-22 - STRIX Security Intersections
 **Learning:** Adding UX enhancements (like `onKeyDown` listeners or `placeholder` texts) to inputs that handle sensitive data (like database DSNs) causes those lines to be analyzed by the repository's STRIX penetration tester. If the underlying code is vulnerable (e.g., handles credentials insecurely), STRIX will flag it and block the PR, even though the UX change itself didn't introduce the vulnerability.
 **Action:** When adding UX improvements, carefully inspect if the target lines handle credentials or sensitive data. If so, avoid modifying those specific elements to prevent triggering unrelated security CI failures.
+## 2026-06-22 - Single Improvement Scope
+**Learning:** When tasked with making *ONE* micro-UX improvement, implementing changes across multiple different modals or components in a single PR violates the agent boundary rules. The `opencode-review` CI step actively enforces this and will fail the run if the scope expands beyond a single distinct feature/enhancement.
+**Action:** Always strictly isolate modifications to a single targeted area (e.g., just the "Add Table" modal) when a boundary restricts work to exactly one improvement.

@@ -722,14 +722,8 @@ export default function App() {
               id="project-name"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && projectName.trim() && !isCreatingProject) {
-                  onCreateProject();
-                }
-              }}
             />
             <button
-              type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
@@ -1040,11 +1034,8 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button type="button" onClick={onCloseExport}>
-                    닫기
-                  </button>
+                  <button onClick={onCloseExport}>닫기</button>
                   <button
-                    type="button"
                     onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
@@ -1107,20 +1098,15 @@ export default function App() {
                   style={{ justifyContent: "space-between", marginTop: 8 }}
                 >
                   <button
-                    type="button"
                     onClick={onRelDelete}
                     style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
                   >
                     삭제
                   </button>
                   <div className="row">
-                    <button type="button" onClick={onRelCancel}>
-                      취소
-                    </button>
+                    <button onClick={onRelCancel}>취소</button>
                     <button
-                      type="button"
                       onClick={onRelSubmit}
-                      disabled={!relLabel.trim()}
                       style={{ background: "#034ea2", color: "#fff" }}
                     >
                       저장
