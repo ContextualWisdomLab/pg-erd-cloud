@@ -19,6 +19,15 @@ def utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
+class RevokedToken(Base):
+    """Persistent storage for revoked tokens to survive application restarts."""
+
+    __tablename__ = "revoked_token"
+
+    jwt_id: Mapped[str] = mapped_column(Text(), primary_key=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+
+
 class UserAccount(Base):
     """User record keyed by a UUID and identified by OIDC subject."""
 
