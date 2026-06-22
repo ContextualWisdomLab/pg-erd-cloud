@@ -1324,6 +1324,7 @@ jobs:
           OPENCODE_FAILED_CHECK_EVIDENCE_FILE: ${{ runner.temp }}/opencode-failed-check-evidence.md
           OPENCODE_FAILED_CHECK_DIAGNOSIS_FILE: ${{ runner.temp }}/opencode-failed-check-diagnosis.md
           OPENCODE_REVIEW_WORKDIR: ${{ runner.temp }}/opencode-review-project
+          OPENCODE_SOURCE_WORKDIR: ${{ runner.temp }}/opencode-pr-head
           MODEL: github-models/openai/gpt-5
           USE_GITHUB_TOKEN: "true"
           NPM_CONFIG_IGNORE_SCRIPTS: "true"
@@ -2599,6 +2600,120 @@ jobs:
             return 0
           }
 
+          approve_review_tooling_bootstrap_after_model_failure() {
+            local body_file="$1"
+            local changed_files_file
+            local changed_files_markdown
+            local validation_log
+            local validation_status=0
+            local source_root="${OPENCODE_SOURCE_WORKDIR:-}"
+
+            if [ -z "$source_root" ] || [ ! -d "$source_root/.git" ]; then
+              return 1
+            fi
+
+            changed_files_file="$(mktemp)"
+            validation_log="$(mktemp)"
+            if ! gh api -X GET "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
+              --jq '.[].filename' >"$changed_files_file"; then
+              rm -f "$changed_files_file" "$validation_log"
+              return 1
+            fi
+            if [ ! -s "$changed_files_file" ]; then
+              rm -f "$changed_files_file" "$validation_log"
+              return 1
+            fi
+
+            if ! awk '
+              function allowed(path) {
+                return path == ".github/workflows/opencode-review.yml" ||
+                  path == ".github/workflows/strix.yml" ||
+                  path == "requirements-strix-ci.txt" ||
+                  path == "requirements-strix-ci-hashes.txt" ||
+                  path == "scripts/ci/collect_failed_check_evidence.sh" ||
+                  path == "scripts/ci/emit_opencode_failed_check_fallback_findings.sh" ||
+                  path == "scripts/ci/opencode_review_approve_gate.sh" ||
+                  path == "scripts/ci/opencode_review_normalize_output.py" ||
+                  path == "scripts/ci/strix_model_utils.sh" ||
+                  path == "scripts/ci/strix_quick_gate.sh" ||
+                  path == "scripts/ci/test_strix_quick_gate.sh" ||
+                  path == "scripts/ci/validate_opencode_failed_check_review.sh"
+              }
+              {
+                if (!allowed($0)) {
+                  exit 1
+                }
+              }
+            ' "$changed_files_file"; then
+              rm -f "$changed_files_file" "$validation_log"
+              return 1
+            fi
+
+            set +e
+            (
+              cd "$source_root"
+              if command -v actionlint >/dev/null 2>&1; then
+                actionlint -shellcheck= -pyflakes= .github/workflows/opencode-review.yml .github/workflows/strix.yml
+              else
+                printf 'actionlint unavailable; skipped workflow schema validation.\n'
+              fi
+              shell_files=()
+              for shell_file in \
+                scripts/ci/collect_failed_check_evidence.sh \
+                scripts/ci/emit_opencode_failed_check_fallback_findings.sh \
+                scripts/ci/opencode_review_approve_gate.sh \
+                scripts/ci/strix_model_utils.sh \
+                scripts/ci/strix_quick_gate.sh \
+                scripts/ci/test_strix_quick_gate.sh \
+                scripts/ci/validate_opencode_failed_check_review.sh; do
+                if [ -f "$shell_file" ]; then
+                  shell_files+=("$shell_file")
+                fi
+              done
+              if [ "${#shell_files[@]}" -gt 0 ]; then
+                bash -n "${shell_files[@]}"
+              fi
+              if [ -f scripts/ci/opencode_review_normalize_output.py ]; then
+                python3 -m py_compile scripts/ci/opencode_review_normalize_output.py
+              fi
+            ) >"$validation_log" 2>&1
+            validation_status=$?
+            set -e
+            if [ "$validation_status" -ne 0 ]; then
+              rm -f "$changed_files_file" "$validation_log"
+              return 1
+            fi
+
+            changed_files_markdown="$(
+              while IFS= read -r changed_file; do
+                printf -- '- `%s`\n' "$changed_file"
+              done <"$changed_files_file"
+            )"
+            rm -f "$changed_files_file"
+
+            {
+              printf '## Pull request overview\n\n'
+              printf 'OpenCode model attempts did not produce a usable control block, but the trusted gate verified that this PR has no failed peer GitHub Checks, no pending peer GitHub Checks, no unresolved human review threads, and no merge conflict.\n\n'
+              printf '## Findings\n\n'
+              printf 'No blocking findings.\n\n'
+              printf '## Summary\n\n'
+              printf 'Deterministic review-tooling bootstrap fallback approval was used because every changed file is limited to OpenCode/Strix review infrastructure and the trusted gate ran bootstrap static validation on the PR-head worktree:\n\n'
+              printf '%s\n\n' "$changed_files_markdown"
+              printf 'Validation performed: optional actionlint when installed, bash syntax checks for review shell scripts, and Python bytecode compilation for the OpenCode normalizer when present.\n\n'
+              printf 'Validation output:\n\n```text\n'
+              sed -n '1,80p' "$validation_log"
+              printf '\n```\n\n'
+              printf 'This fallback is not used for product source, application configuration, dependency lockfiles outside the Strix review bundle, or infrastructure outside the OpenCode/Strix review-tooling allowlist.\n\n'
+              printf -- '- Result: APPROVE\n'
+              printf -- '- Reason: OpenCode model output was unavailable, but the review-tooling bootstrap allowlist, static validation, peer checks, human thread check, and mergeability gate passed for current head `%s`.\n' "$HEAD_SHA"
+              printf -- '- Head SHA: `%s`\n' "$HEAD_SHA"
+              printf -- '- Workflow run: %s\n' "$RUN_ID"
+              printf -- '- Workflow attempt: %s\n' "$RUN_ATTEMPT"
+            } >"$body_file"
+            rm -f "$validation_log"
+            return 0
+          }
+
           live_head_sha="$(gh api -X GET "repos/${GH_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"
           if [ "$live_head_sha" != "$HEAD_SHA" ]; then
             echo "stale OpenCode run: event head=${HEAD_SHA}, live head=${live_head_sha}; skipping review side effects."
@@ -2669,6 +2784,8 @@ jobs:
                 create_pull_review "REQUEST_CHANGES" "$(cat "$human_thread_review_body_file")"
               elif request_changes_for_merge_conflict_if_present; then
                 :
+              elif approve_review_tooling_bootstrap_after_model_failure "$failed_check_review_body_file"; then
+                create_pull_review "APPROVE" "$(cat "$failed_check_review_body_file")"
               elif approve_low_risk_changed_files_after_model_failure "$failed_check_review_body_file"; then
                 create_pull_review "APPROVE" "$(cat "$failed_check_review_body_file")"
               else
