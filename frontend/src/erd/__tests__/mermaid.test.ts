@@ -77,11 +77,7 @@ describe('exportMermaid', () => {
     ];
     const result = exportMermaid(nodes, edges);
 
-    // Check FK modifier
     expect(result).toContain('    integer user_id FK\n');
-
-    // Check relationship output: TARGET ||--o{ SOURCE : "label"
-    // So target is "public.users", source is "public.posts"
     expect(result).toContain('  "public.users" ||--o{ "public.posts" : "fk_user_id"\n');
   });
 
@@ -147,7 +143,6 @@ describe('exportMermaid', () => {
     const result = exportMermaid(nodes, edges);
     expect(result).toContain('  "t1" ||--o{ "t2" : "rel"\n');
   });
-});
 
   it('handles fallback FK detection using node badges if handle is missing', () => {
     const nodes: Node<TableNodeData>[] = [
@@ -176,3 +171,4 @@ describe('exportMermaid', () => {
     const result = exportMermaid(nodes, edges);
     expect(result).toContain('    integer user_id FK\n');
   });
+});
