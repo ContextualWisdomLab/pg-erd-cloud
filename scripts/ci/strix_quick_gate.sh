@@ -83,17 +83,16 @@ except OSError as exc:
     print(f"ERROR: {label} could not be canonicalized: {exc}", file=sys.stderr)
     raise SystemExit(2)
 
-# Follow symlinks first, then require the final input path to stay under the
-# trusted runner temp root. This prevents symlink-component path escapes such as
-# "$RUNNER_TEMP/link-to-outside/secret.txt".
-if not resolved_input.is_relative_to(resolved_root):
-    print(f"ERROR: {label} must be inside the trusted input file root.", file=sys.stderr)
-    raise SystemExit(2)
 if not resolved_root.is_dir():
     print("ERROR: STRIX_INPUT_FILE_ROOT or RUNNER_TEMP must reference a trusted input file root.", file=sys.stderr)
     raise SystemExit(2)
 if not resolved_input.is_file():
     print(f"ERROR: {label} must reference a regular file.", file=sys.stderr)
+    raise SystemExit(2)
+try:
+    resolved_input.relative_to(resolved_root)
+except ValueError:
+    print(f"ERROR: {label} must be inside the trusted input file root.", file=sys.stderr)
     raise SystemExit(2)
 
 print(resolved_input)
@@ -118,6 +117,70 @@ publish_artifact_reports() {
 			cp -R -- "$scope_reports_dir"/. "$ARTIFACT_REPORTS_DIR"/
 		fi
 	done
+}
+
+sanitize_known_strix_report_warnings() {
+	local report_root
+	for report_root in "$@"; do
+		if [ -z "$report_root" ] || [ ! -d "$report_root" ] || [ -L "$report_root" ]; then
+			continue
+		fi
+		python3 - "$report_root" <<'PY'
+from pathlib import Path
+import os
+import re
+import sys
+
+root = Path(sys.argv[1])
+known_internal_warning = re.compile(
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ WARNING "
+    r"[^ ]+ - strix\.core\.execution: agent [0-9a-f]+ produced "
+    r"non-lifecycle final output in non-interactive mode; forcing tool "
+    r"continuation \(\d+/\d+\): "
+)
+
+
+def iter_report_logs(root: Path):
+    for current_root, dir_names, file_names in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current_root)
+        dir_names[:] = [
+            dir_name
+            for dir_name in dir_names
+            if not (current_path / dir_name).is_symlink()
+        ]
+        for file_name in file_names:
+            log_path = current_path / file_name
+            if log_path.suffix != ".log" or log_path.is_symlink() or not log_path.is_file():
+                continue
+            yield log_path
+
+
+for log_path in iter_report_logs(root):
+    try:
+        lines = log_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    except UnicodeDecodeError:
+        continue
+    filtered = [line for line in lines if not known_internal_warning.match(line)]
+    if filtered != lines:
+        log_path.write_text("".join(filtered), encoding="utf-8")
+PY
+	done
+}
+
+has_strix_report_failure_signal() {
+	local report_root
+	local report_log
+	for report_root in "$@"; do
+		if [ -z "$report_root" ] || [ ! -d "$report_root" ] || [ -L "$report_root" ]; then
+			continue
+		fi
+		while IFS= read -r -d '' report_log; do
+			if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning|WARNING|Timeout)([^[:alpha:]]|$)' "$report_log"; then
+				return 0
+			fi
+		done < <(find "$report_root" -type f -name '*.log' -print0)
+	done
+	return 1
 }
 
 # shellcheck disable=SC2317,SC2329  # invoked from EXIT/INT/TERM trap
@@ -439,7 +502,10 @@ copy_pr_head_blob_to_file() {
 
 is_supported_source_file() {
 	case "$1" in
-		*.java | *.kt | *.kts | *.groovy | *.scala | *.py | *.js | *.jsx | *.ts | *.tsx | *.vue | *.yaml | *.yml | *.sh | *.sql | *.xml | *.json | *.html | *.css | *.md | *.lock)
+	*.java | *.kt | *.kts | *.groovy | *.scala | *.py | *.js | *.jsx | *.ts | *.tsx | *.vue | *.yaml | *.yml | *.sh | *.sql | *.xml | *.json | *.html | *.css | *.md)
+		return 0
+		;;
+	Dockerfile | */Dockerfile | Containerfile | */Containerfile | Makefile | */Makefile)
 		return 0
 		;;
 	*)
@@ -450,7 +516,7 @@ is_supported_source_file() {
 
 is_dependency_manifest_path() {
 	case "$1" in
-		pom.xml | */pom.xml | package.json | */package.json | package-lock.json | */package-lock.json | pnpm-lock.yaml | */pnpm-lock.yaml | yarn.lock | */yarn.lock | pyproject.toml | */pyproject.toml | requirements.txt | */requirements.txt | requirements.lock | */requirements.lock | requirements-*.txt | */requirements-*.txt | uv.lock | */uv.lock)
+	pom.xml | */pom.xml | package.json | */package.json | package-lock.json | */package-lock.json | pnpm-lock.yaml | */pnpm-lock.yaml | yarn.lock | */yarn.lock | pyproject.toml | */pyproject.toml | requirements.txt | */requirements.txt | requirements-*.txt | */requirements-*.txt | uv.lock | */uv.lock)
 		return 0
 		;;
 	*)
@@ -521,8 +587,8 @@ is_preexisting_report_dir() {
 is_github_models_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
-	openai/o[1-9]* | \
-	openai/deepseek/* | \
+	openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
+	openai/deepseek/* | openai/meta/* | openai/mistral-ai/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -536,8 +602,7 @@ is_github_models_api_compatible_model() {
 	case "$1" in
 	openai/openai/* | github_models/* | \
 	openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
-	openai/o[1-9]* | \
-	openai/deepseek/* | \
+	openai/deepseek/* | openai/meta/* | openai/mistral-ai/* | \
 	deepseek/* | meta/* | mistral-ai/*)
 		return 0
 		;;
@@ -1102,6 +1167,9 @@ is_scannable_changed_file() {
 	if [[ "$normalized_changed_file" == */__tests__/* || "$normalized_changed_file" == *.test.ts || "$normalized_changed_file" == *.test.tsx || "$normalized_changed_file" == *.spec.ts || "$normalized_changed_file" == *.spec.tsx ]]; then
 		return 1
 	fi
+	if [[ "$normalized_changed_file" == scripts/ci/test_*.sh || "$normalized_changed_file" == scripts/ci/*_test.sh ]]; then
+		return 1
+	fi
 	if [[ "$normalized_changed_file" == pnpm-lock.yaml || "$normalized_changed_file" == package-lock.json || "$normalized_changed_file" == yarn.lock || "$normalized_changed_file" == uv.lock ]]; then
 		return 1
 	fi
@@ -1131,22 +1199,16 @@ is_scannable_changed_file() {
 
 pull_request_scope_context_files() {
 	local needs_backend_python=0
-	local needs_frontend_app_api_context=0
 	local needs_frontend_email_api_context=0
 	local needs_deployment_context=0
 	local changed_file normalized_changed_file
 	for changed_file in "$@"; do
 		normalized_changed_file="$(normalize_changed_file_path "$changed_file")" || return 2
 		case "$normalized_changed_file" in
-		backend/*.py | backend/*/*.py | backend/*/*/*.py | backend/*/*/*/*.py)
-			needs_backend_python=1
-			;;
-		# The React app shell and API client call security-sensitive backend
-		# routes; include the trusted auth, permission, CSRF, and schema context
-		# so PR-scoped scans can evaluate those calls instead of treating the
-		# backend as missing.
-		frontend/src/App.tsx | frontend/src/api.ts)
-			needs_frontend_app_api_context=1
+		backend/*)
+			if [[ "$normalized_changed_file" =~ ^backend/.+\.py$ ]]; then
+				needs_backend_python=1
+			fi
 			;;
 		# The app shell, email components, threading URL builder, and API client can
 		# shape frontend email retrieval flows; include backend auth context with them.
@@ -1157,7 +1219,7 @@ pull_request_scope_context_files() {
 		# changed in the PR. Include the trusted copies so Strix does not downgrade
 		# a clean finding to provider/failure-signal output due to missing Dockerfiles
 		# or VERSION context.
-		.github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/Dockerfile.prod | frontend/next.config.ts | compose*.yaml | compose*.yml | docker-compose*.yml | render.yaml)
+		.github/workflows/* | Dockerfile | frontend/Dockerfile | frontend/next.config.ts | docker-compose*.yml | render.yaml)
 			needs_deployment_context=1
 			;;
 		esac
@@ -1165,7 +1227,6 @@ pull_request_scope_context_files() {
 
 	if [ "$needs_backend_python" -eq 1 ]; then
 		cat <<'EOF'
-backend/pyproject.toml
 backend/requirements.txt
 backend/api/__init__.py
 backend/api/accounts.py
@@ -1211,30 +1272,6 @@ backend/services/threading_service.py
 EOF
 	fi
 
-	if [ "$needs_frontend_app_api_context" -eq 1 ]; then
-		cat <<'EOF'
-frontend/src/api.ts
-frontend/index.html
-frontend/serve-static.mjs
-backend/app/main.py
-backend/app/api/auth_routes.py
-backend/app/api/connections.py
-backend/app/api/me.py
-backend/app/api/projects.py
-backend/app/api/snapshots.py
-backend/app/auth.py
-backend/app/csrf.py
-backend/app/db.py
-backend/app/models.py
-backend/app/permissions.py
-backend/app/rate_limit.py
-backend/app/schemas.py
-backend/app/security.py
-backend/app/security_headers.py
-backend/tests/test_security_headers.py
-EOF
-	fi
-
 	if [ "$needs_frontend_email_api_context" -eq 1 ]; then
 		cat <<'EOF'
 backend/api/auth.py
@@ -1249,13 +1286,16 @@ EOF
 	if [ "$needs_deployment_context" -eq 1 ]; then
 		cat <<'EOF'
 Dockerfile
-frontend/Dockerfile.prod
+backend/api/auth.py
+backend/core/config.py
+backend/core/runtime_secrets.py
+backend/main.py
+backend/scripts/docker_entrypoint.sh
+frontend/Dockerfile
 frontend/package.json
 frontend/package-lock.json
 frontend/next.config.ts
 frontend/postcss.config.mjs
-compose.yaml
-compose.prod.yaml
 docker-compose.yml
 render.yaml
 VERSION
@@ -1636,7 +1676,7 @@ PY
 	TARGET_PATH="$LAST_PULL_REQUEST_SCOPE_DIR"
 	TARGET_PATH_IS_INTERNAL_PR_SCOPE=1
 	if pull_request_head_blob_required; then
-		printf "Scoped pull_request_target Strix scan to %s changed file(s) using PR-head blobs.\n" "$total_files" >&2
+		printf "Materialized PR-head changed-file scope for Strix scan; %s scannable changed file(s) retained for findings attribution.\n" "$total_files" >&2
 	else
 		printf "Scoped pull request Strix scan to %s changed file(s)" "$total_files" >&2
 		printf ".\n" >&2
@@ -1665,12 +1705,14 @@ import sys
 text = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
 patterns = [
     re.compile(r'(?P<path>/workspace/[^`\r\n]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+):\d+'),
-    re.compile(r'(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Location[ \t]+\d+:(?:\*\*)?[ \t]*`?(?P<path>/workspace/[^`\r\n│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`?'),
+    re.compile(r'(?P<path>/workspace/[A-Za-z0-9_./ \[\]-]*(?:Dockerfile|Containerfile|Makefile))'),
     re.compile(r'<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>'),
     re.compile(r'^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)', re.MULTILINE),
+    re.compile(r'^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[A-Za-z0-9_./ \[\]-]*(?:Dockerfile|Containerfile|Makefile)|(?:Dockerfile|Containerfile|Makefile))', re.MULTILINE),
     re.compile(r'^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Endpoint:(?:\*\*)?[ \t]*(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)', re.MULTILINE),
-    re.compile(r'(?i)(?:in\s+)?file\s+`(?P<path>(?:\.\.?/)?[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`'),
-    re.compile(r'(?i)`(?P<path>(?:\.\.?/)?[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`\s+file\b'),
+    re.compile(r'(?:in\s+)?file\s+`(?P<path>(?:\.\.?/)?[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`', flags=re.IGNORECASE),
+    re.compile(r'`(?P<path>(?:\.\.?/)?[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`\s+file\b', flags=re.IGNORECASE),
+    re.compile(r'(?<![A-Za-z0-9_./-])(?P<path>Dockerfile|Containerfile|Makefile)(?![A-Za-z0-9_./-])'),
 ]
 seen = set()
 for pattern in patterns:
@@ -1813,10 +1855,6 @@ evaluate_pull_request_findings() {
 	threshold_rank="$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")"
 	local found_baseline_threshold_finding=0
 	local found_changed_manifest_only_threshold_finding=0
-	local found_absent_placeholder_secret_finding=0
-	local found_incomplete_pr_scope_finding=0
-	local found_strix_runtime_artifact_finding=0
-	local found_workflow_integrity_checksum_finding=0
 	local found_retryable_model_inconsistency=0
 	local found_any_vuln_file=0
 	local run_dir vulnerabilities_dir vuln_file line severity rank
@@ -1845,32 +1883,12 @@ evaluate_pull_request_findings() {
 			if [ "$rank" -lt "$threshold_rank" ]; then
 				continue
 			fi
-			if vulnerability_file_has_absent_placeholder_secret_claim "$vuln_file"; then
-				found_absent_placeholder_secret_finding=1
-				continue
-			fi
-			if vulnerability_file_is_incomplete_pr_scope_assessment "$vuln_file"; then
-				found_incomplete_pr_scope_finding=1
-				continue
-			fi
-			if vulnerability_file_is_workflow_integrity_checksum_finding "$vuln_file"; then
-				found_workflow_integrity_checksum_finding=1
-				continue
-			fi
-			if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
-				found_strix_runtime_artifact_finding=1
-				continue
-			fi
 			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
 				found_retryable_model_inconsistency=1
 				continue
 			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$vuln_file")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
-				if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
-					found_strix_runtime_artifact_finding=1
-					continue
-				fi
 				PR_FINDINGS_DECISION="block_unmapped"
 				echo "Unable to map Strix findings to changed files; failing closed for pull request." >&2
 				return 1
@@ -1909,30 +1927,6 @@ evaluate_pull_request_findings() {
 		done
 	done
 
-	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_absent_placeholder_secret_finding" -eq 1 ]; then
-		PR_FINDINGS_DECISION="allow_absent_placeholder_secret"
-		echo "Strix placeholder hardcoded-secret finding references only absent non-repository example paths; allowing pipeline continuation." >&2
-		return 0
-	fi
-
-	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_incomplete_pr_scope_finding" -eq 1 ]; then
-		PR_FINDINGS_DECISION="allow_incomplete_pr_scope"
-		echo "Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." >&2
-		return 0
-	fi
-
-	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_strix_runtime_artifact_finding" -eq 1 ]; then
-		PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
-		echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
-		return 0
-	fi
-
-	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ] && [ "$found_workflow_integrity_checksum_finding" -eq 1 ]; then
-		PR_FINDINGS_DECISION="allow_workflow_integrity_checksum"
-		echo "Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." >&2
-		return 0
-	fi
-
 	if [ "$found_baseline_threshold_finding" -eq 0 ] && [ "$found_changed_manifest_only_threshold_finding" -eq 0 ]; then
 		rank="$(extract_first_severity_rank "$STRIX_LOG")"
 		if [ "$rank" -lt 0 ]; then
@@ -1943,33 +1937,8 @@ evaluate_pull_request_findings() {
 			return 1
 		fi
 		if [ "$rank" -ge "$threshold_rank" ]; then
-			if vulnerability_file_is_retryable_model_inconsistency "$STRIX_LOG"; then
-				found_retryable_model_inconsistency=1
-				PR_FINDINGS_DECISION="retry_model_inconsistency"
-				return 1
-			fi
-			if vulnerability_file_is_incomplete_pr_scope_assessment "$STRIX_LOG"; then
-				PR_FINDINGS_DECISION="allow_incomplete_pr_scope"
-				echo "Strix incomplete-codebase finding is limited to the intentionally bounded PR scope; allowing pipeline continuation." >&2
-				return 0
-			fi
-			if vulnerability_file_is_workflow_integrity_checksum_finding "$STRIX_LOG"; then
-				PR_FINDINGS_DECISION="allow_workflow_integrity_checksum"
-				echo "Strix hardcoded-secret finding targets a public workflow integrity checksum; allowing pipeline continuation." >&2
-				return 0
-			fi
-			if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
-				PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
-				echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
-				return 0
-			fi
 			mapfile -t vulnerability_locations < <(extract_vulnerability_locations "$STRIX_LOG")
 			if [ "${#vulnerability_locations[@]}" -eq 0 ]; then
-				if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
-					PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
-					echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
-					return 0
-				fi
 				PR_FINDINGS_DECISION="block_unmapped"
 				echo "Unable to map Strix findings to changed files; failing closed for pull request." >&2
 				return 1
@@ -2029,16 +1998,6 @@ evaluate_pull_request_findings() {
 		echo "Strix findings are limited to unchanged files in this pull request; allowing pipeline continuation." >&2
 		return 0
 	fi
-
-	return 1
-}
-
-pull_request_findings_allow_current_change() {
-	case "$PR_FINDINGS_DECISION" in
-	allow_absent_placeholder_secret | allow_baseline | allow_incomplete_pr_scope | allow_manifest_only | allow_strix_runtime_artifact | allow_workflow_integrity_checksum)
-		return 0
-		;;
-	esac
 
 	return 1
 }
@@ -2145,10 +2104,41 @@ resolved_llm_api_base_for_model() {
 		return 2
 	fi
 	if is_github_models_api_base "$llm_api_base_value" && ! is_github_models_api_compatible_model "$model"; then
-		echo "ERROR: LLM_API_BASE may route through GitHub Models only when STRIX_LLM uses a GitHub Models model prefix." >&2
+		echo "ERROR: LLM_API_BASE may route through GitHub Models only when STRIX_LLM uses a GitHub Models-compatible model." >&2
 		return 2
 	fi
 	printf '%s\n' "$llm_api_base_value"
+}
+
+child_model_for_api_base() {
+	local model="$1"
+	local llm_api_base_value="$2"
+
+	if [ -n "$llm_api_base_value" ] && is_github_models_api_base "$llm_api_base_value"; then
+		case "$model" in
+		github_models/openai/*)
+			printf '%s\n' "${model#github_models/}"
+			return 0
+			;;
+		github_models/*)
+			printf 'openai/%s\n' "${model#github_models/}"
+			return 0
+			;;
+		deepseek/* | meta/* | mistral-ai/*)
+			printf 'openai/%s\n' "$model"
+			return 0
+			;;
+		esac
+	fi
+
+	case "$model" in
+	openai_direct/*)
+		printf 'openai/%s\n' "${model#openai_direct/}"
+		return 0
+		;;
+	esac
+
+	printf '%s\n' "$model"
 }
 
 ## Run a single strix invocation against TARGET_PATH with the given model.
@@ -2161,6 +2151,7 @@ run_strix_once() {
 	local model="$1"
 	local rc
 	local llm_api_base_value
+	local child_model
 	local resolved_target_path
 	local timeout_seconds="$STRIX_PROCESS_TIMEOUT_SECONDS"
 	if [ "$STRIX_TOTAL_TIMEOUT_SECONDS" -gt 0 ]; then
@@ -2177,6 +2168,7 @@ run_strix_once() {
 	if ! llm_api_base_value="$(resolved_llm_api_base_for_model "$model")"; then
 		return 2
 	fi
+	child_model="$(child_model_for_api_base "$model" "$llm_api_base_value")"
 	if ! resolved_target_path="$(resolve_current_target_path "$TARGET_PATH")"; then
 		return 1
 	fi
@@ -2188,7 +2180,7 @@ run_strix_once() {
 	fi
 	set -o pipefail
 	set +e
-	STRIX_CHILD_MODEL="$model" \
+	STRIX_CHILD_MODEL="$child_model" \
 		STRIX_CHILD_LLM_API_KEY="$child_llm_api_key" \
 		STRIX_CHILD_LLM_API_BASE="$llm_api_base_value" \
 		STRIX_CHILD_REPORTS_DIR="$ACTIVE_REPORTS_DIR" \
@@ -2289,26 +2281,6 @@ if any(ch in str(target_cwd) for ch in ("\x00", "\n", "\r")):
 
 command = [resolved_strix_bin, "-n", "-t", ".", "--scan-mode", scan_mode]
 
-def output_from_timeout(exc):
-    partial = exc.output if exc.output is not None else exc.stdout
-    if not partial:
-        return ""
-    if isinstance(partial, bytes):
-        return partial.decode("utf-8", errors="replace")
-    return partial
-
-def signal_group(pgid, sig):
-    try:
-        os.killpg(pgid, sig)
-    except (PermissionError, ProcessLookupError):
-        pass
-
-def signal_process(process, sig):
-    try:
-        process.send_signal(sig)
-    except (PermissionError, ProcessLookupError):
-        pass
-
 try:
     process = subprocess.Popen(
         command,
@@ -2319,27 +2291,24 @@ try:
         env=child_env,
         start_new_session=True,
     )
-    try:
-        process_pgid = os.getpgid(process.pid)
-    except ProcessLookupError:
-        process_pgid = process.pid
     output, _ = process.communicate(timeout=process_timeout)
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
     raise SystemExit(process.returncode)
 except subprocess.TimeoutExpired:
-    signal_group(process_pgid, signal.SIGTERM)
-    signal_process(process, signal.SIGTERM)
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
     try:
         output, _ = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
-        signal_group(process_pgid, signal.SIGKILL)
-        signal_process(process, signal.SIGKILL)
         try:
-            output, _ = process.communicate(timeout=5)
-        except subprocess.TimeoutExpired as exc:
-            output = output_from_timeout(exc)
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        output, _ = process.communicate()
     if output:
         sys.stdout.write(output)
     log_path.write_text(output or "", encoding="utf-8")
@@ -2359,7 +2328,14 @@ PY
 		echo "Strix run timed out after ${timeout_seconds}s." | tee -a "$STRIX_LOG" >&2
 	fi
 
-	if has_detected_infrastructure_error; then
+	sanitize_known_strix_report_warnings "$ACTIVE_REPORTS_DIR" "${resolved_target_path%/}/strix_runs"
+	local report_failure_signal=0
+	if has_strix_report_failure_signal "$ACTIVE_REPORTS_DIR" "${resolved_target_path%/}/strix_runs"; then
+		report_failure_signal=1
+		echo "Strix report artifacts emitted warning/fatal/denied/timeout output; failing closed." | tee -a "$STRIX_LOG" >&2
+	fi
+
+	if [ "$report_failure_signal" -eq 1 ] || has_detected_infrastructure_error; then
 		INFRA_ERROR_DETECTED=1
 		if [ "$rc" -eq 0 ] && provider_signal_fail_closed_enabled; then
 			echo "Strix run emitted provider infrastructure or failure-signal output; failing closed." >&2
@@ -2518,8 +2494,9 @@ is_github_models_unavailable_model_error() {
 		return 0
 	fi
 
-	if grep -Eiq 'DeepseekException' "$STRIX_LOG" &&
-		grep -Eiq '(litellm\.APIError|APIError|LLM CONNECTION FAILED|Could not establish connection to the language model)' "$STRIX_LOG"; then
+	if grep -Eiq '(PermissionDeniedError|Error code:[[:space:]]*403|(^|[^0-9])403([^0-9]|$))' "$STRIX_LOG" &&
+		grep -Eiq '(LLM CONNECTION FAILED|Could not establish connection to the language model)' "$STRIX_LOG" &&
+		grep -Eiq '(models\.github\.ai|GitHub Models|openai|OpenAIException)' "$STRIX_LOG"; then
 		return 0
 	fi
 
@@ -2622,7 +2599,7 @@ LLM_PROVIDER_ONLY_REGEX='(litellm|openai|anthropic|VertexAI|Vertex_ai|vertex\.ai
 # was interrupted or incomplete.  Used as a guard to prevent the
 # below-threshold override from silently passing an aborted scan.
 has_detected_infrastructure_error() {
-	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$).*(provider|model|LLM|credential|quota|rate|connection|stream|incomplete scan)' "$STRIX_LOG"; then
+	if grep -Eiq '(^|[^[:alpha:]])(Fatal|Denied|Warn|Warning)([^[:alpha:]]|$)' "$STRIX_LOG"; then
 		return 0
 	fi
 
@@ -2690,8 +2667,6 @@ has_only_below_threshold_vulnerabilities() {
 	threshold_rank="$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")"
 
 	local found_any_vuln_file=0
-	local found_strix_runtime_artifact_vuln_file=0
-	local found_non_strix_runtime_artifact_vuln_file=0
 	local global_max_rank=-1
 	STRIX_MAX_SEVERITY_RANK=-1
 	local saw_any_severity=0
@@ -2744,28 +2719,12 @@ has_only_below_threshold_vulnerabilities() {
 			fi
 
 			found_any_vuln_file=1
-			if vulnerability_file_is_strix_runtime_artifact_finding "$vuln_file"; then
-				found_strix_runtime_artifact_vuln_file=1
-			else
-				found_non_strix_runtime_artifact_vuln_file=1
-			fi
 			update_max_severity_from_stream "$vuln_file"
 		done
 	done
 
 	if [ "$found_any_vuln_file" -eq 0 ]; then
-		if vulnerability_file_is_strix_runtime_artifact_finding "$STRIX_LOG"; then
-			PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
-			echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
-			return 0
-		fi
 		update_max_severity_from_stream "$STRIX_LOG"
-	fi
-
-	if [ "$found_strix_runtime_artifact_vuln_file" -eq 1 ] && [ "$found_non_strix_runtime_artifact_vuln_file" -eq 0 ]; then
-		PR_FINDINGS_DECISION="allow_strix_runtime_artifact"
-		echo "Strix generated-report finding targets scanner-owned runtime artifacts; allowing pipeline continuation." >&2
-		return 0
 	fi
 
 	if [ "$saw_any_severity" -eq 0 ]; then
@@ -2790,6 +2749,51 @@ has_only_below_threshold_vulnerabilities() {
 		return 0
 	fi
 
+	return 1
+}
+
+has_blocking_vulnerability_reports() {
+	local threshold_rank
+	threshold_rank="$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")"
+
+	local run_dir vulnerabilities_dir vuln_file rank
+	for run_dir in "$STRIX_REPORTS_DIR"/*; do
+		if [ ! -d "$run_dir" ] || [ -L "$run_dir" ]; then
+			continue
+		fi
+		if is_preexisting_report_dir "$run_dir"; then
+			continue
+		fi
+
+		vulnerabilities_dir="$run_dir/vulnerabilities"
+		if [ ! -d "$vulnerabilities_dir" ] || [ -L "$vulnerabilities_dir" ]; then
+			continue
+		fi
+
+		for vuln_file in "$vulnerabilities_dir"/*.md; do
+			if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+				continue
+			fi
+			if vulnerability_file_is_retryable_model_inconsistency "$vuln_file"; then
+				continue
+			fi
+
+			rank="$(extract_first_severity_rank "$vuln_file")"
+			if [ "$rank" -lt 0 ] || [ "$rank" -ge "$threshold_rank" ]; then
+				return 0
+			fi
+		done
+	done
+
+	return 1
+}
+
+fail_reported_vulnerabilities_before_fallback_success() {
+	if has_blocking_vulnerability_reports; then
+		echo "Strix model reported threshold vulnerabilities before fallback success; failing closed so every model-reported vulnerability is reviewed." >&2
+		echo "Strix quick scan failed with a non-recoverable error." >&2
+		return 0
+	fi
 	return 1
 }
 
@@ -2978,105 +2982,6 @@ PY
 	return 0
 }
 
-vulnerability_file_has_only_absent_source_locations() {
-	local vuln_file="$1"
-	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	local resolved_target_root=""
-	resolved_target_root="$(resolve_current_target_path "$TARGET_PATH" 2>/dev/null || true)"
-
-	python3 - "$vuln_file" "$REPO_ROOT" "$REPO_NAME" "$resolved_target_root" <<'PY'
-from pathlib import Path
-from urllib.parse import unquote
-import re
-import sys
-
-vuln_file = Path(sys.argv[1])
-repo_root = Path(sys.argv[2]).resolve(strict=True)
-repo_name = sys.argv[3]
-target_root = Path(sys.argv[4]).resolve(strict=True) if sys.argv[4] else None
-target_workspace_prefix = f"/workspace/{target_root.name}/" if target_root else ""
-
-text = vuln_file.read_text(encoding="utf-8", errors="replace")
-lowered = text.lower()
-if (
-    ("hardcoded secret" in lowered or "hardcoded secrets" in lowered)
-    and ("STRIX_PLACEHOLDER_DB_MARKER" in text or "STRIX_PLACEHOLDER_PAYMENT_MARKER" in text)
-):
-    raise SystemExit(1)
-
-patterns = [
-    re.compile(
-        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Location[ \t]+\d+:(?:\*\*)?[ \t]*`?(?P<path>/workspace/[^`\r\n│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./ \[\]-]+\.[A-Za-z0-9_]+)`?"
-    ),
-    re.compile(
-        r"<file>\s*(?P<path>/workspace/[^<`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)\s*</file>"
-    ),
-    re.compile(
-        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Target:(?:\*\*)?[ \t]*(?:File:[ \t]*)?(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
-    ),
-    re.compile(
-        r"(?im)^[^\S\r\n│]*[│]?[ \t]*(?:\*\*)?Endpoint:(?:\*\*)?[ \t]*(?P<path>/workspace/[^`│]*\.[A-Za-z0-9_]+|[A-Za-z0-9_./\[\]-][A-Za-z0-9_./ \[\]-]*\.[A-Za-z0-9_]+)"
-    ),
-]
-
-raw_candidates = []
-seen = set()
-for pattern in patterns:
-    for match in pattern.finditer(text):
-        value = unquote(match.group("path").strip().strip("`"))
-        if value and value not in seen:
-            seen.add(value)
-            raw_candidates.append(value)
-
-if not raw_candidates:
-    raise SystemExit(1)
-
-def safe_relative(value):
-    if not value or value.startswith("/"):
-        return None
-    rel = Path(value)
-    if rel.is_absolute() or ".." in rel.parts:
-        return None
-    if "/" not in rel.as_posix():
-        return None
-    return rel
-
-def relative_from_workspace(value):
-    prefixes = [f"/workspace/{repo_name}/"]
-    if target_workspace_prefix:
-        prefixes.append(target_workspace_prefix)
-    for prefix in prefixes:
-        if value.startswith(prefix):
-            return safe_relative(value[len(prefix):])
-    if value.startswith("/workspace/"):
-        return None
-    return safe_relative(value)
-
-for raw in raw_candidates:
-    rel = relative_from_workspace(raw)
-    if rel is None:
-        raise SystemExit(1)
-
-    possible_paths = [repo_root / rel]
-    if target_root is not None:
-        possible_paths.append(target_root / rel)
-
-    if any(possible_path.exists() for possible_path in possible_paths):
-        raise SystemExit(1)
-
-raise SystemExit(0)
-PY
-	local rc=$?
-	if [ "$rc" -eq 0 ]; then
-		echo "Detected Strix report structured source location(s) absent from the repository; treating as retryable model inconsistency." >&2
-		return 0
-	fi
-	return 1
-}
-
 is_hallucinated_endpoint_finding() {
 	local latest_report_dir
 	if ! latest_report_dir="$(latest_strix_report_dir)"; then
@@ -3183,158 +3088,8 @@ vulnerability_file_has_hallucinated_source_claim() {
 	return 1
 }
 
-vulnerability_file_has_absent_placeholder_secret_claim() {
-	local vuln_file="$1"
-	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	local resolved_locations=()
-	mapfile -t resolved_locations < <(extract_vulnerability_locations "$vuln_file")
-	if [ "${#resolved_locations[@]}" -gt 0 ]; then
-		return 1
-	fi
-
-	python3 - "$vuln_file" <<'PY'
-from pathlib import Path
-import sys
-
-text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-lowered = text.lower()
-
-if "hardcoded secret" not in lowered and "hardcoded secrets" not in lowered:
-    raise SystemExit(1)
-
-placeholder_paths = (
-    "src/config/database.py",
-    "src/services/payment_service.py",
-)
-placeholder_values = (
-    "STRIX_PLACEHOLDER_DB_MARKER",
-    "STRIX_PLACEHOLDER_PAYMENT_MARKER",
-)
-
-has_placeholder_path = any(path in text for path in placeholder_paths)
-has_placeholder_value = any(value in text for value in placeholder_values)
-raise SystemExit(0 if has_placeholder_path and has_placeholder_value else 1)
-PY
-}
-
-vulnerability_file_is_incomplete_pr_scope_assessment() {
-	local vuln_file="$1"
-	if [ "$TARGET_PATH_IS_INTERNAL_PR_SCOPE" -ne 1 ]; then
-		return 1
-	fi
-	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	local resolved_locations=()
-	mapfile -t resolved_locations < <(extract_vulnerability_locations "$vuln_file")
-	if [ "${#resolved_locations[@]}" -gt 0 ]; then
-		return 1
-	fi
-
-	python3 - "$vuln_file" <<'PY'
-from pathlib import Path
-import sys
-
-text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-lowered = text.lower()
-normalized = " ".join(lowered.split())
-
-has_title = (
-    "incomplete codebase" in normalized
-    or "incomplete repository state" in normalized
-    or "missing backend code" in normalized
-    or "missing application code" in normalized
-)
-has_scope_evidence = (
-    "missing application source code" in normalized
-    or "missing source code" in normalized
-    or "lacked actual application source code" in normalized
-    or "missing backend code" in normalized
-    or "missing backend source" in normalized
-    or "no actual source code" in normalized
-    or "no backend code" in normalized
-    or "no source files found" in normalized
-    or "source directories referenced in configuration files were not present" in normalized
-)
-has_assessment_limit = (
-    "full security assessment" in normalized
-    or "prevents comprehensive security assessment" in normalized
-    or "preventing comprehensive security validation" in normalized
-    or "prevented thorough security testing" in normalized
-    or "security review" in normalized
-    or "security assessment" in normalized
-    or "without source code" in normalized
-)
-
-raise SystemExit(0 if has_title and has_scope_evidence and has_assessment_limit else 1)
-PY
-}
-
-vulnerability_file_is_strix_runtime_artifact_finding() {
-	local vuln_file="$1"
-	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	python3 - "$vuln_file" <<'PY'
-from pathlib import Path
-import sys
-
-text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-normalized = text.replace("\\", "/").lower()
-
-has_strix_artifact_path = "strix_runs/" in normalized and "events.jsonl" in normalized
-has_runtime_log_claim = (
-    "runtime log" in normalized
-    or "runtime logs" in normalized
-    or "trace ids" in normalized
-    or "span ids" in normalized
-)
-
-raise SystemExit(0 if has_strix_artifact_path and has_runtime_log_claim else 1)
-PY
-}
-
-vulnerability_file_is_workflow_integrity_checksum_finding() {
-	local vuln_file="$1"
-	if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
-		return 1
-	fi
-
-	python3 - "$vuln_file" <<'PY'
-from pathlib import Path
-import sys
-
-text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-normalized = text.lower()
-
-has_secret_claim = "hardcoded secret" in normalized
-has_sha256_claim = "sha256" in normalized and (
-    "checksum" in normalized or "hash" in normalized
-)
-has_opencode_checksum = "OPENCODE_SHA256" in text
-has_workflow_path = ".github/workflows/opencode-review.yml" in normalized
-
-raise SystemExit(
-    0
-    if has_secret_claim
-    and has_sha256_claim
-    and has_opencode_checksum
-    and has_workflow_path
-    else 1
-)
-PY
-}
-
 vulnerability_file_is_retryable_model_inconsistency() {
 	local vuln_file="$1"
-	if vulnerability_file_has_only_absent_source_locations "$vuln_file"; then
-		return 0
-	fi
 	if vulnerability_file_has_absent_endpoint_finding "$vuln_file"; then
 		return 0
 	fi
@@ -3441,9 +3196,6 @@ run_current_target_scan() {
 	fi
 
 	if evaluate_pull_request_findings; then
-		if pull_request_findings_allow_current_change && [ "$strict_primary_provider_fallback" -eq 0 ]; then
-			return 0
-		fi
 		if [ "$strict_primary_provider_fallback" -eq 0 ]; then
 			return 0
 		fi
@@ -3454,6 +3206,10 @@ run_current_target_scan() {
 		return 1
 		;;
 	esac
+
+	if [ "$strict_primary_provider_fallback" -eq 1 ] && fail_reported_vulnerabilities_before_fallback_success; then
+		return 1
+	fi
 
 	if ! is_model_retryable_error "$PRIMARY_MODEL"; then
 		echo "Strix quick scan failed with a non-recoverable error." >&2
@@ -3487,6 +3243,9 @@ run_current_target_scan() {
 		run_strix_with_transient_retry "$candidate" || fallback_scan_rc=$?
 		local fallback_elapsed=$(( $(date +%s) - fallback_start_epoch ))
 		if [ "$fallback_scan_rc" -eq 0 ]; then
+			if fail_reported_vulnerabilities_before_fallback_success; then
+				return 1
+			fi
 			echo "Strix quick scan succeeded with fallback model '$candidate' in ${fallback_elapsed}s." >&2
 			return 0
 		fi
@@ -3504,9 +3263,6 @@ run_current_target_scan() {
 		fi
 
 		if evaluate_pull_request_findings; then
-			if pull_request_findings_allow_current_change && [ "$strict_fallback_provider_signal" -eq 0 ]; then
-				return 0
-			fi
 			if [ "$strict_fallback_provider_signal" -eq 0 ]; then
 				return 0
 			fi
@@ -3517,6 +3273,10 @@ run_current_target_scan() {
 			return 1
 			;;
 		esac
+
+		if fail_reported_vulnerabilities_before_fallback_success; then
+			return 1
+		fi
 
 		if [ "$strict_fallback_provider_signal" -eq 1 ]; then
 			if is_model_retryable_error "$candidate"; then
@@ -3531,10 +3291,6 @@ run_current_target_scan() {
 			return 1
 		fi
 		done
-
-	if pull_request_findings_allow_current_change; then
-		return 0
-	fi
 
 	if should_fail_pull_request_infra_zero_findings; then
 		return 1
