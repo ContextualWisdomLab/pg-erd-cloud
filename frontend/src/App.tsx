@@ -722,8 +722,14 @@ export default function App() {
               id="project-name"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && projectName.trim() && !isCreatingProject) {
+                  onCreateProject();
+                }
+              }}
             />
             <button
+              type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
@@ -768,7 +774,18 @@ export default function App() {
             id="conn-name"
             value={connName}
             onChange={(e) => setConnName(e.target.value)}
-            placeholder="name"
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                selectedProjectId &&
+                connName.trim() &&
+                isDsnPresent &&
+                !isCreatingConnection
+              ) {
+                onCreateConnection();
+              }
+            }}
+            placeholder="e.g. production-db"
           />
           <input
             id="conn-dsn"
@@ -777,10 +794,22 @@ export default function App() {
             onChange={(e) =>
               setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
             }
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                selectedProjectId &&
+                connName.trim() &&
+                isDsnPresent &&
+                !isCreatingConnection
+              ) {
+                onCreateConnection();
+              }
+            }}
             placeholder="postgresql://... or snowflake://..."
             aria-label="Connection DSN"
           />
           <button
+            type="button"
             onClick={onCreateConnection}
             disabled={
               !selectedProjectId ||
@@ -808,11 +837,22 @@ export default function App() {
             id="schema-filter"
             value={schemaFilter}
             onChange={(e) => setSchemaFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                selectedProjectId &&
+                selectedConnId &&
+                !isCreatingSnapshot
+              ) {
+                onCreateSnapshot();
+              }
+            }}
             placeholder="public"
           />
         </div>
 
         <button
+          type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
           aria-busy={isCreatingSnapshot}
@@ -1034,8 +1074,11 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button onClick={onCloseExport}>닫기</button>
+                  <button type="button" onClick={onCloseExport}>
+                    닫기
+                  </button>
                   <button
+                    type="button"
                     onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
@@ -1098,15 +1141,20 @@ export default function App() {
                   style={{ justifyContent: "space-between", marginTop: 8 }}
                 >
                   <button
+                    type="button"
                     onClick={onRelDelete}
                     style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
                   >
                     삭제
                   </button>
                   <div className="row">
-                    <button onClick={onRelCancel}>취소</button>
+                    <button type="button" onClick={onRelCancel}>
+                      취소
+                    </button>
                     <button
+                      type="button"
                       onClick={onRelSubmit}
+                      disabled={!relLabel.trim()}
                       style={{ background: "#034ea2", color: "#fff" }}
                     >
                       저장
@@ -1445,6 +1493,11 @@ export default function App() {
                     id="new-table-name"
                     value={newTableName}
                     onChange={(e) => setNewTableName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newTableName.trim()) {
+                        onAddTableSubmit();
+                      }
+                    }}
                     placeholder="users"
                     autoFocus
                   />
@@ -1453,9 +1506,13 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button onClick={onAddTableCancel}>취소</button>
+                  <button type="button" onClick={onAddTableCancel}>
+                    취소
+                  </button>
                   <button
+                    type="button"
                     onClick={onAddTableSubmit}
+                    disabled={!newTableName.trim()}
                     style={{ background: "#034ea2", color: "#fff" }}
                   >
                     저장
