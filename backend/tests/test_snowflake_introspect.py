@@ -184,9 +184,10 @@ def fake_rows_for_query(
     return []
 
 
-def test_parse_snowflake_dsn_rejects_connector_overrides() -> None:
+@pytest.mark.asyncio
+async def test_parse_snowflake_dsn_rejects_connector_overrides() -> None:
     with pytest.raises(ValueError, match="unsupported Snowflake DSN query parameter"):
-        _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?host=evil")
+        await _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?host=evil")
 
 
 @pytest.mark.asyncio
@@ -199,8 +200,14 @@ async def test_introspect_snowflake_builds_common_snapshot(
         captured_kwargs.update(kwargs)
         return FakeConnection()
 
+    async def fake_validated_ip_hosts(host, is_hostaddr, port):
+        return (host,)
+
     monkeypatch.setattr(
         "app.snowflake_introspect.introspect._connect", fake_connect
+    )
+    monkeypatch.setattr(
+        "app.snowflake_introspect.introspect._validated_ip_hosts", fake_validated_ip_hosts
     )
 
     snapshot = await introspect_snowflake(
