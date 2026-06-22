@@ -787,7 +787,6 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
-            type="button"
             onClick={onCreateConnection}
             disabled={
               !selectedProjectId ||
