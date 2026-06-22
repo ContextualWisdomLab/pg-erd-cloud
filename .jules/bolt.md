@@ -15,3 +15,6 @@
 - **Learning**: Using `array.some(...)` inside `array.map(...)` can become a significant performance bottleneck (O(N*M)) when dealing with large sets of recommendations or nodes.
 - **Action**: Always pre-compute a `Set` or dictionary outside the mapping loop for fast O(1) signature-based lookups.
 - **Safety**: When moving logic into a state updater callback like `setNodes((currentNodes) => ...)`, make sure to evaluate any validation checks (like checking if an index is already applied) **inside** the callback to prevent stale closures. Avoid unchecked properties like `columns.join` if `columns` could be undefined.
+## 2024-06-21 - Optimize O(N^2) Map building
+**Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
+**Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
