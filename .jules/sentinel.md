@@ -10,3 +10,7 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting, making it vulnerable to denial-of-service (DoS) and caching resource exhaustion attacks. Attackers could flood the system with rapid revocation requests.
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse.
 **Prevention:** Always ensure that revocation or authentication-related endpoints are covered by appropriate rate limiting middleware configurations.
+## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
+**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
+**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
+**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
