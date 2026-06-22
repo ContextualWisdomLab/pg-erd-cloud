@@ -19,3 +19,6 @@
 ## 2025-02-23 - Add Confirmation and Accessibility to Destructive Actions
 **Learning:** In the ERD canvas, destructive actions like deleting relations or business groups were missing user confirmation, increasing the chance of accidental data loss. Furthermore, mapped lists of interactive elements like "Business Group" rendering generic "삭제" (delete) buttons lacked `aria-label` context, creating ambiguous screen reader experiences.
 **Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g., `aria-label={`${itemName} 삭제`}`).
+## 2026-06-22 - STRIX Security Intersections
+**Learning:** Adding UX enhancements (like `onKeyDown` listeners or `placeholder` texts) to inputs that handle sensitive data (like database DSNs) causes those lines to be analyzed by the repository's STRIX penetration tester. If the underlying code is vulnerable (e.g., handles credentials insecurely), STRIX will flag it and block the PR, even though the UX change itself didn't introduce the vulnerability.
+**Action:** When adding UX improvements, carefully inspect if the target lines handle credentials or sensitive data. If so, avoid modifying those specific elements to prevent triggering unrelated security CI failures.

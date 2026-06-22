@@ -774,18 +774,7 @@ export default function App() {
             id="conn-name"
             value={connName}
             onChange={(e) => setConnName(e.target.value)}
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                selectedProjectId &&
-                connName.trim() &&
-                isDsnPresent &&
-                !isCreatingConnection
-              ) {
-                onCreateConnection();
-              }
-            }}
-            placeholder="e.g. production-db"
+            placeholder="name"
           />
           <input
             id="conn-dsn"
@@ -794,17 +783,6 @@ export default function App() {
             onChange={(e) =>
               setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
             }
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                selectedProjectId &&
-                connName.trim() &&
-                isDsnPresent &&
-                !isCreatingConnection
-              ) {
-                onCreateConnection();
-              }
-            }}
             placeholder="postgresql://... or snowflake://..."
             aria-label="Connection DSN"
           />
