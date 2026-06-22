@@ -1,4 +1,3 @@
-
 import {
   Background,
   MiniMap,
@@ -13,7 +12,6 @@ import {
   addEdge,
   type Connection as FlowConnection,
 } from "@xyflow/react";
-import { sanitizeInput } from "./utils";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   getMe,
@@ -739,7 +737,7 @@ export default function App() {
           </div>
           {createProjectHint ? (
             <span id="create-project-hint" className="field-hint">
-              {sanitizeInput(createProjectHint)}
+              {createProjectHint}
             </span>
           ) : null}
         </div>
@@ -801,7 +799,7 @@ export default function App() {
           </button>
           {createConnectionHint ? (
             <span id="create-connection-hint" className="field-hint">
-              {sanitizeInput(createConnectionHint)}
+              {createConnectionHint}
             </span>
           ) : null}
         </div>
@@ -829,7 +827,7 @@ export default function App() {
         </button>
         {createSnapshotHint ? (
           <span id="create-snapshot-hint" className="field-hint">
-            {sanitizeInput(createSnapshotHint)}
+            {createSnapshotHint}
           </span>
         ) : null}
 
@@ -837,14 +835,14 @@ export default function App() {
           Snapshot: {snapshot?.status || "—"}
           {snapshot?.error_message ? (
             <div className="error" role="alert">
-              {sanitizeInput(String(snapshot.error_message))}
+              {String(snapshot.error_message)}
             </div>
           ) : null}
         </div>
 
         {error ? (
           <div className="error" role="alert" style={{ marginTop: 10 }}>
-            {sanitizeInput(error)}
+            {error}
           </div>
         ) : null}
       </aside>
@@ -943,7 +941,7 @@ export default function App() {
               UML
             </button>
             <div className="srOnly" aria-live="polite">
-              {sanitizeInput(layoutMessage)}
+              {layoutMessage}
             </div>
           </div>
 

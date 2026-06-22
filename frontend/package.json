@@ -14,9 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@types/dompurify": "^3.2.0",
     "@xyflow/react": "^12.11.0",
-    "dompurify": "^3.4.11",
     "react": "^19.2.4",
     "react-dom": "^19.2.7"
   },
