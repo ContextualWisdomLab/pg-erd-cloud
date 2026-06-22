@@ -724,6 +724,7 @@ export default function App() {
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
+              type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
@@ -781,6 +782,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
+            type="button"
             onClick={onCreateConnection}
             disabled={
               !selectedProjectId ||
@@ -813,6 +815,7 @@ export default function App() {
         </div>
 
         <button
+          type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
           aria-busy={isCreatingSnapshot}
@@ -1034,8 +1037,9 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button onClick={onCloseExport}>닫기</button>
+                  <button type="button" onClick={onCloseExport}>닫기</button>
                   <button
+                    type="button"
                     onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
@@ -1098,14 +1102,16 @@ export default function App() {
                   style={{ justifyContent: "space-between", marginTop: 8 }}
                 >
                   <button
+                    type="button"
                     onClick={onRelDelete}
                     style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
                   >
                     삭제
                   </button>
                   <div className="row">
-                    <button onClick={onRelCancel}>취소</button>
+                    <button type="button" onClick={onRelCancel}>취소</button>
                     <button
+                      type="button"
                       onClick={onRelSubmit}
                       style={{ background: "#034ea2", color: "#fff" }}
                     >
@@ -1453,8 +1459,9 @@ export default function App() {
                   className="row"
                   style={{ justifyContent: "flex-end", marginTop: 8 }}
                 >
-                  <button onClick={onAddTableCancel}>취소</button>
+                  <button type="button" onClick={onAddTableCancel}>취소</button>
                   <button
+                    type="button"
                     onClick={onAddTableSubmit}
                     style={{ background: "#034ea2", color: "#fff" }}
                   >

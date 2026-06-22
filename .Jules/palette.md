@@ -19,3 +19,6 @@
 ## 2025-02-23 - Add Confirmation and Accessibility to Destructive Actions
 **Learning:** In the ERD canvas, destructive actions like deleting relations or business groups were missing user confirmation, increasing the chance of accidental data loss. Furthermore, mapped lists of interactive elements like "Business Group" rendering generic "삭제" (delete) buttons lacked `aria-label` context, creating ambiguous screen reader experiences.
 **Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g., `aria-label={`${itemName} 삭제`}`).
+## 2024-05-25 - [Button Semantics and `type="button"`]
+**Learning:** In a typical React SPA with numerous `<button>` elements, if the `type` attribute is omitted, the browser defaults to `type="submit"`. Even if these buttons are not currently inside `<form>` elements, relying on the default is a potential UX/a11y bug because a future refactoring that adds a `<form>` wrap can lead to unintended form submissions (and page reloads) when action buttons (like "Cancel" or "Close") are clicked.
+**Action:** Always explicitly define `type="button"` for JavaScript-driven action buttons that are not intended to submit a form.
