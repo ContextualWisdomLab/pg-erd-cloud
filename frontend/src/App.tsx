@@ -422,6 +422,7 @@ export default function App() {
 
   function onRelDelete() {
     if (!editingEdge) return;
+    if (!window.confirm("정말로 이 관계를 삭제하시겠습니까?")) return;
     setEdges((eds) => eds.filter((e) => e.id !== editingEdge.id));
     setEditingEdge(null);
   }
@@ -560,6 +561,7 @@ export default function App() {
   }
 
   function onDeleteBusinessGroup(groupId: string) {
+    if (!window.confirm("이 그룹을 삭제하면 포함된 모든 테이블에서 그룹 지정이 해제됩니다. 정말로 삭제하시겠습니까?")) return;
     setBusinessGroups((groups) =>
       groups.filter((group) => group.id !== groupId),
     );
@@ -1185,6 +1187,7 @@ export default function App() {
                           <strong>{group.name}</strong>
                           <button
                             type="button"
+                            aria-label={`${group.name} 그룹 삭제`}
                             onClick={() => onDeleteBusinessGroup(group.id)}
                           >
                             삭제
