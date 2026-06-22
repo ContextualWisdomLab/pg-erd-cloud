@@ -1182,11 +1182,33 @@ EOF
 
 assert_opencode_failed_check_fallback_emits_each_strix_report() {
 	local tmp_dir
+	local fixture_repo
 	local evidence_file
 	local output_file
 	tmp_dir="$(mktemp -d)"
+	fixture_repo="$tmp_dir/repo"
 	evidence_file="$tmp_dir/failed-check-evidence.md"
 	output_file="$tmp_dir/fallback.md"
+	mkdir -p "$fixture_repo/backend/services" "$fixture_repo/frontend/src/app/prompt-studio" "$fixture_repo/frontend"
+
+	{
+		for _ in $(seq 1 59); do
+			printf '# filler\n'
+		done
+		printf 'filename = part.get_filename()\n'
+	} >"$fixture_repo/backend/services/email_parser.py"
+	{
+		for _ in $(seq 1 28); do
+			printf '// filler\n'
+		done
+		printf 'setTestResult(await apiClient.post("/prompt-studio", payload));\n'
+	} >"$fixture_repo/frontend/src/app/prompt-studio/page.tsx"
+	{
+		for _ in $(seq 1 34); do
+			printf '// filler\n'
+		done
+		printf 'const nextConfig = {};\n'
+	} >"$fixture_repo/frontend/next.config.ts"
 
 	cat >"$evidence_file" <<'EOF'
 ## Failed check: Strix Security Scan/strix
@@ -1222,7 +1244,7 @@ Model deepseek/deepseek-v3-0324 Vulnerabilities 1
 EOF
 
 	bash "$REPO_ROOT/scripts/ci/emit_opencode_failed_check_fallback_findings.sh" \
-		"$evidence_file" "$REPO_ROOT" >"$output_file"
+		"$evidence_file" "$fixture_repo" >"$output_file"
 
 	assert_file_contains "$output_file" "Strix report from deepseek/deepseek-r1-0528: Path Traversal in Email Attachment Handling" "fallback includes first model report"
 	assert_file_contains "$output_file" "backend/services/email_parser.py:60" "fallback maps first report to exact source line"
