@@ -45,6 +45,7 @@ import {
   exportDiagramSvg,
   exportPlantUml,
 } from "./erd/export";
+import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, SnapshotDetail } from "./types";
 
@@ -416,6 +417,14 @@ export default function App() {
     downloadText(
       "pg-erd-diagram.puml",
       exportPlantUml(nodes, edges, snapshot?.snapshot_json),
+      "text/plain",
+    );
+  }
+
+  function onDownloadMermaid() {
+    downloadText(
+      "pg-erd-diagram.mermaid",
+      exportMermaid(nodes, edges),
       "text/plain",
     );
   }
@@ -936,6 +945,17 @@ export default function App() {
               aria-label="PlantUML 내보내기"
             >
               UML
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadMermaid}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "Mermaid 내보내기"
+              }
+              aria-label="Mermaid 내보내기"
+            >
+              Mermaid
             </button>
             <div className="srOnly" aria-live="polite">
               {layoutMessage}
