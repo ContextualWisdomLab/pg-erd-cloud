@@ -1040,8 +1040,6 @@ export default function App() {
                 <textarea
                   readOnly
                   aria-label="DDL Export"
-                  title="클릭하여 전체 선택"
-                  onClick={(e) => e.currentTarget.select()}
                   value={exportDdlText}
                   style={{
                     width: "100%",
@@ -1057,7 +1055,6 @@ export default function App() {
                 >
                   <button onClick={onCloseExport}>닫기</button>
                   <button
-                    autoFocus
                     onClick={onCopyExportDdl}
                     style={{ background: "#034ea2", color: "#fff" }}
                     aria-live="polite"
