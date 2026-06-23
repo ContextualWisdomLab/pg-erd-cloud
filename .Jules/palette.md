@@ -22,3 +22,7 @@
 ## 2026-06-21 - Form Input Keyboard Navigation
 **Learning:** Standalone inputs without wrapping `<form>` elements inherently lack keyboard submission support, forcing users to switch from keyboard to mouse just to complete simple forms. Furthermore, modal dialogues holding inputs trap keyboard users unless explicit cancelation escapes are implemented.
 **Action:** When implementing inputs outside of standard `<form>` contexts or within custom modals, explicitly add `onKeyDown` handlers to support `Enter` for submission and `Escape` for cancelation.
+
+## 2024-06-23 - [Modal Auto-focus and One-click Text Selection]
+**Learning:** When users encounter a read-only code/text area intended for export (like a generated DDL), they almost always want to copy it. Forcing them to manually drag-to-select the entire block is poor UX. Adding `onClick={(e) => e.currentTarget.select()}` provides instant gratification. Additionally, automatically focusing (`autoFocus`) the primary action button (e.g., "Copy") when a modal opens dramatically improves keyboard navigation, saving multiple tab keystrokes.
+**Action:** Always add click-to-select behavior to read-only `textarea` elements intended for copying. Always ensure modals have a logical initial focus target (usually the primary action or first input) to support keyboard users.
