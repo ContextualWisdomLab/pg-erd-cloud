@@ -18,3 +18,6 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+## 2024-06-25 - Prevent Call Stack Size Exceeded from Spread Operator
+**Learning:** Using the spread operator `...` on the result of `Array.map` (e.g., `Math.min(...nodes.map(...))`) for large collections (like ERD nodes) can trigger a `RangeError: Maximum call stack size exceeded` in V8, while allocating multiple intermediate arrays causing high GC pressure.
+**Action:** When calculating bounds/min/max over collections of unpredictable size, use a single O(N) `for` loop to compute the values in-place without generating intermediate garbage arrays or pushing thousands of arguments onto the call stack.
