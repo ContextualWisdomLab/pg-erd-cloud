@@ -3,7 +3,7 @@ name: PR Review Fix Scheduler
 on:
   schedule:
     # Attempt one review-feedback fix before the merge scheduler inspects the queue.
-    - cron: "7 */2 * * *"
+    - cron: "7 */1 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
