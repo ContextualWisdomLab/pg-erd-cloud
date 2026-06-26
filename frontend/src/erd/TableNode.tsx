@@ -118,12 +118,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           );
         })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
-          <div className="tableNode__more" title="생략된 컬럼이 더 있습니다">
+          <div className="tableNode__more">
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
         {data.indexes?.length ? (
-          <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
+          <div className="tableNode__indexes" aria-label="추천 인덱스">
             <div className="tableNode__indexHeading">Indexes</div>
             {data.indexes.slice(0, 4).map((index) => (
               <div key={index.index_name} className="tableNode__index">
@@ -136,7 +136,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </div>
             ))}
             {data.indexes.length > 4 ? (
-              <div className="tableNode__more" title="생략된 인덱스가 더 있습니다">
+              <div className="tableNode__more">
                 … {data.indexes.length - 4} more indexes
               </div>
             ) : null}

@@ -88,16 +88,6 @@ _share_link_rate_limit_policy = RateLimitPolicy(
     route_prefix="/api/share",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
-_revoke_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.api_rate_limit_max_keys
-)
-_revoke_rate_limit_policy = RateLimitPolicy(
-    enabled=settings.api_rate_limit_enabled,
-    requests=10,
-    window_seconds=60,
-    route_prefix="/api/auth/logout",
-    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
-)
 
 app.middleware("http")(
     make_rate_limit_middleware(
@@ -110,13 +100,6 @@ app.middleware("http")(
     make_rate_limit_middleware(
         limiter=_share_link_rate_limiter,
         policy=_share_link_rate_limit_policy,
-    )
-)
-app.middleware("http")(
-    make_rate_limit_middleware(
-        limiter=_revoke_rate_limiter,
-        policy=_revoke_rate_limit_policy,
-        get_subject=try_get_subject_for_rate_limit,
     )
 )
 

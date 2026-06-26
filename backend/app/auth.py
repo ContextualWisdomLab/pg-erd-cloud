@@ -35,9 +35,6 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
         # Defensive: never allow unsigned tokens.
         if alg == "NONE":
             continue
-        # Defensive: never allow symmetric algorithms to prevent public key HMAC forgery.
-        if alg.startswith("HS"):
-            continue
         if alg in seen:
             continue
         seen.add(alg)

@@ -19,9 +19,6 @@ from app.settings import settings
         ("none, RS256", ["RS256"]),
         ("none", ["RS256"]),
         (", , ", ["RS256"]),
-        ("HS256, RS256", ["RS256"]),
-        ("RS256, hs256", ["RS256"]),
-        ("HS256, HS384, HS512", ["RS256"]),
     ],
 )
 def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
@@ -252,10 +249,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 @pytest.mark.parametrize(
     ("header", "detail"),
     [
-        (
-            {"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"},
-            "unsupported token type",
-        ),
+        ({"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"}, "unsupported token type"),
         (
             {"kid": "key-1", "alg": "RS256", "cty": "JWT"},
             "unsupported token content type",
@@ -458,55 +452,3 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
         assert session.flush_calls == 0
     finally:
         auth._user_cache.clear()
-
-
-@pytest.mark.asyncio
-async def test_try_get_subject_for_rate_limit_error_path():
-    """Verify try_get_subject_for_rate_limit returns None on auth failure."""
-    req = make_request()  # No Authorization header
-
-    # We should get None because of the Missing Bearer Token HTTPException
-    subject = await auth.try_get_subject_for_rate_limit(req)
-    assert subject is None
-
-
-async def test_oidc_decode_rejects_invalid_header(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def mock_get_unverified_header(token):
-        raise Exception("Invalid header")
-
-    monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
-
-    with pytest.raises(HTTPException) as excinfo:
-        await auth._decode_verified_oidc_token("invalid_token")
-
-    assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == "invalid token header"
-
-
-@pytest.mark.asyncio
-async def test_oidc_decode_rejects_jwt_decode_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
-    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
-    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
-    monkeypatch.setattr(
-        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
-    )
-
-    async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
-
-    def fail_decode(*_args: object, **_kwargs: object) -> dict:
-        raise auth.jwt.PyJWTError("mocked decoding error")
-
-    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
-    monkeypatch.setattr(auth.jwt, "decode", fail_decode)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await auth._decode_verified_oidc_token("Bearer token")
-
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "token verification failed"

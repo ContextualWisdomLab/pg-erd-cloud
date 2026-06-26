@@ -168,10 +168,13 @@ def generate_reversing_llm_prompt(snapshot: dict) -> str:
     )
 
 
-def _generate_markdown_header(summary: dict) -> list[str]:
-    objects = summary.get("objects", [])
-    relationships = summary.get("relationships", [])
-    return [
+def generate_reversing_markdown(snapshot: dict) -> str:
+    """Generate a deterministic DB reversing specification draft."""
+
+    summary = _compact_snapshot_summary(snapshot)
+    objects = summary["objects"]
+    relationships = summary["relationships"]
+    lines: list[str] = [
         "# DB Reversing Specification",
         "",
         "## Snapshot",
@@ -187,85 +190,75 @@ def _generate_markdown_header(summary: dict) -> list[str]:
         "## Entity Catalog",
     ]
 
-
-def _generate_markdown_entity(obj: dict) -> list[str]:
-    lines = [
-        "",
-        f"### {_text(obj.get('name'), 'unknown')}",
-        f"- Kind: {_text(obj.get('kind'), 'relation')}",
-    ]
-    comment = obj.get("comment")
-    if isinstance(comment, str) and comment:
-        lines.append(f"- Comment: {comment}")
-
-    lines.extend(
-        [
-            "",
-            "| Column | Type | Required | Default | Example | Comment |",
-            "| --- | --- | --- | --- | --- | --- |",
-        ]
-    )
-    for column in obj.get("columns", []):
-        if not isinstance(column, dict):
-            continue
-        lines.append(
-            "| "
-            + " | ".join(
-                [
-                    _escape_cell(column.get("name")),
-                    _escape_cell(column.get("type")),
-                    _bool_text(column.get("not_null")),
-                    _escape_cell(column.get("default")),
-                    _escape_cell(column.get("example")),
-                    _escape_cell(column.get("comment")),
-                ]
-            )
-            + " |"
-        )
-
-    constraints = [
-        item for item in obj.get("constraints", []) if isinstance(item, dict)
-    ]
-    if constraints:
-        lines.extend(["", "Constraints:"])
-        for constraint in constraints:
-            lines.append(
-                "- "
-                f"{_escape_cell(constraint.get('name'))} "
-                f"({_escape_cell(constraint.get('type'))}): "
-                f"{_escape_cell(constraint.get('definition'))}"
-            )
-
-    indexes = [item for item in obj.get("indexes", []) if isinstance(item, dict)]
-    if indexes:
-        lines.extend(["", "Indexes:"])
-        for index in indexes:
-            intent = []
-            if index.get("primary") is True:
-                intent.append("primary")
-            if index.get("unique") is True:
-                intent.append("unique")
-            if index.get("method"):
-                intent.append(f"method={index.get('method')}")
-            if index.get("predicate"):
-                intent.append("partial")
-            suffix = f" [{', '.join(intent)}]" if intent else ""
-            lines.append(f"- {_escape_cell(index.get('name'))}{suffix}")
-
-    return lines
-
-
-def _generate_markdown_entity_catalog(objects: list[dict]) -> list[str]:
     if not objects:
-        return ["", "_No relations were captured in this snapshot._"]
-    lines = []
+        lines.extend(["", "_No relations were captured in this snapshot._"])
     for obj in objects:
-        lines.extend(_generate_markdown_entity(obj))
-    return lines
+        lines.extend(
+            [
+                "",
+                f"### {_text(obj.get('name'), 'unknown')}",
+                f"- Kind: {_text(obj.get('kind'), 'relation')}",
+            ]
+        )
+        comment = obj.get("comment")
+        if isinstance(comment, str) and comment:
+            lines.append(f"- Comment: {comment}")
 
+        lines.extend(
+            [
+                "",
+                "| Column | Type | Required | Default | Example | Comment |",
+                "| --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for column in obj.get("columns", []):
+            if not isinstance(column, dict):
+                continue
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        _escape_cell(column.get("name")),
+                        _escape_cell(column.get("type")),
+                        _bool_text(column.get("not_null")),
+                        _escape_cell(column.get("default")),
+                        _escape_cell(column.get("example")),
+                        _escape_cell(column.get("comment")),
+                    ]
+                )
+                + " |"
+            )
 
-def _generate_markdown_relationship_model(relationships: list[dict]) -> list[str]:
-    lines = ["", "## Relationship Model"]
+        constraints = [
+            item for item in obj.get("constraints", []) if isinstance(item, dict)
+        ]
+        if constraints:
+            lines.extend(["", "Constraints:"])
+            for constraint in constraints:
+                lines.append(
+                    "- "
+                    f"{_escape_cell(constraint.get('name'))} "
+                    f"({_escape_cell(constraint.get('type'))}): "
+                    f"{_escape_cell(constraint.get('definition'))}"
+                )
+
+        indexes = [item for item in obj.get("indexes", []) if isinstance(item, dict)]
+        if indexes:
+            lines.extend(["", "Indexes:"])
+            for index in indexes:
+                intent = []
+                if index.get("primary") is True:
+                    intent.append("primary")
+                if index.get("unique") is True:
+                    intent.append("unique")
+                if index.get("method"):
+                    intent.append(f"method={index.get('method')}")
+                if index.get("predicate"):
+                    intent.append("partial")
+                suffix = f" [{', '.join(intent)}]" if intent else ""
+                lines.append(f"- {_escape_cell(index.get('name'))}{suffix}")
+
+    lines.extend(["", "## Relationship Model"])
     if not relationships:
         lines.append("_No foreign-key relationships were captured._")
     for relationship in relationships:
@@ -275,32 +268,20 @@ def _generate_markdown_relationship_model(relationships: list[dict]) -> list[str
             f"{_escape_cell(relationship.get('to'))} "
             f"({_escape_cell(relationship.get('constraint'))})"
         )
-    return lines
 
-
-def _generate_markdown_footer() -> list[str]:
-    return [
-        "",
-        "## LLM Review Prompt",
-        "Use `/reversing-spec.md?mode=llm-prompt` to generate a compact prompt",
-        "for an approved LLM provider. The prompt includes only schema metadata",
-        "from this snapshot and asks the model to mark unsupported business",
-        "meaning as assumptions.",
-        "When a provider is configured, `/reversing-spec.md?mode=llm-draft`",
-        "asks the provider to generate a Markdown draft directly.",
-        "",
-    ]
-
-
-def generate_reversing_markdown(snapshot: dict) -> str:
-    """Generate a deterministic DB reversing specification draft."""
-
-    summary = _compact_snapshot_summary(snapshot)
-    lines: list[str] = []
-    lines.extend(_generate_markdown_header(summary))
-    lines.extend(_generate_markdown_entity_catalog(summary["objects"]))
-    lines.extend(_generate_markdown_relationship_model(summary["relationships"]))
-    lines.extend(_generate_markdown_footer())
+    lines.extend(
+        [
+            "",
+            "## LLM Review Prompt",
+            "Use `/reversing-spec.md?mode=llm-prompt` to generate a compact prompt",
+            "for an approved LLM provider. The prompt includes only schema metadata",
+            "from this snapshot and asks the model to mark unsupported business",
+            "meaning as assumptions.",
+            "When a provider is configured, `/reversing-spec.md?mode=llm-draft`",
+            "asks the provider to generate a Markdown draft directly.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

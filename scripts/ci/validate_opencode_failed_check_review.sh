@@ -101,33 +101,6 @@ extract_strix_title_markers() {
   ' "$FAILED_CHECK_EVIDENCE_FILE"
 }
 
-extract_strix_report_model_markers() {
-  perl -CS -ne '
-    s/\r//g;
-    s/\x1b\[[0-9;?]*[A-Za-z]//g;
-    if (/│/) {
-      s/^.*?│[[:space:]]*//;
-      s/[[:space:]]*│.*$//;
-    } else {
-      s/^.*?[0-9]Z[[:space:]]+//;
-    }
-    s/[[:space:]]+/ /g;
-    s/^[[:space:]]+|[[:space:]]+$//g;
-
-    if (/^### Strix vulnerability report window/i) {
-      $in_window = 1;
-      while (m{(?:model|for model)[[:space:]]+((?:github[-_]models|openai|deepseek|vertex_ai)/[A-Za-z0-9._/-]+)}gi) {
-        print "$1\n";
-      }
-      next;
-    }
-    next unless $in_window;
-    if (m{(?:^|[[:space:]])Model[[:space:]]+((?:github[-_]models|openai|deepseek|vertex_ai)/[A-Za-z0-9._/-]+)}i) {
-      print "$1\n";
-    }
-  ' "$FAILED_CHECK_EVIDENCE_FILE" | sort -u
-}
-
 count_strix_review_findings() {
   jq -r '
     [
@@ -246,9 +219,9 @@ def parse_reports(text: str) -> list[dict[str, str]]:
         match = model_re.search(line) or failed_model_re.search(line)
         if match:
             current_model = match.group(1)
-            if in_window:
+            if in_window and not window_model:
                 window_model = current_model
-            if in_window and title:
+            if title and not report_model:
                 report_model = current_model
 
         if not in_window:
@@ -274,7 +247,7 @@ def parse_reports(text: str) -> list[dict[str, str]]:
         if field_match:
             finish_report()
             title = field_match.group(1)
-            report_model = window_model
+            report_model = window_model or current_model
             continuation = "title"
             continue
         field_match = re.match(r"^Severity:\s+(CRITICAL|HIGH|MEDIUM|LOW|NONE)\b", line, re.IGNORECASE)
@@ -402,7 +375,10 @@ if grep -Fq "Strix vulnerability report window" "$FAILED_CHECK_EVIDENCE_FILE"; t
       echo "FAILED_CHECK_EVIDENCE_NOT_REFERENCED"
       exit 4
     fi
-  done < <(extract_strix_report_model_markers)
+  done < <(
+    perl -ne 'while (m{(?:openai|deepseek|vertex_ai|github(?:_|-)models)/[A-Za-z0-9._/-]+}g) { print "$&\n" }' \
+      "$FAILED_CHECK_EVIDENCE_FILE" | sort -u
+  )
 
   while IFS= read -r strix_marker; do
     if ! contains_review_text "$strix_marker"; then
