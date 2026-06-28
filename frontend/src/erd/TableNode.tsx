@@ -72,7 +72,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             </span>
           ) : null}
           {data.badges?.pk ? (
-            <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span>
+            <span className="tableNode__badge">PK</span>
           ) : null}
           {data.badges?.fk ? (
             <span className="tableNode__badge">FK</span>
@@ -104,7 +104,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span> : null}
+              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
               {c.is_not_null ? (
                 <span className="tableNode__badge">NOT NULL</span>
               ) : null}
@@ -118,7 +118,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           );
         })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
-          <div className="tableNode__more" title="생략된 컬럼이 더 있습니다">
+          <div className="tableNode__more">
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
@@ -136,7 +136,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </div>
             ))}
             {data.indexes.length > 4 ? (
-              <div className="tableNode__more" title="생략된 인덱스가 더 있습니다">
+              <div className="tableNode__more">
                 … {data.indexes.length - 4} more indexes
               </div>
             ) : null}

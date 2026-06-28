@@ -183,11 +183,7 @@ export default function App() {
       getSnapshot(snapshotId)
         .then((s) => {
           setSnapshot(s);
-          if (
-            s.status === "succeeded" ||
-            s.status === "failed" ||
-            s.status === "not_found"
-          ) {
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
             clearInterval(timer);
           }
         })
@@ -226,7 +222,9 @@ export default function App() {
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
   // Using nodes.find() for single lookups is O(N) but avoids Map construction overhead, providing ~10x speedup and reducing GC pressure.
   const cardinalityNode = useMemo(() => {
-    return nodes.find((n) => n.id === cardinalityTableId) ?? nodes[0] ?? null;
+    return (
+      nodes.find((n) => n.id === cardinalityTableId) ?? nodes[0] ?? null
+    );
   }, [cardinalityTableId, nodes]);
   const cardinalityColumns = useMemo<CardinalityColumnInput[]>(() => {
     if (!cardinalityNode) return [];
@@ -237,7 +235,11 @@ export default function App() {
         cardinalityDistinctCounts[column.column_name] ?? "",
       ),
     }));
-  }, [cardinalityColumnSelections, cardinalityDistinctCounts, cardinalityNode]);
+  }, [
+    cardinalityColumnSelections,
+    cardinalityDistinctCounts,
+    cardinalityNode,
+  ]);
   const cardinalityRecommendations = useMemo(
     () =>
       buildIndexRecommendations({
@@ -245,11 +247,7 @@ export default function App() {
         rowCount: cardinalityRowCountNumber,
         columns: cardinalityColumns,
       }),
-    [
-      cardinalityColumns,
-      cardinalityNode?.data.title,
-      cardinalityRowCountNumber,
-    ],
+    [cardinalityColumns, cardinalityNode?.data.title, cardinalityRowCountNumber],
   );
   const appliedCardinalityIndexes = useMemo(
     () => cardinalityNode?.data.indexes ?? [],
@@ -261,8 +259,7 @@ export default function App() {
     const columns = new Set<string>();
     for (const index of appliedCardinalityIndexes) {
       if (index.index_name) names.add(index.index_name);
-      if (index.columns && index.columns.length > 0)
-        columns.add(index.columns.join(","));
+      if (index.columns && index.columns.length > 0) columns.add(index.columns.join(","));
     }
     return { names, columns };
   }, [appliedCardinalityIndexes]);
@@ -469,7 +466,10 @@ export default function App() {
     }));
   }
 
-  function onCardinalityDistinctCountChange(columnName: string, value: string) {
+  function onCardinalityDistinctCountChange(
+    columnName: string,
+    value: string,
+  ) {
     if (!/^\d*$/.test(value)) return;
     setCardinalityDistinctCounts((prev) => ({
       ...prev,
@@ -499,8 +499,7 @@ export default function App() {
       const recColumns = recommendation.columns?.join(",") ?? "";
 
       if (
-        (recommendation.index_name &&
-          appliedIndexNames.has(recommendation.index_name)) ||
+        (recommendation.index_name && appliedIndexNames.has(recommendation.index_name)) ||
         (recColumns && appliedColumns.has(recColumns))
       ) {
         return currentNodes;
@@ -562,12 +561,7 @@ export default function App() {
   }
 
   function onDeleteBusinessGroup(groupId: string) {
-    if (
-      !window.confirm(
-        "이 그룹을 삭제하면 포함된 모든 테이블에서 그룹 지정이 해제됩니다. 정말로 삭제하시겠습니까?",
-      )
-    )
-      return;
+    if (!window.confirm("이 그룹을 삭제하면 포함된 모든 테이블에서 그룹 지정이 해제됩니다. 정말로 삭제하시겠습니까?")) return;
     setBusinessGroups((groups) =>
       groups.filter((group) => group.id !== groupId),
     );
@@ -728,9 +722,6 @@ export default function App() {
               id="project-name"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onCreateProject();
-              }}
             />
             <button
               onClick={onCreateProject}
@@ -778,9 +769,6 @@ export default function App() {
             value={connName}
             onChange={(e) => setConnName(e.target.value)}
             placeholder="name"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onCreateConnection();
-            }}
           />
           <input
             id="conn-dsn"
@@ -791,9 +779,6 @@ export default function App() {
             }
             placeholder="postgresql://... or snowflake://..."
             aria-label="Connection DSN"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onCreateConnection();
-            }}
           />
           <button
             onClick={onCreateConnection}
@@ -882,7 +867,9 @@ export default function App() {
               type="button"
               onClick={onUndoLayout}
               disabled={!undoPositions || isLayouting}
-              title="정렬 되돌리기"
+              title={
+                !undoPositions ? "되돌릴 작업이 없습니다" : "정렬 되돌리기"
+              }
               aria-label="정렬 되돌리기"
             >
               되돌리기
@@ -985,19 +972,15 @@ export default function App() {
                   />
                   <div className="emptyState__title">스냅샷 생성 중...</div>
                   <div className="emptyState__desc">
-                    데이터베이스에서 스키마를 가져오고 있습니다. 잠시만
-                    기다려주세요.
+                    데이터베이스에서 스키마를 가져오고 있습니다. 잠시만 기다려주세요.
                   </div>
                 </>
               ) : (
                 <>
                   <div className="emptyState__mark" aria-hidden="true" />
-                  <div className="emptyState__title">
-                    ERD 캔버스가 비어 있습니다
-                  </div>
+                  <div className="emptyState__title">ERD 캔버스가 비어 있습니다</div>
                   <div className="emptyState__desc">
-                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b>{" "}
-                    버튼을 눌러 시작하세요.
+                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
                   </div>
                 </>
               )}
@@ -1110,10 +1093,6 @@ export default function App() {
                     onChange={(e) => setRelLabel(e.target.value)}
                     placeholder="fk_constraint_name"
                     autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") onRelSubmit();
-                      if (e.key === "Escape") onRelCancel();
-                    }}
                   />
                 </div>
                 <div
@@ -1167,9 +1146,6 @@ export default function App() {
                       value={newGroupName}
                       onChange={(event) => setNewGroupName(event.target.value)}
                       placeholder="Billing"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") onCreateBusinessGroup();
-                      }}
                     />
                   </div>
                   <div
@@ -1375,9 +1351,7 @@ export default function App() {
                                 }
                               />
                             </td>
-                            <td>
-                              {ratio === null ? "—" : formatPercent(ratio)}
-                            </td>
+                            <td>{ratio === null ? "—" : formatPercent(ratio)}</td>
                           </tr>
                         );
                       })}
@@ -1398,15 +1372,8 @@ export default function App() {
                   ) : null}
                   {cardinalityRecommendations.map((recommendation) => {
                     const isApplied =
-                      (recommendation.index_name &&
-                        appliedCardinalitySignatures.names.has(
-                          recommendation.index_name,
-                        )) ||
-                      (recommendation.columns &&
-                        recommendation.columns.length > 0 &&
-                        appliedCardinalitySignatures.columns.has(
-                          recommendation.columns.join(","),
-                        ));
+                      (recommendation.index_name && appliedCardinalitySignatures.names.has(recommendation.index_name)) ||
+                      (recommendation.columns && recommendation.columns.length > 0 && appliedCardinalitySignatures.columns.has(recommendation.columns.join(",")));
                     return (
                       <div
                         className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
@@ -1414,9 +1381,7 @@ export default function App() {
                       >
                         <div>
                           <div className="cardinalityRecommendation__title">
-                            <span>
-                              {strengthLabel(recommendation.strength)}
-                            </span>
+                            <span>{strengthLabel(recommendation.strength)}</span>
                             <strong>{recommendation.index_name}</strong>
                           </div>
                           <div className="field-hint">
@@ -1484,10 +1449,6 @@ export default function App() {
                     onChange={(e) => setNewTableName(e.target.value)}
                     placeholder="users"
                     autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") onAddTableSubmit();
-                      if (e.key === "Escape") onAddTableCancel();
-                    }}
                   />
                 </div>
                 <div
