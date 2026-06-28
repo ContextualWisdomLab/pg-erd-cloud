@@ -19,7 +19,7 @@ describe('TableNode', () => {
 
     render(
       <ReactFlowProvider>
-         <TableNode data={data as any} id="1" type="tableNode" zIndex={1} isConnectable={true} positionAbsoluteX={0} positionAbsoluteY={0} selected={false} dragHandle="" dragging={false} draggable={false} selectable={false} deletable={false} />
+         <TableNode {...({ data, id: "1", type: "tableNode", isConnectable: true } as any)} />
       </ReactFlowProvider>
     );
 
