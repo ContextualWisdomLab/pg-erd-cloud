@@ -118,7 +118,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           );
         })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
-          <div className="tableNode__more">
+          <div className="tableNode__more" title="생략된 컬럼이 더 있습니다">
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
@@ -136,7 +136,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </div>
             ))}
             {data.indexes.length > 4 ? (
-              <div className="tableNode__more">
+              <div className="tableNode__more" title="생략된 인덱스가 더 있습니다">
                 … {data.indexes.length - 4} more indexes
               </div>
             ) : null}
