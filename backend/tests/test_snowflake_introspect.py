@@ -191,6 +191,47 @@ async def test_parse_snowflake_dsn_rejects_connector_overrides() -> None:
 
 
 @pytest.mark.asyncio
+async def test_parse_snowflake_dsn_validates_authenticator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_validated_ip_hosts(host, is_hostaddr, port):
+        return (host,)
+
+    monkeypatch.setattr(
+        "app.snowflake_introspect.introspect._validated_ip_hosts",
+        fake_validated_ip_hosts,
+    )
+
+    # Allowed okta URLs
+    conf = await _parse_snowflake_dsn(
+        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com"
+    )
+    assert conf.authenticator == "https://company.okta.com"
+
+    # Allowed safe string values
+    conf = await _parse_snowflake_dsn(
+        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=externalbrowser"
+    )
+    assert conf.authenticator == "externalbrowser"
+
+    # Rejected unknown strings
+    with pytest.raises(ValueError, match="unsupported Snowflake authenticator value"):
+        await _parse_snowflake_dsn(
+            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=some_unknown_auth"
+        )
+
+    # Rejected unsafe URLs (SSRF protection)
+    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
+        await _parse_snowflake_dsn(
+            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://127.0.0.1:8000"
+        )
+    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
+        await _parse_snowflake_dsn(
+            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com"
+        )
+
+
+@pytest.mark.asyncio
 async def test_introspect_snowflake_builds_common_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

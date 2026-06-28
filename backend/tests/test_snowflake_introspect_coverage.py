@@ -11,7 +11,6 @@ from app.snowflake_introspect.introspect import (
     _constraint_def,
     _build_constraints
 )
-from app.pg_introspect.dsn_guard import DsnTargetError
 
 def test_int_or_none():
     assert _int_or_none("42") == 42
