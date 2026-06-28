@@ -88,6 +88,7 @@ def make_csrf_middleware(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        """Reject unsafe API requests that do not include a CSRF token."""
         if (
             request.method.upper() in SAFE_METHODS
             or not request.url.path.startswith(route_prefix)
