@@ -234,12 +234,5 @@ describe("cardinality utils", () => {
         // Line 45: return sanitizeIdentifierPart(parts[parts.length - 1] || tableName);
         expect(buildIndexName(".", ["col"])).toBe("idx_col_col"); // parts = ["", ""], parts[1] is "", falls back to "." but sanitizeIdentifierPart(".") is "col"
     });
-
-    it("covers nullish coalescing in distinctCount assignment", () => {
-        // Line 121: distinctCount: Math.min(column.distinctCount ?? 0, rowCount)
-        // Note: the filter in Line 116 already checks `column.distinctCount !== null`.
-        // Thus `?? 0` on line 121 is practically unreachable in standard TS but we can trick it with casting if needed or it may just remain an uncovered branch in v8 if unreachable.
-        // Actually since we filter for !== null and > 0, the ?? 0 fallback is indeed dead code. We won't worry if it's just a branch.
-    });
   });
 });

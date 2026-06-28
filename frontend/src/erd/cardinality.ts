@@ -118,7 +118,7 @@ export function buildIndexRecommendations({
     )
     .map((column) => ({
       ...column,
-      distinctCount: Math.min(column.distinctCount as number, rowCount),
+      distinctCount: Math.min(column.distinctCount ?? 0, rowCount),
     }));
 
   const recommendations = selected.map((column) =>

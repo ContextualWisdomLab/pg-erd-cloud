@@ -35,6 +35,9 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
         # Defensive: never allow unsigned tokens.
         if alg == "NONE":
             continue
+        # Defensive: never allow symmetric algorithms to prevent public key HMAC forgery.
+        if alg.startswith("HS"):
+            continue
         if alg in seen:
             continue
         seen.add(alg)
@@ -64,7 +67,9 @@ class VerifiedToken:
 
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
-_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(
+    0, tz=dt.timezone.utc
+)
 _oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
@@ -225,19 +230,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
 
-    kty = jwk.get("kty", "")
-    if kty == "RSA" and not header_alg.startswith("RS"):
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    if kty == "EC" and not header_alg.startswith("ES"):
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    if kty == "oct" and not header_alg.startswith("HS"):
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-
     try:
         claims = jwt.decode(
             token,
             jwk,
-            algorithms=[header_alg],
+            algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
             options={
