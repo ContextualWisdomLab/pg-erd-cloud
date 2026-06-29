@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 from starlette.requests import Request
+from starlette.responses import Response
 
 from app import security_headers
 from app.csrf import CSRF_HEADER_NAME
@@ -162,3 +163,85 @@ def test_csp_path_normalization_handles_double_slash() -> None:
     }
     request = Request(scope)
     assert security_headers._should_apply_csp(request) is False
+
+
+def test_apply_security_headers_directly() -> None:
+    """apply_security_headers should set baseline headers on direct call."""
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/ping",
+        "raw_path": b"/api/ping",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "root_path": "",
+    }
+    request = Request(scope)
+    response = Response()
+
+    security_headers.apply_security_headers(request, response)
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "Permissions-Policy" in response.headers
+    assert "Content-Security-Policy" in response.headers
+    assert "Strict-Transport-Security" not in response.headers
+
+
+def test_apply_security_headers_https_hsts() -> None:
+    """apply_security_headers should apply HSTS when scheme is HTTPS."""
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "https",
+        "path": "/api/ping",
+        "raw_path": b"/api/ping",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "root_path": "",
+    }
+    request = Request(scope)
+    response = Response()
+
+    security_headers.apply_security_headers(request, response)
+
+    assert "Strict-Transport-Security" in response.headers
+
+
+def test_apply_security_headers_does_not_overwrite() -> None:
+    """apply_security_headers should not overwrite existing headers."""
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "https",
+        "path": "/api/ping",
+        "raw_path": b"/api/ping",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "root_path": "",
+    }
+    request = Request(scope)
+    response = Response()
+
+    # Pre-set some headers
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Strict-Transport-Security"] = "max-age=0"
+
+    security_headers.apply_security_headers(request, response)
+
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert response.headers["Strict-Transport-Security"] == "max-age=0"
