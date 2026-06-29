@@ -28,3 +28,4 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 100 unique routes, 1 unique method each (100 total combinations):
 - Before: ~820.62ms
 - After: ~1.17ms
+- Used lazy initialization of Map data structures in tight loops to avoid memory and cpu overhead when processing sparse relations (like tables with zero edges). This avoids the O(N) penalty of object iteration when no mapping is required.

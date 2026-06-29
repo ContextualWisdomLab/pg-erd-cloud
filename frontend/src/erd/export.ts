@@ -56,7 +56,8 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
-  const nodesById = new Map(nodes.map(n => [n.id, n]));
+  // Bolt: Lazily create map only if there are edges to process
+  let nodesById: Map<string, Node<TableNodeData>> | undefined;
 
   // Export tables
   for (const node of nodes) {
@@ -87,6 +88,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
 
   // Export foreign keys
   for (const edge of edges) {
+    if (!nodesById) nodesById = new Map(nodes.map(n => [n.id, n]));
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
 
@@ -239,7 +241,8 @@ export function exportDiagramSvg(
   snapshot?: SnapshotJson | null,
 ): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
-  const nodesById = new Map(nodes.map(n => [n.id, n]));
+  // Bolt: Lazily create map only if there are edges to process
+  let nodesById: Map<string, Node<TableNodeData>> | undefined;
   const width = 280;
   const headerHeight = 34;
   const rowHeight = 22;
@@ -267,6 +270,7 @@ export function exportDiagramSvg(
   ];
 
   for (const edge of edges) {
+    if (!nodesById) nodesById = new Map(nodes.map(n => [n.id, n]));
     const source = nodesById.get(edge.source);
     const target = nodesById.get(edge.target);
     if (!source || !target) continue;
