@@ -13,6 +13,16 @@ import {
   type Connection as FlowConnection,
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
+import {
+  AddTableModal,
+  CardinalityModal,
+  EditEdgeModal,
+  EditTableModal,
+  ExportModal,
+  GroupModal,
+} from "./components/modals";
+
 import {
   getMe,
   createConnection,
@@ -1069,667 +1079,76 @@ export default function App() {
             </div>
           )}
 
-          {isExportModalOpen && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="export-ddl-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 500,
-                  maxWidth: "90%",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="export-ddl-title">DDL 내보내기</h3>
-                <textarea
-                  readOnly
-                  aria-label="DDL Export"
-                  value={exportDdlText}
-                  style={{
-                    width: "100%",
-                    height: 300,
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    padding: 8,
-                  }}
-                />
-                <div
-                  className="row"
-                  style={{ justifyContent: "flex-end", marginTop: 8 }}
-                >
-                  <button onClick={onCloseExport}>닫기</button>
-                  <button
-                    onClick={onCopyExportDdl}
-                    style={{ background: "#034ea2", color: "#fff" }}
-                    aria-live="polite"
-                  >
-                    {isCopied ? "복사 완료 ✓" : "복사하기"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <ExportModal
+            isOpen={isExportModalOpen}
+            exportDdlText={exportDdlText}
+            isCopied={isCopied}
+            onCloseExport={onCloseExport}
+            onCopyExportDdl={onCopyExportDdl}
+          />
 
-          {editingEdge && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="edit-rel-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 320,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="edit-rel-title">관계 설정</h3>
-                <div style={{ fontSize: 13, color: "#4b5563" }}>
-                  From: {editingEdge.source} <br />
-                  To: {editingEdge.target}
-                </div>
-                <div className="field">
-                  <label htmlFor="rel-label">제약조건 이름 (Label)</label>
-                  <input
-                    id="rel-label"
-                    value={relLabel}
-                    onChange={(e) => setRelLabel(e.target.value)}
-                    placeholder="fk_constraint_name"
-                    autoFocus
-                  />
-                </div>
-                <div
-                  className="row"
-                  style={{ justifyContent: "space-between", marginTop: 8 }}
-                >
-                  <button
-                    onClick={onRelDelete}
-                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-                  >
-                    삭제
-                  </button>
-                  <div className="row">
-                    <button onClick={onRelCancel}>취소</button>
-                    <button
-                      onClick={onRelSubmit}
-                      style={{ background: "#034ea2", color: "#fff" }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <EditEdgeModal
+            editingEdge={editingEdge}
+            relLabel={relLabel}
+            setRelLabel={setRelLabel}
+            onRelDelete={onRelDelete}
+            onRelCancel={onRelCancel}
+            onRelSubmit={onRelSubmit}
+          />
 
-          {isGroupModalOpen && (
-            <div className="modalOverlay">
-              <div
-                className="modalContent groupManager"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="group-manager-title"
-              >
-                <div className="modalHeader">
-                  <h3 id="group-manager-title">업무 그룹</h3>
-                  <button
-                    type="button"
-                    onClick={onCloseGroupManager}
-                    aria-label="업무 그룹 닫기"
-                  >
-                    닫기
-                  </button>
-                </div>
+          <GroupModal
+            isOpen={isGroupModalOpen}
+            businessGroups={businessGroups}
+            newGroupName={newGroupName}
+            setNewGroupName={setNewGroupName}
+            newGroupColor={newGroupColor}
+            setNewGroupColor={setNewGroupColor}
+            nodes={nodes}
+            onCloseGroupManager={onCloseGroupManager}
+            onCreateBusinessGroup={onCreateBusinessGroup}
+            onDeleteBusinessGroup={onDeleteBusinessGroup}
+            onAssignBusinessGroup={onAssignBusinessGroup}
+          />
 
-                <div className="groupManager__create">
-                  <div className="field">
-                    <label htmlFor="business-group-name">그룹 이름</label>
-                    <input
-                      id="business-group-name"
-                      value={newGroupName}
-                      onChange={(event) => setNewGroupName(event.target.value)}
-                      placeholder="Billing"
-                    />
-                  </div>
-                  <div
-                    className="groupManager__swatches"
-                    role="radiogroup"
-                    aria-label="그룹 색상"
-                  >
-                    {BUSINESS_GROUP_COLORS.map((color) => (
-                      <button
-                        type="button"
-                        aria-label={`색상 ${color}`}
-                        aria-pressed={newGroupColor === color}
-                        className="groupManager__swatch"
-                        key={color}
-                        onClick={() => setNewGroupColor(color)}
-                        style={{ background: color }}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onCreateBusinessGroup}
-                    disabled={!newGroupName.trim()}
-                  >
-                    추가
-                  </button>
-                </div>
+          <CardinalityModal
+            isOpen={isCardinalityModalOpen}
+            cardinalityNode={cardinalityNode}
+            nodes={nodes}
+            cardinalityRowCount={cardinalityRowCount}
+            setCardinalityRowCount={setCardinalityRowCount}
+            cardinalityRowCountNumber={cardinalityRowCountNumber}
+            cardinalityDistinctCounts={cardinalityDistinctCounts}
+            cardinalityColumnSelections={cardinalityColumnSelections}
+            cardinalityRecommendations={cardinalityRecommendations}
+            appliedCardinalitySignatures={appliedCardinalitySignatures}
+            onCloseCardinalityWizard={onCloseCardinalityWizard}
+            onCardinalityTableChange={onCardinalityTableChange}
+            onCardinalityColumnToggle={onCardinalityColumnToggle}
+            onCardinalityDistinctCountChange={onCardinalityDistinctCountChange}
+            onApplyCardinalityRecommendation={onApplyCardinalityRecommendation}
+            parsePositiveInteger={parsePositiveInteger}
+            calculateCardinalityRatio={calculateCardinalityRatio}
+            formatPercent={formatPercent}
+            strengthLabel={strengthLabel}
+          />
 
-                <div className="groupManager__section">
-                  <h4>그룹</h4>
-                  {businessGroups.length === 0 ? (
-                    <div className="field-hint">등록된 그룹이 없습니다.</div>
-                  ) : (
-                    <div className="groupManager__list">
-                      {businessGroups.map((group) => (
-                        <div className="groupManager__group" key={group.id}>
-                          <span
-                            className="groupManager__dot"
-                            style={{ background: group.color }}
-                          />
-                          <strong>{group.name}</strong>
-                          <button
-                            type="button"
-                            aria-label={`${group.name} 그룹 삭제`}
-                            onClick={() => onDeleteBusinessGroup(group.id)}
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+          <EditTableModal
+            isOpen={isEditTableModalOpen}
+            editingNode={editingNode}
+            setEditingNode={setEditingNode}
+            setNodes={setNodes}
+            onEditTableCancel={onEditTableCancel}
+            onEditTableSubmit={onEditTableSubmit}
+            onDeleteTable={onDeleteTable}
+          />
 
-                <div className="groupManager__section">
-                  <h4>테이블 배정</h4>
-                  <div className="groupManager__assignments">
-                    {nodes.map((node) => (
-                      <label className="groupManager__assignment" key={node.id}>
-                        <span>{node.data.title}</span>
-                        <select
-                          value={node.data.businessGroup?.id ?? ""}
-                          onChange={(event) =>
-                            onAssignBusinessGroup(node.id, event.target.value)
-                          }
-                        >
-                          <option value="">없음</option>
-                          {businessGroups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                              {group.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isCardinalityModalOpen && cardinalityNode && (
-            <div className="modalOverlay">
-              <div
-                className="modalContent cardinalityWizard"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="cardinality-title"
-              >
-                <div className="modalHeader">
-                  <h3 id="cardinality-title">인덱스 카디널리티</h3>
-                  <button
-                    type="button"
-                    onClick={onCloseCardinalityWizard}
-                    aria-label="카디널리티 계산 닫기"
-                  >
-                    닫기
-                  </button>
-                </div>
-
-                <div className="cardinalityWizard__controls">
-                  <div className="field">
-                    <label htmlFor="cardinality-table">테이블</label>
-                    <select
-                      id="cardinality-table"
-                      value={cardinalityNode.id}
-                      onChange={(event) =>
-                        onCardinalityTableChange(event.target.value)
-                      }
-                    >
-                      {nodes.map((node) => (
-                        <option key={node.id} value={node.id}>
-                          {node.data.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="cardinality-row-count">행 수</label>
-                    <input
-                      id="cardinality-row-count"
-                      inputMode="numeric"
-                      min="1"
-                      type="number"
-                      value={cardinalityRowCount}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (/^\d*$/.test(value)) {
-                          setCardinalityRowCount(value);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="cardinalityWizard__columns">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">사용</th>
-                        <th scope="col">컬럼</th>
-                        <th scope="col">Distinct</th>
-                        <th scope="col">비율</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cardinalityNode.data.columns.map((column, index) => {
-                        const distinctCount = parsePositiveInteger(
-                          cardinalityDistinctCounts[column.column_name] ?? "",
-                        );
-                        const ratio =
-                          cardinalityRowCountNumber !== null &&
-                          distinctCount !== null
-                            ? calculateCardinalityRatio(
-                                cardinalityRowCountNumber,
-                                distinctCount,
-                              )
-                            : null;
-                        const inputId = `cardinality-${index}`;
-                        return (
-                          <tr key={column.column_name}>
-                            <td>
-                              <input
-                                aria-label={`${column.column_name} 사용`}
-                                checked={
-                                  cardinalityColumnSelections[
-                                    column.column_name
-                                  ] ?? false
-                                }
-                                onChange={(event) =>
-                                  onCardinalityColumnToggle(
-                                    column.column_name,
-                                    event.target.checked,
-                                  )
-                                }
-                                type="checkbox"
-                              />
-                            </td>
-                            <td>
-                              <span className="cardinalityWizard__columnIdentity">
-                                <label htmlFor={inputId}>
-                                  {column.column_name}
-                                </label>
-                                <span>{column.data_type}</span>
-                              </span>
-                            </td>
-                            <td>
-                              <input
-                                id={inputId}
-                                inputMode="numeric"
-                                min="1"
-                                type="number"
-                                value={
-                                  cardinalityDistinctCounts[
-                                    column.column_name
-                                  ] ?? ""
-                                }
-                                onChange={(event) =>
-                                  onCardinalityDistinctCountChange(
-                                    column.column_name,
-                                    event.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>{ratio === null ? "—" : formatPercent(ratio)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="cardinalityWizard__recommendations">
-                  <h4>추천 결과</h4>
-                  {cardinalityRowCountNumber === null ? (
-                    <div className="field-hint">Rows 값을 입력하세요.</div>
-                  ) : null}
-                  {cardinalityRowCountNumber !== null &&
-                  cardinalityRecommendations.length === 0 ? (
-                    <div className="field-hint">
-                      사용할 컬럼과 distinct 값을 선택하세요.
-                    </div>
-                  ) : null}
-                  {cardinalityRecommendations.map((recommendation) => {
-                    const isApplied =
-                      (recommendation.index_name && appliedCardinalitySignatures.names.has(recommendation.index_name)) ||
-                      (recommendation.columns && recommendation.columns.length > 0 && appliedCardinalitySignatures.columns.has(recommendation.columns.join(",")));
-                    return (
-                      <div
-                        className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
-                        key={`${recommendation.index_name}-${recommendation.columns.join("-")}`}
-                      >
-                        <div>
-                          <div className="cardinalityRecommendation__title">
-                            <span>{strengthLabel(recommendation.strength)}</span>
-                            <strong>{recommendation.index_name}</strong>
-                          </div>
-                          <div className="field-hint">
-                            {recommendation.columns.join(", ")} ·{" "}
-                            {formatPercent(recommendation.cardinality_ratio)} ·{" "}
-                            {recommendation.reason}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={
-                            recommendation.strength === "skip" || isApplied
-                          }
-                          onClick={() =>
-                            onApplyCardinalityRecommendation(recommendation)
-                          }
-                        >
-                          {isApplied ? "적용됨" : "적용"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {isEditTableModalOpen && editingNode && (
-            <div className="modalOverlay">
-              <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
-                <div className="modal__header">
-                  <h3>테이블 편집</h3>
-                  <button onClick={onEditTableCancel}>X</button>
-                </div>
-                <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
-                  <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
-                    <div className="col">
-                      <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
-                      <input
-                        id="editTableTitle"
-                        name="title"
-                        defaultValue={editingNode.data.title}
-                        placeholder="public.users"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="col">
-                      <label htmlFor="editTableComment">코멘트 (선택)</label>
-                      <input
-                        id="editTableComment"
-                        name="comment"
-                        defaultValue={editingNode.data.comment || ""}
-                        placeholder="사용자 테이블"
-                      />
-                    </div>
-
-                    <div className="col" style={{ marginTop: 16 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <h4 style={{ margin: 0 }}>컬럼</h4>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNodes((nds) =>
-                              nds.map((n) => {
-                                if (n.id === editingNode.id) {
-                                  return {
-                                    ...n,
-                                    data: {
-                                      ...n.data,
-                                      columns: [
-                                        ...n.data.columns,
-                                        {
-                                          column_name: `new_col_${Date.now()}`,
-                                          data_type: "text",
-                                          is_not_null: false,
-                                          is_pk: false,
-                                        }
-                                      ]
-                                    }
-                                  };
-                                }
-                                return n;
-                              })
-                            );
-                            setEditingNode((prev) => {
-                               if (!prev) return prev;
-                               return {
-                                 ...prev,
-                                 data: {
-                                   ...prev.data,
-                                   columns: [
-                                     ...prev.data.columns,
-                                     {
-                                       column_name: `new_col_${Date.now()}`,
-                                       data_type: "text",
-                                       is_not_null: false,
-                                       is_pk: false,
-                                     }
-                                   ]
-                                 }
-                               }
-                            });
-                          }}
-                        >
-                          컬럼 추가
-                        </button>
-                      </div>
-
-                      <div className="col" style={{ gap: 8 }}>
-                        {editingNode.data.columns.map((col, idx) => (
-                          <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
-                            <input
-                              type="text"
-                              name={`col_name_${idx}`}
-                              defaultValue={col.column_name}
-                              placeholder="컬럼명"
-                              style={{ flex: 2 }}
-                              aria-label="컬럼명"
-                            />
-                            <input
-                              type="text"
-                              name={`col_type_${idx}`}
-                              defaultValue={col.data_type}
-                              placeholder="데이터 타입"
-                              style={{ flex: 1.5 }}
-                              aria-label="데이터 타입"
-                            />
-                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
-                              <input
-                                type="checkbox"
-                                name={`col_pk_${idx}`}
-                                defaultChecked={col.is_pk}
-                              />
-                              PK
-                            </label>
-                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
-                              <input
-                                type="checkbox"
-                                name={`col_nn_${idx}`}
-                                defaultChecked={col.is_not_null}
-                              />
-                              NN
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!window.confirm(`'${col.column_name}' 컬럼을 삭제하시겠습니까?`)) return;
-                                setNodes((nds) =>
-                                  nds.map((n) => {
-                                    if (n.id === editingNode.id) {
-                                      return {
-                                        ...n,
-                                        data: {
-                                          ...n.data,
-                                          columns: n.data.columns.filter((_, i) => i !== idx)
-                                        }
-                                      };
-                                    }
-                                    return n;
-                                  })
-                                );
-                                setEditingNode((prev) => {
-                                   if (!prev) return prev;
-                                   return {
-                                     ...prev,
-                                     data: {
-                                       ...prev.data,
-                                       columns: prev.data.columns.filter((_, i) => i !== idx)
-                                     }
-                                   };
-                                });
-                              }}
-                              style={{ color: "#b91c1c", padding: "4px 8px" }}
-                              aria-label={`${col.column_name} 컬럼 삭제`}
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
-                  <button
-                    type="button"
-                    onClick={onDeleteTable}
-                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-                  >
-                    테이블 삭제
-                  </button>
-                  <div className="row">
-                    <button type="button" onClick={onEditTableCancel}>취소</button>
-                    <button
-                      type="submit"
-                      form="editTableForm"
-                      style={{ background: "#034ea2", color: "#fff" }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {isAddTableModalOpen && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="add-table-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 300,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="add-table-title">테이블 추가</h3>
-                <div className="field">
-                  <label htmlFor="new-table-name">테이블 이름</label>
-                  <input
-                    id="new-table-name"
-                    value={newTableName}
-                    onChange={(e) => setNewTableName(e.target.value)}
-                    placeholder="users"
-                    autoFocus
-                  />
-                </div>
-                <div
-                  className="row"
-                  style={{ justifyContent: "flex-end", marginTop: 8 }}
-                >
-                  <button onClick={onAddTableCancel}>취소</button>
-                  <button
-                    onClick={onAddTableSubmit}
-                    style={{ background: "#034ea2", color: "#fff" }}
-                  >
-                    저장
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <AddTableModal
+            isOpen={isAddTableModalOpen}
+            newTableName={newTableName}
+            setNewTableName={setNewTableName}
+            onAddTableCancel={onAddTableCancel}
+            onAddTableSubmit={onAddTableSubmit}
+          />
         </div>
       </main>
     </div>
