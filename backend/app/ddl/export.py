@@ -551,6 +551,45 @@ def _render_indexes_snowflake(indexes: list[dict], lines: list[str]) -> None:
             )
 
 
+def _render_snowflake_table(
+    t: dict,
+    cols_by_oid: dict[int, list[dict]],
+    constraints_by_oid: dict[int, list[dict]],
+    source_dialect: DdlDialect,
+    lines: list[str],
+) -> None:
+    schema = t.get("schema_name")
+    name = t.get("relation_name")
+    oid = t.get("relation_oid")
+    if not (isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)):
+        return
+
+    col_defs = _render_table_columns_snowflake(oid, cols_by_oid, source_dialect)
+    table_cons, skipped_checks = _render_table_constraints_snowflake(
+        oid, constraints_by_oid, cols_by_oid
+    )
+
+    all_defs = col_defs + table_cons
+    lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
+    for i, d in enumerate(all_defs):
+        comma = "," if i < len(all_defs) - 1 else ""
+        lines.append(f"  {d}{comma}")
+    lines.append(");")
+    for cname in skipped_checks:
+        lines.append(
+            f"-- NOTE: skipped PostgreSQL CHECK constraint {_q(cname)} on {_qname(schema, name)} for Snowflake export."
+        )
+    if isinstance(t.get("tablespace_name"), str):
+        lines.append(
+            f"-- NOTE: skipped PostgreSQL TABLESPACE {_q(t['tablespace_name'])} on {_qname(schema, name)} for Snowflake export."
+        )
+    if t.get("relation_kind") == "p" or t.get("is_partition") is True:
+        lines.append(
+            f"-- NOTE: skipped PostgreSQL partition metadata on {_qname(schema, name)} for Snowflake export."
+        )
+    lines.append("")
+
+
 def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     """Generate Snowflake DDL from a captured PostgreSQL/Snowflake snapshot."""
 
@@ -568,38 +607,9 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     _render_schemas(tables, lines)
 
     for t in tables:
-        schema = t.get("schema_name")
-        name = t.get("relation_name")
-        oid = t.get("relation_oid")
-        if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
-        ):
-            continue
-
-        col_defs = _render_table_columns_snowflake(oid, cols_by_oid, source_dialect)
-        table_cons, skipped_checks = _render_table_constraints_snowflake(
-            oid, constraints_by_oid, cols_by_oid
+        _render_snowflake_table(
+            t, cols_by_oid, constraints_by_oid, source_dialect, lines
         )
-
-        all_defs = col_defs + table_cons
-        lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
-        for i, d in enumerate(all_defs):
-            comma = "," if i < len(all_defs) - 1 else ""
-            lines.append(f"  {d}{comma}")
-        lines.append(");")
-        for cname in skipped_checks:
-            lines.append(
-                f"-- NOTE: skipped PostgreSQL CHECK constraint {_q(cname)} on {_qname(schema, name)} for Snowflake export."
-            )
-        if isinstance(t.get("tablespace_name"), str):
-            lines.append(
-                f"-- NOTE: skipped PostgreSQL TABLESPACE {_q(t['tablespace_name'])} on {_qname(schema, name)} for Snowflake export."
-            )
-        if t.get("relation_kind") == "p" or t.get("is_partition") is True:
-            lines.append(
-                f"-- NOTE: skipped PostgreSQL partition metadata on {_qname(schema, name)} for Snowflake export."
-            )
-        lines.append("")
 
     _render_foreign_keys(constraints, lines)
 
