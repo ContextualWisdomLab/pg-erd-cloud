@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import datetime as dt
 import uuid
 
@@ -82,7 +84,9 @@ async def list_project_members(
 ) -> list[ProjectMemberOut]:
     """List members of a project (MVP: any member can view)."""
     # Remediation for IDOR: Only owners or editors can view all members.
-    await require_project_member(session, project_space_uuid, user.user_account_uuid, minimum_role="editor")
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+    )
 
     rows = await session.execute(
         select(ProjectMember, UserAccount)
@@ -106,17 +110,33 @@ async def list_project_members(
 
 
 async def _ensure_owner(
-    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
+    session: AsyncSession,
+    project_space_uuid: uuid.UUID | Sequence[uuid.UUID] | set[uuid.UUID],
+    user_account_uuid: uuid.UUID,
 ) -> None:
-    row = await session.execute(
-        select(ProjectMember.project_role).where(
-            ProjectMember.project_space_uuid == project_space_uuid,
+    if isinstance(project_space_uuid, uuid.UUID):
+        uuids = [project_space_uuid]
+    elif isinstance(project_space_uuid, (list, tuple, set, frozenset)):
+        uuids = list(project_space_uuid)
+    else:
+        uuids = list(project_space_uuid)
+
+    # Optimize: Handle single and multiple UUIDs using a single bulk query to prevent N+1 query issue.
+    if not uuids:
+        return
+
+    rows = await session.execute(
+        select(ProjectMember.project_space_uuid, ProjectMember.project_role).where(
+            ProjectMember.project_space_uuid.in_(uuids),
             ProjectMember.user_account_uuid == user_account_uuid,
         )
     )
-    role = row.scalar_one_or_none()
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="owner role required")
+
+    roles = {row[0]: row[1] for row in rows.all()}
+
+    for p_uuid in uuids:
+        if roles.get(p_uuid) != "owner":
+            raise HTTPException(status_code=403, detail="owner role required")
 
 
 async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccount:
