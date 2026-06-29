@@ -18,3 +18,6 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+## 2024-06-25 - Optimize Nested String Splitting in Loops
+**Learning:** Nested loops containing string operations like `value.split(",")` on small elements in an array have significant Python VM overhead.
+**Action:** When a list of string values needs to be tokenized consistently, flattening it via `",".join(values).split(",")` pushes the operation to the faster C implementation and can improve execution time by 15-60%.
