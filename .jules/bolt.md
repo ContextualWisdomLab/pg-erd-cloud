@@ -28,3 +28,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 100 unique routes, 1 unique method each (100 total combinations):
 - Before: ~820.62ms
 - After: ~1.17ms
+## 2026-06-25 - Avoid unbounded Math.min/Math.max spreads
+**Learning:** Spreading dynamically sized arrays into variadic functions like `Math.max(...values)` creates intermediate arrays and can exceed JS engine argument-count limits, often surfacing as `RangeError` variants such as "Too many arguments".
+**Action:** For unbounded frontend collections such as ERD nodes, calculate min/max bounds with an iterative loop instead of `Math.min(...array)` or `Math.max(...array)`.
