@@ -2344,7 +2344,6 @@ PY
 	fi
 
 	if [ "$rc" -eq 0 ]; then
-		printf "Strix run succeeded for model '%s' in %ds.\n" "$model" "$elapsed" >&2
 		return 0
 	fi
 
@@ -3173,8 +3172,12 @@ run_current_target_scan() {
 	ZERO_FINDINGS_REPORTED=0
 
 	local primary_scan_rc=0
+	local primary_start_epoch
+	primary_start_epoch="$(date +%s)"
 	run_strix_with_transient_retry "$PRIMARY_MODEL" || primary_scan_rc=$?
+	local primary_elapsed=$(( $(date +%s) - primary_start_epoch ))
 	if [ "$primary_scan_rc" -eq 0 ]; then
+		printf "Strix run succeeded for model '%s' in %ds.\n" "$PRIMARY_MODEL" "$primary_elapsed" >&2
 		return 0
 	fi
 	if [ "$primary_scan_rc" -eq 2 ]; then
