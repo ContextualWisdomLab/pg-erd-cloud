@@ -17,7 +17,7 @@ describe('api', () => {
 
   beforeEach(() => {
     fetchMock = vi.fn()
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     localStorageMock = {
       getItem: vi.fn(),
