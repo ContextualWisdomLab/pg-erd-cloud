@@ -91,6 +91,8 @@ SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 @dataclass
 class ConstraintContext:
+    """Parameters for building a constraint."""
+
     name: str
     schema: str
     table: str
