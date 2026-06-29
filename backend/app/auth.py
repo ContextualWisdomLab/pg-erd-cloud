@@ -67,9 +67,7 @@ class VerifiedToken:
 
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
-_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(
-    0, tz=dt.timezone.utc
-)
+_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 _oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)

@@ -39,9 +39,7 @@ async def list_projects(
     )
     projects = rows.scalars().all()
     return [
-        ProjectOut(
-            project_space_uuid=p.project_space_uuid, project_name=p.project_name
-        )
+        ProjectOut(project_space_uuid=p.project_space_uuid, project_name=p.project_name)
         for p in projects
     ]
 
@@ -75,9 +73,7 @@ async def create_project(
     )
 
 
-@router.get(
-    "/{project_space_uuid}/members", response_model=list[ProjectMemberOut]
-)
+@router.get("/{project_space_uuid}/members", response_model=list[ProjectMemberOut])
 async def list_project_members(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
@@ -115,7 +111,9 @@ async def list_project_members(
     return out
 
 
-async def _ensure_owner(session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID) -> None:
+async def _ensure_owner(
+    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
+) -> None:
     row = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
@@ -125,6 +123,7 @@ async def _ensure_owner(session: AsyncSession, project_space_uuid: uuid.UUID, us
     role = row.scalar_one_or_none()
     if role != "owner":
         raise HTTPException(status_code=403, detail="owner role required")
+
 
 async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccount:
     row2 = await session.execute(
@@ -142,7 +141,10 @@ async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccoun
         await session.flush()
     return u
 
-async def _ensure_not_changing_owner_role(session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID) -> None:
+
+async def _ensure_not_changing_owner_role(
+    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
+) -> None:
     row3 = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
@@ -156,7 +158,13 @@ async def _ensure_not_changing_owner_role(session: AsyncSession, project_space_u
             detail="cannot change owner role via invite endpoint",
         )
 
-async def _upsert_project_member(session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID, project_role: str) -> str:
+
+async def _upsert_project_member(
+    session: AsyncSession,
+    project_space_uuid: uuid.UUID,
+    user_account_uuid: uuid.UUID,
+    project_role: str,
+) -> str:
     stmt = (
         insert(ProjectMember)
         .values(
@@ -178,6 +186,7 @@ async def _upsert_project_member(session: AsyncSession, project_space_uuid: uuid
     await session.commit()
     return str(new_role)
 
+
 @router.post("/{project_space_uuid}/members", response_model=ProjectMemberOut)
 async def add_project_member(
     project_space_uuid: uuid.UUID,
@@ -196,9 +205,13 @@ async def add_project_member(
         raise HTTPException(status_code=400, detail="member_subject required")
 
     u = await _ensure_user_exists(session, subject)
-    await _ensure_not_changing_owner_role(session, project_space_uuid, u.user_account_uuid)
+    await _ensure_not_changing_owner_role(
+        session, project_space_uuid, u.user_account_uuid
+    )
 
-    new_role = await _upsert_project_member(session, project_space_uuid, u.user_account_uuid, body.project_role)
+    new_role = await _upsert_project_member(
+        session, project_space_uuid, u.user_account_uuid, body.project_role
+    )
 
     return ProjectMemberOut(
         user_account_uuid=u.user_account_uuid,

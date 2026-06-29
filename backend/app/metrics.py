@@ -41,9 +41,7 @@ def prime_http_metrics(*, methods: set[str], routes: set[str]) -> None:
                 status="200",
             ).inc(0)
             # Histograms can be created without observing.
-            HTTP_REQUEST_DURATION_SECONDS.labels(
-                method=method, route=normalized
-            )
+            HTTP_REQUEST_DURATION_SECONDS.labels(method=method, route=normalized)
 
 
 HTTP_REQUESTS_TOTAL = Counter(
