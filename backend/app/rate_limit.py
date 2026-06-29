@@ -145,6 +145,7 @@ def make_rate_limit_middleware(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        """Apply the configured fixed-window limit to matching requests."""
         if not policy.enabled:
             return await call_next(request)
 

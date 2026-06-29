@@ -54,8 +54,24 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "not_found",
 ]);
 
+const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
+
+type CurrentUser = {
+  subject: string;
+  display_name: string | null;
+};
+
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function isSupportedConnectionDsn(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return SUPPORTED_DSN_PROTOCOLS.has(url.protocol) && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function strengthLabel(strength: CardinalityStrength): string {
@@ -66,10 +82,9 @@ function strengthLabel(strength: CardinalityStrength): string {
 
 export default function App() {
   const [devUser, setDevUser] = useState<string>("local");
-  const [me, setMe] = useState<{
-    subject: string;
-    display_name: string | null;
-  } | null>(null);
+  const [me, setMe] = useState<CurrentUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("demo");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -158,13 +173,36 @@ export default function App() {
   );
 
   useEffect(() => {
+    localStorage.setItem("devUser", devUser.trim() || "local");
+  }, [devUser]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsAuthLoading(true);
+    setAuthError(null);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
+        if (!isCurrent) return;
         setMe({ subject: m.subject, display_name: m.display_name });
         setProjects(p);
         setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (!isCurrent) return;
+        setMe(null);
+        setProjects([]);
+        setSelectedProjectId(null);
+        setConnections([]);
+        setSelectedConnId(null);
+        setAuthError(String(e));
+      })
+      .finally(() => {
+        if (isCurrent) setIsAuthLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [devUser]);
 
   useEffect(() => {
@@ -637,8 +675,20 @@ export default function App() {
     const nextConnectionName = connName.trim();
     const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
     if (!nextConnectionName || !connectionDsn) return;
+    if (!isSupportedConnectionDsn(connectionDsn)) {
+      setError("Connection DSN must use postgresql://, postgres://, or snowflake:// with a host.");
+      if (dsnInputRef.current) {
+        dsnInputRef.current.value = "";
+      }
+      setIsDsnPresent(false);
+      return;
+    }
     setError(null);
     setIsCreatingConnection(true);
+    if (dsnInputRef.current) {
+      dsnInputRef.current.value = "";
+    }
+    setIsDsnPresent(false);
     try {
       const c = await createConnection(
         selectedProjectId,
@@ -647,10 +697,6 @@ export default function App() {
       );
       setConnections((prev) => [c, ...prev]);
       setSelectedConnId(c.db_connection_uuid);
-      if (dsnInputRef.current) {
-        dsnInputRef.current.value = "";
-      }
-      setIsDsnPresent(false);
     } finally {
       setIsCreatingConnection(false);
     }
@@ -671,6 +717,36 @@ export default function App() {
     } finally {
       setIsCreatingSnapshot(false);
     }
+  }
+
+  if (isAuthLoading) {
+    return (
+      <main
+        id="main"
+        className="authGate"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <h1>pg-erd-cloud</h1>
+        <p>Authenticating…</p>
+      </main>
+    );
+  }
+
+  if (!me) {
+    return (
+      <main id="main" className="authGate">
+        <h1>Authentication required</h1>
+        <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+        <label htmlFor="dev-user-auth">User (dev)</label>
+        <input
+          id="dev-user-auth"
+          value={devUser}
+          onChange={(e) => setDevUser(e.target.value)}
+          placeholder="local"
+        />
+      </main>
+    );
   }
 
   return (
