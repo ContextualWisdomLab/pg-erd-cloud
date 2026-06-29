@@ -23,10 +23,14 @@ const HTML_TEXT_ENTITIES: Record<string, string> = {
 export function toPlainText(value: unknown): PlainText | null {
   if (typeof value !== 'string' || value.length === 0) return null
 
-  return value
+  const result = value
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
     .replace(/[&<>"']/g, (char) => HTML_TEXT_ENTITIES[char])
-    .trim() as PlainText
+    .trim()
+
+  if (result.length === 0) return null
+
+  return result as PlainText
 }
 
 export type SnapshotJson = {
