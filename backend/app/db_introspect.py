@@ -4,7 +4,7 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from app.pg_introspect.introspect import introspect_postgres
-from app.snowflake_introspect import introspect_snowflake
+from app.snowflake_introspect.introspect import introspect_snowflake
 
 DatabaseDialect = Literal["postgresql", "snowflake"]
 
