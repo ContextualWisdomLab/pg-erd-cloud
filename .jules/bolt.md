@@ -28,3 +28,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 100 unique routes, 1 unique method each (100 total combinations):
 - Before: ~820.62ms
 - After: ~1.17ms
+## 2024-08-01 - Avoid spread operator for dynamic large arrays
+**Learning:** Using spread syntax (`Math.max(...array)`) on dynamically sized arrays can throw "Maximum call stack size exceeded" if the array is too large. It also creates intermediate arrays (from `.map()`) and increases garbage collection overhead.
+**Action:** Use a standard O(N) `for` loop to compute min/max for dynamically sized collections to avoid stack overflow and reduce memory allocation overhead.
