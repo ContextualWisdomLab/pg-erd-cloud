@@ -1,3 +1,4 @@
+"""PostgreSQL Introspection Module."""
 from __future__ import annotations
 
 import datetime as dt
@@ -12,6 +13,7 @@ from app.sanitize import sanitize_for_storage
 
 
 class SNIOverrideSSLContext(ssl.SSLContext):
+    """Custom SSLContext that forcefully overrides the SNI hostname to prevent SSRF DNS-rebinding attacks."""
     def __new__(
         cls,
         target_hostname: str,
@@ -19,6 +21,7 @@ class SNIOverrideSSLContext(ssl.SSLContext):
         *args,
         **kwargs,
     ):
+        """Create a new SNIOverrideSSLContext instance with the specified target hostname."""
         obj = super().__new__(cls, protocol, *args, **kwargs)
         obj._target_hostname = target_hostname
         return obj
@@ -26,6 +29,7 @@ class SNIOverrideSSLContext(ssl.SSLContext):
     def wrap_bio(
         self, incoming, outgoing, server_side=False, server_hostname=None, session=None
     ):
+        """Wrap the BIO object while forcefully injecting the original server_hostname for TLS SNI validation."""
         return super().wrap_bio(
             incoming,
             outgoing,
