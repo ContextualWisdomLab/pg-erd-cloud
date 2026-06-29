@@ -360,7 +360,7 @@ def _build_foreign_key(
     referenced_table: str | None,
     referenced_columns: list[str],
     foreign_relation_oid: int | None,
-    sorted_rows: list[dict],
+    group_rows: list[dict],
 ) -> tuple[dict, list[dict]]:
     constraint = {
         "constraint_oid": constraint_oid,
@@ -386,7 +386,7 @@ def _build_foreign_key(
 
     fk_edges = []
     if referenced_schema and referenced_table:
-        for ordinal, row in enumerate(sorted_rows, start=1):
+        for ordinal, row in enumerate(group_rows, start=1):
             child_column = _str_or_none(row.get("column_name"))
             parent_column = _str_or_none(row.get("referenced_column_name"))
             if not (child_column and parent_column):
@@ -438,29 +438,27 @@ def _process_constraint_group(
     column_positions: dict[tuple[str, str], dict[str, int]],
     constraint_oid: int,
 ) -> tuple[dict | None, list[dict], list[dict]]:
-    sorted_rows = sorted(
-        group_rows,
-        key=lambda row: int(row.get("ordinal_position") or 0),
-    )
-    ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
+    # group_rows are already sorted by ordinal_position from the SQL ORDER BY clause
+    # so we can use them directly without re-sorting.
+    ctype = _constraint_type(group_rows[0].get("constraint_type"))
     relation_oid = relation_ids.get((schema, table))
     if relation_oid is None:
         return None, [], []
 
     columns = [
         str(row["column_name"])
-        for row in sorted_rows
+        for row in group_rows
         if isinstance(row.get("column_name"), str)
     ]
     attnums = [
         column_positions.get((schema, table), {}).get(column) for column in columns
     ]
     constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
-    referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
-    referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
+    referenced_schema = _str_or_none(group_rows[0].get("referenced_table_schema"))
+    referenced_table = _str_or_none(group_rows[0].get("referenced_table_name"))
     referenced_columns = [
         str(row["referenced_column_name"])
-        for row in sorted_rows
+        for row in group_rows
         if isinstance(row.get("referenced_column_name"), str)
     ]
     foreign_relation_oid = (
@@ -504,7 +502,7 @@ def _process_constraint_group(
             referenced_table,
             referenced_columns,
             foreign_relation_oid,
-            sorted_rows,
+            group_rows,
         )
         return constraint, [], new_fk_edges
 
