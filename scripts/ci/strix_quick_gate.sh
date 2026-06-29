@@ -3168,6 +3168,67 @@ is_model_retryable_error() {
 	return 1
 }
 
+
+compute_global_max_severity_rank() {
+	local global_max_rank=-1
+	local found_any_vuln_file=0
+
+	update_max_severity_from_stream_global() {
+		local source_path="$1"
+		local line
+		local severity
+		local rank
+		while IFS= read -r line; do
+			if [[ "${line^^}" =~ SEVERITY[[:space:]]*:[[:space:][:punct:]]*(CRITICAL|HIGH|MEDIUM|LOW|INFO|INFORMATIONAL|NONE)([[:space:][:punct:]]|$) ]]; then
+				severity="${BASH_REMATCH[1]}"
+			else
+				continue
+			fi
+
+			rank="$(severity_rank "$severity")"
+			if [ "$rank" -lt 0 ]; then
+				continue
+			fi
+
+			if [ "$rank" -gt "$global_max_rank" ]; then
+				global_max_rank="$rank"
+			fi
+		done < <(grep -Ei 'severity[[:space:]]*:' "$source_path" || true)
+	}
+
+	local run_dir
+	for run_dir in "$STRIX_REPORTS_DIR"/*; do
+		if [ ! -d "$run_dir" ] || [ -L "$run_dir" ]; then
+			continue
+		fi
+
+		if is_preexisting_report_dir "$run_dir"; then
+			continue
+		fi
+
+		local vulnerabilities_dir="$run_dir/vulnerabilities"
+		if [ ! -d "$vulnerabilities_dir" ] || [ -L "$vulnerabilities_dir" ]; then
+			continue
+		fi
+
+		local vuln_file
+		for vuln_file in "$vulnerabilities_dir"/*.md; do
+			if [ ! -f "$vuln_file" ] || [ -L "$vuln_file" ]; then
+				continue
+			fi
+
+			found_any_vuln_file=1
+			update_max_severity_from_stream_global "$vuln_file"
+		done
+	done
+
+	if [ "$found_any_vuln_file" -eq 0 ] && [ -f "$STRIX_LOG" ]; then
+		update_max_severity_from_stream_global "$STRIX_LOG"
+	fi
+
+	STRIX_MAX_SEVERITY_RANK="$global_max_rank"
+}
+
 run_current_target_scan() {
 	INFRA_ERROR_DETECTED=0
 	ZERO_FINDINGS_REPORTED=0
@@ -3312,6 +3373,7 @@ run_current_target_scan() {
 		return 1
 	fi
 
+	compute_global_max_severity_rank
 	local threshold_rank
 	threshold_rank="$(severity_rank "$STRIX_FAIL_ON_MIN_SEVERITY")"
 	if [ "${STRIX_MAX_SEVERITY_RANK:--1}" -ge "$threshold_rank" ]; then
