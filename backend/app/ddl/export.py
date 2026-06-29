@@ -377,6 +377,7 @@ def _render_table_constraints_pg(
 
 
 def snapshot_json_to_sql(snapshot: dict, target_dialect: str = "postgresql") -> str:
+    """Render a captured schema snapshot as SQL for the requested dialect."""
     target = _normalize_dialect(target_dialect)
     if target == "snowflake":
         return _snapshot_json_to_snowflake_sql(snapshot)
