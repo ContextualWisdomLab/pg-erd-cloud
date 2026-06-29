@@ -86,11 +86,7 @@ async def create_snapshot(
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
     if conn is None or conn.project_space_uuid != project_space_uuid:
-        return SnapshotOut(
-            schema_snapshot_uuid=uuid.uuid4(),
-            status="failed",
-            schema_filter=body.schema_filter,
-        )
+        raise HTTPException(status_code=404, detail="connection not found")
 
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),

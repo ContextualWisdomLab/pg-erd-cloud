@@ -1,16 +1,5 @@
-## 2025-02-28 - Snowflake DSN Authenticator SSRF
-**Vulnerability:** The Snowflake DSN parser accepted arbitrary URLs in the `authenticator` query parameter without validation, leading to potential SSRF (Server-Side Request Forgery). The connector would make HTTP POST requests to this URL.
-**Learning:** Third-party database connectors often accept extensive configuration parameters (like custom auth endpoints) that can be manipulated by malicious users if passed directly from user input (like a connection string).
-**Prevention:** Strictly validate any URL or "custom endpoint" parameters in user-supplied connection strings against a safe allowlist (like `.okta.com` for Snowflake) or known safe constants.
-2024-06-21 - [Prevent HMAC public key forgery in JWT algorithms]
-**Vulnerability:** The application parsed `OIDC_ALGORITHMS` without blocking symmetric algorithms (like `HS256`). This allows an attacker to exploit the algorithm mechanism, forging a JWT token by treating the public JWKS key as an HMAC secret if the JWT decoder allows the `HS256` header algorithm.
-**Learning:** You must not blindly trust the JWT token header algorithm (`alg`). You must explicitly supply a whitelist of acceptable algorithms to your JWT library AND ensure that public key verification configurations explicitly filter out symmetric algorithm families (`HS*`).
-**Prevention:** Filter out `HS` algorithms when reading allowed configuration algorithms, and explicitly block them in allowlists passed to JWT decoders when dealing with RS256/ES256 public keys.
-2026-06-21 - [Lack of Rate Limiting on Token Revocation Endpoint]
-**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting, making it vulnerable to denial-of-service (DoS) and caching resource exhaustion attacks. Attackers could flood the system with rapid revocation requests.
-**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse.
-**Prevention:** Always ensure that revocation or authentication-related endpoints are covered by appropriate rate limiting middleware configurations.
-## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
-**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
-**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
-**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+
+## 2024-06-25 - 스냅샷 생성 시 잘못된 연결 ID 입력 처리 개선 (IDOR 및 리소스 열거 방지)
+**Vulnerability:** `/api/snapshots/by-project/{project_space_uuid}` 엔드포인트에서 요청된 프로젝트에 속하지 않는 잘못된 `db_connection_uuid` 입력을 받았을 때 요청을 거부하는 대신 "failed" 상태의 스냅샷 작업을 데이터베이스에 생성하는 취약점이 있었습니다.
+**Learning:** 성공적인 HTTP 상태 코드와 함께 "failed" 도메인 객체를 반환하면 공격자가 다른 프로젝트의 리소스 ID를 열거(IDOR)할 수 있으며, 시스템 데이터베이스에 정크 레코드를 무수히 생성(DoS/DB 고갈)할 수 있습니다.
+**Prevention:** 교차 참조되는 리소스 ID가 항상 인증된 부모 리소스 범위에 속하는지 검증하고, 잘못된 상태를 생성하는 대신 존재 여부를 숨기기 위해 `404 Not Found` 오류로 안전하게 실패하도록 구현해야 합니다.
