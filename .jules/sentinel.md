@@ -14,3 +14,8 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
 **Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+
+## 2024-06-25 - Fix SSRF validation rejecting Okta root domain
+**Vulnerability:** A logic bug in `_parse_snowflake_dsn` incorrectly rejected authenticators using Okta root domains `okta.com` or `oktapreview.com` because it only checked `endswith(".okta.com")`, functioning as a DoS for legitimate configurations.
+**Learning:** `endswith(".okta.com")` does not match `okta.com` due to the leading dot. This caused valid configurations to be rejected.
+**Prevention:** Always explicitly allow the exact root domain when performing suffix checks that require a subdomain delimiter.
