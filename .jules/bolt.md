@@ -18,3 +18,6 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+2024-06-29 - [TableNode Refactoring]
+* Learning: Large components in React can be broken down into smaller, focused sub-components. Extracting logical parts like Title, Column, and Indexes improves readability and maintainability.
+* Action: Refactored `TableNode.tsx` into smaller components (`TableNodeTitle`, `TableNodeColumn`, `TableNodeIndexes`) and extracted shared types to `types.ts`.

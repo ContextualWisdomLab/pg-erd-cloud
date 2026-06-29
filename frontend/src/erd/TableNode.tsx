@@ -2,40 +2,14 @@ import { memo, type CSSProperties } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { normalizeBusinessGroupColor } from "./businessGroups";
-import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
+import { TableNodeColumn } from "./components/TableNodeColumn";
+import { TableNodeTitle } from "./components/TableNodeTitle";
+import { TableNodeIndexes } from "./components/TableNodeIndexes";
+import type { Column, TableNodeData } from "./types";
 
 const MAX_RENDERED_COLUMNS = 25;
 
-type Column = {
-  column_name: string;
-  data_type: string;
-  is_not_null: boolean;
-  is_pk?: boolean;
-  column_comment?: string | null;
-  example_value?: string | number | boolean | null;
-};
-
-type TableNodeData = {
-  title: string;
-  comment?: string | null;
-  columns: Column[];
-  businessGroup?: { id: string; name: string; color: string } | null;
-  indexes?: Array<{
-    index_name: string;
-    columns: string[];
-    access_method: string;
-    strength?: string;
-  }>;
-  badges?: { pk?: boolean; fk?: boolean };
-};
-
 type TableNodeNode = Node<TableNodeData, "tableNode">;
-
-function formatExample(value: Column["example_value"]): string | null {
-  if (value === null || value === undefined) return null;
-  const text = String(value).trim();
-  return text ? text : null;
-}
 
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
@@ -56,92 +30,22 @@ function TableNode(props: NodeProps<TableNodeNode>) {
       style={style}
     >
       <Handle type="target" position={Position.Top} />
-      <div className="tableNode__title">
-        <span className="tableNode__titleText">
-          <span>{data.title}</span>
-          {data.comment ? (
-            <span className="tableNode__titleComment">
-              {data.comment}
-            </span>
-          ) : null}
-        </span>
-        <span style={{ display: "inline-flex", gap: 6 }}>
-          {data.businessGroup ? (
-            <span className="tableNode__groupBadge">
-              {data.businessGroup.name}
-            </span>
-          ) : null}
-          {data.badges?.pk ? (
-            <span className="tableNode__badge">PK</span>
-          ) : null}
-          {data.badges?.fk ? (
-            <span className="tableNode__badge">FK</span>
-          ) : null}
-        </span>
-      </div>
+      <TableNodeTitle
+        title={data.title}
+        comment={data.comment}
+        businessGroup={data.businessGroup}
+        badges={data.badges}
+      />
       <div className="tableNode__cols">
-        {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => {
-          const example = formatExample(c.example_value);
-          return (
-            <div key={c.column_name} className="tableNode__col">
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={targetColumnHandleId(c.column_name)}
-                className="colHandle"
-              />
-              <span className="tableNode__colIdentity">
-                <span className="tableNode__colName">{c.column_name}</span>
-                {c.column_comment ? (
-                  <span className="tableNode__colComment">
-                    {c.column_comment}
-                  </span>
-                ) : null}
-                {example ? (
-                  <span className="tableNode__colExample">
-                    e.g. {example}
-                  </span>
-                ) : null}
-              </span>
-              <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
-              {c.is_not_null ? (
-                <span className="tableNode__badge">NOT NULL</span>
-              ) : null}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={sourceColumnHandleId(c.column_name)}
-                className="colHandle"
-              />
-            </div>
-          );
-        })}
+        {data.columns.slice(0, MAX_RENDERED_COLUMNS).map((c) => (
+          <TableNodeColumn key={c.column_name} c={c} />
+        ))}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div className="tableNode__more">
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
-        {data.indexes?.length ? (
-          <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
-            <div className="tableNode__indexHeading">Indexes</div>
-            {data.indexes.slice(0, 4).map((index) => (
-              <div key={index.index_name} className="tableNode__index">
-                <span className="tableNode__indexName">
-                  {index.index_name}
-                </span>
-                <span className="tableNode__indexCols">
-                  ({index.columns.join(", ")})
-                </span>
-              </div>
-            ))}
-            {data.indexes.length > 4 ? (
-              <div className="tableNode__more">
-                … {data.indexes.length - 4} more indexes
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <TableNodeIndexes indexes={data.indexes || []} />
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
