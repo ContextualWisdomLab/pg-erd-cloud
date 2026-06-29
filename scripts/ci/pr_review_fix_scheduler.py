@@ -11,11 +11,14 @@ import sys
 import time
 from typing import Any
 
-from github_utils import GhError, list_prs, run_gh, run_gh_json
+from github_utils import list_prs
 from pr_review_merge_scheduler import (
+    GhError,
     issue_comments,
     pr_reviews,
     pr_view,
+    run_gh,
+    run_gh_json,
     summarize_reviews,
     unresolved_review_threads,
 )

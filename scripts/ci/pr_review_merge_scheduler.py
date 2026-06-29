@@ -13,13 +13,13 @@ import argparse
 import json
 import os
 import re
-
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from typing import Any
 
-from github_utils import GhError, list_prs, run_gh, run_gh_json
+from github_utils import list_prs
 
 
 OK_CHECK_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
@@ -35,6 +35,10 @@ PENDING_STATUS_STATES = {"EXPECTED", "PENDING"}
 MERGEABLE_STATES = {"CLEAN", "HAS_HOOKS", "UNSTABLE"}
 OPEN_CODE_REVIEW_MARKER = "OpenCode Agent"
 DISPATCH_MARKER = "<!-- pr-review-merge-scheduler opencode-dispatch"
+
+
+class GhError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,36 @@ class PullRequestDecision:
     number: int
     action: str
     reasons: tuple[str, ...]
+
+
+def run_gh_json(args: list[str]) -> Any:
+    command = ["gh", *args]
+    completed = subprocess.run(
+        command,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise GhError(
+            f"{' '.join(command)} failed with exit {completed.returncode}: "
+            f"{completed.stderr.strip()}"
+        )
+    try:
+        return json.loads(completed.stdout or "null")
+    except json.JSONDecodeError as exc:
+        raise GhError(f"{' '.join(command)} returned invalid JSON: {exc}") from exc
+
+
+def run_gh(args: list[str], *, dry_run: bool) -> None:
+    command = ["gh", *args]
+    if dry_run:
+        print("DRY-RUN:", " ".join(command))
+        return
+    completed = subprocess.run(command, check=False, text=True)
+    if completed.returncode != 0:
+        raise GhError(f"{' '.join(command)} failed with exit {completed.returncode}")
 
 
 def actor_login(review: dict[str, Any]) -> str:
