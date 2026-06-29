@@ -1,3 +1,4 @@
+from app.snowflake_introspect.introspect import _introspect_snowflake_sync_with_config, SnowflakeDsnConfig
 import pytest
 from app.snowflake_introspect.introspect import (
     _int_or_none,
@@ -197,7 +198,6 @@ def test_build_constraints_fk_missing_columns():
     )
     assert len(fk_edges) == 0
 
-from app.snowflake_introspect.introspect import _introspect_snowflake_sync_with_config, SnowflakeDsnConfig
 
 def test_introspect_snowflake_sync_with_config_missing_schema_filter(monkeypatch):
     class FakeCursor:
