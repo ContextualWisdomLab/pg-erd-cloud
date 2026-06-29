@@ -454,23 +454,52 @@ describe('downloadText', () => {
   it('should trigger download with correct content', () => {
     // Mock DOM elements and URL functions
     const mockClick = vi.fn();
-    const mockCreateElement = vi.spyOn(document, 'createElement').mockReturnValue({
+    const mockAnchor = {
       href: '',
       download: '',
       click: mockClick,
-    } as any);
+    };
+    const mockCreateElement = vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
 
     const mockCreateObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-url');
     const mockRevokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
-    downloadText('test.sql', 'CREATE TABLE test();');
+    downloadText('test.sql', 'CREATE TABLE test();', 'application/sql');
 
     expect(mockCreateElement).toHaveBeenCalledWith('a');
-    expect(mockCreateObjectURL).toHaveBeenCalled();
+    expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(mockClick).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url');
+    expect(mockAnchor.download).toBe('test.sql');
+    expect(mockAnchor.href).toBe('blob:test-url');
 
     // Clean up
+    mockCreateElement.mockRestore();
+    mockCreateObjectURL.mockRestore();
+    mockRevokeObjectURL.mockRestore();
+  });
+
+  it('should trigger download with default type text/plain', () => {
+    const mockClick = vi.fn();
+    const mockAnchor = {
+      href: '',
+      download: '',
+      click: mockClick,
+    };
+    const mockCreateElement = vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
+
+    const mockCreateObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-url2');
+    const mockRevokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    downloadText('test2.txt', 'Hello World');
+
+    expect(mockCreateElement).toHaveBeenCalledWith('a');
+    expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(mockClick).toHaveBeenCalled();
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url2');
+    expect(mockAnchor.download).toBe('test2.txt');
+    expect(mockAnchor.href).toBe('blob:test-url2');
+
     mockCreateElement.mockRestore();
     mockCreateObjectURL.mockRestore();
     mockRevokeObjectURL.mockRestore();
