@@ -900,6 +900,7 @@ export default function App() {
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
+              type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
@@ -957,6 +958,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
+            type="button"
             onClick={onCreateConnection}
             disabled={
               !selectedProjectId ||
@@ -989,6 +991,7 @@ export default function App() {
         </div>
 
         <button
+          type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
           aria-busy={isCreatingSnapshot}

@@ -28,7 +28,7 @@ export function EditTableModal({
       <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
         <div className="modal__header">
           <h3>테이블 편집</h3>
-          <button onClick={onEditTableCancel}>X</button>
+          <button type="button" onClick={onEditTableCancel}>X</button>
         </div>
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>

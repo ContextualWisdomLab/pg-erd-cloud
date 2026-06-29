@@ -63,8 +63,9 @@ export function AddTableModal({
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
         >
-          <button onClick={onAddTableCancel}>취소</button>
+          <button type="button" onClick={onAddTableCancel}>취소</button>
           <button
+            type="button"
             onClick={onAddTableSubmit}
             style={{ background: "#034ea2", color: "#fff" }}
           >
