@@ -72,10 +72,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             </span>
           ) : null}
           {data.badges?.pk ? (
-            <span className="tableNode__badge">PK</span>
+            <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span>
           ) : null}
           {data.badges?.fk ? (
-            <span className="tableNode__badge">FK</span>
+            <span className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</span>
           ) : null}
         </span>
       </div>
@@ -104,9 +104,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
+              {c.is_pk ? <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span> : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge">NOT NULL</span>
+                <span className="tableNode__badge" title="필수 입력 (Not Null)" aria-label="필수 입력 (Not Null)">NOT NULL</span>
               ) : null}
               <Handle
                 type="source"
@@ -127,7 +127,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             <div className="tableNode__indexHeading">Indexes</div>
             {data.indexes.slice(0, 4).map((index) => (
               <div key={index.index_name} className="tableNode__index">
-                <span className="tableNode__indexName">
+                <span className="tableNode__indexName" title={`Access method: ${index.access_method}`}>
                   {index.index_name}
                 </span>
                 <span className="tableNode__indexCols">
