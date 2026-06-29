@@ -172,8 +172,8 @@ async def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
                     raise ValueError("unsupported Snowflake authenticator value")
                 parsed_auth = urlparse(auth_lower)
                 if not parsed_auth.hostname or not (
-                    parsed_auth.hostname.endswith(".okta.com") or
-                    parsed_auth.hostname.endswith(".oktapreview.com")
+                    parsed_auth.hostname.endswith(".okta.com")
+                    or parsed_auth.hostname.endswith(".oktapreview.com")
                 ):
                     raise ValueError("unsupported Snowflake authenticator URL")
 
@@ -633,9 +633,7 @@ def _introspect_snowflake_sync_with_config(
         schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, query_params)
         table_rows = _fetch_dicts(cursor, TABLES_SQL, query_params)
         column_rows = _fetch_dicts(cursor, COLUMNS_SQL, query_params)
-        constraint_rows = _fetch_dicts(
-            cursor, CONSTRAINT_COLUMNS_SQL, query_params
-        )
+        constraint_rows = _fetch_dicts(cursor, CONSTRAINT_COLUMNS_SQL, query_params)
     finally:
         try:
             cursor.close()

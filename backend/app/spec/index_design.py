@@ -175,10 +175,7 @@ def _candidate_indexes(snapshot: dict) -> list[dict]:
                 "schema_name": schema,
                 "table_name": table,
                 "columns": columns,
-                "reason": (
-                    "foreign-key lookup support for "
-                    f"{group['constraint']}"
-                ),
+                "reason": (f"foreign-key lookup support for {group['constraint']}"),
                 "ddl": (
                     f"CREATE INDEX CONCURRENTLY {_q(index_name)} "
                     f"ON {_qname(schema, table)} USING btree ({columns_sql});"
@@ -316,9 +313,7 @@ def generate_index_design_markdown(snapshot: dict) -> str:
         )
 
     candidates = [
-        item
-        for item in summary.get("candidate_indexes", [])
-        if isinstance(item, dict)
+        item for item in summary.get("candidate_indexes", []) if isinstance(item, dict)
     ]
     lines.extend(["", "## Index Recommendations"])
     if not candidates:
