@@ -252,10 +252,18 @@ export function exportDiagramSvg(
       return [node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0))];
     }),
   );
-  const minX = Math.min(...nodes.map((n) => n.position.x), 0);
-  const minY = Math.min(...nodes.map((n) => n.position.y), 0);
-  const maxX = Math.max(...nodes.map((n) => n.position.x + width), width);
-  const maxY = Math.max(...nodes.map((n) => n.position.y + (heights.get(n.id) || headerHeight)), headerHeight);
+  // ⚡ Bolt: Use a standard O(N) loop instead of spread syntax and map() to calculate bounds.
+  // This prevents 'Maximum call stack size exceeded' on large graphs and avoids garbage allocations.
+  let minX = 0;
+  let minY = 0;
+  let maxX = width;
+  let maxY = headerHeight;
+  for (const n of nodes) {
+    minX = Math.min(minX, n.position.x);
+    minY = Math.min(minY, n.position.y);
+    maxX = Math.max(maxX, n.position.x + width);
+    maxY = Math.max(maxY, n.position.y + (heights.get(n.id) || headerHeight));
+  }
   const offsetX = padding - minX;
   const offsetY = padding - minY;
   const svgWidth = maxX - minX + padding * 2;
