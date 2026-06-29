@@ -159,6 +159,7 @@ _SNOWFLAKE_TO_PG_EXACT_TYPES = {
 
 
 def _parse_snowflake_number(normalized: str) -> str | None:
+    """Parse Snowflake numeric types into PostgreSQL numeric types."""
     number = re.match(
         r"^(number|numeric|decimal)\s*(?:\((\d+)(?:\s*,\s*(\d+))?\))?$",
         normalized,
@@ -175,6 +176,7 @@ def _parse_snowflake_number(normalized: str) -> str | None:
 
 
 def _parse_snowflake_string(normalized: str) -> str | None:
+    """Parse Snowflake string types into PostgreSQL string types."""
     varchar = re.match(r"^(varchar|string|text)\s*(?:\((\d+)\))?$", normalized)
     if varchar:
         return f"character varying({varchar.group(2)})" if varchar.group(2) else "text"
@@ -187,6 +189,7 @@ def _parse_snowflake_string(normalized: str) -> str | None:
 
 
 def _parse_snowflake_timestamp(normalized: str) -> str | None:
+    """Parse Snowflake timestamp types into PostgreSQL timestamp types."""
     if normalized.startswith("timestamp_tz") or normalized.startswith("timestamp_ltz"):
         return "timestamp with time zone"
     if normalized.startswith("timestamp_ntz") or normalized.startswith("timestamp"):
