@@ -175,8 +175,8 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem("devUser", devUser.trim() || "local");
+    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+      window.localStorage.setItem("devUser", devUser.trim() || "local");
     }
   }, [devUser]);
 
