@@ -89,6 +89,17 @@ VERSION_SQL = "SELECT CURRENT_VERSION() AS server_version"
 SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 
+@dataclass
+class ConstraintContext:
+    name: str
+    schema: str
+    table: str
+    relation_oid: int
+    columns: list[str]
+    constrained_attnums: list[int]
+    constraint_oid: int
+
+
 @dataclass(frozen=True)
 class SnowflakeDsnConfig:
     """Connection settings parsed from a Snowflake DSN."""
@@ -281,40 +292,32 @@ def _constraint_def(
     return f"FOREIGN KEY ({quoted_cols})"
 
 
-def _build_primary_key(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
-) -> tuple[dict, list[dict]]:
+def _build_primary_key(ctx: ConstraintContext) -> tuple[dict, list[dict]]:
     constraint = {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "p",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": None,
         "foreign_schema_name": None,
         "foreign_relation_name": None,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
-        "constraint_def": _constraint_def("p", columns, None, None, []),
+        "constraint_def": _constraint_def("p", ctx.columns, None, None, []),
         "check_expr": None,
     }
 
     pk_columns = []
-    for ordinal, column in enumerate(columns, start=1):
+    for ordinal, column in enumerate(ctx.columns, start=1):
         pk_columns.append(
             {
-                "constraint_oid": constraint_oid,
-                "constraint_name": name,
-                "schema_name": schema,
-                "relation_oid": relation_oid,
-                "relation_name": table,
+                "constraint_oid": ctx.constraint_oid,
+                "constraint_name": ctx.name,
+                "schema_name": ctx.schema,
+                "relation_oid": ctx.relation_oid,
+                "relation_name": ctx.table,
                 "column_ordinal": ordinal,
                 "column_name": column,
             }
@@ -322,61 +325,57 @@ def _build_primary_key(
     return constraint, pk_columns
 
 
-def _build_unique_constraint(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
-) -> dict:
+def _build_unique_constraint(ctx: ConstraintContext) -> dict:
     return {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "u",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": None,
         "foreign_schema_name": None,
         "foreign_relation_name": None,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
-        "constraint_def": _constraint_def("u", columns, None, None, []),
+        "constraint_def": _constraint_def("u", ctx.columns, None, None, []),
         "check_expr": None,
     }
 
 
 def _build_foreign_key(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
-    referenced_schema: str | None,
-    referenced_table: str | None,
-    referenced_columns: list[str],
-    foreign_relation_oid: int | None,
+    ctx: ConstraintContext,
+    relation_ids: dict[tuple[str, str], int],
     sorted_rows: list[dict],
 ) -> tuple[dict, list[dict]]:
+    referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
+    referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
+    referenced_columns = [
+        str(row["referenced_column_name"])
+        for row in sorted_rows
+        if isinstance(row.get("referenced_column_name"), str)
+    ]
+    foreign_relation_oid = (
+        relation_ids.get((referenced_schema, referenced_table))
+        if referenced_schema and referenced_table
+        else None
+    )
+
     constraint = {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "f",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": foreign_relation_oid,
         "foreign_schema_name": referenced_schema,
         "foreign_relation_name": referenced_table,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
         "constraint_def": _constraint_def(
             "f",
-            columns,
+            ctx.columns,
             referenced_schema,
             referenced_table,
             referenced_columns,
@@ -393,11 +392,11 @@ def _build_foreign_key(
                 continue
             fk_edges.append(
                 {
-                    "fk_constraint_oid": constraint_oid,
-                    "fk_constraint_name": name,
-                    "child_schema_name": schema,
-                    "child_relation_oid": relation_oid,
-                    "child_relation_name": table,
+                    "fk_constraint_oid": ctx.constraint_oid,
+                    "fk_constraint_name": ctx.name,
+                    "child_schema_name": ctx.schema,
+                    "child_relation_oid": ctx.relation_oid,
+                    "child_relation_name": ctx.table,
                     "parent_schema_name": referenced_schema,
                     "parent_relation_oid": foreign_relation_oid,
                     "parent_relation_name": referenced_table,
@@ -452,56 +451,27 @@ def _build_constraints(
             column_positions.get((schema, table), {}).get(column) for column in columns
         ]
         constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
-        referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
-        referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
-        referenced_columns = [
-            str(row["referenced_column_name"])
-            for row in sorted_rows
-            if isinstance(row.get("referenced_column_name"), str)
-        ]
-        foreign_relation_oid = (
-            relation_ids.get((referenced_schema, referenced_table))
-            if referenced_schema and referenced_table
-            else None
-        )
-
         constraint_oid = len(constraints) + 1
+        ctx = ConstraintContext(
+            name=name,
+            schema=schema,
+            table=table,
+            relation_oid=relation_oid,
+            columns=columns,
+            constrained_attnums=constrained_attnums,
+            constraint_oid=constraint_oid,
+        )
         if ctype == "p":
-            constraint, new_pk_columns = _build_primary_key(
-                name,
-                schema,
-                table,
-                relation_oid,
-                columns,
-                constrained_attnums,
-                constraint_oid,
-            )
+            constraint, new_pk_columns = _build_primary_key(ctx)
             constraints.append(constraint)
             pk_columns.extend(new_pk_columns)
         elif ctype == "u":
-            constraint = _build_unique_constraint(
-                name,
-                schema,
-                table,
-                relation_oid,
-                columns,
-                constrained_attnums,
-                constraint_oid,
-            )
+            constraint = _build_unique_constraint(ctx)
             constraints.append(constraint)
         elif ctype == "f":
             constraint, new_fk_edges = _build_foreign_key(
-                name,
-                schema,
-                table,
-                relation_oid,
-                columns,
-                constrained_attnums,
-                constraint_oid,
-                referenced_schema,
-                referenced_table,
-                referenced_columns,
-                foreign_relation_oid,
+                ctx,
+                relation_ids,
                 sorted_rows,
             )
             constraints.append(constraint)
@@ -655,4 +625,6 @@ async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:
     """Introspect Snowflake metadata into the common snapshot JSON shape."""
 
     config = await _parse_snowflake_dsn(dsn)
-    return await asyncio.to_thread(_introspect_snowflake_sync_with_config, config, schema_filter)
+    return await asyncio.to_thread(
+        _introspect_snowflake_sync_with_config, config, schema_filter
+    )
