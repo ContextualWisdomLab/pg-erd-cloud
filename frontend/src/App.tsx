@@ -175,7 +175,9 @@ export default function App() {
   );
 
   useEffect(() => {
-    localStorage.setItem("devUser", devUser.trim() || "local");
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("devUser", devUser.trim() || "local");
+    }
   }, [devUser]);
 
   useEffect(() => {
