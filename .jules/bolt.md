@@ -28,3 +28,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 100 unique routes, 1 unique method each (100 total combinations):
 - Before: ~820.62ms
 - After: ~1.17ms
+## 2026-06-21 - Method Aliasing in Tight Loops vs. PEP 659
+**Learning:** Variable caching optimizations like assigning a bound method (e.g., `con_get = con.get`) inside tight loops used to be a common micro-optimization. However, starting in Python 3.11/3.12, PEP 659 (Specializing Adaptive Interpreter) introduced `LOAD_ATTR` inline caching. As a result, method aliasing inside a loop can actually cause a performance regression compared to repeated direct lookups (`con.get()`).
+**Action:** When performing micro-optimizations, always profile against the exact interpreter version being used in production. Avoid manual method caching loops unless proven faster empirically in the target runtime.

@@ -366,11 +366,12 @@ def _render_table_constraints_pg(
 ) -> list[str]:
     table_cons: list[str] = []
     for con in constraints_by_oid.get(oid, []):
-        ctype = con.get("constraint_type")
+        con_get = con.get
+        ctype = con_get("constraint_type")
         if ctype not in ("p", "u", "c"):
             continue
-        cname = con.get("constraint_name")
-        cdef = con.get("constraint_def")
+        cname = con_get("constraint_name")
+        cdef = con_get("constraint_def")
         if isinstance(cname, str) and isinstance(cdef, str):
             table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
     return table_cons
