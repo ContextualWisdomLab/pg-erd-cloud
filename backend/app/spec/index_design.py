@@ -285,22 +285,8 @@ def generate_index_design_llm_prompt(snapshot: dict) -> str:
     )
 
 
-def generate_index_design_markdown(snapshot: dict) -> str:
-    """Generate deterministic index-design guidance from snapshot metadata."""
-
-    summary = _compact_index_design_summary(snapshot)
-    lines: list[str] = [
-        "# ERD Index Design",
-        "",
-        "## Snapshot",
-        f"- Source dialect: {_text(summary.get('source_dialect'), 'postgresql')}",
-        f"- Server version: {_text(summary.get('server_version'), '-') or '-'}",
-        f"- Captured at: {_text(summary.get('captured_at'), '-') or '-'}",
-        "",
-        "## Valkey Queue",
-    ]
-
-    valkey = summary["valkey_queue"]
+def _append_valkey_queue_section(lines: list[str], summary: dict) -> None:
+    valkey = summary.get("valkey_queue")
     if isinstance(valkey, dict):
         lines.extend(
             [
@@ -312,6 +298,8 @@ def generate_index_design_markdown(snapshot: dict) -> str:
             ]
         )
 
+
+def _append_index_recommendations_section(lines: list[str], summary: dict) -> None:
     candidates = [
         item for item in summary.get("candidate_indexes", []) if isinstance(item, dict)
     ]
@@ -333,6 +321,8 @@ def generate_index_design_markdown(snapshot: dict) -> str:
             ]
         )
 
+
+def _append_citus_placement_section(lines: list[str], snapshot: dict) -> None:
     lines.extend(["", "## Citus Placement"])
     citus_rows = _rows(snapshot, "citus_distributed_tables")
     if not citus_rows:
@@ -360,6 +350,8 @@ def generate_index_design_markdown(snapshot: dict) -> str:
                 + " |"
             )
 
+
+def _append_explain_analyze_evidence_section(lines: list[str], summary: dict) -> None:
     observations = summary.get("workload_observations", [])
     lines.extend(["", "## EXPLAIN ANALYZE Evidence"])
     if not observations:
@@ -370,6 +362,27 @@ def generate_index_design_markdown(snapshot: dict) -> str:
         lines.append("```json")
         lines.append(json.dumps(observations, ensure_ascii=False, indent=2))
         lines.append("```")
+
+
+def generate_index_design_markdown(snapshot: dict) -> str:
+    """Generate deterministic index-design guidance from snapshot metadata."""
+
+    summary = _compact_index_design_summary(snapshot)
+    lines: list[str] = [
+        "# ERD Index Design",
+        "",
+        "## Snapshot",
+        f"- Source dialect: {_text(summary.get('source_dialect'), 'postgresql')}",
+        f"- Server version: {_text(summary.get('server_version'), '-') or '-'}",
+        f"- Captured at: {_text(summary.get('captured_at'), '-') or '-'}",
+        "",
+        "## Valkey Queue",
+    ]
+
+    _append_valkey_queue_section(lines, summary)
+    _append_index_recommendations_section(lines, summary)
+    _append_citus_placement_section(lines, snapshot)
+    _append_explain_analyze_evidence_section(lines, summary)
 
     lines.extend(
         [
