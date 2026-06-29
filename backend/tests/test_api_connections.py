@@ -1,3 +1,5 @@
+"""Integration tests for the /api/connections endpoints."""
+
 from __future__ import annotations
 
 import uuid
@@ -18,40 +20,42 @@ app.include_router(router)
 
 
 class FakeScalars:
-    def __init__(self, data):
+    def __init__(self, data: list) -> None:
         self.data = data
 
-    def all(self):
+    def all(self) -> list:
         return self.data
 
 
 class FakeResult:
-    def __init__(self, data):
+    def __init__(self, data: list) -> None:
         self.data = data
 
-    def scalars(self):
+    def scalars(self) -> FakeScalars:
         return FakeScalars(self.data)
 
-    def scalar_one_or_none(self):
+    def scalar_one_or_none(self) -> object:
         return self.data[0] if self.data else None
 
 
 class FakeSession:
-    def __init__(self, execute_result=None):
+    def __init__(self, execute_result: list | None = None) -> None:
         self.execute_result = execute_result or []
-        self.added = []
+        self.added: list[DbConnection] = []
 
-    async def execute(self, stmt, *args, **kwargs):
+    async def execute(
+        self, stmt: object, *args: object, **kwargs: object
+    ) -> FakeResult:
         return FakeResult(self.execute_result)
 
-    def add(self, obj):
+    def add(self, obj: DbConnection) -> None:
         self.added.append(obj)
 
-    async def commit(self):
+    async def commit(self) -> None:
         pass
 
 
-def fake_get_current_user():
+def fake_get_current_user() -> CurrentUser:
     return CurrentUser(
         user_account_uuid=uuid.uuid4(), subject="test_user", display_name=None
     )
@@ -60,8 +64,8 @@ def fake_get_current_user():
 app.dependency_overrides[get_current_user] = fake_get_current_user
 
 
-def test_list_connections_success(monkeypatch: pytest.MonkeyPatch):
-    async def mock_require(*args, **kwargs):
+def test_list_connections_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def mock_require(*args: object, **kwargs: object) -> str:
         return "viewer"
 
     monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
@@ -76,7 +80,7 @@ def test_list_connections_success(monkeypatch: pytest.MonkeyPatch):
         updated_at=dt.datetime.now(dt.timezone.utc),
     )
 
-    def fake_get_read_session():
+    def fake_get_read_session() -> FakeSession:
         return FakeSession([fake_conn])
 
     app.dependency_overrides[get_read_session] = fake_get_read_session
@@ -91,13 +95,13 @@ def test_list_connections_success(monkeypatch: pytest.MonkeyPatch):
     assert data[0]["db_connection_uuid"] == str(fake_conn.db_connection_uuid)
 
 
-def test_list_connections_access_denied(monkeypatch: pytest.MonkeyPatch):
-    async def mock_require(*args, **kwargs):
+def test_list_connections_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def mock_require(*args: object, **kwargs: object) -> str:
         raise HTTPException(status_code=403, detail="project access denied")
 
     monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
 
-    def fake_get_read_session():
+    def fake_get_read_session() -> FakeSession:
         return FakeSession([])
 
     app.dependency_overrides[get_read_session] = fake_get_read_session
@@ -109,20 +113,20 @@ def test_list_connections_access_denied(monkeypatch: pytest.MonkeyPatch):
     assert response.json()["detail"] == "project access denied"
 
 
-def test_create_connection_success(monkeypatch: pytest.MonkeyPatch):
-    async def mock_require(*args, **kwargs):
+def test_create_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def mock_require(*args: object, **kwargs: object) -> str:
         return "editor"
 
     monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
 
-    def mock_encrypt(text: str):
+    def mock_encrypt(text: str) -> EncryptedBlob:
         return EncryptedBlob(ciphertext=b"encrypted_dsn", nonce=b"nonce")
 
     monkeypatch.setattr("app.api.connections.encrypt_text", mock_encrypt)
 
     session = FakeSession()
 
-    def fake_get_session():
+    def fake_get_session() -> FakeSession:
         return session
 
     app.dependency_overrides[get_session] = fake_get_session
@@ -147,13 +151,13 @@ def test_create_connection_success(monkeypatch: pytest.MonkeyPatch):
     assert added_obj.project_space_uuid == project_uuid
 
 
-def test_create_connection_access_denied(monkeypatch: pytest.MonkeyPatch):
-    async def mock_require(*args, **kwargs):
+def test_create_connection_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def mock_require(*args: object, **kwargs: object) -> str:
         raise HTTPException(status_code=403, detail="insufficient project role")
 
     monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
 
-    def fake_get_session():
+    def fake_get_session() -> FakeSession:
         return FakeSession()
 
     app.dependency_overrides[get_session] = fake_get_session
@@ -168,7 +172,7 @@ def test_create_connection_access_denied(monkeypatch: pytest.MonkeyPatch):
     assert response.json()["detail"] == "insufficient project role"
 
 
-def test_create_connection_invalid_payload():
+def test_create_connection_invalid_payload() -> None:
     client = TestClient(app)
     response = client.post(
         f"/api/connections/by-project/{uuid.uuid4()}",
