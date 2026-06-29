@@ -645,6 +645,10 @@ export default function App() {
     if (!nextConnectionName || !connectionDsn) return;
     setError(null);
     setIsCreatingConnection(true);
+    if (dsnInputRef.current) {
+      dsnInputRef.current.value = "";
+    }
+    setIsDsnPresent(false);
     try {
       const c = await createConnection(
         selectedProjectId,
@@ -653,10 +657,6 @@ export default function App() {
       );
       setConnections((prev) => [c, ...prev]);
       setSelectedConnId(c.db_connection_uuid);
-      if (dsnInputRef.current) {
-        dsnInputRef.current.value = "";
-      }
-      setIsDsnPresent(false);
     } finally {
       setIsCreatingConnection(false);
     }
