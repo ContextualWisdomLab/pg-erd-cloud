@@ -14,7 +14,9 @@ from app.csrf import (
 from app.main import app
 
 
-def make_request(method: str, path: str, headers: dict[str, str] | None = None) -> Request:
+def make_request(
+    method: str, path: str, headers: dict[str, str] | None = None
+) -> Request:
     return Request(
         {
             "type": "http",

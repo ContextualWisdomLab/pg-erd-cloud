@@ -257,8 +257,7 @@ export function exportDiagramSvg(
   let maxX = width;
   let maxY = headerHeight;
 
-  // ⚡ Bolt: Replace multiple O(N) map operations and spread operators with a single O(N) loop
-  // to prevent 'Maximum call stack size exceeded' errors on huge graphs and reduce garbage collection.
+  // Avoid spreading large coordinate arrays when exporting large diagrams.
   for (const n of nodes) {
     const x = n.position.x;
     const y = n.position.y;
