@@ -32,4 +32,22 @@ describe('TableNode', () => {
     expect(screen.getByText('e.g. Alice')).toBeInTheDocument();
     expect(screen.getByText('Core')).toBeInTheDocument();
   });
+
+  it('uses a fallback accessible name for blank table titles', () => {
+    const data = {
+      title: '   ',
+      columns: [
+        { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+      ],
+      badges: { pk: true, fk: false },
+    };
+
+    render(
+      <ReactFlowProvider>
+        <TableNode {...({ data, id: "1", type: "tableNode", isConnectable: true } as any)} />
+      </ReactFlowProvider>
+    );
+
+    expect(screen.getByRole('region', { name: '이름 없는 테이블' })).toBeInTheDocument();
+  });
 });
