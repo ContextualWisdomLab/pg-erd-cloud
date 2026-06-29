@@ -18,3 +18,9 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+2024-05-18 - [Refactoring] Broken down large markdown generation function
+## Learning
+When refactoring a large python string manipulation function into multiple smaller helpers, string-replacement based tools can inadvertently introduce syntax errors (like mismatched or trailing quotes, or unescaped sequences). Using the python ast or a manual replacement strategy via a specific string matching regex is safer than chaining multiple global `sed` commands, especially when multi-line strings or f-strings are involved.
+
+## Action
+Next time modifying string-manipulating python code, double-check string boundaries when using simple find-and-replace, and ensure the resulting string concatenations or line breaks follow Python rules before running the unit tests.
