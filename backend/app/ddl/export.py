@@ -58,6 +58,64 @@ def _index_def_with_concurrently(index_def: str) -> str:
     return _CREATE_INDEX_RE.sub(replacement, index_def, count=1)
 
 
+_PG_TO_SF_EXACT = {
+    "smallint": "NUMBER(5,0)",
+    "integer": "NUMBER(10,0)",
+    "bigint": "NUMBER(19,0)",
+    "real": "FLOAT",
+    "double precision": "FLOAT",
+    "boolean": "BOOLEAN",
+    "text": "VARCHAR",
+    "json": "VARIANT",
+    "jsonb": "VARIANT",
+    "bytea": "BINARY",
+    "date": "DATE",
+    "uuid": "VARCHAR(36)",
+    "inet": "VARCHAR",
+    "cidr": "VARCHAR",
+    "macaddr": "VARCHAR",
+    "macaddr8": "VARCHAR",
+    "xml": "VARCHAR",
+}
+
+def _pg_numeric_to_sf(normalized: str) -> str | None:
+    numeric = re.match(
+        r"^(numeric|decimal)\s*(?:\((\d+)(?:\s*,\s*(\d+))?\))?$",
+        normalized,
+    )
+    if numeric:
+        precision = numeric.group(2)
+        scale = numeric.group(3)
+        if precision and scale:
+            return f"NUMBER({precision},{scale})"
+        if precision:
+            return f"NUMBER({precision},0)"
+        return "NUMBER"
+    return None
+
+def _pg_string_to_sf(normalized: str) -> str | None:
+    varchar = re.match(r"^(character varying|varchar)\s*(?:\((\d+)\))?$", normalized)
+    if varchar:
+        return f"VARCHAR({varchar.group(2)})" if varchar.group(2) else "VARCHAR"
+
+    char = re.match(r"^(character|char)\s*(?:\((\d+)\))?$", normalized)
+    if char:
+        return f"CHAR({char.group(2)})" if char.group(2) else "CHAR"
+
+    return None
+
+def _pg_datetime_to_sf(normalized: str) -> str | None:
+    if normalized.startswith("timestamp") and "with time zone" in normalized:
+        return "TIMESTAMP_TZ"
+    if normalized.startswith("timestamp"):
+        return "TIMESTAMP_NTZ"
+    if normalized.startswith("time"):
+        return "TIME"
+    if normalized.startswith("interval"):
+        return "VARCHAR"
+    return None
+
+
 def _normalize_type_text(data_type: str) -> str:
     return re.sub(r"\s+", " ", data_type.strip().lower())
 
@@ -79,57 +137,17 @@ def _postgres_type_to_snowflake(column: dict) -> str:
     ):
         return "ARRAY"
 
-    exact = {
-        "smallint": "NUMBER(5,0)",
-        "integer": "NUMBER(10,0)",
-        "bigint": "NUMBER(19,0)",
-        "real": "FLOAT",
-        "double precision": "FLOAT",
-        "boolean": "BOOLEAN",
-        "text": "VARCHAR",
-        "json": "VARIANT",
-        "jsonb": "VARIANT",
-        "bytea": "BINARY",
-        "date": "DATE",
-        "uuid": "VARCHAR(36)",
-        "inet": "VARCHAR",
-        "cidr": "VARCHAR",
-        "macaddr": "VARCHAR",
-        "macaddr8": "VARCHAR",
-        "xml": "VARCHAR",
-    }
-    if normalized in exact:
-        return exact[normalized]
+    if normalized in _PG_TO_SF_EXACT:
+        return _PG_TO_SF_EXACT[normalized]
 
-    numeric = re.match(
-        r"^(numeric|decimal)\s*(?:\((\d+)(?:\s*,\s*(\d+))?\))?$",
-        normalized,
-    )
-    if numeric:
-        precision = numeric.group(2)
-        scale = numeric.group(3)
-        if precision and scale:
-            return f"NUMBER({precision},{scale})"
-        if precision:
-            return f"NUMBER({precision},0)"
-        return "NUMBER"
+    if numeric := _pg_numeric_to_sf(normalized):
+        return numeric
 
-    varchar = re.match(r"^(character varying|varchar)\s*(?:\((\d+)\))?$", normalized)
-    if varchar:
-        return f"VARCHAR({varchar.group(2)})" if varchar.group(2) else "VARCHAR"
+    if string_type := _pg_string_to_sf(normalized):
+        return string_type
 
-    char = re.match(r"^(character|char)\s*(?:\((\d+)\))?$", normalized)
-    if char:
-        return f"CHAR({char.group(2)})" if char.group(2) else "CHAR"
-
-    if normalized.startswith("timestamp") and "with time zone" in normalized:
-        return "TIMESTAMP_TZ"
-    if normalized.startswith("timestamp"):
-        return "TIMESTAMP_NTZ"
-    if normalized.startswith("time"):
-        return "TIME"
-    if normalized.startswith("interval"):
-        return "VARCHAR"
+    if datetime_type := _pg_datetime_to_sf(normalized):
+        return datetime_type
 
     if column.get("type_kind") == "e":
         return "VARCHAR"
