@@ -67,9 +67,7 @@ class VerifiedToken:
 
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
-_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(
-    0, tz=dt.timezone.utc
-)
+_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 _oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
@@ -194,8 +192,16 @@ def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    _prune_revoked_token_jtis()
-    return jwt_id in _revoked_token_jtis
+    expires_at = _revoked_token_jtis.get(jwt_id)
+    if not expires_at:
+        return False
+
+    if expires_at <= dt.datetime.now(dt.timezone.utc):
+        # Lazily remove the expired revocation entry
+        _revoked_token_jtis.pop(jwt_id, None)
+        return False
+
+    return True
 
 
 def _bearer_token_from_request(request: Request) -> str:

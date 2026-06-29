@@ -18,3 +18,9 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+
+
+
+## 2024-05-18 - 인증 핫 패스에서 O(N) 백그라운드 정리 작업 회피
+**Learning:** `is_token_jti_revoked` 함수는 매 인증 요청마다 폐기된 토큰의 전체 캐시를 순회(`_prune_revoked_token_jtis`)하여 O(N) 복잡도를 가졌습니다. 이는 활성 토큰 폐기 건수가 많아질수록 응답 지연을 초래합니다.
+**Action:** 핫 패스(조회 경로)에서는 단일 키에 대한 지연(lazy) 평가를 선호해야 합니다. 백그라운드 정리는 메모리 누수를 방지하기 위해 쓰기 경로(`revoke_token_jti`)에만 유지하여 읽기 성능을 최적화해야 합니다.
