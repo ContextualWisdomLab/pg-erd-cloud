@@ -48,7 +48,7 @@ class ConnectionCreateIn(BaseModel):
         min_length=1,
         max_length=4096,
         description=("PostgreSQL or Snowflake connection string. Not logged."),
-        json_schema_extra={"encrypted": True},
+        json_schema_extra={"encryption": "encrypted_at_rest"},
     )
 
 
