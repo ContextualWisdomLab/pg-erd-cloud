@@ -16,3 +16,6 @@
 ## 2026-06-22 - IDOR in Project Members List
 **Learning:** The `/api/projects/{project_space_uuid}/members` endpoint exposed the full list of members and their roles to any user with `viewer` access. This excessive visibility could facilitate enumeration and social engineering attacks.
 **Action:** Implemented stricter role-based access control (RBAC) on the endpoint to require a minimum `editor` role to view project members, mitigating the IDOR risk.
+## 2026-06-29 - Unsafe Inline Scripts in CSP
+**Learning:** Permitting `'unsafe-inline'` in Content-Security-Policy (CSP) headers opens the application to severe Cross-Site Scripting (XSS) risks.
+**Action:** Removed `'unsafe-inline'` from `script-src` and `style-src` directives in `frontend/index.html` to harden the application against XSS vulnerabilities while ensuring frontend tests and builds succeed safely.
