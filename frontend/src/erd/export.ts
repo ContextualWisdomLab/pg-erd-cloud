@@ -252,10 +252,21 @@ export function exportDiagramSvg(
       return [node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0))];
     }),
   );
-  const minX = Math.min(...nodes.map((n) => n.position.x), 0);
-  const minY = Math.min(...nodes.map((n) => n.position.y), 0);
-  const maxX = Math.max(...nodes.map((n) => n.position.x + width), width);
-  const maxY = Math.max(...nodes.map((n) => n.position.y + (heights.get(n.id) || headerHeight)), headerHeight);
+  let minX = 0;
+  let minY = 0;
+  let maxX = width;
+  let maxY = headerHeight;
+
+  // Avoid spreading large coordinate arrays when exporting large diagrams.
+  for (const n of nodes) {
+    const x = n.position.x;
+    const y = n.position.y;
+    const h = heights.get(n.id) || headerHeight;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x + width > maxX) maxX = x + width;
+    if (y + h > maxY) maxY = y + h;
+  }
   const offsetX = padding - minX;
   const offsetY = padding - minY;
   const svgWidth = maxX - minX + padding * 2;
