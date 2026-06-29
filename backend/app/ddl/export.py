@@ -137,34 +137,28 @@ def _postgres_type_to_snowflake(column: dict) -> str:
     return "VARCHAR"
 
 
-def _snowflake_type_to_postgres(column: dict) -> str:
-    data_type = column.get("data_type")
-    if not isinstance(data_type, str):
-        return "text"
+_SNOWFLAKE_TO_PG_EXACT_TYPES = {
+    "boolean": "boolean",
+    "bool": "boolean",
+    "date": "date",
+    "time": "time",
+    "float": "double precision",
+    "float4": "real",
+    "float8": "double precision",
+    "double": "double precision",
+    "double precision": "double precision",
+    "real": "real",
+    "binary": "bytea",
+    "varbinary": "bytea",
+    "variant": "jsonb",
+    "object": "jsonb",
+    "array": "jsonb",
+    "geography": "jsonb",
+    "geometry": "jsonb",
+}
 
-    normalized = _normalize_type_text(data_type)
-    exact = {
-        "boolean": "boolean",
-        "bool": "boolean",
-        "date": "date",
-        "time": "time",
-        "float": "double precision",
-        "float4": "real",
-        "float8": "double precision",
-        "double": "double precision",
-        "double precision": "double precision",
-        "real": "real",
-        "binary": "bytea",
-        "varbinary": "bytea",
-        "variant": "jsonb",
-        "object": "jsonb",
-        "array": "jsonb",
-        "geography": "jsonb",
-        "geometry": "jsonb",
-    }
-    if normalized in exact:
-        return exact[normalized]
 
+def _parse_snowflake_number(normalized: str) -> str | None:
     number = re.match(
         r"^(number|numeric|decimal)\s*(?:\((\d+)(?:\s*,\s*(\d+))?\))?$",
         normalized,
@@ -177,7 +171,10 @@ def _snowflake_type_to_postgres(column: dict) -> str:
         if precision:
             return f"numeric({precision},0)"
         return "numeric"
+    return None
 
+
+def _parse_snowflake_string(normalized: str) -> str | None:
     varchar = re.match(r"^(varchar|string|text)\s*(?:\((\d+)\))?$", normalized)
     if varchar:
         return f"character varying({varchar.group(2)})" if varchar.group(2) else "text"
@@ -186,10 +183,35 @@ def _snowflake_type_to_postgres(column: dict) -> str:
     if char:
         return f"character({char.group(2)})" if char.group(2) else "character"
 
+    return None
+
+
+def _parse_snowflake_timestamp(normalized: str) -> str | None:
     if normalized.startswith("timestamp_tz") or normalized.startswith("timestamp_ltz"):
         return "timestamp with time zone"
     if normalized.startswith("timestamp_ntz") or normalized.startswith("timestamp"):
         return "timestamp without time zone"
+    return None
+
+
+def _snowflake_type_to_postgres(column: dict) -> str:
+    data_type = column.get("data_type")
+    if not isinstance(data_type, str):
+        return "text"
+
+    normalized = _normalize_type_text(data_type)
+
+    if normalized in _SNOWFLAKE_TO_PG_EXACT_TYPES:
+        return _SNOWFLAKE_TO_PG_EXACT_TYPES[normalized]
+
+    if res := _parse_snowflake_number(normalized):
+        return res
+
+    if res := _parse_snowflake_string(normalized):
+        return res
+
+    if res := _parse_snowflake_timestamp(normalized):
+        return res
 
     return "text"
 
