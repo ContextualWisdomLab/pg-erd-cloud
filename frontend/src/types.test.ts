@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { toPlainText } from './types'
+import { toPlainText, snapshotDetailFromResponse } from './types'
 
 describe('toPlainText', () => {
   it('escapes html-sensitive characters and strips control characters', () => {
@@ -14,3 +14,19 @@ describe('toPlainText', () => {
     expect(toPlainText('')).toBeNull()
   })
 })
+
+describe('snapshotDetailFromResponse', () => {
+  it('converts error_message using toPlainText', () => {
+    const input = {
+      schema_snapshot_uuid: '123',
+      status: 'failed',
+      schema_filter: null,
+      snapshot_json: null,
+      error_message: 'Some <error>'
+    };
+
+    // @ts-expect-error test
+    const output = snapshotDetailFromResponse(input);
+    expect(output.error_message).toBe('Some &lt;error&gt;');
+  });
+});
