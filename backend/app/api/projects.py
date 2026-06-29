@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.permissions import require_project_member
 from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
     ProjectCreateIn,
@@ -40,7 +39,9 @@ async def list_projects(
     )
     projects = rows.scalars().all()
     return [
-        ProjectOut(project_space_uuid=p.project_space_uuid, project_name=p.project_name)
+        ProjectOut(
+            project_space_uuid=p.project_space_uuid, project_name=p.project_name
+        )
         for p in projects
     ]
 
@@ -74,17 +75,24 @@ async def create_project(
     )
 
 
-@router.get("/{project_space_uuid}/members", response_model=list[ProjectMemberOut])
+@router.get(
+    "/{project_space_uuid}/members", response_model=list[ProjectMemberOut]
+)
 async def list_project_members(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> list[ProjectMemberOut]:
     """List members of a project (MVP: any member can view)."""
-    # Remediation for IDOR: Only owners or editors can view all members.
-    await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+    # owner/editor/viewer 모두 멤버 조회 가능(MVP)
+    row = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_space_uuid == project_space_uuid,
+            ProjectMember.user_account_uuid == user.user_account_uuid,
+        )
     )
+    if row.scalars().first() is None:
+        raise HTTPException(status_code=403, detail="project access denied")
 
     rows = await session.execute(
         select(ProjectMember, UserAccount)
@@ -107,21 +115,33 @@ async def list_project_members(
     return out
 
 
-async def _ensure_owner(
-    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
-) -> None:
+@router.post("/{project_space_uuid}/members", response_model=ProjectMemberOut)
+async def add_project_member(
+    project_space_uuid: uuid.UUID,
+    body: ProjectMemberAddIn,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectMemberOut:
+    """Invite/add a project member (owner-only).
+
+    Uses a Postgres upsert to make the operation idempotent and race-safe.
+    """
+    # MVP 권한: owner만 초대 가능
     row = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
-            ProjectMember.user_account_uuid == user_account_uuid,
+            ProjectMember.user_account_uuid == user.user_account_uuid,
         )
     )
     role = row.scalar_one_or_none()
     if role != "owner":
         raise HTTPException(status_code=403, detail="owner role required")
 
+    subject = str(sanitize_for_storage(body.member_subject)).strip()
+    if not subject:
+        raise HTTPException(status_code=400, detail="member_subject required")
 
-async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccount:
+    # Ensure user exists.
     row2 = await session.execute(
         select(UserAccount).where(UserAccount.oidc_subject == subject)
     )
@@ -135,38 +155,29 @@ async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccoun
         )
         session.add(u)
         await session.flush()
-    return u
 
-
-async def _ensure_not_changing_owner_role(
-    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
-) -> None:
+    # Idempotent invite: if already a member, update role instead of raising 500.
     row3 = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
-            ProjectMember.user_account_uuid == user_account_uuid,
+            ProjectMember.user_account_uuid == u.user_account_uuid,
         )
     )
     existing_role = row3.scalar_one_or_none()
     if existing_role == "owner":
+        # Avoid leaving project without an owner via this endpoint.
         raise HTTPException(
             status_code=400,
             detail="cannot change owner role via invite endpoint",
         )
 
-
-async def _upsert_project_member(
-    session: AsyncSession,
-    project_space_uuid: uuid.UUID,
-    user_account_uuid: uuid.UUID,
-    project_role: str,
-) -> str:
+    # Race-safe upsert on composite PK.
     stmt = (
         insert(ProjectMember)
         .values(
             project_space_uuid=project_space_uuid,
-            user_account_uuid=user_account_uuid,
-            project_role=project_role,
+            user_account_uuid=u.user_account_uuid,
+            project_role=body.project_role,
             created_at=dt.datetime.now(dt.timezone.utc),
         )
         .on_conflict_do_update(
@@ -174,43 +185,15 @@ async def _upsert_project_member(
                 ProjectMember.project_space_uuid,
                 ProjectMember.user_account_uuid,
             ],
-            set_={"project_role": project_role},
+            set_={"project_role": body.project_role},
         )
         .returning(ProjectMember.project_role)
     )
     new_role = (await session.execute(stmt)).scalar_one()
     await session.commit()
-    return str(new_role)
-
-
-@router.post("/{project_space_uuid}/members", response_model=ProjectMemberOut)
-async def add_project_member(
-    project_space_uuid: uuid.UUID,
-    body: ProjectMemberAddIn,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> ProjectMemberOut:
-    """Invite/add a project member (owner-only).
-
-    Uses a Postgres upsert to make the operation idempotent and race-safe.
-    """
-    await _ensure_owner(session, project_space_uuid, user.user_account_uuid)
-
-    subject = str(sanitize_for_storage(body.member_subject)).strip()
-    if not subject:
-        raise HTTPException(status_code=400, detail="member_subject required")
-
-    u = await _ensure_user_exists(session, subject)
-    await _ensure_not_changing_owner_role(
-        session, project_space_uuid, u.user_account_uuid
-    )
-
-    new_role = await _upsert_project_member(
-        session, project_space_uuid, u.user_account_uuid, body.project_role
-    )
 
     return ProjectMemberOut(
         user_account_uuid=u.user_account_uuid,
         member_subject=u.oidc_subject,
-        project_role=new_role,
+        project_role=str(new_role),
     )

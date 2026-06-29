@@ -33,20 +33,9 @@ SELECT
   c.oid AS relation_oid,
   c.relname AS relation_name,
   c.relkind::text AS relation_kind,
-  pg_catalog.obj_description(c.oid, 'pg_class') AS relation_comment,
-  c.relispartition AS is_partition,
-  pg_catalog.pg_get_partkeydef(c.oid) AS partition_key,
-  pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound,
-  parent.oid AS partition_parent_oid,
-  parent_ns.nspname AS partition_parent_schema,
-  parent.relname AS partition_parent_name,
-  rel_ts.spcname AS tablespace_name
+  c.relispartition AS is_partition
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-LEFT JOIN pg_catalog.pg_inherits inh ON inh.inhrelid = c.oid
-LEFT JOIN pg_catalog.pg_class parent ON parent.oid = inh.inhparent
-LEFT JOIN pg_catalog.pg_namespace parent_ns ON parent_ns.oid = parent.relnamespace
-LEFT JOIN pg_catalog.pg_tablespace rel_ts ON rel_ts.oid = c.reltablespace
 CROSS JOIN params p
 WHERE
   c.relkind IN ('r','p','v','m')
@@ -76,26 +65,6 @@ SELECT
   a.attnum AS column_position,
   a.attname AS column_name,
   pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
-  typ.oid AS type_oid,
-  typ_ns.nspname AS type_schema,
-  typ.typname AS type_name,
-  typ.typtype::text AS type_kind,
-  typ.typcategory::text AS type_category,
-  CASE
-    WHEN typ.typtype = 'd'
-    THEN pg_catalog.format_type(typ.typbasetype, typ.typtypmod)
-    ELSE NULL
-  END AS domain_base_type,
-  base_typ_ns.nspname AS domain_base_schema,
-  base_typ.typname AS domain_base_name,
-  CASE
-    WHEN typ.typcategory = 'A'
-    THEN pg_catalog.format_type(typ.typelem, -1)
-    ELSE NULL
-  END AS array_element_type,
-  elem_typ_ns.nspname AS array_element_schema,
-  elem_typ.typname AS array_element_name,
-  a.attndims AS array_dimensions,
   a.attnotnull AS is_not_null,
   a.atthasdef AS has_default,
   pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
@@ -103,16 +72,6 @@ SELECT
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-JOIN pg_catalog.pg_type typ ON typ.oid = a.atttypid
-JOIN pg_catalog.pg_namespace typ_ns ON typ_ns.oid = typ.typnamespace
-LEFT JOIN pg_catalog.pg_type base_typ
-  ON base_typ.oid = typ.typbasetype AND typ.typtype = 'd'
-LEFT JOIN pg_catalog.pg_namespace base_typ_ns
-  ON base_typ_ns.oid = base_typ.typnamespace
-LEFT JOIN pg_catalog.pg_type elem_typ
-  ON elem_typ.oid = typ.typelem AND typ.typcategory = 'A'
-LEFT JOIN pg_catalog.pg_namespace elem_typ_ns
-  ON elem_typ_ns.oid = elem_typ.typnamespace
 LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
 CROSS JOIN params p
 WHERE
@@ -185,16 +144,11 @@ SELECT
   idx_ns.nspname AS index_schema_name,
   idx.relname AS index_name,
 
-  tbl.oid AS relation_oid,
   tbl.oid AS table_oid,
   tbl_ns.nspname AS table_schema_name,
   tbl.relname AS table_name,
-  idx_ts.spcname AS index_tablespace_name,
 
   am.amname AS access_method,
-  am_ext.extname AS access_method_extension,
-  COALESCE(opclasses.operator_classes, ARRAY[]::text[]) AS operator_classes,
-  COALESCE(opclasses.operator_class_extensions, ARRAY[]::text[]) AS operator_class_extensions,
   ix.indisunique AS is_unique,
   ix.indisprimary AS is_primary,
   ix.indisvalid AS is_valid,
@@ -207,36 +161,6 @@ JOIN pg_catalog.pg_namespace idx_ns ON idx_ns.oid = idx.relnamespace
 JOIN pg_catalog.pg_class tbl ON tbl.oid = ix.indrelid
 JOIN pg_catalog.pg_namespace tbl_ns ON tbl_ns.oid = tbl.relnamespace
 JOIN pg_catalog.pg_am am ON am.oid = idx.relam
-LEFT JOIN pg_catalog.pg_tablespace idx_ts ON idx_ts.oid = idx.reltablespace
-LEFT JOIN LATERAL (
-  SELECT ext.extname
-  FROM pg_catalog.pg_depend dep
-  JOIN pg_catalog.pg_extension ext ON ext.oid = dep.refobjid
-  WHERE
-    dep.classid = 'pg_catalog.pg_am'::regclass
-    AND dep.objid = am.oid
-    AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
-    AND dep.deptype = 'e'
-  ORDER BY ext.extname
-  LIMIT 1
-) am_ext ON true
-LEFT JOIN LATERAL (
-  SELECT
-    array_agg(opc_ns.nspname || '.' || opc.opcname ORDER BY cls.ordinality) AS operator_classes,
-    COALESCE(
-      array_agg(DISTINCT ext.extname ORDER BY ext.extname) FILTER (WHERE ext.extname IS NOT NULL),
-      ARRAY[]::text[]
-    ) AS operator_class_extensions
-  FROM unnest(ix.indclass) WITH ORDINALITY AS cls(opclass_oid, ordinality)
-  JOIN pg_catalog.pg_opclass opc ON opc.oid = cls.opclass_oid
-  JOIN pg_catalog.pg_namespace opc_ns ON opc_ns.oid = opc.opcnamespace
-  LEFT JOIN pg_catalog.pg_depend dep
-    ON dep.classid = 'pg_catalog.pg_opclass'::regclass
-    AND dep.objid = opc.oid
-    AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
-    AND dep.deptype = 'e'
-  LEFT JOIN pg_catalog.pg_extension ext ON ext.oid = dep.refobjid
-) opclasses ON true
 CROSS JOIN params p
 WHERE
   tbl.relkind IN ('r','p','m')
@@ -251,52 +175,6 @@ WHERE
     )
   )
 ORDER BY tbl_ns.nspname, tbl.relname, idx.relname;
-"""
-
-
-CITUS_DISTRIBUTED_TABLES_SQL = """
-WITH params AS (
-  SELECT $1::text AS schema_name, COALESCE($2::boolean, false) AS include_system
-)
-SELECT
-  tbl.oid AS relation_oid,
-  ns.nspname AS schema_name,
-  tbl.relname AS relation_name,
-  p.partmethod::text AS distribution_method,
-  p.partkey::text AS distribution_key,
-  p.colocationid AS colocation_id,
-  p.repmodel::text AS replication_model,
-  co.shardcount AS configured_shard_count,
-  co.replicationfactor AS replication_factor,
-  COUNT(sh.shardid)::int AS shard_count
-FROM pg_catalog.pg_dist_partition p
-JOIN pg_catalog.pg_class tbl ON tbl.oid = p.logicalrelid
-JOIN pg_catalog.pg_namespace ns ON ns.oid = tbl.relnamespace
-LEFT JOIN pg_catalog.pg_dist_colocation co ON co.colocationid = p.colocationid
-LEFT JOIN pg_catalog.pg_dist_shard sh ON sh.logicalrelid = p.logicalrelid
-CROSS JOIN params prm
-WHERE
-  (prm.schema_name IS NULL OR ns.nspname = prm.schema_name)
-  AND (
-    prm.include_system
-    OR (
-      ns.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND ns.nspname NOT LIKE 'pg_toast%'
-      AND ns.nspname NOT LIKE 'pg_temp_%'
-      AND ns.nspname NOT LIKE 'pg_toast_temp_%'
-    )
-  )
-GROUP BY
-  tbl.oid,
-  ns.nspname,
-  tbl.relname,
-  p.partmethod,
-  p.partkey,
-  p.colocationid,
-  p.repmodel,
-  co.shardcount,
-  co.replicationfactor
-ORDER BY ns.nspname, tbl.relname;
 """
 
 

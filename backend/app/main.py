@@ -9,13 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
-from app.api.auth_routes import router as auth_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
-from app.csrf import CSRF_HEADER_NAME, generate_csrf_token, make_csrf_middleware
 from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
@@ -61,13 +59,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 
-CORS_ALLOW_HEADERS = [
-    "Authorization",
-    "Content-Type",
-    "X-Dev-User",
-    CSRF_HEADER_NAME,
-]
-
 _rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
 )
@@ -78,26 +69,6 @@ _rate_limit_policy = RateLimitPolicy(
     route_prefix="/api",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
-_share_link_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.share_link_rate_limit_max_keys
-)
-_share_link_rate_limit_policy = RateLimitPolicy(
-    enabled=settings.share_link_rate_limit_enabled,
-    requests=settings.share_link_rate_limit_requests,
-    window_seconds=settings.share_link_rate_limit_window_seconds,
-    route_prefix="/api/share",
-    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
-)
-_revoke_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.api_rate_limit_max_keys
-)
-_revoke_rate_limit_policy = RateLimitPolicy(
-    enabled=settings.api_rate_limit_enabled,
-    requests=10,
-    window_seconds=60,
-    route_prefix="/api/auth/revoke",
-    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
-)
 
 app.middleware("http")(
     make_rate_limit_middleware(
@@ -106,31 +77,15 @@ app.middleware("http")(
         get_subject=try_get_subject_for_rate_limit,
     )
 )
-app.middleware("http")(
-    make_rate_limit_middleware(
-        limiter=_share_link_rate_limiter,
-        policy=_share_link_rate_limit_policy,
-    )
-)
-app.middleware("http")(
-    make_rate_limit_middleware(
-        limiter=_revoke_rate_limiter,
-        policy=_revoke_rate_limit_policy,
-        get_subject=try_get_subject_for_rate_limit,
-    )
-)
-
-app.middleware("http")(make_csrf_middleware())
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
-    # Default to the strictest safe setting. Enable credentials only when you
-    # actually need cookie-based auth.
-    allow_credentials=False,
-    # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=CORS_ALLOW_HEADERS,
+    allow_origins=[
+        o.strip() for o in settings.cors_origins.split(",") if o.strip()
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Observability should be registered after other middleware so it can capture
@@ -157,15 +112,8 @@ async def healthz() -> dict:
     return {"ok": True}
 
 
-@app.get("/api/csrf-token")
-async def csrf_token() -> dict[str, str]:
-    """Issue a signed token for unsafe API requests."""
-    return {"csrf_token": generate_csrf_token(settings.app_secret)}
-
-
 app.include_router(projects_router)
 app.include_router(connections_router)
 app.include_router(snapshots_router)
 app.include_router(me_router)
 app.include_router(share_router)
-app.include_router(auth_router)

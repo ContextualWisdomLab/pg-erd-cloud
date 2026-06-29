@@ -2,9 +2,27 @@ from __future__ import annotations
 
 import argparse
 import ast
+from collections.abc import Iterable
 from pathlib import Path
 
-from scripts.python_checks.file_utils import iter_python_files
+SKIP_DIR_NAMES = {
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "site-packages",
+    "build",
+    "dist",
+}
+
+
+def iter_python_files(root: Path) -> Iterable[Path]:
+    for path in root.rglob("*.py"):
+        if any(part in SKIP_DIR_NAMES for part in path.parts):
+            continue
+        yield path
 
 
 def _is_sys_path(expr: ast.AST) -> bool:
@@ -73,11 +91,7 @@ def main(argv: list[str] | None = None) -> int:
                 # Avoid false-positives from the checker searching for its own
                 # detection strings.
                 continue
-            try:
-                src = file_path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError) as exc:
-                warnings.append(f"{file_path}: read failed ({exc})")
-                continue
+            src = file_path.read_text(encoding="utf-8")
 
             try:
                 tree = ast.parse(src)

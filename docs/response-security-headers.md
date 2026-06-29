@@ -6,11 +6,10 @@ The backend is an API-first service, but it still benefits from baseline
 **response hardening** headers to reduce the risk of clickjacking, MIME-sniffing,
 and accidental embedding.
 
-This repository applies headers in three places:
+This repository applies headers in two places:
 
 1) **Ingress / reverse proxy (recommended for production)**
-2) **Frontend static server (production SPA assets)**
-3) **FastAPI middleware (fallback for dev/test parity)**
+2) **FastAPI middleware (fallback for dev/test parity)**
 
 ## Applied headers (default)
 
@@ -50,10 +49,8 @@ To avoid breaking Swagger UI, CSP is **not applied** to these endpoints:
 
 - **FastAPI**: `backend/app/security_headers.py` (middleware wired in
   `backend/app/main.py`)
-- **Traefik (prod edge router)**: `deploy/traefik/dynamic.yaml` (adds baseline
-  headers through the `security-headers` middleware)
-- **Frontend static server**: `frontend/serve-static.mjs` (keeps the same
-  baseline headers for direct container checks)
+- **Nginx (prod frontend container)**: `frontend/nginx.conf` (adds baseline
+  headers with `always`)
 
 ## Validation (smoke)
 
@@ -66,8 +63,7 @@ curl -fsS -D- http://127.0.0.1:8000/healthz -o /dev/null
 # docs should NOT include CSP
 curl -fsS -D- http://127.0.0.1:8000/docs -o /dev/null
 
-# production edge router (Traefik)
+# frontend prod container (nginx)
 curl -fsS -D- http://127.0.0.1:8080/ -o /dev/null
 curl -fsS -D- http://127.0.0.1:8080/api/me -o /dev/null
-curl -fsS -D- http://127.0.0.1:8080/healthz -o /dev/null
 ```

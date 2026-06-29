@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,56 +19,8 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
-from app.jobs.valkey_queue import enqueue_job_signal
-from app.spec.llm import (
-    LlmConfigurationError,
-    LlmProviderError,
-    generate_index_design_llm_draft,
-    generate_reversing_llm_draft,
-)
-from app.spec.index_design import generate_index_design_spec
-from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
-
-
-def _snapshot_not_found(schema_snapshot_uuid: uuid.UUID) -> SnapshotDetailOut:
-    """Return the uniform snapshot-not-found response."""
-
-    return SnapshotDetailOut(
-        schema_snapshot_uuid=schema_snapshot_uuid,
-        status="not_found",
-        schema_filter=None,
-        error_message="snapshot not found",
-        snapshot_json=None,
-    )
-
-
-async def _get_authorized_snapshot(
-    session: AsyncSession,
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser,
-) -> SchemaSnapshot | None:
-    """Fetch a snapshot only after project membership has been checked."""
-
-    project_space_uuid = await session.scalar(
-        select(SchemaSnapshot.project_space_uuid).where(
-            SchemaSnapshot.schema_snapshot_uuid == schema_snapshot_uuid
-        )
-    )
-    if project_space_uuid is None:
-        return None
-
-    try:
-        await require_project_member(
-            session, project_space_uuid, user.user_account_uuid
-        )
-    except HTTPException as exc:
-        if exc.status_code == 403:
-            return None
-        raise
-
-    return await session.get(SchemaSnapshot, schema_snapshot_uuid)
 
 
 @router.post("/by-project/{project_space_uuid}", response_model=SnapshotOut)
@@ -80,7 +32,7 @@ async def create_snapshot(
 ) -> SnapshotOut:
     """Create a schema snapshot job for a project connection."""
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+        session, project_space_uuid, user.user_account_uuid
     )
 
     # Ensure connection belongs to this project
@@ -120,7 +72,6 @@ async def create_snapshot(
     session.add(job)
 
     await session.commit()
-    await enqueue_job_signal(job.job_queue_uuid, job.run_after)
     return SnapshotOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
         status=snap.status,
@@ -135,9 +86,18 @@ async def get_snapshot(
     session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
     """Get a snapshot's status and (if present) captured JSON."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
     if snap is None:
-        return _snapshot_not_found(schema_snapshot_uuid)
+        return SnapshotDetailOut(
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            status="not_found",
+            schema_filter=None,
+            error_message="snapshot not found",
+            snapshot_json=None,
+        )
+    await require_project_member(
+        session, snap.project_space_uuid, user.user_account_uuid
+    )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     return SnapshotDetailOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
@@ -148,89 +108,39 @@ async def get_snapshot(
     )
 
 
-@router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
+@router.get(
+    "/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse
+)
 async def export_snapshot_sql(
     schema_snapshot_uuid: uuid.UUID,
-    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
-    """Export a snapshot as dialect-specific SQL DDL (best-effort)."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    """Export a snapshot as PostgreSQL DDL (best-effort)."""
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
     if snap is None:
         return "-- snapshot not found\n"
+    await require_project_member(
+        session, snap.project_space_uuid, user.user_account_uuid
+    )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    return snapshot_json_to_sql(data.snapshot_json)
 
 
 @router.get(
-    "/{schema_snapshot_uuid}/reversing-spec.md",
-    response_class=PlainTextResponse,
+    "/by-project/{project_space_uuid}", response_model=list[SnapshotOut]
 )
-async def export_snapshot_reversing_spec(
-    schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> str:
-    """Export a snapshot as a DB reversing spec or LLM prompt."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return "# DB Reversing Specification\n\nSnapshot not found.\n"
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    if data is None:
-        return "# DB Reversing Specification\n\nSnapshot data not found.\n"
-    if mode == "llm-draft":
-        try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
-        except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except LlmProviderError as exc:
-            raise HTTPException(
-                status_code=502, detail="LLM provider request failed"
-            ) from exc
-    return generate_reversing_spec(data.snapshot_json, mode=mode)
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/index-design.md",
-    response_class=PlainTextResponse,
-)
-async def export_snapshot_index_design(
-    schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> str:
-    """Export table/index design guidance or an LLM prompt."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return "# ERD Index Design\n\nSnapshot not found.\n"
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    if data is None:
-        return "# ERD Index Design\n\nSnapshot data not found.\n"
-    if mode == "llm-draft":
-        try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
-        except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except LlmProviderError as exc:
-            raise HTTPException(
-                status_code=502, detail="LLM provider request failed"
-            ) from exc
-    return generate_index_design_spec(data.snapshot_json, mode=mode)
-
-
-@router.get("/by-project/{project_space_uuid}", response_model=list[SnapshotOut])
 async def list_snapshots(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> list[SnapshotOut]:
     """List snapshots for a project."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid
+    )
     rows = await session.execute(
         select(SchemaSnapshot)
         .where(SchemaSnapshot.project_space_uuid == project_space_uuid)

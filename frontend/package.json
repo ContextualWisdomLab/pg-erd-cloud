@@ -3,32 +3,22 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": {
-    "node": ">=26 <27"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview",
-    "test": "vitest run"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@xyflow/react": "^12.11.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.7"
+    "@xyflow/react": "^12.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.2.10",
-    "@types/react-dom": "^19.2.3",
-    "@vitest/coverage-v8": "^4.1.9",
-    "jsdom": "^29.1.1",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8"
   },
   "overrides": {
     "esbuild": "^0.25.0"
