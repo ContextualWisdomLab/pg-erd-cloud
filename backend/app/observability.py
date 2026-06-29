@@ -113,13 +113,10 @@ def _record_metrics_and_logs(
 def make_request_observability_middleware() -> Callable[
     [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
 ]:
-    """Create request logging, metrics, and request-id middleware."""
-
     async def middleware(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Record one request and attach an X-Request-Id response header."""
         # Avoid recursive noise in logs/metrics.
         is_metrics_path = request.url.path == "/metrics"
 
@@ -174,7 +171,6 @@ def setup_observability(app: FastAPI) -> None:
 
     @app.get("/metrics", include_in_schema=False)
     async def metrics(request: Request) -> Response:
-        """Return Prometheus metrics when the request presents the metrics token."""
         provided = request.headers.get("X-Metrics-Token") or ""
         if not secrets.compare_digest(provided, token):
             return Response(status_code=403)

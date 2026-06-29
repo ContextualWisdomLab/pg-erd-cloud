@@ -3,23 +3,20 @@ import type { Connection, Project, Snapshot, SnapshotDetail, SnapshotDetailRespo
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+const CSRF_STORAGE_KEY = 'csrfToken'
 
-type CsrfTokenResponse = {
-  csrf_token: string
-}
+function csrfToken(): string {
+  const existing = localStorage.getItem(CSRF_STORAGE_KEY)
+  if (existing && existing.length >= 16) return existing
 
-async function csrfToken(): Promise<string> {
-  const r = await fetch(`${API_BASE}/api/csrf-token`, {
-    credentials: 'include',
-    headers: devHeaders()
-  })
-  if (!r.ok) throw new Error(`csrfToken failed: ${r.status}`)
-
-  const payload = (await r.json()) as Partial<CsrfTokenResponse>
-  if (typeof payload.csrf_token !== 'string' || !payload.csrf_token) {
-    throw new Error('csrfToken failed: invalid token response')
-  }
-  return payload.csrf_token
+  const token =
+    typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) =>
+          byte.toString(16).padStart(2, '0')
+        ).join('')
+  localStorage.setItem(CSRF_STORAGE_KEY, token)
+  return token
 }
 
 function devHeaders(): Record<string, string> {
@@ -27,10 +24,10 @@ function devHeaders(): Record<string, string> {
   return devUser ? { 'X-Dev-User': devUser } : {}
 }
 
-async function jsonHeaders(): Promise<Record<string, string>> {
+function jsonHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    'X-CSRF-Token': await csrfToken(),
+    'X-CSRF-Token': csrfToken(),
     ...devHeaders()
   }
 }
@@ -51,7 +48,7 @@ export async function createProject(project_name: string): Promise<Project> {
   const r = await fetch(`${API_BASE}/api/projects`, {
     method: 'POST',
     credentials: 'include',
-    headers: await jsonHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ project_name })
   })
   if (!r.ok) throw new Error(`createProject failed: ${r.status}`)
@@ -68,7 +65,7 @@ export async function createConnection(projectId: string, conn_name: string, dsn
   const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, {
     method: 'POST',
     credentials: 'include',
-    headers: await jsonHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ conn_name, dsn })
   })
   if (!r.ok) throw new Error(`createConnection failed: ${r.status}`)
@@ -85,7 +82,7 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
   const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, {
     method: 'POST',
     credentials: 'include',
-    headers: await jsonHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ db_connection_uuid, schema_filter: schema_filter || null })
   })
   if (!r.ok) throw new Error(`createSnapshot failed: ${r.status}`)

@@ -116,7 +116,6 @@ def infer_column_example(column: dict) -> str:
 
 
 def add_column_examples(columns: list[dict]) -> list[dict]:
-    """Return copied column dictionaries with generated examples when missing."""
     enriched: list[dict] = []
     for column in columns:
         next_column = dict(column)

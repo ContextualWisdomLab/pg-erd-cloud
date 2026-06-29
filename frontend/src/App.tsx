@@ -928,35 +928,44 @@ export default function App() {
               type="button"
               onClick={onDownloadSvg}
               disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
-              }
+              aria-describedby={nodes.length === 0 ? "svg-disabled-reason" : undefined}
               aria-label="SVG 그림 내보내기"
             >
               SVG
             </button>
+            {nodes.length === 0 && (
+              <span id="svg-disabled-reason" className="srOnly">
+                내보낼 테이블이 없습니다
+              </span>
+            )}
             <button
               type="button"
               onClick={onDownloadUml}
               disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
-              }
+              aria-describedby={nodes.length === 0 ? "uml-disabled-reason" : undefined}
               aria-label="PlantUML 내보내기"
             >
               UML
             </button>
+            {nodes.length === 0 && (
+              <span id="uml-disabled-reason" className="srOnly">
+                내보낼 테이블이 없습니다
+              </span>
+            )}
             <button
               type="button"
               onClick={onDownloadMermaid}
               disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "Mermaid 내보내기"
-              }
+              aria-describedby={nodes.length === 0 ? "mermaid-disabled-reason" : undefined}
               aria-label="Mermaid 내보내기"
             >
               Mermaid
             </button>
+            {nodes.length === 0 && (
+              <span id="mermaid-disabled-reason" className="srOnly">
+                내보낼 테이블이 없습니다
+              </span>
+            )}
             <div className="srOnly" aria-live="polite">
               {layoutMessage}
             </div>

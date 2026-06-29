@@ -90,8 +90,6 @@ SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 @dataclass(frozen=True)
 class SnowflakeDsnConfig:
-    """Connection settings parsed from a Snowflake DSN."""
-
     account: str
     user: str
     password: str | None
@@ -102,7 +100,6 @@ class SnowflakeDsnConfig:
     authenticator: str | None
 
     def connect_kwargs(self) -> dict[str, str]:
-        """Return non-empty keyword arguments accepted by the Snowflake connector."""
         kwargs = {
             "account": self.account,
             "user": self.user,

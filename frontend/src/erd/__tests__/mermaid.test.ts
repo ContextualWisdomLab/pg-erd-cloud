@@ -30,7 +30,7 @@ describe('exportMermaid', () => {
     const edges: Edge[] = [];
     const result = exportMermaid(nodes, edges);
     expect(result).toContain('erDiagram\n');
-    expect(result).toContain('  "public.users" {\n');
+    expect(result).toContain('  "publicusers" {\n');
     expect(result).toContain('    integer id PK\n');
     expect(result).toContain('    character_varying_255_ username\n');
     expect(result).toContain('  }\n');
@@ -78,7 +78,7 @@ describe('exportMermaid', () => {
     const result = exportMermaid(nodes, edges);
 
     expect(result).toContain('    integer user_id FK\n');
-    expect(result).toContain('  "public.users" ||--o{ "public.posts" : "fk_user_id"\n');
+    expect(result).toContain('  "publicusers" ||--o{ "publicposts" : "fk_user_id"\n');
   });
 
   it('handles edges with missing nodes', () => {
@@ -211,11 +211,11 @@ describe('exportMermaid', () => {
 
     // Check that quotes and newlines were removed
     expect(result).not.toContain('<script>');
-    expect(result).toContain('  "public.usersscriptalert(1)/script" {\n');
+    expect(result).toContain('  "publicusersscriptalert1script" {\n');
     expect(result).toContain('    integer id PK\n');
-    expect(result).toContain('  "public.posts" {\n');
+    expect(result).toContain('  "publicposts" {\n');
     expect(result).toContain('    integer user_id FK\n');
-    expect(result).toContain('  "public.usersscriptalert(1)/script" ||--o{ "public.posts" : "fk_user_id"\n');
+    expect(result).toContain('  "publicusersscriptalert1script" ||--o{ "publicposts" : "fk_user_id"\n');
   });
 
   it('handles empty titles or missing labels safely', () => {
