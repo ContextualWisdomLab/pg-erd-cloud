@@ -34,6 +34,10 @@ is_vertex_resource_path() {
 
 	IFS='/' read -r -a parts <<<"$path"
 	local part
+	if [ "${parts[0]}" = "deepseek" ]; then
+		return 1
+	fi
+
 	for part in "${parts[@]}"; do
 		if [ -z "$part" ]; then
 			return 1
@@ -91,6 +95,10 @@ normalize_model() {
 
 	case "$model" in
 	projects/* | models/* | publishers/*)
+		printf '%s\n' "$model"
+		return 0
+		;;
+	deepseek/*)
 		printf '%s\n' "$model"
 		return 0
 		;;
