@@ -182,20 +182,26 @@ def setup_observability(app: FastAPI) -> None:
         return Response(content=content, media_type=content_type)
 
     def _prime_metrics_on_startup() -> None:
-        methods: set[str] = set()
-        routes: set[str] = set()
+        route_methods: dict[str, set[str]] = {}
         for r in app.routes:
             path = getattr(r, "path", None)
-            if isinstance(path, str) and path:
-                routes.add(path)
+            if not isinstance(path, str) or not path or path == "/metrics":
+                continue
 
             r_methods = getattr(r, "methods", None)
             if isinstance(r_methods, set):
-                methods.update({m for m in r_methods if m not in {"HEAD"}})
+                methods = {m for m in r_methods if m not in {"HEAD"}}
+            else:
+                methods = set()
 
-        routes.discard("/metrics")
-        if not methods:
-            methods.add("GET")
-        prime_http_metrics(methods=methods, routes=routes)
+            if not methods:
+                methods.add("GET")
+
+            if path in route_methods:
+                route_methods[path].update(methods)
+            else:
+                route_methods[path] = methods
+
+        prime_http_metrics(route_methods=route_methods)
 
     app.router.add_event_handler("startup", _prime_metrics_on_startup)
