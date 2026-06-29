@@ -10,3 +10,7 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting, making it vulnerable to denial-of-service (DoS) and caching resource exhaustion attacks. Attackers could flood the system with rapid revocation requests.
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse.
 **Prevention:** Always ensure that revocation or authentication-related endpoints are covered by appropriate rate limiting middleware configurations.
+## 2025-06-22 - [XSS/Control Character Injection Prevention in Schemas]
+**Vulnerability:** Allowed control characters (like `\x00`, `\n`, `\r`) in project and connection names could lead to XSS or injection attacks.
+**Learning:** Added strict regex validation in Pydantic schemas to ensure user inputs are safely sanitized at the application boundary, specifically blocking unprintable/control characters.
+**Prevention:** Always use regex constraints in `Field` to explicitly restrict allowed characters instead of only relying on `min_length` and `max_length`.
