@@ -285,12 +285,16 @@ def pr_view(repo: str, number: int) -> dict[str, Any]:
 
 
 def pr_reviews(repo: str, number: int) -> list[dict[str, Any]]:
-    pages = run_gh_json(["api", f"repos/{repo}/pulls/{number}/reviews", "--paginate", "--slurp"])
+    pages = run_gh_json(
+        ["api", f"repos/{repo}/pulls/{number}/reviews", "--paginate", "--slurp"]
+    )
     return [review for page in pages for review in page]
 
 
 def issue_comments(repo: str, number: int) -> list[dict[str, Any]]:
-    pages = run_gh_json(["api", f"repos/{repo}/issues/{number}/comments", "--paginate", "--slurp"])
+    pages = run_gh_json(
+        ["api", f"repos/{repo}/issues/{number}/comments", "--paginate", "--slurp"]
+    )
     return [comment for page in pages for comment in page]
 
 
@@ -319,7 +323,9 @@ def should_skip_dispatch_for_recent_marker(
     return False
 
 
-def create_dispatch_marker(repo: str, number: int, head_sha: str, *, dry_run: bool) -> None:
+def create_dispatch_marker(
+    repo: str, number: int, head_sha: str, *, dry_run: bool
+) -> None:
     body = "\n".join(
         [
             f"{DISPATCH_MARKER} head_sha={head_sha} epoch={int(time.time())} -->",
@@ -364,8 +370,19 @@ def dispatch_opencode_review(repo: str, pr: dict[str, Any], *, dry_run: bool) ->
     run_gh(args, dry_run=dry_run)
 
 
-def merge_pr(repo: str, number: int, head_sha: str, method: str, *, auto: bool, dry_run: bool) -> None:
-    args = ["pr", "merge", str(number), "--repo", repo, f"--{method}", "--match-head-commit", head_sha]
+def merge_pr(
+    repo: str, number: int, head_sha: str, method: str, *, auto: bool, dry_run: bool
+) -> None:
+    args = [
+        "pr",
+        "merge",
+        str(number),
+        "--repo",
+        repo,
+        f"--{method}",
+        "--match-head-commit",
+        head_sha,
+    ]
     if auto:
         args.append("--auto")
     run_gh(args, dry_run=dry_run)
@@ -385,7 +402,9 @@ def decide(
     if unresolved_threads > 0:
         reasons.append(f"{unresolved_threads} unresolved review thread(s)")
     if reviews.change_requested:
-        reasons.append("current-head change request: " + ", ".join(reviews.change_sources))
+        reasons.append(
+            "current-head change request: " + ", ".join(reviews.change_sources)
+        )
     if not reviews.approved:
         reasons.append("no current-head approval")
     if checks.failed:
@@ -408,7 +427,9 @@ def decide(
             "auto-merge",
             ("pending checks: " + ", ".join(checks.pending),),
         )
-    return PullRequestDecision(number, "merge", ("current-head approval and clean checks",))
+    return PullRequestDecision(
+        number, "merge", ("current-head approval and clean checks",)
+    )
 
 
 def process_queue(args: argparse.Namespace) -> int:
@@ -444,10 +465,24 @@ def process_queue(args: argparse.Namespace) -> int:
             )
 
             if decision.action == "merge":
-                merge_pr(args.repo, number, head_sha, args.merge_method, auto=False, dry_run=args.dry_run)
+                merge_pr(
+                    args.repo,
+                    number,
+                    head_sha,
+                    args.merge_method,
+                    auto=False,
+                    dry_run=args.dry_run,
+                )
                 merged += 1
             elif decision.action == "auto-merge":
-                merge_pr(args.repo, number, head_sha, args.merge_method, auto=True, dry_run=args.dry_run)
+                merge_pr(
+                    args.repo,
+                    number,
+                    head_sha,
+                    args.merge_method,
+                    auto=True,
+                    dry_run=args.dry_run,
+                )
                 auto_merged += 1
             else:
                 blocked += 1
@@ -463,10 +498,14 @@ def process_queue(args: argparse.Namespace) -> int:
                         head_sha,
                         args.review_retry_hours * 3600,
                     ):
-                        print("OpenCode review dispatch skipped: recent marker exists for this head.")
+                        print(
+                            "OpenCode review dispatch skipped: recent marker exists for this head."
+                        )
                     else:
                         dispatch_opencode_review(args.repo, pr, dry_run=args.dry_run)
-                        create_dispatch_marker(args.repo, number, head_sha, dry_run=args.dry_run)
+                        create_dispatch_marker(
+                            args.repo, number, head_sha, dry_run=args.dry_run
+                        )
                         dispatched += 1
         except GhError as exc:
             blocked += 1
@@ -491,8 +530,18 @@ def process_queue(args: argparse.Namespace) -> int:
 def self_test() -> int:
     head = "a" * 40
     reviews = [
-        {"state": "APPROVED", "commit_id": head, "user": {"login": "opencode-agent[bot]"}, "body": ""},
-        {"state": "CHANGES_REQUESTED", "commit_id": "b" * 40, "user": {"login": "coderabbitai[bot]"}, "body": ""},
+        {
+            "state": "APPROVED",
+            "commit_id": head,
+            "user": {"login": "opencode-agent[bot]"},
+            "body": "",
+        },
+        {
+            "state": "CHANGES_REQUESTED",
+            "commit_id": "b" * 40,
+            "user": {"login": "coderabbitai[bot]"},
+            "body": "",
+        },
     ]
     summary = summarize_reviews(reviews, head)
     assert summary.approved
@@ -507,7 +556,11 @@ def self_test() -> int:
                 "status": "COMPLETED",
                 "conclusion": "SUCCESS",
             },
-            {"__typename": "StatusContext", "context": "CodeRabbit", "state": "SUCCESS"},
+            {
+                "__typename": "StatusContext",
+                "context": "CodeRabbit",
+                "state": "SUCCESS",
+            },
         ]
     )
     assert checks.failed == ()
@@ -579,7 +632,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--max-prs", type=int, default=50)
-    parser.add_argument("--merge-method", choices=("merge", "squash", "rebase"), default="merge")
+    parser.add_argument(
+        "--merge-method", choices=("merge", "squash", "rebase"), default="merge"
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--trigger-reviews", action="store_true")
     parser.add_argument("--review-retry-hours", type=int, default=24)

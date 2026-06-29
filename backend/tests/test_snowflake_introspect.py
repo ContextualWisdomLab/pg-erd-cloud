@@ -240,11 +240,10 @@ async def test_introspect_snowflake_builds_common_snapshot(
     async def fake_validated_ip_hosts(host, is_hostaddr, port):
         return (host,)
 
+    monkeypatch.setattr("app.snowflake_introspect.introspect._connect", fake_connect)
     monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._connect", fake_connect
-    )
-    monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._validated_ip_hosts", fake_validated_ip_hosts
+        "app.snowflake_introspect.introspect._validated_ip_hosts",
+        fake_validated_ip_hosts,
     )
 
     snapshot = await introspect_snowflake(

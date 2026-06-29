@@ -132,7 +132,9 @@ def needs_autofix(repo: str, pr: dict[str, Any]) -> tuple[bool, tuple[str, ...]]
     review_summary = summarize_reviews(pr_reviews(repo, number), head_sha)
     unresolved_threads = unresolved_review_threads(repo, number)
     if review_summary.change_requested:
-        reasons.append("current-head change request: " + ", ".join(review_summary.change_sources))
+        reasons.append(
+            "current-head change request: " + ", ".join(review_summary.change_sources)
+        )
     if unresolved_threads:
         reasons.append(f"{unresolved_threads} unresolved review thread(s)")
     return bool(reasons), tuple(reasons)
@@ -163,7 +165,16 @@ def process_queue(args: argparse.Namespace) -> int:
                 continue
 
             needs_fix, reasons = needs_autofix(args.repo, pr)
-            print(json.dumps({"number": number, "head": head_sha, "needs_fix": needs_fix, "reasons": reasons}))
+            print(
+                json.dumps(
+                    {
+                        "number": number,
+                        "head": head_sha,
+                        "needs_fix": needs_fix,
+                        "reasons": reasons,
+                    }
+                )
+            )
             if not needs_fix:
                 continue
             if dispatched >= args.max_dispatches:
