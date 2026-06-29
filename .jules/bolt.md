@@ -18,3 +18,7 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+
+## $(date +%Y-%m-%d) - Optimize Map operations inside loops
+**Learning:** In Javascript/TypeScript, when building grouped collections (like Maps of Arrays/Sets) inside loops over large collections, unconditional `Map.set()` operations within the loop can degrade performance by triggering unnecessary map re-hashings/writes.
+**Action:** Always fetch the existing collection (Array or Set) with `Map.get()`. Only use `Map.set()` when initializing a new group array/set. Since objects are passed by reference, mutating the retrieved array/set naturally updates the map's contents without needing subsequent `.set()` operations.
