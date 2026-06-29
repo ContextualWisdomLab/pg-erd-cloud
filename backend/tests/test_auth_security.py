@@ -513,13 +513,23 @@ async def test_try_get_subject_for_rate_limit_error_path():
 async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def mock_get_unverified_header(token):
+    def mock_get_unverified_header(token: str) -> dict[str, str]:
         raise Exception("Invalid header")
 
     monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
 
     with pytest.raises(HTTPException) as excinfo:
         await auth._decode_verified_oidc_token("invalid_token")
+
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
+
+
+@pytest.mark.asyncio
+async def test_oidc_decode_rejects_malformed_token() -> None:
+    """Verify that a token with an invalid format triggers the Exception catch block without mocking."""
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("malformed_token_without_dots")
 
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == "invalid token header"
