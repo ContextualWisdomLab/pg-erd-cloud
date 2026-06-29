@@ -10,6 +10,7 @@ from urllib.parse import parse_qsl, unquote, urlparse
 
 from app.pg_introspect.column_examples import add_column_examples
 from app.sanitize import sanitize_for_storage
+from app.pg_introspect.dsn_guard import _validated_ip_hosts
 
 SCHEMAS_SQL = """
 SELECT schema_name
@@ -133,7 +134,7 @@ def _str_or_none(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
+async def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
     parsed = urlparse(dsn)
     if parsed.scheme.lower() != "snowflake":
         raise ValueError("Snowflake DSN must use the snowflake scheme")
@@ -177,6 +178,8 @@ def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
                     raise ValueError("unsupported Snowflake authenticator URL")
 
         query[normalized] = value
+
+    await _validated_ip_hosts(parsed.hostname, is_hostaddr=False, port=443)
 
     return SnowflakeDsnConfig(
         account=parsed.hostname,
@@ -436,8 +439,6 @@ def _build_constraints(
             key=lambda row: int(row.get("ordinal_position") or 0),
         )
         ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
-        if ctype is None:
-            continue
         relation_oid = relation_ids.get((schema, table))
         if relation_oid is None:
             continue
@@ -618,8 +619,10 @@ def _build_snapshot(
     return sanitize_for_storage(snapshot)  # type: ignore[return-value]
 
 
-def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
-    config = _parse_snowflake_dsn(dsn)
+def _introspect_snowflake_sync_with_config(
+    config: SnowflakeDsnConfig,
+    schema_filter: str | None,
+) -> dict:
     effective_schema = schema_filter or config.schema
     query_params = (effective_schema, effective_schema)
 
@@ -653,4 +656,5 @@ def _introspect_snowflake_sync(dsn: str, schema_filter: str | None) -> dict:
 async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:
     """Introspect Snowflake metadata into the common snapshot JSON shape."""
 
-    return await asyncio.to_thread(_introspect_snowflake_sync, dsn, schema_filter)
+    config = await _parse_snowflake_dsn(dsn)
+    return await asyncio.to_thread(_introspect_snowflake_sync_with_config, config, schema_filter)
