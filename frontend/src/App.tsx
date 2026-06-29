@@ -108,6 +108,8 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
+  const [editingTable, setEditingTable] = useState<Node<TableNodeData> | null>(null);
+  const [editingTableData, setEditingTableData] = useState<TableNodeData | null>(null);
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [relLabel, setRelLabel] = useState("");
@@ -140,6 +142,14 @@ export default function App() {
       }
     };
   }, []);
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node<TableNodeData>) => {
+      setEditingTable(node);
+      setEditingTableData(JSON.parse(JSON.stringify(node.data))); // deep copy
+    },
+    [],
+  );
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -964,6 +974,7 @@ export default function App() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onEdgeClick={onEdgeClick}
+            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             fitView
             onInit={(instance) => {
@@ -1061,6 +1072,204 @@ export default function App() {
                   >
                     {isCopied ? "복사 완료 ✓" : "복사하기"}
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {editingTable && editingTableData && (
+            <div
+              className="modalOverlay"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 100,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className="modalContent"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-table-title"
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 8,
+                  width: 500,
+                  maxHeight: "80vh",
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
+                <h3 id="edit-table-title">테이블 편집</h3>
+
+                <div className="field">
+                  <label htmlFor="edit-table-title-input">테이블 이름</label>
+                  <input
+                    id="edit-table-title-input"
+                    value={editingTableData.title}
+                    onChange={(e) =>
+                      setEditingTableData({
+                        ...editingTableData,
+                        title: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="edit-table-comment-input">코멘트</label>
+                  <input
+                    id="edit-table-comment-input"
+                    value={editingTableData.comment || ""}
+                    onChange={(e) =>
+                      setEditingTableData({
+                        ...editingTableData,
+                        comment: e.target.value,
+                      })
+                    }
+                    placeholder="테이블 설명"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <h4>컬럼</h4>
+                  {editingTableData.columns.map((col, index) => (
+                    <div key={index} style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#f9f9f9', padding: 8, borderRadius: 4 }}>
+                      <input
+                        style={{ flex: 1 }}
+                        placeholder="컬럼 이름"
+                        value={col.column_name}
+                        onChange={(e) => {
+                          const newCols = [...editingTableData.columns];
+                          newCols[index].column_name = e.target.value;
+                          setEditingTableData({ ...editingTableData, columns: newCols });
+                        }}
+                      />
+                      <input
+                        style={{ width: 100 }}
+                        placeholder="타입"
+                        value={col.data_type}
+                        onChange={(e) => {
+                          const newCols = [...editingTableData.columns];
+                          newCols[index].data_type = e.target.value;
+                          setEditingTableData({ ...editingTableData, columns: newCols });
+                        }}
+                      />
+                      <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="checkbox"
+                          checked={col.is_pk}
+                          onChange={(e) => {
+                            const newCols = [...editingTableData.columns];
+                            newCols[index].is_pk = e.target.checked;
+                            if (e.target.checked) newCols[index].is_not_null = true;
+                            setEditingTableData({ ...editingTableData, columns: newCols });
+                          }}
+                        />
+                        PK
+                      </label>
+                      <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="checkbox"
+                          checked={col.is_not_null}
+                          disabled={col.is_pk}
+                          onChange={(e) => {
+                            const newCols = [...editingTableData.columns];
+                            newCols[index].is_not_null = e.target.checked;
+                            setEditingTableData({ ...editingTableData, columns: newCols });
+                          }}
+                        />
+                        NOT NULL
+                      </label>
+                      <button
+                        title="삭제"
+                        onClick={() => {
+                          const newCols = editingTableData.columns.filter((_, i) => i !== index);
+                          setEditingTableData({ ...editingTableData, columns: newCols });
+                        }}
+                        style={{ padding: '4px 8px', background: '#e00', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newCol = {
+                        column_name: "new_column",
+                        data_type: "text",
+                        is_not_null: false,
+                        is_pk: false,
+                      };
+                      setEditingTableData({
+                        ...editingTableData,
+                        columns: [...editingTableData.columns, newCol],
+                      });
+                    }}
+                    style={{ alignSelf: 'flex-start', background: '#eee', color: '#333', padding: '4px 12px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    + 컬럼 추가
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('정말 삭제하시겠습니까?')) {
+                        setNodes((nds) => nds.filter((n) => n.id !== editingTable.id));
+                        setEdges((eds) => eds.filter((e) => e.source !== editingTable.id && e.target !== editingTable.id));
+                        setEditingTable(null);
+                        setEditingTableData(null);
+                      }
+                    }}
+                    style={{ background: '#e00', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    테이블 삭제
+                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => {
+                        setEditingTable(null);
+                        setEditingTableData(null);
+                      }}
+                      style={{ padding: '6px 12px', cursor: 'pointer' }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNodes((nds) =>
+                          nds.map((n) => {
+                            if (n.id === editingTable.id) {
+                              const hasPk = editingTableData.columns.some((c) => c.is_pk);
+                              return {
+                                ...n,
+                                data: { ...editingTableData, badges: { ...editingTableData.badges, pk: hasPk } },
+                              };
+                            }
+                            return n;
+                          })
+                        );
+                        setEditingTable(null);
+                        setEditingTableData(null);
+                      }}
+                      style={{ background: '#034ea2', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer' }}
+                    >
+                      저장
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
