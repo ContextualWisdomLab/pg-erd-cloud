@@ -25,3 +25,6 @@
 ## 2026-06-25 - Text Truncation Accessibility
 **Learning:** Elements using `text-overflow: ellipsis` can hide important table, column, example, and group context from users who need the full text.
 **Action:** Treat native `title` as a convenience hover fallback only. Pair truncated text with an accessible name or description, and make the truncated element focusable when the full value is otherwise hidden.
+## 2026-06-25 - SPA Noscript Fallbacks
+**Learning:** A JavaScript-only SPA can show a blank screen when scripts are disabled, which is especially confusing for assistive technology users and locked-down browser environments.
+**Action:** Add a localized `<noscript>` fallback near the top of `<body>` for SPA entry pages. Keep the message in the same language as the document `lang` value, or explicitly mark any different-language text with its own `lang` attribute.
