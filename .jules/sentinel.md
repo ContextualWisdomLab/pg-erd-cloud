@@ -14,3 +14,7 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
 **Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+## 2026-06-26 - Snowflake DSN Authenticator SSRF Bypass
+**Vulnerability:** The Snowflake DSN authenticator validation incorrectly checked the domain ending using `.endswith(\".okta.com\")`. This allowed an attacker to bypass the validation by providing a domain like `evil.okta.com.evil.com`, potentially leading to Server-Side Request Forgery (SSRF).
+**Learning:** When validating URLs, string ending checks must be precise and account for top-level domains properly. Utilizing URL parsers incorrectly can lead to severe validation bypasses.
+**Prevention:** Always validate URL hostnames using strict exact matches for the domain itself, or check for proper subdomain structures to avoid bypassing validation logic.
