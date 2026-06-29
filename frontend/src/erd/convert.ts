@@ -64,8 +64,9 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       }
       hasFk.add(r.child_relation_oid)
     }
-    for (const [oid, rows] of grouped.entries()) {
+    for (const rows of grouped.values()) {
       const first = rows[0]
+      const oid = first.fk_constraint_oid
       const source = String(first.child_relation_oid)
       const target = String(first.parent_relation_oid)
       let sourceHandle: string | undefined = undefined
