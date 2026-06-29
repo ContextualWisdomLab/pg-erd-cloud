@@ -65,7 +65,6 @@ function strengthLabel(strength: CardinalityStrength): string {
 }
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<{
     subject: string;
     display_name: string | null;
@@ -165,7 +164,7 @@ export default function App() {
         setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
       .catch((e) => setError(String(e)));
-  }, [devUser]);
+  }, []);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -686,19 +685,6 @@ export default function App() {
       </a>
       <aside className="sidebar">
         <h2>pg-erd-cloud</h2>
-
-        <div className="field">
-          <label htmlFor="dev-user">User (dev)</label>
-          <input
-            id="dev-user"
-            value={devUser}
-            onChange={(e) => setDevUser(e.target.value)}
-            placeholder="local"
-          />
-          <div style={{ fontSize: 12, color: "#4b5563" }}>
-            Subject: <code>{me?.subject || "—"}</code>
-          </div>
-        </div>
 
         <div className="field">
           <label htmlFor="project-select">Project</label>
