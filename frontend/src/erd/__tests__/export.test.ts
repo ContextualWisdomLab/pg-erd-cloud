@@ -502,6 +502,45 @@ describe('xml and plantuml escaping', () => {
   });
 });
 
+describe('exportDiagramSvg bounds computation', () => {
+  it('should compute bounding box properly with multiple nodes', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: -100, y: -50 },
+        data: { title: '1', columns: [], badges: { pk: false, fk: false } },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 500, y: 300 },
+        data: { title: '2', columns: [], badges: { pk: false, fk: false } },
+      },
+    ];
+    const svg = exportDiagramSvg(nodes, []);
+    // Minimums: x: -100, y: -50
+    // Width defaults to 280, height (default) is 34
+    // Maximums: x: 500 + 280 = 780, y: 300 + 34 = 334
+    // SVG total width: 780 - (-100) + 40*2 = 960
+    // SVG total height: 334 - (-50) + 40*2 = 464
+    expect(svg).toContain('width="960" height="464"');
+    expect(svg).toContain('viewBox="0 0 960 464"');
+  });
+
+  it('should not throw maximum call stack size exceeded on very large arrays', () => {
+    const nodes: Node<TableNodeData>[] = Array.from({ length: 150000 }, (_, i) => ({
+      id: String(i),
+      type: 'tableNode',
+      position: { x: i, y: i },
+      data: { title: `table_${i}`, columns: [], badges: { pk: false, fk: false } },
+    }));
+
+    // This should run successfully without throwing a call stack size exceeded error.
+    expect(() => exportDiagramSvg(nodes, [])).not.toThrow();
+  });
+});
+
 describe('exportDiagramSvg additional edge cases', () => {
   it('should handle undefined columns', () => {
     const nodes: Node<TableNodeData>[] = [

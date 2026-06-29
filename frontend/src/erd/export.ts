@@ -252,10 +252,23 @@ export function exportDiagramSvg(
       return [node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0))];
     }),
   );
-  const minX = Math.min(...nodes.map((n) => n.position.x), 0);
-  const minY = Math.min(...nodes.map((n) => n.position.y), 0);
-  const maxX = Math.max(...nodes.map((n) => n.position.x + width), width);
-  const maxY = Math.max(...nodes.map((n) => n.position.y + (heights.get(n.id) || headerHeight)), headerHeight);
+  let minX = 0;
+  let minY = 0;
+  let maxX = width;
+  let maxY = headerHeight;
+
+  // Bolt: Compute bounds in a single pass to avoid O(N) array spreads which cause Maximum Call Stack Size Exceeded errors.
+  for (const n of nodes) {
+    const x = n.position.x;
+    const y = n.position.y;
+    const w = x + width;
+    const h = y + (heights.get(n.id) || headerHeight);
+
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (w > maxX) maxX = w;
+    if (h > maxY) maxY = h;
+  }
   const offsetX = padding - minX;
   const offsetY = padding - minY;
   const svgWidth = maxX - minX + padding * 2;
