@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from "react";
+import { memo, type CSSProperties, type ReactNode } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { normalizeBusinessGroupColor } from "./businessGroups";
@@ -30,6 +30,32 @@ type TableNodeData = {
 };
 
 type TableNodeNode = Node<TableNodeData, "tableNode">;
+
+function AccessibleTruncatedText({
+  className,
+  text,
+  children,
+}: {
+  className: string;
+  text: string;
+  children?: ReactNode;
+}) {
+  const accessibleText = text.trim();
+  if (!accessibleText) {
+    return <span className={className}>{children ?? text}</span>;
+  }
+
+  return (
+    <span
+      className={className}
+      title={text}
+      aria-label={text}
+      tabIndex={0}
+    >
+      {children ?? text}
+    </span>
+  );
+}
 
 function formatExample(value: Column["example_value"]): string | null {
   if (value === null || value === undefined) return null;
@@ -63,16 +89,18 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         <span className="tableNode__titleText">
           <span>{data.title}</span>
           {data.comment ? (
-            <span className="tableNode__titleComment">
-              {data.comment}
-            </span>
+            <AccessibleTruncatedText
+              className="tableNode__titleComment"
+              text={data.comment}
+            />
           ) : null}
         </span>
         <span style={{ display: "inline-flex", gap: 6 }}>
           {data.businessGroup ? (
-            <span className="tableNode__groupBadge">
-              {data.businessGroup.name}
-            </span>
+            <AccessibleTruncatedText
+              className="tableNode__groupBadge"
+              text={data.businessGroup.name}
+            />
           ) : null}
           {data.badges?.pk ? (
             <span className="tableNode__badge">PK</span>
@@ -96,14 +124,18 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               <span className="tableNode__colIdentity">
                 <span className="tableNode__colName">{c.column_name}</span>
                 {c.column_comment ? (
-                  <span className="tableNode__colComment">
-                    {c.column_comment}
-                  </span>
+                  <AccessibleTruncatedText
+                    className="tableNode__colComment"
+                    text={c.column_comment}
+                  />
                 ) : null}
                 {example ? (
-                  <span className="tableNode__colExample">
+                  <AccessibleTruncatedText
+                    className="tableNode__colExample"
+                    text={`e.g. ${example}`}
+                  >
                     e.g. {example}
-                  </span>
+                  </AccessibleTruncatedText>
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
@@ -121,25 +153,40 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           );
         })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
-          <div className="tableNode__more">
+          <div
+            className="tableNode__more"
+            title="생략된 컬럼이 더 있습니다"
+            aria-label="생략된 컬럼이 더 있습니다"
+            tabIndex={0}
+          >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
         {data.indexes?.length ? (
           <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
             <div className="tableNode__indexHeading">Indexes</div>
-            {data.indexes.slice(0, 4).map((index) => (
-              <div key={index.index_name} className="tableNode__index">
-                <span className="tableNode__indexName">
-                  {index.index_name}
-                </span>
-                <span className="tableNode__indexCols">
-                  ({index.columns.join(", ")})
-                </span>
-              </div>
-            ))}
+            {data.indexes.slice(0, 4).map((index) => {
+              const columnsText = `(${index.columns.join(", ")})`;
+              return (
+                <div key={index.index_name} className="tableNode__index">
+                  <AccessibleTruncatedText
+                    className="tableNode__indexName"
+                    text={index.index_name}
+                  />
+                  <AccessibleTruncatedText
+                    className="tableNode__indexCols"
+                    text={columnsText}
+                  />
+                </div>
+              );
+            })}
             {data.indexes.length > 4 ? (
-              <div className="tableNode__more">
+              <div
+                className="tableNode__more"
+                title="생략된 인덱스가 더 있습니다"
+                aria-label="생략된 인덱스가 더 있습니다"
+                tabIndex={0}
+              >
                 … {data.indexes.length - 4} more indexes
               </div>
             ) : null}

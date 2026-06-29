@@ -118,7 +118,13 @@ export function GroupModal({
           <div className="groupManager__assignments">
             {nodes.map((node) => (
               <label className="groupManager__assignment" key={node.id}>
-                <span>{node.data.title}</span>
+                <span
+                  title={node.data.title}
+                  aria-label={node.data.title}
+                  tabIndex={0}
+                >
+                  {node.data.title}
+                </span>
                 <select
                   value={node.data.businessGroup?.id ?? ""}
                   onChange={(event) =>
