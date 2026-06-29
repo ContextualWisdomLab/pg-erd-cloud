@@ -39,6 +39,7 @@ function formatExample(value: Column["example_value"]): string | null {
 
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
+  const accessibleTableName = data.title.trim() || "이름 없는";
   const groupColor = data.businessGroup
     ? normalizeBusinessGroupColor(data.businessGroup.color)
     : undefined;
@@ -54,6 +55,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
     <div
       className={`tableNode${data.businessGroup ? " tableNode--grouped" : ""}`}
       style={style}
+      role="region"
+      aria-label={`${accessibleTableName} 테이블`}
     >
       <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
