@@ -67,13 +67,13 @@ class VerifiedToken:
 
 _oidc_config: dict[str, Any] | None = None
 _oidc_jwks: dict[str, Any] | None = None
-_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(
-    0, tz=dt.timezone.utc
-)
+_oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 _oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
 OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
+OIDC_JWKS_MIN_REFRESH_INTERVAL = dt.timedelta(seconds=60)
+_last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 _revoked_token_jtis: dict[str, dt.datetime] = {}
@@ -110,10 +110,17 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    global _oidc_jwks, _oidc_jwks_expires_at
+    global _oidc_jwks, _oidc_jwks_expires_at, _last_jwks_refresh_at
     now = dt.datetime.now(dt.timezone.utc)
-    if not force_refresh and _oidc_jwks is not None and now < _oidc_jwks_expires_at:
-        return cast(dict, _oidc_jwks)
+
+    if _oidc_jwks is not None:
+        if not force_refresh and now < _oidc_jwks_expires_at:
+            return cast(dict, _oidc_jwks)
+        if (
+            force_refresh
+            and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
+        ):
+            return cast(dict, _oidc_jwks)
 
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(jwks_uri)
@@ -123,6 +130,7 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
         jwks = cast(dict[str, Any], r.json())
     _oidc_jwks = jwks
     _oidc_jwks_expires_at = now + OIDC_JWKS_CACHE_TTL
+    _last_jwks_refresh_at = now
     return cast(dict, jwks)
 
 
