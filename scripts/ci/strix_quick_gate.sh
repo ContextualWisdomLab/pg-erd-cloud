@@ -3131,9 +3131,6 @@ is_model_retryable_error() {
 	fi
 
 	if is_timeout_error; then
-		if provider_signal_fail_closed_enabled; then
-			return 1
-		fi
 		return 0
 	fi
 
