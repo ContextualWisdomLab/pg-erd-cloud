@@ -217,6 +217,10 @@ def test_parse_snowflake_dsn_validates_authenticator() -> None:
         _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com"
         )
+    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
+        _parse_snowflake_dsn(
+            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://malicious.com%5C.okta.com"
+        )
 
 
 @pytest.mark.asyncio
