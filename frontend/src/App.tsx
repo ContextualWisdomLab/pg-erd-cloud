@@ -123,6 +123,8 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
+  const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
+  const [isEditTableModalOpen, setIsEditTableModalOpen] = useState(false);
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [relLabel, setRelLabel] = useState("");
@@ -390,6 +392,12 @@ export default function App() {
     }
   }
 
+  const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setEditingNode(node as Node<TableNodeData>);
+    setIsEditTableModalOpen(true);
+  }, []);
+
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
     setEditingEdge(edge);
@@ -617,6 +625,81 @@ export default function App() {
       ),
     );
   }
+
+
+  function onDeleteTable() {
+    if (!editingNode) return;
+    if (!window.confirm("정말로 이 테이블을 삭제하시겠습니까?")) return;
+
+    // Remove the node
+    setNodes((nds) => nds.filter((n) => n.id !== editingNode.id));
+
+    // Remove connected edges
+    setEdges((eds) => eds.filter((e) => e.source !== editingNode.id && e.target !== editingNode.id));
+
+    setIsEditTableModalOpen(false);
+    setEditingNode(null);
+  }
+
+  function onEditTableSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingNode) return;
+
+    const formData = new FormData(e.currentTarget);
+    const title = formData.get("title") as string;
+    const comment = formData.get("comment") as string;
+
+    if (!title.trim()) return;
+
+    // Parse columns from formData
+    const updatedColumns: Array<Node<TableNodeData>["data"]["columns"][number]> = [];
+    for (let i = 0; i < editingNode.data.columns.length; i++) {
+      const colName = formData.get(`col_name_${i}`) as string;
+      if (colName === null) continue; // Deleted column
+
+      const colType = formData.get(`col_type_${i}`) as string;
+      const isPk = formData.get(`col_pk_${i}`) === "on";
+      const isNotNull = formData.get(`col_nn_${i}`) === "on";
+
+      updatedColumns.push({
+        ...editingNode.data.columns[i],
+        column_name: colName.trim() || `col_${i}`,
+        data_type: colType.trim() || "text",
+        is_pk: isPk,
+        is_not_null: isNotNull,
+      });
+    }
+
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === editingNode.id) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              title: title.trim(),
+              comment: comment.trim() || null,
+              columns: updatedColumns,
+              badges: {
+                ...n.data.badges,
+                pk: updatedColumns.some(c => c.is_pk)
+              }
+            }
+          };
+        }
+        return n;
+      })
+    );
+
+    setIsEditTableModalOpen(false);
+    setEditingNode(null);
+  }
+
+  function onEditTableCancel() {
+    setIsEditTableModalOpen(false);
+    setEditingNode(null);
+  }
+
 
   function onAddTableSubmit() {
     if (!newTableName.trim()) return;
@@ -1027,6 +1110,7 @@ export default function App() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onEdgeClick={onEdgeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
             nodeTypes={nodeTypes}
             fitView
             onInit={(instance) => {
@@ -1484,6 +1568,188 @@ export default function App() {
               </div>
             </div>
           )}
+
+
+          {isEditTableModalOpen && editingNode && (
+            <div className="modalOverlay">
+              <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+                <div className="modal__header">
+                  <h3>테이블 편집</h3>
+                  <button onClick={onEditTableCancel}>X</button>
+                </div>
+                <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
+                  <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
+                    <div className="col">
+                      <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
+                      <input
+                        id="editTableTitle"
+                        name="title"
+                        defaultValue={editingNode.data.title}
+                        placeholder="public.users"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="col">
+                      <label htmlFor="editTableComment">코멘트 (선택)</label>
+                      <input
+                        id="editTableComment"
+                        name="comment"
+                        defaultValue={editingNode.data.comment || ""}
+                        placeholder="사용자 테이블"
+                      />
+                    </div>
+
+                    <div className="col" style={{ marginTop: 16 }}>
+                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <h4 style={{ margin: 0 }}>컬럼</h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNodes((nds) =>
+                              nds.map((n) => {
+                                if (n.id === editingNode.id) {
+                                  return {
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      columns: [
+                                        ...n.data.columns,
+                                        {
+                                          column_name: `new_col_${Date.now()}`,
+                                          data_type: "text",
+                                          is_not_null: false,
+                                          is_pk: false,
+                                        }
+                                      ]
+                                    }
+                                  };
+                                }
+                                return n;
+                              })
+                            );
+                            setEditingNode((prev) => {
+                               if (!prev) return prev;
+                               return {
+                                 ...prev,
+                                 data: {
+                                   ...prev.data,
+                                   columns: [
+                                     ...prev.data.columns,
+                                     {
+                                       column_name: `new_col_${Date.now()}`,
+                                       data_type: "text",
+                                       is_not_null: false,
+                                       is_pk: false,
+                                     }
+                                   ]
+                                 }
+                               }
+                            });
+                          }}
+                        >
+                          컬럼 추가
+                        </button>
+                      </div>
+
+                      <div className="col" style={{ gap: 8 }}>
+                        {editingNode.data.columns.map((col, idx) => (
+                          <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
+                            <input
+                              type="text"
+                              name={`col_name_${idx}`}
+                              defaultValue={col.column_name}
+                              placeholder="컬럼명"
+                              style={{ flex: 2 }}
+                              aria-label="컬럼명"
+                            />
+                            <input
+                              type="text"
+                              name={`col_type_${idx}`}
+                              defaultValue={col.data_type}
+                              placeholder="데이터 타입"
+                              style={{ flex: 1.5 }}
+                              aria-label="데이터 타입"
+                            />
+                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                              <input
+                                type="checkbox"
+                                name={`col_pk_${idx}`}
+                                defaultChecked={col.is_pk}
+                              />
+                              PK
+                            </label>
+                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                              <input
+                                type="checkbox"
+                                name={`col_nn_${idx}`}
+                                defaultChecked={col.is_not_null}
+                              />
+                              NN
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!window.confirm(`'${col.column_name}' 컬럼을 삭제하시겠습니까?`)) return;
+                                setNodes((nds) =>
+                                  nds.map((n) => {
+                                    if (n.id === editingNode.id) {
+                                      return {
+                                        ...n,
+                                        data: {
+                                          ...n.data,
+                                          columns: n.data.columns.filter((_, i) => i !== idx)
+                                        }
+                                      };
+                                    }
+                                    return n;
+                                  })
+                                );
+                                setEditingNode((prev) => {
+                                   if (!prev) return prev;
+                                   return {
+                                     ...prev,
+                                     data: {
+                                       ...prev.data,
+                                       columns: prev.data.columns.filter((_, i) => i !== idx)
+                                     }
+                                   };
+                                });
+                              }}
+                              style={{ color: "#b91c1c", padding: "4px 8px" }}
+                              aria-label={`${col.column_name} 컬럼 삭제`}
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
+                  <button
+                    type="button"
+                    onClick={onDeleteTable}
+                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+                  >
+                    테이블 삭제
+                  </button>
+                  <div className="row">
+                    <button type="button" onClick={onEditTableCancel}>취소</button>
+                    <button
+                      type="submit"
+                      form="editTableForm"
+                      style={{ background: "#034ea2", color: "#fff" }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {isAddTableModalOpen && (
             <div
