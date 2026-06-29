@@ -22,7 +22,6 @@ def test_utcnow_uses_now():
     mock_now = dt.datetime(2023, 1, 1, tzinfo=dt.timezone.utc)
     with patch('app.models.dt.datetime') as mock_datetime:
         mock_datetime.now.return_value = mock_now
-        mock_datetime.timezone = dt.timezone
 
         result = utcnow()
 
