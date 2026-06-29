@@ -126,6 +126,16 @@ button:disabled {
   color: #9ca3af;
 }
 
+.button-primary {
+  background: #034ea2;
+  color: #fff;
+  border-color: #034ea2;
+}
+
+.button-primary:hover {
+  background: #023875;
+}
+
 .tableNode {
   width: 280px;
   border: 1px solid #d1d5db;

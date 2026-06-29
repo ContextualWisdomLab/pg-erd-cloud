@@ -996,9 +996,17 @@ export default function App() {
                     ERD 캔버스가 비어 있습니다
                   </div>
                   <div className="emptyState__desc">
-                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b>{" "}
+                    좌측 패널에서 스냅샷을 생성하거나 하단의 <b>테이블 추가</b>{" "}
                     버튼을 눌러 시작하세요.
                   </div>
+                  <button
+                    type="button"
+                    onClick={onOpenAddTable}
+                    className="button-primary"
+                    style={{ marginTop: 16 }}
+                  >
+                    테이블 추가
+                  </button>
                 </>
               )}
             </div>
@@ -1056,7 +1064,7 @@ export default function App() {
                   <button onClick={onCloseExport}>닫기</button>
                   <button
                     onClick={onCopyExportDdl}
-                    style={{ background: "#034ea2", color: "#fff" }}
+                    className="button-primary"
                     aria-live="polite"
                   >
                     {isCopied ? "복사 완료 ✓" : "복사하기"}
@@ -1130,7 +1138,7 @@ export default function App() {
                     <button onClick={onRelCancel}>취소</button>
                     <button
                       onClick={onRelSubmit}
-                      style={{ background: "#034ea2", color: "#fff" }}
+                      className="button-primary"
                     >
                       저장
                     </button>
@@ -1497,7 +1505,7 @@ export default function App() {
                   <button onClick={onAddTableCancel}>취소</button>
                   <button
                     onClick={onAddTableSubmit}
-                    style={{ background: "#034ea2", color: "#fff" }}
+                    className="button-primary"
                   >
                     저장
                   </button>
