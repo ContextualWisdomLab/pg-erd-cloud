@@ -106,13 +106,11 @@ def _parse_query_params(query: str) -> dict[str, list[str]]:
 
 
 def _split_query_host_values(values: list[str], parameter: str) -> list[str]:
-    hosts: list[str] = []
-    for value in values:
-        for host in value.split(","):
-            normalized = host.strip()
-            if not normalized:
-                raise DsnTargetError(f"database DSN query {parameter} is invalid")
-            hosts.append(normalized)
+    if not values:
+        return []
+    hosts = [h.strip() for h in ",".join(values).split(",")]
+    if not all(hosts):
+        raise DsnTargetError(f"database DSN query {parameter} is invalid")
     return hosts
 
 
@@ -121,19 +119,18 @@ def _validate_query_ports(values: list[str]) -> int | None:
         return None
 
     first_port: int | None = None
-    for value in values:
-        for port_value in value.split(","):
-            normalized = port_value.strip()
-            if not normalized:
-                raise DsnTargetError("database DSN query port is invalid")
-            try:
-                port = int(normalized)
-            except ValueError as err:
-                raise DsnTargetError("database DSN query port is invalid") from err
-            if port < 1 or port > 65535:
-                raise DsnTargetError("database DSN query port is invalid")
-            if first_port is None:
-                first_port = port
+    for port_value in ",".join(values).split(","):
+        normalized = port_value.strip()
+        if not normalized:
+            raise DsnTargetError("database DSN query port is invalid")
+        try:
+            port = int(normalized)
+        except ValueError as err:
+            raise DsnTargetError("database DSN query port is invalid") from err
+        if port < 1 or port > 65535:
+            raise DsnTargetError("database DSN query port is invalid")
+        if first_port is None:
+            first_port = port
     return first_port
 
 
