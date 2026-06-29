@@ -220,7 +220,12 @@ export default function App() {
     [cardinalityRowCount],
   );
   const businessGroupsById = useMemo(() => {
-    return new Map(businessGroups.map((group) => [group.id, group]));
+    // ⚡ Bolt: Removed array mapping before Map creation to avoid intermediate array allocations.
+    const map = new Map<string, BusinessGroup>();
+    for (const group of businessGroups) {
+      map.set(group.id, group);
+    }
+    return map;
   }, [businessGroups]);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
@@ -278,7 +283,11 @@ export default function App() {
     setEdges(graph.edges);
 
     setNodes((prev) => {
-      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
+      // ⚡ Bolt: Replaced prev.map with a for loop to avoid intermediate array allocations during Map creation.
+      const prevPos = new Map<string, { x: number; y: number }>();
+      for (const n of prev) {
+        prevPos.set(n.id, n.position);
+      }
       return graph.nodes.map((n) => {
         const position = prevPos.get(n.id);
         return position ? { ...n, position } : n;
