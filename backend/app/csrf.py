@@ -15,7 +15,7 @@ from app.settings import settings
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 CSRF_HEADER_NAME = "X-CSRF-Token"
-CSRF_TOKEN_TTL_SECONDS = 12 * 60 * 60
+CSRF_TOKEN_TTL_SECONDS = 15 * 60
 CSRF_TOKEN_NONCE_BYTES = 16
 
 
