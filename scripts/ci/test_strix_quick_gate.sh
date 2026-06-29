@@ -2525,7 +2525,7 @@ EOS
 		esac
 		;;
 	all-fallbacks-same-as-primary)
-		# Bug 13: All fallback models are the same as the primary model.
+		# Issue 13: All fallback models are the same as the primary model.
 		# The gate should emit an ERROR and exit 1.
 		echo "Error: litellm.NotFoundError: Vertex_aiException - x"
 		echo '"status": "NOT_FOUND"'
@@ -7402,7 +7402,7 @@ run_gate_case "default-fallback-order-fast-first" \
 	"vertex_ai/missing-primary|vertex_ai/gemini-2.5-pro" \
 	"<unset>|<unset>"
 
-# Bug 13: All fallback models are the same as the primary model.
+# Issue 13: All fallback models are the same as the primary model.
 # The gate should detect that no distinct fallback was tried and emit an ERROR.
 run_gate_case "all-fallbacks-same-as-primary" \
 	"vertex_ai/same-primary" \
