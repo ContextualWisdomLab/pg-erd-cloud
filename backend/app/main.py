@@ -95,7 +95,7 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=10,
     window_seconds=60,
-    route_prefix="/api/auth/logout",
+    route_prefix="/api/auth/revoke",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 
@@ -124,9 +124,7 @@ app.middleware("http")(make_csrf_middleware())
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        o.strip() for o in settings.cors_origins.split(",") if o.strip()
-    ],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     # Default to the strictest safe setting. Enable credentials only when you
     # actually need cookie-based auth.
     allow_credentials=False,
