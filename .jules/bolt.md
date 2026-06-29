@@ -18,3 +18,6 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+## 2026-06-29 - [Break Down Large Loops in _snapshot_json_to_postgresql_sql and _snapshot_json_to_snowflake_sql]
+**Learning:** Large functions containing nested `for` loops for parsing and transforming DDL syntax hinder readability and make tests difficult. It can also obscure potential bugs or performance bottlenecks if conditions are complex.
+**Action:** Isolate these complex operations into dedicated helper functions such as `_render_table_pg` and `_render_table_snowflake` to simplify the original functions and improve modularity.
