@@ -28,3 +28,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 100 unique routes, 1 unique method each (100 total combinations):
 - Before: ~820.62ms
 - After: ~1.17ms
+## Snowflake Introspection Optimization
+- Removing redundant Python-level sorts (`sorted(...)`) on rows already sorted by a database's SQL `ORDER BY` clause significantly improves processing speed.
+- In `backend/app/snowflake_introspect/introspect.py`, relying on the SQL `ORDER BY ... ordinal_position` rather than re-sorting locally cut down the time spent in loops with complex lambda operations by ~50% in benchmarks.
