@@ -535,3 +535,24 @@ describe('exportDiagramSvg additional edge cases', () => {
     expect(plantUml).not.toContain('test_idx');
   });
 });
+
+describe('downloadText', () => {
+  it('downloads text successfully', () => {
+    // Mock document.createElement and URL functions
+    const createElementSpy = vi.spyOn(document, 'createElement');
+    const mockAnchor = { href: '', download: '', click: vi.fn() } as unknown as HTMLAnchorElement;
+    createElementSpy.mockReturnValue(mockAnchor);
+    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('mock-url');
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    downloadText('test.txt', 'hello');
+
+    expect(createElementSpy).toHaveBeenCalledWith('a');
+    expect(mockAnchor.href).toBe('mock-url');
+    expect(mockAnchor.download).toBe('test.txt');
+    expect(mockAnchor.click).toHaveBeenCalled();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('mock-url');
+
+    vi.restoreAllMocks();
+  });
+});

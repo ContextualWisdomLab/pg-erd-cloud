@@ -1,16 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { describe, it, expect } from 'vitest';
+import { toPlainText, snapshotDetailFromResponse, assertNever } from './types';
 
-import { toPlainText } from './types'
+describe('types', () => {
+  it('toPlainText escapes HTML and control chars', () => {
+    expect(toPlainText('hello & < > " \'')).toBe('hello &amp; &lt; &gt; &quot; &#39;');
+    expect(toPlainText('hello\x00world')).toBe('hello world');
+    expect(toPlainText('')).toBeNull();
+    expect(toPlainText(123)).toBeNull();
+  });
 
-describe('toPlainText', () => {
-  it('escapes html-sensitive characters and strips control characters', () => {
-    expect(toPlainText('<script>alert("x")</script>\u0000')).toBe(
-      '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;'
-    )
-  })
+  it('snapshotDetailFromResponse maps correctly', () => {
+    const response = {
+      schema_snapshot_uuid: 'uuid',
+      status: 'ok',
+      schema_filter: null,
+      error_message: 'bad <error>',
+      snapshot_json: null
+    };
+    const result = snapshotDetailFromResponse(response);
+    expect(result.error_message).toBe('bad &lt;error&gt;');
+  });
 
-  it('returns null for non-string or empty values', () => {
-    expect(toPlainText(null)).toBeNull()
-    expect(toPlainText('')).toBeNull()
-  })
-})
+  it('assertNever throws error', () => {
+     expect(() => assertNever({} as never)).toThrow();
+  });
+});
