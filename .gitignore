@@ -23,6 +23,8 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+coverage/
+frontend/coverage/
 
 # opencode tooling artifacts
 registered_agents.json
