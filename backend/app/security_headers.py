@@ -55,6 +55,7 @@ def apply_security_headers(request: Request, response: Response) -> None:
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=()",
     )
+    _set_if_missing("Cache-Control", "no-store")
 
     if _should_apply_csp(request):
         # API-first default. We only need a minimal policy for JSON responses.

@@ -14,3 +14,7 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
 **Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+## 2026-06-29 - Prevent caching of sensitive API responses
+**Vulnerability:** The API endpoints returned sensitive data (such as DB connection strings and user information) without a `Cache-Control: no-store` header. This could allow intermediate proxies, CDNs, or the user's browser to cache these responses, leading to potential data exposure.
+**Learning:** API responses that contain sensitive, dynamic, or non-public data must explicitly disable caching to prevent accidental leakage through shared network infrastructure or local browser storage.
+**Prevention:** Apply a global security middleware (like `backend/app/security_headers.py`) to ensure baseline anti-caching headers (`Cache-Control: no-store`) are attached to all API responses, and add tests to enforce this behavior.
