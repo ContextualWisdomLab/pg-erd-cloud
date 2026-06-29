@@ -210,7 +210,7 @@ def _fetch_dicts(cursor: Any, sql: str, params: tuple[object, ...] = ()) -> list
     if not rows:
         return []
     if isinstance(rows[0], dict):
-        return [{str(key).lower(): value for key, value in row.items()} for row in rows]
+        return [{key.lower(): value for key, value in row.items()} for row in rows]
 
     columns = [str(description[0]).lower() for description in cursor.description]
     return [dict(zip(columns, row)) for row in rows]
