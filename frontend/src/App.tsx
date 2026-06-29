@@ -228,7 +228,11 @@ export default function App() {
     [cardinalityRowCount],
   );
   const businessGroupsById = useMemo(() => {
-    return new Map(businessGroups.map((group) => [group.id, group]));
+    const map = new Map<string, BusinessGroup>();
+    for (const group of businessGroups) {
+      map.set(group.id, group);
+    }
+    return map;
   }, [businessGroups]);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
