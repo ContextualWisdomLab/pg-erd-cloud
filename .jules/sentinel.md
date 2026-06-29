@@ -62,3 +62,7 @@
 **Vulnerability:** Python's `urllib.parse.urlsplit` fails to parse schemas that contain an underscore (e.g., `snowflake_invalid://`). This moves the credentials into the path instead of recognizing them. In `backend/app/dsn_redaction.py`, this caused the application to fail to find and redact the credentials inside error messages for DSNs with non-standard underscore schemes, leading to a risk of secrets exposure.
 **Learning:** Python's URL parsers strictly adhere to RFC schemes. Any application that uses `urlsplit` or `urlparse` to handle arbitrary strings like custom database DSNs that might have non-standard characters like `_` needs to preprocess them or handle empty schemes properly.
 **Prevention:** If extracting data from a URI, temporarily overwrite non-compliant schemes to a standard one (e.g., `http://`) before using standard URL parsing libraries.
+
+## 2026-06-29 - Unsafe Inline Scripts in CSP
+**Learning:** Permitting `'unsafe-inline'` in Content-Security-Policy (CSP) headers opens the application to severe Cross-Site Scripting (XSS) risks.
+**Action:** Removed `'unsafe-inline'` from `script-src` and `style-src` directives in `frontend/index.html` to harden the application against XSS vulnerabilities while ensuring frontend tests and builds succeed safely.
