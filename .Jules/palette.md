@@ -22,3 +22,6 @@
 ## 2026-06-28 - STRIX Security Intersections and Strict Scope Enforcement
 **Learning:** In projects with strict AI code review agents and security scanners (like STRIX), making multiple distinct micro-UX improvements (e.g. across different files or disparate components) in a single task intended for "ONE micro-UX improvement" will cause a CI failure. Furthermore, applying UX improvements to elements that handle potentially sensitive data (e.g. DSNs, or rendering unsanitized user input) can inadvertently trigger security scanners if those elements contain pre-existing vulnerabilities, blocking the PR entirely.
 **Action:** When tasked with a single micro-UX improvement, strictly isolate the change to one specific element and file. When choosing an element, actively avoid modifying components that handle credentials or render un-escaped user inputs to avoid intersecting with existing unpatched security flaws.
+## 2026-06-25 - Text Truncation Accessibility
+**Learning:** Elements using `text-overflow: ellipsis` can hide important table, column, example, and group context from users who need the full text.
+**Action:** Treat native `title` as a convenience hover fallback only. Pair truncated text with an accessible name or description, and make the truncated element focusable when the full value is otherwise hidden.
