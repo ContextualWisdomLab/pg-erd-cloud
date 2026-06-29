@@ -20,6 +20,7 @@ class ValidatedDsnTarget:
     """Connection target values that were checked for restricted IP ranges."""
 
     hostname: str
+    hostname: str
     hosts: tuple[str, ...]
     port: int | None
 

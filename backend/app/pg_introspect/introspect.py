@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
+import ssl
 
 import asyncpg
 
@@ -9,6 +9,30 @@ from app.pg_introspect import queries
 from app.pg_introspect.column_examples import add_column_examples
 from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
+
+
+class SNIOverrideSSLContext(ssl.SSLContext):
+    def __new__(
+        cls,
+        target_hostname: str,
+        protocol: int = ssl.PROTOCOL_TLS_CLIENT,
+        *args,
+        **kwargs,
+    ):
+        obj = super().__new__(cls, protocol, *args, **kwargs)
+        obj._target_hostname = target_hostname
+        return obj
+
+    def wrap_bio(
+        self, incoming, outgoing, server_side=False, server_hostname=None, session=None
+    ):
+        return super().wrap_bio(
+            incoming,
+            outgoing,
+            server_side=server_side,
+            server_hostname=self._target_hostname,
+            session=session,
+        )
 
 
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
@@ -20,37 +44,18 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
 
-    loop = asyncio.get_running_loop()
-    original_create_connection = loop.create_connection
+    # Use a custom SSLContext to inject the original hostname for SNI since asyncpg
+    # will otherwise default to the IP address when connecting to connect_host.
+    ssl_context = SNIOverrideSSLContext(target.hostname)
 
-    async def patched_create_connection(*args, **kwargs):
-        host = kwargs.get("host")
-        if not host and len(args) > 1:
-            host = args[1]
-
-        connect_hosts = (
-            [connect_host] if isinstance(connect_host, str) else connect_host
+    if target.port is not None:
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, port=target.port, timeout=10, ssl=ssl_context
         )
-
-        if host in connect_hosts:
-            if kwargs.get("ssl") and "server_hostname" not in kwargs:
-                kwargs["server_hostname"] = target.hostname
-            elif kwargs.get("server_hostname") in connect_hosts:
-                kwargs["server_hostname"] = target.hostname
-
-        return await original_create_connection(*args, **kwargs)
-
-    loop.create_connection = patched_create_connection.__get__(loop)
-
-    try:
-        if target.port is not None:
-            conn = await asyncpg.connect(
-                dsn, host=connect_host, port=target.port, timeout=10
-            )
-        else:
-            conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
-    finally:
-        loop.create_connection = original_create_connection
+    else:
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, timeout=10, ssl=ssl_context
+        )
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
