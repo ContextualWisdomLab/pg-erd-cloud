@@ -5,15 +5,36 @@ import pytest
 from app import db_introspect
 
 
-def test_detect_dsn_dialect_supports_postgresql_and_snowflake() -> None:
-    assert db_introspect.detect_dsn_dialect("postgresql://u:p@db/app") == "postgresql"
-    assert db_introspect.detect_dsn_dialect("postgresql+asyncpg://u:p@db/app") == "postgresql"
-    assert db_introspect.detect_dsn_dialect("snowflake://u:p@acct/DB") == "snowflake"
+@pytest.mark.parametrize(
+    "dsn,expected_dialect",
+    [
+        ("postgresql://u:p@db/app", "postgresql"),
+        ("postgresql+asyncpg://u:p@db/app", "postgresql"),
+        ("postgres://u:p@db/app", "postgresql"),
+        ("postgres+psycopg2://u:p@db/app", "postgresql"),
+        ("POSTGRESQL://u:p@db/app", "postgresql"),
+        ("snowflake://u:p@acct/DB", "snowflake"),
+        ("SNOWFLAKE://u:p@acct/DB", "snowflake"),
+    ],
+)
+def test_detect_dsn_dialect_valid(
+    dsn: str, expected_dialect: db_introspect.DatabaseDialect
+) -> None:
+    assert db_introspect.detect_dsn_dialect(dsn) == expected_dialect
 
 
-def test_detect_dsn_dialect_rejects_unknown_scheme() -> None:
-    with pytest.raises(ValueError, match="unsupported database DSN scheme"):
-        db_introspect.detect_dsn_dialect("mysql://u:p@db/app")
+@pytest.mark.parametrize(
+    "dsn,expected_error",
+    [
+        ("mysql://u:p@db/app", "unsupported database DSN scheme: mysql"),
+        ("http://google.com", "unsupported database DSN scheme: http"),
+        ("", "unsupported database DSN scheme: <empty>"),
+        ("just_a_string", "unsupported database DSN scheme: <empty>"),
+    ],
+)
+def test_detect_dsn_dialect_invalid(dsn: str, expected_error: str) -> None:
+    with pytest.raises(ValueError, match=expected_error):
+        db_introspect.detect_dsn_dialect(dsn)
 
 
 @pytest.mark.asyncio

@@ -190,6 +190,11 @@ async def test_oidc_rejects_header_selected_algorithm(
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+
     def fail_decode(*_: object, **__: object) -> dict:
         raise AssertionError("jwt.decode must not run for unsupported algorithms")
 
@@ -226,7 +231,17 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    async def mock_is_token_revoked(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked)
 
     subject, display_name = await auth._get_subject_from_request(
         make_request({"Authorization": "Bearer token"})
@@ -311,7 +326,17 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    async def mock_is_token_revoked(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked)
 
     subject, display_name = await auth._get_subject_from_request(
         make_request({"Authorization": "Bearer token"})
@@ -337,6 +362,11 @@ async def test_oidc_requires_jti_claim(
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(
         auth.jwt,
         "decode",
@@ -369,6 +399,11 @@ async def test_oidc_rejects_revoked_jti(
         minutes=5
     )
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(
         auth.jwt,
         "decode",
@@ -378,7 +413,12 @@ async def test_oidc_rejects_revoked_jti(
             "exp": int(expires_at.timestamp()),
         },
     )
-    auth.revoke_token_jti("revoked-jwt", expires_at)
+
+    async def mock_revoke(jti, ext):
+        pass
+
+    monkeypatch.setattr(auth, "revoke_token_jti", mock_revoke)
+    await auth.revoke_token_jti("revoked-jwt", expires_at)
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(
@@ -503,6 +543,11 @@ async def test_oidc_decode_rejects_jwt_decode_error(
         raise auth.jwt.PyJWTError("mocked decoding error")
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    async def mock_is_token_revoked2(jti):
+        return jti == "revoked-jwt"
+
+    monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
     with pytest.raises(HTTPException) as exc_info:

@@ -1,9 +1,14 @@
-# 변경 사항 (CHANGELOG)
+# 변경 사항
 
-## [Unreleased]
-### 추가됨
-- ERD 다이어그램을 Markdown 환경에서 쉽게 사용할 수 있도록 Mermaid 문법(`erDiagram`)으로 내보내는 기능 추가
-- 프론트엔드 UI에 Mermaid 내보내기 버튼 추가
+## 🎨 Palette: ERD 테이블 및 컬럼 편집 기능 구현
 
-### 수정됨
-- Mermaid 내보내기 기능의 XSS 취약점을 방지하기 위해 사용자 입력 데이터(테이블명, 컬럼명 등)를 엄격한 화이트리스트 방식(영숫자 및 밑줄)으로 정제(Sanitization)하도록 개선
+### ✨ 추가된 기능 (Features)
+- ReactFlow 노드를 더블 클릭하여 테이블 이름 및 코멘트를 수정할 수 있는 편집 모달 기능 구현.
+- 편집 모달 내에서 개별 테이블의 컬럼을 추가/삭제/수정(컬럼명, 데이터타입, PK/NN 여부)할 수 있는 기능 제공.
+- 노드 삭제 시 관련 Edge 또한 삭제하는 로직 추가.
+- 접근성 개선을 위해 파괴적인 액션(테이블 삭제, 컬럼 삭제) 시 사용자 확인 창(`window.confirm`) 추가.
+- 새롭게 추가된 UI 플로우를 위한 기본 테스트 코드(`App.editTable.test.tsx`, `TableNode.test.tsx`) 추가 및 Vitest 프레임워크 셋업 보완.
+
+### 🐛 개선 (Improvements)
+- 불필요한 백엔드 포맷팅 이슈(`ruff` 포맷) 해결.
+- 테스트 커버리지를 높이기 위해 기본 단위 테스트 환경(jsdom, @testing-library) 구축 및 활용.

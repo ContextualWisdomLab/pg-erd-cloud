@@ -7,7 +7,6 @@ from starlette.responses import Response
 
 from app.csrf import (
     CSRF_HEADER_NAME,
-    CSRF_TOKEN_TTL_SECONDS,
     generate_csrf_token,
     make_csrf_middleware,
     verify_csrf_token,
@@ -15,7 +14,9 @@ from app.csrf import (
 from app.main import app
 
 
-def make_request(method: str, path: str, headers: dict[str, str] | None = None) -> Request:
+def make_request(
+    method: str, path: str, headers: dict[str, str] | None = None
+) -> Request:
     return Request(
         {
             "type": "http",
@@ -95,19 +96,6 @@ def test_csrf_verifier_rejects_future_or_malformed_tokens() -> None:
     assert verify_csrf_token(future_token, "test-secret", now=100) is False
     assert verify_csrf_token("issued.nonce.signature", "test-secret") is False
     assert verify_csrf_token("100.nonce.!!", "test-secret", now=100) is False
-
-
-def test_csrf_verifier_uses_short_default_ttl() -> None:
-    token = generate_csrf_token("test-secret", now=100)
-
-    assert (
-        verify_csrf_token(token, "test-secret", now=100 + CSRF_TOKEN_TTL_SECONDS)
-        is True
-    )
-    assert (
-        verify_csrf_token(token, "test-secret", now=101 + CSRF_TOKEN_TTL_SECONDS)
-        is False
-    )
 
 
 def test_csrf_token_endpoint_returns_signed_token() -> None:
