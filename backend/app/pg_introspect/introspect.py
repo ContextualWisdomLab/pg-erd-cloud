@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 
 import asyncpg
@@ -18,38 +19,54 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
-    if target.port is not None:
-        conn = await asyncpg.connect(
-            dsn, host=connect_host, port=target.port, timeout=10
+
+    loop = asyncio.get_running_loop()
+    original_create_connection = loop.create_connection
+
+    async def patched_create_connection(*args, **kwargs):
+        host = kwargs.get("host")
+        if not host and len(args) > 1:
+            host = args[1]
+
+        connect_hosts = (
+            [connect_host] if isinstance(connect_host, str) else connect_host
         )
-    else:
-        conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
+
+        if host in connect_hosts:
+            if kwargs.get("ssl") and "server_hostname" not in kwargs:
+                kwargs["server_hostname"] = target.hostname
+            elif kwargs.get("server_hostname") in connect_hosts:
+                kwargs["server_hostname"] = target.hostname
+
+        return await original_create_connection(*args, **kwargs)
+
+    loop.create_connection = patched_create_connection.__get__(loop)
+
+    try:
+        if target.port is not None:
+            conn = await asyncpg.connect(
+                dsn, host=connect_host, port=target.port, timeout=10
+            )
+        else:
+            conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
+    finally:
+        loop.create_connection = original_create_connection
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
         include_system = False
 
-        schemas = await conn.fetch(
-            queries.SCHEMAS_SQL, schema_name, include_system
-        )
-        relations = await conn.fetch(
-            queries.RELATIONS_SQL, schema_name, include_system
-        )
-        columns = await conn.fetch(
-            queries.COLUMNS_SQL, schema_name, include_system
-        )
+        schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
+        relations = await conn.fetch(queries.RELATIONS_SQL, schema_name, include_system)
+        columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)
         constraints = await conn.fetch(
             queries.CONSTRAINTS_SQL, schema_name, include_system
         )
-        indexes = await conn.fetch(
-            queries.INDEXES_SQL, schema_name, include_system
-        )
+        indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
         pk_columns = await conn.fetch(
             queries.PK_COLUMNS_SQL, schema_name, include_system
         )
-        fk_edges = await conn.fetch(
-            queries.FK_EDGES_SQL, schema_name, include_system
-        )
+        fk_edges = await conn.fetch(queries.FK_EDGES_SQL, schema_name, include_system)
         citus_distributed_tables = []
         has_citus = await conn.fetchval(
             "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'citus')"
@@ -75,9 +92,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             "indexes": [dict(r) for r in indexes],
             "pk_columns": [dict(r) for r in pk_columns],
             "fk_edges": [dict(r) for r in fk_edges],
-            "citus_distributed_tables": [
-                dict(r) for r in citus_distributed_tables
-            ],
+            "citus_distributed_tables": [dict(r) for r in citus_distributed_tables],
         }
 
         return sanitize_for_storage(snapshot)  # type: ignore[return-value]

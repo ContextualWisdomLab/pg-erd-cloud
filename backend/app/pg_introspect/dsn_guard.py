@@ -19,6 +19,7 @@ class DsnTargetError(ValueError):
 class ValidatedDsnTarget:
     """Connection target values that were checked for restricted IP ranges."""
 
+    hostname: str
     hosts: tuple[str, ...]
     port: int | None
 
@@ -61,7 +62,9 @@ def _is_restricted_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool
     )
 
 
-def _parse_ip_literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+def _parse_ip_literal(
+    host: str,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     try:
         return ipaddress.ip_address(host.strip("[]"))
     except ValueError:
@@ -76,7 +79,9 @@ def _connection_host_for_ip(
     return str(ip)
 
 
-async def _resolved_ips(host: str, port: int | None) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+async def _resolved_ips(
+    host: str, port: int | None
+) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
     try:
         loop = asyncio.get_running_loop()
         addrinfo = await loop.getaddrinfo(host, port or 5432, type=socket.SOCK_STREAM)
@@ -144,7 +149,9 @@ def _unique_hosts(hosts: list[str]) -> tuple[str, ...]:
     return tuple(unique)
 
 
-async def _validated_ip_hosts(h: str, is_hostaddr: bool, port: int | None) -> tuple[str, ...]:
+async def _validated_ip_hosts(
+    h: str, is_hostaddr: bool, port: int | None
+) -> tuple[str, ...]:
     normalized = h.lower().rstrip(".")
 
     if normalized == "localhost" or normalized.endswith(".localhost"):
@@ -193,7 +200,9 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     for query_host in _split_query_host_values(query.get("host", []), "host"):
         query_hosts.append(await _validated_ip_hosts(query_host, False, port))
     query_hostaddrs = []
-    for query_hostaddr in _split_query_host_values(query.get("hostaddr", []), "hostaddr"):
+    for query_hostaddr in _split_query_host_values(
+        query.get("hostaddr", []), "hostaddr"
+    ):
         query_hostaddrs.append(await _validated_ip_hosts(query_hostaddr, True, port))
 
     connection_host_groups = query_hosts + query_hostaddrs
@@ -201,8 +210,7 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
         connection_host_groups = [primary_hosts]
 
     return ValidatedDsnTarget(
-        hosts=_unique_hosts(
-            [host for group in connection_host_groups for host in group]
-        ),
+        hostname=host,
+        hosts=_unique_hosts([h for group in connection_host_groups for h in group]),
         port=port,
     )
