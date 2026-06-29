@@ -18,15 +18,21 @@ export type TableNodeData = {
   }
 }
 
-export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<TableNodeData>>; edges: Edge[] } {
-  const tableRels = (snapshot.relations || []).filter((r) => r.relation_kind === 'r' || r.relation_kind === 'p')
+function buildPkSets(snapshot: SnapshotJson) {
   const pkColsByRel = new Map<number, Set<string>>()
+  const hasPk = new Set<number>()
+
   for (const p of snapshot.pk_columns || []) {
     const set = pkColsByRel.get(p.relation_oid) || new Set<string>()
     set.add(p.column_name)
     pkColsByRel.set(p.relation_oid, set)
+    hasPk.add(p.relation_oid)
   }
 
+  return { pkColsByRel, hasPk }
+}
+
+function buildColumnsByRel(snapshot: SnapshotJson, pkColsByRel: Map<number, Set<string>>) {
   const columnsByRel = new Map<number, TableNodeData['columns']>()
   for (const c of snapshot.columns || []) {
     const list = columnsByRel.get(c.relation_oid) || []
@@ -34,21 +40,21 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     list.push({ column_name: c.column_name, data_type: c.data_type, is_not_null: c.is_not_null, is_pk: isPk, column_comment: c.column_comment, example_value: c.example_value })
     columnsByRel.set(c.relation_oid, list)
   }
+  return columnsByRel
+}
 
-  const hasPk = new Set<number>()
-  for (const p of snapshot.pk_columns || []) {
-    hasPk.add(p.relation_oid)
-  }
+type FkEdgeData = {
+  id: string
+  source: string
+  target: string
+  sourceHandle?: string
+  targetHandle?: string
+  label: string
+}
 
+function buildFkEdgesAndBadges(snapshot: SnapshotJson, hasPk: Set<number>): { fkEdges: FkEdgeData[]; hasFk: Set<number> } {
   const hasFk = new Set<number>()
-  const fkEdges: Array<{
-    id: string
-    source: string
-    target: string
-    sourceHandle?: string
-    targetHandle?: string
-    label: string
-  }> = []
+  const fkEdges: FkEdgeData[] = []
 
   const fkRows = snapshot.fk_edges || []
   if (fkRows.length > 0) {
@@ -97,6 +103,16 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       }
     }
   }
+
+  return { fkEdges, hasFk }
+}
+
+export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<TableNodeData>>; edges: Edge[] } {
+  const tableRels = (snapshot.relations || []).filter((r) => r.relation_kind === 'r' || r.relation_kind === 'p')
+
+  const { pkColsByRel, hasPk } = buildPkSets(snapshot)
+  const columnsByRel = buildColumnsByRel(snapshot, pkColsByRel)
+  const { fkEdges, hasFk } = buildFkEdgesAndBadges(snapshot, hasPk)
 
   const nodes: Array<Node<TableNodeData>> = tableRels.map((t, i) => {
     const cols = columnsByRel.get(t.relation_oid) || []
