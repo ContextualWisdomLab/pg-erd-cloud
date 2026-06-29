@@ -33,6 +33,7 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r.headers
     assert "Content-Security-Policy" in r.headers
+    assert r.headers["Cache-Control"] == "no-store"
     assert (
         r.headers["Strict-Transport-Security"]
         == "max-age=31536000; includeSubDomains"
@@ -45,6 +46,7 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     assert r2.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r2.headers
     assert "Content-Security-Policy" in r2.headers
+    assert r2.headers["Cache-Control"] == "no-store"
     assert (
         r2.headers["Strict-Transport-Security"]
         == "max-age=31536000; includeSubDomains"
@@ -97,6 +99,7 @@ def test_security_headers_present_on_cors_preflight() -> None:
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "Permissions-Policy" in r.headers
+    assert r.headers["Cache-Control"] == "no-store"
     assert "Strict-Transport-Security" not in r.headers
 
 
