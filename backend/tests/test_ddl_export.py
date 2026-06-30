@@ -105,7 +105,7 @@ def test_snapshot_export_preserves_partition_parent_and_child() -> None:
     assert (
         'CREATE TABLE IF NOT EXISTS "public"."events" (\n'
         '  "created_at" date NOT NULL\n'
-        ') PARTITION BY RANGE (created_at);'
+        ") PARTITION BY RANGE (created_at);"
     ) in sql
     assert (
         'CREATE TABLE IF NOT EXISTS "public"."events_2026" PARTITION OF "public"."events" '
@@ -196,19 +196,10 @@ def test_snapshot_export_can_target_snowflake_from_postgres_snapshot() -> None:
     assert "nextval" not in sql
     assert '  "amount" NUMBER(12,2),' in sql
     assert '  "payload" VARIANT,' in sql
-    assert (
-        '  "created_at" TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP() NOT NULL,'
-        in sql
-    )
+    assert '  "created_at" TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP() NOT NULL,' in sql
     assert '  CONSTRAINT "orders_pkey" PRIMARY KEY ("id")' in sql
-    assert (
-        '-- NOTE: skipped PostgreSQL CHECK constraint "orders_amount_check"'
-        in sql
-    )
-    assert (
-        '-- NOTE: PostgreSQL index "orders_amount_idx" on "public"."orders"'
-        in sql
-    )
+    assert '-- NOTE: skipped PostgreSQL CHECK constraint "orders_amount_check"' in sql
+    assert '-- NOTE: PostgreSQL index "orders_amount_idx" on "public"."orders"' in sql
 
 
 def test_snapshot_export_can_target_postgresql_from_snowflake_snapshot() -> None:
@@ -253,6 +244,7 @@ def test_snapshot_export_can_target_postgresql_from_snowflake_snapshot() -> None
     assert '  "EVENT_ID" numeric(38,0) NOT NULL,' in sql
     assert '  "PAYLOAD" jsonb,' in sql
     assert '  "CREATED_AT" timestamp without time zone' in sql
+
 
 def test_snapshot_source_dialect_fallback() -> None:
     from app.ddl.export import _snapshot_source_dialect

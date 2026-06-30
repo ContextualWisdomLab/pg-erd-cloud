@@ -4,9 +4,9 @@ import { buildIndexRecommendations, classifyCardinality, parsePositiveInteger } 
 describe('cardinality extra', () => {
   it('buildIndexRecommendations handles combinations of columns correctly', () => {
     const columns = [
-      { columnName: 'a', isSelected: true, distinctCount: '10' },
-      { columnName: 'b', isSelected: true, distinctCount: '100' },
-      { columnName: 'c', isSelected: true, distinctCount: '50' }
+      { columnName: 'a', isSelected: true, distinctCount: 10 },
+      { columnName: 'b', isSelected: true, distinctCount: 100 },
+      { columnName: 'c', isSelected: true, distinctCount: 50 }
     ];
     const recs = buildIndexRecommendations({ tableName: 'tbl', columns, rowCount: 1000 });
     // Should test the permutations generated
@@ -16,12 +16,12 @@ describe('cardinality extra', () => {
 
   it('buildIndexRecommendations handles skip cases (0 ratio or negative distinct count if valid)', () => {
     const columns = [
-      { columnName: 'a', isSelected: true, distinctCount: '0' },
-      { columnName: 'b', isSelected: true, distinctCount: '-10' },
+      { columnName: 'a', isSelected: true, distinctCount: 0 },
+      { columnName: 'b', isSelected: true, distinctCount: -10 },
     ];
     const recs = buildIndexRecommendations({ tableName: 'tbl', columns, rowCount: 1000 });
     expect(recs).toBeDefined();
-    // 0 and -10 distinctCount evaluate to null distinct values which skip index recommendations.
+    // 0 and -10 distinctCount values skip index recommendations.
     expect(recs).toEqual([]);
   });
 
@@ -33,8 +33,8 @@ describe('cardinality extra', () => {
 
   it('buildIndexRecommendations combinations logic', () => {
      const columns = [
-      { columnName: 'a', isSelected: true, distinctCount: '20' },
-      { columnName: 'b', isSelected: true, distinctCount: '10' },
+      { columnName: 'a', isSelected: true, distinctCount: 20 },
+      { columnName: 'b', isSelected: true, distinctCount: 10 },
     ];
     const recs = buildIndexRecommendations({ tableName: 'tbl', columns, rowCount: 100 });
     // 'a' has ratio 0.20 => recommended
