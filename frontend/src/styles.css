@@ -14,6 +14,25 @@ html, body {
   height: 100vh;
 }
 
+.authGate {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.authGate input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
 .skip-link {
   position: absolute;
   left: 8px;

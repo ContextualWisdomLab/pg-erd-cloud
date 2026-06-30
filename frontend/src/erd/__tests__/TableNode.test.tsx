@@ -32,4 +32,67 @@ describe('TableNode', () => {
     expect(screen.getByText('e.g. Alice')).toBeInTheDocument();
     expect(screen.getByText('Core')).toBeInTheDocument();
   });
+
+  it('exposes truncated metadata to keyboard and assistive technology users', () => {
+    const data = {
+      title: 'public.users',
+      comment: 'Stores application users with long operational notes',
+      columns: [
+        {
+          column_name: 'email',
+          data_type: 'varchar',
+          is_pk: false,
+          is_not_null: true,
+          column_comment: 'Primary login address used for notifications',
+          example_value: 'alex@example.com',
+        },
+      ],
+      indexes: [
+        {
+          index_name: 'idx_users_email_unique_long_name',
+          columns: ['email', 'tenant_id'],
+          access_method: 'btree',
+        },
+      ],
+      badges: { pk: false, fk: false },
+      businessGroup: { id: 'g1', name: 'Customer operations', color: '#ff0000' },
+    };
+
+    render(
+      <ReactFlowProvider>
+        <TableNode {...({ data, id: "1", type: "tableNode", isConnectable: true } as any)} />
+      </ReactFlowProvider>
+    );
+
+    for (const name of [
+      'Stores application users with long operational notes',
+      'Customer operations',
+      'Primary login address used for notifications',
+      'e.g. alex@example.com',
+      'idx_users_email_unique_long_name',
+      '(email, tenant_id)',
+    ]) {
+      const item = screen.getByLabelText(name);
+      expect(item).toHaveAttribute('title', name);
+      expect(item).toHaveAttribute('tabindex', '0');
+    }
+  });
+
+  it('uses a fallback accessible name for blank table titles', () => {
+    const data = {
+      title: '   ',
+      columns: [
+        { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+      ],
+      badges: { pk: true, fk: false },
+    };
+
+    render(
+      <ReactFlowProvider>
+        <TableNode {...({ data, id: "1", type: "tableNode", isConnectable: true } as any)} />
+      </ReactFlowProvider>
+    );
+
+    expect(screen.getByRole('region', { name: '이름 없는 테이블' })).toBeInTheDocument();
+  });
 });

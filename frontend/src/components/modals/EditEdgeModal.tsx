@@ -71,14 +71,16 @@ export function EditEdgeModal({
           style={{ justifyContent: "space-between", marginTop: 8 }}
         >
           <button
+            type="button"
             onClick={onRelDelete}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
           >
             삭제
           </button>
           <div className="row">
-            <button onClick={onRelCancel}>취소</button>
+            <button type="button" onClick={onRelCancel}>취소</button>
             <button
+              type="button"
               onClick={onRelSubmit}
               style={{ background: "#034ea2", color: "#fff" }}
             >

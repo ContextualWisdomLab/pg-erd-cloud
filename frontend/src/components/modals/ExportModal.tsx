@@ -66,8 +66,9 @@ export function ExportModal({
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
         >
-          <button onClick={onCloseExport}>닫기</button>
+          <button type="button" onClick={onCloseExport}>닫기</button>
           <button
+            type="button"
             onClick={onCopyExportDdl}
             style={{ background: "#034ea2", color: "#fff" }}
             aria-live="polite"

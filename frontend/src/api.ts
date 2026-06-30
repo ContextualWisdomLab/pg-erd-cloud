@@ -8,6 +8,17 @@ type CsrfTokenResponse = {
   csrf_token: string
 }
 
+function isLocalDevelopmentHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+}
+
+function requireSecureCredentialTransport(): void {
+  const targetUrl = new URL(API_BASE || window.location.origin, window.location.origin)
+  if (targetUrl.protocol !== 'https:' && !isLocalDevelopmentHost(targetUrl.hostname)) {
+    throw new Error('createConnection requires HTTPS for credential transport')
+  }
+}
+
 async function csrfToken(): Promise<string> {
   const r = await fetch(`${API_BASE}/api/csrf-token`, {
     credentials: 'include',
@@ -65,6 +76,7 @@ export async function listConnections(projectId: string): Promise<Connection[]> 
 }
 
 export async function createConnection(projectId: string, conn_name: string, dsn: string): Promise<Connection> {
+  requireSecureCredentialTransport()
   const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, {
     method: 'POST',
     credentials: 'include',
