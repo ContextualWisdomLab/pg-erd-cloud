@@ -232,6 +232,12 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
 
+    jwk_kty = str(jwk.get("kty")).upper()
+    if jwk_kty == "RSA" and not (header_alg.startswith("RS") or header_alg.startswith("PS")):
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+    if jwk_kty == "EC" and not header_alg.startswith("ES"):
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+
     try:
         claims = jwt.decode(
             token,

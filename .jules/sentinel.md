@@ -16,3 +16,8 @@
 ## 2026-06-22 - IDOR in Project Members List
 **Learning:** The `/api/projects/{project_space_uuid}/members` endpoint exposed the full list of members and their roles to any user with `viewer` access. This excessive visibility could facilitate enumeration and social engineering attacks.
 **Action:** Implemented stricter role-based access control (RBAC) on the endpoint to require a minimum `editor` role to view project members, mitigating the IDOR risk.
+## 2024-06-30 - JWT Algorithm Confusion
+
+**Vulnerability:** The application was susceptible to JWT algorithm confusion. It decoded JWTs without validating that the algorithm provided in the token header (`alg`) matched the key type (`kty`) of the JSON Web Key (JWK) fetched from the provider.
+**Learning:** Even when using a fixed whitelist of allowed algorithms (`RS256`), an attacker can craft a token with an `RS256` header, but if the provider somehow exposes both symmetric and asymmetric keys, or if the library misinterprets the key format, it could lead to improper validation. More importantly, explicitly enforcing `kty` to `alg` alignment prevents a wide class of downgrade/confusion attacks before `jwt.decode` is even invoked.
+**Prevention:** Always validate that `kty == 'RSA'` requires `alg` starting with `RS` or `PS`, and `kty == 'EC'` requires `alg` starting with `ES`. Never rely solely on the `alg` header or the presence of a key identifier (`kid`) without checking the key material's intended type.
