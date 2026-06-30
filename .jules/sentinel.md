@@ -19,3 +19,14 @@
 **Vulnerability:** A logic bug in `_parse_snowflake_dsn` incorrectly rejected authenticators using Okta root domains `okta.com` or `oktapreview.com` because it only checked `endswith(".okta.com")`, functioning as a DoS for legitimate configurations.
 **Learning:** `endswith(".okta.com")` does not match `okta.com` due to the leading dot. This caused valid configurations to be rejected.
 **Prevention:** Always explicitly allow the exact root domain when performing suffix checks that require a subdomain delimiter.
+## 2026-06-22 - Token Revocation Cache and Project Members Access
+**Learning:** The token revocation mechanism used an in-memory dictionary `_revoked_token_jtis` that doesn't persist across application restarts. This could allow revoked tokens to become valid again after a service restart until their natural expiration. Also, the `list_project_members` endpoint did not properly check authorization, potentially allowing low-privilege users (e.g. viewers) to enumerate all project members.
+**Action:** Always implement persistent storage (e.g. database or Redis) for revoked tokens to ensure revocation survives application restarts. Also, ensure appropriate role-based access controls are strictly applied for viewing members in project spaces.
+## 2026-06-22 - IDOR in Project Members List
+**Learning:** The `/api/projects/{project_space_uuid}/members` endpoint exposed the full list of members and their roles to any user with `viewer` access. This excessive visibility could facilitate enumeration and social engineering attacks.
+**Action:** Implemented stricter role-based access control (RBAC) on the endpoint to require a minimum `editor` role to view project members, mitigating the IDOR risk.
+
+## 2026-06-26 - Password Leak in Database Introspection Exceptions
+**Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
+**Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
+**Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
