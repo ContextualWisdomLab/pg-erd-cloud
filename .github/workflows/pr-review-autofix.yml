@@ -28,7 +28,10 @@ concurrency:
   group: pr-review-autofix-${{ github.repository }}-${{ inputs.pr_number }}
   cancel-in-progress: false
 
-permissions: read-all
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
 
 jobs:
   autofix:
