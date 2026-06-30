@@ -28,3 +28,6 @@
 ## 2026-06-25 - SPA Noscript Fallbacks
 **Learning:** A JavaScript-only SPA can show a blank screen when scripts are disabled, which is especially confusing for assistive technology users and locked-down browser environments.
 **Action:** Add a localized `<noscript>` fallback near the top of `<body>` for SPA entry pages. Keep the message in the same language as the document `lang` value, or explicitly mark any different-language text with its own `lang` attribute.
+## 2026-06-30 - Custom Modals and ARIA Context
+**Learning:** Custom generic `<div>` components mimicking native elements (like modals) frequently lack basic ARIA boundaries (`role="dialog"`, `aria-modal="true"`) and contextual naming, leading to screen reader confusion. Additionally, using `aria-label` on non-interactive generic elements (like an outer `div` wrapping list items) without a corresponding role (e.g. `role="group"`) is commonly ignored by assistive tech.
+**Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading.
