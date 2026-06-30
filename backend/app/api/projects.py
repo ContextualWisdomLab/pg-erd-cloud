@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.permissions import require_project_member
 from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
     ProjectCreateIn,
@@ -80,15 +81,10 @@ async def list_project_members(
     session: AsyncSession = Depends(get_read_session),
 ) -> list[ProjectMemberOut]:
     """List members of a project (MVP: any member can view)."""
-    # owner/editor/viewer 모두 멤버 조회 가능(MVP)
-    row = await session.execute(
-        select(ProjectMember).where(
-            ProjectMember.project_space_uuid == project_space_uuid,
-            ProjectMember.user_account_uuid == user.user_account_uuid,
-        )
+    # Remediation for IDOR: Only owners or editors can view all members.
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
-    if row.scalars().first() is None:
-        raise HTTPException(status_code=403, detail="project access denied")
 
     rows = await session.execute(
         select(ProjectMember, UserAccount)
