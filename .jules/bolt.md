@@ -18,6 +18,10 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+
+## 2026-06-25 - Avoid Redundant map.set() on Mutable Map Values
+**Learning:** When updating mutable values stored in a `Map`, such as `Set` or `Array`, calling `map.set(key, value)` after every mutation repeats work once the entry already exists.
+**Action:** Create and store the mutable value only when `map.get(key)` misses. After that, mutate the retrieved collection directly with `.add()` or `.push()`.
 ## Performance Issue: Inefficient Route Metric Priming
 The previous implementation of `prime_http_metrics` resulted in an O(M * R) Cartesian product loop creating metric series for every HTTP method across every single route.
 
