@@ -29,7 +29,7 @@ dependencies = [
   "urllib3>=2.7.0",
   "aiohttp>=3.14.1",
   "requests>=2.33.0",
-  "python-multipart>=0.0.31",
+  "python-multipart>=0.0.32",
 ]
 
 [project.optional-dependencies]
