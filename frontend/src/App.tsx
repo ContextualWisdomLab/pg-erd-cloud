@@ -115,6 +115,7 @@ export default function App() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [nodeSearch, setNodeSearch] = useState("");
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
     [],
@@ -160,6 +161,45 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+  const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
+  const searchMatchedNodeIds = useMemo(() => {
+    if (!normalizedNodeSearch) return new Set<string>();
+    const matches = new Set<string>();
+    for (const node of nodes) {
+      const haystack = [
+        node.data.title,
+        node.data.comment ?? "",
+        ...node.data.columns.flatMap((column) => [
+          column.column_name,
+          column.data_type,
+          column.column_comment ?? "",
+        ]),
+      ]
+        .join(" ")
+        .toLocaleLowerCase();
+      if (haystack.includes(normalizedNodeSearch)) {
+        matches.add(node.id);
+      }
+    }
+    return matches;
+  }, [nodes, normalizedNodeSearch]);
+  const visibleNodes = useMemo(() => {
+    if (!normalizedNodeSearch) return nodes;
+    return nodes.map((node) => {
+      const isHighlighted = searchMatchedNodeIds.has(node.id);
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          isDimmed: !isHighlighted,
+          isHighlighted,
+        },
+      };
+    });
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  const nodeSearchStatus = normalizedNodeSearch
+    ? `${searchMatchedNodeIds.size}개 테이블 일치`
+    : "";
 
   useEffect(() => {
     return () => {
@@ -1030,6 +1070,16 @@ export default function App() {
             role="toolbar"
             aria-label="ERD 캔버스 도구"
           >
+            <label className="canvasToolbar__search">
+              <span className="srOnly">테이블 또는 컬럼 검색</span>
+              <input
+                aria-label="테이블 또는 컬럼 검색"
+                placeholder="테이블/컬럼 검색"
+                type="search"
+                value={nodeSearch}
+                onChange={(event) => setNodeSearch(event.currentTarget.value)}
+              />
+            </label>
             <button
               type="button"
               onClick={onAutoLayout}
@@ -1132,12 +1182,12 @@ export default function App() {
               Mermaid
             </button>
             <div className="srOnly" aria-live="polite">
-              {layoutMessage}
+              {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
             </div>
           </div>
 
           <ReactFlow
-            nodes={nodes}
+            nodes={visibleNodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}

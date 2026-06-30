@@ -26,6 +26,8 @@ type TableNodeData = {
     access_method: string;
     strength?: string;
   }>;
+  isDimmed?: boolean;
+  isHighlighted?: boolean;
   badges?: { pk?: boolean; fk?: boolean };
 };
 
@@ -77,9 +79,18 @@ function TableNode(props: NodeProps<TableNodeNode>) {
 
   // User-supplied labels/comments are rendered as React text nodes; do not
   // switch these fields to raw HTML rendering.
+  const className = [
+    "tableNode",
+    data.businessGroup ? "tableNode--grouped" : "",
+    data.isDimmed ? "tableNode--dimmed" : "",
+    data.isHighlighted ? "tableNode--highlighted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      className={`tableNode${data.businessGroup ? " tableNode--grouped" : ""}`}
+      className={className}
       style={style}
       role="region"
       aria-label={`${accessibleTableName} 테이블`}
@@ -245,6 +256,8 @@ export default memo(TableNode, (prev, next) => {
     prev.data.businessGroup?.id === next.data.businessGroup?.id &&
     prev.data.businessGroup?.name === next.data.businessGroup?.name &&
     prev.data.businessGroup?.color === next.data.businessGroup?.color &&
+    prev.data.isDimmed === next.data.isDimmed &&
+    prev.data.isHighlighted === next.data.isHighlighted &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk
   );

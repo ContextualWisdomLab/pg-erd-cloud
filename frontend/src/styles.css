@@ -88,6 +88,13 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.92);
 }
 
+.canvasToolbar__search input {
+  width: 180px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -150,6 +157,20 @@ button:disabled {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #fff;
+  transition:
+    box-shadow 0.16s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.tableNode--dimmed {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+}
+
+.tableNode--highlighted {
+  border-color: #034ea2;
+  box-shadow: 0 0 0 3px rgba(3, 78, 162, 0.18);
 }
 
 .tableNode--grouped {
