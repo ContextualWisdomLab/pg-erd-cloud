@@ -22,17 +22,23 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
   const tableRels = (snapshot.relations || []).filter((r) => r.relation_kind === 'r' || r.relation_kind === 'p')
   const pkColsByRel = new Map<number, Set<string>>()
   for (const p of snapshot.pk_columns || []) {
-    const set = pkColsByRel.get(p.relation_oid) || new Set<string>()
+    let set = pkColsByRel.get(p.relation_oid)
+    if (!set) {
+      set = new Set<string>()
+      pkColsByRel.set(p.relation_oid, set)
+    }
     set.add(p.column_name)
-    pkColsByRel.set(p.relation_oid, set)
   }
 
   const columnsByRel = new Map<number, TableNodeData['columns']>()
   for (const c of snapshot.columns || []) {
-    const list = columnsByRel.get(c.relation_oid) || []
+    let list = columnsByRel.get(c.relation_oid)
+    if (!list) {
+      list = []
+      columnsByRel.set(c.relation_oid, list)
+    }
     const isPk = pkColsByRel.get(c.relation_oid)?.has(c.column_name) || false
     list.push({ column_name: c.column_name, data_type: c.data_type, is_not_null: c.is_not_null, is_pk: isPk, column_comment: c.column_comment, example_value: c.example_value })
-    columnsByRel.set(c.relation_oid, list)
   }
 
   const hasPk = new Set<number>()
