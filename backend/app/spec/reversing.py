@@ -305,6 +305,7 @@ def generate_reversing_markdown(snapshot: dict) -> str:
 
 
 def generate_reversing_spec(snapshot: dict, mode: str = "markdown") -> str:
+    """Generate a reverse-engineering document or LLM prompt from a snapshot."""
     if mode == "llm-prompt":
         return generate_reversing_llm_prompt(snapshot)
     if mode == "markdown":

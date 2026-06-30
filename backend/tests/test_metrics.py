@@ -35,7 +35,9 @@ def test_normalize_route_label_valid() -> None:
 def test_prime_http_metrics() -> None:
     """Metrics should be primed in the registry to expose expected series."""
     # Run the prime function with dummy data.
-    prime_http_metrics(methods={"GET", "POST"}, routes={"/test/route", "invalid"})
+    prime_http_metrics(
+        route_methods={"/test/route": {"GET", "POST"}, "invalid": {"GET"}}
+    )
 
     # Check counters.
     # '/test/route' -> '/test/route'
@@ -74,7 +76,7 @@ def test_prime_http_metrics() -> None:
 
 def test_prime_http_metrics_empty_inputs_do_not_create_labels() -> None:
     """Empty inputs should be a no-op."""
-    prime_http_metrics(methods=set(), routes=set())
+    prime_http_metrics(route_methods={})
 
     value = REGISTRY.get_sample_value(
         "http_requests_total",
@@ -85,7 +87,12 @@ def test_prime_http_metrics_empty_inputs_do_not_create_labels() -> None:
 
 def test_prime_http_metrics_primes_method_route_combinations() -> None:
     """Priming creates the Cartesian product of supplied methods and routes."""
-    prime_http_metrics(methods={"DELETE", "PATCH"}, routes={"/metrics/a", "/metrics/b"})
+    prime_http_metrics(
+        route_methods={
+            "/metrics/a": {"DELETE", "PATCH"},
+            "/metrics/b": {"DELETE", "PATCH"},
+        }
+    )
 
     for method in ["DELETE", "PATCH"]:
         for route in ["/metrics/a", "/metrics/b"]:

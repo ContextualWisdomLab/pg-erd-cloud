@@ -1,7 +1,0 @@
-🛡️ Sentinel: [CRITICAL] Fix Authentication Bypass via X-Dev-User Header
-
-🚨 Severity: CRITICAL
-💡 Vulnerability: The frontend and backend contained a leftover development feature that allowed specifying a user via the `X-Dev-User` header. This could be used to bypass authentication by injecting a user ID. The backend vulnerability had been addressed, but the frontend still set the `devUser` value in `localStorage` and sent the `X-Dev-User` header in API requests, leaving a misconfiguration and potential client-side issue, and the backend still permitted the `X-Dev-User` header in the CORS `allow_headers`.
-🎯 Impact: This could be exploited or spoofed if the backend endpoints were misconfigured, and leaving the header in CORS implies the app intends to accept the header.
-🔧 Fix: Removed `devUser` state and local storage logic in `frontend/src/api.ts` and `frontend/src/App.tsx`. Removed the `X-Dev-User` header from `CORS_ALLOW_HEADERS` in `backend/app/main.py`.
-✅ Verification: Tested API calls with the updated headers mechanism and ran all automated tests successfully.
