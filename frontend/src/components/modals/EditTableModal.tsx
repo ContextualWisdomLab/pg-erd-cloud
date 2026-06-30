@@ -128,16 +128,18 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
+                        aria-label="Primary Key"
                       />
-                      PK
+                      <abbr title="Primary Key" aria-label="Primary Key" style={{ textDecoration: "none" }}>PK</abbr>
                     </label>
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
+                        aria-label="Not Null"
                       />
-                      NN
+                      <abbr title="Not Null" aria-label="Not Null" style={{ textDecoration: "none" }}>NN</abbr>
                     </label>
                     <button
                       type="button"

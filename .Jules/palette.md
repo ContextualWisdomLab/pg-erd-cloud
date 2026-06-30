@@ -34,3 +34,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2024-07-01 - Technical Abbreviations Accessibility
+**Learning:** Combining `title` and `aria-label` attributes on domain-specific abbreviations (e.g., PK, FK, NN) is crucial. While `title` provides visual hover feedback, screen readers may ignore it on `<abbr>` tags or non-interactive elements. Additionally, associated interactive elements like `<input type="checkbox">` should also have an explicit `aria-label` for full context.
+**Action:** When adding technical abbreviations in UI badges or forms, consistently use a descriptive `title` attribute for tooltips and an `aria-label` for screen readers to ensure accessibility across all modalities.
