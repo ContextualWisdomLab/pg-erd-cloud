@@ -15,7 +15,7 @@ from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
-from app.csrf import CSRF_HEADER_NAME, generate_csrf_token, make_csrf_middleware
+from app.csrf import CSRF_HEADER_NAME, make_csrf_middleware
 from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
 from app.jobs.worker import run_worker_forever
@@ -95,7 +95,7 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=10,
     window_seconds=60,
-    route_prefix="/api/auth/revoke",
+    route_prefix="/api/auth/logout",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 
@@ -124,7 +124,9 @@ app.middleware("http")(make_csrf_middleware())
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_origins=[
+        o.strip() for o in settings.cors_origins.split(",") if o.strip()
+    ],
     # Default to the strictest safe setting. Enable credentials only when you
     # actually need cookie-based auth.
     allow_credentials=False,
@@ -155,12 +157,6 @@ app.middleware("http")(make_security_headers_middleware())
 async def healthz() -> dict:
     """Simple health-check endpoint."""
     return {"ok": True}
-
-
-@app.get("/api/csrf-token")
-async def csrf_token() -> dict[str, str]:
-    """Issue a signed token for unsafe API requests."""
-    return {"csrf_token": generate_csrf_token(settings.app_secret)}
 
 
 app.include_router(projects_router)
