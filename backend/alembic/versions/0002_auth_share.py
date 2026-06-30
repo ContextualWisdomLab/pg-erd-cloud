@@ -105,9 +105,7 @@ def upgrade() -> None:
     # Share links
     op.create_table(
         "share_link",
-        sa.Column(
-            "share_link_uuid", sa.Uuid(), primary_key=True, nullable=False
-        ),
+        sa.Column("share_link_uuid", sa.Uuid(), primary_key=True, nullable=False),
         sa.Column("project_space_uuid", sa.Uuid(), nullable=False),
         sa.Column("created_by_user_uuid", sa.Uuid(), nullable=False),
         sa.Column("permission_kind", sa.Text(), nullable=False),
@@ -141,9 +139,7 @@ def downgrade() -> None:
     op.drop_constraint(
         "fk_share_link__created_by_user", "share_link", type_="foreignkey"
     )
-    op.drop_constraint(
-        "fk_share_link__project_space", "share_link", type_="foreignkey"
-    )
+    op.drop_constraint("fk_share_link__project_space", "share_link", type_="foreignkey")
     op.drop_index("ix_share_link__project_space_uuid", table_name="share_link")
     op.drop_table("share_link")
 
