@@ -28,14 +28,14 @@ concurrency:
   group: pr-review-autofix-${{ github.repository }}-${{ inputs.pr_number }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: read
-  statuses: read
+permissions: read-all
 
 jobs:
   autofix:
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
