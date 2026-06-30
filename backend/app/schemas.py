@@ -48,6 +48,7 @@ class ConnectionCreateIn(BaseModel):
         min_length=1,
         max_length=4096,
         description=("PostgreSQL or Snowflake connection string. Not logged."),
+        json_schema_extra={"encryption": "encrypted_at_rest"},
     )
 
 
@@ -97,3 +98,9 @@ class MeOut(BaseModel):
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class UserUpdate(BaseModel):
+    """Request body for updating current user details."""
+
+    display_name: str | None = Field(default=None, max_length=255)
