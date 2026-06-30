@@ -55,6 +55,7 @@ export function GroupModal({
           <div className="field">
             <label htmlFor="business-group-name">그룹 이름</label>
             <input
+              autoFocus
               id="business-group-name"
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}

@@ -51,6 +51,7 @@ export function ExportModal({
       >
         <h3 id="export-ddl-title">DDL 내보내기</h3>
         <textarea
+          autoFocus
           readOnly
           aria-label="DDL Export"
           value={exportDdlText}
