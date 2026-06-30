@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import datetime as dt
-import re
 import uuid
 from collections.abc import Callable
-from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dsn_redaction import redact_dsn_error_message
 from app.models import (
     DbConnection,
     JobQueue,
@@ -17,54 +16,7 @@ from app.models import (
 from app.db_introspect import introspect_database
 from app.security import decrypt_text
 
-_SECRET_KEY_PATTERN = re.compile(
-    r"(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|api[_-]?key|"
-    r"access[_-]?key|auth(?:entication)?)",
-    re.IGNORECASE,
-)
-_SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"(?P<prefix>\b[\w.-]*(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|"
-    r"api[_-]?key|access[_-]?key|auth(?:entication)?)[\w.-]*\s*[:=]\s*)"
-    r"(?P<value>[^&\s,;\"'<>]+)",
-    re.IGNORECASE,
-)
-
-
-def _password_candidates_from_dsn(dsn: str) -> set[str]:
-    candidates: set[str] = set()
-    parsed = urlsplit(dsn)
-
-    if parsed.password:
-        candidates.add(parsed.password)
-        candidates.add(quote(parsed.password, safe=""))
-
-    if "@" in parsed.netloc:
-        userinfo = parsed.netloc.rsplit("@", 1)[0]
-        if ":" in userinfo:
-            raw_password = userinfo.split(":", 1)[1]
-            candidates.add(raw_password)
-            candidates.add(unquote(raw_password))
-
-    for part in parsed.query.split("&"):
-        key, sep, raw_value = part.partition("=")
-        if not sep:
-            continue
-        if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
-            continue
-        decoded_value = unquote_plus(raw_value)
-        candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
-
-    return {candidate for candidate in candidates if candidate}
-
-
-def _redact_snapshot_error_message(error_message: str, dsn: str) -> str:
-    redacted = error_message
-    for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
-        redacted = redacted.replace(secret, "***")
-    return _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)
+_redact_snapshot_error_message = redact_dsn_error_message
 
 
 async def handle_snapshot_job(
