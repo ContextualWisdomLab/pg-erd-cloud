@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 
 def _text(value: object) -> str:
     return value if isinstance(value, str) else ""
@@ -13,10 +11,6 @@ def _normalized(value: object) -> str:
 
 def _has_name(column_name: str, *patterns: str) -> bool:
     return any(pattern in column_name for pattern in patterns)
-
-
-def _matches_name(column_name: str, pattern: str) -> bool:
-    return re.search(pattern, column_name) is not None
 
 
 def infer_column_example(column: dict) -> str:
@@ -60,9 +54,9 @@ def infer_column_example(column: dict) -> str:
     if _has_name(column_name, "description", "comment", "memo", "note"):
         return "Example description"
 
-    if "uuid" in combined_type or _matches_name(column_name, r"(^uuid$|_uuid$)"):
+    if "uuid" in combined_type or column_name == "uuid" or column_name.endswith("_uuid"):
         return "550e8400-e29b-41d4-a716-446655440000"
-    if _matches_name(column_name, r"(^id$|_id$|_uuid$)"):
+    if column_name == "id" or column_name.endswith("_id"):
         if "char" in combined_type or "text" in combined_type:
             return "ID-1001"
         return "1001"
