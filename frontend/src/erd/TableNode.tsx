@@ -145,7 +145,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge">NOT NULL</span>
+                <span className="tableNode__badge" title="Not Null">
+                  NOT NULL
+                </span>
               ) : null}
               <Handle
                 type="source"

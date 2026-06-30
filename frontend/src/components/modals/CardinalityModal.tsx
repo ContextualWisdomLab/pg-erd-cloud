@@ -71,6 +71,7 @@ export function CardinalityModal({
           <div className="field">
             <label htmlFor="cardinality-table">테이블</label>
             <select
+              autoFocus
               id="cardinality-table"
               value={cardinalityNode.id}
               onChange={(event) =>
