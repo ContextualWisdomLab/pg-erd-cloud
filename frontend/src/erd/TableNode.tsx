@@ -206,6 +206,7 @@ function isSameRenderedColumns(
   prevCols: Column[],
   nextCols: Column[],
 ): boolean {
+  if (prevCols === nextCols) return true;
   if (prevCols.length !== nextCols.length) return false;
 
   // The component only renders the first MAX_RENDERED_COLUMNS and the "… N more" count.
@@ -228,6 +229,8 @@ function isSameRenderedColumns(
 }
 
 export default memo(TableNode, (prev, next) => {
+  if (prev.data === next.data) return true;
+
   // React Flow typically provides new node objects when data changes.
   // This comparator is a conservative safeguard for the most relevant fields.
   // Note: if upstream mutates `columns` in-place between renders, no memo comparator can
