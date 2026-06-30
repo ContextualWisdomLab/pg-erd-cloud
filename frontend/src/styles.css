@@ -14,6 +14,25 @@ html, body {
   height: 100vh;
 }
 
+.authGate {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.authGate input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
 .skip-link {
   position: absolute;
   left: 8px;
@@ -67,6 +86,13 @@ textarea:focus-visible {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
+}
+
+.canvasToolbar__search input {
+  width: 180px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
 }
 
 .srOnly {
@@ -131,6 +157,20 @@ button:disabled {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #fff;
+  transition:
+    box-shadow 0.16s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.tableNode--dimmed {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+}
+
+.tableNode--highlighted {
+  border-color: #034ea2;
+  box-shadow: 0 0 0 3px rgba(3, 78, 162, 0.18);
 }
 
 .tableNode--grouped {

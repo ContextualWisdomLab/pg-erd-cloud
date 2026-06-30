@@ -73,11 +73,9 @@ def apply_security_headers(request: Request, response: Response) -> None:
         )
 
 
-def make_security_headers_middleware() -> (
-    Callable[
-        [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
-    ]
-):
+def make_security_headers_middleware() -> Callable[
+    [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
+]:
     """Create a Starlette/FastAPI http middleware applying response headers."""
 
     async def middleware(
