@@ -210,6 +210,43 @@ async def test_oidc_rejects_header_selected_algorithm(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "jwk",
+    [
+        {"kid": "key-1", "kty": "EC"},
+        {"kid": "key-1", "kty": "oct"},
+        {"kid": "key-1"},
+    ],
+)
+async def test_oidc_decode_rejects_kty_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    jwk: dict[str, object],
+) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [jwk]}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    def fail_decode(*_: object, **__: object) -> dict:
+        raise AssertionError("jwt.decode must not run for mismatched key types")
+
+    monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._decode_verified_oidc_token("ey...fake...")
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
+@pytest.mark.asyncio
 async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
