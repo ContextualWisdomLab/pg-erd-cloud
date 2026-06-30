@@ -29,13 +29,15 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
   pull-requests: read
-  statuses: read
 
 jobs:
   autofix:
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
