@@ -162,3 +162,39 @@ def test_csp_path_normalization_handles_double_slash() -> None:
     }
     request = Request(scope)
     assert security_headers._should_apply_csp(request) is False
+
+
+def test_apply_security_headers_directly() -> None:
+    """apply_security_headers should set headers directly on a response object and not overwrite existing ones."""
+    from starlette.requests import Request
+    from starlette.responses import Response
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "scheme": "https",
+        "server": ("testserver", 443),
+        "path": "/api/test",
+        "headers": [(b"host", b"testserver")],
+        "query_string": b"",
+    }
+    request = Request(scope)
+
+    # Test setting missing headers
+    response = Response()
+    security_headers.apply_security_headers(request, response)
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "Permissions-Policy" in response.headers
+    assert "Content-Security-Policy" in response.headers
+    assert (
+        response.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
+    )
+
+    # Test not overwriting existing headers
+    response_with_existing = Response(headers={"X-Frame-Options": "SAMEORIGIN"})
+    security_headers.apply_security_headers(request, response_with_existing)
+    assert response_with_existing.headers["X-Frame-Options"] == "SAMEORIGIN"
