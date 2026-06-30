@@ -29,13 +29,15 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
   pull-requests: read
-  statuses: read
 
 jobs:
   autofix:
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -49,11 +51,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Snapshot trusted autofix helpers
+      - name: Fetch central autofix helper
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/trusted-autofix"
-          cp scripts/ci/pr_review_autofix_context.py "$RUNNER_TEMP/trusted-autofix/"
+          gh api \
+            "repos/ContextualWisdomLab/.github/contents/scripts/ci/pr_review_autofix_context.py?ref=main" \
+            --jq .content \
+            | base64 --decode >"$RUNNER_TEMP/trusted-autofix/pr_review_autofix_context.py"
 
       - name: Fetch and checkout PR head
         env:
