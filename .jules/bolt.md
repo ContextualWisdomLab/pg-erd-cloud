@@ -35,3 +35,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid unbounded Math.min/Math.max spreads
 **Learning:** Spreading dynamically sized arrays into variadic functions like `Math.max(...values)` creates intermediate arrays and can exceed JS engine argument-count limits, often surfacing as `RangeError` variants such as "Too many arguments".
 **Action:** For unbounded frontend collections such as ERD nodes, calculate min/max bounds with an iterative loop instead of `Math.min(...array)` or `Math.max(...array)`.
+
+## 2024-07-01 - Avoid O(N^2) Complexity in Graph Exporters
+**Learning:** Nested array `.find()` or `.some()` iterations within loops parsing graph connections result in O(N^2) complexity, significantly degrading UI performance for large outputs (like exporting Mermaid diagrams where we check every column of every node against every edge).
+**Action:** Always pre-compute a lookup `Map` or `Set` in O(N) or O(E) when multiple specific node or edge lookups are needed within iterative processes.
