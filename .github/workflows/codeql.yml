@@ -1,12 +1,12 @@
-name: codeql-advanced (manual)
+name: codeql-ci-sast
 
 on:
-  # NOTE: This repository has GitHub Code Scanning "default setup" enabled and
-  # it is controlled by organization administrators. Running an advanced
-  # CodeQL workflow alongside default setup can fail with:
-  # "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled".
-  #
-  # To avoid merge-gate noise, keep this workflow manual only.
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "17 2 * * 2"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -38,3 +37,9 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          # The repository already uses GitHub Code Scanning default setup for
+          # SARIF upload. Keep this CI workflow upload-free so it provides an
+          # explicit SAST check for Scorecard without competing with default
+          # setup for code scanning ownership.
+          upload: never
