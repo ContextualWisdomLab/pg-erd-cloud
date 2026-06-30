@@ -2,6 +2,7 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -30,6 +31,8 @@ export function GroupModal({
   onDeleteBusinessGroup,
   onAssignBusinessGroup,
 }: GroupModalProps) {
+  const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
+
   if (!isOpen) return null;
 
   return (
@@ -39,6 +42,8 @@ export function GroupModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="group-manager-title"
+        ref={dialogRef}
+        tabIndex={-1}
       >
         <div className="modalHeader">
           <h3 id="group-manager-title">업무 그룹</h3>
