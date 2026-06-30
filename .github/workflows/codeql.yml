@@ -19,6 +19,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -37,9 +38,3 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
-        with:
-          # The repository already uses GitHub Code Scanning default setup for
-          # SARIF upload. Keep this CI workflow upload-free so it provides an
-          # explicit SAST check for Scorecard without competing with default
-          # setup for code scanning ownership.
-          upload: never
