@@ -31,11 +31,9 @@ import {
   getSnapshot,
   listConnections,
   listProjects,
-  listSnapshots,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import {
-  BUSINESS_GROUP_COLORS,
   DEFAULT_BUSINESS_GROUP_COLOR,
   uniqueBusinessGroupId,
   type BusinessGroup,
