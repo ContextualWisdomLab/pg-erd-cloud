@@ -28,6 +28,9 @@ test('renders TableNode with correct aria-labels for abbreviations', () => {
     positionAbsoluteX: 0,
     positionAbsoluteY: 0,
     dragging: false,
+    draggable: false,
+    selectable: false,
+    deletable: false,
   };
 
   render(<TableNode {...nodeProps} />);
