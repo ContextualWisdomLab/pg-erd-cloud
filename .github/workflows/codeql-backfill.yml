@@ -1,5 +1,10 @@
 name: codeql-sast-backfill
 
+# Verification evidence:
+# - docs/security/codeql-sast-backfill.md explains the reviewed operational
+#   contract and manual dispatch procedure.
+# - scripts/ci/validate_codeql_backfill.py performs static checks for the
+#   workflow inputs, write permissions, and language matrix.
 on:
   workflow_dispatch:
     inputs:
