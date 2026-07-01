@@ -12,27 +12,41 @@ export type TableNodeData = {
   columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
   indexes?: IndexRecommendation[]
   businessGroup?: BusinessGroup | null
+  isDimmed?: boolean
+  isHighlighted?: boolean
   badges: {
     pk: boolean
     fk: boolean
   }
 }
 
+export type ForeignKeyEdgeData = {
+  sourceColumns?: string[]
+  targetColumns?: string[]
+}
+
 export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<TableNodeData>>; edges: Edge[] } {
   const tableRels = (snapshot.relations || []).filter((r) => r.relation_kind === 'r' || r.relation_kind === 'p')
+  // ⚡ Bolt: Avoid redundant map lookups and allocations inside loops
   const pkColsByRel = new Map<number, Set<string>>()
   for (const p of snapshot.pk_columns || []) {
-    const set = pkColsByRel.get(p.relation_oid) || new Set<string>()
+    let set = pkColsByRel.get(p.relation_oid)
+    if (!set) {
+      set = new Set<string>()
+      pkColsByRel.set(p.relation_oid, set)
+    }
     set.add(p.column_name)
-    pkColsByRel.set(p.relation_oid, set)
   }
 
   const columnsByRel = new Map<number, TableNodeData['columns']>()
   for (const c of snapshot.columns || []) {
-    const list = columnsByRel.get(c.relation_oid) || []
+    let list = columnsByRel.get(c.relation_oid)
+    if (!list) {
+      list = []
+      columnsByRel.set(c.relation_oid, list)
+    }
     const isPk = pkColsByRel.get(c.relation_oid)?.has(c.column_name) || false
     list.push({ column_name: c.column_name, data_type: c.data_type, is_not_null: c.is_not_null, is_pk: isPk, column_comment: c.column_comment, example_value: c.example_value })
-    columnsByRel.set(c.relation_oid, list)
   }
 
   const hasPk = new Set<number>()
@@ -48,6 +62,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     sourceHandle?: string
     targetHandle?: string
     label: string
+    data?: ForeignKeyEdgeData
   }> = []
 
   const fkRows = snapshot.fk_edges || []
@@ -65,22 +80,34 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       hasFk.add(r.child_relation_oid)
     }
     for (const [oid, rows] of grouped.entries()) {
-      const first = rows[0]
+      const orderedRows = [...rows].sort((a, b) => a.column_ordinal - b.column_ordinal)
+      const first = orderedRows[0]
       const source = String(first.child_relation_oid)
       const target = String(first.parent_relation_oid)
       let sourceHandle: string | undefined = undefined
       let targetHandle: string | undefined = undefined
       let label = ''
 
-      if (rows.length === 1) {
+      if (orderedRows.length === 1) {
         label = `${first.fk_constraint_name}: ${first.child_column_name} → ${first.parent_column_name}`
         sourceHandle = sourceColumnHandleId(first.child_column_name)
         targetHandle = targetColumnHandleId(first.parent_column_name)
       } else {
-        label = `${first.fk_constraint_name} (${rows.length} cols)`
+        label = `${first.fk_constraint_name} (${orderedRows.length} cols)`
       }
 
-      fkEdges.push({ id: String(oid), source, target, sourceHandle, targetHandle, label })
+      fkEdges.push({
+        id: String(oid),
+        source,
+        target,
+        sourceHandle,
+        targetHandle,
+        label,
+        data: {
+          sourceColumns: orderedRows.map((row) => row.child_column_name),
+          targetColumns: orderedRows.map((row) => row.parent_column_name),
+        },
+      })
     }
   } else {
     // Backward compat: infer FKs from constraints list only.
@@ -123,6 +150,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     sourceHandle: e.sourceHandle,
     targetHandle: e.targetHandle,
     label: e.label,
+    data: e.data,
     animated: false,
     type: 'smoothstep'
   }))
