@@ -42,3 +42,8 @@
 **Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
 **Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
+
+## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
+**Vulnerability:** The `/api/auth/logout` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
+**Learning:** The backend implements a custom `RateLimitPolicy` that enforces rate limits based on exact string matching of `route_prefix`. It is critical to ensure that the configured `route_prefix` perfectly matches the corresponding `APIRouter` path configurations.
+**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.

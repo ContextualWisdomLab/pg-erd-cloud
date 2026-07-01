@@ -54,7 +54,11 @@ def infer_column_example(column: dict) -> str:
     if _has_name(column_name, "description", "comment", "memo", "note"):
         return "Example description"
 
-    if "uuid" in combined_type or column_name == "uuid" or column_name.endswith("_uuid"):
+    if (
+        "uuid" in combined_type
+        or column_name == "uuid"
+        or column_name.endswith("_uuid")
+    ):
         return "550e8400-e29b-41d4-a716-446655440000"
     if column_name == "id" or column_name.endswith("_id"):
         if "char" in combined_type or "text" in combined_type:
