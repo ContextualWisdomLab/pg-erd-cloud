@@ -33,4 +33,6 @@
 **Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading.
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
-**Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+**Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.## 2024-07-01 - Pair disabled buttons with visible hint and aria-describedby
+**Learning:** Some browsers and screen readers do not expose tooltips for disabled controls properly. Furthermore, relying only on `title` does not visually explain to all users why a button is disabled. It is a much stronger UX/a11y pattern to use a visibly rendered helper text alongside a disabled button, and link them using `aria-describedby` instead of just using `title` attributes.
+**Action:** Always prefer rendering visible helper text (e.g. `field-hint` class) with an `id` and mapping it via `aria-describedby` to a disabled submit button instead of a simple `title`.
