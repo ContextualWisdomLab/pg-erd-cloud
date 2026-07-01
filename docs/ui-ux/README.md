@@ -8,6 +8,11 @@ These reference screens define the intended product direction for Cloud ERD UI w
 - Modals should be centered, restrained, and form-first.
 - The ERD editor should prioritize canvas space, toolbars, side properties, sharing, and export workflows.
 
+Execution planning:
+
+- [Product Design and Figma execution plan](product-design-figma-execution-plan.md)
+- [Product Design UX audit](product-design-audit.md)
+
 Screens:
 
 1. `01-login-screen.png`
