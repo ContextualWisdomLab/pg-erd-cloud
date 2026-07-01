@@ -1,8 +1,8 @@
 
 import '@testing-library/jest-dom/vitest';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -11,15 +11,26 @@ globalThis.ResizeObserver = class ResizeObserver {
 };
 import App from '../../App';
 
+afterEach(() => {
+  cleanup();
+});
+
 vi.mock('../../api', () => ({
   getMe: vi.fn().mockResolvedValue({ subject: 'test-user', display_name: 'Test User' }),
-  listProjects: vi.fn().mockResolvedValue([]),
+  listProjects: vi.fn().mockResolvedValue([
+    { project_space_uuid: 'project-1', project_name: 'Billing' },
+  ]),
   listConnections: vi.fn().mockResolvedValue([]),
-  listSnapshots: vi.fn().mockResolvedValue([]),
+  listSnapshots: vi.fn().mockResolvedValue([
+    { schema_snapshot_uuid: 'snap-1', status: 'succeeded', schema_filter: 'billing' },
+    { schema_snapshot_uuid: 'snap-2', status: 'failed', schema_filter: 'hr' },
+  ]),
+  createConnection: vi.fn(),
+  createProject: vi.fn(),
+  createSnapshot: vi.fn(),
+  getSnapshot: vi.fn(),
   createShareLink: vi.fn(),
 }));
-
-afterEach(cleanup);
 
 describe('App edit functionality', () => {
     it('renders without crashing', () => {
@@ -49,5 +60,18 @@ describe('App edit functionality', () => {
         expect(toolbarQueries.getByRole('button', { name: 'SVG 그림 내보내기' })).toHaveTextContent('IMG');
         expect(toolbarQueries.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveTextContent('UML');
         expect(toolbarQueries.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveTextContent('{}');
+    });
+
+    it('filters the diagram list by search text', async () => {
+        const user = userEvent.setup();
+        render(<App />);
+
+        await user.click(await screen.findByRole('button', { name: '다이어그램' }));
+        await screen.findByText('ERD_billing_1');
+
+        await user.type(screen.getByLabelText('다이어그램 검색'), 'hr');
+
+        expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument();
+        expect(screen.getByText('ERD_hr_2')).toBeInTheDocument();
     });
 });
