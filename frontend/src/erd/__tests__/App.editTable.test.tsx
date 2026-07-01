@@ -33,45 +33,45 @@ vi.mock('../../api', () => ({
 }));
 
 describe('App edit functionality', () => {
-    it('renders without crashing', () => {
-        render(<App />);
-        expect(screen.getByText('pg-erd-cloud')).toBeInTheDocument();
-    });
+  it('renders without crashing', () => {
+    render(<App />);
+    expect(screen.getByText('pg-erd-cloud')).toBeInTheDocument();
+  });
 
-    it('renders compact visual labels while preserving toolbar accessible names', async () => {
-        const user = userEvent.setup();
-        render(<App />);
+  it('renders compact visual labels while preserving toolbar accessible names', async () => {
+    const user = userEvent.setup();
+    render(<App />);
 
-        await user.click(await screen.findByRole('button', { name: '편집기' }));
+    await user.click(await screen.findByRole('button', { name: '편집기' }));
 
-        const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
-        expect(toolbar).toBeInTheDocument();
+    const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
+    expect(toolbar).toBeInTheDocument();
 
-        const toolbarQueries = within(toolbar);
-        expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
-        expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
-        expect(toolbarQueries.getByRole('button', { name: '관계 자동 추론' })).toHaveTextContent('🪄');
-        expect(toolbarQueries.getByRole('button', { name: '모든 노드 지우기' })).toHaveTextContent('🗑️');
-        expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
-        expect(toolbarQueries.getByRole('button', { name: '업무 그룹' })).toHaveTextContent('◇');
-        expect(toolbarQueries.getByRole('button', { name: '인덱스 카디널리티 계산' })).toHaveTextContent('#');
-        expect(toolbarQueries.getByRole('button', { name: 'DDL 내보내기' })).toHaveTextContent('SQL');
-        expect(toolbarQueries.getByRole('button', { name: '공유 및 내보내기' })).toHaveTextContent('↗');
-        expect(toolbarQueries.getByRole('button', { name: 'SVG 그림 내보내기' })).toHaveTextContent('IMG');
-        expect(toolbarQueries.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveTextContent('UML');
-        expect(toolbarQueries.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveTextContent('{}');
-    });
+    const toolbarQueries = within(toolbar);
+    expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
+    expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
+    expect(toolbarQueries.getByRole('button', { name: '관계 자동 추론' })).toHaveTextContent('🪄');
+    expect(toolbarQueries.getByRole('button', { name: '모든 노드 지우기' })).toHaveTextContent('🗑️');
+    expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
+    expect(toolbarQueries.getByRole('button', { name: '업무 그룹' })).toHaveTextContent('◇');
+    expect(toolbarQueries.getByRole('button', { name: '인덱스 카디널리티 계산' })).toHaveTextContent('#');
+    expect(toolbarQueries.getByRole('button', { name: 'DDL 내보내기' })).toHaveTextContent('SQL');
+    expect(toolbarQueries.getByRole('button', { name: '공유 및 내보내기' })).toHaveTextContent('↗');
+    expect(toolbarQueries.getByRole('button', { name: 'SVG 그림 내보내기' })).toHaveTextContent('IMG');
+    expect(toolbarQueries.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveTextContent('UML');
+    expect(toolbarQueries.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveTextContent('{}');
+  });
 
-    it('filters the diagram list by search text', async () => {
-        const user = userEvent.setup();
-        render(<App />);
+  it('filters the diagram list by search text', async () => {
+    const user = userEvent.setup();
+    render(<App />);
 
-        await user.click(await screen.findByRole('button', { name: '다이어그램' }));
-        await screen.findByText('ERD_billing_1');
+    await user.click(await screen.findByRole('button', { name: '다이어그램' }));
+    await screen.findByText('ERD_billing_1');
 
-        await user.type(screen.getByLabelText('다이어그램 검색'), 'hr');
+    await user.type(screen.getByLabelText('다이어그램 검색'), 'hr');
 
-        expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument();
-        expect(screen.getByText('ERD_hr_2')).toBeInTheDocument();
-    });
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument();
+    expect(screen.getByText('ERD_hr_2')).toBeInTheDocument();
+  });
 });
