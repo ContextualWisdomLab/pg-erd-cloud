@@ -586,7 +586,7 @@ describe('downloadText', () => {
     const createElementSpy = vi.spyOn(document, 'createElement');
     const mockAnchor = { href: '', download: '', click: vi.fn() } as unknown as HTMLAnchorElement;
     createElementSpy.mockReturnValue(mockAnchor);
-    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('mock-url');
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('mock-url');
     const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
     downloadText('test.txt', 'hello');
