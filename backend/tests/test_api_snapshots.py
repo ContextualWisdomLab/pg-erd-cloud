@@ -43,7 +43,7 @@ async def test_create_snapshot_rejects_connection_from_other_project():
     session_mock.get.return_value = conn_mock
 
     project_space_uuid = uuid.uuid4()
-    body = SnapshotCreateIn(db_connection_uuid=uuid.uuid4(), schema_filter=None)
+    body = SnapshotCreateIn(db_connection_uuid=conn_mock.db_connection_uuid, schema_filter=None)
     user = CurrentUser(user_account_uuid=uuid.uuid4(), subject="test", display_name="Test")
 
     with patch("app.api.snapshots.require_project_member", new_callable=AsyncMock):
