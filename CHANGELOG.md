@@ -10,5 +10,6 @@
 - 새롭게 추가된 UI 플로우를 위한 기본 테스트 코드(`App.editTable.test.tsx`, `TableNode.test.tsx`) 추가 및 Vitest 프레임워크 셋업 보완.
 
 ### 🐛 개선 (Improvements)
+- 대규모 ERD 검색 성능 개선: `flatMap`, 배열 복사(`...`), 그리고 긴 문자열 조인(`join(" ")`)을 제거하고 `for` 루프와 `break`/`continue`를 활용하여 조건 성립 즉시 평가를 중단(short-circuit)하도록 개선함으로써 사용자 입력 지연(Input Lag)과 불필요한 메모리 할당(Garbage Collection 압박)을 해결.
 - 불필요한 백엔드 포맷팅 이슈(`ruff` 포맷) 해결.
 - 테스트 커버리지를 높이기 위해 기본 단위 테스트 환경(jsdom, @testing-library) 구축 및 활용.
