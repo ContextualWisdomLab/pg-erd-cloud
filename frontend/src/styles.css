@@ -319,6 +319,15 @@ textarea:focus-visible {
   border-radius: 6px;
 }
 
+.canvasToolbar > button {
+  min-width: 44px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -945,7 +954,7 @@ button:disabled {
 
   .canvasToolbar > button,
   .canvasToolbar__search {
-    flex: 1 1 84px;
+    flex: 1 1 44px;
   }
 
   .canvasToolbar__search input {
