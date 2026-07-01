@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -74,6 +74,8 @@ type CsrfTokenResponse = {
   csrf_token: string
 }
 
+type ShareLinkResponse = Omit<ShareLink, 'url'>
+
 function isLocalDevelopmentHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 }
@@ -83,6 +85,15 @@ function requireSecureCredentialTransport(): void {
   if (targetUrl.protocol !== 'https:' && !isLocalDevelopmentHost(targetUrl.hostname)) {
     throw new Error('createConnection requires HTTPS for credential transport')
   }
+}
+
+export function shareLinkUrlFromPath(urlPath: unknown): string {
+  if (typeof urlPath !== 'string' || !urlPath.startsWith('/api/share/')) {
+    throw new Error('createShareLink failed: invalid share URL path')
+  }
+
+  const apiBase = new URL(API_BASE || window.location.origin, window.location.origin)
+  return new URL(urlPath, apiBase).toString()
 }
 
 async function csrfToken(): Promise<string> {
@@ -202,6 +213,30 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
   })
   if (!r.ok) throw new Error(`createSnapshot failed: ${r.status}`)
   return r.json()
+}
+
+export async function createShareLink(projectId: string): Promise<ShareLink> {
+  if (DEMO_MODE) {
+    return {
+      share_link_uuid: `demo-share-${Date.now()}`,
+      permission_kind: 'read',
+      url_path: `/api/share/demo-${projectId}`,
+      url: shareLinkUrlFromPath(`/api/share/demo-${projectId}`)
+    }
+  }
+
+  const r = await fetch(`${API_BASE}/api/projects/${projectId}/share-links`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await jsonHeaders()
+  })
+  if (!r.ok) throw new Error(`createShareLink failed: ${r.status}`)
+
+  const response = (await r.json()) as ShareLinkResponse
+  return {
+    ...response,
+    url: shareLinkUrlFromPath(response.url_path)
+  }
 }
 
 export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {

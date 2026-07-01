@@ -572,6 +572,76 @@ button:disabled {
   margin: 0;
 }
 
+.modalLead {
+  margin: 4px 0 0;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.exportModal {
+  width: min(720px, 96vw);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.exportModal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.exportModal__sectionHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.exportModal__sectionHeader h4 {
+  margin: 0;
+}
+
+.exportModal__sectionHeader p {
+  margin: 4px 0 0;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.exportModal__shareResult {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.exportModal__shareResult input {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.exportModal__ddl {
+  width: 100%;
+  min-height: 260px;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .cardinalityWizard {
   width: min(760px, 96vw);
   padding: 20px;
@@ -887,6 +957,11 @@ button:disabled {
   }
 
   .cardinalityRecommendation {
+    grid-template-columns: 1fr;
+  }
+
+  .exportModal__sectionHeader,
+  .exportModal__shareResult {
     grid-template-columns: 1fr;
   }
 
