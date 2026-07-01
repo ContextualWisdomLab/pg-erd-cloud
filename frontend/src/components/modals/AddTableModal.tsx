@@ -1,5 +1,5 @@
-import React from 'react';
-import { useDialogAccessibility } from './useDialogAccessibility';
+import React from "react";
+import { useDialogAccessibility } from "./useDialogAccessibility";
 
 interface AddTableModalProps {
   isOpen: boolean;
@@ -16,7 +16,10 @@ export function AddTableModal({
   onAddTableCancel,
   onAddTableSubmit,
 }: AddTableModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
+  const dialogRef = useDialogAccessibility<HTMLFormElement>(
+    isOpen,
+    onAddTableCancel,
+  );
 
   if (!isOpen) return null;
 
@@ -73,20 +76,38 @@ export function AddTableModal({
         </div>
         <div
           className="row"
-          style={{ justifyContent: "flex-end", marginTop: 8 }}
+          style={{
+            justifyContent: "space-between",
+            marginTop: 8,
+            alignItems: "center",
+          }}
         >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
-          <button
-            type="submit"
-            disabled={!newTableName.trim()}
-            style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
-            }
-          >
-            저장
-          </button>
+          {!newTableName.trim() ? (
+            <span id="add-table-hint" className="field-hint">
+              테이블 이름을 입력하세요.
+            </span>
+          ) : (
+            <span />
+          )}
+          <div className="row">
+            <button type="button" onClick={onAddTableCancel}>
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={!newTableName.trim()}
+              aria-describedby={
+                !newTableName.trim() ? "add-table-hint" : undefined
+              }
+              style={
+                newTableName.trim()
+                  ? { background: "#034ea2", color: "#fff" }
+                  : undefined
+              }
+            >
+              저장
+            </button>
+          </div>
         </div>
       </form>
     </div>

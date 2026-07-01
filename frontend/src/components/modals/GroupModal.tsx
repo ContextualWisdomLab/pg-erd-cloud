@@ -1,8 +1,11 @@
-import React from 'react';
+import React from "react";
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
-import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import {
+  BUSINESS_GROUP_COLORS,
+  type BusinessGroup,
+} from "../../erd/businessGroups";
+import { useDialogAccessibility } from "./useDialogAccessibility";
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -84,13 +87,32 @@ export function GroupModal({
               />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={onCreateBusinessGroup}
-            disabled={!newGroupName.trim()}
+          <div
+            className="row"
+            style={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginTop: 4,
+            }}
           >
-            추가
-          </button>
+            {!newGroupName.trim() ? (
+              <span id="group-add-hint" className="field-hint">
+                그룹 이름을 입력하세요.
+              </span>
+            ) : (
+              <span />
+            )}
+            <button
+              type="button"
+              onClick={onCreateBusinessGroup}
+              disabled={!newGroupName.trim()}
+              aria-describedby={
+                !newGroupName.trim() ? "group-add-hint" : undefined
+              }
+            >
+              추가
+            </button>
+          </div>
         </div>
 
         <div className="groupManager__section">
