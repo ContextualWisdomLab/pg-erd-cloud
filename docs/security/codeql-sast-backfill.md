@@ -9,8 +9,7 @@ the recent `main` history.
 Scorecard evaluates whether recent commits have SAST results. The normal CodeQL
 workflow now uploads CodeQL results for new pull requests, but older recent
 commits still need analyses before the SAST coverage ratio catches up. This
-workflow lets maintainers explicitly analyze recent first-parent commits on a
-target branch.
+workflow lets maintainers explicitly analyze recent commits on a target branch.
 
 ## Manual dispatch
 
@@ -19,8 +18,8 @@ Use the GitHub Actions UI and run `codeql-sast-backfill` with:
 - `branch`: `main`
 - `commit_count`: `30`
 
-The workflow enumerates first-parent commits from `origin/<branch>` and analyzes
-each commit for:
+The workflow enumerates recent commits from `origin/<branch>` and analyzes each
+commit for:
 
 - `javascript-typescript`
 - `python`
@@ -34,6 +33,8 @@ each commit for:
 - Checkout credentials are not persisted.
 - The uploaded SARIF analysis is attributed to `refs/heads/<branch>` and the
   specific commit SHA selected by the matrix.
+- `commit_count` is capped at `128` so the two-language matrix stays within the
+  GitHub Actions 256-job limit.
 
 ## Verification
 
