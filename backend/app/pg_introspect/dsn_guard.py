@@ -19,6 +19,7 @@ class DsnTargetError(ValueError):
 class ValidatedDsnTarget:
     """Connection target values that were checked for restricted IP ranges."""
 
+    hostname: str
     hosts: tuple[str, ...]
     port: int | None
 
@@ -184,6 +185,7 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     host = parsed.hostname
     if not host:
         raise DsnTargetError("database DSN must include a host")
+    hostname = host.lower().rstrip(".")
     try:
         port = parsed.port
     except ValueError as err:
@@ -209,6 +211,7 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
         connection_host_groups = [primary_hosts]
 
     return ValidatedDsnTarget(
+        hostname=hostname,
         hosts=_unique_hosts(
             [host for group in connection_host_groups for host in group]
         ),

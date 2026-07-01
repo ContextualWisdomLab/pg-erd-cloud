@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import ssl
+from urllib.parse import parse_qsl, urlparse
 
 import asyncpg
 
@@ -8,6 +10,37 @@ from app.pg_introspect import queries
 from app.pg_introspect.column_examples import add_column_examples
 from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
+
+
+class _ServerHostnameSSLContext(ssl.SSLContext):
+    """SSL context that keeps certificate verification tied to the DSN host."""
+
+    def __new__(cls, server_hostname: str) -> "_ServerHostnameSSLContext":
+        context = super().__new__(cls, ssl.PROTOCOL_TLS_CLIENT)
+        context.load_default_certs()
+        context._server_hostname = server_hostname
+        return context
+
+    def wrap_bio(
+        self,
+        incoming: ssl.MemoryBIO,
+        outgoing: ssl.MemoryBIO,
+        server_side: bool = False,
+        server_hostname: str | None = None,
+        session: ssl.SSLSession | None = None,
+    ) -> ssl.SSLObject:
+        return super().wrap_bio(
+            incoming,
+            outgoing,
+            server_side=server_side,
+            server_hostname=self._server_hostname,
+            session=session,
+        )
+
+
+def _requires_verified_tls_hostname(dsn: str) -> bool:
+    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
+    return query.get("sslmode", "").lower() == "verify-full"
 
 
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
@@ -18,12 +51,13 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
+    connect_kwargs: dict[str, object] = {"host": connect_host, "timeout": 10}
+    if _requires_verified_tls_hostname(dsn):
+        connect_kwargs["ssl"] = _ServerHostnameSSLContext(target.hostname)
     if target.port is not None:
-        conn = await asyncpg.connect(
-            dsn, host=connect_host, port=target.port, timeout=10
-        )
+        conn = await asyncpg.connect(dsn, port=target.port, **connect_kwargs)
     else:
-        conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
+        conn = await asyncpg.connect(dsn, **connect_kwargs)
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
