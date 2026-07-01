@@ -1,5 +1,12 @@
 # 변경 사항
 
+## 🎨 Palette: ERD 노드 자동 정렬 기능(Dagre) 도입
+
+### ✨ 추가된 기능 (Features)
+- `dagre` 알고리즘을 도입하여 노드와 엣지(FK) 관계를 고려한 계층적(DAG) 자동 배치(`computeDagreLayout`) 기능 구현
+- ERD 툴바의 '자동 정렬' 버튼 클릭 시 기존 단순 그리드 배치의 선 꼬임 현상을 획기적으로 개선
+- 관련 로직의 100% 테스트 커버리지 달성을 위한 단위 테스트(`layout.test.ts`) 작성
+
 ## 🎨 Palette: ERD 테이블 및 컬럼 편집 기능 구현
 
 ### ✨ 추가된 기능 (Features)
