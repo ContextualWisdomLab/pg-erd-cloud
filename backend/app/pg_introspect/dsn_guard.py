@@ -197,8 +197,11 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
         port = port_override
 
     primary_hosts = await _validated_ip_hosts(host, False, port)
+    query_host_values = _split_query_host_values(query.get("host", []), "host")
+    if query_host_values:
+        hostname = query_host_values[0].lower().rstrip(".")
     query_hosts = []
-    for query_host in _split_query_host_values(query.get("host", []), "host"):
+    for query_host in query_host_values:
         query_hosts.append(await _validated_ip_hosts(query_host, False, port))
     query_hostaddrs = []
     for query_hostaddr in _split_query_host_values(

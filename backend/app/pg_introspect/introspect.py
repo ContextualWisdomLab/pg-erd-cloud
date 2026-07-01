@@ -19,9 +19,11 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
 
     def __new__(cls, server_hostname: str) -> "_ServerHostnameSSLContext":
         context = super().__new__(cls, ssl.PROTOCOL_TLS_CLIENT)
-        context.load_default_certs()
         context._server_hostname = server_hostname
         return context
+
+    def __init__(self, server_hostname: str) -> None:
+        return None
 
     def wrap_bio(
         self,
@@ -45,6 +47,18 @@ def _requires_verified_tls_hostname(dsn: str) -> bool:
     return query.get("sslmode", "").lower() == "verify-full"
 
 
+def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
+    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
+    context = _ServerHostnameSSLContext(server_hostname)
+    if query.get("sslrootcert"):
+        context.load_verify_locations(cafile=query["sslrootcert"])
+    else:
+        context.load_default_certs()
+    if query.get("sslcert") and query.get("sslkey"):
+        context.load_cert_chain(query["sslcert"], query["sslkey"])
+    return context
+
+
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
@@ -54,7 +68,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
     ssl_context = (
-        _ServerHostnameSSLContext(target.hostname)
+        _verified_tls_context(dsn, target.hostname)
         if _requires_verified_tls_hostname(dsn)
         else None
     )
