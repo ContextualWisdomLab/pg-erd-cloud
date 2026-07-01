@@ -1,3 +1,7 @@
+## 2025-02-28 - X-Forwarded-For IP Spoofing Prevention
+**Vulnerability:** IP Spoofing / Rate-Limiting DoS via `X-Forwarded-For` Left-Most IP Extraction.
+**Learning:** Extracting the left-most IP (`xff.split(",")[0]`) from `X-Forwarded-For` allows users to spoof their IP by manually providing a fake IP in the header, leading to rate limit circumvention or conversely, rate-limiting the wrong proxy server and causing DoS for legitimate users using that proxy. The right-most IP should be extracted as it represents the nearest trusted proxy, mitigating these spoofing risks.
+**Prevention:** In rate-limiting and observability middlewares, ensure the right-most value (`xff.split(",")[-1].strip()`) is extracted when relying on the `X-Forwarded-For` header to guarantee that the IP address corresponds to the nearest, authenticated hop.
 ## 2025-02-28 - Snowflake DSN Authenticator SSRF
 **Vulnerability:** The Snowflake DSN parser accepted arbitrary URLs in the `authenticator` query parameter without validation, leading to potential SSRF (Server-Side Request Forgery). The connector would make HTTP POST requests to this URL.
 **Learning:** Third-party database connectors often accept extensive configuration parameters (like custom auth endpoints) that can be manipulated by malicious users if passed directly from user input (like a connection string).
