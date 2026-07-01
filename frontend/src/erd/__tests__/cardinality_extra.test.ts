@@ -9,9 +9,19 @@ describe('cardinality extra', () => {
       { columnName: 'c', isSelected: true, distinctCount: 50 }
     ];
     const recs = buildIndexRecommendations({ tableName: 'tbl', columns, rowCount: 1000 });
-    // Should test the permutations generated
-    expect(recs.length).toBeGreaterThan(0);
-    expect(recs[0].columns).toContain('b'); // max distinct should be first
+    expect(recs.map((rec) => rec.columns)).toEqual([
+      ['a', 'b', 'c'],
+      ['b'],
+      ['c'],
+      ['a'],
+    ]);
+    expect(recs.map((rec) => rec.estimated_distinct)).toEqual([1000, 100, 50, 10]);
+    expect(recs.map((rec) => rec.strength)).toEqual([
+      'recommended',
+      'consider',
+      'consider',
+      'skip',
+    ]);
   });
 
   it('buildIndexRecommendations handles skip cases (0 ratio or negative distinct count if valid)', () => {

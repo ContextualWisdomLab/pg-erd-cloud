@@ -580,7 +580,7 @@ describe('exportDiagramSvg additional edge cases', () => {
   });
 });
 
-describe('downloadText', () => {
+describe('downloadText lifecycle', () => {
   it('downloads text successfully', () => {
     // Mock document.createElement and URL functions
     const createElementSpy = vi.spyOn(document, 'createElement');
@@ -589,14 +589,16 @@ describe('downloadText', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('mock-url');
     const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
-    downloadText('test.txt', 'hello');
+    try {
+      downloadText('test.txt', 'hello');
 
-    expect(createElementSpy).toHaveBeenCalledWith('a');
-    expect(mockAnchor.href).toBe('mock-url');
-    expect(mockAnchor.download).toBe('test.txt');
-    expect(mockAnchor.click).toHaveBeenCalled();
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith('mock-url');
-
-    vi.restoreAllMocks();
+      expect(createElementSpy).toHaveBeenCalledWith('a');
+      expect(mockAnchor.href).toBe('mock-url');
+      expect(mockAnchor.download).toBe('test.txt');
+      expect(mockAnchor.click).toHaveBeenCalled();
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('mock-url');
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
