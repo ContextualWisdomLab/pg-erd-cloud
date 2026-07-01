@@ -34,7 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 snowflake = [
-  "snowflake-connector-python>=3.18.0,<4",
+  "snowflake-connector-python>=3.18.0,<5",
 ]
 dev = [
   "pytest>=9.0.3",
