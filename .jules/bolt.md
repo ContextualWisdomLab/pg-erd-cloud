@@ -50,3 +50,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Action:**
 1. React Flow를 활용하는 경우, 노드의 속성이 분리된 형태(위치 vs 데이터)를 인식하고 `memo` 비교 시 참조 비교(fast-path)를 적극 적용하여 비용이 큰 깊은 비교를 회피하도록 합니다.
 2. 루프 내에서 가변 컬렉션(배열/Set 등)을 Map에 저장하여 다룰 때는 `if (!collection) { collection = []; map.set(key, collection); } collection.push(val);` 패턴을 엄격하게 사용하여 성능 저하 및 불필요한 메모리 재할당을 피합니다.
+## 2024-06-25 - Avoid O(N) Map.set inside Loops for Existing Arrays/Sets
+**Learning:** When building Maps containing arrays or Sets in a loop, continually calling `map.set(key, list)` even after `list` is retrieved from `map.get()` causes unnecessary hashing and re-balancing overhead.
+**Action:** Only call `map.set()` when the array or Set doesn't exist yet (during creation). If the collection already exists in the Map, mutate it directly (e.g. `list.push` or `set.add`) without re-setting it in the Map.

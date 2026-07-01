@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ export function ExportModal({
   onCloseExport,
   onCopyExportDdl,
 }: ExportModalProps) {
+  const dialogRef = useDialogAccessibility(isOpen, onCloseExport);
+
   if (!isOpen) return null;
 
   return (
@@ -38,6 +41,8 @@ export function ExportModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="export-ddl-title"
+        ref={dialogRef}
+        tabIndex={-1}
         style={{
           background: "#fff",
           padding: 20,

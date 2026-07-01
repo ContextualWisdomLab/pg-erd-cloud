@@ -1212,7 +1212,7 @@ export default function App() {
                     title="테이블 추가"
                     aria-label="테이블 추가"
                     onClick={onOpenAddTable}
-                    style={{ marginTop: 16, pointerEvents: "auto" }}
+                    style={{ marginTop: 16 }}
                   >
                     + 테이블 추가
                   </button>
