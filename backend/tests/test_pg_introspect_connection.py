@@ -10,10 +10,7 @@ from app.settings import settings
 
 
 def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]:
-    return [
-        (socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 5432))
-        for ip in ips
-    ]
+    return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 5432)) for ip in ips]
 
 
 class FakeConnection:
