@@ -5,11 +5,11 @@ WORKDIR /app
 # Ensure the non-root `node` user can write to /app (e.g. for node_modules).
 RUN chown -R node:node /app
 
-COPY --chown=node:node package.json package-lock.json /app/
+COPY --chown=node:node package.json /app/
 
 USER node
 
-RUN npm ci
+RUN npm i
 
 COPY --chown=node:node . /app
 
