@@ -12,6 +12,8 @@ design exercise.
 - Existing UI reference source: `docs/ui-ux/README.md` and the nine PNG screens
   in `docs/ui-ux`.
 - Core flow source: `docs/ui-ux/core-user-flow.mmd`.
+- Product Design Kit Figma file:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>.
 - Generated FigJam flow board:
   <https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588>.
 - Current visual direction: quiet work-focused layout, persistent left sidebar,
@@ -94,6 +96,8 @@ Deliverable:
 
 - Editable Figma file containing the source references, componentized screens,
   and a clickable prototype.
+- Initial Figma file created with pages for intake, current references,
+  foundations, components, core prototype flow, and QA/handoff.
 
 ### 3. Core Prototype Flow
 
