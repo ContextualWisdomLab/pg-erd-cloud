@@ -630,6 +630,10 @@ button:disabled {
   line-height: 1.5;
 }
 
+.emptyState button {
+  pointer-events: auto;
+}
+
 @keyframes emptyStateSpin {
   to {
     transform: rotate(360deg);
