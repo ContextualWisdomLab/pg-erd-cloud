@@ -21,8 +21,7 @@ function requireSecureCredentialTransport(): void {
 
 async function csrfToken(): Promise<string> {
   const r = await fetch(`${API_BASE}/api/csrf-token`, {
-    credentials: 'include',
-    headers: devHeaders()
+    credentials: 'include'
   })
   if (!r.ok) throw new Error(`csrfToken failed: ${r.status}`)
 
@@ -33,27 +32,21 @@ async function csrfToken(): Promise<string> {
   return payload.csrf_token
 }
 
-function devHeaders(): Record<string, string> {
-  const devUser = localStorage.getItem('devUser')
-  return devUser ? { 'X-Dev-User': devUser } : {}
-}
-
 async function jsonHeaders(): Promise<Record<string, string>> {
   return {
     'Content-Type': 'application/json',
-    'X-CSRF-Token': await csrfToken(),
-    ...devHeaders()
+    'X-CSRF-Token': await csrfToken()
   }
 }
 
 export async function getMe(): Promise<{ subject: string; display_name: string | null; user_account_uuid: string }> {
-  const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include', headers: devHeaders() })
+  const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
   if (!r.ok) throw new Error(`getMe failed: ${r.status}`)
   return r.json()
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include', headers: devHeaders() })
+  const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listProjects failed: ${r.status}`)
   return r.json()
 }
@@ -70,7 +63,7 @@ export async function createProject(project_name: string): Promise<Project> {
 }
 
 export async function listConnections(projectId: string): Promise<Connection[]> {
-  const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, { credentials: 'include', headers: devHeaders() })
+  const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listConnections failed: ${r.status}`)
   return r.json()
 }
@@ -88,7 +81,7 @@ export async function createConnection(projectId: string, conn_name: string, dsn
 }
 
 export async function listSnapshots(projectId: string): Promise<Snapshot[]> {
-  const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, { credentials: 'include', headers: devHeaders() })
+  const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listSnapshots failed: ${r.status}`)
   return r.json()
 }
@@ -105,7 +98,7 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
 }
 
 export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
-  const r = await fetch(`${API_BASE}/api/snapshots/${snapshotId}`, { credentials: 'include', headers: devHeaders() })
+  const r = await fetch(`${API_BASE}/api/snapshots/${snapshotId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`getSnapshot failed: ${r.status}`)
   const response = (await r.json()) as SnapshotDetailResponse
   return snapshotDetailFromResponse(response)

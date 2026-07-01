@@ -31,11 +31,9 @@ import {
   getSnapshot,
   listConnections,
   listProjects,
-  listSnapshots,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import {
-  BUSINESS_GROUP_COLORS,
   DEFAULT_BUSINESS_GROUP_COLOR,
   uniqueBusinessGroupId,
   type BusinessGroup,
@@ -92,7 +90,6 @@ function strengthLabel(strength: CardinalityStrength): string {
 }
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -226,12 +223,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
-      window.localStorage.setItem("devUser", devUser.trim() || "local");
-    }
-  }, [devUser]);
-
-  useEffect(() => {
     let isCurrent = true;
     setIsAuthLoading(true);
     setAuthError(null);
@@ -258,7 +249,7 @@ export default function App() {
     return () => {
       isCurrent = false;
     };
-  }, [devUser]);
+  }, []);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -887,13 +878,6 @@ export default function App() {
       <main id="main" className="authGate">
         <h1>Authentication required</h1>
         <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
-        <label htmlFor="dev-user-auth">User (dev)</label>
-        <input
-          id="dev-user-auth"
-          value={devUser}
-          onChange={(e) => setDevUser(e.target.value)}
-          placeholder="local"
-        />
       </main>
     );
   }
@@ -905,19 +889,6 @@ export default function App() {
       </a>
       <aside className="sidebar">
         <h2>pg-erd-cloud</h2>
-
-        <div className="field">
-          <label htmlFor="dev-user">User (dev)</label>
-          <input
-            id="dev-user"
-            value={devUser}
-            onChange={(e) => setDevUser(e.target.value)}
-            placeholder="local"
-          />
-          <div style={{ fontSize: 12, color: "#4b5563" }}>
-            Subject: <code>{me?.subject || "—"}</code>
-          </div>
-        </div>
 
         <div className="field">
           <label htmlFor="project-select">Project</label>
