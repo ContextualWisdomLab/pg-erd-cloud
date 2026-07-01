@@ -111,7 +111,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    global _oidc_jwks, _oidc_jwks_expires_at, _last_jwks_refresh_at
     now = dt.datetime.now(dt.timezone.utc)
 
     if _oidc_jwks is not None:
@@ -142,9 +141,9 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
             jwks = cast(dict[str, Any], r.json())
 
         refreshed_at = dt.datetime.now(dt.timezone.utc)
-        _oidc_jwks = jwks
-        _oidc_jwks_expires_at = refreshed_at + OIDC_JWKS_CACHE_TTL
-        _last_jwks_refresh_at = refreshed_at
+        globals()["_oidc_jwks"] = jwks
+        globals()["_oidc_jwks_expires_at"] = refreshed_at + OIDC_JWKS_CACHE_TTL
+        globals()["_last_jwks_refresh_at"] = refreshed_at
         return cast(dict, jwks)
 
 
