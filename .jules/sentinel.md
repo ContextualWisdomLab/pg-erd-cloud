@@ -17,14 +17,10 @@
 **Learning:** You must not blindly trust the JWT token header algorithm (`alg`). You must explicitly supply a whitelist of acceptable algorithms to your JWT library AND ensure that public key verification configurations explicitly filter out symmetric algorithm families (`HS*`).
 **Prevention:** Filter out `HS` algorithms when reading allowed configuration algorithms, and explicitly block them in allowlists passed to JWT decoders when dealing with RS256/ES256 public keys.
 
-2026-06-21 - [Lack of Rate Limiting on Token Revocation Endpoint]
-**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting, making it vulnerable to denial-of-service (DoS) and caching resource exhaustion attacks. Attackers could flood the system with rapid revocation requests.
-**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse.
-**Prevention:** Always ensure that revocation or authentication-related endpoints are covered by appropriate rate limiting middleware configurations.
 ## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
-**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
-**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
-**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+**Vulnerability:** The `/api/auth/logout` token revocation endpoint lacked its intended tighter rate limit because `_revoke_rate_limit_policy` in `backend/app/main.py` used the stale route prefix `"/api/auth/revoke"` instead of `"/api/auth/logout"`.
+**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. Route-prefix policies must match the actual `APIRouter` path exactly.
+**Prevention:** Always verify that sensitive endpoint rate-limit prefixes match the actual route definitions, and keep app-wiring regression tests for those policies.
 
 ## 2024-06-25 - Fix SSRF validation rejecting Okta root domain
 **Vulnerability:** A logic bug in `_parse_snowflake_dsn` incorrectly rejected authenticators using Okta root domains `okta.com` or `oktapreview.com` because it only checked `endswith(".okta.com")`, functioning as a DoS for legitimate configurations.
@@ -43,7 +39,3 @@
 **Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
 
-## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
-**Vulnerability:** The `/api/auth/logout` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
-**Learning:** The backend implements a custom `RateLimitPolicy` that enforces rate limits based on exact string matching of `route_prefix`. It is critical to ensure that the configured `route_prefix` perfectly matches the corresponding `APIRouter` path configurations.
-**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
