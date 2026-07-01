@@ -278,12 +278,16 @@ export default function App() {
         setConnections(c);
         if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (isCurrent) setError(String(e));
+      });
     listSnapshots(selectedProjectId)
       .then((items) => {
         if (isCurrent) setSnapshots(items);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (isCurrent) setError(String(e));
+      });
     return () => {
       isCurrent = false;
     };
@@ -1216,13 +1220,13 @@ export default function App() {
               </div>
             </div>
             <div className="dataTable" role="table" aria-label="프로젝트 목록">
-              <div className="dataTable__row dataTable__row--head" role="row">
+              <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
                 <span role="columnheader">이름</span>
                 <span role="columnheader">연결</span>
                 <span role="columnheader">동작</span>
               </div>
               {projects.map((project) => (
-                <div className="dataTable__row" role="row" key={project.project_space_uuid}>
+                <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
                   <strong role="cell">{project.project_name}</strong>
                   <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
                   <span role="cell">

@@ -235,6 +235,10 @@ textarea:focus-visible {
   border-top: 1px solid #e2e8f0;
 }
 
+.dataTable__row--projects {
+  grid-template-columns: 2fr 1.5fr 0.8fr;
+}
+
 .dataTable__row:first-child {
   border-top: 0;
 }
