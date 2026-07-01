@@ -60,3 +60,17 @@ def test_valkey_queue_rejects_invalid_sentinel_hosts(
 
     with pytest.raises(ValueError, match="host:port"):
         valkey_queue.valkey_queue_config_summary()
+
+def test_load_redis_module_raises_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_module(_name: str) -> object:
+        raise ModuleNotFoundError("redis")
+
+    monkeypatch.setattr(valkey_queue.importlib, "import_module", missing_module)
+
+    with pytest.raises(
+        valkey_queue.ValkeyQueueUnavailable,
+        match="Valkey queue backend requires redis-py with asyncio support",
+    ):
+        valkey_queue._load_redis_module()
