@@ -34,7 +34,8 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     assert "Permissions-Policy" in r.headers
     assert "Content-Security-Policy" in r.headers
     assert (
-        r.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+        r.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
     )
 
     r2 = client.get("/api/ping")
@@ -45,7 +46,8 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     assert "Permissions-Policy" in r2.headers
     assert "Content-Security-Policy" in r2.headers
     assert (
-        r2.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+        r2.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
     )
 
 
@@ -125,7 +127,9 @@ def test_cors_preflight_allows_csrf_token_header() -> None:
     )
 
     assert r.status_code in (200, 204)
-    assert CSRF_HEADER_NAME.lower() in r.headers["Access-Control-Allow-Headers"].lower()
+    assert CSRF_HEADER_NAME.lower() in r.headers[
+        "Access-Control-Allow-Headers"
+    ].lower()
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:

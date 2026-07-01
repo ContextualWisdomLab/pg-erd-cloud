@@ -9,7 +9,7 @@ include = ["app*"]
 [project]
 name = "pg-erd-cloud-backend"
 version = "0.1.0"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.137.1",
   "hypercorn>=0.18.0",
@@ -19,7 +19,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.51,<2.1",
   "asyncpg>=0.31.0",
   "psycopg[binary]>=3.3.4",
-  "alembic>=1.18.5",
+  "alembic>=1.18.4",
   "cryptography>=46.0.7",
   "httpx>=0.28.1",
   "python-jose[cryptography]>=3.5.0",
@@ -28,31 +28,19 @@ dependencies = [
   "starlette>=1.1.0",
   "urllib3>=2.7.0",
   "aiohttp>=3.14.1",
-  "requests>=2.34.2",
-  "python-multipart>=0.0.32",
+  "requests>=2.33.0",
+  "python-multipart>=0.0.31",
 ]
 
 [project.optional-dependencies]
 snowflake = [
-  "snowflake-connector-python>=4,<5",
+  "snowflake-connector-python>=3.18.0,<5",
 ]
 dev = [
   "pytest>=9.0.3",
   "pytest-asyncio>=1.4.0",
-  "pytest-cov>=7.0.0",
-  "mypy>=2.1.0",
-  "asyncpg-stubs>=0.31.2",
-  "types-python-jose>=3.5.0.20260408",
-  "types-requests",
-]
-
-[dependency-groups]
-dev = [
-  "pytest>=9.0.3",
-  "pytest-asyncio>=1.4.0",
-  "pytest-cov>=7.0.0",
-  "mypy>=2.1.0",
-  "asyncpg-stubs>=0.31.2",
+  "mypy>=1.10.0",
+  "asyncpg-stubs>=0.31.0",
   "types-python-jose>=3.5.0.20260408",
   "types-requests",
 ]
@@ -60,19 +48,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-
-[tool.coverage.run]
-include = [
-  "app/csrf.py",
-  "app/db_introspect.py",
-  "app/metrics.py",
-  "app/permissions.py",
-  "app/pg_introspect/queries.py",
-  "app/pooler.py",
-  "app/schemas.py",
-  "app/security.py",
-  "app/security_headers.py",
-]
 
 [tool.mypy]
 python_version = "3.10"
