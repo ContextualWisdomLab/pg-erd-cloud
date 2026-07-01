@@ -29,17 +29,27 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
         schema_name = schema_filter
         include_system = False
 
-        schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
-        relations = await conn.fetch(queries.RELATIONS_SQL, schema_name, include_system)
-        columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)
+        schemas = await conn.fetch(
+            queries.SCHEMAS_SQL, schema_name, include_system
+        )
+        relations = await conn.fetch(
+            queries.RELATIONS_SQL, schema_name, include_system
+        )
+        columns = await conn.fetch(
+            queries.COLUMNS_SQL, schema_name, include_system
+        )
         constraints = await conn.fetch(
             queries.CONSTRAINTS_SQL, schema_name, include_system
         )
-        indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
+        indexes = await conn.fetch(
+            queries.INDEXES_SQL, schema_name, include_system
+        )
         pk_columns = await conn.fetch(
             queries.PK_COLUMNS_SQL, schema_name, include_system
         )
-        fk_edges = await conn.fetch(queries.FK_EDGES_SQL, schema_name, include_system)
+        fk_edges = await conn.fetch(
+            queries.FK_EDGES_SQL, schema_name, include_system
+        )
         citus_distributed_tables = []
         has_citus = await conn.fetchval(
             "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'citus')"
@@ -65,7 +75,9 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             "indexes": [dict(r) for r in indexes],
             "pk_columns": [dict(r) for r in pk_columns],
             "fk_edges": [dict(r) for r in fk_edges],
-            "citus_distributed_tables": [dict(r) for r in citus_distributed_tables],
+            "citus_distributed_tables": [
+                dict(r) for r in citus_distributed_tables
+            ],
         }
 
         return sanitize_for_storage(snapshot)  # type: ignore[return-value]

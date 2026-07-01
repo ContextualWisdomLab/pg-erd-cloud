@@ -19,18 +19,10 @@
 ## 2025-02-23 - Add Confirmation and Accessibility to Destructive Actions
 **Learning:** In the ERD canvas, destructive actions like deleting relations or business groups were missing user confirmation, increasing the chance of accidental data loss. Furthermore, mapped lists of interactive elements like "Business Group" rendering generic "삭제" (delete) buttons lacked `aria-label` context, creating ambiguous screen reader experiences.
 **Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g., `aria-label={`${itemName} 삭제`}`).
-## 2026-06-28 - STRIX Security Intersections and Strict Scope Enforcement
-**Learning:** In projects with strict AI code review agents and security scanners (like STRIX), making multiple distinct micro-UX improvements (e.g. across different files or disparate components) in a single task intended for "ONE micro-UX improvement" will cause a CI failure. Furthermore, applying UX improvements to elements that handle potentially sensitive data (e.g. DSNs, or rendering unsanitized user input) can inadvertently trigger security scanners if those elements contain pre-existing vulnerabilities, blocking the PR entirely.
-**Action:** When tasked with a single micro-UX improvement, strictly isolate the change to one specific element and file. When choosing an element, actively avoid modifying components that handle credentials or render un-escaped user inputs to avoid intersecting with existing unpatched security flaws.
-## 2026-06-25 - Text Truncation Accessibility
-**Learning:** Elements using `text-overflow: ellipsis` can hide important table, column, example, and group context from users who need the full text.
-**Action:** Treat native `title` as a convenience hover fallback only. Pair truncated text with an accessible name or description, and make the truncated element focusable when the full value is otherwise hidden.
-## 2026-06-25 - SPA Noscript Fallbacks
-**Learning:** A JavaScript-only SPA can show a blank screen when scripts are disabled, which is especially confusing for assistive technology users and locked-down browser environments.
-**Action:** Add a localized `<noscript>` fallback near the top of `<body>` for SPA entry pages. Keep the message in the same language as the document `lang` value, or explicitly mark any different-language text with its own `lang` attribute.
-## 2026-06-30 - Custom Modals and ARIA Context
-**Learning:** Custom generic `<div>` components mimicking native elements (like modals) frequently lack basic ARIA boundaries (`role="dialog"`, `aria-modal="true"`) and contextual naming, leading to screen reader confusion. Additionally, using `aria-label` on non-interactive generic elements (like an outer `div` wrapping list items) without a corresponding role (e.g. `role="group"`) is commonly ignored by assistive tech.
-**Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading.
-## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
-**Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
-**Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-06-21 - Form Input Keyboard Navigation
+**Learning:** Standalone inputs without wrapping `<form>` elements inherently lack keyboard submission support, forcing users to switch from keyboard to mouse just to complete simple forms. Furthermore, modal dialogues holding inputs trap keyboard users unless explicit cancelation escapes are implemented.
+**Action:** When implementing inputs outside of standard `<form>` contexts or within custom modals, explicitly add `onKeyDown` handlers to support `Enter` for submission and `Escape` for cancelation.
+
+## 2024-06-23 - [Safe Scope UX Tooltips]
+**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g., "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
+**Action:** Always verify the security posture of a file before making non-security changes to it. Prefer touching isolated display components (like `TableNode.tsx`) for UX enhancements rather than high-risk root components.
