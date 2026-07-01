@@ -62,6 +62,8 @@ def test_add_column_examples_preserves_existing_fields() -> None:
     # which is intended behavior since these dicts are freshly instantiated
     enriched = add_column_examples(columns)
 
+    assert enriched is columns
+    assert enriched[0] is columns[0]
     assert enriched[0]["column_comment"] == "Current workflow state"
     assert enriched[0]["example_value"] == "active"
     assert enriched[0]["example_value_source"] == "generated"

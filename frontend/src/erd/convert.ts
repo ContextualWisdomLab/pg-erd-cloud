@@ -12,6 +12,8 @@ export type TableNodeData = {
   columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
   indexes?: IndexRecommendation[]
   businessGroup?: BusinessGroup | null
+  isDimmed?: boolean
+  isHighlighted?: boolean
   badges: {
     pk: boolean
     fk: boolean

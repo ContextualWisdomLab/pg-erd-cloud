@@ -117,7 +117,7 @@ def infer_column_example(column: dict) -> str:
 
 def add_column_examples(columns: list[dict]) -> list[dict]:
     # ⚡ Bolt: Mutate dictionaries in-place to avoid allocating new dicts for each column.
-    # The input list and dictionaries are freshly created from asyncpg Records specifically for the snapshot payload.
+    # Snapshot introspectors pass freshly built payload dictionaries, so callers do not share these objects.
     for col in columns:
         if "example_value" not in col:
             col["example_value"] = infer_column_example(col)
