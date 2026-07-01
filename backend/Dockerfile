@@ -1,9 +1,10 @@
-FROM python:3.14.6-slim@sha256:44dd04494ee8f3b538294360e7c4b3acb87c8268e4d0a4828a6500b1eff50061
+FROM python:3.14.6-slim@sha256:63a4c7f612a00f92042cbdcc7cdc6a306f38485af0a200b9c89de7d9b1607d15
 
 WORKDIR /app
 
 # Avoid writing .pyc under bind-mounted source trees (e.g. docker compose dev).
 ENV PYTHONPYCACHEPREFIX=/tmp/pycache
+ENV PYTHONPATH=/app
 
 COPY requirements.lock /app/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /app/requirements.lock
@@ -12,8 +13,6 @@ COPY pyproject.toml /app/pyproject.toml
 COPY app /app/app
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
-
-RUN pip install --no-cache-dir --no-deps .
 
 # Run the application as a non-root user (least privilege).
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
