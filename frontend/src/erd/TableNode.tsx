@@ -172,8 +172,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div
             className="tableNode__more"
-            title="생략된 컬럼이 더 있습니다"
-            aria-label="생략된 컬럼이 더 있습니다"
+            title={`생략된 컬럼이 ${data.columns.length - MAX_RENDERED_COLUMNS}개 더 있습니다`}
+            aria-label={`생략된 컬럼이 ${data.columns.length - MAX_RENDERED_COLUMNS}개 더 있습니다`}
             tabIndex={0}
           >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
@@ -200,8 +200,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             {data.indexes.length > 4 ? (
               <div
                 className="tableNode__more"
-                title="생략된 인덱스가 더 있습니다"
-                aria-label="생략된 인덱스가 더 있습니다"
+                title={`생략된 인덱스가 ${data.indexes.length - 4}개 더 있습니다`}
+                aria-label={`생략된 인덱스가 ${data.indexes.length - 4}개 더 있습니다`}
                 tabIndex={0}
               >
                 … {data.indexes.length - 4} more indexes
