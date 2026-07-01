@@ -19,15 +19,6 @@ def utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
-class RevokedToken(Base):
-    """Persistent storage for revoked tokens to survive application restarts."""
-
-    __tablename__ = "revoked_token"
-
-    jwt_id: Mapped[str] = mapped_column(Text(), primary_key=True)
-    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
-
-
 class UserAccount(Base):
     """User record keyed by a UUID and identified by OIDC subject."""
 
@@ -182,7 +173,9 @@ class JobQueue(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+    __table_args__ = (
+        Index("ix_job_queue__status_run_after", "status", "run_after"),
+    )
 
 
 class ShareLink(Base):
@@ -202,7 +195,9 @@ class ShareLink(Base):
         UUID(as_uuid=True),
         ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
     )
-    permission_kind: Mapped[str] = mapped_column(Text())  # viewer/editor (MVP: viewer)
+    permission_kind: Mapped[str] = mapped_column(
+        Text()
+    )  # viewer/editor (MVP: viewer)
     expires_at: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

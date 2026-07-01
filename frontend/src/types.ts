@@ -8,13 +8,6 @@ export type Connection = {
   conn_name: string
 }
 
-export type ShareLink = {
-  share_link_uuid: string
-  permission_kind: string
-  url_path: string
-  url: string
-}
-
 declare const plainTextBrand: unique symbol
 
 export type PlainText = string & { readonly [plainTextBrand]: true }
