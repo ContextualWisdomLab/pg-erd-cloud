@@ -25,7 +25,7 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
 **Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
-## 2024-05-XX - [CRITICAL] Authentication Bypass via X-Dev-User Leftover Mitigation
+## 2024-05 - [CRITICAL] Authentication Bypass via X-Dev-User Leftover Mitigation
 **Vulnerability:** Leftover logic defining an `X-Dev-User` bypass vector existed partially in the backend CORS allowed headers and heavily in the frontend via localStorage and request headers.
 **Learning:** Even after backend vulnerability logic is removed (e.g. `try_get_subject_for_rate_limit` fallback logic removed), residual CORS configurations (`backend/app/main.py`) or client-side storage & transmission (`frontend/src/api.ts` and `frontend/src/App.tsx`) might still mistakenly use and expose development bypass tokens.
 **Prevention:** When removing an auth-bypass test vector, conduct a full-stack search (e.g., `grep -rn "X-Dev-User" .`) to ensure the entire trace, including frontend localStorage keys, UI toggles, and backend CORS configuration, is cleanly removed.
