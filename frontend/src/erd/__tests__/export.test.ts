@@ -97,7 +97,10 @@ describe('exportDDL', () => {
     expect(ddl).toContain('ALTER TABLE "public.posts"');
     expect(ddl).toContain('ADD CONSTRAINT "fk_posts_users"');
     expect(ddl).toContain('ADD CONSTRAINT "fk_2_1"');
-    expect(ddl).toContain('REFERENCES "public.users"');
+    expect(ddl).toContain('FOREIGN KEY ("user_id")');
+    expect(ddl).toContain('REFERENCES "public.users" ("id")');
+    expect(ddl).not.toContain('/* source columns */');
+    expect(ddl).not.toContain('/* target columns */');
   });
 
   it('should not throw if foreign key source or target is missing', () => {
