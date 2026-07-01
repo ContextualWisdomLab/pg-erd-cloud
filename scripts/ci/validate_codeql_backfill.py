@@ -29,7 +29,7 @@ def main() -> int:
     require("persist-credentials: false" in text, "checkout credentials must not persist")
     require("git rev-list --max-count" in text, "must enumerate recent commits")
     require("--first-parent" not in text, "must not skip non-first-parent commits")
-    require("count > 128" in text, "commit_count must cap the matrix below 256 jobs")
+    require("count > 127" in text, "commit_count must cap the workflow at 256 jobs")
     require("github/codeql-action/init@" in text, "must initialize CodeQL")
     require("github/codeql-action/analyze@" in text, "must upload CodeQL analysis")
     require('ref: "refs/heads/${{ inputs.branch }}"' in text, "analysis ref must target the requested branch")

@@ -49,8 +49,8 @@ jobs:
             exit 1
           fi
 
-          if (( count < 1 || count > 128 )); then
-            echo "commit_count must be between 1 and 128 to stay within the GitHub Actions matrix limit" >&2
+          if (( count < 1 || count > 127 )); then
+            echo "commit_count must be between 1 and 127 to stay within the GitHub Actions workflow job limit" >&2
             exit 1
           fi
 

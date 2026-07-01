@@ -33,8 +33,8 @@ commit for:
 - Checkout credentials are not persisted.
 - The uploaded SARIF analysis is attributed to `refs/heads/<branch>` and the
   specific commit SHA selected by the matrix.
-- `commit_count` is capped at `128` so the two-language matrix stays within the
-  GitHub Actions 256-job limit.
+- `commit_count` is capped at `127` so the two-language matrix plus the
+  enumerate job stays within the GitHub Actions 256-job limit.
 
 ## Verification
 
