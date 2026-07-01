@@ -139,6 +139,46 @@ describe('exportDDL', () => {
     expect(ddl).not.toContain('fk_missing_source');
   });
 
+  it('should fall back to placeholder columns for malformed foreign key handles', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.posts',
+          columns: [{ column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false }],
+          badges: { pk: false, fk: true },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'fk1',
+        source: '2',
+        target: '1',
+        label: 'fk_posts_users',
+        sourceHandle: 'src-c-110000',
+        targetHandle: 'tgt-c-not-hex',
+      },
+    ];
+
+    expect(() => exportDDL(nodes, edges)).not.toThrow();
+    const ddl = exportDDL(nodes, edges);
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
+    expect(ddl).toContain('REFERENCES "public.users" (/* target columns */)');
+  });
+
   it('should export indexes correctly and not emit duplicate index names', () => {
     const nodes: Node<TableNodeData>[] = [
       {

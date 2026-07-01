@@ -69,7 +69,9 @@ function columnNameFromHandle(handle: unknown, prefix: string): string | null {
       return null;
     }
     const codePoint = Number.parseInt(part, 16);
-    return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : null;
+    return Number.isSafeInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF
+      ? String.fromCodePoint(codePoint)
+      : null;
   });
 
   if (chars.some((char) => char === null)) {
