@@ -2,6 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
+import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
@@ -64,6 +65,16 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
+  const sourceHandleColumn = (sourceNode.data.columns || [])
+    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
+    ?.column_name;
+  const targetHandleColumn = (targetNode.data.columns || [])
+    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
+    ?.column_name;
+  if (sourceHandleColumn && targetHandleColumn) {
+    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+  }
+
   const fallbackSource = (sourceNode.data.columns || [])
     .filter((column) => !column.is_pk)
     .map((column) => column.column_name);
@@ -117,12 +128,15 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
 
     if (sourceNode && targetNode) {
       const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
-      if (!fkColumns) continue;
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
-      const sourceColumns = fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ');
-      const targetColumns = fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ');
+      const sourceColumns = fkColumns
+        ? fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* source columns */';
+      const targetColumns = fkColumns
+        ? fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* target columns */';
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
       ddl += `  FOREIGN KEY (${sourceColumns})\n`;

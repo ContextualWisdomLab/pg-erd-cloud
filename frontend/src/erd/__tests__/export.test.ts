@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { exportDDL, exportPlantUml, exportDiagramSvg, downloadText } from '../export';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportDDL', () => {
   it('should export basic table DDL with primary key', () => {
@@ -83,12 +84,16 @@ describe('exportDDL', () => {
         id: 'fk1',
         source: '2', // source is the table with foreign key
         target: '1', // target is the referenced table
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: 'fk_posts_users',
       },
       {
         id: 'fk2',
         source: '2',
         target: '1',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         // missing label to test auto generated constraint name fallback
       }
     ];
@@ -101,6 +106,84 @@ describe('exportDDL', () => {
     expect(ddl).toContain('REFERENCES "public.users" ("id")');
     expect(ddl).not.toContain('/* source columns */');
     expect(ddl).not.toContain('/* target columns */');
+  });
+
+  it('exports composite foreign key columns from edge data in order', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.parents',
+          columns: [
+            { column_name: 'org_id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'dept_id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.children',
+          columns: [
+            { column_name: 'child_org_id', data_type: 'integer', is_not_null: true, is_pk: false },
+            { column_name: 'child_dept_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+          badges: { pk: false, fk: true },
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'fk_composite',
+        source: '2',
+        target: '1',
+        label: 'fk_child_parent',
+        data: {
+          sourceColumns: ['child_org_id', 'child_dept_id'],
+          targetColumns: ['org_id', 'dept_id'],
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, edges);
+
+    expect(ddl).toContain('FOREIGN KEY ("child_org_id", "child_dept_id")');
+    expect(ddl).toContain('REFERENCES "public.parents" ("org_id", "dept_id")');
+  });
+
+  it('keeps a placeholder foreign key when columns cannot be inferred', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.audit',
+          columns: [],
+          badges: { pk: false, fk: true },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, [{ id: 'fk_legacy', source: '2', target: '1', label: 'fk_legacy' }]);
+
+    expect(ddl).toContain('ADD CONSTRAINT "fk_legacy"');
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
   });
 
   it('should not throw if foreign key source or target is missing', () => {
