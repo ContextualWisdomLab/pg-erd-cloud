@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 import pytest
@@ -643,3 +644,64 @@ async def test_oidc_jwks_refresh_rate_limiting(
     assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
     # Request count shouldn't increase for jwks because it's within the refresh interval
     assert request_count == before_second_refresh
+
+
+@pytest.mark.asyncio
+async def test_oidc_jwks_force_refresh_is_serialized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_count = 0
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> _FakeHttpResponse:
+            nonlocal request_count
+            request_count += 1
+            if url.endswith("openid-configuration"):
+                return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
+            await asyncio.sleep(0)
+            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA"}]})
+
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(auth, "_oidc_config", None)
+    monkeypatch.setattr(auth, "_oidc_jwks", None)
+    monkeypatch.setattr(
+        auth,
+        "_oidc_jwks_expires_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+    monkeypatch.setattr(
+        auth,
+        "_last_jwks_refresh_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+
+    await auth._get_jwks()
+    before_concurrent_refresh = request_count
+    monkeypatch.setattr(
+        auth,
+        "_last_jwks_refresh_at",
+        auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
+    )
+
+    refreshed = await asyncio.gather(
+        *(auth._get_jwks(force_refresh=True) for _ in range(5))
+    )
+
+    assert refreshed == [
+        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+    ]
+    assert request_count == before_concurrent_refresh + 1

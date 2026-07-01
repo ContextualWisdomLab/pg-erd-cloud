@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
 from dataclasses import dataclass
@@ -74,6 +75,7 @@ OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
 OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
 OIDC_JWKS_MIN_REFRESH_INTERVAL = dt.timedelta(seconds=60)
 _last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+_jwks_refresh_lock = asyncio.Lock()
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 
@@ -121,16 +123,29 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
         ):
             return cast(dict, _oidc_jwks)
 
-    async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
-        r = await client.get(jwks_uri)
-        if r.is_redirect:
-            raise RuntimeError("OIDC JWKS endpoint must not redirect")
-        r.raise_for_status()
-        jwks = cast(dict[str, Any], r.json())
-    _oidc_jwks = jwks
-    _oidc_jwks_expires_at = now + OIDC_JWKS_CACHE_TTL
-    _last_jwks_refresh_at = now
-    return cast(dict, jwks)
+    async with _jwks_refresh_lock:
+        now = dt.datetime.now(dt.timezone.utc)
+        if _oidc_jwks is not None:
+            if not force_refresh and now < _oidc_jwks_expires_at:
+                return cast(dict, _oidc_jwks)
+            if (
+                force_refresh
+                and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
+            ):
+                return cast(dict, _oidc_jwks)
+
+        async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
+            r = await client.get(jwks_uri)
+            if r.is_redirect:
+                raise RuntimeError("OIDC JWKS endpoint must not redirect")
+            r.raise_for_status()
+            jwks = cast(dict[str, Any], r.json())
+
+        refreshed_at = dt.datetime.now(dt.timezone.utc)
+        _oidc_jwks = jwks
+        _oidc_jwks_expires_at = refreshed_at + OIDC_JWKS_CACHE_TTL
+        _last_jwks_refresh_at = refreshed_at
+        return cast(dict, jwks)
 
 
 def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
