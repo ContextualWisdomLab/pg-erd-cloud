@@ -53,3 +53,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-06-25 - Avoid O(N) Map.set inside Loops for Existing Arrays/Sets
 **Learning:** When building Maps containing arrays or Sets in a loop, continually calling `map.set(key, list)` even after `list` is retrieved from `map.get()` causes unnecessary hashing and re-balancing overhead.
 **Action:** Only call `map.set()` when the array or Set doesn't exist yet (during creation). If the collection already exists in the Map, mutate it directly (e.g. `list.push` or `set.add`) without re-setting it in the Map.
+
+## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
+**Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
+**Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
