@@ -1,7 +1,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 globalThis.ResizeObserver = class ResizeObserver {
@@ -19,9 +19,7 @@ vi.mock('../../api', () => ({
   createShareLink: vi.fn(),
 }));
 
-afterEach(() => {
-    cleanup();
-});
+afterEach(cleanup);
 
 describe('App edit functionality', () => {
     it('renders without crashing', () => {
@@ -35,13 +33,10 @@ describe('App edit functionality', () => {
 
         await user.click(await screen.findByRole('button', { name: '편집기' }));
 
-        let toolbar: HTMLElement;
-        await waitFor(() => {
-            toolbar = screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' });
-            expect(toolbar).toBeInTheDocument();
-        });
+        const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
+        expect(toolbar).toBeInTheDocument();
 
-        const toolbarQueries = within(toolbar!);
+        const toolbarQueries = within(toolbar);
         expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
         expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
         expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
