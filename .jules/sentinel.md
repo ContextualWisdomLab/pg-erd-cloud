@@ -1,3 +1,8 @@
+## 2024-06-25 - 스냅샷 생성 시 잘못된 연결 ID 입력 처리 개선 (IDOR 및 리소스 열거 방지)
+**Vulnerability:** `/api/snapshots/by-project/{project_space_uuid}` 엔드포인트에서 요청된 프로젝트에 속하지 않는 잘못된 `db_connection_uuid` 입력을 받았을 때 요청을 거부하는 대신 "failed" 상태의 스냅샷 작업을 데이터베이스에 생성하는 취약점이 있었습니다.
+**Learning:** 성공적인 HTTP 상태 코드와 함께 "failed" 도메인 객체를 반환하면 공격자가 다른 프로젝트의 리소스 ID를 열거(IDOR)할 수 있으며, 시스템 데이터베이스에 정크 레코드를 무수히 생성(DoS/DB 고갈)할 수 있습니다.
+**Prevention:** 교차 참조되는 리소스 ID가 항상 인증된 부모 리소스 범위에 속하는지 검증하고, 잘못된 상태를 생성하는 대신 존재 여부를 숨기기 위해 `404 Not Found` 오류로 안전하게 실패하도록 구현해야 합니다.
+
 ## 2025-02-21 - [Okta SSRF vulnerability in Snowflake DSN authenticator parsing]
 **Vulnerability:** Found a Server-Side Request Forgery (SSRF) bypass in Snowflake DSN parsing for Okta authenticators via the `.endswith(".okta.com")` string check.
 **Learning:** The simple `.endswith` check permitted inputs like `attacker-okta.com` or potentially backslash manipulation in `urllib.parse` parsing.
@@ -47,4 +52,3 @@
 **Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
 **Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
-
