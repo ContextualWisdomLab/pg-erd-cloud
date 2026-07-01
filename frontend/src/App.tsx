@@ -31,11 +31,9 @@ import {
   getSnapshot,
   listConnections,
   listProjects,
-  listSnapshots,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import {
-  BUSINESS_GROUP_COLORS,
   DEFAULT_BUSINESS_GROUP_COLOR,
   uniqueBusinessGroupId,
   type BusinessGroup,
@@ -308,15 +306,6 @@ export default function App() {
     () => parsePositiveInteger(cardinalityRowCount),
     [cardinalityRowCount],
   );
-  const businessGroupsById = useMemo(() => {
-    // ⚡ Bolt: Removed array mapping before Map creation to avoid intermediate array allocations.
-    const map = new Map<string, BusinessGroup>();
-    for (const group of businessGroups) {
-      map.set(group.id, group);
-    }
-    return map;
-  }, [businessGroups]);
-
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
   // Using nodes.find() for single lookups is O(N) but avoids Map construction overhead, providing ~10x speedup and reducing GC pressure.
   const cardinalityNode = useMemo(() => {
@@ -373,7 +362,6 @@ export default function App() {
     setEdges(graph.edges);
 
     setNodes((prev) => {
-      // ⚡ Bolt: Replaced prev.map with a for loop to avoid intermediate array allocations during Map creation.
       const prevPos = new Map<string, { x: number; y: number }>();
       for (const n of prev) {
         prevPos.set(n.id, n.position);
@@ -656,7 +644,7 @@ export default function App() {
   }
 
   function onAssignBusinessGroup(nodeId: string, groupId: string) {
-    const group = businessGroupsById.get(groupId);
+    const group = businessGroups.find((g) => g.id === groupId);
     setNodes((currentNodes) =>
       currentNodes.map((node) =>
         node.id === nodeId
