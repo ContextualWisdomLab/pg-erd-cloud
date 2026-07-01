@@ -64,7 +64,6 @@ app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 CORS_ALLOW_HEADERS = [
     "Authorization",
     "Content-Type",
-    "X-Dev-User",
     CSRF_HEADER_NAME,
 ]
 

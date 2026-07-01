@@ -25,6 +25,15 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
 **Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
+## 2024-05 - [CRITICAL] Authentication Bypass via X-Dev-User Leftover Mitigation
+**Vulnerability:** Leftover logic defining an `X-Dev-User` bypass vector existed partially in the backend CORS allowed headers and heavily in the frontend via localStorage and request headers.
+**Learning:** Even after backend vulnerability logic is removed (e.g. `try_get_subject_for_rate_limit` fallback logic removed), residual CORS configurations (`backend/app/main.py`) or client-side storage & transmission (`frontend/src/api.ts` and `frontend/src/App.tsx`) might still mistakenly use and expose development bypass tokens.
+**Prevention:** When removing an auth-bypass test vector, conduct a full-stack search (e.g., `grep -rn "X-Dev-User" .`) to ensure the entire trace, including frontend localStorage keys, UI toggles, and backend CORS configuration, is cleanly removed.
+
+## 2026-06-23 - OIDC JWKS 갱신 관련 서비스 거부(DoS) 취약점
+**Vulnerability:** JWT 인증을 처리하는 `_get_jwks` 함수에서, 알 수 없는 `kid`를 가진 토큰이 유입될 때마다 `force_refresh=True`가 호출되어 OIDC 엔드포인트(JWKS)로 외부 HTTP 갱신 요청을 즉시 보냅니다. 공격자가 고의로 무작위 `kid`를 포함한 토큰을 대량으로 보내면, 서버는 불필요하게 잦은 외부 요청을 수행하게 되어 스레드 고갈이나 외부 OIDC 제공자로부터 Rate Limit 제한을 받는 DoS(서비스 거부) 공격에 취약해집니다.
+**Learning:** 서드파티 OIDC 제공자나 외부 API를 통해 공개키/설정을 동적으로 가져오는(fetch) 패턴에서는, 인증에 실패하거나 캐시 미스(Cache Miss)가 발생하는 경우에도 외부 요청을 제한할 수 있는 디바운싱(Debouncing), Rate Limiting, 그리고 동시 갱신 직렬화가 필요합니다.
+**Prevention:** 강제 캐시 갱신(`force_refresh`) 요청이 들어오더라도 `OIDC_JWKS_MIN_REFRESH_INTERVAL` 변수와 JWKS 갱신 lock을 사용하여 최소 갱신 간격을 보장하고 concurrent bad `kid` 요청이 외부 호출을 병렬 증폭하지 못하게 합니다.
 
 ## 2024-06-25 - Fix SSRF validation rejecting Okta root domain
 **Vulnerability:** A logic bug in `_parse_snowflake_dsn` incorrectly rejected authenticators using Okta root domains `okta.com` or `oktapreview.com` because it only checked `endswith(".okta.com")`, functioning as a DoS for legitimate configurations.
