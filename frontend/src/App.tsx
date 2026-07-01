@@ -1354,7 +1354,7 @@ export default function App() {
                 nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
               }
             >
-              {isLayouting ? "정렬 중…" : "정렬"}
+              {isLayouting ? "…" : "↔"}
             </button>
             <button
               type="button"
@@ -1365,7 +1365,7 @@ export default function App() {
               }
               aria-label="정렬 되돌리기"
             >
-              되돌리기
+              ↶
             </button>
             <button
               type="button"
@@ -1373,7 +1373,7 @@ export default function App() {
               title="테이블 추가"
               aria-label="테이블 추가"
             >
-              테이블 추가
+              +
             </button>
             <button
               type="button"
@@ -1384,7 +1384,7 @@ export default function App() {
               }
               aria-label="업무 그룹"
             >
-              그룹
+              ◇
             </button>
             <button
               type="button"
@@ -1397,7 +1397,7 @@ export default function App() {
               }
               aria-label="인덱스 카디널리티 계산"
             >
-              카디널리티
+              #
             </button>
             <button
               type="button"
@@ -1408,7 +1408,7 @@ export default function App() {
               }
               aria-label="DDL 내보내기"
             >
-              DDL
+              SQL
             </button>
             <button
               type="button"
@@ -1421,7 +1421,7 @@ export default function App() {
               }
               aria-label="공유 및 내보내기"
             >
-              공유
+              ↗
             </button>
             <button
               type="button"
@@ -1432,7 +1432,7 @@ export default function App() {
               }
               aria-label="SVG 그림 내보내기"
             >
-              SVG
+              IMG
             </button>
             <button
               type="button"
@@ -1456,7 +1456,7 @@ export default function App() {
               }
               aria-label="Mermaid 내보내기"
             >
-              Mermaid
+              {"{}"}
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
