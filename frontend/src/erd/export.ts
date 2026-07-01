@@ -257,17 +257,15 @@ export function exportDiagramSvg(
   let maxX = width;
   let maxY = headerHeight;
 
-  // Bolt: Compute bounds in a single pass to avoid O(N) array spreads which cause Maximum Call Stack Size Exceeded errors.
+  // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
   for (const n of nodes) {
     const x = n.position.x;
     const y = n.position.y;
-    const w = x + width;
-    const h = y + (heights.get(n.id) || headerHeight);
-
+    const h = heights.get(n.id) || headerHeight;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
-    if (w > maxX) maxX = w;
-    if (h > maxY) maxY = h;
+    if (x + width > maxX) maxX = x + width;
+    if (y + h > maxY) maxY = y + h;
   }
   const offsetX = padding - minX;
   const offsetY = padding - minY;
