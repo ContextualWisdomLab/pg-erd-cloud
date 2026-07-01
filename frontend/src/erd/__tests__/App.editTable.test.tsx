@@ -33,21 +33,21 @@ vi.mock('../../api', () => ({
 }));
 
 describe('App edit functionality', () => {
-    it('renders without crashing', () => {
+  it('renders without crashing', () => {
     render(<App />);
     expect(screen.getByText('pg-erd-cloud')).toBeInTheDocument();
   });
 
-    it('renders compact visual labels while preserving toolbar accessible names', async () => {
+  it('renders compact visual labels while preserving toolbar accessible names', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: '편집기' }));
 
-        const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
+    const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
     expect(toolbar).toBeInTheDocument();
 
-        const toolbarQueries = within(toolbar);
+    const toolbarQueries = within(toolbar);
     expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
     expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
     expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
