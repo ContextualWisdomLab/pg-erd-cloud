@@ -7,6 +7,11 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:*;" />
   </head>
   <body>
+    <noscript>
+      <div role="status" style="padding: 16px; font-family: system-ui, sans-serif; line-height: 1.5;">
+        pg-erd-cloud는 ERD 생성과 편집을 위해 JavaScript가 필요합니다. 브라우저 설정에서 JavaScript를 활성화한 뒤 다시 시도해 주세요.
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,0 +1,61 @@
+--- backend/app/auth.py
++++ backend/app/auth.py
+@@ -10,6 +10,7 @@
+ from fastapi import Depends, HTTPException, Request
+ from jose import jwt
+ from pydantic import BaseModel
++from sqlalchemy import delete, select
+ from sqlalchemy.ext.asyncio import AsyncSession
+
+ from app.db import get_read_session, get_session
+@@ -167,31 +168,26 @@
+     return header_alg_raw.upper()
+
+
+-def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
+-    """Drop expired token revocation entries from the in-memory cache."""
+-
+-    current = now or dt.datetime.now(dt.timezone.utc)
+-    expired = [
+-        jwt_id
+-        for jwt_id, expires_at in _revoked_token_jtis.items()
+-        if expires_at <= current
+-    ]
+-    for jwt_id in expired:
+-        _revoked_token_jtis.pop(jwt_id, None)
+-
+-
+-def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
++async def revoke_token_jti(session: AsyncSession, jwt_id: str, expires_at: dt.datetime) -> None:
+     """Record a JWT ID as revoked until its natural expiry."""
+
++    from app.models import RevokedToken
++
+     if not jwt_id:
+         return
+-    _prune_revoked_token_jtis()
+-    _revoked_token_jtis[jwt_id] = expires_at
++
++    current = dt.datetime.now(dt.timezone.utc)
++    await session.execute(delete(RevokedToken).where(RevokedToken.expires_at <= current))
++
++    revoked = RevokedToken(jwt_id=jwt_id, expires_at=expires_at)
++    session.add(revoked)
++    await session.commit()
+
+-
+-def is_token_jti_revoked(jwt_id: str) -> bool:
++async def is_token_jti_revoked(session: AsyncSession, jwt_id: str) -> bool:
+     """Return whether the JWT ID is currently revoked."""
++
++    from app.models import RevokedToken
+
+-    _prune_revoked_token_jtis()
+-    return jwt_id in _revoked_token_jtis
++    current = dt.datetime.now(dt.timezone.utc)
++    stmt = select(RevokedToken).where(RevokedToken.jwt_id == jwt_id, RevokedToken.expires_at > current)
++    result = await session.execute(stmt)
++    return result.scalar_one_or_none() is not None
+
+
+ def _bearer_token_from_request(request: Request) -> str:
