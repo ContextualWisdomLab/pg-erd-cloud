@@ -142,6 +142,8 @@ QA checks:
 
 Deliverable:
 
+- `docs/ui-ux/design-qa-checklist.md` as the standing pre-implementation QA
+  gate.
 - `docs/ui-ux/design-qa-report.md` with screenshots or Figma node links,
   mismatches, decisions, and implementation-ready fixes.
 
