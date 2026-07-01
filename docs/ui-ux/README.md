@@ -15,6 +15,7 @@ Execution planning:
 - [Design QA checklist](design-qa-checklist.md)
 - [Core user flow Mermaid source](core-user-flow.mmd)
 - [Product Design Kit Figma file](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si)
+  with the nine screenshots placed on `01 Current References`
 - [Core user flow FigJam board](https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588)
 
 Screens:

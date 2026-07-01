@@ -9,15 +9,18 @@ Evidence used in this pass:
 
 - Repository screenshots in `docs/ui-ux/01-login-screen.png` through
   `docs/ui-ux/09-share-export-modal.png`.
+- Figma Product Design Kit
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>, where the same nine
+  screenshots are placed on `01 Current References`.
 - Current frontend source in `frontend/src/App.tsx`,
   `frontend/src/styles.css`, `frontend/src/erd/TableNode.tsx`, and
   `frontend/src/components/modals/*`.
 
 Evidence limits:
 
-- This is a local repository audit, not a completed Figma-board audit. A Figma
-  file URL/file key or plan key is still needed before screenshots and notes can
-  be placed in Figma.
+- This is a repository-plus-reference audit, not a completed browser-observed
+  usability study. The source screenshots are now available in Figma, but live
+  interaction evidence still needs browser capture.
 - Screenshots show the intended product direction, while source review shows the
   current implementation. Live keyboard traversal, screen-reader output, backend
   latency, and real database-scale behavior still need browser verification.

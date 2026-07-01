@@ -10,7 +10,7 @@ design exercise.
   snapshot export, reversing-spec generation, and share links.
 - Frontend: React 19, Vite, and React Flow under `frontend/src`.
 - Existing UI reference source: `docs/ui-ux/README.md` and the nine PNG screens
-  in `docs/ui-ux`.
+  in `docs/ui-ux`, now placed on the Figma `01 Current References` page.
 - Core flow source: `docs/ui-ux/core-user-flow.mmd`.
 - Product Design Kit Figma file:
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>.
@@ -98,6 +98,8 @@ Deliverable:
   and a clickable prototype.
 - Initial Figma file created with pages for intake, current references,
   foundations, components, core prototype flow, and QA/handoff.
+- `01 Current References` populated with all nine repository screenshots as
+  editable image-fill cards using `FIT` scale mode.
 
 ### 3. Core Prototype Flow
 
@@ -181,18 +183,17 @@ Deliverable:
 
 ## Immediate Next Actions
 
-1. Confirm whether to create a new Figma file or use an existing Figma design
-   file.
-2. Run the Product Design audit against the current screenshots and source UI.
-3. If a Figma target is available, import/capture the current references and
-   create the page structure above.
-4. Build the first clickable prototype around the connection-to-share workflow.
-5. Use the prototype review to choose the first implementation PR.
+1. Review the Product Design audit findings and choose the first design problem
+   to resolve in Figma.
+2. Componentize the highest-priority screens in the Product Design Kit:
+   sidebar, toolbar, modal shell, table node, and share/export controls.
+3. Build the first clickable prototype around the connection-to-share workflow.
+4. Capture the running local app into Figma when a browser-verifiable URL is
+   available, then compare it against the repository screenshots.
+5. Use the prototype review to choose the first focused implementation PR.
 
 ## Open Inputs
 
-- Figma target: existing design file URL/file key or plan key for new-file
-  creation.
 - Preferred prototype fidelity: static clickable prototype or richer local coded
   prototype.
 - First implementation priority: audit fixes, ERD editor, share/export, or
