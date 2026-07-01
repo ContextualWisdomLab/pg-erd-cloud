@@ -25,6 +25,7 @@ import {
 
 import {
   getMe,
+  createShareLink,
   createConnection,
   createProject,
   createSnapshot,
@@ -136,6 +137,7 @@ export default function App() {
     Edge
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -143,6 +145,10 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [shareLinkUrl, setShareLinkUrl] = useState("");
+  const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
+  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
+  const [shareLinkError, setShareLinkError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -216,8 +222,17 @@ export default function App() {
       if (copyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(copyFeedbackTimeoutRef.current);
       }
+      if (shareCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    setShareLinkUrl("");
+    setIsShareLinkCopied(false);
+    setShareLinkError(null);
+  }, [selectedProjectId]);
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -517,8 +532,8 @@ export default function App() {
   }
 
   function onOpenExport() {
-    const ddl = exportDDL(nodes, edges);
-    setExportDdlText(ddl);
+    setExportDdlText(nodes.length > 0 ? exportDDL(nodes, edges) : "");
+    setShareLinkError(null);
     setIsExportModalOpen(true);
   }
 
@@ -529,6 +544,12 @@ export default function App() {
       window.clearTimeout(copyFeedbackTimeoutRef.current);
       copyFeedbackTimeoutRef.current = null;
     }
+    if (shareCopyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      shareCopyFeedbackTimeoutRef.current = null;
+    }
+    setIsShareLinkCopied(false);
+    setShareLinkError(null);
   }
 
   const onCopyExportDdl = useCallback(() => {
@@ -544,6 +565,44 @@ export default function App() {
       copyFeedbackTimeoutRef.current = null;
     }, 2000);
   }, [exportDdlText]);
+
+  const onCreateShareLink = useCallback(async () => {
+    if (!selectedProjectId || isCreatingShareLink) return;
+
+    setIsCreatingShareLink(true);
+    setShareLinkError(null);
+    setIsShareLinkCopied(false);
+
+    try {
+      const link = await createShareLink(selectedProjectId);
+      setShareLinkUrl(link.url);
+    } catch (error) {
+      setShareLinkError(String(error));
+    } finally {
+      setIsCreatingShareLink(false);
+    }
+  }, [isCreatingShareLink, selectedProjectId]);
+
+  const onCopyShareLink = useCallback(async () => {
+    if (!shareLinkUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareLinkUrl);
+      setShareLinkError(null);
+      setIsShareLinkCopied(true);
+
+      if (shareCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      }
+
+      shareCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setIsShareLinkCopied(false);
+        shareCopyFeedbackTimeoutRef.current = null;
+      }, 2000);
+    } catch {
+      setIsShareLinkCopied(false);
+      setShareLinkError("공유 링크 복사에 실패했습니다.");
+    }
+  }, [shareLinkUrl]);
 
   function onDownloadSvg() {
     downloadText(
@@ -1353,6 +1412,19 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenExport}
+              disabled={!selectedProjectId}
+              title={
+                !selectedProjectId
+                  ? "공유할 프로젝트를 먼저 선택하세요"
+                  : "공유 및 내보내기"
+              }
+              aria-label="공유 및 내보내기"
+            >
+              공유
+            </button>
+            <button
+              type="button"
               onClick={onDownloadSvg}
               disabled={nodes.length === 0}
               title={
@@ -1448,8 +1520,16 @@ export default function App() {
             isOpen={isExportModalOpen}
             exportDdlText={exportDdlText}
             isCopied={isCopied}
+            hasDdlExport={nodes.length > 0}
+            shareLinkUrl={shareLinkUrl}
+            isCreatingShareLink={isCreatingShareLink}
+            isShareLinkCopied={isShareLinkCopied}
+            shareLinkError={shareLinkError}
+            canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
+            onCreateShareLink={onCreateShareLink}
+            onCopyShareLink={onCopyShareLink}
           />
 
           <EditEdgeModal

@@ -15,6 +15,7 @@ vi.mock('../../api', () => ({
   listProjects: vi.fn().mockResolvedValue([]),
   listConnections: vi.fn().mockResolvedValue([]),
   listSnapshots: vi.fn().mockResolvedValue([]),
+  createShareLink: vi.fn(),
 }));
 
 describe('App edit functionality', () => {
