@@ -97,3 +97,9 @@ class MeOut(BaseModel):
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class UserUpdate(BaseModel):
+    """Request body for updating a user."""
+
+    display_name: str | None = Field(default=None, max_length=255)
