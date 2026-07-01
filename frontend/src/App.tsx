@@ -1,4 +1,4 @@
-﻿import {
+import {
   Background,
   MiniMap,
   Controls,
@@ -362,7 +362,10 @@ export default function App() {
     setEdges(graph.edges);
 
     setNodes((prev) => {
-      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
+      const prevPos = new Map<string, { x: number; y: number }>();
+      for (const n of prev) {
+        prevPos.set(n.id, n.position);
+      }
       return graph.nodes.map((n) => {
         const position = prevPos.get(n.id);
         return position ? { ...n, position } : n;
