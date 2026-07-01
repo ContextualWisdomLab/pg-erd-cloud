@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import uuid
 from dataclasses import dataclass
 from typing import Any, cast
 
+import asyncio
 import httpx
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -75,9 +75,10 @@ OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
 OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
 OIDC_JWKS_MIN_REFRESH_INTERVAL = dt.timedelta(seconds=60)
 _last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
-_jwks_lock = asyncio.Lock()
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
+_revoked_token_jtis: dict[str, dt.datetime] = {}
+_jwks_lock = asyncio.Lock()
 
 
 async def _get_oidc_config() -> dict:
@@ -140,11 +141,9 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
                 raise RuntimeError("OIDC JWKS endpoint must not redirect")
             r.raise_for_status()
             jwks = cast(dict[str, Any], r.json())
-
-        refreshed_at = dt.datetime.now(dt.timezone.utc)
         _oidc_jwks = jwks
-        _oidc_jwks_expires_at = refreshed_at + OIDC_JWKS_CACHE_TTL
-        _last_jwks_refresh_at = refreshed_at
+        _oidc_jwks_expires_at = now + OIDC_JWKS_CACHE_TTL
+        _last_jwks_refresh_at = now
         return cast(dict, jwks)
 
 
@@ -191,38 +190,33 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     return header_alg_raw.upper()
 
 
-async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
-    """Record a JWT ID as revoked until its natural expiry."""
+def _prune_revoked_token_jtis(now: dt.datetime | None = None) -> None:
+    """Drop expired token revocation entries from the in-memory cache."""
 
-    from app.models import RevokedToken
-    from app.db import SessionLocal
+    current = now or dt.datetime.now(dt.timezone.utc)
+    expired = [
+        jwt_id
+        for jwt_id, expires_at in _revoked_token_jtis.items()
+        if expires_at <= current
+    ]
+    for jwt_id in expired:
+        _revoked_token_jtis.pop(jwt_id, None)
+
+
+def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
+    """Record a JWT ID as revoked until its natural expiry."""
 
     if not jwt_id:
         return
-
-    current = dt.datetime.now(dt.timezone.utc)
-    async with SessionLocal() as session:
-        await session.execute(
-            delete(RevokedToken).where(RevokedToken.expires_at <= current)
-        )
-        revoked = RevokedToken(jwt_id=jwt_id, expires_at=expires_at)
-        session.add(revoked)
-        await session.commit()
+    _prune_revoked_token_jtis()
+    _revoked_token_jtis[jwt_id] = expires_at
 
 
-async def is_token_jti_revoked(jwt_id: str) -> bool:
+def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.models import RevokedToken
-    from app.db import SessionLocal
-
-    current = dt.datetime.now(dt.timezone.utc)
-    async with SessionLocal() as session:
-        stmt = select(RevokedToken).where(
-            RevokedToken.jwt_id == jwt_id, RevokedToken.expires_at > current
-        )
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+    _prune_revoked_token_jtis()
+    return jwt_id in _revoked_token_jtis
 
 
 def _bearer_token_from_request(request: Request) -> str:
@@ -257,18 +251,6 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
 
-    kty = jwk.get("kty")
-    if not isinstance(kty, str):
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    if kty == "RSA":
-        if not (header_alg.startswith("RS") or header_alg.startswith("PS")):
-            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    elif kty == "EC":
-        if not header_alg.startswith("ES"):
-            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    else:
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-
     try:
         claims = jwt.decode(
             token,
@@ -293,9 +275,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     return cast(dict[str, Any], claims)
 
 
-async def _verified_token_from_claims(
-    claims: dict[str, Any], verify_revocation: bool = True
-) -> VerifiedToken:
+def _verified_token_from_claims(claims: dict[str, Any]) -> VerifiedToken:
     """Validate decoded claims and return the request auth identity."""
 
     sub = claims.get("sub")
@@ -307,7 +287,7 @@ async def _verified_token_from_claims(
         raise HTTPException(status_code=401, detail="token missing jti")
 
     expires_at = _jwt_expiry(claims)
-    if verify_revocation and await is_token_jti_revoked(jwt_id):
+    if is_token_jti_revoked(jwt_id):
         raise HTTPException(status_code=401, detail="token revoked")
 
     return VerifiedToken(
@@ -318,25 +298,26 @@ async def _verified_token_from_claims(
     )
 
 
-async def _get_verified_token_from_request(
-    request: Request, verify_revocation: bool = True
-) -> VerifiedToken:
-    """Extract and verify OIDC token claims from a request."""
+async def _get_verified_token_from_request(request: Request) -> VerifiedToken:
+    """Extract and verify OIDC token claims from a request.
 
+    Uses OIDC bearer tokens when configured. If OIDC is not configured, auth
+    fails closed.
+    """
+
+    # OIDC mode (Casdoor etc.)
     if settings.oidc_issuer:
         token = _bearer_token_from_request(request)
         claims = await _decode_verified_oidc_token(token)
-        return await _verified_token_from_claims(claims, verify_revocation)
+        return _verified_token_from_claims(claims)
 
     raise HTTPException(status_code=500, detail="OIDC configuration required")
 
 
-async def _get_subject_from_request(
-    request: Request, verify_revocation: bool = True
-) -> tuple[str, str | None]:
+async def _get_subject_from_request(request: Request) -> tuple[str, str | None]:
     """Extract (subject, display_name) from a verified request token."""
 
-    verified = await _get_verified_token_from_request(request, verify_revocation)
+    verified = await _get_verified_token_from_request(request)
     return verified.subject, verified.display_name
 
 
@@ -350,7 +331,7 @@ async def try_get_subject_for_rate_limit(request: Request) -> str | None:
     """
 
     try:
-        subject, _ = await _get_subject_from_request(request, verify_revocation=False)
+        subject, _ = await _get_subject_from_request(request)
         return subject
     except HTTPException:
         return None
@@ -420,4 +401,4 @@ async def revoke_current_request_token(request: Request) -> None:
     """Revoke the current request token until its natural expiry."""
 
     verified = await _get_verified_token_from_request(request)
-    await revoke_token_jti(verified.jwt_id, verified.expires_at)
+    revoke_token_jti(verified.jwt_id, verified.expires_at)

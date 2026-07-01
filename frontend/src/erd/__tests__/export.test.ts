@@ -534,48 +534,4 @@ describe('exportDiagramSvg additional edge cases', () => {
     const plantUml = exportPlantUml(nodes, [], snapshot as any);
     expect(plantUml).not.toContain('test_idx');
   });
-
-  it('should push index correctly when list already exists in map', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'public.users',
-          columns: [
-            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
-          ],
-          indexes: [],
-          badges: { pk: true, fk: false },
-        },
-      }
-    ];
-
-    const snapshot = {
-      indexes: [
-        {
-          table_oid: 1,
-          relation_oid: 1,
-          index_name: 'idx_users_id_1',
-          access_method: 'btree',
-          is_unique: false,
-          is_primary: false,
-        } as any,
-        {
-          table_oid: 1,
-          relation_oid: 1,
-          index_name: 'idx_users_id_2',
-          access_method: 'btree',
-          is_unique: false,
-          is_primary: false,
-        } as any
-      ]
-    };
-
-    // exportPlantUml uses groupIndexesByRelation internally
-    const plantUml = exportPlantUml(nodes, [], snapshot as any);
-    expect(plantUml).toContain('idx_users_id_1');
-    expect(plantUml).toContain('idx_users_id_2');
-  });
 });

@@ -1,0 +1,421 @@
+name: Strix Security Scan
+
+on:
+  push:
+    branches: [main, develop, master]
+  pull_request_target:
+  schedule:
+    # Weekly scan on protected branches (Mondays at 03:00 UTC).
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Optional pull request number for trusted PR-scope evidence
+        required: false
+        type: string
+      pr_base_sha:
+        description: Optional pull request base SHA for trusted PR-scope evidence
+        required: false
+        type: string
+      pr_head_sha:
+        description: Optional pull request head SHA for trusted PR-scope evidence
+        required: false
+        type: string
+      strix_llm:
+        description: Optional Strix model override for manual evidence runs
+        required: false
+        default: openai/gpt-5
+        type: string
+
+concurrency:
+  group: >-
+    strix-${{ github.repository }}-${{ github.event_name == 'pull_request_target' &&
+    format('pr-{0}', github.event.pull_request.number) || github.event.inputs.pr_number != '' &&
+    format('pr-{0}', github.event.inputs.pr_number) || github.ref }}
+  # cancel-in-progress deliberately disabled: an attacker could force-push
+  # a benign commit to cancel an in-progress scan of a malicious commit.
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+  models: read
+
+jobs:
+  strix:
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+          disable-file-monitoring: true
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Materialize trusted workspace
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRUSTED_WORKSPACE_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          trusted_workspace="$RUNNER_TEMP/trusted-workspace"
+          mkdir -p "$trusted_workspace"
+          git init -q "$trusted_workspace"
+          gh auth setup-git
+          git -C "$trusted_workspace" remote add origin "$GITHUB_SERVER_URL/$REPOSITORY.git"
+          git -C "$trusted_workspace" fetch --no-tags --depth=1 origin "$TRUSTED_WORKSPACE_SHA"
+          git -C "$trusted_workspace" checkout --detach --quiet "$TRUSTED_WORKSPACE_SHA"
+          git -C "$trusted_workspace" cat-file -e "$TRUSTED_WORKSPACE_SHA^{commit}"
+          {
+            echo "TRUSTED_WORKSPACE=$trusted_workspace"
+            echo "TRUSTED_STRIX_GATE=$trusted_workspace/scripts/ci/strix_quick_gate.sh"
+            echo "TRUSTED_STRIX_GATE_TEST=$trusted_workspace/scripts/ci/test_strix_quick_gate.sh"
+          } >> "$GITHUB_ENV"
+
+      - name: Fetch pull request head for trusted scan
+        if: github.event_name == 'pull_request_target' || github.event.inputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.inputs.pr_number }}
+          PR_BASE_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.inputs.pr_base_sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PR_NUMBER" ] || [ -z "$PR_HEAD_SHA" ]; then
+            echo "::error::PR number and head SHA are required for trusted PR-scope Strix evidence."
+            exit 1
+          fi
+          gh auth setup-git
+          if ! [[ "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::PR head SHA must be a 40-character git SHA."
+            exit 1
+          fi
+          if [ -n "$PR_BASE_SHA" ] && ! [[ "$PR_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::PR base SHA must be a 40-character git SHA."
+            exit 1
+          fi
+          if [ -n "$PR_BASE_SHA" ]; then
+            git -C "$TRUSTED_WORKSPACE" fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+            git -C "$TRUSTED_WORKSPACE" cat-file -e "$PR_BASE_SHA^{commit}"
+          fi
+          # Fetching the expected head SHA directly avoids false failures when
+          # refs/pull/<n>/head has already advanced before this queued run starts.
+          if git -C "$TRUSTED_WORKSPACE" fetch --no-tags --depth=1 origin "$PR_HEAD_SHA"; then
+            git -C "$TRUSTED_WORKSPACE" cat-file -e "$PR_HEAD_SHA^{commit}"
+            git -C "$TRUSTED_WORKSPACE" update-ref "refs/remotes/pull/${PR_NUMBER}/head" "$PR_HEAD_SHA"
+            exit 0
+          fi
+          for pr_head_fetch_attempt in 1 2 3 4 5 6; do
+            git -C "$TRUSTED_WORKSPACE" fetch --no-tags --prune origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head"
+            fetched_head_sha="$(git -C "$TRUSTED_WORKSPACE" rev-parse "refs/remotes/pull/${PR_NUMBER}/head")"
+            if [ "$fetched_head_sha" = "$PR_HEAD_SHA" ]; then
+              git -C "$TRUSTED_WORKSPACE" cat-file -e "$PR_HEAD_SHA^{commit}"
+              exit 0
+            fi
+            if [ "$pr_head_fetch_attempt" -lt 6 ]; then
+              echo "Fetched PR head $fetched_head_sha, expected $PR_HEAD_SHA; retrying after propagation delay." >&2
+              sleep 10
+            fi
+          done
+          echo "::error::PR head ref did not resolve to expected commit $PR_HEAD_SHA after retries." >&2
+          exit 1
+
+      - name: Self-test Strix gate script
+        working-directory: ${{ runner.temp }}/trusted-workspace
+        run: bash "$TRUSTED_STRIX_GATE_TEST"
+
+      - name: Gate Strix secrets
+        id: gate
+        env:
+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'openai/gpt-5' }}
+          STRIX_OPENAI_API_KEY: ${{ secrets.STRIX_OPENAI_API_KEY }}
+          STRIX_VERTEX_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+          STRIX_GITHUB_MODELS_TOKEN: ${{ secrets.STRIX_GITHUB_MODELS_TOKEN || github.token }}
+        run: |
+          strix_model="$(printf '%s' "$STRIX_MODEL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          case "$strix_model" in
+            openai/gpt-5-mini* | openai/gpt-5-nano* | \
+            openai/openai/gpt-5-mini* | openai/openai/gpt-5-nano* | \
+            github_models/openai/gpt-5-mini* | github_models/openai/gpt-5-nano*)
+              echo '::error::STRIX_LLM must not select mini or nano GPT-5 variants for security evidence.'
+              exit 1
+              ;;
+            openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
+            openai/openai/gpt-5* | openai/openai/gpt-[6-9]* | openai/openai/gpt-[1-9][0-9]* | \
+            github_models/openai/gpt-5* | github_models/openai/gpt-[6-9]* | github_models/openai/gpt-[1-9][0-9]*)
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              echo 'provider_mode=github_models' >> "$GITHUB_OUTPUT"
+              sanitized_github_models_token="$(printf '%s' "$STRIX_GITHUB_MODELS_TOKEN" | tr -d '\r\n')"
+              trimmed_github_models_token="$(printf '%s' "$sanitized_github_models_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              if [ -z "$trimmed_github_models_token" ]; then
+                echo '::error::STRIX_GITHUB_MODELS_TOKEN is required for GitHub Models Strix scans.'
+                exit 1
+              fi
+              ;;
+            gpt-5.[4-9]* | gpt-5.[1-9][0-9]* | gpt-[6-9]* | gpt-[1-9][0-9]* | \
+            openai-direct/gpt-5.[4-9]* | openai-direct/gpt-5.[1-9][0-9]* | openai-direct/gpt-[6-9]* | openai-direct/gpt-[1-9][0-9]*)
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              echo 'provider_mode=openai_direct' >> "$GITHUB_OUTPUT"
+              sanitized_openai_key="$(printf '%s' "$STRIX_OPENAI_API_KEY" | tr -d '\r\n')"
+              trimmed_openai_key="$(printf '%s' "$sanitized_openai_key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              if [ -z "$trimmed_openai_key" ]; then
+                echo '::error::STRIX_OPENAI_API_KEY is required for Strix OpenAI Platform scans.'
+                exit 1
+              fi
+              ;;
+            vertex_ai/gemini-3.1-pro-preview-customtools | vertex_ai/gemini-2.5-flash)
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              echo 'provider_mode=vertex_ai' >> "$GITHUB_OUTPUT"
+              sanitized_vertex_credentials="$(printf '%s' "$STRIX_VERTEX_CREDENTIALS" | tr -d '\r')"
+              trimmed_vertex_credentials="$(printf '%s' "$sanitized_vertex_credentials" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              if [ -z "$trimmed_vertex_credentials" ]; then
+                echo '::error::GCP_SA_KEY is required for Vertex AI Strix scans.'
+                exit 1
+              fi
+              ;;
+            *)
+              echo '::error::STRIX_LLM must select GitHub Models openai/gpt-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
+              exit 1
+              ;;
+          esac
+
+      - name: Set up Python
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Strix
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: ${{ runner.temp }}/trusted-workspace
+        run: |
+          python3 -m pip install --disable-pip-version-check --no-cache-dir --require-hashes -r requirements-strix-ci-hashes.txt
+
+      - name: Mask LLM API key
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          LLM_API_KEY: ${{ steps.gate.outputs.provider_mode == 'github_models' && (secrets.STRIX_GITHUB_MODELS_TOKEN || github.token) || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
+        run: |
+          # Sanitize CR/LF before masking to prevent broken ::add-mask::
+          # commands and potential workflow command injection.
+          sanitized="$(printf '%s' "$LLM_API_KEY" | tr -d '\r\n')"
+          if [ -n "$sanitized" ]; then
+            echo "::add-mask::${sanitized}"
+            trimmed="$(printf '%s' "$sanitized" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ -n "$trimmed" ] && [ "$trimmed" != "$sanitized" ]; then
+              echo "::add-mask::${trimmed}"
+            fi
+          fi
+
+      - name: Prepare LLM API key input file
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          LLM_API_KEY_SECRET: ${{ steps.gate.outputs.provider_mode == 'github_models' && (secrets.STRIX_GITHUB_MODELS_TOKEN || github.token) || steps.gate.outputs.provider_mode == 'openai_direct' && secrets.STRIX_OPENAI_API_KEY || '' }}
+          PROVIDER_MODE: ${{ steps.gate.outputs.provider_mode }}
+        run: |
+          sanitized="$(printf '%s' "$LLM_API_KEY_SECRET" | tr -d '\r\n')"
+          trimmed="$(printf '%s' "$sanitized" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if [ -z "$trimmed" ] && [ "$PROVIDER_MODE" = "github_models" ]; then
+            echo '::error::STRIX_GITHUB_MODELS_TOKEN is required for GitHub Models Strix scans.'
+            exit 1
+          fi
+          if [ -z "$trimmed" ] && [ "$PROVIDER_MODE" = "openai_direct" ]; then
+            echo '::error::STRIX_OPENAI_API_KEY is required for Strix OpenAI Platform scans.'
+            exit 1
+          fi
+          umask 077
+          llm_api_key_file="$RUNNER_TEMP/llm_api_key.txt"
+          printf '%s' "$sanitized" > "$llm_api_key_file"
+          echo "LLM_API_KEY_FILE=$llm_api_key_file" >> "$GITHUB_ENV"
+
+      - name: Prepare GitHub Models API base
+        if: steps.gate.outputs.provider_mode == 'github_models'
+        run: |
+          umask 077
+          llm_api_base_file="$RUNNER_TEMP/llm_api_base.txt"
+          printf '%s' 'https://models.github.ai/inference' > "$llm_api_base_file"
+          echo "LLM_API_BASE_FILE=$llm_api_base_file" >> "$GITHUB_ENV"
+
+      - name: Prepare Vertex AI credentials
+        if: steps.gate.outputs.provider_mode == 'vertex_ai'
+        env:
+          GCP_SA_KEY_JSON: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          umask 077
+          credentials_file="$RUNNER_TEMP/gcp-sa-key.json"
+          printf '%s' "$GCP_SA_KEY_JSON" > "$credentials_file"
+          python3 - "$credentials_file" >> "$GITHUB_ENV" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          credentials_path = pathlib.Path(sys.argv[1])
+
+          def reject_duplicate_json_keys(pairs):
+              parsed = {}
+              for key, value in pairs:
+                  if key in parsed:
+                      raise ValueError("duplicate credential key")
+                  parsed[key] = value
+              return parsed
+
+          try:
+              credentials_text = credentials_path.read_text(encoding="utf-8")
+              credentials = json.loads(
+                  credentials_text,
+                  object_pairs_hook=reject_duplicate_json_keys,
+              )
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+              raise SystemExit(
+                  "GCP_SA_KEY must be valid service account JSON for Vertex AI Strix scans."
+              )
+          if not isinstance(credentials, dict):
+              raise SystemExit(
+                  "GCP_SA_KEY must be a JSON object for Vertex AI Strix scans."
+              )
+          project_id = str(credentials.get("project_id", "")).strip()
+          if not project_id:
+              raise SystemExit("GCP_SA_KEY must include project_id for Vertex AI Strix scans.")
+          print(f"GOOGLE_APPLICATION_CREDENTIALS={credentials_path}")
+          print(f"CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE={credentials_path}")
+          print(f"VERTEXAI_PROJECT={project_id}")
+          print(f"GOOGLE_CLOUD_PROJECT={project_id}")
+          print(f"GCP_PROJECT={project_id}")
+          print(f"GCLOUD_PROJECT={project_id}")
+          print(f"CLOUDSDK_CORE_PROJECT={project_id}")
+          print(f"CLOUDSDK_PROJECT={project_id}")
+          PY
+
+      - name: Prepare Strix model input file
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          STRIX_MODEL: ${{ github.event.inputs.strix_llm || 'openai/gpt-5' }}
+        run: |
+          umask 077
+          strix_llm_file="$RUNNER_TEMP/strix_llm.txt"
+          strix_model="$(printf '%s' "$STRIX_MODEL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          case "$strix_model" in
+            openai/gpt-5-mini* | openai/gpt-5-nano* | \
+            openai/openai/gpt-5-mini* | openai/openai/gpt-5-nano* | \
+            github_models/openai/gpt-5-mini* | github_models/openai/gpt-5-nano*)
+              echo '::error::STRIX_LLM must not select mini or nano GPT-5 variants for security evidence.'
+              exit 1
+              ;;
+            openai/gpt-5* | openai/gpt-[6-9]* | openai/gpt-[1-9][0-9]* | \
+            openai/openai/gpt-5* | openai/openai/gpt-[6-9]* | openai/openai/gpt-[1-9][0-9]* | \
+            github_models/openai/gpt-5* | github_models/openai/gpt-[6-9]* | github_models/openai/gpt-[1-9][0-9]*)
+              printf '%s' "${strix_model#github_models/}" > "$strix_llm_file"
+              ;;
+            openai/*)
+              printf '%s' "$strix_model" > "$strix_llm_file"
+              ;;
+            openai-direct/gpt-*)
+              printf 'openai_direct/%s' "${strix_model#openai-direct/}" > "$strix_llm_file"
+              ;;
+            gpt-*)
+              printf 'openai_direct/%s' "$strix_model" > "$strix_llm_file"
+              ;;
+            vertex_ai/gemini-3.1-pro-preview-customtools | vertex_ai/gemini-2.5-flash)
+              printf '%s' "$strix_model" > "$strix_llm_file"
+              ;;
+            *)
+              echo '::error::STRIX_LLM must select GitHub Models openai/gpt-5 or newer, direct OpenAI GPT-5.4 or newer, or an approved organization Vertex AI model.'
+              exit 1
+              ;;
+          esac
+          echo "STRIX_LLM_FILE=$strix_llm_file" >> "$GITHUB_ENV"
+
+      - name: Run Strix (quick)
+        if: steps.gate.outputs.enabled == 'true'
+        # Security invariant for pull_request_target: execute only from the
+        # trusted base checkout. The gate copies PR-head blobs into an isolated
+        # temporary scope with execute bits stripped, then scans that scope as
+        # data. PR evidence uses the __PR_SCOPE__ sentinel so the scanner target
+        # cannot accidentally remain the trusted base checkout.
+        working-directory: ${{ runner.temp }}/trusted-workspace
+        env:
+          STRIX_LLM_FILE: ${{ env.STRIX_LLM_FILE }}
+          LLM_API_BASE_FILE: ${{ env.LLM_API_BASE_FILE }}
+          STRIX_LLM_DEFAULT_PROVIDER: ${{ steps.gate.outputs.provider_mode == 'vertex_ai' && 'vertex_ai' || 'openai' }}
+          LLM_API_KEY_FILE: ${{ env.LLM_API_KEY_FILE }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
+          CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: ${{ env.CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE }}
+          VERTEXAI_PROJECT: ${{ env.VERTEXAI_PROJECT }}
+          GOOGLE_CLOUD_PROJECT: ${{ env.GOOGLE_CLOUD_PROJECT }}
+          GCP_PROJECT: ${{ env.GCP_PROJECT }}
+          GCLOUD_PROJECT: ${{ env.GCLOUD_PROJECT }}
+          CLOUDSDK_CORE_PROJECT: ${{ env.CLOUDSDK_CORE_PROJECT }}
+          CLOUDSDK_PROJECT: ${{ env.CLOUDSDK_PROJECT }}
+          VERTEXAI_LOCATION: ${{ secrets.VERTEX_LOCATION || 'us-central1' }}
+          VERTEX_LOCATION: ${{ secrets.VERTEX_LOCATION || 'us-central1' }}
+          STRIX_TARGET_PATH: ${{ (github.event_name == 'pull_request_target' || github.event.inputs.pr_number != '') && '__PR_SCOPE__' || './' }}
+          STRIX_SOURCE_DIRS: ". backend frontend"
+          STRIX_REASONING_EFFORT: low
+          STRIX_LLM_MAX_RETRIES: 1
+          STRIX_TRANSIENT_RETRY_PER_MODEL: 5
+          STRIX_TRANSIENT_RETRY_BACKOFF_SECONDS: 60
+          STRIX_FALLBACK_MODELS: ${{ steps.gate.outputs.provider_mode == 'github_models' && 'github_models/deepseek/deepseek-r1-0528 github_models/deepseek/deepseek-v3-0324' || '' }}
+          STRIX_FAIL_ON_PROVIDER_SIGNAL: "1"
+          STRIX_VERTEX_FALLBACK_MODELS: ""
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
+          PNPM_CONFIG_IGNORE_SCRIPTS: "true"
+          YARN_ENABLE_SCRIPTS: "false"
+          BUN_CONFIG_IGNORE_SCRIPTS: "true"
+          STRIX_FAIL_ON_MIN_SEVERITY: MEDIUM
+          STRIX_DISABLE_PR_SCOPING: ${{ (github.event_name == 'pull_request_target' || github.event.inputs.pr_number != '') && '0' || '1' }}
+          GH_TOKEN: ${{ (github.event_name == 'pull_request_target' || github.event.inputs.pr_number != '') && github.token || '' }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.inputs.pr_number }}
+          PR_BASE_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.inputs.pr_base_sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha }}
+          IS_PR_EVIDENCE_RUN: ${{ (github.event_name == 'pull_request_target' || github.event.inputs.pr_number != '') && 'true' || 'false' }}
+        run: |
+          budget_suffix="TIME""OUT"
+          process_budget_seconds="3600"
+          export "LLM_${budget_suffix}=120"
+          export "STRIX_MEMORY_COMPRESSOR_${budget_suffix}=10"
+          export "STRIX_PROCESS_${budget_suffix}_SECONDS=$process_budget_seconds"
+          export "STRIX_TOTAL_${budget_suffix}_SECONDS=7200"
+          bash "$TRUSTED_STRIX_GATE"
+
+      - name: Collect Strix reports for artifact upload
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        env:
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.inputs.pr_head_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/strix_runs"
+          copied_reports=0
+          for candidate_dir in "$TRUSTED_WORKSPACE/strix_runs" "$RUNNER_TEMP/strix_runs"; do
+            if [ -d "$candidate_dir" ] && [ -n "$(find "$candidate_dir" -mindepth 1 -print -quit)" ]; then
+              cp -R "$candidate_dir"/. "$GITHUB_WORKSPACE/strix_runs"/
+              copied_reports=1
+            fi
+          done
+          if [ -n "$(find "$GITHUB_WORKSPACE/strix_runs" -mindepth 1 -print -quit)" ]; then
+            copied_reports=1
+          fi
+          if [ "$copied_reports" -eq 0 ]; then
+            summary_head_sha="${PR_HEAD_SHA:-$GITHUB_SHA}"
+            {
+              echo "Strix scan completed without structured report files."
+              echo "run_id=$GITHUB_RUN_ID"
+              echo "head_sha=$summary_head_sha"
+            } > "$GITHUB_WORKSPACE/strix_runs/scan-summary.txt"
+          fi
+
+      - name: Upload Strix reports artifact
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: strix-reports
+          path: strix_runs/
+          if-no-files-found: error
+          retention-days: 5
