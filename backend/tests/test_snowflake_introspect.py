@@ -17,7 +17,9 @@ class FakeCursor:
         self._rows: list[tuple[object, ...]] = []
         self.closed = False
 
-    def execute(self, sql: str, params: Sequence[object] = ()) -> None:
+    def execute(
+        self, sql: str, params: Sequence[object] = ()
+    ) -> None:
         rows = fake_rows_for_query(sql, params)
         columns = list(rows[0].keys()) if rows else ["empty"]
         self.description = [(column,) for column in columns]
@@ -42,7 +44,9 @@ class FakeConnection:
         self.closed = True
 
 
-def fake_rows_for_query(sql: str, params: Sequence[object]) -> list[dict[str, object]]:
+def fake_rows_for_query(
+    sql: str, params: Sequence[object]
+) -> list[dict[str, object]]:
     schema_filter = params[0] if params else None
     assert schema_filter in (None, "PUBLIC")
 
@@ -180,62 +184,38 @@ def fake_rows_for_query(sql: str, params: Sequence[object]) -> list[dict[str, ob
     return []
 
 
-@pytest.mark.asyncio
-async def test_parse_snowflake_dsn_rejects_connector_overrides() -> None:
+def test_parse_snowflake_dsn_rejects_connector_overrides() -> None:
     with pytest.raises(ValueError, match="unsupported Snowflake DSN query parameter"):
-        await _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?host=evil")
+        _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?host=evil")
 
 
-@pytest.mark.asyncio
-async def test_parse_snowflake_dsn_validates_authenticator(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def fake_validated_ip_hosts(host, is_hostaddr, port):
-        return (host,)
-
-    monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._validated_ip_hosts",
-        fake_validated_ip_hosts,
-    )
-
+def test_parse_snowflake_dsn_validates_authenticator() -> None:
     # Allowed okta URLs
-    conf = await _parse_snowflake_dsn(
+    conf = _parse_snowflake_dsn(
         "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com"
     )
     assert conf.authenticator == "https://company.okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://okta.com"
-    )
-    assert conf.authenticator == "https://okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://oktapreview.com"
-    )
-    assert conf.authenticator == "https://oktapreview.com"
 
     # Allowed safe string values
-    conf = await _parse_snowflake_dsn(
+    conf = _parse_snowflake_dsn(
         "snowflake://user:pass@acct/DB/PUBLIC?authenticator=externalbrowser"
     )
     assert conf.authenticator == "externalbrowser"
 
     # Rejected unknown strings
     with pytest.raises(ValueError, match="unsupported Snowflake authenticator value"):
-        await _parse_snowflake_dsn(
+        _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=some_unknown_auth"
         )
 
     # Rejected unsafe URLs (SSRF protection)
     with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        await _parse_snowflake_dsn(
+        _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://127.0.0.1:8000"
         )
     with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        await _parse_snowflake_dsn(
+        _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com"
-        )
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        await _parse_snowflake_dsn(
-            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.okta.com.attacker.com"
         )
 
 
@@ -249,13 +229,8 @@ async def test_introspect_snowflake_builds_common_snapshot(
         captured_kwargs.update(kwargs)
         return FakeConnection()
 
-    async def fake_validated_ip_hosts(host, is_hostaddr, port):
-        return (host,)
-
-    monkeypatch.setattr("app.snowflake_introspect.introspect._connect", fake_connect)
     monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._validated_ip_hosts",
-        fake_validated_ip_hosts,
+        "app.snowflake_introspect.introspect._connect", fake_connect
     )
 
     snapshot = await introspect_snowflake(

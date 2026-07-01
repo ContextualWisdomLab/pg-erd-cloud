@@ -20,7 +20,9 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "user_account",
-        sa.Column("user_account_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "user_account_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("oidc_subject", sa.Text(), nullable=False, unique=True),
         sa.Column("display_name", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -28,7 +30,9 @@ def upgrade() -> None:
 
     op.create_table(
         "project_space",
-        sa.Column("project_space_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "project_space_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("project_name", sa.Text(), nullable=False),
         sa.Column("created_by_user_uuid", sa.Uuid(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -55,7 +59,9 @@ def upgrade() -> None:
 
     op.create_table(
         "db_connection",
-        sa.Column("db_connection_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "db_connection_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("project_space_uuid", sa.Uuid(), nullable=False),
         sa.Column("conn_name", sa.Text(), nullable=False),
         sa.Column("dsn_ciphertext", sa.LargeBinary(), nullable=False),
@@ -71,7 +77,9 @@ def upgrade() -> None:
 
     op.create_table(
         "schema_snapshot",
-        sa.Column("schema_snapshot_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "schema_snapshot_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("project_space_uuid", sa.Uuid(), nullable=False),
         sa.Column("db_connection_uuid", sa.Uuid(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False),
@@ -89,14 +97,18 @@ def upgrade() -> None:
 
     op.create_table(
         "schema_snapshot_data",
-        sa.Column("schema_snapshot_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "schema_snapshot_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("snapshot_json", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
 
     op.create_table(
         "job_queue",
-        sa.Column("job_queue_uuid", sa.Uuid(), primary_key=True, nullable=False),
+        sa.Column(
+            "job_queue_uuid", sa.Uuid(), primary_key=True, nullable=False
+        ),
         sa.Column("job_type", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False),
         sa.Column("payload_json", sa.JSON(), nullable=False),
@@ -122,13 +134,19 @@ def downgrade() -> None:
     )
     op.drop_table("schema_snapshot")
 
-    op.drop_index("ix_db_connection__project_space_uuid", table_name="db_connection")
+    op.drop_index(
+        "ix_db_connection__project_space_uuid", table_name="db_connection"
+    )
     op.drop_table("db_connection")
 
-    op.drop_index("ix_project_member__user_account_uuid", table_name="project_member")
+    op.drop_index(
+        "ix_project_member__user_account_uuid", table_name="project_member"
+    )
     op.drop_table("project_member")
 
-    op.drop_index("ix_project_space__created_by_user_uuid", table_name="project_space")
+    op.drop_index(
+        "ix_project_space__created_by_user_uuid", table_name="project_space"
+    )
     op.drop_table("project_space")
 
     op.drop_table("user_account")

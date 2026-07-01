@@ -1,3 +1,0 @@
-## 2025-07-01 - AddTableModal Form Submission
-**Learning:** Adding form submission (listening to `Enter` key via wrapping in a `<form>` and converting the save button to `type="submit"`) is a fundamental micro-UX pattern often overlooked in simple React dialogs. It greatly enhances keyboard accessibility and efficiency for quick data entry modals.
-**Action:** Always check if modals with input fields and an action button are wrapped in a `<form>` element. If not, convert the main wrapper and leverage native HTML5 validation (e.g. `required`) and event handling (`onSubmit`) instead of relying solely on `onClick` handlers.
