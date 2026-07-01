@@ -386,13 +386,20 @@ button:disabled {
 }
 
 .button-primary {
-  background: #034ea2;
+  background-color: #034ea2;
   color: #fff;
   border-color: #034ea2;
 }
 
 .button-primary:hover {
-  background: #023875;
+  background-color: #023875;
+}
+
+.button-primary:disabled,
+.button-primary:disabled:hover {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  border-color: #d1d5db;
 }
 
 .tableNode {
