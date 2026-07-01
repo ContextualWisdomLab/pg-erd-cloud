@@ -11,6 +11,9 @@ design exercise.
 - Frontend: React 19, Vite, and React Flow under `frontend/src`.
 - Existing UI reference source: `docs/ui-ux/README.md` and the nine PNG screens
   in `docs/ui-ux`.
+- Core flow source: `docs/ui-ux/core-user-flow.mmd`.
+- Generated FigJam flow board:
+  <https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588>.
 - Current visual direction: quiet work-focused layout, persistent left sidebar,
   light palette, blue primary actions, thin borders, subtle shadows, compact
   tables, and dense ERD editor controls.
@@ -115,6 +118,7 @@ Interaction level:
 Deliverables:
 
 - Figma prototype links for the desktop flow.
+- FigJam user-flow board for the core connection-to-share journey.
 - Optional local coded prototype when a selected visual direction needs richer
   interaction.
 
