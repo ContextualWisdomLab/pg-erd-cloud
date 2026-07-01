@@ -3,6 +3,10 @@
 **Learning:** The simple `.endswith` check permitted inputs like `attacker-okta.com` or potentially backslash manipulation in `urllib.parse` parsing.
 **Prevention:** Always use precise regex patterns (`^([a-zA-Z0-9-]+\.)*(okta|oktapreview)\.com$`) or strict URI structural inspection to validate target URLs for SSRF protections rather than naive substring matching.
 
+## 2025-02-28 - X-Forwarded-For IP Spoofing Prevention
+**Vulnerability:** IP Spoofing / Rate-Limiting DoS via `X-Forwarded-For` Left-Most IP Extraction.
+**Learning:** Extracting the left-most IP (`xff.split(",")[0]`) from `X-Forwarded-For` allows users to spoof their IP by manually providing a fake IP in the header, leading to rate limit circumvention or conversely, rate-limiting the wrong proxy server and causing DoS for legitimate users using that proxy. The right-most IP should be extracted as it represents the nearest trusted proxy, mitigating these spoofing risks.
+**Prevention:** In rate-limiting and observability middlewares, ensure the right-most value (`xff.split(",")[-1].strip()`) is extracted when relying on the `X-Forwarded-For` header to guarantee that the IP address corresponds to the nearest, authenticated hop.
 ## 2025-02-28 - Snowflake DSN Authenticator SSRF
 **Vulnerability:** The Snowflake DSN parser accepted arbitrary URLs in the `authenticator` query parameter without validation, leading to potential SSRF (Server-Side Request Forgery). The connector would make HTTP POST requests to this URL.
 **Learning:** Third-party database connectors often accept extensive configuration parameters (like custom auth endpoints) that can be manipulated by malicious users if passed directly from user input (like a connection string).
@@ -17,7 +21,15 @@
 **Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting, making it vulnerable to denial-of-service (DoS) and caching resource exhaustion attacks. Attackers could flood the system with rapid revocation requests.
 **Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse.
 **Prevention:** Always ensure that revocation or authentication-related endpoints are covered by appropriate rate limiting middleware configurations.
+## 2026-06-22 - Missing Rate Limiting on Token Revocation Endpoint
+**Vulnerability:** The `/api/auth/revoke` token revocation endpoint lacked rate limiting because the route prefix in the rate limiting middleware configuration (`_revoke_rate_limit_policy` in `backend/app/main.py`) was incorrect (`"/api/auth/revoke"` instead of `"/api/auth/logout"`).
+**Learning:** Any endpoint that interacts with caching systems or performs authentication state mutations must have strict rate limiting to prevent resource exhaustion and abuse. It is critical to ensure that the configured `route_prefix` matches the actual route definition.
+**Prevention:** Always verify that the route prefix in the rate limiter configuration matches the actual route defined in the router, and write tests that explicitly check rate limits on sensitive endpoints.
 
+## 2024-06-25 - Fix SSRF validation rejecting Okta root domain
+**Vulnerability:** A logic bug in `_parse_snowflake_dsn` incorrectly rejected authenticators using Okta root domains `okta.com` or `oktapreview.com` because it only checked `endswith(".okta.com")`, functioning as a DoS for legitimate configurations.
+**Learning:** `endswith(".okta.com")` does not match `okta.com` due to the leading dot. This caused valid configurations to be rejected.
+**Prevention:** Always explicitly allow the exact root domain when performing suffix checks that require a subdomain delimiter.
 ## 2026-06-22 - Token Revocation Cache and Project Members Access
 **Learning:** The token revocation mechanism used an in-memory dictionary `_revoked_token_jtis` that doesn't persist across application restarts. This could allow revoked tokens to become valid again after a service restart until their natural expiration. Also, the `list_project_members` endpoint did not properly check authorization, potentially allowing low-privilege users (e.g. viewers) to enumerate all project members.
 **Action:** Always implement persistent storage (e.g. database or Redis) for revoked tokens to ensure revocation survives application restarts. Also, ensure appropriate role-based access controls are strictly applied for viewing members in project spaces.
