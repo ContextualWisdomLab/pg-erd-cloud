@@ -480,6 +480,41 @@ describe('exportDiagramSvg', () => {
       maxSpy.mockRestore();
     }
   });
+
+  it('should include nodes with negative coordinates in the SVG bounds', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'negative',
+        type: 'tableNode',
+        position: { x: -120, y: -50 },
+        data: {
+          title: 'public.negative_origin',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: 'positive',
+        type: 'tableNode',
+        position: { x: 500, y: 200 },
+        data: {
+          title: 'public.positive_origin',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+          badges: { pk: true, fk: false },
+        },
+      },
+    ];
+
+    const svg = exportDiagramSvg(nodes, []);
+
+    expect(svg).toContain('viewBox="0 0 980 386"');
+    expect(svg).toContain('>public.negative_origin</text>');
+    expect(svg).toContain('>public.positive_origin</text>');
+  });
 });
 
 describe('downloadText', () => {

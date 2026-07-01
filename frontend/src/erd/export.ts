@@ -257,7 +257,7 @@ export function exportDiagramSvg(
   let maxX = width;
   let maxY = headerHeight;
 
-  // Avoid spreading large coordinate arrays; JS engines cap variadic argument counts.
+  // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
   for (const n of nodes) {
     const x = n.position.x;
     const y = n.position.y;
