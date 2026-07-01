@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from app.dsn_redaction import redact_dsn_error_message
 from app.pg_introspect.introspect import introspect_postgres
-from app.snowflake_introspect import introspect_snowflake
+from app.snowflake_introspect.introspect import introspect_snowflake
 
 DatabaseDialect = Literal["postgresql", "snowflake"]
 
