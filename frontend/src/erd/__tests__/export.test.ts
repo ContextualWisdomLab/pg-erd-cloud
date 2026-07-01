@@ -448,6 +448,38 @@ describe('exportDiagramSvg', () => {
     expect(svg).toContain('>fk_posts_users</text>');
     expect(svg).not.toContain('fk_missing_source');
   });
+
+  it('should not spread node coordinate arrays into Math.min or Math.max', () => {
+    const originalMin = Math.min;
+    const originalMax = Math.max;
+    const minSpy = vi.spyOn(Math, 'min').mockImplementation((...values) => {
+      expect(values.length).toBeLessThanOrEqual(2);
+      return originalMin(...values);
+    });
+    const maxSpy = vi.spyOn(Math, 'max').mockImplementation((...values) => {
+      expect(values.length).toBeLessThanOrEqual(2);
+      return originalMax(...values);
+    });
+    const nodes: Node<TableNodeData>[] = Array.from({ length: 12 }, (_, index) => ({
+      id: `node-${index}`,
+      type: 'tableNode',
+      position: { x: index * 180, y: index * 80 },
+      data: {
+        title: `public.table_${index}`,
+        columns: [
+          { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+        ],
+        badges: { pk: true, fk: false },
+      },
+    }));
+
+    try {
+      expect(exportDiagramSvg(nodes, [])).toContain('<svg');
+    } finally {
+      minSpy.mockRestore();
+      maxSpy.mockRestore();
+    }
+  });
 });
 
 describe('downloadText', () => {
@@ -533,5 +565,72 @@ describe('exportDiagramSvg additional edge cases', () => {
     };
     const plantUml = exportPlantUml(nodes, [], snapshot as any);
     expect(plantUml).not.toContain('test_idx');
+  });
+
+  it('should push index correctly when list already exists in map', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.users',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+          indexes: [],
+          badges: { pk: true, fk: false },
+        },
+      }
+    ];
+
+    const snapshot = {
+      indexes: [
+        {
+          table_oid: 1,
+          relation_oid: 1,
+          index_name: 'idx_users_id_1',
+          access_method: 'btree',
+          is_unique: false,
+          is_primary: false,
+        } as any,
+        {
+          table_oid: 1,
+          relation_oid: 1,
+          index_name: 'idx_users_id_2',
+          access_method: 'btree',
+          is_unique: false,
+          is_primary: false,
+        } as any
+      ]
+    };
+
+    // exportPlantUml uses groupIndexesByRelation internally
+    const plantUml = exportPlantUml(nodes, [], snapshot as any);
+    expect(plantUml).toContain('idx_users_id_1');
+    expect(plantUml).toContain('idx_users_id_2');
+  });
+});
+
+describe('downloadText lifecycle', () => {
+  it('downloads text successfully', () => {
+    // Mock document.createElement and URL functions
+    const createElementSpy = vi.spyOn(document, 'createElement');
+    const mockAnchor = { href: '', download: '', click: vi.fn() } as unknown as HTMLAnchorElement;
+    createElementSpy.mockReturnValue(mockAnchor);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('mock-url');
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    try {
+      downloadText('test.txt', 'hello');
+
+      expect(createElementSpy).toHaveBeenCalledWith('a');
+      expect(mockAnchor.href).toBe('mock-url');
+      expect(mockAnchor.download).toBe('test.txt');
+      expect(mockAnchor.click).toHaveBeenCalled();
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('mock-url');
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });

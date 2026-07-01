@@ -386,6 +386,7 @@ def generate_index_design_markdown(snapshot: dict) -> str:
 
 
 def generate_index_design_spec(snapshot: dict, mode: str = "markdown") -> str:
+    """Generate an index-design document or LLM prompt from a snapshot."""
     if mode == "llm-prompt":
         return generate_index_design_llm_prompt(snapshot)
     if mode == "markdown":

@@ -41,10 +41,9 @@ def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
     if trust_x_forwarded_for:
         xff = request.headers.get("X-Forwarded-For")
         if xff:
-            # Use the left-most value (original client), trimming whitespace.
-            # This header is user-controllable unless sanitized by a trusted
-            # proxy/ingress. Keep default trust off.
-            ip = xff.split(",", 1)[0].strip()
+            # Use the right-most value (nearest trusted proxy), trimming whitespace.
+            # This is safer than the left-most which can be spoofed by the client.
+            ip = xff.split(",")[-1].strip()
             if ip:
                 return ip
 
@@ -133,6 +132,7 @@ def make_rate_limit_middleware(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        """Apply the configured fixed-window limit to matching requests."""
         if not policy.enabled:
             return await call_next(request)
 
