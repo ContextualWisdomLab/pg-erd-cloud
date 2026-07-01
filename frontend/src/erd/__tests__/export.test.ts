@@ -448,6 +448,38 @@ describe('exportDiagramSvg', () => {
     expect(svg).toContain('>fk_posts_users</text>');
     expect(svg).not.toContain('fk_missing_source');
   });
+
+  it('should not spread node coordinate arrays into Math.min or Math.max', () => {
+    const originalMin = Math.min;
+    const originalMax = Math.max;
+    const minSpy = vi.spyOn(Math, 'min').mockImplementation((...values) => {
+      expect(values.length).toBeLessThanOrEqual(2);
+      return originalMin(...values);
+    });
+    const maxSpy = vi.spyOn(Math, 'max').mockImplementation((...values) => {
+      expect(values.length).toBeLessThanOrEqual(2);
+      return originalMax(...values);
+    });
+    const nodes: Node<TableNodeData>[] = Array.from({ length: 12 }, (_, index) => ({
+      id: `node-${index}`,
+      type: 'tableNode',
+      position: { x: index * 180, y: index * 80 },
+      data: {
+        title: `public.table_${index}`,
+        columns: [
+          { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+        ],
+        badges: { pk: true, fk: false },
+      },
+    }));
+
+    try {
+      expect(exportDiagramSvg(nodes, [])).toContain('<svg');
+    } finally {
+      minSpy.mockRestore();
+      maxSpy.mockRestore();
+    }
+  });
 });
 
 describe('downloadText', () => {

@@ -13,7 +13,7 @@ on:
         required: true
         default: "main"
       commit_count:
-        description: "Number of first-parent commits to backfill"
+        description: "Number of recent commits to backfill"
         required: true
         default: "30"
 
@@ -49,8 +49,13 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags --prune --depth="${count}" origin "${branch}"
-          git rev-list --first-parent --max-count="${count}" "origin/${branch}" \
+          if (( count < 1 || count > 127 )); then
+            echo "commit_count must be between 1 and 127 to stay within the GitHub Actions workflow job limit" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags --prune origin "${branch}"
+          git rev-list --max-count="${count}" "origin/${branch}" \
             | jq -R -s -c 'split("\n")[:-1]' \
             | sed 's/^/commits=/' >> "${GITHUB_OUTPUT}"
 

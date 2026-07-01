@@ -1,8 +1,74 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, Snapshot, SnapshotDetail, SnapshotDetailResponse } from './types'
+import type { Connection, Project, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+
+let demoProjects: Project[] = [
+  { project_space_uuid: 'demo-shopping', project_name: '쇼핑몰 시스템' },
+  { project_space_uuid: 'demo-hr', project_name: '회사 인사관리' },
+  { project_space_uuid: 'demo-parking', project_name: '전자상거래 DB' }
+]
+
+const demoConnectionsByProject: Record<string, Connection[]> = {
+  'demo-shopping': [{ db_connection_uuid: 'demo-shopping-db', conn_name: 'production-readonly' }],
+  'demo-hr': [{ db_connection_uuid: 'demo-hr-db', conn_name: 'hr-warehouse' }],
+  'demo-parking': [{ db_connection_uuid: 'demo-commerce-db', conn_name: 'commerce-db' }]
+}
+
+const demoSnapshotsByProject: Record<string, Snapshot[]> = {
+  'demo-shopping': [
+    { schema_snapshot_uuid: 'demo-shopping-snapshot', status: 'succeeded', schema_filter: 'public' }
+  ],
+  'demo-hr': [
+    { schema_snapshot_uuid: 'demo-hr-snapshot', status: 'succeeded', schema_filter: 'hr' }
+  ],
+  'demo-parking': [
+    { schema_snapshot_uuid: 'demo-commerce-snapshot', status: 'succeeded', schema_filter: 'sales' }
+  ]
+}
+
+const demoSnapshotJson: SnapshotJson = {
+  relations: [
+    { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'member', relation_comment: '회원' },
+    { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'orders', relation_comment: '주문' },
+    { relation_oid: 3, relation_kind: 'r', schema_name: 'public', relation_name: 'order_item', relation_comment: '주문 상세' }
+  ],
+  columns: [
+    { relation_oid: 1, column_name: 'member_id', data_type: 'bigint', is_not_null: true },
+    { relation_oid: 1, column_name: 'email', data_type: 'varchar(255)', is_not_null: true },
+    { relation_oid: 2, column_name: 'order_id', data_type: 'bigint', is_not_null: true },
+    { relation_oid: 2, column_name: 'member_id', data_type: 'bigint', is_not_null: true },
+    { relation_oid: 3, column_name: 'order_item_id', data_type: 'bigint', is_not_null: true },
+    { relation_oid: 3, column_name: 'order_id', data_type: 'bigint', is_not_null: true }
+  ],
+  pk_columns: [
+    { relation_oid: 1, column_name: 'member_id' },
+    { relation_oid: 2, column_name: 'order_id' },
+    { relation_oid: 3, column_name: 'order_item_id' }
+  ],
+  fk_edges: [
+    {
+      fk_constraint_oid: 10,
+      fk_constraint_name: 'fk_orders_member',
+      child_relation_oid: 2,
+      parent_relation_oid: 1,
+      child_column_name: 'member_id',
+      parent_column_name: 'member_id',
+      column_ordinal: 1
+    },
+    {
+      fk_constraint_oid: 11,
+      fk_constraint_name: 'fk_order_item_order',
+      child_relation_oid: 3,
+      parent_relation_oid: 2,
+      child_column_name: 'order_id',
+      parent_column_name: 'order_id',
+      column_ordinal: 1
+    }
+  ]
+}
 
 type CsrfTokenResponse = {
   csrf_token: string
@@ -21,8 +87,7 @@ function requireSecureCredentialTransport(): void {
 
 async function csrfToken(): Promise<string> {
   const r = await fetch(`${API_BASE}/api/csrf-token`, {
-    credentials: 'include',
-    headers: devHeaders()
+    credentials: 'include'
   })
   if (!r.ok) throw new Error(`csrfToken failed: ${r.status}`)
 
@@ -33,32 +98,40 @@ async function csrfToken(): Promise<string> {
   return payload.csrf_token
 }
 
-function devHeaders(): Record<string, string> {
-  const devUser = localStorage.getItem('devUser')
-  return devUser ? { 'X-Dev-User': devUser } : {}
-}
-
 async function jsonHeaders(): Promise<Record<string, string>> {
   return {
     'Content-Type': 'application/json',
-    'X-CSRF-Token': await csrfToken(),
-    ...devHeaders()
+    'X-CSRF-Token': await csrfToken()
   }
 }
 
 export async function getMe(): Promise<{ subject: string; display_name: string | null; user_account_uuid: string }> {
-  const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include', headers: devHeaders() })
+  if (DEMO_MODE) {
+    return { subject: 'local', display_name: 'Local Designer', user_account_uuid: 'demo-user' }
+  }
+  const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
   if (!r.ok) throw new Error(`getMe failed: ${r.status}`)
   return r.json()
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include', headers: devHeaders() })
+  if (DEMO_MODE) return demoProjects
+  const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listProjects failed: ${r.status}`)
   return r.json()
 }
 
 export async function createProject(project_name: string): Promise<Project> {
+  if (DEMO_MODE) {
+    const project = {
+      project_space_uuid: `demo-project-${Date.now()}`,
+      project_name
+    }
+    demoProjects = [project, ...demoProjects]
+    demoConnectionsByProject[project.project_space_uuid] = []
+    demoSnapshotsByProject[project.project_space_uuid] = []
+    return project
+  }
   const r = await fetch(`${API_BASE}/api/projects`, {
     method: 'POST',
     credentials: 'include',
@@ -70,12 +143,25 @@ export async function createProject(project_name: string): Promise<Project> {
 }
 
 export async function listConnections(projectId: string): Promise<Connection[]> {
-  const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, { credentials: 'include', headers: devHeaders() })
+  if (DEMO_MODE) return demoConnectionsByProject[projectId] ?? []
+  const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listConnections failed: ${r.status}`)
   return r.json()
 }
 
 export async function createConnection(projectId: string, conn_name: string, dsn: string): Promise<Connection> {
+  if (DEMO_MODE) {
+    const connection = {
+      db_connection_uuid: `demo-conn-${Date.now()}`,
+      conn_name
+    }
+    demoConnectionsByProject[projectId] = [
+      connection,
+      ...(demoConnectionsByProject[projectId] ?? [])
+    ]
+    void dsn
+    return connection
+  }
   requireSecureCredentialTransport()
   const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, {
     method: 'POST',
@@ -88,12 +174,26 @@ export async function createConnection(projectId: string, conn_name: string, dsn
 }
 
 export async function listSnapshots(projectId: string): Promise<Snapshot[]> {
-  const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, { credentials: 'include', headers: devHeaders() })
+  if (DEMO_MODE) return demoSnapshotsByProject[projectId] ?? []
+  const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listSnapshots failed: ${r.status}`)
   return r.json()
 }
 
 export async function createSnapshot(projectId: string, db_connection_uuid: string, schema_filter?: string): Promise<Snapshot> {
+  if (DEMO_MODE) {
+    const snapshot = {
+      schema_snapshot_uuid: `demo-snapshot-${Date.now()}`,
+      status: 'succeeded',
+      schema_filter: schema_filter || null
+    }
+    demoSnapshotsByProject[projectId] = [
+      snapshot,
+      ...(demoSnapshotsByProject[projectId] ?? [])
+    ]
+    void db_connection_uuid
+    return snapshot
+  }
   const r = await fetch(`${API_BASE}/api/snapshots/by-project/${projectId}`, {
     method: 'POST',
     credentials: 'include',
@@ -105,7 +205,16 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
 }
 
 export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
-  const r = await fetch(`${API_BASE}/api/snapshots/${snapshotId}`, { credentials: 'include', headers: devHeaders() })
+  if (DEMO_MODE) {
+    return {
+      schema_snapshot_uuid: snapshotId,
+      status: 'succeeded',
+      schema_filter: 'public',
+      error_message: null,
+      snapshot_json: demoSnapshotJson
+    }
+  }
+  const r = await fetch(`${API_BASE}/api/snapshots/${snapshotId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`getSnapshot failed: ${r.status}`)
   const response = (await r.json()) as SnapshotDetailResponse
   return snapshotDetailFromResponse(response)
