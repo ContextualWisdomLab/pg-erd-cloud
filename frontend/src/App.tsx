@@ -1428,7 +1428,7 @@ export default function App() {
                   <div className="emptyState__mark" aria-hidden="true" />
                   <div className="emptyState__title">ERD 캔버스가 비어 있습니다</div>
                   <div className="emptyState__desc">
-                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
+                    작업 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
                   </div>
                   <button
                     type="button"

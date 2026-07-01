@@ -759,15 +759,127 @@ button:disabled {
   border-radius: 999px;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1180px) {
   .layout {
+    grid-template-columns: 300px 1fr;
+  }
+
+  .workspaceScreen {
+    padding: 24px;
+  }
+
+  .projectCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  #root {
+    min-height: 100vh;
+    height: auto;
+  }
+
+  .layout {
+    min-height: 100vh;
+    height: auto;
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(540px, 1fr);
   }
 
   .sidebar {
+    max-height: 44vh;
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
+  }
+
+  .main {
+    min-height: 540px;
+  }
+
+  .brandLockup {
+    margin-bottom: 14px;
+  }
+
+  .workspaceNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+
+  .workspaceNav__item {
+    min-height: 42px;
+    padding: 8px 6px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .workspaceScreen {
+    padding: 20px 16px 28px;
+  }
+
+  .workspaceHeader,
+  .sectionHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspaceHeader {
+    margin-bottom: 20px;
+  }
+
+  .workspaceHeader button,
+  .sectionHeader button {
+    width: 100%;
+  }
+
+  .metricGrid,
+  .projectCards {
+    grid-template-columns: 1fr;
+  }
+
+  .metricCard {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .inlineCreate {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .inlineCreate input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .dataTable {
+    overflow-x: auto;
+  }
+
+  .dataTable__row {
+    min-width: 560px;
+  }
+
+  .dataTable__row--projects {
+    min-width: 440px;
+  }
+
+  .canvasToolbar {
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    max-width: none;
+  }
+
+  .canvasToolbar > button,
+  .canvasToolbar__search {
+    flex: 1 1 84px;
+  }
+
+  .canvasToolbar__search input {
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .cardinalityWizard__controls {
@@ -856,6 +968,16 @@ button:disabled {
 
 .emptyState button {
   pointer-events: auto;
+}
+
+@media (max-width: 767px) {
+  .emptyState {
+    top: auto;
+    bottom: 24px;
+    transform: translateX(-50%);
+    width: min(300px, calc(100% - 24px));
+    padding: 20px;
+  }
 }
 
 @keyframes emptyStateSpin {
