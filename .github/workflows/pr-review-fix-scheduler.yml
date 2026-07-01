@@ -1,0 +1,67 @@
+name: PR Review Fix Scheduler
+
+on:
+  schedule:
+    # Attempt one review-feedback fix before the merge scheduler inspects the queue.
+    - cron: "7 */1 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print actions without dispatching autofix
+        required: false
+        default: false
+        type: boolean
+      max_prs:
+        description: Maximum open PRs to inspect
+        required: false
+        default: "50"
+        type: string
+      max_dispatches:
+        description: Maximum autofix runs to dispatch
+        required: false
+        default: "1"
+        type: string
+
+concurrency:
+  group: pr-review-fix-scheduler-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+  statuses: read
+
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout trusted scheduler
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Self-test scheduler contract
+        run: python3 scripts/ci/pr_review_fix_scheduler.py --self-test
+
+      - name: Dispatch review-feedback autofix
+        env:
+          GH_TOKEN: ${{ secrets.PR_REVIEW_MERGE_TOKEN || secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          MAX_PRS: ${{ github.event_name == 'workflow_dispatch' && inputs.max_prs || '50' }}
+          MAX_DISPATCHES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_dispatches || '1' }}
+        run: |
+          set -euo pipefail
+          args=(
+            --repo "$GITHUB_REPOSITORY"
+            --max-prs "$MAX_PRS"
+            --max-dispatches "$MAX_DISPATCHES"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python3 scripts/ci/pr_review_fix_scheduler.py "${args[@]}"

@@ -1,0 +1,71 @@
+name: PR Review Merge Scheduler
+
+on:
+  schedule:
+    # Keep the queue moving without overlapping long OpenCode review runs.
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print actions without dispatching reviews or merging PRs
+        required: false
+        default: false
+        type: boolean
+      trigger_reviews:
+        description: Dispatch OpenCode review for PR heads that lack one
+        required: false
+        default: true
+        type: boolean
+      max_prs:
+        description: Maximum open PRs to inspect
+        required: false
+        default: "50"
+        type: string
+
+concurrency:
+  group: pr-review-merge-scheduler-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout trusted scheduler
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Self-test scheduler contract
+        run: python3 scripts/ci/pr_review_merge_scheduler.py --self-test
+
+      - name: Review and merge eligible PRs
+        env:
+          GH_TOKEN: ${{ secrets.PR_REVIEW_MERGE_TOKEN || secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          TRIGGER_REVIEWS: ${{ github.event_name == 'workflow_dispatch' && inputs.trigger_reviews || 'true' }}
+          MAX_PRS: ${{ github.event_name == 'workflow_dispatch' && inputs.max_prs || '50' }}
+        run: |
+          set -euo pipefail
+          args=(
+            --repo "$GITHUB_REPOSITORY"
+            --merge-method merge
+            --max-prs "$MAX_PRS"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          if [ "$TRIGGER_REVIEWS" = "true" ]; then
+            args+=(--trigger-reviews)
+          fi
+          python3 scripts/ci/pr_review_merge_scheduler.py "${args[@]}"

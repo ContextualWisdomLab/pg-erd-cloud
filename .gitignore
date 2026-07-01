@@ -16,7 +16,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
-.coverage
 *.egg-info/
 
 # node
@@ -24,8 +23,6 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
-coverage/
-frontend/coverage/
 
 # opencode tooling artifacts
 registered_agents.json
