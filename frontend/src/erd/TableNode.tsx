@@ -52,8 +52,8 @@ function AccessibleTruncatedText({
   return (
     <span
       className={className}
-      title={title ?? text}
-      aria-label={text}
+      title={title ?? accessibleText}
+      aria-label={accessibleText}
       tabIndex={0}
     >
       {children ?? text}
