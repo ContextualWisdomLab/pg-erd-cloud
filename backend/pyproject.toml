@@ -9,7 +9,7 @@ include = ["app*"]
 [project]
 name = "pg-erd-cloud-backend"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 dependencies = [
   "fastapi>=0.137.1",
   "hypercorn>=0.16.0",
@@ -28,11 +28,23 @@ dependencies = [
 
 [project.optional-dependencies]
 snowflake = [
-  "snowflake-connector-python>=3.18.0,<4",
+  "snowflake-connector-python>=4,<5",
 ]
 dev = [
   "pytest>=9.0.3",
   "pytest-asyncio>=1.3.0",
+  "pytest-cov>=7.0.0",
+  "mypy>=1.10.0",
+  "asyncpg-stubs>=0.31.0",
+  "types-python-jose>=3.5.0.20260408",
+  "types-requests",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.3",
+  "pytest-asyncio>=1.3.0",
+  "pytest-cov>=7.0.0",
   "mypy>=1.10.0",
   "asyncpg-stubs>=0.31.0",
   "types-python-jose>=3.5.0.20260408",
@@ -42,6 +54,19 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+include = [
+  "app/csrf.py",
+  "app/db_introspect.py",
+  "app/metrics.py",
+  "app/permissions.py",
+  "app/pg_introspect/queries.py",
+  "app/pooler.py",
+  "app/schemas.py",
+  "app/security.py",
+  "app/security_headers.py",
+]
 
 [tool.mypy]
 python_version = "3.10"

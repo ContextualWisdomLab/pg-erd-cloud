@@ -65,6 +65,7 @@ async def test_introspection_connects_to_validated_ip(
     try:
         ssl_context.wrap_bio(in_bio, out_bio)
     except Exception:
+        # Some OpenSSL builds reject the synthetic BIO; this call only covers the wrapper path.
         pass
 
     captured.clear()
