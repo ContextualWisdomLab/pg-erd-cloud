@@ -152,6 +152,13 @@ describe('exportDDL', () => {
 
     const ddl = exportDDL(nodes, edges);
 
+    expect(ddl).toContain(
+      [
+        'ADD CONSTRAINT "fk_child_parent"',
+        '  FOREIGN KEY ("child_org_id", "child_dept_id")',
+        '  REFERENCES "public.parents" ("org_id", "dept_id");',
+      ].join('\n'),
+    );
     expect(ddl).toContain('FOREIGN KEY ("child_org_id", "child_dept_id")');
     expect(ddl).toContain('REFERENCES "public.parents" ("org_id", "dept_id")');
   });
