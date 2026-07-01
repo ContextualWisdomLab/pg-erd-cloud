@@ -1,4 +1,4 @@
-import {
+﻿import {
   Background,
   MiniMap,
   Controls,
