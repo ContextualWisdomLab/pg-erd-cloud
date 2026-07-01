@@ -15,6 +15,8 @@ from app.sanitize import sanitize_for_storage
 class _ServerHostnameSSLContext(ssl.SSLContext):
     """SSL context that keeps certificate verification tied to the DSN host."""
 
+    _server_hostname: str
+
     def __new__(cls, server_hostname: str) -> "_ServerHostnameSSLContext":
         context = super().__new__(cls, ssl.PROTOCOL_TLS_CLIENT)
         context.load_default_certs()
@@ -26,7 +28,7 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
         incoming: ssl.MemoryBIO,
         outgoing: ssl.MemoryBIO,
         server_side: bool = False,
-        server_hostname: str | None = None,
+        server_hostname: str | bytes | None = None,
         session: ssl.SSLSession | None = None,
     ) -> ssl.SSLObject:
         return super().wrap_bio(
@@ -51,13 +53,31 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
-    connect_kwargs: dict[str, object] = {"host": connect_host, "timeout": 10}
-    if _requires_verified_tls_hostname(dsn):
-        connect_kwargs["ssl"] = _ServerHostnameSSLContext(target.hostname)
+    ssl_context = (
+        _ServerHostnameSSLContext(target.hostname)
+        if _requires_verified_tls_hostname(dsn)
+        else None
+    )
     if target.port is not None:
-        conn = await asyncpg.connect(dsn, port=target.port, **connect_kwargs)
+        if ssl_context is not None:
+            conn = await asyncpg.connect(
+                dsn,
+                host=connect_host,
+                port=target.port,
+                timeout=10,
+                ssl=ssl_context,
+            )
+        else:
+            conn = await asyncpg.connect(
+                dsn, host=connect_host, port=target.port, timeout=10
+            )
     else:
-        conn = await asyncpg.connect(dsn, **connect_kwargs)
+        if ssl_context is not None:
+            conn = await asyncpg.connect(
+                dsn, host=connect_host, timeout=10, ssl=ssl_context
+            )
+        else:
+            conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
     try:
         version = await conn.fetchval("SHOW server_version")
         schema_name = schema_filter
