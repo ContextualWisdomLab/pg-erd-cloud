@@ -36,6 +36,8 @@ const SQL_IDENTIFIER_QUOTE_RE = /"/g;
 const SQL_ACCESS_METHOD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SQL_DATA_TYPE_RE = /^[A-Za-z0-9_ .,[\]()]+$/;
 const PLANT_TEXT_ESCAPE_RE = /[\\\r\n]/g;
+const SOURCE_HANDLE_PREFIX = 'src-c-';
+const TARGET_HANDLE_PREFIX = 'tgt-c-';
 
 function quoteSqlIdentifier(value: unknown): string {
   const text = String(value ?? '').trim() || 'unnamed';
@@ -50,6 +52,44 @@ function sqlAccessMethod(value: unknown): string {
 function sqlDataType(value: unknown): string {
   const text = String(value ?? '').trim();
   return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
+}
+
+function columnNameFromHandle(handle: unknown, prefix: string): string | null {
+  if (typeof handle !== 'string' || !handle.startsWith(prefix)) {
+    return null;
+  }
+
+  const encoded = handle.slice(prefix.length);
+  if (!encoded || encoded === 'empty') {
+    return null;
+  }
+
+  const chars = encoded.split('-').map((part) => {
+    if (!/^[0-9a-fA-F]+$/.test(part)) {
+      return null;
+    }
+    const codePoint = Number.parseInt(part, 16);
+    return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : null;
+  });
+
+  if (chars.some((char) => char === null)) {
+    return null;
+  }
+
+  return chars.join('');
+}
+
+function quotedColumnListFromHandles(
+  sourceHandle: Edge['sourceHandle'],
+  targetHandle: Edge['targetHandle'],
+): { sourceColumns: string; targetColumns: string } {
+  const sourceColumn = columnNameFromHandle(sourceHandle, SOURCE_HANDLE_PREFIX);
+  const targetColumn = columnNameFromHandle(targetHandle, TARGET_HANDLE_PREFIX);
+
+  return {
+    sourceColumns: sourceColumn ? quoteSqlIdentifier(sourceColumn) : '/* source columns */',
+    targetColumns: targetColumn ? quoteSqlIdentifier(targetColumn) : '/* target columns */',
+  };
 }
 
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
@@ -94,11 +134,11 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
+      const { sourceColumns, targetColumns } = quotedColumnListFromHandles(edge.sourceHandle, edge.targetHandle);
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
-      // For simplicity in UI without detailed column mapping we just put placeholder comments
-      ddl += `  FOREIGN KEY (/* source columns */)\n`;
-      ddl += `  REFERENCES ${targetTable} (/* target columns */);\n\n`;
+      ddl += `  FOREIGN KEY (${sourceColumns})\n`;
+      ddl += `  REFERENCES ${targetTable} (${targetColumns});\n\n`;
     }
   }
 

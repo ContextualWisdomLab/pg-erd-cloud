@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { exportDDL, exportPlantUml, exportDiagramSvg, downloadText } from '../export';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportDDL', () => {
   it('should export basic table DDL with primary key', () => {
@@ -84,6 +85,8 @@ describe('exportDDL', () => {
         source: '2', // source is the table with foreign key
         target: '1', // target is the referenced table
         label: 'fk_posts_users',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
       },
       {
         id: 'fk2',
@@ -96,8 +99,11 @@ describe('exportDDL', () => {
     const ddl = exportDDL(nodes, edges);
     expect(ddl).toContain('ALTER TABLE "public.posts"');
     expect(ddl).toContain('ADD CONSTRAINT "fk_posts_users"');
+    expect(ddl).toContain('FOREIGN KEY ("user_id")');
+    expect(ddl).toContain('REFERENCES "public.users" ("id")');
     expect(ddl).toContain('ADD CONSTRAINT "fk_2_1"');
-    expect(ddl).toContain('REFERENCES "public.users"');
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
+    expect(ddl).toContain('REFERENCES "public.users" (/* target columns */)');
   });
 
   it('should not throw if foreign key source or target is missing', () => {
