@@ -4,6 +4,20 @@ html, body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+:root {
+  --color-brand: #034ea2;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-surface: #fff;
+  --color-surface-soft: #f8fafc;
+  --color-border: #d1d5db;
+  --color-border-soft: #e5e7eb;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --space-control-y: 8px;
+  --space-control-x: 10px;
+}
+
 #root {
   height: 100vh;
 }
@@ -28,19 +42,19 @@ html, body {
 .authGate input {
   width: 100%;
   box-sizing: border-box;
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .skip-link {
   position: absolute;
   left: 8px;
   top: 8px;
-  background: #fff;
-  border: 2px solid #034ea2;
-  border-radius: 6px;
-  padding: 8px 10px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  padding: var(--space-control-y) var(--space-control-x);
   transform: translateY(-150%);
 }
 
@@ -53,12 +67,12 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #034ea2;
+  outline: 3px solid var(--color-brand);
   outline-offset: 2px;
 }
 
 .sidebar {
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid var(--color-border-soft);
   padding: 16px;
   overflow: auto;
   background: #fbfdff;
@@ -74,7 +88,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
-  color: #034ea2;
+  color: var(--color-brand);
 }
 
 .brandLockup h2 {
@@ -85,8 +99,8 @@ textarea:focus-visible {
 .brandLockup__mark {
   width: 28px;
   height: 18px;
-  border: 2px solid #034ea2;
-  border-radius: 999px 999px 6px 6px;
+  border: 2px solid var(--color-brand);
+  border-radius: 999px 999px var(--radius-control) var(--radius-control);
   border-top-width: 3px;
 }
 
@@ -108,7 +122,7 @@ textarea:focus-visible {
 .workspaceNav__item--active {
   border-color: #dbeafe;
   background: #eff6ff;
-  color: #034ea2;
+  color: var(--color-brand);
   font-weight: 700;
 }
 
@@ -124,7 +138,7 @@ textarea:focus-visible {
 }
 
 .sidebarSummary span {
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 12px;
 }
 
@@ -132,7 +146,7 @@ textarea:focus-visible {
   min-height: 100%;
   box-sizing: border-box;
   padding: 28px 32px;
-  background: #fff;
+  background: var(--color-surface);
   overflow: auto;
 }
 
@@ -151,12 +165,12 @@ textarea:focus-visible {
 .workspaceHeader h1,
 .workspaceSection h2 {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .workspaceHeader p {
   margin: 6px 0 0;
-  color: #64748b;
+  color: var(--color-muted);
 }
 
 .metricGrid {
@@ -171,8 +185,8 @@ textarea:focus-visible {
 .dataTable,
 .panelEmpty {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
 }
 
 .metricCard {
@@ -184,12 +198,12 @@ textarea:focus-visible {
 .metricCard span,
 .projectCard span,
 .dataTable span {
-  color: #64748b;
+  color: var(--color-muted);
 }
 
 .metricCard strong {
   font-size: 30px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .workspaceSection {
@@ -245,7 +259,7 @@ textarea:focus-visible {
 
 .dataTable__row--head {
   min-height: 44px;
-  background: #f8fafc;
+  background: var(--color-surface-soft);
   font-size: 13px;
   font-weight: 700;
 }
@@ -257,14 +271,14 @@ textarea:focus-visible {
 
 .inlineCreate input {
   min-width: 220px;
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .panelEmpty {
   padding: 24px;
-  color: #64748b;
+  color: var(--color-muted);
   text-align: center;
 }
 
@@ -307,16 +321,16 @@ textarea:focus-visible {
   align-items: center;
   padding: 8px;
   max-width: calc(100% - 24px);
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-panel);
   background: rgba(255, 255, 255, 0.92);
 }
 
 .canvasToolbar__search input {
   width: 180px;
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .canvasToolbar > button {
@@ -348,15 +362,15 @@ textarea:focus-visible {
 }
 
 .field input {
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .field select {
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .field-hint {
@@ -371,10 +385,10 @@ textarea:focus-visible {
 }
 
 button {
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  padding: var(--space-control-y) var(--space-control-x);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   cursor: pointer;
 }
 
@@ -387,9 +401,9 @@ button:disabled {
 
 .tableNode {
   width: 280px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
   transition:
     box-shadow 0.16s ease,
     filter 0.16s ease,
@@ -402,7 +416,7 @@ button:disabled {
 }
 
 .tableNode--highlighted {
-  border-color: #034ea2;
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(3, 78, 162, 0.18);
 }
 
@@ -416,8 +430,8 @@ button:disabled {
 
 .tableNode__title {
   font-weight: 700;
-  padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: var(--space-control-y) var(--space-control-x);
+  border-bottom: 1px solid var(--color-border-soft);
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -439,7 +453,7 @@ button:disabled {
 }
 
 .tableNode__cols {
-  padding: 8px 10px;
+  padding: var(--space-control-y) var(--space-control-x);
 }
 
 .tableNode__col {
@@ -483,14 +497,14 @@ button:disabled {
   font-size: 11px;
   color: #111827;
   background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-soft);
   border-radius: 999px;
   padding: 1px 6px;
 }
 
 .tableNode__groupBadge {
   color: #111827;
-  border: 1px solid color-mix(in srgb, var(--table-group-color) 38%, #e5e7eb);
+  border: 1px solid color-mix(in srgb, var(--table-group-color) 38%, var(--color-border-soft));
   border-radius: 999px;
   background: color-mix(in srgb, var(--table-group-color) 14%, #fff);
   padding: 1px 6px;
@@ -511,7 +525,7 @@ button:disabled {
 .tableNode__indexes {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .tableNode__indexHeading {
@@ -566,8 +580,8 @@ button:disabled {
 .modalContent {
   max-height: calc(100vh - 32px);
   overflow: auto;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--color-surface);
+  border-radius: var(--radius-panel);
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
 }
 
@@ -603,8 +617,8 @@ button:disabled {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-panel);
   background: #f9fafb;
 }
 
@@ -634,9 +648,9 @@ button:disabled {
 
 .exportModal__shareResult input {
   min-width: 0;
-  padding: 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-control-y);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 
 .exportModal__ddl {
@@ -988,7 +1002,7 @@ button:disabled {
 
 .colHandle {
   background: transparent;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border);
   border-radius: 50%;
   width: 6px;
   height: 6px;
@@ -996,8 +1010,8 @@ button:disabled {
   transform: translateY(-50%);
 }
 .colHandle:hover {
-  background: #034ea2;
-  border-color: #034ea2;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }
 
 .emptyState {
@@ -1012,8 +1026,8 @@ button:disabled {
   width: min(320px, calc(100% - 32px));
   background: rgba(255, 255, 255, 0.94);
   padding: 24px;
-  border-radius: 8px;
-  border: 2px dashed #d1d5db;
+  border-radius: var(--radius-panel);
+  border: 2px dashed var(--color-border);
   pointer-events: none;
   z-index: 5;
 }
@@ -1022,18 +1036,18 @@ button:disabled {
   width: 40px;
   height: 40px;
   margin-bottom: 14px;
-  border-radius: 8px;
-  border: 2px solid #034ea2;
+  border-radius: var(--radius-panel);
+  border: 2px solid var(--color-brand);
   background:
-    linear-gradient(#034ea2, #034ea2) 10px 12px / 20px 2px no-repeat,
-    linear-gradient(#034ea2, #034ea2) 10px 19px / 20px 2px no-repeat,
-    linear-gradient(#034ea2, #034ea2) 10px 26px / 14px 2px no-repeat;
+    linear-gradient(var(--color-brand), var(--color-brand)) 10px 12px / 20px 2px no-repeat,
+    linear-gradient(var(--color-brand), var(--color-brand)) 10px 19px / 20px 2px no-repeat,
+    linear-gradient(var(--color-brand), var(--color-brand)) 10px 26px / 14px 2px no-repeat;
 }
 
 .emptyState__mark--busy {
   border-radius: 50%;
-  border-color: #d1d5db;
-  border-top-color: #034ea2;
+  border-color: var(--color-border);
+  border-top-color: var(--color-brand);
   background: none;
   animation: emptyStateSpin 900ms linear infinite;
 }
@@ -1041,13 +1055,13 @@ button:disabled {
 .emptyState__title {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .emptyState__desc {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--color-muted);
   line-height: 1.5;
 }
 
@@ -1074,11 +1088,11 @@ button:disabled {
 /* Style table-level top and bottom handles */
 .react-flow__handle-top, .react-flow__handle-bottom {
   background: transparent;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border);
   width: 6px;
   height: 6px;
 }
 .react-flow__handle-top:hover, .react-flow__handle-bottom:hover {
-  background: #034ea2;
-  border-color: #034ea2;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }
