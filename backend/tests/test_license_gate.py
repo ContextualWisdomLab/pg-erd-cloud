@@ -40,6 +40,8 @@ def _signed_license_token(
 def test_license_gate_skips_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "license_mode", "off")
     monkeypatch.setattr(settings, "license_key", "x" * 64)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     require_active_license(x_license_key=None)
 
@@ -48,6 +50,8 @@ def test_license_gate_rejects_missing_license_key(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", "x" * 32)
     monkeypatch.setattr(settings, "license_public_key", None)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     with pytest.raises(HTTPException) as exc_info:
         require_active_license(x_license_key=None)
@@ -59,6 +63,8 @@ def test_license_gate_rejects_wrong_license_key(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", "x" * 32)
     monkeypatch.setattr(settings, "license_public_key", None)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     with pytest.raises(HTTPException) as exc_info:
         require_active_license(x_license_key="wrong-key")
@@ -72,6 +78,8 @@ def test_license_gate_rejects_when_mode_is_required_but_key_not_configured(
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", None)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     with pytest.raises(HTTPException) as exc_info:
         require_active_license(x_license_key="anything")
@@ -83,6 +91,8 @@ def test_license_gate_accepts_valid_key(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", "x" * 32)
     monkeypatch.setattr(settings, "license_public_key", None)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     require_active_license(x_license_key="x" * 32)
 
@@ -94,12 +104,15 @@ def test_license_gate_accepts_signed_on_prem_license_token(
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     token = _signed_license_token(
         private_key,
         {
             "sub": "customer-acme",
             "plan": "enterprise",
+            "jti": "license-2026-07",
             "exp": int(time.time()) + 3600,
             "seats": 25,
         },
@@ -115,6 +128,8 @@ def test_license_gate_rejects_expired_signed_license_token(
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     token = _signed_license_token(
         private_key,
@@ -139,6 +154,8 @@ def test_license_gate_rejects_tampered_signed_license_token(
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
 
     token = _signed_license_token(
         private_key,
@@ -166,3 +183,84 @@ def test_license_gate_rejects_tampered_signed_license_token(
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "license token signature is invalid"
+
+
+def test_license_gate_rejects_revoked_signed_license_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "license-2026-07")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
+
+    token = _signed_license_token(
+        private_key,
+        {
+            "sub": "customer-acme",
+            "plan": "enterprise",
+            "jti": "license-2026-07",
+            "exp": int(time.time()) + 3600,
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_active_license(x_license_key=token)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "license token is revoked"
+
+
+def test_license_gate_rejects_signed_license_with_padded_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "license-2026-07")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
+
+    token = _signed_license_token(
+        private_key,
+        {
+            "sub": "customer-acme",
+            "plan": "enterprise",
+            "jti": " license-2026-07 ",
+            "exp": int(time.time()) + 3600,
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_active_license(x_license_key=token)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "license token payload is invalid"
+
+
+def test_license_gate_rejects_revoked_license_subject(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", _public_key_value(private_key))
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "customer-acme")
+
+    token = _signed_license_token(
+        private_key,
+        {
+            "sub": "customer-acme",
+            "plan": "enterprise",
+            "jti": "license-2026-08",
+            "exp": int(time.time()) + 3600,
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_active_license(x_license_key=token)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "license token is revoked"

@@ -59,6 +59,7 @@ _AUTHZ_DETAIL_REASON_MAP = {
     "license token signature is invalid": "license_token_signature_invalid",
     "license token is expired": "license_token_expired",
     "license token is not yet valid": "license_token_not_yet_valid",
+    "license token is revoked": "license_token_revoked",
 }
 
 

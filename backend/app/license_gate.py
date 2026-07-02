@@ -36,6 +36,10 @@ def _normalize_key(value: str | None) -> str:
     return value.strip() if value else ""
 
 
+def _split_csv(value: str) -> set[str]:
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
 def _b64url_decode(value: str) -> bytes:
     padding = "=" * (-len(value) % 4)
     try:
@@ -84,7 +88,7 @@ def _load_ed25519_public_key(value: str | None) -> Ed25519PublicKey:
 
 def _require_str_claim(payload: dict[str, Any], claim: str) -> None:
     value = payload.get(claim)
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
         raise LicenseValidationError("license token payload is invalid")
 
 
@@ -113,6 +117,27 @@ def _validate_license_payload(payload: dict[str, Any], *, now: int) -> None:
     seats = payload.get("seats")
     if seats is not None and (not isinstance(seats, int) or seats <= 0):
         raise LicenseValidationError("license token payload is invalid")
+
+    license_id = payload.get("jti")
+    if license_id is not None and (
+        not isinstance(license_id, str)
+        or not license_id.strip()
+        or license_id != license_id.strip()
+    ):
+        raise LicenseValidationError("license token payload is invalid")
+
+
+def _reject_revoked_license(payload: dict[str, Any]) -> None:
+    revoked_ids = _split_csv(settings.license_revoked_token_ids)
+    revoked_subjects = _split_csv(settings.license_revoked_subjects)
+
+    license_id = payload.get("jti")
+    if isinstance(license_id, str) and license_id in revoked_ids:
+        raise LicenseValidationError("license token is revoked")
+
+    subject = payload.get("sub")
+    if isinstance(subject, str) and subject in revoked_subjects:
+        raise LicenseValidationError("license token is revoked")
 
 
 def _validate_signed_license_token(
@@ -145,6 +170,7 @@ def _validate_signed_license_token(
         raise LicenseValidationError("license token payload is invalid")
 
     _validate_license_payload(decoded, now=now or int(time.time()))
+    _reject_revoked_license(decoded)
 
 
 def _matches_static_license_key(candidate: str) -> bool:

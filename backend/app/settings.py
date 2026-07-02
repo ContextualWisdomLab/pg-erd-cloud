@@ -128,6 +128,10 @@ class Settings(BaseSettings):
     license_key: str | None = None
     # Optional Ed25519 public key for offline signed on-prem license tokens.
     license_public_key: str | None = None
+    # Comma-separated signed license token IDs (jti) or customer subjects (sub)
+    # that must be rejected before their natural expiry.
+    license_revoked_token_ids: str = ""
+    license_revoked_subjects: str = ""
 
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
