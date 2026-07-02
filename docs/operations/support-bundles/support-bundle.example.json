@@ -1,0 +1,120 @@
+{
+  "backend_error_log_tail": [
+    "database_url=postgresql://erd:[redacted]@postgres/erd",
+    "Authorization: [redacted]",
+    "provider_api_key=[redacted]"
+  ],
+  "billing": {
+    "environment_names": [
+      {
+        "configured": true,
+        "name": "BILLING_ALLOWED_PLANS"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_CHECKOUT_URL"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_PORTAL_URL"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_SUPPORT_URL"
+      },
+      {
+        "configured": true,
+        "name": "ACCOUNT_REACTIVATION_URL"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_ENTITLEMENT_EVENT_TYPES"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_CONTRACT_STATE_EVENTS_ENABLED"
+      }
+    ],
+    "provider_catalog_version": "catalog-2026-07-02",
+    "secret_environment_names": [
+      {
+        "configured": true,
+        "name": "BILLING_WEBHOOK_SECRET"
+      },
+      {
+        "configured": true,
+        "name": "BILLING_WEBHOOK_SIGNATURE_SECRET"
+      }
+    ]
+  },
+  "bundle_id": "support-bundle-20260702T223000Z",
+  "bundle_schema_version": 1,
+  "database": {
+    "alembic_current": "0005_llm_draft_usage_event (head)"
+  },
+  "deployment": {
+    "billing_provider_catalog_version": "catalog-2026-07-02",
+    "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+    "compose_prod": {
+      "exists": true,
+      "path": "compose.prod.yaml",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "generated_at": "2026-07-02T22:30:00Z",
+  "healthz": {
+    "ok": true
+  },
+  "license": {
+    "mode": "required",
+    "revocation_environment_names": [
+      {
+        "configured": true,
+        "name": "LICENSE_REVOKED_TOKEN_IDS"
+      },
+      {
+        "configured": true,
+        "name": "LICENSE_REVOKED_SUBJECTS"
+      }
+    ],
+    "verifier": "signed_token"
+  },
+  "redaction": {
+    "applied": true,
+    "rules": [
+      "secret-like keys are replaced with [redacted]",
+      "raw provider metadata fields are replaced with [redacted]",
+      "public share URL/token fields are replaced with [redacted]",
+      "URL credentials and secret query parameters are redacted in text",
+      "bearer tokens and secret assignments are redacted in text"
+    ]
+  },
+  "support_account_summary": {
+    "billing_support_url": "https://support.example.com/pg-erd-cloud",
+    "metadata": "[redacted]",
+    "recent_billing_events": [
+      {
+        "metadata_summary": [
+          {
+            "key": "seat_count",
+            "value": "25"
+          },
+          {
+            "key": "api_key",
+            "value": "[redacted]"
+          }
+        ],
+        "provider": "contract-ledger",
+        "provider_event_id": "evt_20260702_support_001",
+        "target_plan": "enterprise"
+      }
+    ],
+    "recent_share_links": [
+      {
+        "name": "Board review",
+        "share_url": "[redacted]"
+      }
+    ],
+    "subject": "customer-admin"
+  }
+}

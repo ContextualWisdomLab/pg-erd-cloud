@@ -50,6 +50,7 @@ REQUIRED_DOCUMENTS = (
     "alert_thresholds",
     "billing_provider_catalog",
     "support_bundle_generator",
+    "support_bundle_example",
 )
 
 PLACEHOLDER_RE = re.compile(r"\b(tbd|todo|fixme|pending|placeholder)\b|[<>]", re.IGNORECASE)

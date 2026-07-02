@@ -119,6 +119,13 @@ python scripts/operations/generate_support_bundle.py \
 생성 후 `support-bundle.json`에서 raw `APP_SECRET`, DB password, DSN, private key,
 billing secret, raw provider metadata, 공개 share URL/token이 남아 있으면 판매
 지원 증거로 사용하지 않습니다.
+`docs/operations/support-bundles/support-bundle.example.json`은 지원 bundle의 승인
+가능한 구조를 보여주며, 다음 validator가 release gate에서 redaction과 필수 필드를
+검사합니다.
+
+```bash
+python scripts/ci/validate_support_bundle.py
+```
 
 ## Billing provider catalog
 

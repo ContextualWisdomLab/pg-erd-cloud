@@ -120,6 +120,7 @@ python scripts/operations/generate_support_bundle.py \
   --support-account-file evidence/support-account.json \
   --backend-log-file evidence/backend-error.log \
   --output evidence/support-bundle.json
+python scripts/ci/validate_support_bundle.py
 python scripts/ci/validate_restore_drill_manifest.py
 ```
 

@@ -395,6 +395,8 @@ Files:
 - `deploy/*`
 - `scripts/ci/validate_onprem_package.py`
 - `scripts/operations/generate_support_bundle.py`
+- `scripts/ci/validate_support_bundle.py`
+- `docs/operations/support-bundles/support-bundle.example.json`
 
 Status:
 
@@ -405,6 +407,9 @@ Status:
 - Support bundle generator implemented with
   `scripts/operations/generate_support_bundle.py`, redaction tests, and CI
   execution.
+- Support bundle evidence validator implemented with
+  `scripts/ci/validate_support_bundle.py` and
+  `docs/operations/support-bundles/support-bundle.example.json`.
 - Remaining gap: customer-environment restore/rollback evidence from a real
   paid pilot or staging deployment.
 
@@ -416,12 +421,14 @@ Tasks:
 - Add a smoke command or script for validating the documented package path.
   - Implemented: `python scripts/ci/validate_restore_drill_manifest.py`.
   - Implemented: `python scripts/operations/generate_support_bundle.py`.
+  - Implemented: `python scripts/ci/validate_support_bundle.py`.
 
 Verification:
 
 ```bash
 git diff --check docs/operations/backup-restore.md docs/operations/migration-rollback.md docs/legal/license-billing.md
-python -m pytest scripts/operations/test_generate_support_bundle.py -q
+python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_validate_support_bundle.py -q
+python scripts/ci/validate_support_bundle.py
 python scripts/ci/validate_restore_drill_manifest.py
 ```
 

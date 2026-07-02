@@ -44,10 +44,13 @@ jobs:
         run: pytest -q
 
       - name: Support bundle generator tests
-        run: python -m pytest scripts/operations/test_generate_support_bundle.py -q
+        run: python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_validate_support_bundle.py -q
 
       - name: Commercial release approval manifests
         run: python scripts/ci/validate_commercial_release_approval.py
+
+      - name: Support bundle evidence manifests
+        run: python scripts/ci/validate_support_bundle.py
 
       - name: Billing provider catalog manifest
         run: python scripts/ci/validate_billing_provider_catalog.py
