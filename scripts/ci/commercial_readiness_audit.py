@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -28,6 +29,25 @@ EVIDENCE_VALIDATORS = {
     "support_bundle_evidence": "scripts/ci/validate_support_bundle.py",
     "real_billing_provider_catalog": "scripts/ci/validate_billing_provider_catalog.py",
 }
+
+SAMPLE_TEXT_MARKERS = (
+    (
+        "reserved_example_domain",
+        re.compile(r"\bexample\.(?:com|org|net)\b", re.IGNORECASE),
+    ),
+    (
+        "fake_commit_sha",
+        re.compile(r"\b0123456789abcdef0123456789abcdef01234567\b", re.IGNORECASE),
+    ),
+    (
+        "single_character_sha256",
+        re.compile(r"\b([0-9a-f])\1{63}\b", re.IGNORECASE),
+    ),
+    (
+        "customer_acme_placeholder",
+        re.compile(r"\bcustomer-acme\b", re.IGNORECASE),
+    ),
+)
 
 REAL_EVIDENCE_RULES = (
     {
@@ -105,10 +125,41 @@ def _run_validator(script_path: str, paths: list[pathlib.Path] | None = None) ->
     }
 
 
+def _sample_markers_in_value(value: Any, field_path: str) -> list[str]:
+    findings: list[str] = []
+    if isinstance(value, dict):
+        for raw_key, child in value.items():
+            key = str(raw_key)
+            child_path = f"{field_path}.{key}" if field_path else key
+            findings.extend(_sample_markers_in_value(child, child_path))
+        return findings
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            findings.extend(_sample_markers_in_value(child, f"{field_path}[{index}]"))
+        return findings
+    if isinstance(value, str):
+        for marker_id, pattern in SAMPLE_TEXT_MARKERS:
+            if pattern.search(value):
+                findings.append(f"{field_path}: {marker_id}")
+    return findings
+
+
+def _sample_markers(path: pathlib.Path) -> list[str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [f"{_relative(path)}: unreadable_json"]
+    return [
+        f"{_relative(path)}:{finding}"
+        for finding in _sample_markers_in_value(payload, "")
+    ]
+
+
 def _real_evidence_gate(
     rule: dict[str, Any],
     explicit_paths: list[pathlib.Path],
     explicit_validator_passed: bool | None,
+    explicit_sample_markers: list[str],
 ) -> dict[str, Any]:
     directory = ROOT / str(rule["directory"])
     example_names = set(rule["example_names"])
@@ -117,12 +168,25 @@ def _real_evidence_gate(
     real_files = [path for path in files if path.name not in example_names]
     explicit_real_paths = [path for path in explicit_paths if path.name not in example_names]
     explicit_example_paths = [path for path in explicit_paths if path.name in example_names]
-    has_valid_explicit_evidence = bool(explicit_real_paths) and explicit_validator_passed is True
-    status = "ready" if real_files or has_valid_explicit_evidence else "no_go"
+    has_valid_explicit_evidence = (
+        bool(explicit_real_paths)
+        and explicit_validator_passed is True
+        and not explicit_sample_markers
+    )
+    status = "ready"
+    if explicit_paths and explicit_validator_passed is False:
+        status = "no_go"
+    elif explicit_sample_markers:
+        status = "no_go"
+    elif not real_files and not has_valid_explicit_evidence:
+        status = "no_go"
+
     no_go_reason = None
     if status != "ready":
         if explicit_paths and explicit_validator_passed is False:
             no_go_reason = "Explicit evidence paths failed the required validator."
+        elif explicit_sample_markers:
+            no_go_reason = "Explicit evidence paths still contain example or synthetic evidence markers."
         elif explicit_example_paths and not explicit_real_paths:
             no_go_reason = "Explicit evidence paths use example manifest names."
         else:
@@ -137,6 +201,7 @@ def _real_evidence_gate(
         "explicit_evidence_files": [_relative(path) for path in explicit_real_paths],
         "explicit_example_files": [_relative(path) for path in explicit_example_paths],
         "explicit_validator_passed": explicit_validator_passed,
+        "explicit_sample_markers": explicit_sample_markers,
         "example_files": [_relative(path) for path in example_files],
         "no_go_reason": no_go_reason,
     }
@@ -149,9 +214,11 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
         for gate_id, script_path in VALIDATORS
     ]
     explicit_validator_passed: dict[str, bool | None] = {}
+    explicit_sample_markers: dict[str, list[str]] = {}
     for evidence_id, paths in explicit_evidence_paths.items():
         if not paths:
             explicit_validator_passed[evidence_id] = None
+            explicit_sample_markers[evidence_id] = []
             continue
         result = {
             "id": f"explicit_{evidence_id}",
@@ -159,6 +226,11 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
         }
         validator_results.append(result)
         explicit_validator_passed[evidence_id] = result["passed"]
+        explicit_sample_markers[evidence_id] = [
+            marker
+            for path in paths
+            for marker in _sample_markers(path)
+        ]
 
     schema_ready = all(result["passed"] for result in validator_results)
     evidence_gates = [
@@ -166,6 +238,7 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
             rule,
             explicit_evidence_paths.get(str(rule["id"]), []),
             explicit_validator_passed.get(str(rule["id"])),
+            explicit_sample_markers.get(str(rule["id"]), []),
         )
         for rule in REAL_EVIDENCE_RULES
     ]

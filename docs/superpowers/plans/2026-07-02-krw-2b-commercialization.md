@@ -418,7 +418,8 @@ Status:
   from actual non-example sale evidence. It now accepts uncommitted customer or
   staging evidence paths through `--release-approval`, `--restore-drill`,
   `--support-bundle`, and `--billing-provider-catalog`; `*.example.json` names
-  are still treated as example evidence, not real sale proof.
+  and sample markers such as `example.com`, fake commit SHA, repeated SHA-256,
+  and `customer-acme` are still treated as example evidence, not real sale proof.
 - Remaining gap: customer-environment restore/rollback evidence from a real
   paid pilot or staging deployment.
 
@@ -435,6 +436,9 @@ Tasks:
   - Implemented: explicit external evidence path validation for release
     approvals, restore drills, support bundles, billing catalogs, and the
     aggregate commercial readiness audit.
+  - Implemented: explicit real-evidence hardening so renamed example manifests
+    with reserved sample domains, fake commit SHA, repeated SHA-256, or
+    `customer-acme` placeholders do not satisfy `--strict`.
 
 Verification:
 
