@@ -64,6 +64,9 @@ Run the QA pass on these screens before broad UI implementation:
 13. Share/export modal with no project, loading, success, copy-feedback, error,
     and no-DDL states.
 14. Narrow viewport review/share state.
+15. Support diagnostics with an authorized operator, populated account summary,
+    billing/reactivation URLs, recent billing events, and narrow viewport
+    fallback.
 
 ## Fidelity Surfaces
 
@@ -111,6 +114,9 @@ Run the QA pass on these screens before broad UI implementation:
 - Toolbar, modal, and disabled-state copy explains the next action.
 - Share/export copy distinguishes project share links from DDL text and diagram
   file exports.
+- Support diagnostics copy distinguishes customer account status, license
+  verifier, billing portal, reactivation path, and support handoff without
+  exposing raw billing metadata.
 - DSN and schema-filter hints are explicit about PostgreSQL and Snowflake.
 - Error states say what failed and what the user can try next.
 

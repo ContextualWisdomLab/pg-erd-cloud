@@ -5,6 +5,7 @@ import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, Snapshot
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 const DEMO_EMPTY_WORKSPACE_QUERY = 'demo-workspace'
+const DEMO_SUPPORT_QUERY = 'demo-support'
 
 type ApiErrorOptions = {
   accountStatus?: string | null
@@ -41,6 +42,11 @@ function apiErrorFromResponse(operation: string, response: Response): ApiError {
 function isDemoEmptyWorkspace(): boolean {
   if (!DEMO_MODE || typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get(DEMO_EMPTY_WORKSPACE_QUERY) === 'empty'
+}
+
+function isDemoSupportOperator(): boolean {
+  if (!DEMO_MODE || typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get(DEMO_SUPPORT_QUERY) === 'operator'
 }
 
 let demoProjects: Project[] = [
@@ -196,7 +202,7 @@ export async function getMe(): Promise<CurrentUser> {
       subject: 'local',
       display_name: 'Local Designer',
       user_account_uuid: 'demo-user',
-      support_operator: false
+      support_operator: isDemoSupportOperator()
     }
   }
   const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
@@ -205,6 +211,47 @@ export async function getMe(): Promise<CurrentUser> {
 }
 
 export async function getBillingSupportAccount(subject: string): Promise<BillingSupportAccount> {
+  if (DEMO_MODE) {
+    return {
+      subject: subject || 'customer-owner',
+      user_account_uuid: 'demo-customer-user',
+      account_status: 'active',
+      license_mode: 'required',
+      license_verifier: 'signed_token',
+      billing_portal_url: 'https://billing.example.com/customer/demo-customer-user',
+      billing_support_url: 'https://support.example.com/billing',
+      account_reactivation_url: 'https://billing.example.com/reactivate/demo-customer-user',
+      project_count: 3,
+      seat_count: 12,
+      connection_count: 4,
+      snapshot_count: 18,
+      share_link_count: 7,
+      active_share_link_count: 2,
+      recent_billing_events: [
+        {
+          billing_event_uuid: 'demo-billing-event-1',
+          provider: 'stripe',
+          provider_event_id: 'evt_demo_subscription_updated',
+          event_type: 'subscription.updated',
+          target_plan: 'enterprise',
+          status: 'recorded',
+          occurred_at: '2026-07-02T00:00:00Z',
+          received_at: '2026-07-02T00:01:22Z'
+        },
+        {
+          billing_event_uuid: 'demo-billing-event-2',
+          provider: 'manual-contract',
+          provider_event_id: 'contract-demo-renewal',
+          event_type: 'contract.renewed',
+          target_plan: 'onprem-enterprise',
+          status: 'recorded',
+          occurred_at: '2026-07-01T09:00:00Z',
+          received_at: '2026-07-01T09:03:11Z'
+        }
+      ]
+    }
+  }
+
   const query = new URLSearchParams({ subject })
   const r = await fetch(`${API_BASE}/api/billing/support/account?${query.toString()}`, {
     credentials: 'include'

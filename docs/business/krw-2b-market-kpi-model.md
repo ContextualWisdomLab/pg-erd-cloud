@@ -106,8 +106,10 @@ operational reliability, and support burden.
   event recording path, raw-body HMAC signature verification path, and
   billing reconciliation outcome metric are now covered by tests.
 - Admin/support diagnostics are now partially measured by tests through the
-  backend read-only diagnostics API and operator-only frontend view. Support
-  workload and resolution-time metrics still need pilot data.
+  backend read-only diagnostics API, operator-only frontend view, demo-mode E2E
+  support lookup, and Product Design/Figma audit evidence in
+  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`. Support workload and
+  resolution-time metrics still need pilot data.
 - On-premises packaging drills are a P1 gap because regulated buyers need proof
   that the product can run and be recovered in their environment.
 - Figma/Product Design work must include buyer-trust states, not only the happy
@@ -119,7 +121,8 @@ operational reliability, and support burden.
 - Measured today: local automated tests for license, usage limits, account
   deactivation, plan-change handoff, provider-neutral billing event ingestion,
   billing webhook outcome metrics, read-only support diagnostics, operator-only
-  support diagnostics UI, visual regression, accessibility, and E2E smoke paths.
+  support diagnostics UI, support diagnostics demo evidence, visual regression,
+  accessibility, and E2E smoke paths.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation
   rates, support effort, and buyer conversion.
 - Missing today: real customer interviews, paid pilot data, procurement notes,

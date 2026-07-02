@@ -9,9 +9,14 @@ Evidence used in this pass:
 
 - Repository screenshots in `docs/ui-ux/01-login-screen.png` through
   `docs/ui-ux/09-share-export-modal.png`.
+- Current-run support diagnostics audit screenshots in
+  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`, covering desktop
+  support diagnostics, narrow support diagnostics, and commercial demo
+  dashboard.
 - Figma Product Design Kit
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>, where the same nine
-  screenshots are placed on `01 Current References`.
+  screenshots are placed on `01 Current References` and the support diagnostics
+  audit is placed in section `48:2`.
 - Current frontend source in `frontend/src/App.tsx`,
   `frontend/src/styles.css`, `frontend/src/erd/TableNode.tsx`, and
   `frontend/src/components/modals/*`.
@@ -19,8 +24,9 @@ Evidence used in this pass:
 Evidence limits:
 
 - This is a repository-plus-reference audit, not a completed browser-observed
-  usability study. The source screenshots are now available in Figma, but live
-  interaction evidence still needs browser capture.
+  usability study. The support diagnostics slice now has current-run browser
+  capture evidence, but the older nine-screen core workspace reference still
+  needs a full live-flow browser audit.
 - Screenshots show the intended product direction, while source review shows the
   current implementation. Live keyboard traversal, screen-reader output, backend
   latency, and real database-scale behavior still need browser verification.
@@ -98,6 +104,43 @@ the next focused code PR, not as proof that the production UI already changed.
      entry points in `frontend/src/App.tsx`.
 
 ## Findings
+
+### P1. Support diagnostics is now demoable, but narrow-width billing evidence loses context
+
+Evidence:
+
+- `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/01-support-diagnostics-desktop.png`
+  shows the read-only support operator view after looking up `customer-owner`.
+- `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/02-support-diagnostics-mobile.png`
+  shows the same flow at 390px width.
+- Figma section:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>
+- The capture used `VITE_DEMO_MODE=true` and `/?demo-support=operator`; Figma
+  Code Connect was not used.
+
+Impact:
+
+- Desktop support diagnostics are credible for paid-pilot support demos: counts,
+  account state, license verifier, support URL, billing portal URL,
+  reactivation URL, and recent billing events are all visible in one operator
+  flow.
+- Narrow support diagnostics reflows the summary cards and account details, but
+  the recent billing events table loses `Plan` and `Received` context off-screen.
+  That is acceptable as fallback evidence, but not as a polished buyer-critical
+  mobile support workflow.
+- Long billing and reactivation URLs wrap inside cards, which can reduce trust
+  during live support calls even though the data is available.
+
+Recommendation:
+
+- Keep the support diagnostics implementation as an operator-only read path.
+- For the next UI slice, convert recent billing events to stacked cards below
+  narrow widths or add an explicit horizontal-scroll affordance with preserved
+  column labels.
+- Format billing/support URLs as named links with copy actions instead of raw
+  full URLs in the account detail cards.
+- Preserve the demo-only `?demo-support=operator` path as Product Design and
+  sales-engineering evidence, not as a production authorization shortcut.
 
 ### P1. Setup workflow is split between the product concept and current editor sidebar
 

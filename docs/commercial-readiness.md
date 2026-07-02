@@ -24,6 +24,8 @@ blocker로 분류합니다.
   `docs/superpowers/plans/2026-07-02-krw-2b-commercialization.md`
 - 시장/KPI 모델:
   `docs/business/krw-2b-market-kpi-model.md`
+- Product Design 지원 진단 감사:
+  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/README.md`
 - FigJam 운영 모델:
   <https://www.figma.com/board/XJXqiPUAYyrV85N5XzQpsB?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=abef7f56-0ca9-4a97-9173-0e6ecb254b71>
 
@@ -50,6 +52,23 @@ blocker로 분류합니다.
   - `github-actions`: 4개
   - 수동 작성자(사람) 미해결 thread는 현재 0개로 집계됨
 - 판단: **자동 리뷰 지연·품질봇 코멘트는 원칙대로 blocker에서 제외**하되, 해당 코멘트가 요구하는 실제 개선(예: 접근성/성능/테스트 규칙)은 별도 이슈로 반영하여 순차 처리.
+
+## Product Design/Figma Evidence Refresh (2026-07-02)
+
+- Figma Code Connect는 사용하지 않았습니다.
+- `VITE_DEMO_MODE=true`와 `/?demo-support=operator`로 support operator 전용
+  read-only 결제/계정 진단 흐름을 재현할 수 있게 했습니다. 이 경로는 데모와
+  Product Design 감사 전용이며 production authorization을 우회하지 않습니다.
+- 현재 run에서 캡처한 증거는
+  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`에 저장했고, Figma
+  디자인 파일의 `Support diagnostics commercial-readiness audit` 섹션
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>에 배치했습니다.
+- desktop support diagnostics는 paid-pilot 지원 데모에 사용할 수 있는 수준입니다.
+  다만 narrow viewport에서는 billing event의 plan/received context가 표 밖으로
+  밀려나므로, 일반 판매 전에는 stacked event card 또는 명확한 horizontal-scroll
+  cue가 필요합니다.
+- raw billing/support URL은 카드 안에서 줄바꿈되어 보입니다. 다음 UI slice에서는
+  named link와 copy action으로 바꾸는 것이 구매자 신뢰 관점에서 적절합니다.
 
 ## 상업 릴리즈 진입 판정(실시간)
 
@@ -175,6 +194,10 @@ blocker로 분류합니다.
 - 🆕 운영자 UI: `/api/me`의 `support_operator` flag로 허용된 운영자에게만
   프론트엔드 `지원 진단` 화면을 노출하고, raw billing metadata 없이 read-only
   계정/사용량/최근 event summary를 표시함
+- 🆕 지원 진단 데모/감사 경로: `VITE_DEMO_MODE=true`에서
+  `/?demo-support=operator`로 Product Design, Figma, sales-engineering 감사용
+  operator 화면과 billing event sample을 재현할 수 있으며, Playwright E2E로
+  조회 흐름을 검증함
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
   provider별 checkout/fulfillment와 계약 상태 적용 어댑터는 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,

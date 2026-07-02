@@ -18,3 +18,20 @@ test('demo workspace loads, editor responds, and a screenshot is renderable', as
   const screenshot = await page.screenshot({ fullPage: false });
   expect(screenshot.byteLength).toBeGreaterThan(10_000);
 });
+
+test('demo support operator can inspect billing diagnostics', async ({ page }) => {
+  await page.goto('/?demo-support=operator');
+
+  const navigation = page.getByRole('navigation', { name: '주요 화면' });
+  await expect(navigation.getByRole('button', { name: '지원' })).toBeVisible();
+  await navigation.getByRole('button', { name: '지원' }).click();
+
+  await expect(page.getByRole('heading', { name: '지원 진단' })).toBeVisible();
+  await page.getByRole('textbox', { name: '지원 진단 대상 subject' }).fill('customer-owner');
+  await page.getByRole('button', { name: '조회' }).click();
+
+  await expect(page.getByText('demo-customer-user', { exact: true })).toBeVisible();
+  await expect(page.getByText('서명 토큰')).toBeVisible();
+  await expect(page.getByRole('table', { name: '최근 결제 이벤트' })).toBeVisible();
+  await expect(page.getByText('subscription.updated')).toBeVisible();
+});

@@ -13,6 +13,9 @@ operating paths block release.
 FigJam operating model:
 https://www.figma.com/board/XJXqiPUAYyrV85N5XzQpsB?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=abef7f56-0ca9-4a97-9173-0e6ecb254b71
 
+Product Design support diagnostics audit:
+https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2
+
 ## Tool Roles
 
 ### Superpowers
@@ -199,6 +202,7 @@ Files:
 
 - `docs/ui-ux/product-design-audit.md`
 - `docs/ui-ux/design-qa-checklist.md`
+- `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/README.md`
 
 Tasks:
 
@@ -206,6 +210,12 @@ Tasks:
   first-run onboarding, empty workspace, connection errors, billing limits,
   plan-change handoff, account deactivation, share/export success, and support
   escalation.
+- Keep `/?demo-support=operator` available in `VITE_DEMO_MODE=true` as a
+  sales-engineering and Product Design evidence path for support diagnostics.
+- Track support diagnostics UI follow-ups:
+  raw billing/support URLs should become named links with copy actions, and
+  narrow-width billing events should become stacked cards or expose a clear
+  horizontal-scroll affordance.
 - Convert every `P0` design issue into a frontend task with test coverage.
 
 Verification:

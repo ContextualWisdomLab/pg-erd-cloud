@@ -19,6 +19,9 @@ Execution planning:
   with the nine screenshots placed on `01 Current References`, local variables
   on `02 Foundations`, component sets on `03 Components`, and a desktop core
   flow prototype on `04 Core Flow Prototype`
+- [Support diagnostics audit evidence](qa/2026-07-02-support-diagnostics-audit/README.md)
+  with current-run local browser screenshots and Figma section
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>
 - [Core user flow FigJam board](https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588)
 
 Current Figma implementation anchors:
@@ -28,6 +31,7 @@ Current Figma implementation anchors:
 - [Toolbar button variants](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=28-33)
 - [Share/export modal states](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143)
 - [Core flow prototype](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=32-2)
+- [Support diagnostics Product Design audit](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2)
 
 Screens:
 
