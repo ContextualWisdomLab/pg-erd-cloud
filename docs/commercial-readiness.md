@@ -34,8 +34,8 @@ blocker로 분류합니다.
 
 1. **P0 인증·인가 완성도**: 현재는 OIDC 검증 강제, API 허가, 공유 경로 제한이 적용되어 있으나, 사용자 메시지/알림 임계치 템플릿은 미완.
 2. **P2 라이선스/과금 운영 연동**: `LICENSE_MODE`, Ed25519 서명 토큰 검증, CLI 기반 발급/재발급, env 기반 토큰/고객 회수 목록, 사용량 summary API, 기본 사용량 한도 enforcement, billing/reactivation URL 노출은 구현됐으나, 실제 과금 포털·요금제 변경 자동화는 미구현.
-3. **지원/법무 패키지 승인 기록**: 약관/개인정보/SLA/보안 신고/승인 체크리스트는 준비됐으나, 실제 판매 버전의 법무 승인 기록은 아직 없음.
-4. **릴리즈별 승인·운영 자동화 잔여분**: 법무/지원 승인 gate, desktop/mobile/first-run UI 회귀 자동화, baseline 승인 절차, subject 기반 계정 비활성화는 들어갔으나, 실제 판매 릴리즈별 승인 기록과 포털 기반 재활성화 자동화는 아직 필요.
+3. **지원/법무 패키지 승인 기록**: 약관/개인정보/SLA/보안 신고/승인 체크리스트와 release approval manifest CI 검증은 준비됐으나, 실제 판매 버전의 승인자 서명 기록은 아직 없음.
+4. **릴리즈별 승인·운영 자동화 잔여분**: 법무/지원 승인 manifest 검증, desktop/mobile/first-run UI 회귀 자동화, baseline 승인 절차, subject 기반 계정 비활성화는 들어갔으나, 실제 판매 릴리즈별 승인 기록과 포털 기반 재활성화 자동화는 아직 필요.
 
 ### 우선순위 기반 실행 계획(현재 PR과 분리)
 
@@ -44,7 +44,7 @@ blocker로 분류합니다.
 | P0 | 인증/인가/오류 처리 | 부분 완료 | 사용자 안내(코드/메시지 표준화)와 알람 임계치 문서 자동화 |
 | P1 | 라이선스·사용량·과금 체계 | 서명 토큰 발급 CLI + 검증 + env 기반 회수 목록 + 사용량 summary API + 기본 한도 enforcement + billing/reactivation URL 노출 도입 | 교체/비정상 탐지 SOP + 실제 과금 포털 연동 |
 | P1 | 운영 자동화 | 부분 완료 | 장애 대응·백업·마이그레이션 절차를 CI 재시작 플로우와 연결 |
-| P2 | 법무 문서 고도화 | 약관/개인정보/SLA/보안 신고/승인 gate 문서화 | 지역/계약별 승인 기록 첨부 |
+| P2 | 법무 문서 고도화 | 약관/개인정보/SLA/보안 신고/승인 gate 문서화 + manifest CI 검증 | 지역/계약별 실제 승인 기록 첨부 |
 | P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + desktop/mobile editor baseline + first-run dashboard baseline + share/export modal baseline + baseline 갱신 승인 절차 도입 | 추가 브라우저/핵심 workflow baseline 검토 |
 
 위 항목 중 하나라도 미완이면 “판매 전 검수 합격”으로 보기 어렵습니다.
@@ -128,6 +128,9 @@ blocker로 분류합니다.
   포털·요금제 변경 실행 자동화는 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,
   상용 릴리즈 승인 체크리스트를 배포물에 포함함
+- ✅ 승인 기록 형식 검증: `docs/legal/release-approvals/release-approval.example.json`과
+  `scripts/ci/validate_commercial_release_approval.py`를 추가해 릴리즈별 승인 manifest
+  구조, 승인 필드, 문서 경로를 CI에서 검증함
 - 🟡 법무 승인: 실제 판매 버전의 승인자/일자/계약 범위 기록은 릴리즈별로 첨부 필요
 - ✅ 접근성 smoke: `npm run test:a11y`와 CI `Accessibility smoke` 단계를 추가해
   skip link, main landmark, navigation state, editor toolbar accessible names, modal focus trap을 검증함

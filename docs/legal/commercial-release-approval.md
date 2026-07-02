@@ -30,6 +30,11 @@
 ## 3) 승인 기록
 
 릴리즈 전 다음 항목을 릴리즈 이슈 또는 계약 승인 문서에 남깁니다.
+판매 대상 릴리즈를 저장소에 기록할 때는
+`docs/legal/release-approvals/release-approval.example.json`을 복사해
+릴리즈별 manifest를 만들고, `scripts/ci/validate_commercial_release_approval.py`가
+CI에서 통과해야 합니다. example 파일은 형식 검증용이며 실제 승인 기록으로
+간주하지 않습니다.
 
 | 항목 | 값 |
 |---|---|

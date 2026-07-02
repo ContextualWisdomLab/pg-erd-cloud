@@ -43,6 +43,9 @@ jobs:
           PYTHONPATH: .
         run: pytest -q
 
+      - name: Commercial release approval manifests
+        run: python scripts/ci/validate_commercial_release_approval.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:
