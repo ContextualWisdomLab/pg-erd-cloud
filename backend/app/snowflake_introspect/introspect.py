@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import importlib
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -172,8 +171,9 @@ async def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
                 if not auth_lower.startswith("https://"):
                     raise ValueError("unsupported Snowflake authenticator value")
                 parsed_auth = urlparse(auth_lower)
-                if not parsed_auth.hostname or not re.match(
-                    r"^([a-zA-Z0-9-]+\.)*(okta|oktapreview)\.com$", parsed_auth.hostname
+                if not parsed_auth.hostname or not (
+                    parsed_auth.hostname.endswith(".okta.com")
+                    or parsed_auth.hostname.endswith(".oktapreview.com")
                 ):
                     raise ValueError("unsupported Snowflake authenticator URL")
 
@@ -413,9 +413,11 @@ def _build_foreign_key(
     return constraint, fk_edges
 
 
-def _group_constraint_rows(
+def _build_constraints(
     rows: list[dict],
-) -> dict[tuple[str, str, str, str], list[dict]]:
+    relation_ids: dict[tuple[str, str], int],
+    column_positions: dict[tuple[str, str], dict[str, int]],
+) -> tuple[list[dict], list[dict], list[dict]]:
     grouped: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
     for row in rows:
         ctype = _constraint_type(row.get("constraint_type"))
@@ -426,116 +428,83 @@ def _group_constraint_rows(
         if not (ctype and schema and table and name and constraint_schema):
             continue
         grouped[(constraint_schema, name, schema, table)].append(row)
-    return grouped
-
-
-def _process_constraint_group(
-    group_rows: list[dict],
-    name: str,
-    schema: str,
-    table: str,
-    relation_ids: dict[tuple[str, str], int],
-    column_positions: dict[tuple[str, str], dict[str, int]],
-    constraint_oid: int,
-) -> tuple[dict | None, list[dict], list[dict]]:
-    sorted_rows = sorted(
-        group_rows,
-        key=lambda row: int(row.get("ordinal_position") or 0),
-    )
-    ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
-    relation_oid = relation_ids.get((schema, table))
-    if relation_oid is None:
-        return None, [], []
-
-    columns = [
-        str(row["column_name"])
-        for row in sorted_rows
-        if isinstance(row.get("column_name"), str)
-    ]
-    attnums = [
-        column_positions.get((schema, table), {}).get(column) for column in columns
-    ]
-    constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
-    referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
-    referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
-    referenced_columns = [
-        str(row["referenced_column_name"])
-        for row in sorted_rows
-        if isinstance(row.get("referenced_column_name"), str)
-    ]
-    foreign_relation_oid = (
-        relation_ids.get((referenced_schema, referenced_table))
-        if referenced_schema and referenced_table
-        else None
-    )
-
-    if ctype == "p":
-        constraint, new_pk_columns = _build_primary_key(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
-        )
-        return constraint, new_pk_columns, []
-    elif ctype == "u":
-        constraint = _build_unique_constraint(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
-        )
-        return constraint, [], []
-    elif ctype == "f":
-        constraint, new_fk_edges = _build_foreign_key(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
-            referenced_schema,
-            referenced_table,
-            referenced_columns,
-            foreign_relation_oid,
-            sorted_rows,
-        )
-        return constraint, [], new_fk_edges
-
-    return None, [], []
-
-
-def _build_constraints(
-    rows: list[dict],
-    relation_ids: dict[tuple[str, str], int],
-    column_positions: dict[tuple[str, str], dict[str, int]],
-) -> tuple[list[dict], list[dict], list[dict]]:
-    grouped = _group_constraint_rows(rows)
 
     constraints: list[dict] = []
     pk_columns: list[dict] = []
     fk_edges: list[dict] = []
 
     for (_, name, schema, table), group_rows in grouped.items():
-        constraint_oid = len(constraints) + 1
-        constraint, new_pk_columns, new_fk_edges = _process_constraint_group(
+        sorted_rows = sorted(
             group_rows,
-            name,
-            schema,
-            table,
-            relation_ids,
-            column_positions,
-            constraint_oid,
+            key=lambda row: int(row.get("ordinal_position") or 0),
         )
-        if constraint:
+        ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
+        relation_oid = relation_ids.get((schema, table))
+        if relation_oid is None:
+            continue
+
+        columns = [
+            str(row["column_name"])
+            for row in sorted_rows
+            if isinstance(row.get("column_name"), str)
+        ]
+        attnums = [
+            column_positions.get((schema, table), {}).get(column) for column in columns
+        ]
+        constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
+        referenced_schema = _str_or_none(sorted_rows[0].get("referenced_table_schema"))
+        referenced_table = _str_or_none(sorted_rows[0].get("referenced_table_name"))
+        referenced_columns = [
+            str(row["referenced_column_name"])
+            for row in sorted_rows
+            if isinstance(row.get("referenced_column_name"), str)
+        ]
+        foreign_relation_oid = (
+            relation_ids.get((referenced_schema, referenced_table))
+            if referenced_schema and referenced_table
+            else None
+        )
+
+        constraint_oid = len(constraints) + 1
+        if ctype == "p":
+            constraint, new_pk_columns = _build_primary_key(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+            )
             constraints.append(constraint)
             pk_columns.extend(new_pk_columns)
+        elif ctype == "u":
+            constraint = _build_unique_constraint(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+            )
+            constraints.append(constraint)
+        elif ctype == "f":
+            constraint, new_fk_edges = _build_foreign_key(
+                name,
+                schema,
+                table,
+                relation_oid,
+                columns,
+                constrained_attnums,
+                constraint_oid,
+                referenced_schema,
+                referenced_table,
+                referenced_columns,
+                foreign_relation_oid,
+                sorted_rows,
+            )
+            constraints.append(constraint)
             fk_edges.extend(new_fk_edges)
 
     return constraints, pk_columns, fk_edges
@@ -686,6 +655,4 @@ async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:
     """Introspect Snowflake metadata into the common snapshot JSON shape."""
 
     config = await _parse_snowflake_dsn(dsn)
-    return await asyncio.to_thread(
-        _introspect_snowflake_sync_with_config, config, schema_filter
-    )
+    return await asyncio.to_thread(_introspect_snowflake_sync_with_config, config, schema_filter)

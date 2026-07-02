@@ -7,12 +7,12 @@ from pathlib import Path
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-CHECKED_MODULES = (BACKEND_ROOT / "app" / "snowflake_introspect" / "introspect.py",)
+CHECKED_MODULES = (
+    BACKEND_ROOT / "app" / "snowflake_introspect" / "introspect.py",
+)
 
 
-def _public_defs(
-    tree: ast.AST,
-) -> list[ast.AsyncFunctionDef | ast.ClassDef | ast.FunctionDef]:
+def _public_defs(tree: ast.AST) -> list[ast.AsyncFunctionDef | ast.ClassDef | ast.FunctionDef]:
     return [
         node
         for node in ast.walk(tree)
@@ -24,9 +24,7 @@ def _public_defs(
 def test_changed_public_backend_apis_have_docstrings() -> None:
     missing: list[str] = []
     for module_path in CHECKED_MODULES:
-        tree = ast.parse(
-            module_path.read_text(encoding="utf-8"), filename=str(module_path)
-        )
+        tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=str(module_path))
         for node in _public_defs(tree):
             if ast.get_docstring(node):
                 continue
