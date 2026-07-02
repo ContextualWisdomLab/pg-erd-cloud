@@ -12,8 +12,8 @@ blocker로 분류합니다.
 
 ### Current Control Board (2026-07-02 UTC)
 
-- P0: `partially` (공개 비용 방지 + 생산성 검사 설정은 완료했지만, 인증 실패
-  대응 메시지 통일, 일부 운영 알림 임계치가 미정)
+- P0: `in_progress` (공개 비용 방지와 핵심 설정 강제는 완료했고, 인증 실패
+  대응 메시지/알람 통일과 일부 운영 임계치 보강은 진행 중)
 - P1: `in_progress` (공유 링크 감사 로그, migration rollback, 장애 대응 runbook은
   1차 진행 중)
 - P2: `not_started` (결제/라이선스, 보안 운영 SLA, 법무 문서 체계 미구축)
@@ -38,7 +38,8 @@ blocker로 분류합니다.
 - ✅ `APP_ENV=production` startup guard로 핵심 보안 설정 강제
 - ✅ `Llm` prompt/output 상한으로 비용 탐색 경로 제한
 - ✅ `share 링크` TTL 기본값 7일(`SHARE_LINK_DEFAULT_TTL_HOURS=168`) 적용
-- ⚠️ 인증 실패 응답의 운영 이벤트(알람/관측) 연결 및 사용자 안내 표준화 미완
+- ✅ 인증 실패 응답(`authz_failure`) 관측 이벤트 로깅 추가
+- 🟡 사용자 안내 메시지 표준화와 보안 알림 임계치 전략은 진행 중
 
 ### P1: 유료 베타 필수
 
@@ -51,8 +52,8 @@ blocker로 분류합니다.
 
 - ✅ 공유 링크 운영 감사 로그 JSON 이벤트(`event=share_audit`) 추가 및 경로별 테스트
 - ✅ `docs/operations/backup-restore.md` 추가로 앱 DB 복구 절차 기초 정립
-- 🟡 migration rollback playbook은 새로 작성 필요 (`docs/operations/migration-rollback.md`)
-- 🟡 장애 대응 runbook은 새로 작성 필요 (`docs/operations/incident-response.md`)
+- ✅ `docs/operations/migration-rollback.md` 작성 및 운영 복구 문서화
+- ✅ `docs/operations/incident-response.md` 작성 및 1차 대응 흐름 정리
 - 🟡 운영 알림(LLM 비용/오류율, 공유 링크 남용) 임계치 정책 문서·구성 미완
 
 ### P2: 일반 판매 권장
