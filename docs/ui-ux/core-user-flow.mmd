@@ -1,0 +1,69 @@
+flowchart LR
+    start(["Signed-in workspace"])
+
+    subgraph intake ["Workspace setup"]
+        dashboard["Dashboard overview"]
+        project{ "Project exists?" }
+        createProject["Create project"]
+        selectProject["Select project"]
+        connection{ "Connection exists?" }
+        createConnection["Save PostgreSQL or Snowflake DSN"]
+        schemaFilter["Set optional schema filter"]
+    end
+
+    subgraph snapshotPhase ["Reverse engineering"]
+        createSnapshot["Create schema snapshot"]
+        snapshotStatus{ "Snapshot status" }
+        retrySnapshot["Fix DSN or retry"]
+        snapshotReady["Snapshot succeeded"]
+    end
+
+    subgraph editorPhase ["ERD editor"]
+        renderErd["Render React Flow ERD"]
+        searchTables["Search tables and columns"]
+        autoLayout["Auto-layout canvas"]
+        editTables["Add or edit tables"]
+        editRelations["Edit relationships"]
+        groupTables["Assign business groups"]
+        cardinality["Review cardinality recommendations"]
+    end
+
+    subgraph handoffPhase ["Share and export"]
+        openExport["Open share/export modal"]
+        shareLink["Create share link"]
+        ddlExport["Copy SQL DDL"]
+        diagramExport["Download SVG, PlantUML, or Mermaid"]
+        teammate["Teammate reviews shared ERD"]
+    end
+
+    start --> dashboard
+    dashboard --> project
+    project -->|"No"| createProject
+    project -->|"Yes"| selectProject
+    createProject --> selectProject
+    selectProject --> connection
+    connection -->|"No"| createConnection
+    connection -->|"Yes"| schemaFilter
+    createConnection --> schemaFilter
+    schemaFilter --> createSnapshot
+    createSnapshot --> snapshotStatus
+    snapshotStatus -->|"Failed"| retrySnapshot
+    retrySnapshot --> createConnection
+    snapshotStatus -->|"Succeeded"| snapshotReady
+    snapshotReady --> renderErd
+    renderErd --> searchTables
+    renderErd --> autoLayout
+    renderErd --> editTables
+    renderErd --> editRelations
+    renderErd --> groupTables
+    renderErd --> cardinality
+    searchTables & autoLayout & editTables & editRelations & groupTables & cardinality --> openExport
+    openExport --> shareLink
+    openExport --> ddlExport
+    openExport --> diagramExport
+    shareLink --> teammate
+
+    style intake fill:#E8F2FF,stroke:#3D7DD8
+    style snapshotPhase fill:#FFF2D8,stroke:#D99A20
+    style editorPhase fill:#EAF7EA,stroke:#3A9B4A
+    style handoffPhase fill:#F1E8FF,stroke:#7B61D1
