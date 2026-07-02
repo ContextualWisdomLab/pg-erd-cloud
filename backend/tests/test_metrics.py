@@ -6,6 +6,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY
 from app.metrics import (
     normalize_route_label,
     prime_http_metrics,
+    record_product_event,
     render_metrics,
 )
 
@@ -126,6 +127,15 @@ def test_render_metrics() -> None:
         assert isinstance(data, bytes)
         assert data == b"mocked_metric_total 42\n"
         mock_generate.assert_called_once()
+
+
+def test_record_product_event_uses_low_cardinality_labels() -> None:
+    labels = {"area": "project", "action": "create", "outcome": "success"}
+    before = REGISTRY.get_sample_value("product_events_total", labels) or 0.0
+
+    record_product_event("project", "create", "success")
+
+    assert REGISTRY.get_sample_value("product_events_total", labels) == before + 1
 
 
 def test_normalize_route_label_none() -> None:

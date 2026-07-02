@@ -79,6 +79,18 @@ BILLING_EVENTS_TOTAL = Counter(
 )
 
 
+PRODUCT_EVENTS_TOTAL = Counter(
+    "product_events_total",
+    "Total product lifecycle events by area, action, and outcome.",
+    ["area", "action", "outcome"],
+)
+
+
+def record_product_event(area: str, action: str, outcome: str) -> None:
+    """Record a low-cardinality product lifecycle event."""
+    PRODUCT_EVENTS_TOTAL.labels(area=area, action=action, outcome=outcome).inc()
+
+
 JOB_QUEUE_JOBS_TOTAL = Counter(
     "job_queue_jobs_total",
     "Total number of job queue executions by type/outcome.",

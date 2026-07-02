@@ -182,6 +182,9 @@ Tasks:
   activation, connection success, snapshot success, ERD render latency,
   share/export success, license validation, billing reconciliation, restore
   drill, incident response, and support effort.
+- Instrument initial privacy-preserving lifecycle outcomes with
+  `product_events_total(area, action, outcome)` for project, connection,
+  snapshot, and share-link creation.
 - Mark every assumption as `measured`, `estimated`, or `missing`.
 
 Verification:

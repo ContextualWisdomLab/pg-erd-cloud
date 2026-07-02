@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.metrics import record_product_event
 from app.models import (
     DbConnection,
     JobQueue,
@@ -81,15 +82,24 @@ async def create_snapshot(
     session: AsyncSession = Depends(get_session),
 ) -> SnapshotOut:
     """Create a schema snapshot job for a project connection."""
-    await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
-    )
+    try:
+        await require_project_member(
+            session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+        )
+    except HTTPException:
+        record_product_event("snapshot", "create", "denied")
+        raise
 
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
     if conn is None or conn.project_space_uuid != project_space_uuid:
+        record_product_event("snapshot", "create", "not_found")
         raise HTTPException(status_code=404, detail="connection not found")
-    await enforce_snapshot_quota(session, project_space_uuid)
+    try:
+        await enforce_snapshot_quota(session, project_space_uuid)
+    except HTTPException:
+        record_product_event("snapshot", "create", "denied")
+        raise
 
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),
@@ -120,6 +130,7 @@ async def create_snapshot(
 
     await session.commit()
     await enqueue_job_signal(job.job_queue_uuid, job.run_after)
+    record_product_event("snapshot", "create", "queued")
     return SnapshotOut(
         schema_snapshot_uuid=snap.schema_snapshot_uuid,
         status=snap.status,

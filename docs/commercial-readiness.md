@@ -137,6 +137,9 @@ blocker로 분류합니다.
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전
   운영자가 볼 수 있게 함
+- 🆕 제품 KPI 측정 보완: project/connection/snapshot/share-link 생성 흐름을
+  `product_events_total(area, action, outcome)`로 기록해 activation, setup,
+  snapshot queueing, share-link creation의 성공/거절 분포를 파일럿에서 집계할 수 있음
 
 ### P1: 유료 베타 필수
 

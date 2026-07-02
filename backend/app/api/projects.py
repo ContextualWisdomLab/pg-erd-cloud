@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.metrics import record_product_event
 from app.permissions import require_project_member
 from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
@@ -53,7 +54,11 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
     """Create a new project and add the creator as the owner."""
-    await enforce_project_quota(session, user.user_account_uuid)
+    try:
+        await enforce_project_quota(session, user.user_account_uuid)
+    except HTTPException:
+        record_product_event("project", "create", "denied")
+        raise
 
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
@@ -72,6 +77,7 @@ async def create_project(
     )
     session.add(m)
     await session.commit()
+    record_product_event("project", "create", "success")
     return ProjectOut(
         project_space_uuid=p.project_space_uuid, project_name=p.project_name
     )

@@ -15,7 +15,7 @@ from starlette.requests import Request
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
-from app.metrics import SHARE_AUDIT_EVENTS_TOTAL
+from app.metrics import SHARE_AUDIT_EVENTS_TOTAL, record_product_event
 from app.models import (
     ProjectMember,
     SchemaSnapshot,
@@ -202,6 +202,7 @@ async def create_share_link(
         await _ensure_project_owner(session, project_space_uuid, user.user_account_uuid)
         await enforce_share_link_quota(session, project_space_uuid)
     except HTTPException as exc:
+        record_product_event("share_link", "create", "denied")
         _record_share_audit_event(
             action="share_link.create",
             outcome="denied",
@@ -223,6 +224,7 @@ async def create_share_link(
     )
     session.add(link)
     await session.commit()
+    record_product_event("share_link", "create", "success")
     _record_share_audit_event(
         action="share_link.create",
         outcome="success",

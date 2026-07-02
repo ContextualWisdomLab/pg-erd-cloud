@@ -68,11 +68,11 @@ operational reliability, and support burden.
 
 | KPI | Target For Paid Pilot | Target For GA | Current Status |
 |---|---:|---:|---|
-| Workspace activation rate | 60% of invited workspaces create one project | 75% | missing |
-| Connection setup success rate | 80% of attempts complete or fail with actionable guidance | 90% | missing |
-| Snapshot creation success rate | 90% for supported PostgreSQL/Snowflake paths | 95% | missing |
+| Workspace activation rate | 60% of invited workspaces create one project | 75% | project creation measured by `product_events_total`; invite denominator missing |
+| Connection setup success rate | 80% of attempts complete or fail with actionable guidance | 90% | connection creation measured by `product_events_total`; live validation denominator missing |
+| Snapshot creation success rate | 90% for supported PostgreSQL/Snowflake paths | 95% | snapshot queueing measured by `product_events_total` and job metrics |
 | ERD editor first render p95 | under 3 seconds for pilot-size schemas | under 2 seconds | missing |
-| Share/export success rate | 95% for supported export paths | 98% | missing |
+| Share/export success rate | 95% for supported export paths | 98% | share-link creation measured by `product_events_total` and share audit metrics |
 | License validation success | 99% valid commercial tokens accepted | 99.9% | partially measured by tests |
 | Billing reconciliation success | 99% provider events applied or queued for support review | 99.9% | partially measured by tests and `billing_events_total` |
 | Backup restore drill | one successful drill before paid pilot | quarterly successful drills | documented, not measured |
@@ -94,6 +94,9 @@ operational reliability, and support burden.
 
 1. Add event taxonomy for activation, connection setup, snapshot job, share,
    export, license validation, billing event, restore drill, and support action.
+   Initial low-cardinality lifecycle events now use
+   `product_events_total(area, action, outcome)` for project, connection,
+   snapshot, and share-link creation.
 2. Keep customer identifiers redacted or pseudonymous in telemetry.
 3. Make each KPI auditable from logs, metrics, or release artifacts.
 4. Add sample dashboard queries after the event taxonomy is implemented.
@@ -124,6 +127,8 @@ operational reliability, and support burden.
 - Measured today: local automated tests for license, usage limits, account
   deactivation, plan-change handoff, provider-neutral billing event ingestion,
   provider event alias normalization, billing webhook outcome metrics,
+  product lifecycle outcome metrics for project/connection/snapshot/share-link
+  creation,
   read-only support diagnostics with recent share-link summaries,
   operator-only support diagnostics UI, support diagnostics demo evidence,
   visual regression, accessibility, and E2E smoke paths.
