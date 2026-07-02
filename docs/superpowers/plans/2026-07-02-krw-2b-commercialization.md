@@ -449,6 +449,10 @@ Tasks:
   - Implemented: top-level `sale_blockers` audit output, so a buyer or release
     owner can see the exact schema validator failure or missing real-evidence
     reason without reconstructing it from per-gate details.
+  - Implemented: `scripts/operations/build_commercial_evidence_index.py` to
+    generate a tamper-evident external evidence index with file paths, sizes,
+    SHA-256 digests, readiness state, and `sale_blockers` without copying raw
+    evidence contents.
 
 Verification:
 
@@ -461,6 +465,7 @@ python scripts/ci/validate_support_bundle.py evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
 python scripts/ci/validate_rollback_drill_manifest.py
 python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
+python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --output evidence/commercial-evidence-index.json
 ```
 
 Acceptance:

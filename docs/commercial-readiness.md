@@ -182,6 +182,12 @@ blocker로 분류합니다.
   non-example 증거 파일도 같은 validator와 샘플 표식 검사를 통과해야 함. audit
   JSON의 `sale_blockers`는 validator 실패와 실제 증거 no-go 이유를 최상위에서
   요약해 판매 불가 사유를 바로 확인할 수 있게 함
+- 🆕 상용 증거 index:
+  `scripts/operations/build_commercial_evidence_index.py`로 외부 release approval,
+  restore drill, rollback drill, support bundle, billing provider catalog 파일의
+  path, size, SHA-256, gate 상태, `sale_blockers`를 하나의 JSON으로 묶음. 증거 파일
+  본문은 복사하지 않아 support bundle 또는 provider metadata의 재노출을 피하면서
+  어떤 exact 증거 세트로 판매 승인했는지 재검증할 수 있음
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전

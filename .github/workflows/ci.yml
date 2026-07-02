@@ -44,7 +44,7 @@ jobs:
         run: pytest -q
 
       - name: Commercial evidence tests
-        run: python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_*.py -q
+        run: python -m pytest scripts/operations/test_*.py scripts/ci/test_*.py -q
 
       - name: Commercial release approval manifests
         run: python scripts/ci/validate_commercial_release_approval.py
