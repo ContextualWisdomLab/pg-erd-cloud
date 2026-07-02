@@ -104,10 +104,12 @@ class FakeSupportSession:
         account: UserAccount | None,
         counts: list[int],
         events: list[BillingEvent],
+        contract_event: BillingEvent | None = None,
     ) -> None:
         self.account = account
         self.counts = counts
         self.events = events
+        self.contract_event = contract_event
         self.statement_count = 0
 
     async def execute(self, stmt: object) -> FakeSupportResult:
@@ -117,6 +119,8 @@ class FakeSupportSession:
             return FakeSupportResult(self.account)
         if 2 <= self.statement_count <= 7:
             return FakeSupportResult(self.counts[self.statement_count - 2])
+        if self.statement_count == 8 and self.contract_event is not None:
+            return FakeSupportResult(self.contract_event)
         return FakeSupportResult(values=list(self.events))
 
 
@@ -632,3 +636,68 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         }
     ]
     assert session.statement_count == 8
+
+
+def test_support_account_billing_applies_contract_deactivation_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    customer_uuid = uuid.uuid4()
+    account = UserAccount(
+        user_account_uuid=customer_uuid,
+        oidc_subject="customer-owner",
+        display_name="Customer Owner",
+    )
+    contract_event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="manual-contract",
+        provider_event_id="contract-suspend-1",
+        event_type="contract.suspended",
+        subject="customer-owner",
+        target_plan="enterprise",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+        metadata_json={},
+    )
+    session = FakeSupportSession(
+        account=account,
+        counts=[2, 5, 3, 8, 4, 1],
+        events=[contract_event],
+        contract_event=contract_event,
+    )
+    monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    monkeypatch.setattr(settings, "account_deactivated_subjects", "")
+    monkeypatch.setattr(settings, "billing_contract_state_events_enabled", True)
+    monkeypatch.setattr(
+        settings,
+        "billing_contract_deactivated_event_types",
+        "contract.suspended",
+    )
+    monkeypatch.setattr(
+        settings,
+        "billing_contract_active_event_types",
+        "contract.reactivated",
+    )
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", "x" * 44)
+    monkeypatch.setattr(settings, "billing_portal_url", "https://billing.example.com")
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+    monkeypatch.setattr(
+        settings,
+        "account_reactivation_url",
+        "https://billing.example.com/reactivate",
+    )
+    app.dependency_overrides[get_current_user] = fake_get_support_operator
+    app.dependency_overrides[get_read_session] = lambda: session
+
+    response = TestClient(app).get(
+        "/api/billing/support/account",
+        params={"subject": "customer-owner"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["account_status"] == "deactivated"
+    assert payload["recent_billing_events"][0]["event_type"] == "contract.suspended"
+    assert session.statement_count == 9

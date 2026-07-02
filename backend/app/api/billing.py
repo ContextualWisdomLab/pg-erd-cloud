@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
 
 from app.auth import CurrentUser, get_current_user
+from app.contract_state import latest_contract_state_for_subject
 from app.db import get_read_session, get_session
 from app.models import (
     BillingEvent,
@@ -91,11 +92,14 @@ def _split_csv(value: str) -> set[str]:
     return {item.strip() for item in value.split(",") if item.strip()}
 
 
-def _account_status_for_subject(
+async def _account_status_for_subject(
+    session: AsyncSession,
     subject: str,
     user_account_uuid: uuid.UUID | None,
 ) -> Literal["active", "deactivated", "unknown"]:
     if subject in _split_csv(settings.account_deactivated_subjects):
+        return "deactivated"
+    if await latest_contract_state_for_subject(session, subject) == "deactivated":
         return "deactivated"
     if user_account_uuid is None:
         return "unknown"
@@ -392,7 +396,11 @@ async def get_support_account_billing(
     return BillingSupportAccountOut(
         subject=subject,
         user_account_uuid=user_account_uuid,
-        account_status=_account_status_for_subject(subject, user_account_uuid),
+        account_status=await _account_status_for_subject(
+            session,
+            subject,
+            user_account_uuid,
+        ),
         license_mode=settings.license_mode,
         license_verifier=_license_verifier_kind(),
         billing_portal_url=settings.billing_portal_url,

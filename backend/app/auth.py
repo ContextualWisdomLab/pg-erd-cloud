@@ -12,6 +12,7 @@ from jose import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contract_state import latest_contract_state_for_subject
 from app.db import get_session
 from app.models import UserAccount
 from app.settings import settings
@@ -62,6 +63,18 @@ def _account_deactivation_headers() -> dict[str, str]:
 
 def _reject_deactivated_subject(subject: str) -> None:
     if subject in _split_csv(settings.account_deactivated_subjects):
+        raise HTTPException(
+            status_code=403,
+            detail="account deactivated",
+            headers=_account_deactivation_headers(),
+        )
+
+
+async def _reject_contract_deactivated_subject(
+    session: AsyncSession,
+    subject: str,
+) -> None:
+    if await latest_contract_state_for_subject(session, subject) == "deactivated":
         raise HTTPException(
             status_code=403,
             detail="account deactivated",
@@ -435,6 +448,7 @@ async def get_current_user(
     subject, display_name = await _get_subject_from_request(request)
     _reject_deactivated_subject(subject)
     async with session.begin():
+        await _reject_contract_deactivated_subject(session, subject)
         return await _ensure_user(session, subject, display_name)
 
 

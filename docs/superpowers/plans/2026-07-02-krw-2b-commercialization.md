@@ -277,8 +277,10 @@ Status:
   adding provider SDK dependencies.
 - Billing webhook outcomes now emit `billing_events_total` labels for recorded,
   duplicate, rejected authentication, and rejected configuration events.
-- Remaining gap: provider-specific checkout/fulfillment and contract-state
-  application adapters.
+- Normalized contract-state event application is implemented behind
+  `BILLING_CONTRACT_STATE_EVENTS_ENABLED`.
+- Remaining gap: provider-specific checkout/fulfillment and provider event
+  normalization adapters.
 
 Tasks:
 

@@ -89,6 +89,14 @@
     오면 duplicate로 응답하고 상태를 두 번 적용하지 않습니다.
   - payload는 `provider`, `provider_event_id`, `event_type`, `subject`,
     `target_plan`, `occurred_at`, `metadata`를 받을 수 있습니다.
+  - `BILLING_CONTRACT_STATE_EVENTS_ENABLED=true`이면 normalized `event_type`이
+    `BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES`에 포함될 때 해당 subject의 API
+    접근을 `account deactivated`로 차단합니다. 이후 최신 contract-state event가
+    `BILLING_CONTRACT_ACTIVE_EVENT_TYPES`에 포함되면 차단을 해제합니다.
+  - 이 기능은 provider-specific checkout/fulfillment SDK가 아닙니다. Stripe,
+    Paddle, 수기 계약 시스템 등 외부 provider의 원본 event는 gateway나 운영
+    시스템에서 `contract.suspended`, `contract.reactivated` 같은 normalized
+    event_type으로 변환한 뒤 전송해야 합니다.
   - `metadata`의 `secret`, `token`, `password`, `api_key`, `client_secret`,
     `authorization`, `card`, `dsn` 계열 키는 저장 전에 `[redacted]`로 치환됩니다.
   - 응답에는 민감 metadata를 반환하지 않습니다.
@@ -114,6 +122,12 @@
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
   - `BILLING_WEBHOOK_SIGNATURE_SECRET`: provider/gateway webhook raw-body
     HMAC-SHA256 signature 검증용 secret
+  - `BILLING_CONTRACT_STATE_EVENTS_ENABLED`: billing event에서 account
+    deactivation/reactivation 상태를 적용할지 여부
+  - `BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES`: 접근 차단으로 해석할 normalized
+    event_type 목록
+  - `BILLING_CONTRACT_ACTIVE_EVENT_TYPES`: 접근 허용으로 복귀시키는 normalized
+    event_type 목록
   - `ACCOUNT_REACTIVATION_URL`: 미납/계약 중단/abuse hold 해제 요청 경로
   - `SUPPORT_OPERATOR_SUBJECTS`: read-only 지원 진단 API 접근 허용 subject 목록
 - 계약 중단, 미납, abuse 대응으로 계정 접근을 즉시 차단해야 하면
@@ -127,8 +141,7 @@
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
-  - 위반 탐지 시 자동 비활성화/재활성화 실행 규칙
-  - provider별 checkout/fulfillment 어댑터와 계약 시스템 상태 반영 규칙
+  - provider별 checkout/fulfillment 어댑터와 provider event normalization 규칙
 
 ## 5) 온프레미스 체크리스트
 

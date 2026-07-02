@@ -142,6 +142,9 @@ class Settings(BaseSettings):
     billing_support_url: str | None = None
     billing_webhook_secret: str | None = None
     billing_webhook_signature_secret: str | None = None
+    billing_contract_state_events_enabled: bool = False
+    billing_contract_deactivated_event_types: str = "contract.deactivated,contract.suspended"
+    billing_contract_active_event_types: str = "contract.activated,contract.reactivated"
     account_reactivation_url: str | None = None
     # Comma-separated OIDC subjects that must be denied before DB access.
     account_deactivated_subjects: str = ""
@@ -220,6 +223,17 @@ def validate_production_settings(config: Settings) -> list[str]:
             "ACCOUNT_DEACTIVATED_SUBJECTS requires ACCOUNT_REACTIVATION_URL or "
             "BILLING_SUPPORT_URL in production"
         )
+    if config.billing_contract_state_events_enabled:
+        if not _split_csv(config.billing_contract_deactivated_event_types):
+            errors.append(
+                "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES is required when "
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED=true"
+            )
+        if not (config.account_reactivation_url or config.billing_support_url):
+            errors.append(
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+                "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
+            )
     return errors
 
 

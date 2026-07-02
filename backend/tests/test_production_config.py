@@ -115,3 +115,29 @@ def test_validate_production_settings_accepts_reactivation_path_for_deactivated_
     )
 
     assert errors == []
+
+
+def test_validate_production_settings_requires_reactivation_path_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(billing_contract_state_events_enabled=True)
+    )
+
+    assert (
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+        "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
+    ) in errors
+
+
+def test_validate_production_settings_requires_deactivation_event_types() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_contract_deactivated_event_types="",
+            billing_support_url="https://support.example.com",
+        )
+    )
+
+    assert (
+        "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES is required when "
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED=true"
+    ) in errors

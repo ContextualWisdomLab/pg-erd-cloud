@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import uuid
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app import auth
+from app.models import BillingEvent
 from app.settings import settings
 
 
@@ -579,6 +581,171 @@ async def test_get_current_user_rejects_deactivated_subject_before_db(
         "X-Account-Reactivation-Url": "https://billing.example.com/reactivate",
         "X-Billing-Support-Url": "https://support.example.com",
     }
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_rejects_contract_deactivated_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_subject(_request: Request) -> tuple[str, str | None]:
+        return "customer-owner", "Customer Owner"
+
+    class FakeContractResult:
+        def scalar_one_or_none(self) -> BillingEvent:
+            return BillingEvent(
+                billing_event_uuid=uuid.uuid4(),
+                provider="manual-contract",
+                provider_event_id="contract-suspend-1",
+                event_type="contract.suspended",
+                subject="customer-owner",
+                target_plan="enterprise",
+                event_status="recorded",
+                occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+                received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+                metadata_json={},
+            )
+
+    class FakeBegin:
+        async def __aenter__(self) -> None:
+            return None
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    class FakeContractSession:
+        async def execute(self, _statement: object) -> FakeContractResult:
+            return FakeContractResult()
+
+        def begin(self) -> FakeBegin:
+            return FakeBegin()
+
+    monkeypatch.setattr(auth, "_get_subject_from_request", fake_subject)
+    monkeypatch.setattr(settings, "account_deactivated_subjects", "", raising=False)
+    monkeypatch.setattr(
+        settings,
+        "billing_contract_state_events_enabled",
+        True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        settings,
+        "billing_contract_deactivated_event_types",
+        "contract.suspended",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        settings,
+        "billing_contract_active_event_types",
+        "contract.reactivated",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        settings,
+        "account_reactivation_url",
+        "https://billing.example.com/reactivate",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        settings,
+        "billing_support_url",
+        "https://support.example.com",
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth.get_current_user(make_request(), FakeContractSession())  # type: ignore[arg-type]
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "account deactivated"
+    assert exc_info.value.headers == {
+        "X-Account-Status": "deactivated",
+        "X-Account-Reactivation-Url": "https://billing.example.com/reactivate",
+        "X-Billing-Support-Url": "https://support.example.com",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_allows_contract_reactivated_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_subject(_request: Request) -> tuple[str, str | None]:
+        return "subject-1", "User One"
+
+    class FakeMixedResult:
+        def __init__(self, value: object) -> None:
+            self.value = value
+
+        def scalar_one_or_none(self) -> object:
+            return self.value
+
+        def scalars(self) -> _FakeScalarResult:
+            return _FakeScalarResult(self.value)
+
+    class FakeBegin:
+        async def __aenter__(self) -> None:
+            return None
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    class FakeContractSession:
+        def __init__(self) -> None:
+            self.execute_calls = 0
+
+        async def execute(self, _statement: object) -> FakeMixedResult:
+            self.execute_calls += 1
+            if self.execute_calls == 1:
+                return FakeMixedResult(
+                    BillingEvent(
+                        billing_event_uuid=uuid.uuid4(),
+                        provider="manual-contract",
+                        provider_event_id="contract-reactivate-1",
+                        event_type="contract.reactivated",
+                        subject="subject-1",
+                        target_plan="enterprise",
+                        event_status="recorded",
+                        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+                        received_at=dt.datetime(
+                            2026, 7, 2, 1, tzinfo=dt.timezone.utc
+                        ),
+                        metadata_json={},
+                    )
+                )
+            return FakeMixedResult(_ExistingUser())
+
+        def begin(self) -> FakeBegin:
+            return FakeBegin()
+
+    auth._user_cache.clear()
+    try:
+        session = FakeContractSession()
+        monkeypatch.setattr(auth, "_get_subject_from_request", fake_subject)
+        monkeypatch.setattr(settings, "account_deactivated_subjects", "", raising=False)
+        monkeypatch.setattr(
+            settings,
+            "billing_contract_state_events_enabled",
+            True,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            settings,
+            "billing_contract_deactivated_event_types",
+            "contract.suspended",
+            raising=False,
+        )
+        monkeypatch.setattr(
+            settings,
+            "billing_contract_active_event_types",
+            "contract.reactivated",
+            raising=False,
+        )
+
+        user = await auth.get_current_user(make_request(), session)  # type: ignore[arg-type]
+
+        assert user.subject == "subject-1"
+        assert session.execute_calls == 2
+    finally:
+        auth._user_cache.clear()
 
 
 @pytest.mark.asyncio

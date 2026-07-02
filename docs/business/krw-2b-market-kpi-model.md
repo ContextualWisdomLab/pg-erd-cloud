@@ -102,9 +102,10 @@ operational reliability, and support burden.
 ## Immediate Product Implications
 
 - Billing provider reconciliation remains a P1 gap until provider-specific
-  checkout/fulfillment and contract-state application adapters exist. The common
-  event recording path, raw-body HMAC signature verification path, and
-  billing reconciliation outcome metric are now covered by tests.
+  checkout/fulfillment and provider event normalization adapters exist. The
+  common event recording path, raw-body HMAC signature verification path,
+  normalized contract-state application path, and billing reconciliation outcome
+  metric are now covered by tests.
 - Admin/support diagnostics are now partially measured by tests through the
   backend read-only diagnostics API, operator-only frontend view, demo-mode E2E
   support lookup, and Product Design/Figma audit evidence in
