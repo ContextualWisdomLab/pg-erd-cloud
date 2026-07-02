@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic import model_validator
@@ -14,6 +15,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
+    app_env: Literal["development", "production"] = "development"
+    production_config_checks_enabled: bool = True
     # Optional: a read-only endpoint/replica DSN.
     database_read_only_url: str | None = None
 
@@ -130,6 +133,50 @@ class Settings(BaseSettings):
     # NOTE: Do not trust the token header's alg; only accept algorithms from
     # this allowlist.
     oidc_algorithms: str = "RS256"
+
+
+def _split_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _is_public_https_origin(origin: str) -> bool:
+    parsed = urlparse(origin)
+    host = parsed.hostname or ""
+    return (
+        parsed.scheme == "https"
+        and bool(parsed.netloc)
+        and host not in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+    )
+
+
+def validate_production_settings(config: Settings) -> list[str]:
+    """Return startup-blocking configuration errors for production deployments."""
+    if config.app_env != "production" or not config.production_config_checks_enabled:
+        return []
+
+    errors: list[str] = []
+    if not config.oidc_issuer:
+        errors.append("OIDC_ISSUER is required when APP_ENV=production")
+    if not config.oidc_audience:
+        errors.append("OIDC_AUDIENCE is required when APP_ENV=production")
+    if len(config.app_secret) < 32:
+        errors.append("APP_SECRET must be at least 32 characters in production")
+    if not _split_csv(config.db_introspection_allowed_hosts):
+        errors.append(
+            "DB_INTROSPECTION_ALLOWED_HOSTS must allow explicit target DB hosts"
+        )
+    if not any(_is_public_https_origin(origin) for origin in _split_csv(config.cors_origins)):
+        errors.append("CORS_ORIGINS must include at least one public HTTPS origin")
+    if config.share_link_default_ttl_hours == 0:
+        errors.append("SHARE_LINK_DEFAULT_TTL_HOURS must be greater than 0")
+    if config.share_link_llm_draft_enabled and not (
+        config.llm_api_base_url and config.llm_api_key and config.llm_model
+    ):
+        errors.append(
+            "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
+            "SHARE_LINK_LLM_DRAFT_ENABLED=true"
+        )
+    return errors
 
 
 settings = Settings()  # type: ignore[call-arg]

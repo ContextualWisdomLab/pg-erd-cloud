@@ -110,6 +110,12 @@ PY
 # Restrict secret file permissions (owner read/write only)
 chmod 600 secrets/app_secret
 
+# compose.prod.yaml은 APP_ENV=production으로 실행됩니다. 아래 값을 localhost가 아닌
+# 운영 값으로 바꾸세요. 누락되면 백엔드는 시작 단계에서 실패합니다.
+# - OIDC_ISSUER / OIDC_AUDIENCE
+# - CORS_ORIGINS=https://erd.example.com
+# - DB_INTROSPECTION_ALLOWED_HOSTS=db.example.com,*.internal.example.com
+
 docker compose -f compose.prod.yaml up -d --build
 ```
 
@@ -152,6 +158,8 @@ pip install -e ".[snowflake]"
 - `APP_SECRET`은 앱 DB에 저장되는 DSN 암호화 키로 사용되므로, 변경 시 기존 데이터
   복호화에 영향을 줄 수 있습니다. 가능하면 `APP_SECRET_FILE`(예:
   `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요.
+- `APP_ENV=production`에서는 OIDC, 공개 HTTPS CORS origin, 대상 DB allowlist,
+  32자 이상의 secret, 공유 링크 기본 만료가 startup guard로 강제됩니다.
 
 ### Frontend
 

@@ -36,6 +36,8 @@
 
 - ✅ Basic Auth 미사용 (OIDC Bearer Token 또는 dev fallback)
   - 근거: `backend/app/auth.py`
+- ✅ `APP_ENV=production` startup guard가 OIDC issuer/audience 누락을 차단
+  - 근거: `backend/app/settings.py`, `backend/app/main.py`
 - ✅ JWT 검증 시 알고리즘 allowlist 강제(토큰 헤더 `alg` 신뢰 금지)
   - 설정: `OIDC_ALGORITHMS` (default: `RS256`)
   - 근거: `backend/app/auth.py`, `backend/app/settings.py`
@@ -115,6 +117,9 @@
 - 필요 시 2차 개선으로 Redis/Valkey 같은 공유 스토어 기반으로 확장합니다.
 
 - 🟡 HTTPS/TLS/HSTS는 인그레스/리버스프록시 계층에서 강제 필요 (앱 단독 강제는 한계)
+- ✅ `APP_ENV=production` startup guard가 localhost/non-HTTPS CORS origin, 약한
+  secret, 대상 DB allowlist 누락, 무기한 공유 링크 기본값을 차단
+  - 근거: `backend/app/settings.py`, `backend/tests/test_production_config.py`
 
 ### Input validation / Data safety
 

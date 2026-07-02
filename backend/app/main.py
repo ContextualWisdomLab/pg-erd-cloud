@@ -26,7 +26,7 @@ from app.rate_limit import (
     make_rate_limit_middleware,
 )
 from app.security_headers import make_security_headers_middleware
-from app.settings import settings
+from app.settings import settings, validate_production_settings
 
 
 @asynccontextmanager
@@ -36,6 +36,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     Starts a background job worker on startup and ensures it is cancelled and
     awaited on shutdown.
     """
+
+    production_errors = validate_production_settings(settings)
+    if production_errors:
+        raise RuntimeError(
+            "production configuration is invalid: " + "; ".join(production_errors)
+        )
 
     handlers = {"snapshot": handle_snapshot_job}
     task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
