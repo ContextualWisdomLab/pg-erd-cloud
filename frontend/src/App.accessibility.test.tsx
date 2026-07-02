@@ -118,6 +118,16 @@ describe('App accessibility smoke', () => {
       snapshot_count: 8,
       share_link_count: 4,
       active_share_link_count: 1,
+      recent_share_links: [
+        {
+          share_link_uuid: 'share-link-1',
+          project_space_uuid: 'project-1',
+          permission_kind: 'viewer',
+          status: 'active',
+          expires_at: '2026-07-09T00:00:00Z',
+          created_at: '2026-07-02T00:00:00Z',
+        },
+      ],
       recent_billing_events: [
         {
           billing_event_uuid: 'event-1',
@@ -162,6 +172,9 @@ describe('App accessibility smoke', () => {
       'href',
       'https://billing.example.com/reactivate',
     );
+    expect(screen.getByRole('table', { name: '최근 공유 링크' })).toBeInTheDocument();
+    expect(screen.getByText('share-link-1')).toBeInTheDocument();
+    expect(screen.getAllByText('활성')).not.toHaveLength(0);
     expect(screen.getByRole('table', { name: '최근 결제 이벤트' })).toBeInTheDocument();
     expect(screen.getByText('subscription.updated')).toBeInTheDocument();
   });

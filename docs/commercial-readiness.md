@@ -198,10 +198,11 @@ blocker로 분류합니다.
   바꾸고, 원본 event_type은 `raw_event_type` metadata로 감사 보존함
 - 🆕 지원 진단: `SUPPORT_OPERATOR_SUBJECTS` allowlist 기반
   `GET /api/billing/support/account` read-only API로 대상 계정 상태, usage counter,
-  license verifier, billing/reactivation URL, 최근 billing event summary를 조회할 수 있음
+  license verifier, billing/reactivation URL, 최근 share link summary, 최근 billing
+  event summary를 조회할 수 있음
 - 🆕 운영자 UI: `/api/me`의 `support_operator` flag로 허용된 운영자에게만
-  프론트엔드 `지원 진단` 화면을 노출하고, raw billing metadata 없이 read-only
-  계정/사용량/최근 event summary를 표시함
+  프론트엔드 `지원 진단` 화면을 노출하고, raw billing metadata와 공개 share URL
+  없이 read-only 계정/사용량/최근 share link/최근 event summary를 표시함
 - 🆕 지원 진단 데모/감사 경로: `VITE_DEMO_MODE=true`에서
   `/?demo-support=operator`로 Product Design, Figma, sales-engineering 감사용
   operator 화면과 billing event sample을 재현할 수 있으며, Playwright E2E로

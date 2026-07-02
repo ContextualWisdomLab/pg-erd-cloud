@@ -231,6 +231,17 @@ class BillingEventSummaryOut(BaseModel):
     received_at: dt.datetime
 
 
+class BillingSupportShareLinkSummaryOut(BaseModel):
+    """Share-link summary safe for support diagnostics."""
+
+    share_link_uuid: uuid.UUID
+    project_space_uuid: uuid.UUID
+    permission_kind: str
+    status: Literal["active", "expired"]
+    expires_at: dt.datetime | None
+    created_at: dt.datetime
+
+
 class BillingSupportAccountOut(BaseModel):
     """Read-only account diagnostics for authorized support operators."""
 
@@ -250,4 +261,5 @@ class BillingSupportAccountOut(BaseModel):
     snapshot_count: int = Field(ge=0)
     share_link_count: int = Field(ge=0)
     active_share_link_count: int = Field(ge=0)
+    recent_share_links: list[BillingSupportShareLinkSummaryOut]
     recent_billing_events: list[BillingEventSummaryOut]

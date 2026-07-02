@@ -40,6 +40,8 @@ test('demo support operator can inspect billing diagnostics', async ({ page }) =
     'href',
     'https://billing.example.com/customer/demo-customer-user',
   );
+  await expect(page.getByRole('table', { name: '최근 공유 링크' })).toBeVisible();
+  await expect(page.getByText('demo-share-active-1')).toBeVisible();
   await expect(page.getByRole('table', { name: '최근 결제 이벤트' })).toBeVisible();
   await expect(page.getByText('subscription.updated')).toBeVisible();
 });

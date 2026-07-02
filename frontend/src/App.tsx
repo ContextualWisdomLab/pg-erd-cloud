@@ -166,6 +166,13 @@ function accountStatusLabel(status: BillingSupportAccount["account_status"]): st
   return "미확인";
 }
 
+function shareLinkStatusLabel(
+  status: BillingSupportAccount["recent_share_links"][number]["status"],
+): string {
+  if (status === "active") return "활성";
+  return "만료";
+}
+
 function licenseVerifierLabel(
   verifier: BillingSupportAccount["license_verifier"],
 ): string {
@@ -1501,7 +1508,10 @@ export default function App() {
             <div className="workspaceHeader">
               <div>
                 <h1 id="support-title">지원 진단</h1>
-                <p>계정 상태, 사용량, 라이선스 검증 방식, 최근 결제 이벤트를 read-only로 확인합니다.</p>
+                <p>
+                  계정 상태, 사용량, 라이선스 검증 방식, 최근 공유 링크와 결제 이벤트를
+                  read-only로 확인합니다.
+                </p>
               </div>
             </div>
 
@@ -1598,6 +1608,54 @@ export default function App() {
                       <dd>{renderSupportUrl("재활성화", "재활성화 열기", supportAccount.account_reactivation_url)}</dd>
                     </div>
                   </dl>
+                </section>
+
+                <section
+                  className="workspaceSection"
+                  aria-labelledby="support-share-links-title"
+                >
+                  <div className="sectionHeader">
+                    <h2 id="support-share-links-title">최근 공유 링크</h2>
+                  </div>
+                  {supportAccount.recent_share_links.length ? (
+                    <div
+                      className="dataTable supportEvents"
+                      role="table"
+                      aria-label="최근 공유 링크"
+                    >
+                      <div
+                        className="dataTable__row dataTable__row--head supportEvents__row"
+                        role="row"
+                      >
+                        <span role="columnheader">Project</span>
+                        <span role="columnheader">Link</span>
+                        <span role="columnheader">Status</span>
+                        <span role="columnheader">Expires</span>
+                      </div>
+                      {supportAccount.recent_share_links.map((link) => (
+                        <div
+                          className="dataTable__row supportEvents__row"
+                          role="row"
+                          key={link.share_link_uuid}
+                        >
+                          <span role="cell" data-label="Project">
+                            {link.project_space_uuid}
+                          </span>
+                          <strong role="cell" data-label="Link">
+                            {link.share_link_uuid}
+                          </strong>
+                          <span role="cell" data-label="Status">
+                            {shareLinkStatusLabel(link.status)}
+                          </span>
+                          <span role="cell" data-label="Expires">
+                            {link.expires_at || "만료 없음"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="panelEmpty">기록된 공유 링크가 없습니다.</div>
+                  )}
                 </section>
 
                 <section className="workspaceSection" aria-labelledby="support-events-title">

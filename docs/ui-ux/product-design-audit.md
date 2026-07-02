@@ -122,10 +122,11 @@ Impact:
 
 - Desktop support diagnostics are credible for paid-pilot support demos: counts,
   account state, license verifier, named support/billing/reactivation links,
-  URL copy actions, and recent billing events are all visible in one operator
-  flow.
+  URL copy actions, recent share-link summaries, and recent billing events are
+  all visible in one operator flow.
 - Narrow support diagnostics now reflows the summary cards, account details,
-  URL actions, and billing events without hiding `Plan` or `Received` context.
+  URL actions, share-link summaries, and billing events without hiding key row
+  context.
 - The remaining risk is scale evidence: real provider payloads can contain long
   event names, contract IDs, timestamps, and plan names that still need
   production-like stress testing.
@@ -135,8 +136,8 @@ Recommendation:
 - Keep the support diagnostics implementation as an operator-only read path.
 - Keep billing/support URLs as named links with copy actions rather than raw
   full URLs in the account detail cards.
-- Preserve the stacked narrow-width billing event labels and add stress fixtures
-  before claiming mobile support workflow completeness.
+- Preserve the stacked narrow-width support table labels and add stress
+  fixtures before claiming mobile support workflow completeness.
 - Preserve the demo-only `?demo-support=operator` path as Product Design and
   sales-engineering evidence, not as a production authorization shortcut.
 

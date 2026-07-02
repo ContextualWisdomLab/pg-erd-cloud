@@ -65,7 +65,8 @@ Run the QA pass on these screens before broad UI implementation:
     and no-DDL states.
 14. Narrow viewport review/share state.
 15. Support diagnostics with an authorized operator, populated account summary,
-    billing/reactivation URLs, recent billing events, and narrow viewport
+    billing/reactivation URLs, recent share links, recent billing events, and
+    narrow viewport
     fallback.
 
 ## Fidelity Surfaces

@@ -331,6 +331,8 @@ Status:
   `SUPPORT_OPERATOR_SUBJECTS` and `GET /api/billing/support/account`.
 - Operator frontend view implemented in PR `#415` via the `/api/me`
   `support_operator` flag and a read-only `지원 진단` workspace screen.
+- Recent share-link summaries are included without exposing public share URLs
+  or raw billing metadata.
 - Remaining gap: audited destructive admin actions, if the sales/support motion
   proves they are necessary.
 
@@ -338,7 +340,7 @@ Tasks:
 
 - Expose read-only admin/support account diagnostics for account state, usage
   limits, license verification mode, reactivation URL, support URL, and recent
-  billing events.
+  share links and billing events.
 - Add frontend support view only for authorized operators.
 - Keep destructive actions out of the first implementation slice unless tests
   and audit logs are in place.

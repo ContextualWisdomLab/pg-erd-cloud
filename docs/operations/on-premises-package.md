@@ -82,8 +82,8 @@
 - `compose.prod.yaml` 변경 여부
 - `/healthz` 응답
 - 최근 backend error log
-- `GET /api/billing/support/account?subject=<OIDC-subject>` 결과에서 raw metadata를
-  제외한 summary
+- `GET /api/billing/support/account?subject=<OIDC-subject>` 결과에서 raw metadata와
+  공개 share URL/token을 제외한 summary
 - 적용 중인 `LICENSE_MODE`, verifier 종류, revocation env 이름 목록
 
 민감값(`APP_SECRET`, DB password, DSN, private key, billing secret, raw provider

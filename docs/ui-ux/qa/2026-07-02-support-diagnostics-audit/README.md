@@ -27,8 +27,8 @@ Evidence files:
 2. `02-support-diagnostics-mobile.png`
    - Narrow viewport support diagnostics view.
    - Health: stable and usable as a review/support fallback.
-   - Evidence: recent billing events preserve `Provider`, `Event`, `Plan`, and
-     `Received` labels in stacked rows.
+   - Evidence: recent share links and billing events preserve key labels in
+     stacked rows.
 3. `03-demo-dashboard-commercial.png`
    - Default commercial demo dashboard.
    - Health: solid buyer-demo entry state.
@@ -55,5 +55,5 @@ Implementation evidence:
 - `frontend/src/api.ts` exposes demo-only support-operator state through
   `?demo-support=operator`.
 - `frontend/e2e/app-smoke.spec.ts` verifies that the support operator can open
-  the support diagnostics screen, look up a subject, inspect recent billing
-  events, and see named support/billing links.
+  the support diagnostics screen, look up a subject, inspect recent share links
+  and billing events, and see named support/billing links.

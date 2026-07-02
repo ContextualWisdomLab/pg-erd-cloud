@@ -15,7 +15,7 @@ from prometheus_client import REGISTRY
 from app.api.billing import router
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.models import BillingEvent, UserAccount
+from app.models import BillingEvent, ShareLink, UserAccount
 from app.settings import settings
 
 app = FastAPI()
@@ -104,11 +104,13 @@ class FakeSupportSession:
         account: UserAccount | None,
         counts: list[int],
         events: list[BillingEvent],
+        share_links: list[ShareLink] | None = None,
         contract_event: BillingEvent | None = None,
     ) -> None:
         self.account = account
         self.counts = counts
         self.events = events
+        self.share_links = share_links or []
         self.contract_event = contract_event
         self.statement_count = 0
 
@@ -121,6 +123,14 @@ class FakeSupportSession:
             return FakeSupportResult(self.counts[self.statement_count - 2])
         if self.statement_count == 8 and self.contract_event is not None:
             return FakeSupportResult(self.contract_event)
+        if (
+            self.statement_count == 8
+            or (
+                self.statement_count == 9
+                and self.contract_event is not None
+            )
+        ):
+            return FakeSupportResult(values=list(self.share_links))
         return FakeSupportResult(values=list(self.events))
 
 
@@ -614,10 +624,20 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     customer_uuid = uuid.uuid4()
+    project_uuid = uuid.uuid4()
+    share_link_uuid = uuid.uuid4()
     account = UserAccount(
         user_account_uuid=customer_uuid,
         oidc_subject="customer-owner",
         display_name="Customer Owner",
+    )
+    share_link = ShareLink(
+        share_link_uuid=share_link_uuid,
+        project_space_uuid=project_uuid,
+        created_by_user_uuid=customer_uuid,
+        permission_kind="viewer",
+        expires_at=dt.datetime(2099, 7, 2, tzinfo=dt.timezone.utc),
+        created_at=dt.datetime(2026, 7, 2, 2, tzinfo=dt.timezone.utc),
     )
     event = BillingEvent(
         billing_event_uuid=uuid.uuid4(),
@@ -635,6 +655,7 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         account=account,
         counts=[2, 5, 3, 8, 4, 1],
         events=[event],
+        share_links=[share_link],
     )
     monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
     monkeypatch.setattr(settings, "account_deactivated_subjects", "")
@@ -674,6 +695,16 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
     assert payload["snapshot_count"] == 8
     assert payload["share_link_count"] == 4
     assert payload["active_share_link_count"] == 1
+    assert payload["recent_share_links"] == [
+        {
+            "share_link_uuid": str(share_link_uuid),
+            "project_space_uuid": str(project_uuid),
+            "permission_kind": "viewer",
+            "status": "active",
+            "expires_at": "2099-07-02T00:00:00Z",
+            "created_at": "2026-07-02T02:00:00Z",
+        }
+    ]
     assert payload["recent_billing_events"] == [
         {
             "billing_event_uuid": str(event.billing_event_uuid),
@@ -686,17 +717,27 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
             "received_at": "2026-07-02T01:00:00Z",
         }
     ]
-    assert session.statement_count == 8
+    assert session.statement_count == 9
 
 
 def test_support_account_billing_applies_contract_deactivation_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     customer_uuid = uuid.uuid4()
+    project_uuid = uuid.uuid4()
+    share_link_uuid = uuid.uuid4()
     account = UserAccount(
         user_account_uuid=customer_uuid,
         oidc_subject="customer-owner",
         display_name="Customer Owner",
+    )
+    share_link = ShareLink(
+        share_link_uuid=share_link_uuid,
+        project_space_uuid=project_uuid,
+        created_by_user_uuid=customer_uuid,
+        permission_kind="viewer",
+        expires_at=dt.datetime(2020, 7, 2, tzinfo=dt.timezone.utc),
+        created_at=dt.datetime(2020, 7, 1, tzinfo=dt.timezone.utc),
     )
     contract_event = BillingEvent(
         billing_event_uuid=uuid.uuid4(),
@@ -714,6 +755,7 @@ def test_support_account_billing_applies_contract_deactivation_event(
         account=account,
         counts=[2, 5, 3, 8, 4, 1],
         events=[contract_event],
+        share_links=[share_link],
         contract_event=contract_event,
     )
     monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
@@ -750,5 +792,6 @@ def test_support_account_billing_applies_contract_deactivation_event(
     assert response.status_code == 200
     payload = response.json()
     assert payload["account_status"] == "deactivated"
+    assert payload["recent_share_links"][0]["status"] == "expired"
     assert payload["recent_billing_events"][0]["event_type"] == "contract.suspended"
-    assert session.statement_count == 9
+    assert session.statement_count == 10

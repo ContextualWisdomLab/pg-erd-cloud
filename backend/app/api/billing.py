@@ -40,6 +40,7 @@ from app.schemas import (
     BillingPlanChangeIn,
     BillingPlanChangeOut,
     BillingSupportAccountOut,
+    BillingSupportShareLinkSummaryOut,
     BillingUsageOut,
 )
 from app.settings import settings
@@ -333,6 +334,29 @@ def _billing_event_summary(event: BillingEvent) -> BillingEventSummaryOut:
     )
 
 
+def _share_link_status(
+    link: ShareLink,
+    now: dt.datetime,
+) -> Literal["active", "expired"]:
+    if link.expires_at is None or link.expires_at > now:
+        return "active"
+    return "expired"
+
+
+def _share_link_summary(
+    link: ShareLink,
+    now: dt.datetime,
+) -> BillingSupportShareLinkSummaryOut:
+    return BillingSupportShareLinkSummaryOut(
+        share_link_uuid=link.share_link_uuid,
+        project_space_uuid=link.project_space_uuid,
+        permission_kind=link.permission_kind,
+        status=_share_link_status(link, now),
+        expires_at=link.expires_at,
+        created_at=link.created_at,
+    )
+
+
 async def _recent_billing_events(
     session: AsyncSession,
     subject: str,
@@ -344,6 +368,23 @@ async def _recent_billing_events(
         .limit(10)
     )
     return [_billing_event_summary(event) for event in result.scalars().all()]
+
+
+async def _recent_share_links_for_owner(
+    session: AsyncSession,
+    user_account_uuid: uuid.UUID,
+) -> list[BillingSupportShareLinkSummaryOut]:
+    owned_project_ids = select(ProjectSpace.project_space_uuid).where(
+        ProjectSpace.created_by_user_uuid == user_account_uuid
+    )
+    result = await session.execute(
+        select(ShareLink)
+        .where(ShareLink.project_space_uuid.in_(owned_project_ids))
+        .order_by(desc(ShareLink.created_at))
+        .limit(10)
+    )
+    now = dt.datetime.now(dt.timezone.utc)
+    return [_share_link_summary(link, now) for link in result.scalars().all()]
 
 
 @router.get("/usage", response_model=BillingUsageOut)
@@ -425,6 +466,11 @@ async def get_support_account_billing(
         snapshot_count=usage_counts.snapshot_count,
         share_link_count=usage_counts.share_link_count,
         active_share_link_count=usage_counts.active_share_link_count,
+        recent_share_links=(
+            await _recent_share_links_for_owner(session, user_account_uuid)
+            if user_account_uuid is not None
+            else []
+        ),
         recent_billing_events=await _recent_billing_events(session, subject),
     )
 

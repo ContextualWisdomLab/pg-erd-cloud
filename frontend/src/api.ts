@@ -138,6 +138,15 @@ export type BillingEventSummary = {
   received_at: string
 }
 
+export type BillingSupportShareLinkSummary = {
+  share_link_uuid: string
+  project_space_uuid: string
+  permission_kind: string
+  status: 'active' | 'expired'
+  expires_at: string | null
+  created_at: string
+}
+
 export type BillingSupportAccount = {
   subject: string
   user_account_uuid: string | null
@@ -153,6 +162,7 @@ export type BillingSupportAccount = {
   snapshot_count: number
   share_link_count: number
   active_share_link_count: number
+  recent_share_links: BillingSupportShareLinkSummary[]
   recent_billing_events: BillingEventSummary[]
 }
 
@@ -227,6 +237,24 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
       snapshot_count: 18,
       share_link_count: 7,
       active_share_link_count: 2,
+      recent_share_links: [
+        {
+          share_link_uuid: 'demo-share-active-1',
+          project_space_uuid: 'demo-project-warehouse',
+          permission_kind: 'viewer',
+          status: 'active',
+          expires_at: '2026-07-09T00:00:00Z',
+          created_at: '2026-07-02T00:05:00Z'
+        },
+        {
+          share_link_uuid: 'demo-share-expired-1',
+          project_space_uuid: 'demo-project-archive',
+          permission_kind: 'viewer',
+          status: 'expired',
+          expires_at: '2026-06-25T00:00:00Z',
+          created_at: '2026-06-18T00:05:00Z'
+        }
+      ],
       recent_billing_events: [
         {
           billing_event_uuid: 'demo-billing-event-1',
