@@ -162,6 +162,8 @@ pip install -e ".[snowflake]"
   `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요.
 - `APP_ENV=production`에서는 OIDC, 공개 HTTPS CORS origin, 대상 DB allowlist,
   32자 이상의 secret, 공유 링크 기본 만료가 startup guard로 강제됩니다.
+- 백업/복구 절차는 [docs/operations/backup-restore.md](docs/operations/backup-restore.md)를
+  기준으로 운영합니다.
 
 ### Frontend
 
