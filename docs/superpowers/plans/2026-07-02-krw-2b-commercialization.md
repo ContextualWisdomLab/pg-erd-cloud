@@ -295,6 +295,9 @@ Status:
 - Support diagnostics derive provider-neutral entitlement evidence from the latest
   `BILLING_ENTITLEMENT_EVENT_TYPES` event with `target_plan` and optional
   `seat_count`/`seats` metadata.
+- Project member invite now uses the same entitlement evidence to reject new
+  seats when the contracted seat count is already reached, while allowing role
+  updates for existing seated members.
 - Remaining gap: provider-specific fulfillment SDKs, customer portal deep
   integration, and real provider catalog operating values.
 

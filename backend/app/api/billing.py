@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
 
 from app.auth import CurrentUser, get_current_user
+from app.billing_entitlements import billing_entitlement_from_events
 from app.contract_state import (
     latest_contract_state_for_subject,
     normalize_billing_event_type,
@@ -35,7 +36,6 @@ from app.metrics import BILLING_EVENTS_TOTAL
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
     BillingCheckoutOut,
-    BillingEntitlementOut,
     BillingEventMetadataSummaryOut,
     BillingEventIn,
     BillingEventOut,
@@ -64,13 +64,6 @@ _SENSITIVE_METADATA_KEY_PARTS = (
 _METADATA_SUMMARY_ITEM_LIMIT = 8
 _METADATA_SUMMARY_KEY_LIMIT = 96
 _METADATA_SUMMARY_VALUE_LIMIT = 240
-_ENTITLEMENT_SEAT_METADATA_KEYS = (
-    "seat_count",
-    "seats",
-    "seat_limit",
-    "licensed_seats",
-    "quantity",
-)
 
 LicenseVerifierKind = Literal[
     "none", "static_key", "signed_token", "static_key_and_signed_token"
@@ -365,65 +358,6 @@ def _billing_event_summary(event: BillingEvent) -> BillingEventSummaryOut:
     )
 
 
-def _positive_int_metadata_value(value: object) -> int | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int) and value > 0:
-        return value
-    if isinstance(value, str) and value.isdecimal():
-        parsed = int(value)
-        return parsed if parsed > 0 else None
-    return None
-
-
-def _entitlement_seat_count(metadata: object) -> int | None:
-    if not isinstance(metadata, Mapping):
-        return None
-    for key in _ENTITLEMENT_SEAT_METADATA_KEYS:
-        if key in metadata:
-            parsed = _positive_int_metadata_value(metadata[key])
-            if parsed is not None:
-                return parsed
-    return None
-
-
-def _empty_billing_entitlement() -> BillingEntitlementOut:
-    return BillingEntitlementOut(
-        plan=None,
-        seat_count=None,
-        source_provider=None,
-        source_provider_event_id=None,
-        source_event_type=None,
-        source_occurred_at=None,
-    )
-
-
-def _billing_entitlement_from_events(
-    events: list[BillingEvent],
-) -> BillingEntitlementOut:
-    entitlement_event_types = _split_csv(settings.billing_entitlement_event_types)
-    if not entitlement_event_types:
-        return _empty_billing_entitlement()
-
-    for event in sorted(
-        events,
-        key=lambda item: (item.occurred_at, item.received_at),
-        reverse=True,
-    ):
-        if event.event_type not in entitlement_event_types or not event.target_plan:
-            continue
-        return BillingEntitlementOut(
-            plan=event.target_plan,
-            seat_count=_entitlement_seat_count(event.metadata_json),
-            source_provider=event.provider,
-            source_provider_event_id=event.provider_event_id,
-            source_event_type=event.event_type,
-            source_occurred_at=event.occurred_at,
-        )
-
-    return _empty_billing_entitlement()
-
-
 def _truncate_metadata_text(value: str, *, limit: int) -> str:
     if len(value) <= limit:
         return value
@@ -618,7 +552,7 @@ async def get_support_account_billing(
         snapshot_count=usage_counts.snapshot_count,
         share_link_count=usage_counts.share_link_count,
         active_share_link_count=usage_counts.active_share_link_count,
-        billing_entitlement=_billing_entitlement_from_events(
+        billing_entitlement=billing_entitlement_from_events(
             recent_billing_event_models,
         ),
         recent_share_links=recent_share_links,

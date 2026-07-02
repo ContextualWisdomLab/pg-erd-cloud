@@ -115,13 +115,15 @@
     `authorization`, `card`, `dsn` 계열 키는 저장 전에 `[redacted]`로 치환됩니다.
   - 응답에는 민감 metadata를 반환하지 않습니다.
 - `BILLING_ENTITLEMENT_EVENT_TYPES`에 포함된 최신 billing event가 `target_plan`을
-  가지면 support diagnostics는 이를 현재 entitlement evidence로 계산합니다.
+  가지면 support diagnostics는 이를 현재 entitlement evidence로 계산하고, 계약
+  seat count가 있으면 프로젝트 멤버 초대 시 신규 seat 초과를 차단합니다.
   - 기본값은 `checkout.completed`, `invoice.paid`, `subscription.created`,
     `subscription.updated`, `contract.activated`, `contract.reactivated`입니다.
   - event metadata의 `seat_count`, `seats`, `seat_limit`, `licensed_seats`,
     `quantity` 값이 양의 정수이면 contracted seat count로 표시합니다.
-  - 이 계산은 지원/정산 증거용입니다. provider fulfillment 완료, seat provisioning,
-    invoice settlement의 원장 시스템을 대체하지 않습니다.
+  - 이 계산은 지원/정산 증거 및 기본 seat-limit enforcement용입니다. provider
+    fulfillment 완료, 자동 seat provisioning/deprovisioning, invoice settlement의
+    원장 시스템을 대체하지 않습니다.
 - `GET /api/billing/support/account?subject=<OIDC-subject>`는
   `SUPPORT_OPERATOR_SUBJECTS`에 포함된 사용자만 접근할 수 있는 read-only 지원
   진단 API입니다.
@@ -155,8 +157,9 @@
     event_type으로 바꾸는 쉼표 구분 `source=target` 목록. 공급자 충돌을 피하려면
     `stripe:customer.subscription.deleted=contract.suspended`처럼
     `provider:event_type=normalized_event_type` 형식을 사용합니다.
-  - `BILLING_ENTITLEMENT_EVENT_TYPES`: support diagnostics가 현재 plan/seat
-    entitlement evidence로 해석할 billing event_type 목록
+  - `BILLING_ENTITLEMENT_EVENT_TYPES`: support diagnostics와 member invite
+    seat-limit enforcement가 현재 plan/seat entitlement evidence로 해석할 billing
+    event_type 목록
   - `BILLING_CONTRACT_STATE_EVENTS_ENABLED`: billing event에서 account
     deactivation/reactivation 상태를 적용할지 여부
   - `BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES`: 접근 차단으로 해석할 normalized
@@ -188,7 +191,7 @@
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
   - provider별 fulfillment 어댑터, customer portal 심화 연동, 실제 event catalog에
-    맞춘 별칭, entitlement event type, plan catalog 운영값
+    맞춘 별칭, entitlement event type, plan catalog 운영값, 자동 seat provisioning
 
 ## 5) 온프레미스 체크리스트
 
