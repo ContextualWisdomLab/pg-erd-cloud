@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
-import { getMe } from './api';
+import { getBillingSupportAccount, getMe } from './api';
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -13,7 +13,12 @@ globalThis.ResizeObserver = class ResizeObserver {
 };
 
 vi.mock('./api', () => ({
-  getMe: vi.fn().mockResolvedValue({ subject: 'test-user', display_name: 'Test User' }),
+  getMe: vi.fn().mockResolvedValue({
+    subject: 'test-user',
+    display_name: 'Test User',
+    user_account_uuid: 'test-user-uuid',
+    support_operator: false
+  }),
   listProjects: vi.fn().mockResolvedValue([]),
   listConnections: vi.fn().mockResolvedValue([]),
   listSnapshots: vi.fn().mockResolvedValue([]),
@@ -21,6 +26,7 @@ vi.mock('./api', () => ({
   createConnection: vi.fn(),
   createSnapshot: vi.fn(),
   createShareLink: vi.fn(),
+  getBillingSupportAccount: vi.fn(),
   getSnapshot: vi.fn(),
 }));
 
@@ -44,6 +50,7 @@ describe('App accessibility smoke', () => {
       'aria-current',
       'page',
     );
+    expect(nav.queryByRole('button', { name: '지원' })).not.toBeInTheDocument();
 
     await user.click(nav.getByRole('button', { name: '편집기' }));
 
@@ -86,5 +93,64 @@ describe('App accessibility smoke', () => {
       'href',
       'https://support.example.com',
     );
+  });
+
+  it('shows read-only support diagnostics for support operators', async () => {
+    const user = userEvent.setup();
+    vi.mocked(getMe).mockResolvedValueOnce({
+      subject: 'support-operator',
+      display_name: 'Support Operator',
+      user_account_uuid: 'support-user-uuid',
+      support_operator: true,
+    });
+    vi.mocked(getBillingSupportAccount).mockResolvedValueOnce({
+      subject: 'customer-owner',
+      user_account_uuid: 'customer-user-uuid',
+      account_status: 'active',
+      license_mode: 'required',
+      license_verifier: 'signed_token',
+      billing_portal_url: 'https://billing.example.com',
+      billing_support_url: 'https://support.example.com',
+      account_reactivation_url: 'https://billing.example.com/reactivate',
+      project_count: 2,
+      seat_count: 5,
+      connection_count: 3,
+      snapshot_count: 8,
+      share_link_count: 4,
+      active_share_link_count: 1,
+      recent_billing_events: [
+        {
+          billing_event_uuid: 'event-1',
+          provider: 'stripe',
+          provider_event_id: 'evt_1',
+          event_type: 'subscription.updated',
+          target_plan: 'enterprise',
+          status: 'recorded',
+          occurred_at: '2026-07-02T00:00:00Z',
+          received_at: '2026-07-02T01:00:00Z',
+        },
+      ],
+    });
+
+    render(<App />);
+
+    const navigation = await screen.findByRole('navigation', { name: '주요 화면' });
+    await user.click(within(navigation).getByRole('button', { name: '지원' }));
+
+    expect(
+      await screen.findByRole('heading', { name: '지원 진단' }),
+    ).toBeInTheDocument();
+
+    await user.type(
+      screen.getByRole('textbox', { name: '지원 진단 대상 subject' }),
+      'customer-owner',
+    );
+    await user.click(screen.getByRole('button', { name: '조회' }));
+
+    expect(getBillingSupportAccount).toHaveBeenCalledWith('customer-owner');
+    expect(await screen.findByText('customer-user-uuid')).toBeInTheDocument();
+    expect(screen.getByText('서명 토큰')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: '최근 결제 이벤트' })).toBeInTheDocument();
+    expect(screen.getByText('subscription.updated')).toBeInTheDocument();
   });
 });

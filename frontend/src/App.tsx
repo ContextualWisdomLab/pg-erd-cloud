@@ -25,6 +25,7 @@ import {
 
 import {
   getMe,
+  getBillingSupportAccount,
   createShareLink,
   createConnection,
   createProject,
@@ -58,6 +59,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import type { BillingSupportAccount, CurrentUser } from "./api";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
@@ -67,11 +69,6 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
 ]);
 
 const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
-
-type CurrentUser = {
-  subject: string;
-  display_name: string | null;
-};
 
 type AuthNotice = {
   title: string;
@@ -87,9 +84,9 @@ type AccountAwareError = {
   billingSupportUrl?: unknown;
 };
 
-type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor";
+type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor" | "support";
 
-const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
+const baseWorkspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
   { id: "dashboard", label: "대시보드" },
   { id: "projects", label: "프로젝트" },
   { id: "diagrams", label: "다이어그램" },
@@ -163,6 +160,21 @@ function strengthLabel(strength: CardinalityStrength): string {
   return "보류";
 }
 
+function accountStatusLabel(status: BillingSupportAccount["account_status"]): string {
+  if (status === "active") return "활성";
+  if (status === "deactivated") return "비활성";
+  return "미확인";
+}
+
+function licenseVerifierLabel(
+  verifier: BillingSupportAccount["license_verifier"],
+): string {
+  if (verifier === "signed_token") return "서명 토큰";
+  if (verifier === "static_key") return "정적 키";
+  if (verifier === "static_key_and_signed_token") return "정적 키 + 서명 토큰";
+  return "없음";
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
@@ -211,6 +223,10 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+  const [supportSubject, setSupportSubject] = useState("");
+  const [supportAccount, setSupportAccount] = useState<BillingSupportAccount | null>(null);
+  const [isSupportLookupLoading, setIsSupportLookupLoading] = useState(false);
+  const [supportLookupError, setSupportLookupError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -239,6 +255,13 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+  const workspaceNavItems = useMemo(
+    () =>
+      me?.support_operator
+        ? [...baseWorkspaceNavItems, { id: "support" as const, label: "지원" }]
+        : baseWorkspaceNavItems,
+    [me?.support_operator],
+  );
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
     if (!normalizedNodeSearch) return new Set<string>();
@@ -319,7 +342,7 @@ export default function App() {
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         if (!isCurrent) return;
-        setMe({ subject: m.subject, display_name: m.display_name });
+        setMe(m);
         setProjects(p);
         setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
@@ -340,6 +363,12 @@ export default function App() {
       isCurrent = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (activeView === "support" && !me?.support_operator) {
+      setActiveView("dashboard");
+    }
+  }, [activeView, me?.support_operator]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -665,6 +694,26 @@ export default function App() {
       setShareLinkError("공유 링크 복사에 실패했습니다.");
     }
   }, [shareLinkUrl]);
+
+  const onLookupSupportAccount = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const subject = supportSubject.trim();
+      if (!subject || isSupportLookupLoading) return;
+
+      setIsSupportLookupLoading(true);
+      setSupportLookupError(null);
+      try {
+        setSupportAccount(await getBillingSupportAccount(subject));
+      } catch {
+        setSupportAccount(null);
+        setSupportLookupError("지원 진단 정보를 불러오지 못했습니다.");
+      } finally {
+        setIsSupportLookupLoading(false);
+      }
+    },
+    [isSupportLookupLoading, supportSubject],
+  );
 
   function onDownloadSvg() {
     downloadText(
@@ -1401,6 +1450,140 @@ export default function App() {
                 setActiveView("editor");
               }}
             />
+          </section>
+        ) : activeView === "support" ? (
+          <section className="workspaceScreen" aria-labelledby="support-title">
+            <div className="workspaceHeader">
+              <div>
+                <h1 id="support-title">지원 진단</h1>
+                <p>계정 상태, 사용량, 라이선스 검증 방식, 최근 결제 이벤트를 read-only로 확인합니다.</p>
+              </div>
+            </div>
+
+            <form className="supportLookup" onSubmit={onLookupSupportAccount}>
+              <label htmlFor="support-subject">대상 OIDC subject</label>
+              <div className="inlineCreate">
+                <input
+                  id="support-subject"
+                  aria-label="지원 진단 대상 subject"
+                  value={supportSubject}
+                  onChange={(event) => setSupportSubject(event.currentTarget.value)}
+                  placeholder="customer-owner"
+                />
+                <button
+                  type="submit"
+                  disabled={!supportSubject.trim() || isSupportLookupLoading}
+                  aria-busy={isSupportLookupLoading}
+                >
+                  {isSupportLookupLoading ? "조회 중" : "조회"}
+                </button>
+              </div>
+            </form>
+
+            {supportLookupError ? (
+              <div className="error" role="alert">
+                {supportLookupError}
+              </div>
+            ) : null}
+
+            {supportAccount ? (
+              <>
+                <div className="metricGrid metricGrid--support" aria-label="지원 진단 요약">
+                  <div className="metricCard">
+                    <span>프로젝트</span>
+                    <strong>{supportAccount.project_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>시트</span>
+                    <strong>{supportAccount.seat_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>연결</span>
+                    <strong>{supportAccount.connection_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>스냅샷</span>
+                    <strong>{supportAccount.snapshot_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>공유 링크</span>
+                    <strong>{supportAccount.share_link_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>활성 공유</span>
+                    <strong>{supportAccount.active_share_link_count}</strong>
+                  </div>
+                </div>
+
+                <section className="workspaceSection" aria-labelledby="support-account-title">
+                  <div className="sectionHeader">
+                    <h2 id="support-account-title">계정 운영 정보</h2>
+                  </div>
+                  <dl className="supportDetails">
+                    <div>
+                      <dt>Subject</dt>
+                      <dd>{supportAccount.subject}</dd>
+                    </div>
+                    <div>
+                      <dt>계정 UUID</dt>
+                      <dd>{supportAccount.user_account_uuid || "미생성"}</dd>
+                    </div>
+                    <div>
+                      <dt>계정 상태</dt>
+                      <dd>{accountStatusLabel(supportAccount.account_status)}</dd>
+                    </div>
+                    <div>
+                      <dt>라이선스 모드</dt>
+                      <dd>{supportAccount.license_mode}</dd>
+                    </div>
+                    <div>
+                      <dt>검증 방식</dt>
+                      <dd>{licenseVerifierLabel(supportAccount.license_verifier)}</dd>
+                    </div>
+                    <div>
+                      <dt>지원 URL</dt>
+                      <dd>{supportAccount.billing_support_url || "미설정"}</dd>
+                    </div>
+                    <div>
+                      <dt>포털 URL</dt>
+                      <dd>{supportAccount.billing_portal_url || "미설정"}</dd>
+                    </div>
+                    <div>
+                      <dt>재활성화 URL</dt>
+                      <dd>{supportAccount.account_reactivation_url || "미설정"}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="workspaceSection" aria-labelledby="support-events-title">
+                  <div className="sectionHeader">
+                    <h2 id="support-events-title">최근 결제 이벤트</h2>
+                  </div>
+                  {supportAccount.recent_billing_events.length ? (
+                    <div className="dataTable supportEvents" role="table" aria-label="최근 결제 이벤트">
+                      <div className="dataTable__row dataTable__row--head supportEvents__row" role="row">
+                        <span role="columnheader">Provider</span>
+                        <span role="columnheader">Event</span>
+                        <span role="columnheader">Plan</span>
+                        <span role="columnheader">Received</span>
+                      </div>
+                      {supportAccount.recent_billing_events.map((event) => (
+                        <div className="dataTable__row supportEvents__row" role="row" key={event.billing_event_uuid}>
+                          <span role="cell">{event.provider}</span>
+                          <strong role="cell">{event.event_type}</strong>
+                          <span role="cell">{event.target_plan || "없음"}</span>
+                          <span role="cell">{event.received_at}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="panelEmpty">기록된 결제 이벤트가 없습니다.</div>
+                  )}
+                </section>
+              </>
+            ) : (
+              <div className="panelEmpty">지원할 계정 subject를 입력해 진단 정보를 조회하세요.</div>
+            )}
           </section>
         ) : (
           <div className="canvas">

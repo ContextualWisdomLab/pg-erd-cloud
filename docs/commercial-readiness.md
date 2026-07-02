@@ -161,6 +161,9 @@ blocker로 분류합니다.
 - 🆕 지원 진단: `SUPPORT_OPERATOR_SUBJECTS` allowlist 기반
   `GET /api/billing/support/account` read-only API로 대상 계정 상태, usage counter,
   license verifier, billing/reactivation URL, 최근 billing event summary를 조회할 수 있음
+- 🆕 운영자 UI: `/api/me`의 `support_operator` flag로 허용된 운영자에게만
+  프론트엔드 `지원 진단` 화면을 노출하고, raw billing metadata 없이 read-only
+  계정/사용량/최근 event summary를 표시함
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
   provider별 checkout/fulfillment와 signature verification adapter는 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,

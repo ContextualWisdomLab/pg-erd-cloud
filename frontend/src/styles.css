@@ -190,6 +190,10 @@ textarea:focus-visible {
   margin-bottom: 30px;
 }
 
+.metricGrid--support {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .metricCard,
 .projectCard,
 .dataTable,
@@ -284,6 +288,51 @@ textarea:focus-visible {
   padding: 8px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
+}
+
+.supportLookup {
+  display: grid;
+  gap: 8px;
+  max-width: 680px;
+  margin-bottom: 20px;
+}
+
+.supportLookup label {
+  color: #334155;
+  font-weight: 700;
+}
+
+.supportDetails {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.supportDetails div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.supportDetails dt {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.supportDetails dd {
+  min-width: 0;
+  margin: 0;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.supportEvents__row {
+  grid-template-columns: 1fr 1.7fr 1fr 1.5fr;
 }
 
 .panelEmpty {
@@ -966,6 +1015,11 @@ button:disabled {
   .projectCards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .metricGrid--support,
+  .supportDetails {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767px) {
@@ -996,7 +1050,7 @@ button:disabled {
   }
 
   .workspaceNav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
     gap: 4px;
     margin-bottom: 14px;
   }
@@ -1028,7 +1082,12 @@ button:disabled {
   }
 
   .metricGrid,
+  .metricGrid--support,
   .projectCards {
+    grid-template-columns: 1fr;
+  }
+
+  .supportDetails {
     grid-template-columns: 1fr;
   }
 
@@ -1058,6 +1117,10 @@ button:disabled {
 
   .dataTable__row--projects {
     min-width: 440px;
+  }
+
+  .supportEvents__row {
+    min-width: 720px;
   }
 
   .canvasToolbar {

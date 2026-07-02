@@ -94,6 +94,10 @@
     billing/reactivation URL, 최근 billing event summary를 반환합니다.
   - billing event의 raw metadata는 반환하지 않습니다.
   - allowlist에 없는 사용자는 `403 support operator role required`로 거절됩니다.
+- `/api/me`는 현재 사용자가 `SUPPORT_OPERATOR_SUBJECTS`에 포함되어 있으면
+  `support_operator: true`를 반환합니다. 프론트엔드는 이 값으로 `지원 진단`
+  화면 노출 여부를 결정하지만, 실제 접근 제어는 항상 backend support API의
+  allowlist 검증을 따릅니다.
 - 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
   - `BILLING_MAX_PROJECTS_PER_USER`
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`

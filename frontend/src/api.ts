@@ -114,6 +114,42 @@ type CsrfTokenResponse = {
 
 type ShareLinkResponse = Omit<ShareLink, 'url'>
 
+export type CurrentUser = {
+  user_account_uuid: string
+  subject: string
+  display_name: string | null
+  support_operator: boolean
+}
+
+export type BillingEventSummary = {
+  billing_event_uuid: string
+  provider: string
+  provider_event_id: string
+  event_type: string
+  target_plan: string | null
+  status: 'recorded'
+  occurred_at: string
+  received_at: string
+}
+
+export type BillingSupportAccount = {
+  subject: string
+  user_account_uuid: string | null
+  account_status: 'active' | 'deactivated' | 'unknown'
+  license_mode: 'off' | 'required'
+  license_verifier: 'none' | 'static_key' | 'signed_token' | 'static_key_and_signed_token'
+  billing_portal_url: string | null
+  billing_support_url: string | null
+  account_reactivation_url: string | null
+  project_count: number
+  seat_count: number
+  connection_count: number
+  snapshot_count: number
+  share_link_count: number
+  active_share_link_count: number
+  recent_billing_events: BillingEventSummary[]
+}
+
 function isLocalDevelopmentHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 }
@@ -154,12 +190,26 @@ async function jsonHeaders(): Promise<Record<string, string>> {
   }
 }
 
-export async function getMe(): Promise<{ subject: string; display_name: string | null; user_account_uuid: string }> {
+export async function getMe(): Promise<CurrentUser> {
   if (DEMO_MODE) {
-    return { subject: 'local', display_name: 'Local Designer', user_account_uuid: 'demo-user' }
+    return {
+      subject: 'local',
+      display_name: 'Local Designer',
+      user_account_uuid: 'demo-user',
+      support_operator: false
+    }
   }
   const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
   if (!r.ok) throw apiErrorFromResponse('getMe', r)
+  return r.json()
+}
+
+export async function getBillingSupportAccount(subject: string): Promise<BillingSupportAccount> {
+  const query = new URLSearchParams({ subject })
+  const r = await fetch(`${API_BASE}/api/billing/support/account?${query.toString()}`, {
+    credentials: 'include'
+  })
+  if (!r.ok) throw new Error(`getBillingSupportAccount failed: ${r.status}`)
   return r.json()
 }
 

@@ -302,7 +302,10 @@ Status:
 
 - Backend read-only support diagnostics implemented in PR `#415` via
   `SUPPORT_OPERATOR_SUBJECTS` and `GET /api/billing/support/account`.
-- Remaining gap: operator frontend view and audited destructive admin actions.
+- Operator frontend view implemented in PR `#415` via the `/api/me`
+  `support_operator` flag and a read-only `지원 진단` workspace screen.
+- Remaining gap: audited destructive admin actions, if the sales/support motion
+  proves they are necessary.
 
 Tasks:
 

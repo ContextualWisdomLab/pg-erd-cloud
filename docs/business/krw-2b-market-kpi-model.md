@@ -104,8 +104,9 @@ operational reliability, and support burden.
 - Billing provider reconciliation remains a P1 gap until provider-specific
   signature verification and fulfillment adapters exist. The common event
   recording path is now covered by tests.
-- Admin/support diagnostics remain a P1 gap until an operator frontend exists.
-  The backend read-only diagnostics API is now covered by tests.
+- Admin/support diagnostics are now partially measured by tests through the
+  backend read-only diagnostics API and operator-only frontend view. Support
+  workload and resolution-time metrics still need pilot data.
 - On-premises packaging drills are a P1 gap because regulated buyers need proof
   that the product can run and be recovered in their environment.
 - Figma/Product Design work must include buyer-trust states, not only the happy
@@ -116,8 +117,8 @@ operational reliability, and support burden.
 
 - Measured today: local automated tests for license, usage limits, account
   deactivation, plan-change handoff, provider-neutral billing event ingestion,
-  read-only support diagnostics, visual regression, accessibility, and E2E
-  smoke paths.
+  read-only support diagnostics, operator-only support diagnostics UI, visual
+  regression, accessibility, and E2E smoke paths.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation
   rates, support effort, and buyer conversion.
 - Missing today: real customer interviews, paid pilot data, procurement notes,
