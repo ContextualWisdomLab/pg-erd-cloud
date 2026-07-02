@@ -187,20 +187,22 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
+    const hasMatch = (value: string | null | undefined) =>
+      value?.toLocaleLowerCase().includes(normalizedNodeSearch) ?? false;
     for (const node of nodes) {
-      // ⚡ Bolt: Avoid allocating intermediate arrays with flatMap and join for node search.
-      let haystack = node.data.title + " " + (node.data.comment ?? "");
-      for (const column of node.data.columns) {
-        haystack +=
-          " " +
-          column.column_name +
-          " " +
-          column.data_type +
-          " " +
-          (column.column_comment ?? "");
-      }
-      if (haystack.toLocaleLowerCase().includes(normalizedNodeSearch)) {
+      if (hasMatch(node.data.title) || hasMatch(node.data.comment)) {
         matches.add(node.id);
+        continue;
+      }
+      for (const column of node.data.columns) {
+        if (
+          hasMatch(column.column_name) ||
+          hasMatch(column.data_type) ||
+          hasMatch(column.column_comment)
+        ) {
+          matches.add(node.id);
+          break;
+        }
       }
     }
     return matches;
