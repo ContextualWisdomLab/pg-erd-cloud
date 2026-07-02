@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import pathlib
@@ -63,6 +64,13 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def display_path(path: pathlib.Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def require_text(value: Any, field: str) -> str:
     require(isinstance(value, str), f"{field} must be a string")
     text = value.strip()
@@ -79,12 +87,13 @@ def require_text_list(value: Any, field: str) -> None:
 
 
 def validate_manifest(path: pathlib.Path) -> None:
+    require(path.is_file(), f"release approval manifest does not exist: {display_path(path)}")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise AssertionError(f"{path.relative_to(ROOT)} is invalid JSON: {exc}") from exc
+        raise AssertionError(f"{display_path(path)} is invalid JSON: {exc}") from exc
 
-    require(isinstance(payload, dict), f"{path.relative_to(ROOT)} must contain a JSON object")
+    require(isinstance(payload, dict), f"{display_path(path)} must contain a JSON object")
 
     for field in REQUIRED_STRING_FIELDS:
         require_text(payload.get(field), field)
@@ -106,7 +115,29 @@ def validate_manifest(path: pathlib.Path) -> None:
         require_text_list(payload.get(field), field)
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Validate commercial release approval manifests. With no paths, "
+            "validates committed docs/legal/release-approvals/*.json."
+        )
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=pathlib.Path,
+        help="Optional release approval JSON path(s) to validate directly.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.paths:
+        for manifest in args.paths:
+            validate_manifest(manifest)
+        return 0
+
     require(APPROVAL_DIR.is_dir(), "release approval manifest directory is missing")
 
     manifests = sorted(APPROVAL_DIR.glob("*.json"))

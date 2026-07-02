@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import pathlib
@@ -98,6 +99,7 @@ def require_positive_number(value: Any, field: str) -> None:
 
 
 def validate_manifest(path: pathlib.Path) -> None:
+    require(path.is_file(), f"restore drill manifest does not exist: {display_path(path)}")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -158,7 +160,29 @@ def validate_manifest(path: pathlib.Path) -> None:
             require((ROOT / link).exists(), f"evidence_links[{index}] does not exist: {link}")
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Validate on-premises restore drill evidence manifests. With no paths, "
+            "validates committed docs/operations/restore-drills/*.json."
+        )
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=pathlib.Path,
+        help="Optional restore drill JSON path(s) to validate directly.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.paths:
+        for manifest in args.paths:
+            validate_manifest(manifest)
+        return 0
+
     require(DRILL_DIR.is_dir(), "restore drill manifest directory is missing")
 
     manifests = sorted(DRILL_DIR.glob("*.json"))

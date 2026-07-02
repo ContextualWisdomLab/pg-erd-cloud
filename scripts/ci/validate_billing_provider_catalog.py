@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import pathlib
@@ -62,6 +63,13 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def display_path(path: pathlib.Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def require_text(value: Any, field: str) -> str:
     require(isinstance(value, str), f"{field} must be a string")
     text = value.strip()
@@ -106,12 +114,12 @@ def require_secret_reference(value: Any, field: str) -> str:
 
 
 def load_manifest(path: pathlib.Path) -> dict[str, Any]:
-    require(path.is_file(), f"missing billing provider catalog manifest: {path.relative_to(ROOT)}")
+    require(path.is_file(), f"missing billing provider catalog manifest: {display_path(path)}")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise AssertionError(f"{path.relative_to(ROOT)} is invalid JSON: {exc}") from exc
-    require(isinstance(payload, dict), f"{path.relative_to(ROOT)} must contain a JSON object")
+        raise AssertionError(f"{display_path(path)} is invalid JSON: {exc}") from exc
+    require(isinstance(payload, dict), f"{display_path(path)} must contain a JSON object")
     return payload
 
 
@@ -241,8 +249,27 @@ def validate_manifest(path: pathlib.Path) -> None:
     )
 
 
-def main() -> int:
-    validate_manifest(CATALOG_PATH)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Validate billing provider catalog manifests. With no paths, "
+            "validates docs/operations/billing-provider-catalog.example.json."
+        )
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=pathlib.Path,
+        help="Optional billing provider catalog JSON path(s) to validate directly.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    catalogs = args.paths or [CATALOG_PATH]
+    for catalog in catalogs:
+        validate_manifest(catalog)
     return 0
 
 

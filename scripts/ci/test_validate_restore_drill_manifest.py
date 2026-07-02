@@ -73,6 +73,21 @@ def test_valid_restore_drill_manifest_passes(tmp_path: pathlib.Path) -> None:
     validator.validate_manifest(manifest)
 
 
+def test_main_validates_explicit_restore_drill_path(tmp_path: pathlib.Path) -> None:
+    validator = load_validator()
+    manifest = write_manifest(tmp_path / "restore-drill.customer.json", valid_manifest())
+
+    assert validator.main([str(manifest)]) == 0
+
+
+def test_missing_explicit_restore_drill_path_fails(tmp_path: pathlib.Path) -> None:
+    validator = load_validator()
+    missing = tmp_path / "missing-restore-drill.json"
+
+    with pytest.raises(AssertionError, match="does not exist"):
+        validator.main([str(missing)])
+
+
 def test_missing_required_smoke_test_fails(tmp_path: pathlib.Path) -> None:
     validator = load_validator()
     payload = valid_manifest()
@@ -90,4 +105,4 @@ def test_example_manifest_is_required_by_main(tmp_path: pathlib.Path, monkeypatc
     monkeypatch.setattr(validator, "DRILL_DIR", manifest_dir)
 
     with pytest.raises(AssertionError, match="restore-drill.example.json is required"):
-        validator.main()
+        validator.main([])

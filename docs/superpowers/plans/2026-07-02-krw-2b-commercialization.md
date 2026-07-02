@@ -415,7 +415,10 @@ Status:
   `evidence/support-bundle.json`.
 - Commercial readiness audit implemented with
   `scripts/ci/commercial_readiness_audit.py` to separate schema-ready evidence
-  from actual non-example sale evidence.
+  from actual non-example sale evidence. It now accepts uncommitted customer or
+  staging evidence paths through `--release-approval`, `--restore-drill`,
+  `--support-bundle`, and `--billing-provider-catalog`; `*.example.json` names
+  are still treated as example evidence, not real sale proof.
 - Remaining gap: customer-environment restore/rollback evidence from a real
   paid pilot or staging deployment.
 
@@ -429,6 +432,9 @@ Tasks:
   - Implemented: `python scripts/operations/generate_support_bundle.py`.
   - Implemented: `python scripts/ci/validate_support_bundle.py`.
   - Implemented: `python scripts/ci/commercial_readiness_audit.py --strict`.
+  - Implemented: explicit external evidence path validation for release
+    approvals, restore drills, support bundles, billing catalogs, and the
+    aggregate commercial readiness audit.
 
 Verification:
 
@@ -439,6 +445,7 @@ python scripts/ci/commercial_readiness_audit.py --output /tmp/commercial-readine
 python scripts/ci/validate_support_bundle.py
 python scripts/ci/validate_support_bundle.py evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
+python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
 ```
 
 Acceptance:
