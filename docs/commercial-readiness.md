@@ -35,7 +35,7 @@ blocker로 분류합니다.
 1. **P0 인증·인가 완성도**: 현재는 OIDC 검증 강제, API 허가, 공유 경로 제한이 적용되어 있으나, 사용자 메시지/알림 임계치 템플릿은 미완.
 2. **P2 라이선스/과금 운영 연동**: `LICENSE_MODE`, Ed25519 서명 토큰 검증, 사용량 summary API는 구현됐으나, 실제 과금 포털·요금제 변경·재발급 키 회수 자동화는 미구현.
 3. **지원/법무 패키지의 계약 텍스트 강제화**: 템플릿 초안은 준비되었으나, 영업/계약에 투입 가능한 문구로 대체되지 않음.
-4. **고급 UI 회귀 자동화 게이트**: 접근성 smoke는 CI 단계로 분리했으나, 브라우저 E2E/시각 회귀 gate는 아직 미구현.
+4. **고급 UI 회귀 자동화 게이트**: 접근성 smoke와 브라우저 E2E smoke는 CI 단계로 분리했으나, 픽셀 baseline 기반 시각 회귀 gate는 아직 미구현.
 
 ### 우선순위 기반 실행 계획(현재 PR과 분리)
 
@@ -45,7 +45,7 @@ blocker로 분류합니다.
 | P1 | 라이선스·사용량·과금 체계 | 서명 토큰 검증 + 사용량 summary API 도입 | 키 회수/교체/비정상 탐지 SOP + 과금 포털 연동 |
 | P1 | 운영 자동화 | 부분 완료 | 장애 대응·백업·마이그레이션 절차를 CI 재시작 플로우와 연결 |
 | P2 | 법무 문서 고도화 | 템플릿 단계 | 지역/계약 템플릿 교체 및 계약 승인 게이트 반영 |
-| P2 | 품질 게이트 | 접근성 smoke CI 도입 | 브라우저 E2E/시각 회귀를 `ci` 또는 별도 릴리즈 워크플로에 통합 |
+| P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke CI 도입 | 픽셀 baseline 기반 시각 회귀를 `ci` 또는 별도 릴리즈 워크플로에 통합 |
 
 위 항목 중 하나라도 미완이면 “판매 전 검수 합격”으로 보기 어렵습니다.
 
@@ -118,7 +118,9 @@ blocker로 분류합니다.
 - 🟡 법무 문서(개인정보 처리, 이용약관, 면책/보증): 배포 전용 템플릿 문서 작성 중
 - ✅ 접근성 smoke: `npm run test:a11y`와 CI `Accessibility smoke` 단계를 추가해
   skip link, main landmark, navigation state, editor toolbar accessible names, modal focus trap을 검증함
-- 🟡 고급 운영 테스트: 브라우저 E2E/시각 회귀 CI 연동은 미완
+- ✅ 브라우저 E2E smoke: `npm run test:e2e`와 CI `Browser E2E smoke` 단계를 추가해
+  demo workspace load, editor toolbar interaction, screenshot rendering을 Chromium에서 검증함
+- 🟡 고급 운영 테스트: 픽셀 baseline 기반 시각 회귀 CI 연동은 미완
 
 ## First Implementation Slice
 

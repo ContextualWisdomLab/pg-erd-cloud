@@ -11,8 +11,9 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:a11y": "vitest run src/App.accessibility.test.tsx src/components/modals/DialogAccessibility.test.tsx"
+    "test": "vitest run src",
+    "test:a11y": "vitest run src/App.accessibility.test.tsx src/components/modals/DialogAccessibility.test.tsx",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.1",
@@ -20,6 +21,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
