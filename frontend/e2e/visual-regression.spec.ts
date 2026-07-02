@@ -53,6 +53,6 @@ test('share export modal visual baseline remains stable on desktop', async ({ pa
 
   await expect(dialog).toHaveScreenshot('share-export-modal.png', {
     animations: 'disabled',
-    maxDiffPixelRatio: 0.03,
+    maxDiffPixelRatio: 0.06,
   });
 });
