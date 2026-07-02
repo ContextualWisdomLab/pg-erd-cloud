@@ -112,15 +112,20 @@ class FakeSupportResult:
         self,
         value: object | None = None,
         values: list[object] | None = None,
+        mapping: dict[str, int] | None = None,
     ) -> None:
         self.value = value
         self.values = values or []
+        self.mapping = mapping or {}
 
     def scalar_one(self) -> object:
         return self.value
 
     def scalar_one_or_none(self) -> object | None:
         return self.value
+
+    def one(self) -> FakeLlmUsageRow:
+        return FakeLlmUsageRow(self.mapping)
 
     def scalars(self) -> FakeScalars:
         return FakeScalars(self.values)
@@ -134,12 +139,21 @@ class FakeSupportSession:
         events: list[BillingEvent],
         share_links: list[ShareLink] | None = None,
         contract_event: BillingEvent | None = None,
+        llm_usage_counts: dict[str, int] | None = None,
     ) -> None:
         self.account = account
         self.counts = counts
         self.events = events
         self.share_links = share_links or []
         self.contract_event = contract_event
+        self.llm_usage_counts = llm_usage_counts or {
+            "request_count": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "quota_exceeded_count": 0,
+            "input_chars": 0,
+            "output_chars": 0,
+        }
         self.statement_count = 0
 
     async def execute(self, stmt: object) -> FakeSupportResult:
@@ -149,17 +163,19 @@ class FakeSupportSession:
             return FakeSupportResult(self.account)
         if 2 <= self.statement_count <= 7:
             return FakeSupportResult(self.counts[self.statement_count - 2])
-        if self.statement_count == 8 and self.contract_event is not None:
+        contract_index = 8 if self.contract_event is not None else None
+        share_index = 9 if self.contract_event is not None else 8
+        events_index = share_index + 1
+        llm_index = events_index + 1
+        if self.statement_count == contract_index:
             return FakeSupportResult(self.contract_event)
-        if (
-            self.statement_count == 8
-            or (
-                self.statement_count == 9
-                and self.contract_event is not None
-            )
-        ):
+        if self.statement_count == share_index:
             return FakeSupportResult(values=list(self.share_links))
-        return FakeSupportResult(values=list(self.events))
+        if self.statement_count == events_index:
+            return FakeSupportResult(values=list(self.events))
+        if self.statement_count == llm_index:
+            return FakeSupportResult(mapping=self.llm_usage_counts)
+        raise AssertionError(f"unexpected support query #{self.statement_count}")
 
 
 @pytest.fixture(autouse=True)
@@ -857,8 +873,20 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         counts=[2, 5, 3, 8, 4, 1],
         events=[event],
         share_links=[share_link],
+        llm_usage_counts={
+            "request_count": 12,
+            "success_count": 10,
+            "failure_count": 2,
+            "quota_exceeded_count": 1,
+            "input_chars": 2048,
+            "output_chars": 512,
+        },
     )
     monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    monkeypatch.setattr(
+        "app.api.billing.utcnow",
+        lambda: dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+    )
     monkeypatch.setattr(settings, "account_deactivated_subjects", "")
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
@@ -896,6 +924,16 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
     assert payload["snapshot_count"] == 8
     assert payload["share_link_count"] == 4
     assert payload["active_share_link_count"] == 1
+    assert payload["llm_usage_current_month"] == {
+        "scope": "account",
+        "month": "2026-07",
+        "request_count": 12,
+        "success_count": 10,
+        "failure_count": 2,
+        "quota_exceeded_count": 1,
+        "input_chars": 2048,
+        "output_chars": 512,
+    }
     assert payload["recent_share_links"] == [
         {
             "share_link_uuid": str(share_link_uuid),
@@ -931,7 +969,7 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         "source_event_type": "subscription.updated",
         "source_occurred_at": "2026-07-02T00:00:00Z",
     }
-    assert session.statement_count == 9
+    assert session.statement_count == 10
 
 
 def test_support_account_billing_derives_entitlement_from_latest_active_event(
@@ -1073,4 +1111,4 @@ def test_support_account_billing_applies_contract_deactivation_event(
     assert payload["billing_entitlement"]["plan"] is None
     assert payload["recent_share_links"][0]["status"] == "expired"
     assert payload["recent_billing_events"][0]["event_type"] == "contract.suspended"
-    assert session.statement_count == 10
+    assert session.statement_count == 11

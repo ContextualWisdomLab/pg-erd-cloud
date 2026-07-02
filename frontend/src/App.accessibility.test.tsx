@@ -126,6 +126,16 @@ describe('App accessibility smoke', () => {
         source_event_type: 'subscription.updated',
         source_occurred_at: '2026-07-02T00:00:00Z',
       },
+      llm_usage_current_month: {
+        scope: 'account',
+        month: '2026-07',
+        request_count: 42,
+        success_count: 39,
+        failure_count: 3,
+        quota_exceeded_count: 1,
+        input_chars: 12345,
+        output_chars: 6789,
+      },
       recent_share_links: [
         {
           share_link_uuid: 'share-link-1',
@@ -175,6 +185,10 @@ describe('App accessibility smoke', () => {
     expect(screen.getAllByText('enterprise')).not.toHaveLength(0);
     expect(screen.getByText('25')).toBeInTheDocument();
     expect(screen.getByText('stripe / subscription.updated')).toBeInTheDocument();
+    const llmUsage = screen.getByLabelText('이번 달 LLM 사용량 지표');
+    expect(within(llmUsage).getByText('2026-07')).toBeInTheDocument();
+    expect(within(llmUsage).getByText('42')).toBeInTheDocument();
+    expect(within(llmUsage).getByText('12,345 / 6,789')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '지원센터 열기' })).toHaveAttribute(
       'href',
       'https://support.example.com',

@@ -157,6 +157,17 @@ export type BillingEntitlement = {
   source_occurred_at: string | null
 }
 
+export type BillingLlmUsage = {
+  scope: 'account'
+  month: string
+  request_count: number
+  success_count: number
+  failure_count: number
+  quota_exceeded_count: number
+  input_chars: number
+  output_chars: number
+}
+
 export type BillingSupportAccount = {
   subject: string
   user_account_uuid: string | null
@@ -173,6 +184,7 @@ export type BillingSupportAccount = {
   share_link_count: number
   active_share_link_count: number
   billing_entitlement: BillingEntitlement
+  llm_usage_current_month: BillingLlmUsage
   recent_share_links: BillingSupportShareLinkSummary[]
   recent_billing_events: BillingEventSummary[]
 }
@@ -262,6 +274,16 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
             'contract.lifecycle.enterprise_plus_private_onprem_renewal_completed',
           source_occurred_at: '2026-07-02T00:00:00Z'
         },
+        llm_usage_current_month: {
+          scope: 'account',
+          month: '2026-07',
+          request_count: 1280,
+          success_count: 1242,
+          failure_count: 38,
+          quota_exceeded_count: 6,
+          input_chars: 1842200,
+          output_chars: 426900
+        },
         recent_share_links: [
           {
             share_link_uuid:
@@ -316,6 +338,16 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
         source_provider_event_id: 'evt_demo_subscription_updated',
         source_event_type: 'subscription.updated',
         source_occurred_at: '2026-07-02T00:00:00Z'
+      },
+      llm_usage_current_month: {
+        scope: 'account',
+        month: '2026-07',
+        request_count: 42,
+        success_count: 39,
+        failure_count: 3,
+        quota_exceeded_count: 1,
+        input_chars: 38420,
+        output_chars: 12880
       },
       recent_share_links: [
         {

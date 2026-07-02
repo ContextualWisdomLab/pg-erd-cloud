@@ -131,8 +131,10 @@
   `SUPPORT_OPERATOR_SUBJECTS`에 포함된 사용자만 접근할 수 있는 read-only 지원
   진단 API입니다.
   - 대상 계정 UUID, 활성/비활성/미확인 상태, usage counter, license verifier,
-    billing/reactivation URL, 현재 entitlement evidence, 최근 share link summary,
-    최근 billing event summary를 반환합니다.
+    billing/reactivation URL, 현재 entitlement evidence, 현재 월 LLM draft usage
+    summary, 최근 share link summary, 최근 billing event summary를 반환합니다.
+  - LLM usage summary는 account 단위 월, 요청 수, 성공/실패/quota 초과, input/output
+    문자량만 포함하며 prompt, snapshot JSON, provider response는 반환하지 않습니다.
   - share link summary는 UUID, project UUID, 권한, 활성/만료 상태, 생성/만료
     시각만 포함하며 공개 URL/token은 반환하지 않습니다.
   - billing event의 raw metadata는 반환하지 않습니다.

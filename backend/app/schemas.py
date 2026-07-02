@@ -306,5 +306,6 @@ class BillingSupportAccountOut(BaseModel):
     share_link_count: int = Field(ge=0)
     active_share_link_count: int = Field(ge=0)
     billing_entitlement: BillingEntitlementOut
+    llm_usage_current_month: BillingLlmUsageOut
     recent_share_links: list[BillingSupportShareLinkSummaryOut]
     recent_billing_events: list[BillingEventSummaryOut]

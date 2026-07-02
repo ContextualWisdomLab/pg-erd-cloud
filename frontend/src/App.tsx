@@ -1517,8 +1517,8 @@ export default function App() {
               <div>
                 <h1 id="support-title">지원 진단</h1>
                 <p>
-                  계정 상태, 사용량, 라이선스 검증 방식, 최근 공유 링크와 결제 이벤트를
-                  read-only로 확인합니다.
+                  계정 상태, 사용량, 라이선스 검증 방식, LLM 비용 사용량, 최근 공유
+                  링크와 결제 이벤트를 read-only로 확인합니다.
                 </p>
               </div>
             </div>
@@ -1635,6 +1635,53 @@ export default function App() {
                       <dd>{renderSupportUrl("재활성화", "재활성화 열기", supportAccount.account_reactivation_url)}</dd>
                     </div>
                   </dl>
+                </section>
+
+                <section className="workspaceSection" aria-labelledby="support-llm-title">
+                  <div className="sectionHeader">
+                    <h2 id="support-llm-title">이번 달 LLM 사용량</h2>
+                  </div>
+                  <div
+                    className="metricGrid metricGrid--support metricGrid--supportLlm"
+                    aria-label="이번 달 LLM 사용량 지표"
+                  >
+                    <div className="metricCard metricCard--compact">
+                      <span>월</span>
+                      <strong>{supportAccount.llm_usage_current_month.month}</strong>
+                    </div>
+                    <div className="metricCard metricCard--compact">
+                      <span>LLM 요청</span>
+                      <strong>
+                        {supportAccount.llm_usage_current_month.request_count.toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="metricCard metricCard--compact">
+                      <span>성공</span>
+                      <strong>
+                        {supportAccount.llm_usage_current_month.success_count.toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="metricCard metricCard--compact">
+                      <span>실패</span>
+                      <strong>
+                        {supportAccount.llm_usage_current_month.failure_count.toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="metricCard metricCard--compact">
+                      <span>쿼터 초과</span>
+                      <strong>
+                        {supportAccount.llm_usage_current_month.quota_exceeded_count.toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="metricCard metricCard--compact">
+                      <span>입력/출력 문자</span>
+                      <strong>
+                        {supportAccount.llm_usage_current_month.input_chars.toLocaleString()}
+                        {" / "}
+                        {supportAccount.llm_usage_current_month.output_chars.toLocaleString()}
+                      </strong>
+                    </div>
+                  </div>
                 </section>
 
                 <section

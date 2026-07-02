@@ -220,6 +220,12 @@ textarea:focus-visible {
   color: #0f172a;
 }
 
+.metricCard--compact strong {
+  font-size: 22px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
 .workspaceSection {
   margin-top: 26px;
 }

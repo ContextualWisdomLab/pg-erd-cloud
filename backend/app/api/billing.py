@@ -282,6 +282,34 @@ async def _llm_usage_counts_for_account(
     )
 
 
+def _empty_llm_usage_counts() -> BillingLlmUsageCounts:
+    return BillingLlmUsageCounts(
+        request_count=0,
+        success_count=0,
+        failure_count=0,
+        quota_exceeded_count=0,
+        input_chars=0,
+        output_chars=0,
+    )
+
+
+def _llm_usage_response(
+    *,
+    month: str,
+    counts: BillingLlmUsageCounts,
+) -> BillingLlmUsageOut:
+    return BillingLlmUsageOut(
+        scope="account",
+        month=month,
+        request_count=counts.request_count,
+        success_count=counts.success_count,
+        failure_count=counts.failure_count,
+        quota_exceeded_count=counts.quota_exceeded_count,
+        input_chars=counts.input_chars,
+        output_chars=counts.output_chars,
+    )
+
+
 def _redact_billing_metadata(value: object) -> object:
     if isinstance(value, Mapping):
         redacted: dict[str, object] = {}
@@ -586,16 +614,7 @@ async def get_billing_llm_usage(
         start=start,
         end=end,
     )
-    return BillingLlmUsageOut(
-        scope="account",
-        month=normalized_month,
-        request_count=counts.request_count,
-        success_count=counts.success_count,
-        failure_count=counts.failure_count,
-        quota_exceeded_count=counts.quota_exceeded_count,
-        input_chars=counts.input_chars,
-        output_chars=counts.output_chars,
-    )
+    return _llm_usage_response(month=normalized_month, counts=counts)
 
 
 @router.get("/support/account", response_model=BillingSupportAccountOut)
@@ -643,6 +662,17 @@ async def get_support_account_billing(
         session,
         subject,
     )
+    llm_month, llm_start, llm_end = _billing_month_window(None)
+    llm_usage_counts = (
+        await _llm_usage_counts_for_account(
+            session,
+            user_account_uuid,
+            start=llm_start,
+            end=llm_end,
+        )
+        if user_account_uuid is not None
+        else _empty_llm_usage_counts()
+    )
 
     return BillingSupportAccountOut(
         subject=subject,
@@ -661,6 +691,10 @@ async def get_support_account_billing(
         active_share_link_count=usage_counts.active_share_link_count,
         billing_entitlement=billing_entitlement_from_events(
             recent_billing_event_models,
+        ),
+        llm_usage_current_month=_llm_usage_response(
+            month=llm_month,
+            counts=llm_usage_counts,
         ),
         recent_share_links=recent_share_links,
         recent_billing_events=[

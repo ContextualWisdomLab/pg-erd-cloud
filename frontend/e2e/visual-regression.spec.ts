@@ -18,13 +18,13 @@ const supportBaselines = [
     name: 'desktop',
     screenshotName: 'support-diagnostics.png',
     viewport: { width: 1280, height: 900 },
-    captureViewport: { width: 1280, height: 1220 },
+    captureViewport: { width: 1280, height: 1500 },
   },
   {
     name: 'mobile review',
     screenshotName: 'support-diagnostics-mobile.png',
     viewport: { width: 390, height: 844 },
-    captureViewport: { width: 390, height: 3100 },
+    captureViewport: { width: 390, height: 3600 },
   },
 ] as const;
 

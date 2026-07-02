@@ -69,8 +69,10 @@ The same live draft events are persisted to `llm_draft_usage_event` for monthly
 billing attribution. Authenticated users can query
 `GET /api/billing/llm-usage?month=YYYY-MM` to retrieve account-level request,
 success, failure, quota-exceeded, input-character, and output-character totals.
-Use those totals to reconcile provider invoices; do not log or store prompt
-contents for this workflow.
+Authorized support operators see the current-month account summary in
+`GET /api/billing/support/account?subject=<OIDC-subject>` and the support
+diagnostics UI. Use those totals to reconcile provider invoices; do not log or
+store prompt contents for this workflow.
 
 `outcome=quota_exceeded` means the in-process LLM draft quota rejected the
 request before any provider call. Authenticated routes use the account UUID as
