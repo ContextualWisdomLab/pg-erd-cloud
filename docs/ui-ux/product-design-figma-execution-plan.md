@@ -16,6 +16,8 @@ design exercise.
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>.
 - Generated FigJam flow board:
   <https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588>.
+- Generated KRW 2B commercial readiness FigJam board:
+  <https://www.figma.com/board/XJXqiPUAYyrV85N5XzQpsB?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=abef7f56-0ca9-4a97-9173-0e6ecb254b71>.
 - Current visual direction: quiet work-focused layout, persistent left sidebar,
   light palette, blue primary actions, thin borders, subtle shadows, compact
   tables, and dense ERD editor controls.
@@ -128,6 +130,7 @@ Proposed Figma pages:
 
 Figma tool use:
 
+- Do not use Figma Code Connect for this project track.
 - Use `get_libraries` and `search_design_system` before recreating components,
   variables, or styles.
 - Use `generate_figma_design` to capture the running web app into the target

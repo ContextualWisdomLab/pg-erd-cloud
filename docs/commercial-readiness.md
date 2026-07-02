@@ -10,6 +10,31 @@ blocker로 분류합니다.
 현재 제품은 실행 가능한 MVP 기반이지만, 그대로 판매 가능한 프로그램은 아닙니다.
 핵심 이유는 보안/인증/운영 체계가 모두 완성 단계에 있지 않기 때문입니다.
 
+## KRW 2B Commercialization Track
+
+`pg-erd-cloud`를 KRW 2B급 엔터프라이즈 SaaS/온프레미스 제품으로 평가받을 수
+있게 만들기 위한 구체 실행 계획은
+`docs/superpowers/plans/2026-07-02-krw-2b-commercialization.md`에 둡니다.
+이 기준에서 KRW 2B는 매출 보장이 아니라, 구매자·투자자·전략적 인수자가
+엔터프라이즈급 제품 패키지로 신뢰할 수 있는 완성도 기준입니다.
+
+관련 산출물:
+
+- KRW 2B 실행 계획:
+  `docs/superpowers/plans/2026-07-02-krw-2b-commercialization.md`
+- 시장/KPI 모델:
+  `docs/business/krw-2b-market-kpi-model.md`
+- FigJam 운영 모델:
+  <https://www.figma.com/board/XJXqiPUAYyrV85N5XzQpsB?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=abef7f56-0ca9-4a97-9173-0e6ecb254b71>
+
+현재 결정:
+
+- Figma Code Connect는 사용하지 않습니다.
+- 새 git submodule은 만들지 않습니다. 독립 배포·별도 버전관리·복수 소비자가
+  검증되기 전까지는 repo 내부 모듈과 문서/테스트 gate로 관리합니다.
+- 자동 리뷰 봇 대기와 queued 분석 지연은 blocker가 아닙니다. 실제 실패한 CI,
+  보안 결함, 미구현 판매 필수 기능, 검증 불가능한 운영 경로만 blocker입니다.
+
 ## 실시간 감사(2026-07-02 UTC 기준)
 
 - `main` 브랜치 최근 실행(40건 기준): **39건 성공, 1건 실패**. 실패는 `codeql-sast-backfill`의 과거 단일 실패(2026-07-01T00:55Z)이며, 현재 `main`은 연속 성공 라인입니다.
