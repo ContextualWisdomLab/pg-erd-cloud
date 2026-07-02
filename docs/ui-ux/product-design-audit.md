@@ -25,6 +25,27 @@ Evidence limits:
   current implementation. Live keyboard traversal, screen-reader output, backend
   latency, and real database-scale behavior still need browser verification.
 
+## Figma Follow-Through Status
+
+The first Figma pass now covers the highest-priority audit findings:
+
+- Setup workflow: `04 Core Flow Prototype` includes a guided connection setup
+  frame between dashboard and ERD editor.
+- Toolbar density: `PG ERD Toolbar Button` defines fixed-size icon and format
+  button variants for the editor toolbar.
+- Share/export overload: `PG ERD Share Export Modal` separates share links,
+  SQL DDL, diagram image, and Mermaid export rows, with ready, copied, and error
+  states.
+- Modal consistency: the share/export modal component provides the first modal
+  shell candidate for implementation alignment.
+- Table node density: `PG ERD Table Node` defines compact, standard, and detail
+  variants.
+- Token drift: `02 Foundations` defines local Figma variables and text/effect
+  styles that can be mirrored into frontend CSS custom properties.
+
+Implementation is still pending. Treat the Figma work as the visual source for
+the next focused code PR, not as proof that the production UI already changed.
+
 ## Flow Steps
 
 1. Login/auth gate
@@ -248,20 +269,22 @@ Evidence:
 
 - `docs/ui-ux` contains nine raster reference screens and a concise direction
   note.
-- There is no Figma file link, component inventory, token inventory, or design QA
-  baseline in the repository yet.
+- The Figma file now contains editable pages, component sets, variables, and a
+  prototype, but the repository still needs to keep this status synchronized as
+  the design evolves.
 
 Impact:
 
-- The team has product direction, but not a durable editable source for design
-  review, prototype links, or implementation handoff.
+- The team has product direction and an editable Figma source, but future PRs
+  can still drift if design status, token names, and implementation handoff
+  notes are not maintained together.
 
 Recommendation:
 
-- Use the execution plan in
-  `docs/ui-ux/product-design-figma-execution-plan.md` to create a Figma file
-  with pages for references, foundations, components, prototype, and QA.
-- Add the Figma file link back to `docs/ui-ux/README.md` after creation.
+- Keep `docs/ui-ux/product-design-figma-execution-plan.md` and
+  `docs/ui-ux/README.md` synchronized with important Figma node links.
+- Add a design QA report after the first implementation PR compares live app
+  screenshots against the Figma source.
 
 ## Strengths To Preserve
 
@@ -280,7 +303,8 @@ Recommendation:
 
 Start with the share/export surface because it is central to collaboration,
 already has a focused component (`ExportModal.tsx`), and has clear reference
-material in `09-share-export-modal.png`.
+material in `09-share-export-modal.png` plus a dedicated Figma component set:
+<https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143>.
 
 Suggested PR scope:
 

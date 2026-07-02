@@ -22,6 +22,25 @@ rendered implementation.
   - Same viewport class: desktop editor, narrow review layout, or modal-focused
     capture.
 
+## Current Figma Baseline
+
+Use these source nodes for the first implementation comparison pass:
+
+- Component foundations:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=17-2>
+- ERD table node density variants:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=25-78>
+- Editor toolbar button variants:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=28-33>
+- Share/export modal states:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143>
+- Core flow prototype dashboard:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=32-2>
+
+The Figma component and prototype screenshots were checked for clipped text and
+overlap during the design pass. A code implementation still requires a separate
+browser screenshot comparison before merge.
+
 ## Required Screens
 
 Run the QA pass on these screens before broad UI implementation:
@@ -134,3 +153,6 @@ remains.
 Start with the share/export modal because it is the recommended first
 implementation surface from `product-design-audit.md` and has a clear existing
 reference in `09-share-export-modal.png`.
+
+First source target:
+<https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143>

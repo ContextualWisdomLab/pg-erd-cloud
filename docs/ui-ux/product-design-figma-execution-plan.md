@@ -30,6 +30,51 @@ inspect the ERD, adjust metadata, export DDL or diagrams, and share the result.
 The interface should feel like an operational tool: dense, calm, keyboard and
 screen-reader aware, and optimized for repeated use rather than marketing.
 
+## Execution Status
+
+Status as of 2026-07-02:
+
+- Figma file structure is in place with pages for intake, current references,
+  foundations, components, core flow prototype, and QA/handoff.
+- `01 Current References` contains all nine repository screenshots as image-fill
+  cards using `FIT` scale mode.
+- `02 Foundations` contains local Figma variables for primitives, semantic
+  colors, spacing, radius, text styles, modal shadow, and focus ring. The
+  variable WEB code syntax uses proposed CSS custom property names because the
+  current frontend still hardcodes the corresponding values.
+- `03 Components` contains editable component sets for button, input field,
+  ERD table node, status pill, toolbar button, and share/export modal.
+- `04 Core Flow Prototype` contains four connected desktop frames:
+  dashboard, connection setup, ERD editor, and share/export. The main CTAs use
+  Figma `ON_CLICK -> NAVIGATE` prototype reactions.
+
+Key Figma nodes:
+
+- Foundations summary:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=17-2>
+- Button component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=18-17>
+- Input field component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=20-20>
+- ERD table node component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=25-78>
+- Status pill component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=27-23>
+- Toolbar button component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=28-33>
+- Share/export modal component set:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143>
+- Core flow prototype dashboard:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=32-2>
+
+Visual checks completed:
+
+- Foundation summary rendered without clipped text.
+- Button, input, table node, status pill, toolbar button, and share/export modal
+  component sets were screenshot-checked for overlap and text clipping.
+- The ERD editor and share/export prototype frames were screenshot-checked after
+  composition.
+
 ## Work Packages
 
 ### 1. Product Design UX Audit
@@ -100,6 +145,9 @@ Deliverable:
   foundations, components, core prototype flow, and QA/handoff.
 - `01 Current References` populated with all nine repository screenshots as
   editable image-fill cards using `FIT` scale mode.
+- Local variables and component sets now exist in the Figma file. The next code
+  step is to mirror the token names into CSS custom properties before broader
+  visual implementation.
 
 ### 3. Core Prototype Flow
 
@@ -127,6 +175,8 @@ Deliverables:
 - FigJam user-flow board for the core connection-to-share journey.
 - Optional local coded prototype when a selected visual direction needs richer
   interaction.
+- First Figma pass complete: dashboard -> connection setup -> ERD editor ->
+  share/export, with clickable navigation on the main CTAs.
 
 ### 4. Design QA Before Implementation
 
@@ -183,18 +233,20 @@ Deliverable:
 
 ## Immediate Next Actions
 
-1. Review the Product Design audit findings and choose the first design problem
-   to resolve in Figma.
-2. Componentize the highest-priority screens in the Product Design Kit:
-   sidebar, toolbar, modal shell, table node, and share/export controls.
-3. Build the first clickable prototype around the connection-to-share workflow.
-4. Capture the running local app into Figma when a browser-verifiable URL is
-   available, then compare it against the repository screenshots.
-5. Use the prototype review to choose the first focused implementation PR.
+1. Review the Figma component sets and core flow prototype with product and
+   engineering stakeholders.
+2. Choose the first implementation PR scope. The recommended first scope remains
+   share/export because it has a focused component and clear audit finding.
+3. Capture the running local app into Figma when a browser-verifiable URL is
+   available, then compare it against the repository screenshots and current
+   Figma components.
+4. Mirror the Figma token names into CSS custom properties before broad visual
+   implementation.
+5. Use the implementation QA checklist before merging any UI code PR.
 
 ## Open Inputs
 
-- Preferred prototype fidelity: static clickable prototype or richer local coded
-  prototype.
 - First implementation priority: audit fixes, ERD editor, share/export, or
   onboarding/dashboard.
+- Whether narrow-width work should stay review/share-only or include full mobile
+  editing.
