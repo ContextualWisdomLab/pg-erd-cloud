@@ -22,6 +22,7 @@ from app.ddl.export import snapshot_json_to_sql
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
+    LlmPromptTooLargeError,
     LlmProviderError,
     generate_index_design_llm_draft,
     generate_reversing_llm_draft,
@@ -185,6 +186,8 @@ async def export_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
+        except LlmPromptTooLargeError as exc:
+            raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
@@ -216,6 +219,8 @@ async def export_snapshot_index_design(
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
+        except LlmPromptTooLargeError as exc:
+            raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"

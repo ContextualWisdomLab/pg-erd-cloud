@@ -30,8 +30,7 @@ blocker로 분류합니다.
 
 - 공유 링크별 감사 로그를 제공해야 합니다.
 - 백업/복구 runbook, migration rollback policy, 장애 대응 runbook을 문서화해야 합니다.
-- LLM draft 사용량/비용 한도, provider timeout, 실패율 알림 기준을 운영 문서와
-  테스트로 고정해야 합니다.
+- LLM draft 사용량 감사 로그와 실패율 알림 기준을 운영 문서와 테스트로 고정해야 합니다.
 - 설치/운영 문서에서 MVP 표현을 제거하고, 지원 범위와 미지원 범위를 명시해야 합니다.
 
 ### P2: 일반 판매 권장
@@ -53,6 +52,8 @@ blocker로 분류합니다.
 - 프로젝트 오너가 공유 링크를 목록 조회하고 삭제 방식으로 폐기할 수 있게 합니다.
 - `APP_ENV=production` startup guard로 OIDC, 공개 HTTPS CORS origin, 강한 secret,
   대상 DB allowlist, 공유 링크 기본 만료를 강제합니다.
+- 인증된 live LLM draft도 `LLM_MAX_PROMPT_CHARS`와 `LLM_MAX_OUTPUT_TOKENS`로
+  provider 호출 전 비용 상한을 둡니다.
 - 운영자가 공개 공유 링크 LLM draft를 의도적으로 열 수는 있지만, 별도 비용 한도,
   감사 로그, 운영 승인 정책을 갖춘 배포에서만 사용하도록 문서화합니다.
 

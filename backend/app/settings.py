@@ -126,6 +126,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
+    llm_max_prompt_chars: int = Field(120_000, ge=1_000)
+    llm_max_output_tokens: int = Field(1_200, ge=1, le=8_192)
     share_link_llm_draft_enabled: bool = False
 
     # Allowed JWT signing algorithms for OIDC verification.

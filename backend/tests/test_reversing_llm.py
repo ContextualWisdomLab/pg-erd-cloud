@@ -15,6 +15,7 @@ from app.models import SchemaSnapshot, SchemaSnapshotData, ShareLink
 from app.settings import settings
 from app.spec.llm import (
     LlmConfigurationError,
+    LlmPromptTooLargeError,
     LlmProviderError,
     generate_reversing_llm_draft,
 )
@@ -58,6 +59,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
         body = json.loads(request.content)
         seen["model"] = body["model"]
         seen["messages"] = body["messages"]
+        seen["max_tokens"] = body["max_tokens"]
         return httpx.Response(
             200,
             json={
@@ -75,6 +77,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
     assert seen["url"] == "https://llm.example/v1/chat/completions"
     assert seen["authorization"] == "Bearer test-key"
     assert seen["model"] == "test-model"
+    assert seen["max_tokens"] == settings.llm_max_output_tokens
     messages = seen["messages"]
     assert isinstance(messages, list)
     assert messages[0]["role"] == "system"
@@ -92,6 +95,30 @@ async def test_generate_reversing_llm_draft_requires_configuration(
 
     with pytest.raises(LlmConfigurationError, match="LLM_API_BASE_URL"):
         await generate_reversing_llm_draft(_snapshot())
+
+
+@pytest.mark.asyncio
+async def test_generate_reversing_llm_draft_rejects_oversized_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "llm_api_base_url", "https://llm.example/v1")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(settings, "llm_max_prompt_chars", 1_000)
+
+    snapshot = _snapshot()
+    snapshot["relations"] = [
+        {
+            "schema_name": "public",
+            "relation_name": f"large_table_{i}",
+            "relation_oid": i,
+            "relation_kind": "r",
+        }
+        for i in range(300)
+    ]
+
+    with pytest.raises(LlmPromptTooLargeError):
+        await generate_reversing_llm_draft(snapshot)
 
 
 @pytest.mark.asyncio
@@ -204,6 +231,10 @@ async def _raise_config_error(_: object) -> str:
     raise LlmConfigurationError("LLM_API_BASE_URL is required for live LLM drafts")
 
 
+async def _raise_prompt_too_large(_: object) -> str:
+    raise LlmPromptTooLargeError("prompt too large")
+
+
 def _current_user() -> CurrentUser:
     return CurrentUser(
         user_account_uuid=uuid.uuid4(),
@@ -298,6 +329,13 @@ def _assert_sanitized_config_error(
     assert "LLM_API_BASE_URL" not in exc_info.value.detail
 
 
+def _assert_prompt_too_large_error(
+    exc_info: pytest.ExceptionInfo[HTTPException],
+) -> None:
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail == "LLM prompt too large"
+
+
 def _assert_share_link_llm_draft_disabled(
     exc_info: pytest.ExceptionInfo[HTTPException],
 ) -> None:
@@ -321,6 +359,26 @@ async def test_snapshot_reversing_draft_hides_llm_configuration_detail(
         )
 
     _assert_sanitized_config_error(exc_info)
+
+
+@pytest.mark.asyncio
+async def test_snapshot_reversing_draft_rejects_oversized_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(snapshots, "_get_authorized_snapshot", _authorized_snapshot)
+    monkeypatch.setattr(
+        snapshots, "generate_reversing_llm_draft", _raise_prompt_too_large
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await snapshots.export_snapshot_reversing_spec(
+            uuid.uuid4(),
+            mode="llm-draft",
+            user=_current_user(),
+            session=_SnapshotSession(),
+        )
+
+    _assert_prompt_too_large_error(exc_info)
 
 
 @pytest.mark.asyncio

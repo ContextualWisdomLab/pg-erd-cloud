@@ -107,6 +107,10 @@
 - `SHARE_LINK_DEFAULT_TTL_HOURS` (default: `168`)
   - 공개 공유 링크가 영구 bearer URL로 남지 않도록 기본 만료를 적용합니다.
   - `0`은 만료 없음이므로 승인된 운영 예외에만 사용하세요.
+- `LLM_MAX_PROMPT_CHARS` (default: `120000`) / `LLM_MAX_OUTPUT_TOKENS`
+  (default: `1200`)
+  - 인증된 live LLM draft에서도 provider 호출 전 prompt 크기와 출력 토큰 상한을
+    강제해 비용 폭주를 줄입니다.
 
 ##### Trade-offs / 향후 계획
 
