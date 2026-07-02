@@ -67,14 +67,14 @@ groups:
 
       - alert: PgErdCloudLlmDraftFailures
         expr: |
-          increase(llm_draft_requests_total{outcome=~"configuration_error|provider_error|prompt_too_large"}[10m]) > 0
+          increase(llm_draft_requests_total{outcome=~"configuration_error|provider_error|prompt_too_large|quota_exceeded"}[10m]) > 0
         for: 0m
         labels:
           severity: ticket
           area: llm-cost-control
         annotations:
           summary: "pg-erd-cloud live LLM draft requests are failing"
-          description: "Live LLM draft configuration, prompt-size, or provider failures occurred in the last 10 minutes."
+          description: "Live LLM draft configuration, prompt-size, provider, or quota failures occurred in the last 10 minutes."
 
       - alert: PgErdCloudJobFailures
         expr: |

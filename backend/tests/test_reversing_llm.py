@@ -11,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 from prometheus_client import REGISTRY
 
+from app import llm_quota
 from app.api import share, snapshots
 from app.auth import CurrentUser
 from app.models import SchemaSnapshot, SchemaSnapshotData, ShareLink
@@ -472,6 +473,63 @@ async def test_snapshot_reversing_draft_records_usage_metric_and_audit_log(
 
 
 @pytest.mark.asyncio
+async def test_snapshot_reversing_draft_enforces_account_llm_quota(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    project_uuid = uuid.uuid4()
+    snapshot_uuid = uuid.uuid4()
+    user = _current_user()
+    draft_calls = 0
+
+    async def _authorized_snapshot_with_project(*_: object) -> object:
+        return SimpleNamespace(project_space_uuid=project_uuid)
+
+    async def _draft(_: object) -> str:
+        nonlocal draft_calls
+        draft_calls += 1
+        return "# DB Reversing Specification\n\nDraft"
+
+    llm_quota.reset_llm_draft_quota_state()
+    monkeypatch.setattr(settings, "llm_draft_quota_enabled", True)
+    monkeypatch.setattr(settings, "llm_draft_quota_requests", 1)
+    monkeypatch.setattr(settings, "llm_draft_quota_window_seconds", 60.0)
+    monkeypatch.setattr(
+        snapshots, "_get_authorized_snapshot", _authorized_snapshot_with_project
+    )
+    monkeypatch.setattr(snapshots, "generate_reversing_llm_draft", _draft)
+
+    first = await snapshots.export_snapshot_reversing_spec(
+        snapshot_uuid,
+        mode="llm-draft",
+        user=user,
+        session=_SnapshotSession(),
+    )
+    assert first == "# DB Reversing Specification\n\nDraft"
+
+    with caplog.at_level(logging.INFO, logger="app.llm_usage"):
+        with pytest.raises(HTTPException) as exc_info:
+            await snapshots.export_snapshot_reversing_spec(
+                snapshot_uuid,
+                mode="llm-draft",
+                user=user,
+                session=_SnapshotSession(),
+            )
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.detail == "LLM draft quota exceeded"
+    assert draft_calls == 1
+    events = _llm_usage_events(caplog)
+    assert events
+    assert events[-1]["surface"] == "authenticated"
+    assert events[-1]["artifact"] == "reversing_spec"
+    assert events[-1]["outcome"] == "quota_exceeded"
+    assert events[-1]["user_account_uuid"] == str(user.user_account_uuid)
+    assert events[-1]["project_space_uuid"] == str(project_uuid)
+    assert events[-1]["schema_snapshot_uuid"] == str(snapshot_uuid)
+
+
+@pytest.mark.asyncio
 async def test_snapshot_reversing_draft_rejects_oversized_prompt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -627,6 +685,63 @@ async def test_shared_reversing_draft_success_event_is_audited(
     assert events[-1]["share_link_uuid"] == str(share_link_uuid)
     assert events[-1]["schema_snapshot_uuid"] == str(schema_snapshot_uuid)
     assert events[-1]["project_space_uuid"] == str(session.project_space_uuid)
+
+
+@pytest.mark.asyncio
+async def test_shared_reversing_draft_enforces_share_link_llm_quota(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
+    monkeypatch.setattr(settings, "llm_draft_quota_enabled", True)
+    monkeypatch.setattr(settings, "llm_draft_quota_requests", 1)
+    monkeypatch.setattr(settings, "llm_draft_quota_window_seconds", 60.0)
+    llm_quota.reset_llm_draft_quota_state()
+    draft_calls = 0
+
+    async def _draft(_: object) -> str:
+        nonlocal draft_calls
+        draft_calls += 1
+        return "# DB Reversing Specification\n\nDraft"
+
+    monkeypatch.setattr(share, "generate_reversing_llm_draft", _draft)
+    session = _ShareSession()
+    share_link_uuid = uuid.uuid4()
+    schema_snapshot_uuid = uuid.uuid4()
+
+    first = await share.export_shared_snapshot_reversing_spec(
+        share_link_uuid,
+        schema_snapshot_uuid,
+        mode="llm-draft",
+        request=_request(),
+        session=session,
+    )
+    assert first == "# DB Reversing Specification\n\nDraft"
+
+    with caplog.at_level(logging.INFO):
+        with pytest.raises(HTTPException) as exc_info:
+            await share.export_shared_snapshot_reversing_spec(
+                share_link_uuid,
+                schema_snapshot_uuid,
+                mode="llm-draft",
+                request=_request(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.detail == "LLM draft quota exceeded"
+    assert draft_calls == 1
+    usage_events = _llm_usage_events(caplog)
+    assert usage_events
+    assert usage_events[-1]["surface"] == "share_link"
+    assert usage_events[-1]["artifact"] == "reversing_spec"
+    assert usage_events[-1]["outcome"] == "quota_exceeded"
+    assert usage_events[-1]["share_link_uuid"] == str(share_link_uuid)
+    share_events = _share_audit_events(caplog)
+    assert share_events
+    assert share_events[-1]["action"] == "share_snapshot.reversing_spec"
+    assert share_events[-1]["outcome"] == "denied"
+    assert share_events[-1]["error_detail"] == "LLM draft quota exceeded"
 
 
 @pytest.mark.asyncio

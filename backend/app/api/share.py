@@ -15,6 +15,7 @@ from starlette.requests import Request
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
+from app.llm_quota import enforce_llm_draft_quota
 from app.llm_usage import record_llm_draft_usage
 from app.metrics import SHARE_AUDIT_EVENTS_TOTAL, record_product_event
 from app.models import (
@@ -146,6 +147,43 @@ def _record_share_audit_error(
         error_detail=error_detail,
         mode=mode,
     )
+
+
+async def _enforce_share_link_llm_draft_quota(
+    *,
+    action: str,
+    artifact: str,
+    snapshot_json: dict,
+    request: Request,
+    share_link_uuid: uuid.UUID,
+    project_space_uuid: uuid.UUID,
+    schema_snapshot_uuid: uuid.UUID,
+    mode: str,
+) -> None:
+    try:
+        await enforce_llm_draft_quota(f"share:{share_link_uuid}")
+    except HTTPException:
+        record_llm_draft_usage(
+            surface="share_link",
+            artifact=artifact,
+            outcome="quota_exceeded",
+            snapshot_json=snapshot_json,
+            project_space_uuid=project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            share_link_uuid=share_link_uuid,
+            error_code="quota_exceeded",
+        )
+        _record_share_audit_error(
+            action=action,
+            outcome="denied",
+            request=request,
+            share_link_uuid=share_link_uuid,
+            project_space_uuid=project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            mode=mode,
+            error_detail="LLM draft quota exceeded",
+        )
+        raise
 
 
 def _require_share_link_llm_draft_enabled() -> None:
@@ -549,6 +587,16 @@ async def export_shared_snapshot_reversing_spec(
                 error_detail="share link LLM draft is disabled",
             )
         _require_share_link_llm_draft_enabled()
+        await _enforce_share_link_llm_draft_quota(
+            action="share_snapshot.reversing_spec",
+            artifact="reversing_spec",
+            snapshot_json=data.snapshot_json,
+            request=request,
+            share_link_uuid=share_link_uuid,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            mode=mode,
+        )
         try:
             draft = await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
@@ -725,6 +773,16 @@ async def export_shared_snapshot_index_design(
                 error_detail="share link LLM draft is disabled",
             )
         _require_share_link_llm_draft_enabled()
+        await _enforce_share_link_llm_draft_quota(
+            action="share_snapshot.index_design",
+            artifact="index_design",
+            snapshot_json=data.snapshot_json,
+            request=request,
+            share_link_uuid=share_link_uuid,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            mode=mode,
+        )
         try:
             draft = await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:

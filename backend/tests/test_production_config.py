@@ -64,6 +64,22 @@ def test_validate_production_settings_requires_llm_provider_when_shared_drafts_e
     ) in errors
 
 
+def test_validate_production_settings_requires_llm_draft_quota_when_provider_configured() -> None:
+    errors = validate_production_settings(
+        _settings(
+            llm_api_base_url="https://llm.example/v1",
+            llm_api_key="test-key",
+            llm_model="test-model",
+            llm_draft_quota_enabled=False,
+        )
+    )
+
+    assert (
+        "LLM_DRAFT_QUOTA_ENABLED must stay true when live LLM provider is configured"
+        in errors
+    )
+
+
 def test_validate_production_settings_requires_license_verifier_when_license_required() -> None:
     errors = validate_production_settings(
         _settings(license_mode="required", license_key=None, license_public_key=None)

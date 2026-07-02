@@ -176,8 +176,11 @@ blocker로 분류합니다.
 - 🆕 LLM 비용/사용량 관측성: live LLM draft 경로에서
   `llm_draft_requests_total`, input/output char histogram, `event=llm_draft_usage`
   구조화 로그를 기록해 계정/스냅샷 단위 비용 조사를 할 수 있음
-- 🟡 LLM 비용/사용량의 계정별 hard quota와 과금 provider 연동은 별도 사용량 저장소
-  또는 billing provider 연동이 필요함
+- 🆕 LLM draft fixed-window hard gate: 인증 경로는 account UUID, 공유 경로는
+  share-link UUID 기준으로 `LLM_DRAFT_QUOTA_*`를 적용하고, 초과 시 provider 호출 전
+  `429`와 `event=llm_draft_usage outcome=quota_exceeded`를 기록함
+- 🟡 LLM 비용/사용량의 월간 billing attribution과 provider 과금 연동은 별도 사용량
+  저장소 또는 billing provider 연동이 필요함
 - 🆕 PR #415 상용화 증거 보드: 구현 완료 항목, Product Design 증거, Data
   Analytics/KPI 계획, GitHub queued 상태, 잔여 sale-quality blocker를 Figma
   섹션과 repository screenshot으로 보존함
@@ -276,10 +279,12 @@ blocker로 분류합니다.
   제한하고, billing webhook secret 길이와 contract-state webhook 인증 수단을
   강제합니다.
 - 인증된 live LLM draft도 `LLM_MAX_PROMPT_CHARS`와 `LLM_MAX_OUTPUT_TOKENS`로
-  provider 호출 전 비용 상한을 둡니다.
+  provider 호출 전 비용 상한을 두며, `LLM_DRAFT_QUOTA_*` fixed-window quota를
+  통과해야 provider를 호출합니다.
 - 앱 메타데이터 PostgreSQL backup/restore runbook을 추가합니다.
-- 운영자가 공개 공유 링크 LLM draft를 의도적으로 열 수는 있지만, 별도 비용 한도,
-  감사 로그, 운영 승인 정책을 갖춘 배포에서만 사용하도록 문서화합니다.
+- 운영자가 공개 공유 링크 LLM draft를 의도적으로 열 수는 있지만,
+  `SHARE_LINK_LLM_DRAFT_ENABLED=true`와 `LLM_DRAFT_QUOTA_*` 비용 한도, 감사 로그,
+  운영 승인 정책을 갖춘 배포에서만 사용하도록 문서화합니다.
 - 공개 공유 링크 감사 로그는 모든 성공/실패 동작에서 JSON 이벤트로 기록되며,
   실시간 모니터링 연계 시 사용 가능한 형태로 유지합니다.
 

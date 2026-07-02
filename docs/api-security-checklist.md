@@ -111,6 +111,12 @@
   (default: `1200`)
   - 인증된 live LLM draft에서도 provider 호출 전 prompt 크기와 출력 토큰 상한을
     강제해 비용 폭주를 줄입니다.
+- `LLM_DRAFT_QUOTA_ENABLED` (default: `true`) /
+  `LLM_DRAFT_QUOTA_REQUESTS` (default: `20`) /
+  `LLM_DRAFT_QUOTA_WINDOW_SECONDS` (default: `3600`)
+  - 인증 경로는 account UUID, 공유 경로는 share-link UUID 기준으로 fixed-window
+    quota를 적용합니다.
+  - production에서 live LLM provider가 설정되면 quota를 끌 수 없습니다.
   - live draft 요청은 `llm_draft_requests_total`, input/output char histogram,
     `event=llm_draft_usage` 로그로 기록되어 계정/스냅샷 단위 비용 조사가 가능합니다.
 - `BILLING_ALLOWED_PLANS` (default: empty)

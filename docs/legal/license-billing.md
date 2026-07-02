@@ -69,6 +69,10 @@
   - `project_limit`, `connection_limit`, `snapshot_limit`, `share_link_limit`
   - `account_status`
   - `billing_portal_url`, `billing_support_url`, `account_reactivation_url`
+- live LLM draft 비용 폭주는 `LLM_DRAFT_QUOTA_ENABLED`,
+  `LLM_DRAFT_QUOTA_REQUESTS`, `LLM_DRAFT_QUOTA_WINDOW_SECONDS`로 provider 호출 전
+  차단합니다. 이 quota는 운영 비용 방어선이며, 월간 과금 attribution 또는 provider
+  invoice 정산을 대체하지 않습니다.
 - `POST /api/billing/plan-change`는 `{ "target_plan": "enterprise-plus" }`
   요청을 받아 plan 변경 실행 경로를 반환합니다.
   - `BILLING_PORTAL_URL`이 있으면 `target_plan` query를 붙인 portal redirect

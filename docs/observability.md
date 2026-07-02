@@ -65,9 +65,15 @@ logs include `surface`, `artifact`, `outcome`, UUID references, and input/output
 character counts. They intentionally do not include prompt contents, snapshot
 JSON, provider responses, or API keys.
 
+`outcome=quota_exceeded` means the in-process LLM draft quota rejected the
+request before any provider call. Authenticated routes use the account UUID as
+the quota key; shared routes use the share-link UUID. `Retry-After` is returned
+to the caller with the 429 response.
+
 Shared live LLM draft exports also emit `event=share_audit` with
-`outcome=success`, so support can correlate a successful public export with the
-share link, project, snapshot, and request ID without seeing prompt contents.
+`outcome=success` or `outcome=denied`, so support can correlate a public export
+or quota denial with the share link, project, snapshot, and request ID without
+seeing prompt contents.
 
 ### Job queue metrics (DB-backed queue)
 

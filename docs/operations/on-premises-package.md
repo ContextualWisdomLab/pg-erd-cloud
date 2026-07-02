@@ -61,6 +61,8 @@
 - 짧은 수명 컨테이너로 내부 DB 또는 registry를 점검해야 하는 self-hosted runner에서는
   고객 DNS 정책에 따라 `docker run --network host ...`가 필요할 수 있습니다.
 - live LLM draft는 승인된 provider와 네트워크 정책이 없으면 비활성 상태를 유지합니다.
+  provider를 켜는 배포는 `LLM_DRAFT_QUOTA_ENABLED=true`와 환경별
+  `LLM_DRAFT_QUOTA_REQUESTS`, `LLM_DRAFT_QUOTA_WINDOW_SECONDS` 값을 함께 설정합니다.
 
 ## Restore drill
 

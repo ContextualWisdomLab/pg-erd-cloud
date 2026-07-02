@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.llm_quota import enforce_llm_draft_quota
 from app.llm_usage import record_llm_draft_usage
 from app.metrics import record_product_event
 from app.models import (
@@ -77,6 +78,30 @@ async def _get_authorized_snapshot(
         raise
 
     return await session.get(SchemaSnapshot, schema_snapshot_uuid)
+
+
+async def _enforce_authenticated_llm_draft_quota(
+    *,
+    artifact: str,
+    snapshot_json: dict,
+    user: CurrentUser,
+    snap: SchemaSnapshot,
+    schema_snapshot_uuid: uuid.UUID,
+) -> None:
+    try:
+        await enforce_llm_draft_quota(f"account:{user.user_account_uuid}")
+    except HTTPException:
+        record_llm_draft_usage(
+            surface="authenticated",
+            artifact=artifact,
+            outcome="quota_exceeded",
+            snapshot_json=snapshot_json,
+            user_account_uuid=user.user_account_uuid,
+            project_space_uuid=_snapshot_project_space_uuid(snap),
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            error_code="quota_exceeded",
+        )
+        raise
 
 
 @router.post("/by-project/{project_space_uuid}", response_model=SnapshotOut)
@@ -198,6 +223,13 @@ async def export_snapshot_reversing_spec(
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        await _enforce_authenticated_llm_draft_quota(
+            artifact="reversing_spec",
+            snapshot_json=data.snapshot_json,
+            user=user,
+            snap=snap,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+        )
         try:
             draft = await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
@@ -272,6 +304,13 @@ async def export_snapshot_index_design(
     if data is None:
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        await _enforce_authenticated_llm_draft_quota(
+            artifact="index_design",
+            snapshot_json=data.snapshot_json,
+            user=user,
+            snap=snap,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+        )
         try:
             draft = await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:

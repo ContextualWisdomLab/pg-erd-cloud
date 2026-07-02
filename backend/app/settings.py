@@ -162,6 +162,9 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
     llm_max_prompt_chars: int = Field(120_000, ge=1_000)
     llm_max_output_tokens: int = Field(1_200, ge=1, le=8_192)
+    llm_draft_quota_enabled: bool = True
+    llm_draft_quota_requests: int = Field(20, ge=1)
+    llm_draft_quota_window_seconds: float = Field(3600.0, gt=0.0)
     share_link_llm_draft_enabled: bool = False
 
     # Allowed JWT signing algorithms for OIDC verification.
@@ -237,6 +240,15 @@ def validate_production_settings(config: Settings) -> list[str]:
         errors.append(
             "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
             "SHARE_LINK_LLM_DRAFT_ENABLED=true"
+        )
+    if (
+        config.llm_api_base_url
+        and config.llm_api_key
+        and config.llm_model
+        and not config.llm_draft_quota_enabled
+    ):
+        errors.append(
+            "LLM_DRAFT_QUOTA_ENABLED must stay true when live LLM provider is configured"
         )
     if config.license_mode == "required":
         if not (config.license_key or config.license_public_key):
