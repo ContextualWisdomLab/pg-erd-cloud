@@ -8,9 +8,15 @@ blocker로 분류합니다.
 ## Current Verdict
 
 현재 제품은 실행 가능한 MVP 기반이지만, 그대로 판매 가능한 프로그램은 아닙니다.
-핵심 이유는 README 자체가 MVP로 표기되어 있고, 공개 공유 링크/LLM 비용 통제,
-공유 링크 수명주기, 프로덕션 설정 강제, 백업/복구, 법무/지원 문서, 과금/사용량
-한도, 운영 알림 기준이 상용 패키지 수준으로 닫혀 있지 않기 때문입니다.
+핵심 이유는 보안/인증/운영 체계가 모두 완성 단계에 있지 않기 때문입니다.
+
+### Current Control Board (2026-07-02 UTC)
+
+- P0: `partially` (공개 비용 방지 + 생산성 검사 설정은 완료했지만, 인증 실패
+  대응 메시지 통일, 일부 운영 알림 임계치가 미정)
+- P1: `in_progress` (공유 링크 감사 로그, migration rollback, 장애 대응 runbook은
+  1차 진행 중)
+- P2: `not_started` (결제/라이선스, 보안 운영 SLA, 법무 문서 체계 미구축)
 
 ## Release Gates
 
@@ -26,12 +32,28 @@ blocker로 분류합니다.
 - 배포 재현성: Docker/prod compose, backend/frontend lockfile, 런타임 버전이 일관되어야 합니다.
 - 검증: backend mypy/pytest, frontend typecheck/test/build가 main 기준에서 통과해야 합니다.
 
+현재 상태
+
+- ✅ `SHARE_LINK_LLM_DRAFT_ENABLED=false` 기본값 및 공용 공유의 LLM 비용 방지
+- ✅ `APP_ENV=production` startup guard로 핵심 보안 설정 강제
+- ✅ `Llm` prompt/output 상한으로 비용 탐색 경로 제한
+- ✅ `share 링크` TTL 기본값 7일(`SHARE_LINK_DEFAULT_TTL_HOURS=168`) 적용
+- ⚠️ 인증 실패 응답의 운영 이벤트(알람/관측) 연결 및 사용자 안내 표준화 미완
+
 ### P1: 유료 베타 필수
 
 - 공유 링크별 감사 로그를 제공해야 합니다.
 - migration rollback policy와 장애 대응 runbook을 문서화해야 합니다.
 - LLM draft 사용량 감사 로그와 실패율 알림 기준을 운영 문서와 테스트로 고정해야 합니다.
 - 설치/운영 문서에서 MVP 표현을 제거하고, 지원 범위와 미지원 범위를 명시해야 합니다.
+
+현재 상태
+
+- ✅ 공유 링크 운영 감사 로그 JSON 이벤트(`event=share_audit`) 추가 및 경로별 테스트
+- ✅ `docs/operations/backup-restore.md` 추가로 앱 DB 복구 절차 기초 정립
+- 🟡 migration rollback playbook은 새로 작성 필요 (`docs/operations/migration-rollback.md`)
+- 🟡 장애 대응 runbook은 새로 작성 필요 (`docs/operations/incident-response.md`)
+- 🟡 운영 알림(LLM 비용/오류율, 공유 링크 남용) 임계치 정책 문서·구성 미완
 
 ### P2: 일반 판매 권장
 
@@ -40,9 +62,16 @@ blocker로 분류합니다.
 - 시각 회귀 테스트, 브라우저 E2E, 접근성 스모크 테스트를 CI release gate로 운영해야 합니다.
 - 관리자가 프로젝트/멤버/공유 링크/사용량을 검색하고 제한할 수 있어야 합니다.
 
+현재 상태
+
+- 🟡 결제/라이선스/좌석/미터링은 계획 단계 미입력
+- 🟡 법무 문서(개인정보 처리, 이용약관, 면책/보증)는 미구축
+- 🟡 고급 운영 테스트(E2E/회귀/접근성) CI 연동은 미완
+
 ## First Implementation Slice
 
-이번 1차 구현은 판매 전 P0 중 “공개 엔드포인트 비용/노출 남용 방지”를 닫습니다.
+이번 2차 반복 구현은 P0의 “공개 엔드포인트 비용/노출 남용 방지”와 P1의
+공유 링크 감사 추적을 닫는 작업을 함께 진행합니다.
 
 - `SHARE_LINK_LLM_DRAFT_ENABLED=false`를 기본값으로 추가합니다.
 - 공개 공유 링크의 `mode=llm-draft` 호출은 기본적으로 `403`으로 차단합니다.
@@ -57,6 +86,8 @@ blocker로 분류합니다.
 - 앱 메타데이터 PostgreSQL backup/restore runbook을 추가합니다.
 - 운영자가 공개 공유 링크 LLM draft를 의도적으로 열 수는 있지만, 별도 비용 한도,
   감사 로그, 운영 승인 정책을 갖춘 배포에서만 사용하도록 문서화합니다.
+- 공개 공유 링크 감사 로그는 모든 성공/실패 동작에서 JSON 이벤트로 기록되며,
+  실시간 모니터링 연계 시 사용 가능한 형태로 유지합니다.
 
 ## Ongoing Execution Rules
 

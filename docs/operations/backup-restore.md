@@ -94,6 +94,8 @@ docker rm -f pg-erd-restore-drill
   불가능합니다. secret 보관소에서 올바른 값을 복구하기 전까지 운영 전환을 중단합니다.
 - migration mismatch가 있으면 앱을 올리지 말고, 현재 배포 commit의 alembic revision과
   restore DB의 revision을 먼저 맞춥니다.
+- migration rollback이 빈번해질 가능성이 높으면 [migration rollback policy](./migration-rollback.md)
+  를 함께 점검하고, 장애 징후 발생 시 [incident response runbook](./incident-response.md)을 병행합니다.
 
 ## Recurring Review
 

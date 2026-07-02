@@ -1,6 +1,14 @@
-# pg-erd-cloud (MVP skeleton)
+# pg-erd-cloud
 
-PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어의 **실행 가능한 MVP 골격**입니다.
+PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어입니다.  
+현재 상용화 준비 단계이며, 판매 가능성 기준은 [상용화 준비 계획](docs/commercial-readiness.md)로 운영합니다.
+
+## 운영 문서(필수)
+
+- 공개 공유 보안/운영: [상용 준비 계획](docs/commercial-readiness.md)
+- 앱 DB 백업/복구: [backup-restore.md](docs/operations/backup-restore.md)
+- 마이그레이션 롤백 정책: [migration-rollback.md](docs/operations/migration-rollback.md)
+- 장애 대응: [incident-response.md](docs/operations/incident-response.md)
 
 ## 제공 기능(현재)
 

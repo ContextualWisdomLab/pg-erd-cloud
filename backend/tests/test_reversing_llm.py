@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import uuid
 from types import SimpleNamespace
 
@@ -42,6 +43,27 @@ def _snapshot() -> dict:
             }
         ],
     }
+
+
+def _request() -> SimpleNamespace:
+    return SimpleNamespace(
+        headers={"user-agent": "pytest"},
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+
+
+def _share_audit_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for record in caplog.records:
+        if record.name != "app.share":
+            continue
+        try:
+            payload = json.loads(record.getMessage())
+        except json.JSONDecodeError:
+            continue
+        if payload.get("event") == "share_audit":
+            events.append(payload)
+    return events
 
 
 @pytest.mark.asyncio
@@ -254,6 +276,7 @@ async def test_create_share_link_uses_default_expiration(
     out = await share.create_share_link(
         uuid.uuid4(),
         body=None,
+        request=_request(),
         user=_current_user(),
         session=session,
     )
@@ -274,6 +297,7 @@ async def test_create_share_link_can_explicitly_disable_expiration() -> None:
     out = await share.create_share_link(
         uuid.uuid4(),
         body=share.ShareLinkCreateIn(expires_in_hours=0),
+        request=_request(),
         user=_current_user(),
         session=session,
     )
@@ -288,6 +312,7 @@ async def test_list_share_links_requires_owner() -> None:
     with pytest.raises(HTTPException) as exc_info:
         await share.list_share_links(
             uuid.uuid4(),
+            request=_request(),
             user=_current_user(),
             session=session,
         )
@@ -312,6 +337,7 @@ async def test_delete_share_link_revokes_existing_link() -> None:
     response = await share.delete_share_link(
         project_uuid,
         link.share_link_uuid,
+        request=_request(),
         user=_current_user(),
         session=session,
     )
@@ -419,6 +445,7 @@ async def test_shared_reversing_draft_is_disabled_by_default(
             uuid.uuid4(),
             uuid.uuid4(),
             mode="llm-draft",
+            request=_request(),
             session=_ShareSession(),
         )
 
@@ -437,6 +464,7 @@ async def test_shared_reversing_draft_hides_llm_configuration_detail(
             uuid.uuid4(),
             uuid.uuid4(),
             mode="llm-draft",
+            request=_request(),
             session=_ShareSession(),
         )
 
@@ -459,6 +487,7 @@ async def test_shared_index_design_draft_is_disabled_by_default(
             uuid.uuid4(),
             uuid.uuid4(),
             mode="llm-draft",
+            request=_request(),
             session=_ShareSession(),
         )
 
@@ -477,7 +506,76 @@ async def test_shared_index_design_draft_hides_llm_configuration_detail(
             uuid.uuid4(),
             uuid.uuid4(),
             mode="llm-draft",
+            request=_request(),
             session=_ShareSession(),
         )
 
     _assert_sanitized_config_error(exc_info)
+
+
+@pytest.mark.asyncio
+async def test_share_link_create_audit_event_is_emitted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session = _ShareLinkManagementSession()
+    project_uuid = uuid.uuid4()
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        out = await share.create_share_link(
+            project_uuid,
+            body=None,
+            request=_request(),
+            user=_current_user(),
+            session=session,
+        )
+
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_link.create"
+    assert events[-1]["outcome"] == "success"
+    assert events[-1]["project_space_uuid"] == str(project_uuid)
+    assert events[-1]["share_link_uuid"] == str(out.share_link_uuid)
+
+
+@pytest.mark.asyncio
+async def test_share_link_list_denied_audit_event_is_emitted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session = _ShareLinkManagementSession(role="viewer")
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        with pytest.raises(HTTPException):
+            await share.list_share_links(
+                uuid.uuid4(),
+                request=_request(),
+                user=_current_user(),
+                session=session,
+            )
+
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_link.list"
+    assert events[-1]["outcome"] == "denied"
+    assert events[-1]["error_detail"] == "owner role required"
+
+
+@pytest.mark.asyncio
+async def test_share_snapshot_reversing_spec_audit_event_is_emitted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session = _ShareSession()
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        await share.export_shared_snapshot_reversing_spec(
+            uuid.uuid4(),
+            uuid.uuid4(),
+            mode="markdown",
+            request=_request(),
+            session=session,
+        )
+
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_snapshot.reversing_spec"
+    assert events[-1]["outcome"] == "success"
+    assert events[-1]["mode"] == "markdown"
