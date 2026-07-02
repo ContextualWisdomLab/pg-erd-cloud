@@ -728,6 +728,17 @@ button:disabled {
   gap: 8px;
 }
 
+.exportModal__disabledHintButton {
+  opacity: 0.9;
+}
+
+.exportModal__hint {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .exportModal__artifactList {
   display: flex;
   flex-direction: column;

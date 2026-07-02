@@ -1492,9 +1492,11 @@ export default function App() {
               onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
+                nodes.length === 0
+                  ? "내보낼 테이블이 없습니다"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="SVG 그림 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               IMG
             </button>
@@ -1503,9 +1505,9 @@ export default function App() {
               onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="PlantUML 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               UML
             </button>
@@ -1516,9 +1518,9 @@ export default function App() {
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
-                  : "Mermaid 내보내기"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="Mermaid 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               {"{}"}
             </button>
