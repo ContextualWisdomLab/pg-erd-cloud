@@ -1489,7 +1489,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadSvg}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
@@ -1500,7 +1500,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadUml}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
@@ -1511,7 +1511,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadMermaid}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0
@@ -1593,9 +1593,9 @@ export default function App() {
 
           <ExportModal
             isOpen={isExportModalOpen}
-            exportDdlText={exportDdlText}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
+            hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
@@ -1603,6 +1603,9 @@ export default function App() {
             canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
+            onDownloadSvg={onDownloadSvg}
+            onDownloadUml={onDownloadUml}
+            onDownloadMermaid={onDownloadMermaid}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
