@@ -591,6 +591,7 @@ button:disabled {
 
 .exportModal {
   width: min(640px, 96vw);
+  min-height: 602px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
