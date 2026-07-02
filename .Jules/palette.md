@@ -43,3 +43,9 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-07-01 - [Dynamic ARIA labels for dynamic lists]
+**Learning:** When rendering dynamic lists of form inputs, screen readers will announce generic labels (e.g., '데이터 타입') repeatedly if they aren't uniquely identified per row.
+**Action:** Prepend the row's specific item name to the `aria-label` (e.g., `${col.column_name} 데이터 타입`) so inputs are clearly distinguishable.
+## 2026-07-02 - [aria-describedby for disabled buttons]
+**Learning:** Screen reader users are often not informed why a button is disabled, leading to confusion.
+**Action:** When disabling a button, provide a visible helper text element and associate it with the disabled button using `aria-describedby` to programmatically convey the reason.
