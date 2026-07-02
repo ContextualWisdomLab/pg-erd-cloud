@@ -268,6 +268,9 @@ blocker로 분류합니다.
 - 프로젝트 오너가 공유 링크를 목록 조회하고 삭제 방식으로 폐기할 수 있게 합니다.
 - `APP_ENV=production` startup guard로 OIDC, 공개 HTTPS CORS origin, 강한 secret,
   대상 DB allowlist, 공유 링크 기본 만료를 강제합니다.
+- production startup guard는 billing portal/support/reactivation URL도 공개 HTTPS로
+  제한하고, billing webhook secret 길이와 contract-state webhook 인증 수단을
+  강제합니다.
 - 인증된 live LLM draft도 `LLM_MAX_PROMPT_CHARS`와 `LLM_MAX_OUTPUT_TOKENS`로
   provider 호출 전 비용 상한을 둡니다.
 - 앱 메타데이터 PostgreSQL backup/restore runbook을 추가합니다.

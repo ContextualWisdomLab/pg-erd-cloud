@@ -117,6 +117,36 @@ def test_validate_production_settings_accepts_reactivation_path_for_deactivated_
     assert errors == []
 
 
+def test_validate_production_settings_rejects_insecure_billing_urls() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_portal_url="http://billing.example.com/portal",
+            billing_support_url="http://support.example.com",
+            account_reactivation_url="http://billing.example.com/reactivate",
+        )
+    )
+
+    assert "BILLING_PORTAL_URL must be a public HTTPS URL in production" in errors
+    assert "BILLING_SUPPORT_URL must be a public HTTPS URL in production" in errors
+    assert (
+        "ACCOUNT_REACTIVATION_URL must be a public HTTPS URL in production" in errors
+    )
+
+
+def test_validate_production_settings_rejects_short_billing_webhook_secrets() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_webhook_secret="short",
+            billing_webhook_signature_secret="short",
+        )
+    )
+
+    assert "BILLING_WEBHOOK_SECRET must be at least 24 characters" in errors
+    assert (
+        "BILLING_WEBHOOK_SIGNATURE_SECRET must be at least 32 characters" in errors
+    )
+
+
 def test_validate_production_settings_requires_reactivation_path_for_contract_state_events() -> None:
     errors = validate_production_settings(
         _settings(billing_contract_state_events_enabled=True)
@@ -126,6 +156,32 @@ def test_validate_production_settings_requires_reactivation_path_for_contract_st
         "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
         "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
     ) in errors
+
+
+def test_validate_production_settings_requires_webhook_auth_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_support_url="https://support.example.com",
+        )
+    )
+
+    assert (
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires BILLING_WEBHOOK_SECRET "
+        "or BILLING_WEBHOOK_SIGNATURE_SECRET in production"
+    ) in errors
+
+
+def test_validate_production_settings_accepts_signature_auth_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_support_url="https://support.example.com",
+            billing_webhook_signature_secret="x" * 40,
+        )
+    )
+
+    assert errors == []
 
 
 def test_validate_production_settings_requires_deactivation_event_types() -> None:

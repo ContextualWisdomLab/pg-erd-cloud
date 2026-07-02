@@ -201,6 +201,16 @@ def _is_public_https_origin(origin: str) -> bool:
     )
 
 
+def _append_public_https_url_error(
+    errors: list[str],
+    *,
+    setting_name: str,
+    setting_value: str | None,
+) -> None:
+    if setting_value and not _is_public_https_origin(setting_value):
+        errors.append(f"{setting_name} must be a public HTTPS URL in production")
+
+
 def validate_production_settings(config: Settings) -> list[str]:
     """Return startup-blocking configuration errors for production deployments."""
     if config.app_env != "production" or not config.production_config_checks_enabled:
@@ -235,6 +245,29 @@ def validate_production_settings(config: Settings) -> list[str]:
             )
         if config.license_key and len(config.license_key) < 24:
             errors.append("LICENSE_KEY must be at least 24 characters")
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_PORTAL_URL",
+        setting_value=config.billing_portal_url,
+    )
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_SUPPORT_URL",
+        setting_value=config.billing_support_url,
+    )
+    _append_public_https_url_error(
+        errors,
+        setting_name="ACCOUNT_REACTIVATION_URL",
+        setting_value=config.account_reactivation_url,
+    )
+    if config.billing_webhook_secret and len(config.billing_webhook_secret) < 24:
+        errors.append("BILLING_WEBHOOK_SECRET must be at least 24 characters")
+    if config.billing_webhook_signature_secret and (
+        len(config.billing_webhook_signature_secret) < 32
+    ):
+        errors.append(
+            "BILLING_WEBHOOK_SIGNATURE_SECRET must be at least 32 characters"
+        )
     if _split_csv(config.account_deactivated_subjects) and not (
         config.account_reactivation_url or config.billing_support_url
     ):
@@ -252,6 +285,14 @@ def validate_production_settings(config: Settings) -> list[str]:
             errors.append(
                 "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
                 "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
+            )
+        if not (
+            config.billing_webhook_secret or config.billing_webhook_signature_secret
+        ):
+            errors.append(
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+                "BILLING_WEBHOOK_SECRET or BILLING_WEBHOOK_SIGNATURE_SECRET "
+                "in production"
             )
     if _invalid_key_value_csv(config.billing_event_type_aliases):
         errors.append(

@@ -38,8 +38,10 @@
   secret file은 `./secrets/app_secret`에서 읽습니다.
 - `APP_SECRET` 또는 secret file이 유실되면 저장된 DSN ciphertext를 복호화할 수
   없으므로 restore 완료로 보지 않습니다.
-- `POSTGRES_PASSWORD`, `BILLING_WEBHOOK_SECRET`, provider secret, private license key는
-  저장소에 커밋하지 않습니다.
+- `POSTGRES_PASSWORD`, `BILLING_WEBHOOK_SECRET`,
+  `BILLING_WEBHOOK_SIGNATURE_SECRET`, provider secret, private license key는 저장소에
+  커밋하지 않습니다. production에서는 billing webhook shared secret은 24자 이상,
+  signature secret은 32자 이상이어야 합니다.
 
 ## Revocation update
 
