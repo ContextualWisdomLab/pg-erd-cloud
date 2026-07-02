@@ -64,7 +64,7 @@ the next focused code PR, not as proof that the production UI already changed.
      cards, and recent diagram table in `frontend/src/App.tsx`.
 
 3. Project list
-   - Health: clear enough for MVP, needs density and empty-state polish.
+   - Health: clear enough for paid-pilot review, needs density and empty-state polish.
    - Evidence: `03-project-list-screen.png`; project list rows and inline create
      path in `frontend/src/App.tsx`.
 
@@ -93,7 +93,7 @@ the next focused code PR, not as proof that the production UI already changed.
      `AddTableModal.tsx`, and modal CSS.
 
 8. Relationship settings
-   - Health: usable for MVP relationship labeling, needs clearer destructive and
+   - Health: usable for relationship labeling, needs clearer destructive and
      save/cancel hierarchy.
    - Evidence: `08-relationship-settings-modal.png`; `EditEdgeModal.tsx`.
 

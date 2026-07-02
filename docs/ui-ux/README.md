@@ -22,6 +22,9 @@ Execution planning:
 - [Support diagnostics audit evidence](qa/2026-07-02-support-diagnostics-audit/README.md)
   with current-run local browser screenshots and Figma section
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>
+- [PR #415 commercial readiness evidence board](qa/2026-07-02-commercial-readiness-evidence-board.png)
+  with Figma section
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>
 - [Core user flow FigJam board](https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588)
 
 Current Figma implementation anchors:
@@ -32,6 +35,7 @@ Current Figma implementation anchors:
 - [Share/export modal states](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143)
 - [Core flow prototype](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=32-2)
 - [Support diagnostics Product Design audit](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2)
+- [PR #415 commercial readiness evidence](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2)
 
 Screens:
 

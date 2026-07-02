@@ -29,7 +29,7 @@ PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어입니다.
   PK/UNIQUE/FK 메타데이터를 수집하고 `source_dialect: "snowflake"` 스냅샷으로 저장합니다.
   실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
 - **ERD UI**: React Flow(MIT)로 PK/FK를 그래픽으로 렌더링
-- **Forward engineering(포워드)**: MVP 단계에서는 “스냅샷 기반 DDL(export)” 중심
+- **Forward engineering(포워드)**: 현재 제공 범위는 “스냅샷 기반 DDL(export)” 중심
   (diff/변경 SQL 생성은 로드맵)
 
   - SQL export: `GET /api/snapshots/{snapshot_uuid}/export.sql`

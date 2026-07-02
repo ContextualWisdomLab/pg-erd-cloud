@@ -115,8 +115,12 @@ operational reliability, and support burden.
   backend read-only diagnostics API, operator-only frontend view, demo-mode E2E
   support lookup with recent share-link evidence, and Product Design/Figma audit
   evidence in
-  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`. Support workload and
-  resolution-time metrics still need pilot data.
+  `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`. PR #415 also has a
+  commercial readiness evidence board in Figma at
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>, with a
+  repository screenshot at
+  `docs/ui-ux/qa/2026-07-02-commercial-readiness-evidence-board.png`. Support
+  workload and resolution-time metrics still need pilot data.
 - On-premises packaging drills are a P1 gap because regulated buyers need proof
   that the product can run and be recovered in their environment.
 - Figma/Product Design work must include buyer-trust states, not only the happy

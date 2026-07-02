@@ -1,6 +1,6 @@
 # Product Design and Figma Execution Plan
 
-This plan turns the current `pg-erd-cloud` MVP into a repeatable Product Design
+This plan turns the current `pg-erd-cloud` product surface into a repeatable Product Design
 and Figma workflow. It is grounded in the current product surface, not a generic
 design exercise.
 
@@ -14,6 +14,8 @@ design exercise.
 - Core flow source: `docs/ui-ux/core-user-flow.mmd`.
 - Product Design Kit Figma file:
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si>.
+- PR #415 commercial readiness evidence section:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>.
 - Generated FigJam flow board:
   <https://www.figma.com/board/kHs1cKzwGzkNIBNaMt0xVq?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=b079e329-893d-4418-8909-b22a816fa588>.
 - Generated KRW 2B commercial readiness FigJam board:
@@ -68,6 +70,8 @@ Key Figma nodes:
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=29-143>
 - Core flow prototype dashboard:
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=32-2>
+- PR #415 commercial readiness evidence:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>
 
 Visual checks completed:
 
@@ -76,6 +80,8 @@ Visual checks completed:
   component sets were screenshot-checked for overlap and text clipping.
 - The ERD editor and share/export prototype frames were screenshot-checked after
   composition.
+- The PR #415 commercial readiness evidence board was screenshot-checked and
+  stored as `docs/ui-ux/qa/2026-07-02-commercial-readiness-evidence-board.png`.
 
 ## Work Packages
 

@@ -7,7 +7,7 @@ blocker로 분류합니다.
 
 ## Current Verdict
 
-현재 제품은 실행 가능한 MVP 기반이지만, 그대로 판매 가능한 프로그램은 아닙니다.
+현재 제품은 실행 가능한 초기 제품 골격을 갖췄지만, 그대로 판매 가능한 프로그램은 아닙니다.
 핵심 이유는 보안/인증/운영 체계가 모두 완성 단계에 있지 않기 때문입니다.
 
 ## KRW 2B Commercialization Track
@@ -26,6 +26,10 @@ blocker로 분류합니다.
   `docs/business/krw-2b-market-kpi-model.md`
 - Product Design 지원 진단 감사:
   `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/README.md`
+- PR #415 상용화 증거 Figma 섹션:
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>
+- PR #415 상용화 증거 스크린샷:
+  `docs/ui-ux/qa/2026-07-02-commercial-readiness-evidence-board.png`
 - FigJam 운영 모델:
   <https://www.figma.com/board/XJXqiPUAYyrV85N5XzQpsB?utm_source=codex&utm_content=edit_in_figjam&oai_id=&request_id=abef7f56-0ca9-4a97-9173-0e6ecb254b71>
 
@@ -63,6 +67,12 @@ blocker로 분류합니다.
   `docs/ui-ux/qa/2026-07-02-support-diagnostics-audit/`에 저장했고, Figma
   디자인 파일의 `Support diagnostics commercial-readiness audit` 섹션
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>에 배치했습니다.
+- PR #415의 상용화 구현 증거, KPI 계획, GitHub 대기 상태, 잔여 sale-quality
+  blocker는 Figma의 `PR #415 Commercial Readiness Evidence` 섹션
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=63-2>에 배치했고,
+  검증 스크린샷을
+  `docs/ui-ux/qa/2026-07-02-commercial-readiness-evidence-board.png`로 보존했습니다.
+  이 섹션도 Figma Code Connect 없이 생성했습니다.
 - desktop support diagnostics는 paid-pilot 지원 데모에 사용할 수 있는 수준입니다.
   support/billing/reactivation destination은 raw URL 대신 named link와 URL copy
   action으로 표시합니다.
@@ -147,7 +157,7 @@ blocker로 분류합니다.
 - 공유 링크별 감사 로그를 제공해야 합니다.
 - migration rollback policy와 장애 대응 runbook을 문서화해야 합니다.
 - LLM draft 사용량 감사 로그와 실패율 알림 기준을 운영 문서와 테스트로 고정해야 합니다.
-- 설치/운영 문서에서 MVP 표현을 제거하고, 지원 범위와 미지원 범위를 명시해야 합니다.
+- 설치/운영 문서에서 초기 제품 단계 표현을 제거하고, 지원 범위와 미지원 범위를 명시해야 합니다.
 
 현재 상태
 
@@ -163,6 +173,9 @@ blocker로 분류합니다.
   구조화 로그를 기록해 계정/스냅샷 단위 비용 조사를 할 수 있음
 - 🟡 LLM 비용/사용량의 계정별 hard quota와 과금 provider 연동은 별도 사용량 저장소
   또는 billing provider 연동이 필요함
+- 🆕 PR #415 상용화 증거 보드: 구현 완료 항목, Product Design 증거, Data
+  Analytics/KPI 계획, GitHub queued 상태, 잔여 sale-quality blocker를 Figma
+  섹션과 repository screenshot으로 보존함
 
 ### P2: 일반 판매 권장
 
