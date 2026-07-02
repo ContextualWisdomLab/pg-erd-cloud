@@ -118,6 +118,14 @@ describe('App accessibility smoke', () => {
       snapshot_count: 8,
       share_link_count: 4,
       active_share_link_count: 1,
+      billing_entitlement: {
+        plan: 'enterprise',
+        seat_count: 25,
+        source_provider: 'stripe',
+        source_provider_event_id: 'evt_1',
+        source_event_type: 'subscription.updated',
+        source_occurred_at: '2026-07-02T00:00:00Z',
+      },
       recent_share_links: [
         {
           share_link_uuid: 'share-link-1',
@@ -164,6 +172,9 @@ describe('App accessibility smoke', () => {
     expect(getBillingSupportAccount).toHaveBeenCalledWith('customer-owner');
     expect(await screen.findByText('customer-user-uuid')).toBeInTheDocument();
     expect(screen.getByText('서명 토큰')).toBeInTheDocument();
+    expect(screen.getAllByText('enterprise')).not.toHaveLength(0);
+    expect(screen.getByText('25')).toBeInTheDocument();
+    expect(screen.getByText('stripe / subscription.updated')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '지원센터 열기' })).toHaveAttribute(
       'href',
       'https://support.example.com',

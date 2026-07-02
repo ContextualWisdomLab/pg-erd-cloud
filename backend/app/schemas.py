@@ -262,6 +262,17 @@ class BillingSupportShareLinkSummaryOut(BaseModel):
     created_at: dt.datetime
 
 
+class BillingEntitlementOut(BaseModel):
+    """Latest provider-neutral entitlement evidence for a billing subject."""
+
+    plan: str | None
+    seat_count: int | None = Field(default=None, ge=1)
+    source_provider: str | None
+    source_provider_event_id: str | None
+    source_event_type: str | None
+    source_occurred_at: dt.datetime | None
+
+
 class BillingSupportAccountOut(BaseModel):
     """Read-only account diagnostics for authorized support operators."""
 
@@ -281,5 +292,6 @@ class BillingSupportAccountOut(BaseModel):
     snapshot_count: int = Field(ge=0)
     share_link_count: int = Field(ge=0)
     active_share_link_count: int = Field(ge=0)
+    billing_entitlement: BillingEntitlementOut
     recent_share_links: list[BillingSupportShareLinkSummaryOut]
     recent_billing_events: list[BillingEventSummaryOut]

@@ -146,6 +146,10 @@ class Settings(BaseSettings):
     billing_webhook_signature_secret: str | None = None
     billing_allowed_plans: str = ""
     billing_event_type_aliases: str = ""
+    billing_entitlement_event_types: str = (
+        "checkout.completed,invoice.paid,subscription.created,"
+        "subscription.updated,contract.activated,contract.reactivated"
+    )
     billing_contract_state_events_enabled: bool = False
     billing_contract_deactivated_event_types: str = "contract.deactivated,contract.suspended"
     billing_contract_active_event_types: str = "contract.activated,contract.reactivated"
@@ -189,10 +193,17 @@ def _invalid_key_value_csv(value: str) -> list[str]:
 
 
 _BILLING_PLAN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+_BILLING_EVENT_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 
 def _invalid_billing_plan_ids(value: str) -> list[str]:
     return [item for item in _split_csv(value) if not _BILLING_PLAN_ID_RE.fullmatch(item)]
+
+
+def _invalid_billing_event_type_ids(value: str) -> list[str]:
+    return [
+        item for item in _split_csv(value) if not _BILLING_EVENT_TYPE_RE.fullmatch(item)
+    ]
 
 
 def _is_public_https_origin(origin: str) -> bool:
@@ -319,6 +330,10 @@ def validate_production_settings(config: Settings) -> list[str]:
     if _invalid_billing_plan_ids(config.billing_allowed_plans):
         errors.append(
             "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs"
+        )
+    if _invalid_billing_event_type_ids(config.billing_entitlement_event_types):
+        errors.append(
+            "BILLING_ENTITLEMENT_EVENT_TYPES entries must be billing event type IDs"
         )
     return errors
 

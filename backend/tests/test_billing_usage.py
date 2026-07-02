@@ -855,7 +855,79 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
             ],
         }
     ]
+    assert payload["billing_entitlement"] == {
+        "plan": "enterprise",
+        "seat_count": None,
+        "source_provider": "stripe",
+        "source_provider_event_id": "evt_1",
+        "source_event_type": "subscription.updated",
+        "source_occurred_at": "2026-07-02T00:00:00Z",
+    }
     assert session.statement_count == 9
+
+
+def test_support_account_billing_derives_entitlement_from_latest_active_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    customer_uuid = uuid.uuid4()
+    account = UserAccount(
+        user_account_uuid=customer_uuid,
+        oidc_subject="customer-owner",
+        display_name="Customer Owner",
+    )
+    older_event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="stripe",
+        provider_event_id="evt_old",
+        event_type="invoice.paid",
+        subject="customer-owner",
+        target_plan="team",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 1, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 1, 1, tzinfo=dt.timezone.utc),
+        metadata_json={"seat_count": 5},
+    )
+    latest_event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="stripe",
+        provider_event_id="evt_latest",
+        event_type="subscription.updated",
+        subject="customer-owner",
+        target_plan="enterprise",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+        metadata_json={"seats": "25"},
+    )
+    session = FakeSupportSession(
+        account=account,
+        counts=[1, 3, 2, 4, 1, 1],
+        events=[latest_event, older_event],
+    )
+    monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    monkeypatch.setattr(settings, "account_deactivated_subjects", "")
+    monkeypatch.setattr(
+        settings,
+        "billing_entitlement_event_types",
+        "invoice.paid,subscription.updated",
+    )
+    app.dependency_overrides[get_current_user] = fake_get_support_operator
+    app.dependency_overrides[get_read_session] = lambda: session
+
+    response = TestClient(app).get(
+        "/api/billing/support/account",
+        params={"subject": "customer-owner"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["billing_entitlement"] == {
+        "plan": "enterprise",
+        "seat_count": 25,
+        "source_provider": "stripe",
+        "source_provider_event_id": "evt_latest",
+        "source_event_type": "subscription.updated",
+        "source_occurred_at": "2026-07-02T00:00:00Z",
+    }
 
 
 def test_support_account_billing_applies_contract_deactivation_event(
@@ -930,6 +1002,7 @@ def test_support_account_billing_applies_contract_deactivation_event(
     assert response.status_code == 200
     payload = response.json()
     assert payload["account_status"] == "deactivated"
+    assert payload["billing_entitlement"]["plan"] is None
     assert payload["recent_share_links"][0]["status"] == "expired"
     assert payload["recent_billing_events"][0]["event_type"] == "contract.suspended"
     assert session.statement_count == 10

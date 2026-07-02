@@ -292,6 +292,9 @@ Status:
   `target_plan` values.
 - Provider-neutral checkout handoff is implemented through
   `POST /api/billing/checkout` with `BILLING_CHECKOUT_URL` or support fallback.
+- Support diagnostics derive provider-neutral entitlement evidence from the latest
+  `BILLING_ENTITLEMENT_EVENT_TYPES` event with `target_plan` and optional
+  `seat_count`/`seats` metadata.
 - Remaining gap: provider-specific fulfillment SDKs, customer portal deep
   integration, and real provider catalog operating values.
 

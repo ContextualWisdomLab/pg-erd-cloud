@@ -89,7 +89,7 @@ blocker로 분류합니다.
 ### No-Go 항목 (판매 즉시 블로커)
 
 1. **P0 인증·인가 완성도**: 현재는 OIDC 검증 강제, API 허가, 공유 경로 제한, 계정 비활성화 사용자 안내, 알림 임계치 운영 템플릿이 적용되어 있음.
-2. **P2 라이선스/과금 운영 연동**: `LICENSE_MODE`, Ed25519 서명 토큰 검증, CLI 기반 발급/재발급, env 기반 토큰/고객 회수 목록, 사용량 summary API, 기본 사용량 한도 enforcement, billing/reactivation URL 노출, checkout/plan-change handoff, provider-neutral billing event reconciliation, raw-body HMAC signature 검증, configurable provider event alias normalization, configurable plan catalog validation, normalized contract-state event 적용은 구현됐으나, provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 운영값 주입은 미구현.
+2. **P2 라이선스/과금 운영 연동**: `LICENSE_MODE`, Ed25519 서명 토큰 검증, CLI 기반 발급/재발급, env 기반 토큰/고객 회수 목록, 사용량 summary API, 기본 사용량 한도 enforcement, billing/reactivation URL 노출, checkout/plan-change handoff, provider-neutral billing event reconciliation, raw-body HMAC signature 검증, configurable provider event alias normalization, configurable entitlement evidence, configurable plan catalog validation, normalized contract-state event 적용은 구현됐으나, provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 운영값 주입은 미구현.
 3. **지원/법무 패키지 승인 기록**: 약관/개인정보/SLA/보안 신고/승인 체크리스트와 release approval manifest CI 검증은 준비됐으나, 실제 판매 버전의 승인자 서명 기록은 아직 없음.
 4. **릴리즈별 승인·운영 자동화 잔여분**: 법무/지원 승인 manifest 검증, desktop/mobile/first-run UI 회귀 자동화, baseline 승인 절차, subject 기반 계정 비활성화는 들어갔으나, 실제 판매 릴리즈별 승인 기록과 포털 기반 재활성화 자동화는 아직 필요.
 
@@ -98,7 +98,7 @@ blocker로 분류합니다.
 | 우선순위 | 항목 | 현재 상태 | 다음 조치 |
 |---|---|---|---|
 | P0 | 인증/인가/오류 처리 | 기준 충족 | 릴리즈 환경별 threshold 승인 기록 유지 |
-| P1 | 라이선스·사용량·과금 체계 | 서명 토큰 발급 CLI + 검증 + env 기반 회수 목록 + 사용량 summary API + 기본 한도 enforcement + billing/reactivation URL + checkout/plan-change handoff + provider-neutral billing event 기록 + HMAC signature 검증 + configurable provider event alias normalization + configurable plan catalog validation + normalized contract-state event 적용 | provider별 fulfillment SDK + customer portal 심화 연동 + 실제 provider catalog 운영값 주입 |
+| P1 | 라이선스·사용량·과금 체계 | 서명 토큰 발급 CLI + 검증 + env 기반 회수 목록 + 사용량 summary API + 기본 한도 enforcement + billing/reactivation URL + checkout/plan-change handoff + provider-neutral billing event 기록 + HMAC signature 검증 + configurable provider event alias normalization + configurable entitlement evidence + configurable plan catalog validation + normalized contract-state event 적용 | provider별 fulfillment SDK + customer portal 심화 연동 + 실제 provider catalog 운영값 주입 |
 | P1 | 운영 자동화 | 부분 완료 | 장애 대응·백업·마이그레이션 절차를 CI 재시작 플로우와 연결 |
 | P2 | 법무 문서 고도화 | 약관/개인정보/SLA/보안 신고/승인 gate 문서화 + manifest CI 검증 | 지역/계약별 실제 승인 기록 첨부 |
 | P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + desktop/mobile editor baseline + first-run dashboard baseline + share/export modal baseline + baseline 갱신 승인 절차 도입 | 추가 브라우저/핵심 workflow baseline 검토 |
@@ -232,10 +232,13 @@ blocker로 분류합니다.
 - 🆕 Plan catalog validation: `BILLING_ALLOWED_PLANS`로 plan-change 요청과 billing
   webhook `target_plan`을 configured provider/customer catalog에 대조하고, catalog
   drift는 `rejected_catalog` metric/alert로 노출함
+- 🆕 Billing entitlement evidence: `BILLING_ENTITLEMENT_EVENT_TYPES`에 포함된 최신
+  billing event의 `target_plan`과 metadata `seat_count`/`seats`류 값을 support
+  diagnostics에서 현재 plan/contracted seat evidence로 표시함
 - 🆕 지원 진단: `SUPPORT_OPERATOR_SUBJECTS` allowlist 기반
   `GET /api/billing/support/account` read-only API로 대상 계정 상태, usage counter,
-  license verifier, billing/reactivation URL, 최근 share link summary, 최근 billing
-  event summary, redacted provider metadata summary를 조회할 수 있음
+  license verifier, billing/reactivation URL, entitlement evidence, 최근 share link
+  summary, 최근 billing event summary, redacted provider metadata summary를 조회할 수 있음
 - 🆕 운영자 UI: `/api/me`의 `support_operator` flag로 허용된 운영자에게만
   프론트엔드 `지원 진단` 화면을 노출하고, raw billing metadata와 공개 share URL 없이
   read-only 계정/사용량/최근 share link/최근 event/redacted metadata summary를 표시함
@@ -245,7 +248,7 @@ blocker로 분류합니다.
   조회 흐름을 검증함
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
   provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 기반
-  alias 운영값 검증은 추가 설계 중
+  alias/entitlement 운영값 검증은 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,
   상용 릴리즈 승인 체크리스트를 배포물에 포함함
 - ✅ 승인 기록 형식 검증: `docs/legal/release-approvals/release-approval.example.json`과

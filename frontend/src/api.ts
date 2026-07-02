@@ -148,6 +148,15 @@ export type BillingSupportShareLinkSummary = {
   created_at: string
 }
 
+export type BillingEntitlement = {
+  plan: string | null
+  seat_count: number | null
+  source_provider: string | null
+  source_provider_event_id: string | null
+  source_event_type: string | null
+  source_occurred_at: string | null
+}
+
 export type BillingSupportAccount = {
   subject: string
   user_account_uuid: string | null
@@ -163,6 +172,7 @@ export type BillingSupportAccount = {
   snapshot_count: number
   share_link_count: number
   active_share_link_count: number
+  billing_entitlement: BillingEntitlement
   recent_share_links: BillingSupportShareLinkSummary[]
   recent_billing_events: BillingEventSummary[]
 }
@@ -242,6 +252,16 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
         snapshot_count: 128,
         share_link_count: 31,
         active_share_link_count: 9,
+        billing_entitlement: {
+          plan: 'onprem-enterprise-plus-krw-2b-evaluation-with-private-network-addon',
+          seat_count: 250,
+          source_provider: 'enterprise-contracting-system-apac-ko-very-long-provider-code',
+          source_provider_event_id:
+            'contract-2026-07-private-network-renewal-krw-2b-evaluation-001',
+          source_event_type:
+            'contract.lifecycle.enterprise_plus_private_onprem_renewal_completed',
+          source_occurred_at: '2026-07-02T00:00:00Z'
+        },
         recent_share_links: [
           {
             share_link_uuid:
@@ -289,6 +309,14 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
       snapshot_count: 18,
       share_link_count: 7,
       active_share_link_count: 2,
+      billing_entitlement: {
+        plan: 'enterprise',
+        seat_count: 12,
+        source_provider: 'stripe',
+        source_provider_event_id: 'evt_demo_subscription_updated',
+        source_event_type: 'subscription.updated',
+        source_occurred_at: '2026-07-02T00:00:00Z'
+      },
       recent_share_links: [
         {
           share_link_uuid: 'demo-share-active-1',

@@ -246,3 +246,14 @@ def test_validate_production_settings_rejects_invalid_billing_catalog_plan() -> 
     assert (
         "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs" in errors
     )
+
+
+def test_validate_production_settings_rejects_invalid_entitlement_event_type() -> None:
+    errors = validate_production_settings(
+        _settings(billing_entitlement_event_types="invoice.paid, bad event")
+    )
+
+    assert (
+        "BILLING_ENTITLEMENT_EVENT_TYPES entries must be billing event type IDs"
+        in errors
+    )

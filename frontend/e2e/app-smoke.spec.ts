@@ -42,9 +42,10 @@ test('demo support operator can inspect billing diagnostics', async ({ page }) =
   );
   await expect(page.getByRole('table', { name: '최근 공유 링크' })).toBeVisible();
   await expect(page.getByText('demo-share-active-1')).toBeVisible();
-  await expect(page.getByRole('table', { name: '최근 결제 이벤트' })).toBeVisible();
-  await expect(page.getByText('subscription.updated')).toBeVisible();
-  await expect(page.getByText(/invoice_id=in_demo_001/)).toBeVisible();
+  const billingEvents = page.getByRole('table', { name: '최근 결제 이벤트' });
+  await expect(billingEvents).toBeVisible();
+  await expect(billingEvents.getByRole('cell', { name: 'subscription.updated' })).toBeVisible();
+  await expect(billingEvents.getByRole('cell', { name: /invoice_id=in_demo_001/ })).toBeVisible();
 });
 
 test('demo support diagnostics keep long billing evidence readable', async ({ page }) => {
@@ -61,9 +62,10 @@ test('demo support diagnostics keep long billing evidence readable', async ({ pa
   const longEvent = 'contract.lifecycle.enterprise_plus_private_onprem_renewal_completed';
   const longPlan = 'onprem-enterprise-plus-krw-2b-evaluation-with-private-network-addon';
   const longEvidence = 'invoice_id=in_enterprise_private_network_202607';
-  await expect(page.getByText(longEvent)).toBeVisible();
-  await expect(page.getByText(longPlan)).toBeVisible();
-  await expect(page.getByText(new RegExp(longEvidence))).toBeVisible();
+  const billingEvents = page.getByRole('table', { name: '최근 결제 이벤트' });
+  await expect(billingEvents.getByRole('cell', { name: longEvent })).toBeVisible();
+  await expect(billingEvents.getByRole('cell', { name: longPlan })).toBeVisible();
+  await expect(billingEvents.getByRole('cell', { name: new RegExp(longEvidence) })).toBeVisible();
 
   const hasOverflow = await page
     .locator('.supportEvents__row [role="cell"]')

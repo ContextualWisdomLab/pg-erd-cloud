@@ -1604,6 +1604,25 @@ export default function App() {
                       <dd>{licenseVerifierLabel(supportAccount.license_verifier)}</dd>
                     </div>
                     <div>
+                      <dt>계약 플랜</dt>
+                      <dd>{supportAccount.billing_entitlement.plan || "근거 없음"}</dd>
+                    </div>
+                    <div>
+                      <dt>계약 시트</dt>
+                      <dd>
+                        {supportAccount.billing_entitlement.seat_count?.toLocaleString() ||
+                          "근거 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>계약 근거</dt>
+                      <dd>
+                        {supportAccount.billing_entitlement.source_provider_event_id
+                          ? `${supportAccount.billing_entitlement.source_provider || "unknown"} / ${supportAccount.billing_entitlement.source_event_type || "unknown"}`
+                          : "근거 없음"}
+                      </dd>
+                    </div>
+                    <div>
                       <dt>지원 URL</dt>
                       <dd>{renderSupportUrl("지원", "지원센터 열기", supportAccount.billing_support_url)}</dd>
                     </div>
