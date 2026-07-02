@@ -35,7 +35,7 @@ blocker로 분류합니다.
 1. **P0 인증·인가 완성도**: 현재는 OIDC 검증 강제, API 허가, 공유 경로 제한이 적용되어 있으나, 사용자 메시지/알림 임계치 템플릿은 미완.
 2. **P2 라이선스/과금 운영 연동**: `LICENSE_MODE`, Ed25519 서명 토큰 검증, CLI 기반 발급/재발급, env 기반 토큰/고객 회수 목록, 사용량 summary API, 기본 사용량 한도 enforcement는 구현됐으나, 실제 과금 포털·요금제 변경 자동화는 미구현.
 3. **지원/법무 패키지 승인 기록**: 약관/개인정보/SLA/보안 신고/승인 체크리스트는 준비됐으나, 실제 판매 버전의 법무 승인 기록은 아직 없음.
-4. **릴리즈별 승인·운영 자동화 잔여분**: 법무/지원 승인 gate와 UI 회귀 자동화, subject 기반 계정 비활성화는 들어갔으나, 실제 판매 릴리즈별 승인 기록과 포털 기반 재활성화 자동화는 아직 필요.
+4. **릴리즈별 승인·운영 자동화 잔여분**: 법무/지원 승인 gate, desktop/mobile UI 회귀 자동화, baseline 승인 절차, subject 기반 계정 비활성화는 들어갔으나, 실제 판매 릴리즈별 승인 기록과 포털 기반 재활성화 자동화는 아직 필요.
 
 ### 우선순위 기반 실행 계획(현재 PR과 분리)
 
@@ -45,7 +45,7 @@ blocker로 분류합니다.
 | P1 | 라이선스·사용량·과금 체계 | 서명 토큰 발급 CLI + 검증 + env 기반 회수 목록 + 사용량 summary API + 기본 한도 enforcement 도입 | 교체/비정상 탐지 SOP + 과금 포털 연동 |
 | P1 | 운영 자동화 | 부분 완료 | 장애 대응·백업·마이그레이션 절차를 CI 재시작 플로우와 연결 |
 | P2 | 법무 문서 고도화 | 약관/개인정보/SLA/보안 신고/승인 gate 문서화 | 지역/계약별 승인 기록 첨부 |
-| P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + 픽셀 baseline 시각 회귀 CI 도입 | baseline 갱신 승인 절차 문서화 |
+| P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + desktop/mobile 픽셀 baseline 시각 회귀 CI + baseline 갱신 승인 절차 도입 | 추가 브라우저/핵심 workflow baseline 검토 |
 
 위 항목 중 하나라도 미완이면 “판매 전 검수 합격”으로 보기 어렵습니다.
 
@@ -131,8 +131,11 @@ blocker로 분류합니다.
 - ✅ 브라우저 E2E smoke: `npm run test:e2e`와 CI `Browser E2E smoke` 단계를 추가해
   demo workspace load, editor toolbar interaction, screenshot rendering을 Chromium에서 검증함
 - ✅ 시각 회귀 gate: `npm run test:visual`과 CI `Visual regression` 단계로 demo editor
-  1280x720 픽셀 baseline을 검증함
-- 🟡 고급 운영 테스트: baseline 갱신 승인 절차와 추가 viewport/browser baseline은 후속 보강 필요
+  desktop 1280x720 및 mobile review 390x844 픽셀 baseline을 검증함
+- ✅ baseline 갱신 승인 절차: `docs/ui-ux/visual-regression-baseline.md`에 변경 사유,
+  Figma/참조 증거, 브라우저 증거, 승인자, No-Go 조건, 갱신 명령 순서를 고정함
+- 🟡 고급 운영 테스트: Firefox/WebKit 등 추가 브라우저와 share/export modal 등 핵심
+  workflow별 baseline은 후속 보강 필요
 
 ## First Implementation Slice
 

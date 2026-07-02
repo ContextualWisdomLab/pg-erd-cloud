@@ -13,6 +13,7 @@ Execution planning:
 - [Product Design and Figma execution plan](product-design-figma-execution-plan.md)
 - [Product Design UX audit](product-design-audit.md)
 - [Design QA checklist](design-qa-checklist.md)
+- [Visual regression baseline policy](visual-regression-baseline.md)
 - [Core user flow Mermaid source](core-user-flow.mmd)
 - [Product Design Kit Figma file](https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si)
   with the nine screenshots placed on `01 Current References`, local variables

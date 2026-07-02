@@ -140,6 +140,9 @@ Required fields:
 - Full-view comparison evidence.
 - Focused-region comparison evidence for toolbar, table node, and modal details,
   or a reason focused regions were not needed.
+- Visual baseline update evidence when screenshots under
+  `frontend/e2e/__screenshots__` change. Follow
+  `visual-regression-baseline.md` for approval requirements.
 - Findings ordered by severity.
 - Fix checklist.
 - Final result: `passed` or `blocked`.

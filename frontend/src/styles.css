@@ -957,7 +957,7 @@ button:disabled {
   }
 
   .sidebar {
-    max-height: 44vh;
+    max-height: 54vh;
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
   }
@@ -1042,8 +1042,11 @@ button:disabled {
     max-width: none;
   }
 
-  .canvasToolbar > button,
   .canvasToolbar__search {
+    flex: 1 0 100%;
+  }
+
+  .canvasToolbar > button {
     flex: 1 1 44px;
   }
 
