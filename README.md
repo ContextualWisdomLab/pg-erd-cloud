@@ -13,7 +13,8 @@ PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어입니다.
   - [라이선스/결제 가이드](docs/legal/license-billing.md)
   - [개인정보 처리방침](docs/legal/privacy-policy.md)
   - [이용약관](docs/legal/terms-of-service.md)
-  - [SLA/지원 초안](docs/legal/sla-support.md)
+  - [SLA/지원 기준](docs/legal/sla-support.md)
+  - [상용 릴리즈 승인 체크리스트](docs/legal/commercial-release-approval.md)
 
 ## 제공 기능(현재)
 

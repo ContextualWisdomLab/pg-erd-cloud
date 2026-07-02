@@ -23,3 +23,10 @@ We aim to:
 - Fix the issue and coordinate disclosure within **90 days**, when feasible
 
 Timelines may vary depending on severity, complexity, and downstream impact.
+
+## Commercial Release Gate
+
+Paid SaaS or on-prem releases must identify the person or team responsible for
+security triage in `docs/legal/commercial-release-approval.md` before customer
+delivery. A release without a private advisory path, triage owner, and customer
+notification owner is not considered sales-ready.
