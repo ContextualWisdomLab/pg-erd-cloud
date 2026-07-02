@@ -196,6 +196,13 @@
   유지해야 합니다. `python scripts/ci/validate_billing_provider_catalog.py`는 checkout,
   portal, support URL, allowed plan, entitlement event, contract-state event, webhook
   secret storage reference가 빠졌는지 검증합니다.
+- 승인된 catalog가 실제 배포 env에 적용됐는지는 runtime evidence로 별도 검증합니다.
+  `python scripts/operations/build_billing_runtime_evidence.py --catalog evidence/billing-provider-catalog.customer.json --env-file .env.production --output evidence/billing-runtime-evidence.json`
+  실행 후
+  `python scripts/ci/validate_billing_runtime_evidence.py evidence/billing-runtime-evidence.json`
+  로 검사합니다. 이 증거는 raw env 값을 저장하지 않고 SHA-256 비교 결과만 남기며,
+  webhook secret 계열 값이 secret storage reference가 아니면 sale-ready runtime
+  evidence로 인정하지 않습니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙

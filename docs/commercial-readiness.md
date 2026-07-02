@@ -188,6 +188,13 @@ blocker로 분류합니다.
   path, size, SHA-256, gate 상태, `sale_blockers`를 하나의 JSON으로 묶음. 증거 파일
   본문은 복사하지 않아 support bundle 또는 provider metadata의 재노출을 피하면서
   어떤 exact 증거 세트로 판매 승인했는지 재검증할 수 있음
+- 🆕 Billing runtime evidence:
+  `scripts/operations/build_billing_runtime_evidence.py`와
+  `scripts/ci/validate_billing_runtime_evidence.py`로 승인된 billing provider catalog와
+  배포 env 파일이 일치하는지 raw URL/secret 값을 복사하지 않고 SHA-256 비교 결과와
+  blocker 목록으로 증거화함. `docs/operations/billing-runtime.env.example`은 safe
+  smoke fixture이며, 실제 판매 증거는 고객/스테이징 env와 real provider catalog로
+  생성해야 함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전

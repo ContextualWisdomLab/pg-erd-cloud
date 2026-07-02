@@ -295,6 +295,12 @@ Status:
   `scripts/ci/validate_billing_provider_catalog.py`, covering checkout, portal,
   support URL, allowed plans, entitlement events, contract-state events, and
   webhook secret storage references.
+- Billing runtime evidence is implemented through
+  `scripts/operations/build_billing_runtime_evidence.py`,
+  `scripts/ci/validate_billing_runtime_evidence.py`, and
+  `docs/operations/billing-runtime.env.example`, proving catalog/env alignment
+  with SHA-256 comparisons while rejecting raw webhook secret material in
+  reviewed env evidence files.
 - Provider-neutral checkout handoff is implemented through
   `POST /api/billing/checkout` with `BILLING_CHECKOUT_URL` or support fallback.
 - Support diagnostics derive provider-neutral entitlement evidence from the latest
@@ -453,6 +459,10 @@ Tasks:
     generate a tamper-evident external evidence index with file paths, sizes,
     SHA-256 digests, readiness state, and `sale_blockers` without copying raw
     evidence contents.
+  - Implemented: `scripts/operations/build_billing_runtime_evidence.py` and
+    `scripts/ci/validate_billing_runtime_evidence.py` to prove a deployment env
+    matches the approved billing provider catalog without copying raw runtime
+    values or webhook secrets.
 
 Verification:
 
@@ -464,6 +474,8 @@ python scripts/ci/validate_support_bundle.py
 python scripts/ci/validate_support_bundle.py evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
 python scripts/ci/validate_rollback_drill_manifest.py
+python scripts/operations/build_billing_runtime_evidence.py --catalog docs/operations/billing-provider-catalog.example.json --env-file docs/operations/billing-runtime.env.example --output /tmp/billing-runtime-evidence.json
+python scripts/ci/validate_billing_runtime_evidence.py /tmp/billing-runtime-evidence.json
 python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
 python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --output evidence/commercial-evidence-index.json
 ```

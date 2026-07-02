@@ -58,6 +58,14 @@ jobs:
       - name: Billing provider catalog manifest
         run: python scripts/ci/validate_billing_provider_catalog.py
 
+      - name: Billing runtime evidence smoke
+        run: |
+          python scripts/operations/build_billing_runtime_evidence.py \
+            --catalog docs/operations/billing-provider-catalog.example.json \
+            --env-file docs/operations/billing-runtime.env.example \
+            --output /tmp/billing-runtime-evidence.json
+          python scripts/ci/validate_billing_runtime_evidence.py /tmp/billing-runtime-evidence.json
+
       - name: Restore drill evidence manifests
         run: python scripts/ci/validate_restore_drill_manifest.py
 
