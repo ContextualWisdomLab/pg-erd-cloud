@@ -13,6 +13,8 @@ interface EditTableModalProps {
   onDeleteTable: () => void;
 }
 
+const abbrStyle = { textDecoration: "none", cursor: "help" };
+
 export function EditTableModal({
   isOpen,
   editingNode,
@@ -132,7 +134,7 @@ export function EditTableModal({
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
                       />
-                      <abbr title="Primary Key" aria-label="Primary Key" style={{ textDecoration: "none", cursor: "help" }}>PK</abbr>
+                      <abbr title="Primary Key" aria-label="Primary Key" style={abbrStyle}>PK</abbr>
                     </label>
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
@@ -140,7 +142,7 @@ export function EditTableModal({
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
                       />
-                      <abbr title="Not Null" aria-label="필수 입력 (Not Null)" style={{ textDecoration: "none", cursor: "help" }}>NN</abbr>
+                      <abbr title="Not Null" aria-label="Not Null" style={abbrStyle}>NN</abbr>
                     </label>
                     <button
                       type="button"
