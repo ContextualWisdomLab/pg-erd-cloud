@@ -54,9 +54,9 @@
 
 ## 4) 결제/과금 연계 전제
 
-- 현재 단계는 상용화 준비 상태이며, 외부 결제 provider별 SDK/checkout은 아직
-  제품 내부에 고정하지 않습니다. 대신 공통 usage 조회, plan-change handoff,
-  provider-neutral reconciliation event 기록 경로를 제공합니다.
+- 현재 단계는 상용화 준비 상태이며, 외부 결제 provider별 fulfillment SDK는 아직
+  제품 내부에 고정하지 않습니다. 대신 공통 usage 조회, checkout/plan-change
+  handoff, provider-neutral reconciliation event 기록 경로를 제공합니다.
 - `GET /api/billing/usage`는 현재 사용자 소유 프로젝트 범위의 과금 준비용 사용량을
   반환합니다.
   - `project_count`
@@ -73,6 +73,15 @@
   `LLM_DRAFT_QUOTA_REQUESTS`, `LLM_DRAFT_QUOTA_WINDOW_SECONDS`로 provider 호출 전
   차단합니다. 이 quota는 운영 비용 방어선이며, 월간 과금 attribution 또는 provider
   invoice 정산을 대체하지 않습니다.
+- `POST /api/billing/checkout`은 `{ "target_plan": "enterprise-plus" }`
+  요청을 받아 결제 시작 경로를 반환합니다.
+  - `BILLING_CHECKOUT_URL`이 있으면 `target_plan` query를 붙인 checkout redirect
+    action을 반환합니다.
+  - checkout URL이 없고 `BILLING_SUPPORT_URL`이 있으면 support contact action을
+    반환합니다.
+  - 둘 다 없으면 `503`으로 실패해 판매 배포의 구매 시작 경로 누락을 드러냅니다.
+  - 이 경로는 provider-specific fulfillment 완료, 영수증 처리, seat provisioning,
+    invoice reconciliation을 대체하지 않습니다.
 - `POST /api/billing/plan-change`는 `{ "target_plan": "enterprise-plus" }`
   요청을 받아 plan 변경 실행 경로를 반환합니다.
   - `BILLING_PORTAL_URL`이 있으면 `target_plan` query를 붙인 portal redirect
@@ -124,7 +133,8 @@
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
   - `BILLING_MAX_SNAPSHOTS_PER_PROJECT`
   - `BILLING_MAX_SHARE_LINKS_PER_PROJECT`
-- 고객 포털 또는 지원 경로는 환경 변수로 노출합니다.
+- 결제 시작, 고객 포털 또는 지원 경로는 환경 변수로 노출합니다.
+  - `BILLING_CHECKOUT_URL`: 신규 구매 또는 유료 전환 checkout 시작 URL
   - `BILLING_PORTAL_URL`: 플랜 변경, 결제수단, 청구 내역 관리 포털
   - `BILLING_SUPPORT_URL`: 결제/계약 문의 지원 경로
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
@@ -156,16 +166,17 @@
   값이 되며, 원본 provider event_type은 billing metadata의 `raw_event_type`에
   감사용으로 보존됩니다. Provider가 같은 key를 metadata로 보낸 경우에도 서버가
   실제 원본 event_type으로 덮어씁니다.
-- `BILLING_ALLOWED_PLANS`가 설정된 경우 `POST /api/billing/plan-change`와
-  `POST /api/billing/events`의 `target_plan`이 catalog에 없으면 `422 target plan
-  is not in configured billing catalog`로 거절합니다. Billing webhook 거절은
+- `BILLING_ALLOWED_PLANS`가 설정된 경우 `POST /api/billing/checkout`,
+  `POST /api/billing/plan-change`, `POST /api/billing/events`의 `target_plan`이
+  catalog에 없으면 `422 target plan is not in configured billing catalog`로
+  거절합니다. Billing webhook 거절은
   `billing_events_total{outcome="rejected_catalog"}`로 기록됩니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
-  - provider별 checkout/fulfillment 어댑터, customer portal 연동, 실제
-    event catalog에 맞춘 별칭 및 plan catalog 운영값
+  - provider별 fulfillment 어댑터, customer portal 심화 연동, 실제 event catalog에
+    맞춘 별칭 및 plan catalog 운영값
 
 ## 5) 온프레미스 체크리스트
 

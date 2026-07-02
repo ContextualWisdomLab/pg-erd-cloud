@@ -290,7 +290,9 @@ Status:
 - Configurable plan catalog validation is implemented through
   `BILLING_ALLOWED_PLANS` for plan-change requests and billing webhook
   `target_plan` values.
-- Remaining gap: provider-specific checkout/fulfillment SDKs, customer portal
+- Provider-neutral checkout handoff is implemented through
+  `POST /api/billing/checkout` with `BILLING_CHECKOUT_URL` or support fallback.
+- Remaining gap: provider-specific fulfillment SDKs, customer portal deep
   integration, and real provider catalog operating values.
 
 Tasks:

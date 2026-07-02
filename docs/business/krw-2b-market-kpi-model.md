@@ -108,11 +108,12 @@ operational reliability, and support burden.
 ## Immediate Product Implications
 
 - Billing provider reconciliation remains a P1 gap until provider-specific
-  checkout/fulfillment, customer portal handoff, and real provider catalog
-  operating values exist. The common event recording path, raw-body HMAC signature
-  verification path, configurable provider event alias normalization,
-  configurable plan catalog validation, normalized contract-state application
-  path, and billing reconciliation outcome metrics are now covered by tests.
+  fulfillment, customer portal deep integration, and real provider catalog
+  operating values exist. The checkout handoff API, common event recording path,
+  raw-body HMAC signature verification path, configurable provider event alias
+  normalization, configurable plan catalog validation, normalized contract-state
+  application path, and billing reconciliation outcome metrics are now covered
+  by tests.
 - Admin/support diagnostics are now partially measured by tests through the
   backend read-only diagnostics API, operator-only frontend view, demo-mode E2E
   support lookup with recent share-link evidence, and Product Design/Figma audit
@@ -132,7 +133,7 @@ operational reliability, and support burden.
 ## Evidence Status Summary
 
 - Measured today: local automated tests for license, usage limits, account
-  deactivation, plan-change handoff, provider-neutral billing event ingestion,
+  deactivation, checkout/plan-change handoff, provider-neutral billing event ingestion,
   provider event alias normalization, plan catalog validation, billing webhook outcome metrics,
   product lifecycle outcome metrics for project/connection/snapshot/share-link
   creation, LLM draft usage/failure metrics and audit logs,

@@ -139,6 +139,7 @@ class Settings(BaseSettings):
     billing_max_connections_per_project: int = Field(0, ge=0)
     billing_max_snapshots_per_project: int = Field(0, ge=0)
     billing_max_share_links_per_project: int = Field(0, ge=0)
+    billing_checkout_url: str | None = None
     billing_portal_url: str | None = None
     billing_support_url: str | None = None
     billing_webhook_secret: str | None = None
@@ -257,6 +258,11 @@ def validate_production_settings(config: Settings) -> list[str]:
             )
         if config.license_key and len(config.license_key) < 24:
             errors.append("LICENSE_KEY must be at least 24 characters")
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_CHECKOUT_URL",
+        setting_value=config.billing_checkout_url,
+    )
     _append_public_https_url_error(
         errors,
         setting_name="BILLING_PORTAL_URL",

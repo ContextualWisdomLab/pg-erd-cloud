@@ -169,6 +169,16 @@ class BillingPlanChangeOut(BaseModel):
     message: str
 
 
+class BillingCheckoutOut(BaseModel):
+    """Billing checkout action returned to the client."""
+
+    action: Literal["checkout_redirect", "contact_support"]
+    target_plan: str
+    billing_checkout_url: str | None
+    billing_support_url: str | None
+    message: str
+
+
 class BillingEventIn(BaseModel):
     """Provider-neutral billing/license event for reconciliation."""
 

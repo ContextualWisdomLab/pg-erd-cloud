@@ -343,6 +343,77 @@ def test_billing_plan_change_requires_portal_or_support_path(
     assert response.json()["detail"] == "billing plan change path is not configured"
 
 
+def test_billing_checkout_returns_checkout_url_with_target_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "billing_checkout_url",
+        "https://billing.example.com/checkout?source=pg-erd",
+    )
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+
+    response = TestClient(app).post(
+        "/api/billing/checkout",
+        json={"target_plan": "enterprise-plus"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "action": "checkout_redirect",
+        "target_plan": "enterprise-plus",
+        "billing_checkout_url": (
+            "https://billing.example.com/checkout?"
+            "source=pg-erd&target_plan=enterprise-plus"
+        ),
+        "billing_support_url": "https://support.example.com",
+        "message": "Open checkout to start this plan.",
+    }
+
+
+def test_billing_checkout_rejects_unknown_catalog_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "billing_checkout_url", "https://billing.example.com")
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+    monkeypatch.setattr(settings, "billing_allowed_plans", "team,enterprise")
+
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+
+    response = TestClient(app).post(
+        "/api/billing/checkout",
+        json={"target_plan": "unsupported-plan"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "target plan is not in configured billing catalog"
+
+
+def test_billing_checkout_falls_back_to_support_when_checkout_unconfigured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "billing_checkout_url", None)
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+
+    response = TestClient(app).post(
+        "/api/billing/checkout",
+        json={"target_plan": "team"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "action": "contact_support",
+        "target_plan": "team",
+        "billing_checkout_url": None,
+        "billing_support_url": "https://support.example.com",
+        "message": "Contact billing support to start this plan.",
+    }
+
+
 def test_billing_event_requires_configured_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -136,12 +136,14 @@ def test_validate_production_settings_accepts_reactivation_path_for_deactivated_
 def test_validate_production_settings_rejects_insecure_billing_urls() -> None:
     errors = validate_production_settings(
         _settings(
+            billing_checkout_url="http://billing.example.com/checkout",
             billing_portal_url="http://billing.example.com/portal",
             billing_support_url="http://support.example.com",
             account_reactivation_url="http://billing.example.com/reactivate",
         )
     )
 
+    assert "BILLING_CHECKOUT_URL must be a public HTTPS URL in production" in errors
     assert "BILLING_PORTAL_URL must be a public HTTPS URL in production" in errors
     assert "BILLING_SUPPORT_URL must be a public HTTPS URL in production" in errors
     assert (

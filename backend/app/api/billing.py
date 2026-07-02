@@ -34,6 +34,7 @@ from app.models import (
 from app.metrics import BILLING_EVENTS_TOTAL
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
+    BillingCheckoutOut,
     BillingEventMetadataSummaryOut,
     BillingEventIn,
     BillingEventOut,
@@ -581,6 +582,42 @@ async def request_billing_plan_change(
     raise HTTPException(
         status_code=503,
         detail="billing plan change path is not configured",
+    )
+
+
+@router.post("/checkout", response_model=BillingCheckoutOut)
+async def request_billing_checkout(
+    payload: BillingPlanChangeIn,
+    user: CurrentUser = Depends(get_current_user),
+) -> BillingCheckoutOut:
+    """Return the configured billing checkout action for a requested plan."""
+    del user
+    _require_allowed_target_plan(payload.target_plan)
+
+    if settings.billing_checkout_url:
+        return BillingCheckoutOut(
+            action="checkout_redirect",
+            target_plan=payload.target_plan,
+            billing_checkout_url=_portal_url_with_target_plan(
+                settings.billing_checkout_url,
+                payload.target_plan,
+            ),
+            billing_support_url=settings.billing_support_url,
+            message="Open checkout to start this plan.",
+        )
+
+    if settings.billing_support_url:
+        return BillingCheckoutOut(
+            action="contact_support",
+            target_plan=payload.target_plan,
+            billing_checkout_url=None,
+            billing_support_url=settings.billing_support_url,
+            message="Contact billing support to start this plan.",
+        )
+
+    raise HTTPException(
+        status_code=503,
+        detail="billing checkout path is not configured",
     )
 
 
