@@ -88,12 +88,12 @@ def test_get_route_template_empty_path() -> None:
         ),
         # trust_xff=True, single IP
         (True, [(b"x-forwarded-for", b"10.0.0.1")], ("192.168.1.1", 12345), "10.0.0.1"),
-        # trust_xff=True, multiple IPs (takes the first one)
+        # trust_xff=True, multiple IPs (takes the right-most one, nearest trusted proxy)
         (
             True,
             [(b"x-forwarded-for", b"10.0.0.1, 10.0.0.2")],
             ("192.168.1.1", 12345),
-            "10.0.0.1",
+            "10.0.0.2",
         ),
         # trust_xff=True, empty XFF value falls back to client
         (True, [(b"x-forwarded-for", b"")], ("192.168.1.1", 12345), "192.168.1.1"),
