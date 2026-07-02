@@ -15,6 +15,7 @@ from starlette.requests import Request
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
+from app.metrics import SHARE_AUDIT_EVENTS_TOTAL
 from app.models import (
     ProjectMember,
     SchemaSnapshot,
@@ -85,6 +86,7 @@ def _record_share_audit_event(
         "mode": mode,
         "error_detail": error_detail,
     }
+    SHARE_AUDIT_EVENTS_TOTAL.labels(action=action, outcome=outcome).inc()
     _LOGGER.info(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
 
 

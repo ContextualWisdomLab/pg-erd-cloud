@@ -50,6 +50,8 @@ When enabled, the backend exposes metrics at:
 
 - `http_requests_total{method,route,status}`
 - `http_request_duration_seconds_bucket|sum|count{method,route}`
+- `authz_failures_total{status,route,reason}`
+- `share_audit_events_total{action,outcome}`
 
 ### Job queue metrics (DB-backed queue)
 
@@ -70,6 +72,11 @@ Tune thresholds per environment; these are reasonable starting points.
   - alert when `5xx / total` > 1% for 5 minutes
 - Latency regression
   - alert when p95 latency > 1s for 10 minutes (per route group)
+- 인증/인가 실패 급증
+  - alert when `sum by (route,reason) (rate(authz_failures_total[5m]))` > 10/s
+    (또는 401/403 비율이 동시간 대비 급증할 때)
+- 공유 감사 실패/비정상
+  - alert when `sum by (action,outcome) (rate(share_audit_events_total{outcome=~"denied|failed"}[5m]))` > 5/s
 
 ### Job queue
 

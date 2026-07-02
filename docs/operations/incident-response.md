@@ -18,6 +18,7 @@
 1. 상태 확인
    - `/healthz` 응답, 최근 배포 상태, 알림 채널 알람 수신 내역 확인
    - 앱 로그에서 `event=share_audit`의 `request_id`를 기준으로 `event=authz_failure`, `http_request`와 함께 조회
+   - `authz_failures_total` 및 `share_audit_events_total` 메트릭에서 직전 15분 구간의 급증 여부를 우선 점검
 2. 스코프 확인
    - 공개 공유 링크 계열인지, 인증 API인지, LLM draft 경로인지 분기
 3. 피해 억제

@@ -58,6 +58,20 @@ HTTP_REQUEST_DURATION_SECONDS = Histogram(
 )
 
 
+AUTHZ_FAILURES_TOTAL = Counter(
+    "authz_failures_total",
+    "Total authorization/authentication failures by status, route, and reason.",
+    ["status", "route", "reason"],
+)
+
+
+SHARE_AUDIT_EVENTS_TOTAL = Counter(
+    "share_audit_events_total",
+    "Total share audit events emitted by action and outcome.",
+    ["action", "outcome"],
+)
+
+
 JOB_QUEUE_JOBS_TOTAL = Counter(
     "job_queue_jobs_total",
     "Total number of job queue executions by type/outcome.",

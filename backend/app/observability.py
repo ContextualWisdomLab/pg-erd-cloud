@@ -21,6 +21,7 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app.metrics import (
+    AUTHZ_FAILURES_TOTAL,
     HTTP_REQUEST_DURATION_SECONDS,
     HTTP_REQUESTS_TOTAL,
     normalize_route_label,
@@ -33,6 +34,26 @@ _logger = logging.getLogger("app.observability")
 
 _SAFE_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _AUTHZ_HTTP_STATUS = {401, 403}
+_UNKNOWN_AUTHZ_REASON = "unknown"
+_AUTHZ_DETAIL_REASON_MAP = {
+    "missing bearer token": "missing_bearer_token",
+    "invalid token header": "invalid_token_header",
+    "unsupported token type": "unsupported_token_type",
+    "unsupported token content type": "unsupported_token_content_type",
+    "token missing alg": "missing_token_alg",
+    "token missing exp": "token_missing_exp",
+    "token missing sub": "token_missing_sub",
+    "token missing jti": "token_missing_jti",
+    "token revoked": "token_revoked",
+    "unsupported token algorithm": "unsupported_token_algorithm",
+    "unknown signing key": "unknown_signing_key",
+    "algorithm/key type mismatch": "algorithm_key_type_mismatch",
+    "token verification failed": "token_verification_failed",
+    "owner role required": "owner_role_required",
+    "share link LLM draft is disabled": "share_llm_draft_disabled",
+    "license key is not configured for required mode": "license_key_not_configured",
+    "invalid or missing license key": "license_key_invalid",
+}
 
 
 def _utc_now_iso() -> str:
@@ -116,17 +137,36 @@ def _record_authz_event(request: Request, request_id: str, status: int) -> None:
     if status not in _AUTHZ_HTTP_STATUS:
         return
 
-    _log_json(
-        "authz_failure",
-        {
-            "request_id": request_id,
-            "method": request.method,
-            "route": _get_route_template(request),
-            "status": status,
-            "client_ip": _get_client_ip(request),
-        },
-        level=logging.WARNING,
-    )
+    reason = _classify_authz_reason(None)
+    if settings.observability_metrics_enabled:
+        AUTHZ_FAILURES_TOTAL.labels(
+            status=str(status),
+            route=normalize_route_label(_get_route_template(request)),
+            reason=reason,
+        ).inc()
+
+    if status in _AUTHZ_HTTP_STATUS:
+        _log_json(
+            "authz_failure",
+            {
+                "request_id": request_id,
+                "method": request.method,
+                "route": _get_route_template(request),
+                "status": status,
+                "reason": reason,
+                "client_ip": _get_client_ip(request),
+            },
+            level=logging.WARNING,
+        )
+
+
+def _classify_authz_reason(detail: object) -> str:
+    if not isinstance(detail, str):
+        return _UNKNOWN_AUTHZ_REASON
+    normalized = detail.strip().lower()
+    if not normalized:
+        return _UNKNOWN_AUTHZ_REASON
+    return _AUTHZ_DETAIL_REASON_MAP.get(normalized, _UNKNOWN_AUTHZ_REASON)
 
 
 def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[Response]]:
@@ -141,6 +181,13 @@ def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[R
 
         status = int(exc.status_code)
         if status in _AUTHZ_HTTP_STATUS and settings.observability_request_logging_enabled:
+            reason = _classify_authz_reason(exc.detail)
+            if settings.observability_metrics_enabled:
+                AUTHZ_FAILURES_TOTAL.labels(
+                    status=str(status),
+                    route=normalize_route_label(_get_route_template(request)),
+                    reason=reason,
+                ).inc()
             _log_json(
                 "authz_failure",
                 {
@@ -148,6 +195,7 @@ def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[R
                     "method": request.method,
                     "route": _get_route_template(request),
                     "status": status,
+                    "reason": reason,
                     "detail": jsonable_encoder(exc.detail),
                     "client_ip": _get_client_ip(request),
                 },

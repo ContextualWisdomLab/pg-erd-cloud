@@ -10,6 +10,22 @@ blocker로 분류합니다.
 현재 제품은 실행 가능한 MVP 기반이지만, 그대로 판매 가능한 프로그램은 아닙니다.
 핵심 이유는 보안/인증/운영 체계가 모두 완성 단계에 있지 않기 때문입니다.
 
+## 실시간 감사(2026-07-02 UTC 기준)
+
+- `main` 브랜치 최근 실행: 최근 40개 워크플로우 실행 중 **39건 성공, 1건 실패**. 실패는 `codeql-sast-backfill`에서 과거 시점(2026-07-01T00:55Z) 단일 실패였고, 현재 `main` 최신 상태는 계속 성공 라인입니다.
+- 현재 open PR 상태:
+  - 총 **81개** PR
+  - `reviewDecision`: `REVIEW_REQUIRED` 46개, `CHANGES_REQUESTED` 27개, `APPROVED` 6개
+  - `mergeStateStatus`: `BLOCKED` 32개, `DIRTY` 49개
+  - 리뷰 스레드 기준 **미해결 27개**, 중복 포함 아님
+- `CHANGES_REQUESTED` 27개 중, 실질 미해결 thread는 13개가 `BLOCKED`, 5개가 `DIRTY` 상태.
+- 미해결 thread 작성자 분포:
+  - `github-code-quality`: 12개
+  - `copilot-pull-request-reviewer`: 11개
+  - `github-actions`: 4개
+  - 수동 작성자(사람) 미해결 thread는 현재 0개로 집계됨
+- 판단: **자동 리뷰 지연·품질봇 코멘트는 원칙대로 blocker에서 제외**하되, 해당 코멘트가 요구하는 실제 개선(예: 접근성/성능/테스트 규칙)은 별도 이슈로 반영하여 순차 처리.
+
 ## 상업 릴리즈 진입 판정(실시간)
 
 현재 기준일(UTC): 2026-07-02 11:45
@@ -65,6 +81,7 @@ blocker로 분류합니다.
 - ✅ 공유 감사(`share_audit`)에 `request_id`를 포함해 지원 티켓/로그 상관관계 분석 강화
 - ✅ 공개 공유 링크 LLM-draft 차단/실패 이벤트의 공유 감사 로그 보강(액션·결과·에러코드)
 - 🟡 사용자 안내 메시지 표준화와 보안 알림 임계치 전략은 진행 중
+- 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 
 ### P1: 유료 베타 필수
 
@@ -80,6 +97,7 @@ blocker로 분류합니다.
 - ✅ `docs/operations/migration-rollback.md` 작성 및 운영 복구 문서화
 - ✅ `docs/operations/incident-response.md` 작성 및 1차 대응 흐름 정리
 - 🟡 운영 알림(LLM 비용/오류율, 공유 링크 남용) 임계치 정책 문서·구성 미완
+- 🆕 임시 경보 임계치와 탐지 지표(`authz_failures_total`, `share_audit_events_total`)를 기준으로 1차 운영 대응 체계를 고도화함
 
 ### P2: 일반 판매 권장
 
