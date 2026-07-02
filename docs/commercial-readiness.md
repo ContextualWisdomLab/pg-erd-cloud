@@ -17,10 +17,10 @@ blocker로 분류합니다.
   - 총 **81개** PR
   - `reviewDecision`: `REVIEW_REQUIRED` 46개, `CHANGES_REQUESTED` 27개, `APPROVED` 6개
   - `mergeStateStatus`: `BLOCKED` 32개, `DIRTY` 49개
-  - 리뷰 스레드 기준 **미해결 28개**, 중복 포함 아님
-- 미해결 thread가 있는 PR 분포는 `BLOCKED` 상태 11개, `DIRTY` 상태 5개입니다.
+  - 리뷰 스레드 기준 **미해결 27개**, 중복 포함 아님
+- 미해결 thread가 있는 PR 분포는 `BLOCKED` 상태 10개, `DIRTY` 상태 5개입니다.
 - 미해결 thread 작성자 분포:
-  - `github-code-quality`: 13개
+  - `github-code-quality`: 12개
   - `copilot-pull-request-reviewer`: 11개
   - `github-actions`: 4개
   - 수동 작성자(사람) 미해결 thread는 현재 0개로 집계됨
@@ -28,7 +28,7 @@ blocker로 분류합니다.
 
 ## 상업 릴리즈 진입 판정(실시간)
 
-현재 기준일(UTC): 2026-07-02 03:27
+현재 기준일(UTC): 2026-07-02 03:37
 
 ### No-Go 항목 (판매 즉시 블로커)
 
