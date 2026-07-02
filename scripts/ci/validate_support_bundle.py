@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import pathlib
@@ -159,6 +160,7 @@ def _scan_redaction(value: Any, path: str) -> None:
 
 
 def validate_bundle(path: pathlib.Path) -> None:
+    require(path.is_file(), f"support bundle manifest does not exist: {display_path(path)}")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -226,7 +228,29 @@ def validate_bundle(path: pathlib.Path) -> None:
     _scan_redaction(payload, "")
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Validate redacted pg-erd-cloud support bundle JSON files. "
+            "With no paths, validates committed docs/operations/support-bundles/*.json."
+        )
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=pathlib.Path,
+        help="Optional generated support bundle JSON path(s) to validate directly.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.paths:
+        for bundle in args.paths:
+            validate_bundle(bundle)
+        return 0
+
     require(BUNDLE_DIR.is_dir(), "support bundle manifest directory is missing")
     bundles = sorted(BUNDLE_DIR.glob("*.json"))
     require(bundles, "at least the example support bundle manifest is required")

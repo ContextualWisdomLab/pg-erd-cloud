@@ -162,6 +162,8 @@ blocker로 분류합니다.
   `docs/operations/support-bundles/support-bundle.example.json`와
   `scripts/ci/validate_support_bundle.py`로 생성된 support bundle의 필수 필드,
   compose digest, redaction.applied, 민감 key/value redaction을 CI에서 검증함
+  `python scripts/ci/validate_support_bundle.py evidence/support-bundle.json`처럼
+  실제 고객/스테이징에서 생성한 bundle 파일도 같은 규칙으로 직접 검증할 수 있음
 - 🆕 판매 가능성 audit:
   `scripts/ci/commercial_readiness_audit.py`로 schema validator 통과 여부와
   실제 판매 증거(승인 manifest, restore drill, support bundle, billing provider

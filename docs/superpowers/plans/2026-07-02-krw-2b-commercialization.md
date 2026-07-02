@@ -410,7 +410,9 @@ Status:
   execution.
 - Support bundle evidence validator implemented with
   `scripts/ci/validate_support_bundle.py` and
-  `docs/operations/support-bundles/support-bundle.example.json`.
+  `docs/operations/support-bundles/support-bundle.example.json`. The validator
+  also accepts explicit generated bundle paths such as
+  `evidence/support-bundle.json`.
 - Commercial readiness audit implemented with
   `scripts/ci/commercial_readiness_audit.py` to separate schema-ready evidence
   from actual non-example sale evidence.
@@ -435,6 +437,7 @@ git diff --check docs/operations/backup-restore.md docs/operations/migration-rol
 python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_validate_support_bundle.py scripts/ci/test_commercial_readiness_audit.py -q
 python scripts/ci/commercial_readiness_audit.py --output /tmp/commercial-readiness-audit.json
 python scripts/ci/validate_support_bundle.py
+python scripts/ci/validate_support_bundle.py evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
 ```
 

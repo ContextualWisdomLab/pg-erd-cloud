@@ -43,6 +43,12 @@ PUBLIC_LINK_KEY_FRAGMENTS = (
     "link_token",
     "url_token",
 )
+SAFE_STRUCTURAL_KEYS = {
+    "environment_names",
+    "secret_environment_names",
+    "revocation_environment_names",
+    "rules",
+}
 SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)(\b[\w.-]*(?:password|passwd|pwd|token|secret|private[_-]?key|"
     r"api[_-]?key|client[_-]?secret|authorization|dsn|card)[\w.-]*\s*[:=]\s*)"
@@ -99,6 +105,8 @@ def redact_text(value: str) -> str:
 
 def _key_is_sensitive(key: str) -> bool:
     lowered = key.lower().replace(" ", "_")
+    if lowered in SAFE_STRUCTURAL_KEYS:
+        return False
     if lowered in RAW_METADATA_KEYS or lowered.endswith("_metadata"):
         return True
     if any(fragment in lowered for fragment in SECRET_KEY_FRAGMENTS):

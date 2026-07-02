@@ -42,6 +42,13 @@ def test_valid_support_bundle_manifest_passes(tmp_path: pathlib.Path) -> None:
     validator.validate_bundle(manifest)
 
 
+def test_main_validates_explicit_generated_bundle_path(tmp_path: pathlib.Path) -> None:
+    validator = load_validator()
+    manifest = write_bundle(tmp_path / "support-bundle.json", valid_bundle())
+
+    assert validator.main([str(manifest)]) == 0
+
+
 def test_raw_metadata_must_be_redacted(tmp_path: pathlib.Path) -> None:
     validator = load_validator()
     payload = valid_bundle()
@@ -72,7 +79,15 @@ def test_example_manifest_is_required_by_main(
     monkeypatch.setattr(validator, "BUNDLE_DIR", manifest_dir)
 
     with pytest.raises(AssertionError, match="example support bundle manifest"):
-        validator.main()
+        validator.main([])
+
+
+def test_missing_explicit_bundle_path_fails(tmp_path: pathlib.Path) -> None:
+    validator = load_validator()
+    missing = tmp_path / "missing-support-bundle.json"
+
+    with pytest.raises(AssertionError, match="does not exist"):
+        validator.main([str(missing)])
 
 
 def test_missing_compose_digest_fails_when_compose_exists(tmp_path: pathlib.Path) -> None:

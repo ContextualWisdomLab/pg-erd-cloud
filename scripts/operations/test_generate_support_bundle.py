@@ -20,6 +20,17 @@ def load_generator() -> Any:
     return module
 
 
+def load_validator() -> Any:
+    script = ROOT / "scripts" / "ci" / "validate_support_bundle.py"
+    assert script.is_file(), "support bundle validator script is missing"
+    spec = importlib.util.spec_from_file_location("validate_support_bundle", script)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_support_bundle_redacts_sensitive_inputs(tmp_path: pathlib.Path) -> None:
     generator = load_generator()
     env_file = tmp_path / "deployment.env"
@@ -114,7 +125,10 @@ def test_support_bundle_redacts_sensitive_inputs(tmp_path: pathlib.Path) -> None
     assert bundle["license"]["verifier"] == "signed_token"
     assert bundle["deployment"]["compose_prod"]["sha256"]
     assert bundle["database"]["alembic_current"] == "0005_llm_draft_usage_event (head)"
+    assert isinstance(bundle["billing"]["secret_environment_names"], list)
+    assert isinstance(bundle["license"]["revocation_environment_names"], list)
     assert "seat_count" in serialized
+    load_validator().validate_bundle(output)
 
     for leaked in (
         "dbpass",
