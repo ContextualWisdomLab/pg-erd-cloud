@@ -426,7 +426,8 @@ Status:
   `scripts/ci/commercial_readiness_audit.py` to separate schema-ready evidence
   from actual non-example sale evidence. It now accepts uncommitted customer or
   staging evidence paths through `--release-approval`, `--restore-drill`,
-  `--rollback-drill`, `--support-bundle`, and `--billing-provider-catalog`; `*.example.json` names
+  `--rollback-drill`, `--support-bundle`, `--billing-provider-catalog`, and
+  `--billing-runtime-evidence`; `*.example.json` names
   and sample markers such as `example.com`, fake commit SHA, repeated SHA-256,
   and `customer-acme` are still treated as example evidence, not real sale proof.
 - Remaining gap: customer-environment restore/rollback evidence from a real
@@ -476,8 +477,8 @@ python scripts/ci/validate_restore_drill_manifest.py
 python scripts/ci/validate_rollback_drill_manifest.py
 python scripts/operations/build_billing_runtime_evidence.py --catalog docs/operations/billing-provider-catalog.example.json --env-file docs/operations/billing-runtime.env.example --output /tmp/billing-runtime-evidence.json
 python scripts/ci/validate_billing_runtime_evidence.py /tmp/billing-runtime-evidence.json
-python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
-python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --output evidence/commercial-evidence-index.json
+python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --billing-runtime-evidence evidence/billing-runtime-evidence.json
+python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --billing-runtime-evidence evidence/billing-runtime-evidence.json --output evidence/commercial-evidence-index.json
 ```
 
 Acceptance:

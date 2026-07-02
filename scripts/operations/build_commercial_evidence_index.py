@@ -20,6 +20,7 @@ EVIDENCE_ARGS = (
     ("customer_rollback_drill", "rollback_drill", "--rollback-drill"),
     ("support_bundle_evidence", "support_bundle", "--support-bundle"),
     ("real_billing_provider_catalog", "billing_provider_catalog", "--billing-provider-catalog"),
+    ("billing_runtime_evidence", "billing_runtime_evidence", "--billing-runtime-evidence"),
 )
 
 

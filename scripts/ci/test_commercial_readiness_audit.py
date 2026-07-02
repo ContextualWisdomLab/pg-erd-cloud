@@ -11,11 +11,25 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ci" / "commercial_readiness_audit.py"
+RUNTIME_BUILDER_SCRIPT = ROOT / "scripts" / "operations" / "build_billing_runtime_evidence.py"
 
 
 def load_audit() -> Any:
     assert SCRIPT.is_file(), "commercial readiness audit script is missing"
     spec = importlib.util.spec_from_file_location("commercial_readiness_audit", SCRIPT)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_runtime_builder() -> Any:
+    assert RUNTIME_BUILDER_SCRIPT.is_file(), "billing runtime evidence builder is missing"
+    spec = importlib.util.spec_from_file_location(
+        "build_billing_runtime_evidence",
+        RUNTIME_BUILDER_SCRIPT,
+    )
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -39,6 +53,7 @@ def test_report_flags_example_only_evidence() -> None:
     assert "signed_release_approval" in no_go_ids
     assert "customer_rollback_drill" in no_go_ids
     assert "real_billing_provider_catalog" in no_go_ids
+    assert "billing_runtime_evidence" in no_go_ids
     assert {blocker["id"] for blocker in report["sale_blockers"]} == no_go_ids
     assert all(blocker["type"] == "real_evidence" for blocker in report["sale_blockers"])
     assert all(blocker["reason"] for blocker in report["sale_blockers"])
@@ -80,6 +95,11 @@ def load_json(path: pathlib.Path) -> dict[str, Any]:
 
 
 def renamed_example_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pathlib.Path]]:
+    runtime_builder = load_runtime_builder()
+    runtime_evidence = runtime_builder.build_evidence(
+        ROOT / "docs" / "operations" / "billing-provider-catalog.example.json",
+        ROOT / "docs" / "operations" / "billing-runtime.env.example",
+    )
     return {
         "signed_release_approval": [
             copy_example(
@@ -114,6 +134,12 @@ def renamed_example_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pat
                 ROOT / "docs" / "operations" / "billing-provider-catalog.example.json",
                 tmp_path,
                 "billing-provider-catalog.customer.json",
+            )
+        ],
+        "billing_runtime_evidence": [
+            write_json(
+                tmp_path / "billing-runtime-evidence.customer.json",
+                runtime_evidence,
             )
         ],
     }
@@ -157,6 +183,18 @@ def explicit_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pathlib.Pa
     billing["required_environment"]["BILLING_CHECKOUT_URL"] = billing["checkout_url"]
     billing["required_environment"]["BILLING_PORTAL_URL"] = billing["portal_url"]
     billing["required_environment"]["BILLING_SUPPORT_URL"] = billing["support_url"]
+    billing_path = write_json(tmp_path / "billing-provider-catalog.customer.json", billing)
+    runtime_env_path = tmp_path / "billing-runtime.customer.env"
+    runtime_env_path.write_text(
+        "\n".join(
+            f"{key}={value}"
+            for key, value in sorted(billing["required_environment"].items())
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    runtime_builder = load_runtime_builder()
+    runtime_evidence = runtime_builder.build_evidence(billing_path, runtime_env_path)
 
     return {
         "signed_release_approval": [
@@ -171,8 +209,12 @@ def explicit_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pathlib.Pa
         "support_bundle_evidence": [
             write_json(tmp_path / "support-bundle.customer.json", support)
         ],
-        "real_billing_provider_catalog": [
-            write_json(tmp_path / "billing-provider-catalog.customer.json", billing)
+        "real_billing_provider_catalog": [billing_path],
+        "billing_runtime_evidence": [
+            write_json(
+                tmp_path / "billing-runtime-evidence.customer.json",
+                runtime_evidence,
+            )
         ],
     }
 
@@ -196,6 +238,7 @@ def test_report_rejects_renamed_example_evidence_paths(tmp_path: pathlib.Path) -
         "customer_rollback_drill",
         "support_bundle_evidence",
         "real_billing_provider_catalog",
+        "billing_runtime_evidence",
     }
 
 
@@ -232,6 +275,8 @@ def test_strict_mode_accepts_explicit_real_evidence_paths(tmp_path: pathlib.Path
             str(paths["support_bundle_evidence"][0]),
             "--billing-provider-catalog",
             str(paths["real_billing_provider_catalog"][0]),
+            "--billing-runtime-evidence",
+            str(paths["billing_runtime_evidence"][0]),
         ]
     ) == 0
 

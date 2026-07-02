@@ -43,6 +43,8 @@ def evidence_cli_args(paths: dict[str, list[pathlib.Path]]) -> list[str]:
         str(paths["support_bundle_evidence"][0]),
         "--billing-provider-catalog",
         str(paths["real_billing_provider_catalog"][0]),
+        "--billing-runtime-evidence",
+        str(paths["billing_runtime_evidence"][0]),
     ]
 
 
@@ -61,7 +63,7 @@ def test_index_builder_accepts_sale_ready_external_evidence(
     assert payload["sale_ready"] is True
     assert payload["decision"] == "ready_for_sale"
     assert payload["sale_blockers"] == []
-    assert len(payload["evidence"]) == 5
+    assert len(payload["evidence"]) == 6
     for entry in payload["evidence"]:
         assert entry["exists"] is True
         assert entry["gate_status"] == "ready"
@@ -90,6 +92,7 @@ def test_index_builder_can_emit_incomplete_intake_blockers(
         "customer_rollback_drill",
         "support_bundle_evidence",
         "real_billing_provider_catalog",
+        "billing_runtime_evidence",
     }
 
 

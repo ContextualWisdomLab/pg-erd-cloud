@@ -176,7 +176,8 @@ blocker로 분류합니다.
   billing provider catalog)가 예시-only인지 실제 파일인지 구분함. 기본 실행은 report를 만들고,
   `--strict`는 실제 판매 증거가 부족하면 실패함. 고객/스테이징 증거는 저장소에
   커밋하지 않고 `--release-approval`, `--restore-drill`, `--rollback-drill`,
-  `--support-bundle`, `--billing-provider-catalog` 경로로 직접 주입할 수 있으며, `*.example.json`
+  `--support-bundle`, `--billing-provider-catalog`, `--billing-runtime-evidence`
+  경로로 직접 주입할 수 있으며, `*.example.json`
   이름 또는 `example.com`, fake commit SHA, 반복 SHA-256, `customer-acme`
   같은 샘플 표식이 남은 파일은 실제 판매 증거로 집계하지 않음. 저장소에 커밋한
   non-example 증거 파일도 같은 validator와 샘플 표식 검사를 통과해야 함. audit
@@ -184,7 +185,8 @@ blocker로 분류합니다.
   요약해 판매 불가 사유를 바로 확인할 수 있게 함
 - 🆕 상용 증거 index:
   `scripts/operations/build_commercial_evidence_index.py`로 외부 release approval,
-  restore drill, rollback drill, support bundle, billing provider catalog 파일의
+  restore drill, rollback drill, support bundle, billing provider catalog,
+  billing runtime evidence 파일의
   path, size, SHA-256, gate 상태, `sale_blockers`를 하나의 JSON으로 묶음. 증거 파일
   본문은 복사하지 않아 support bundle 또는 provider metadata의 재노출을 피하면서
   어떤 exact 증거 세트로 판매 승인했는지 재검증할 수 있음

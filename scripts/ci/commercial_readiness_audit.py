@@ -30,6 +30,7 @@ EVIDENCE_VALIDATORS = {
     "customer_rollback_drill": "scripts/ci/validate_rollback_drill_manifest.py",
     "support_bundle_evidence": "scripts/ci/validate_support_bundle.py",
     "real_billing_provider_catalog": "scripts/ci/validate_billing_provider_catalog.py",
+    "billing_runtime_evidence": "scripts/ci/validate_billing_runtime_evidence.py",
 }
 
 SAMPLE_TEXT_MARKERS = (
@@ -97,6 +98,15 @@ REAL_EVIDENCE_RULES = (
         "example_names": {"billing-provider-catalog.example.json"},
         "no_go_reason": "Only the example billing provider catalog is present.",
     },
+    {
+        "id": "billing_runtime_evidence",
+        "label": "Billing runtime catalog/env evidence",
+        "required_for": "paid_billing",
+        "directory": "docs/operations/billing-runtime-evidence",
+        "pattern": "*.json",
+        "example_names": {"billing-runtime-evidence.example.json"},
+        "no_go_reason": "No real billing runtime catalog/env evidence is present.",
+    },
 )
 
 
@@ -160,10 +170,25 @@ def _sample_markers(path: pathlib.Path) -> list[str]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return [f"{_relative(path)}: unreadable_json"]
-    return [
+    findings = [
         f"{_relative(path)}:{finding}"
         for finding in _sample_markers_in_value(payload, "")
     ]
+    if (
+        isinstance(payload, dict)
+        and payload.get("evidence_schema_version") == 1
+        and isinstance(payload.get("catalog"), dict)
+        and isinstance(payload.get("runtime_environment"), dict)
+    ):
+        for field_path, value in (
+            ("catalog.path", payload["catalog"].get("path")),
+            ("runtime_environment.path", payload["runtime_environment"].get("path")),
+        ):
+            if isinstance(value, str) and ".example" in value:
+                findings.append(
+                    f"{_relative(path)}:{field_path}: example_artifact_reference"
+                )
+    return findings
 
 
 def _real_evidence_gate(
@@ -398,6 +423,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=pathlib.Path,
         help="Real billing provider catalog manifest path to validate as real sale evidence.",
     )
+    parser.add_argument(
+        "--billing-runtime-evidence",
+        action="append",
+        default=[],
+        type=pathlib.Path,
+        help="Billing runtime catalog/env evidence path to validate as real sale evidence.",
+    )
     return parser
 
 
@@ -408,6 +440,7 @@ def _explicit_evidence_paths_from_args(args: argparse.Namespace) -> dict[str, li
         "customer_rollback_drill": list(args.rollback_drill),
         "support_bundle_evidence": list(args.support_bundle),
         "real_billing_provider_catalog": list(args.billing_provider_catalog),
+        "billing_runtime_evidence": list(args.billing_runtime_evidence),
     }
 
 

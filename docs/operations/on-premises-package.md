@@ -145,6 +145,7 @@ python scripts/operations/build_commercial_evidence_index.py \
   --rollback-drill evidence/rollback-drill.customer.json \
   --support-bundle evidence/support-bundle.json \
   --billing-provider-catalog evidence/billing-provider-catalog.customer.json \
+  --billing-runtime-evidence evidence/billing-runtime-evidence.json \
   --output evidence/commercial-evidence-index.json
 ```
 
@@ -202,8 +203,8 @@ evidence는 sale-ready로 집계하지 않습니다.
 - `python scripts/ci/validate_restore_drill_manifest.py evidence/restore-drill.customer.json` 통과
 - `python scripts/ci/validate_rollback_drill_manifest.py evidence/rollback-drill.customer.json` 통과
 - `python scripts/ci/validate_commercial_release_approval.py evidence/release-approval.customer.json` 통과
-- `python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json` 통과
-- `python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --output evidence/commercial-evidence-index.json` 통과
+- `python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --billing-runtime-evidence evidence/billing-runtime-evidence.json` 통과
+- `python scripts/operations/build_commercial_evidence_index.py --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json --billing-runtime-evidence evidence/billing-runtime-evidence.json --output evidence/commercial-evidence-index.json` 통과
 - 이름만 바꾼 예시 manifest는 `commercial_readiness_audit.py --strict`에서 실패해야 함
 - backend tests, frontend unit/accessibility/E2E/visual/build 통과
 - 실제 판매 버전의 release approval manifest에 설치/지원 책임자와 승인일 기재
