@@ -138,6 +138,9 @@ class Settings(BaseSettings):
     billing_max_connections_per_project: int = Field(0, ge=0)
     billing_max_snapshots_per_project: int = Field(0, ge=0)
     billing_max_share_links_per_project: int = Field(0, ge=0)
+    billing_portal_url: str | None = None
+    billing_support_url: str | None = None
+    account_reactivation_url: str | None = None
     # Comma-separated OIDC subjects that must be denied before DB access.
     account_deactivated_subjects: str = ""
 
@@ -206,6 +209,13 @@ def validate_production_settings(config: Settings) -> list[str]:
             )
         if config.license_key and len(config.license_key) < 24:
             errors.append("LICENSE_KEY must be at least 24 characters")
+    if _split_csv(config.account_deactivated_subjects) and not (
+        config.account_reactivation_url or config.billing_support_url
+    ):
+        errors.append(
+            "ACCOUNT_DEACTIVATED_SUBJECTS requires ACCOUNT_REACTIVATION_URL or "
+            "BILLING_SUPPORT_URL in production"
+        )
     return errors
 
 

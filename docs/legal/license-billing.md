@@ -66,19 +66,29 @@
   - `active_share_link_count`
   - `license_mode`, `license_verifier`
   - `project_limit`, `connection_limit`, `snapshot_limit`, `share_link_limit`
+  - `account_status`
+  - `billing_portal_url`, `billing_support_url`, `account_reactivation_url`
 - 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
   - `BILLING_MAX_PROJECTS_PER_USER`
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
   - `BILLING_MAX_SNAPSHOTS_PER_PROJECT`
   - `BILLING_MAX_SHARE_LINKS_PER_PROJECT`
+- 고객 포털 또는 지원 경로는 환경 변수로 노출합니다.
+  - `BILLING_PORTAL_URL`: 플랜 변경, 결제수단, 청구 내역 관리 포털
+  - `BILLING_SUPPORT_URL`: 결제/계약 문의 지원 경로
+  - `ACCOUNT_REACTIVATION_URL`: 미납/계약 중단/abuse hold 해제 요청 경로
 - 계약 중단, 미납, abuse 대응으로 계정 접근을 즉시 차단해야 하면
   `ACCOUNT_DEACTIVATED_SUBJECTS`에 OIDC subject를 쉼표로 구분해 설정합니다.
-  해당 subject는 DB 사용자 upsert 전에 403으로 거절됩니다.
+  해당 subject는 DB 사용자 upsert 전에 403으로 거절됩니다. 응답에는
+  `X-Account-Status: deactivated`와, 설정된 경우 `X-Account-Reactivation-Url`,
+  `X-Billing-Support-Url` 헤더가 포함됩니다.
+- `APP_ENV=production`에서 `ACCOUNT_DEACTIVATED_SUBJECTS`를 설정하려면
+  `ACCOUNT_REACTIVATION_URL` 또는 `BILLING_SUPPORT_URL` 중 하나가 필요합니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
-  - 위반 탐지 시 자동 비활성화/재활성화 규칙
+  - 위반 탐지 시 자동 비활성화/재활성화 실행 규칙
 
 ## 5) 온프레미스 체크리스트
 

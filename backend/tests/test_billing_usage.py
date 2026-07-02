@@ -61,6 +61,13 @@ def test_billing_usage_returns_owned_project_scope_counts(
     monkeypatch.setattr(settings, "billing_max_connections_per_project", 20)
     monkeypatch.setattr(settings, "billing_max_snapshots_per_project", 30)
     monkeypatch.setattr(settings, "billing_max_share_links_per_project", 40)
+    monkeypatch.setattr(settings, "billing_portal_url", "https://billing.example.com")
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+    monkeypatch.setattr(
+        settings,
+        "account_reactivation_url",
+        "https://billing.example.com/reactivate",
+    )
 
     app.dependency_overrides[get_current_user] = fake_get_current_user
     app.dependency_overrides[get_read_session] = lambda: session
@@ -82,6 +89,10 @@ def test_billing_usage_returns_owned_project_scope_counts(
         "connection_limit": 20,
         "snapshot_limit": 30,
         "share_link_limit": 40,
+        "account_status": "active",
+        "billing_portal_url": "https://billing.example.com",
+        "billing_support_url": "https://support.example.com",
+        "account_reactivation_url": "https://billing.example.com/reactivate",
     }
     assert session.statement_count == 6
 
@@ -97,6 +108,9 @@ def test_billing_usage_reports_no_license_verifier_when_unconfigured(
     monkeypatch.setattr(settings, "billing_max_connections_per_project", 0)
     monkeypatch.setattr(settings, "billing_max_snapshots_per_project", 0)
     monkeypatch.setattr(settings, "billing_max_share_links_per_project", 0)
+    monkeypatch.setattr(settings, "billing_portal_url", None)
+    monkeypatch.setattr(settings, "billing_support_url", None)
+    monkeypatch.setattr(settings, "account_reactivation_url", None)
 
     app.dependency_overrides[get_current_user] = fake_get_current_user
     app.dependency_overrides[get_read_session] = lambda: session
@@ -106,3 +120,7 @@ def test_billing_usage_reports_no_license_verifier_when_unconfigured(
     assert response.status_code == 200
     assert response.json()["license_verifier"] == "none"
     assert response.json()["project_count"] == 0
+    assert response.json()["account_status"] == "active"
+    assert response.json()["billing_portal_url"] is None
+    assert response.json()["billing_support_url"] is None
+    assert response.json()["account_reactivation_url"] is None

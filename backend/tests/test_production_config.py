@@ -93,3 +93,25 @@ def test_validate_production_settings_rejects_short_license_key() -> None:
     )
 
     assert "LICENSE_KEY must be at least 24 characters" in errors
+
+
+def test_validate_production_settings_requires_reactivation_path_for_deactivated_subjects() -> None:
+    errors = validate_production_settings(
+        _settings(account_deactivated_subjects="customer-owner")
+    )
+
+    assert (
+        "ACCOUNT_DEACTIVATED_SUBJECTS requires ACCOUNT_REACTIVATION_URL or "
+        "BILLING_SUPPORT_URL in production"
+    ) in errors
+
+
+def test_validate_production_settings_accepts_reactivation_path_for_deactivated_subjects() -> None:
+    errors = validate_production_settings(
+        _settings(
+            account_deactivated_subjects="customer-owner",
+            account_reactivation_url="https://billing.example.com/reactivate",
+        )
+    )
+
+    assert errors == []

@@ -128,10 +128,14 @@ class BillingUsageOut(BaseModel):
     """Read-only usage counters for billing and license operations."""
 
     scope: Literal["owned_projects"]
+    account_status: Literal["active"]
     license_mode: Literal["off", "required"]
     license_verifier: Literal[
         "none", "static_key", "signed_token", "static_key_and_signed_token"
     ]
+    billing_portal_url: str | None
+    billing_support_url: str | None
+    account_reactivation_url: str | None
     project_count: int = Field(ge=0)
     seat_count: int = Field(ge=0)
     connection_count: int = Field(ge=0)

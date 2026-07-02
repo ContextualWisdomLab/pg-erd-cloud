@@ -556,12 +556,29 @@ async def test_get_current_user_rejects_deactivated_subject_before_db(
         "subject-1, subject-2",
         raising=False,
     )
+    monkeypatch.setattr(
+        settings,
+        "account_reactivation_url",
+        "https://billing.example.com/reactivate",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        settings,
+        "billing_support_url",
+        "https://support.example.com",
+        raising=False,
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await auth.get_current_user(make_request(), NoDbSession())  # type: ignore[arg-type]
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "account deactivated"
+    assert exc_info.value.headers == {
+        "X-Account-Status": "deactivated",
+        "X-Account-Reactivation-Url": "https://billing.example.com/reactivate",
+        "X-Billing-Support-Url": "https://support.example.com",
+    }
 
 
 @pytest.mark.asyncio

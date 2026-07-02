@@ -51,9 +51,22 @@ def _split_csv(raw: str) -> set[str]:
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
+def _account_deactivation_headers() -> dict[str, str]:
+    headers = {"X-Account-Status": "deactivated"}
+    if settings.account_reactivation_url:
+        headers["X-Account-Reactivation-Url"] = settings.account_reactivation_url
+    if settings.billing_support_url:
+        headers["X-Billing-Support-Url"] = settings.billing_support_url
+    return headers
+
+
 def _reject_deactivated_subject(subject: str) -> None:
     if subject in _split_csv(settings.account_deactivated_subjects):
-        raise HTTPException(status_code=403, detail="account deactivated")
+        raise HTTPException(
+            status_code=403,
+            detail="account deactivated",
+            headers=_account_deactivation_headers(),
+        )
 
 
 @dataclass(frozen=True)

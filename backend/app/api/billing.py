@@ -96,8 +96,12 @@ async def get_billing_usage(
 
     return BillingUsageOut(
         scope="owned_projects",
+        account_status="active",
         license_mode=settings.license_mode,
         license_verifier=_license_verifier_kind(),
+        billing_portal_url=settings.billing_portal_url,
+        billing_support_url=settings.billing_support_url,
+        account_reactivation_url=settings.account_reactivation_url,
         project_count=project_count,
         seat_count=seat_count,
         connection_count=connection_count,
