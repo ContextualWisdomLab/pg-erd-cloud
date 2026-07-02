@@ -1,3 +1,4 @@
+from app.snowflake_introspect.introspect import _introspect_snowflake_sync_with_config, SnowflakeDsnConfig
 import pytest
 from app.snowflake_introspect.introspect import (
     _int_or_none,
