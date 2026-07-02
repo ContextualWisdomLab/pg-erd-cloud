@@ -61,6 +61,9 @@ jobs:
       - name: Restore drill evidence manifests
         run: python scripts/ci/validate_restore_drill_manifest.py
 
+      - name: Rollback drill evidence manifests
+        run: python scripts/ci/validate_rollback_drill_manifest.py
+
       - name: On-premises package smoke
         run: python scripts/ci/validate_onprem_package.py
 

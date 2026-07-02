@@ -19,6 +19,7 @@ REQUIRED_FILES = (
     "docs/operations/alert-thresholds.md",
     "docs/operations/backup-restore.md",
     "docs/operations/restore-drills/restore-drill.example.json",
+    "docs/operations/rollback-drills/rollback-drill.example.json",
     "docs/operations/migration-rollback.md",
     "docs/operations/on-premises-package.md",
     "docs/operations/billing-provider-catalog.example.json",
@@ -27,6 +28,7 @@ REQUIRED_FILES = (
     "scripts/ci/validate_support_bundle.py",
     "scripts/ci/validate_billing_provider_catalog.py",
     "scripts/ci/validate_restore_drill_manifest.py",
+    "scripts/ci/validate_rollback_drill_manifest.py",
 )
 
 COMPOSE_REQUIRED_SNIPPETS = (
@@ -86,6 +88,8 @@ ROLLBACK_DOC_REQUIRED_SNIPPETS = (
     "alembic downgrade",
     "compose.prod.yaml",
     "/healthz",
+    "rollback-drill.example.json",
+    "python scripts/ci/validate_rollback_drill_manifest.py",
 )
 
 ONPREM_DOC_REQUIRED_SNIPPETS = (
@@ -101,6 +105,7 @@ ONPREM_DOC_REQUIRED_SNIPPETS = (
     "python scripts/ci/validate_support_bundle.py",
     "python scripts/ci/validate_billing_provider_catalog.py",
     "python scripts/ci/validate_restore_drill_manifest.py",
+    "python scripts/ci/validate_rollback_drill_manifest.py",
 )
 
 ALERT_DOC_REQUIRED_SNIPPETS = (

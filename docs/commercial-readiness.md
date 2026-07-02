@@ -153,6 +153,12 @@ blocker로 분류합니다.
   `scripts/ci/validate_restore_drill_manifest.py`로 backup artifact SHA-256,
   격리 restore target, secret source, `/healthz`, project/share/export/support bundle
   smoke 결과를 기계 검증 가능한 manifest로 고정함
+- 🆕 Rollback drill evidence gate:
+  `docs/operations/rollback-drills/rollback-drill.example.json`와
+  `scripts/ci/validate_rollback_drill_manifest.py`로 rollback 전 backup artifact,
+  `alembic downgrade --sql` dry-run, 실제 rollback revision 결과, `/healthz`,
+  project/snapshot/share/export/support bundle smoke를 기계 검증 가능한 manifest로
+  고정함
 - 🆕 지원 bundle 생성 gate: `scripts/operations/generate_support_bundle.py`와
   `scripts/operations/test_generate_support_bundle.py`로 배포 commit, billing provider
   catalog version, `alembic current`, `/healthz`, backend error log, support diagnostics
@@ -166,11 +172,11 @@ blocker로 분류합니다.
   실제 고객/스테이징에서 생성한 bundle 파일도 같은 규칙으로 직접 검증할 수 있음
 - 🆕 판매 가능성 audit:
   `scripts/ci/commercial_readiness_audit.py`로 schema validator 통과 여부와
-  실제 판매 증거(승인 manifest, restore drill, support bundle, billing provider
-  catalog)가 예시-only인지 실제 파일인지 구분함. 기본 실행은 report를 만들고,
+  실제 판매 증거(승인 manifest, restore drill, rollback drill, support bundle,
+  billing provider catalog)가 예시-only인지 실제 파일인지 구분함. 기본 실행은 report를 만들고,
   `--strict`는 실제 판매 증거가 부족하면 실패함. 고객/스테이징 증거는 저장소에
-  커밋하지 않고 `--release-approval`, `--restore-drill`, `--support-bundle`,
-  `--billing-provider-catalog` 경로로 직접 주입할 수 있으며, `*.example.json`
+  커밋하지 않고 `--release-approval`, `--restore-drill`, `--rollback-drill`,
+  `--support-bundle`, `--billing-provider-catalog` 경로로 직접 주입할 수 있으며, `*.example.json`
   이름 또는 `example.com`, fake commit SHA, 반복 SHA-256, `customer-acme`
   같은 샘플 표식이 남은 파일은 실제 판매 증거로 집계하지 않음
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함

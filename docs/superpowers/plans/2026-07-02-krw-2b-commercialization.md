@@ -405,6 +405,9 @@ Status:
 - Restore drill manifest gate implemented with
   `scripts/ci/validate_restore_drill_manifest.py` and
   `docs/operations/restore-drills/restore-drill.example.json`.
+- Rollback drill manifest gate implemented with
+  `scripts/ci/validate_rollback_drill_manifest.py` and
+  `docs/operations/rollback-drills/rollback-drill.example.json`.
 - Support bundle generator implemented with
   `scripts/operations/generate_support_bundle.py`, redaction tests, and CI
   execution.
@@ -417,7 +420,7 @@ Status:
   `scripts/ci/commercial_readiness_audit.py` to separate schema-ready evidence
   from actual non-example sale evidence. It now accepts uncommitted customer or
   staging evidence paths through `--release-approval`, `--restore-drill`,
-  `--support-bundle`, and `--billing-provider-catalog`; `*.example.json` names
+  `--rollback-drill`, `--support-bundle`, and `--billing-provider-catalog`; `*.example.json` names
   and sample markers such as `example.com`, fake commit SHA, repeated SHA-256,
   and `customer-acme` are still treated as example evidence, not real sale proof.
 - Remaining gap: customer-environment restore/rollback evidence from a real
@@ -430,6 +433,7 @@ Tasks:
   and support bundle collection.
 - Add a smoke command or script for validating the documented package path.
   - Implemented: `python scripts/ci/validate_restore_drill_manifest.py`.
+  - Implemented: `python scripts/ci/validate_rollback_drill_manifest.py`.
   - Implemented: `python scripts/operations/generate_support_bundle.py`.
   - Implemented: `python scripts/ci/validate_support_bundle.py`.
   - Implemented: `python scripts/ci/commercial_readiness_audit.py --strict`.
@@ -449,7 +453,8 @@ python scripts/ci/commercial_readiness_audit.py --output /tmp/commercial-readine
 python scripts/ci/validate_support_bundle.py
 python scripts/ci/validate_support_bundle.py evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
-python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
+python scripts/ci/validate_rollback_drill_manifest.py
+python scripts/ci/commercial_readiness_audit.py --strict --release-approval evidence/release-approval.customer.json --restore-drill evidence/restore-drill.customer.json --rollback-drill evidence/rollback-drill.customer.json --support-bundle evidence/support-bundle.json --billing-provider-catalog evidence/billing-provider-catalog.customer.json
 ```
 
 Acceptance:

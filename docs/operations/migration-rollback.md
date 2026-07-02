@@ -75,3 +75,18 @@ docker compose -f compose.prod.yaml run --rm backend alembic downgrade -2
 
 - 롤백이 실제로 발생하면 24시간 이내에 `docs/commercial-readiness.md`의 P1/P0 항목
   상태를 갱신하고, 배포 이슈/PR 본문에 재발 방지 조치를 첨부합니다.
+
+## Rollback Drill Evidence
+
+운영 투입 전 staging 또는 고객 승인 환경에서 최소 1회 rollback drill을 수행하고
+`docs/operations/rollback-drills/rollback-drill.example.json` 형식의 manifest로
+남깁니다. 실제 판매 증거는 저장소에 커밋하지 않고 다음 명령으로 직접 검증할 수
+있습니다.
+
+```bash
+python scripts/ci/validate_rollback_drill_manifest.py evidence/rollback-drill.customer.json
+```
+
+manifest에는 rollback 전 backup artifact SHA-256, `alembic downgrade --sql` dry-run
+SQL digest, 실제 rollback 명령, rollback 전/대상/후 revision, `/healthz`, 프로젝트,
+스냅샷, 공유 링크, SQL export, support bundle redaction smoke 결과를 포함해야 합니다.

@@ -35,6 +35,7 @@ def test_report_flags_example_only_evidence() -> None:
         if gate["status"] == "no_go"
     }
     assert "signed_release_approval" in no_go_ids
+    assert "customer_rollback_drill" in no_go_ids
     assert "real_billing_provider_catalog" in no_go_ids
     assert report["review_queue_is_blocker"] is False
     assert report["queued_checks_are_blocker"] is False
@@ -88,6 +89,13 @@ def renamed_example_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pat
                 "restore-drill.customer.json",
             )
         ],
+        "customer_rollback_drill": [
+            copy_example(
+                ROOT / "docs" / "operations" / "rollback-drills" / "rollback-drill.example.json",
+                tmp_path,
+                "rollback-drill.customer.json",
+            )
+        ],
         "support_bundle_evidence": [
             copy_example(
                 ROOT / "docs" / "operations" / "support-bundles" / "support-bundle.example.json",
@@ -123,6 +131,12 @@ def explicit_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pathlib.Pa
     restore["app_secret_source"] = "vault://customer-production/pg-erd-cloud/app-secret"
     restore["backup_artifact"]["sha256"] = "ab" * 32
 
+    rollback = load_json(ROOT / "docs" / "operations" / "rollback-drills" / "rollback-drill.example.json")
+    rollback["environment"] = "production-staging"
+    rollback["backup_artifact"]["path"] = "backups/pg-erd-cloud-20260702T000000Z.dump"
+    rollback["backup_artifact"]["sha256"] = "ef" * 32
+    rollback["dry_run"]["sql_sha256"] = "12" * 32
+
     support = load_json(ROOT / "docs" / "operations" / "support-bundles" / "support-bundle.example.json")
     support["deployment"]["commit_sha"] = "2b20d9894b4693dad7d12e98e2e0fb9aea6eae32"
     support["deployment"]["compose_prod"]["sha256"] = "cd" * 32
@@ -144,6 +158,9 @@ def explicit_evidence_paths(tmp_path: pathlib.Path) -> dict[str, list[pathlib.Pa
         ],
         "customer_restore_drill": [
             write_json(tmp_path / "restore-drill.customer.json", restore)
+        ],
+        "customer_rollback_drill": [
+            write_json(tmp_path / "rollback-drill.customer.json", rollback)
         ],
         "support_bundle_evidence": [
             write_json(tmp_path / "support-bundle.customer.json", support)
@@ -170,6 +187,7 @@ def test_report_rejects_renamed_example_evidence_paths(tmp_path: pathlib.Path) -
     assert {gate["id"] for gate in gates_with_sample_markers} == {
         "signed_release_approval",
         "customer_restore_drill",
+        "customer_rollback_drill",
         "support_bundle_evidence",
         "real_billing_provider_catalog",
     }
@@ -201,6 +219,8 @@ def test_strict_mode_accepts_explicit_real_evidence_paths(tmp_path: pathlib.Path
             str(paths["signed_release_approval"][0]),
             "--restore-drill",
             str(paths["customer_restore_drill"][0]),
+            "--rollback-drill",
+            str(paths["customer_rollback_drill"][0]),
             "--support-bundle",
             str(paths["support_bundle_evidence"][0]),
             "--billing-provider-catalog",

@@ -21,11 +21,13 @@ VALIDATORS = (
     ("support_bundle_schema", "scripts/ci/validate_support_bundle.py"),
     ("onprem_package_schema", "scripts/ci/validate_onprem_package.py"),
     ("restore_drill_schema", "scripts/ci/validate_restore_drill_manifest.py"),
+    ("rollback_drill_schema", "scripts/ci/validate_rollback_drill_manifest.py"),
 )
 
 EVIDENCE_VALIDATORS = {
     "signed_release_approval": "scripts/ci/validate_commercial_release_approval.py",
     "customer_restore_drill": "scripts/ci/validate_restore_drill_manifest.py",
+    "customer_rollback_drill": "scripts/ci/validate_rollback_drill_manifest.py",
     "support_bundle_evidence": "scripts/ci/validate_support_bundle.py",
     "real_billing_provider_catalog": "scripts/ci/validate_billing_provider_catalog.py",
 }
@@ -67,6 +69,15 @@ REAL_EVIDENCE_RULES = (
         "pattern": "*.json",
         "example_names": {"restore-drill.example.json"},
         "no_go_reason": "Only the example restore drill manifest is present.",
+    },
+    {
+        "id": "customer_rollback_drill",
+        "label": "Customer or staging rollback drill evidence",
+        "required_for": "on_premises_sale",
+        "directory": "docs/operations/rollback-drills",
+        "pattern": "*.json",
+        "example_names": {"rollback-drill.example.json"},
+        "no_go_reason": "Only the example rollback drill manifest is present.",
     },
     {
         "id": "support_bundle_evidence",
@@ -285,6 +296,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Customer or staging restore drill manifest path to validate as real sale evidence.",
     )
     parser.add_argument(
+        "--rollback-drill",
+        action="append",
+        default=[],
+        type=pathlib.Path,
+        help="Customer or staging rollback drill manifest path to validate as real sale evidence.",
+    )
+    parser.add_argument(
         "--support-bundle",
         action="append",
         default=[],
@@ -305,6 +323,7 @@ def _explicit_evidence_paths_from_args(args: argparse.Namespace) -> dict[str, li
     return {
         "signed_release_approval": list(args.release_approval),
         "customer_restore_drill": list(args.restore_drill),
+        "customer_rollback_drill": list(args.rollback_drill),
         "support_bundle_evidence": list(args.support_bundle),
         "real_billing_provider_catalog": list(args.billing_provider_catalog),
     }
