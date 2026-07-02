@@ -541,20 +541,8 @@ def _build_constraints(
     return constraints, pk_columns, fk_edges
 
 
-def _build_snapshot(
-    config: SnowflakeDsnConfig,
-    effective_schema: str | None,
-    version_rows: list[dict],
-    schema_rows: list[dict],
-    table_rows: list[dict],
-    column_rows: list[dict],
-    constraint_rows: list[dict],
-) -> dict:
-    relation_keys = sorted({_table_key(row) for row in table_rows})
-    relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
-    column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
-
-    schemas = [
+def _build_schemas(schema_rows: list[dict]) -> list[dict]:
+    return [
         {
             "schema_oid": index,
             "schema_name": str(row.get("schema_name")),
@@ -563,6 +551,12 @@ def _build_snapshot(
         if isinstance(row.get("schema_name"), str)
     ]
 
+
+def _build_relations(
+    table_rows: list[dict],
+    relation_keys: list[tuple[str, str]],
+    relation_ids: dict[tuple[str, str], int],
+) -> list[dict]:
     relations = []
     table_row_by_key = {_table_key(row): row for row in table_rows}
     for schema, table in relation_keys:
@@ -583,7 +577,14 @@ def _build_snapshot(
                 "tablespace_name": None,
             }
         )
+    return relations
 
+
+def _build_columns(
+    column_rows: list[dict],
+    relation_ids: dict[tuple[str, str], int],
+    column_positions: dict[tuple[str, str], dict[str, int]],
+) -> list[dict]:
     columns = []
     for row in column_rows:
         schema, table = _table_key(row)
@@ -623,6 +624,25 @@ def _build_snapshot(
                 "column_comment": row.get("comment"),
             }
         )
+    return columns
+
+
+def _build_snapshot(
+    config: SnowflakeDsnConfig,
+    effective_schema: str | None,
+    version_rows: list[dict],
+    schema_rows: list[dict],
+    table_rows: list[dict],
+    column_rows: list[dict],
+    constraint_rows: list[dict],
+) -> dict:
+    relation_keys = sorted({_table_key(row) for row in table_rows})
+    relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
+    column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
+
+    schemas = _build_schemas(schema_rows)
+    relations = _build_relations(table_rows, relation_keys, relation_ids)
+    columns = _build_columns(column_rows, relation_ids, column_positions)
 
     constraints, pk_columns, fk_edges = _build_constraints(
         constraint_rows, relation_ids, column_positions
