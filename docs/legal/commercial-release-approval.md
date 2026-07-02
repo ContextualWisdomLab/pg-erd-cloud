@@ -15,6 +15,7 @@
   - `docs/operations/incident-response.md`
   - `docs/operations/backup-restore.md`
   - `docs/operations/migration-rollback.md`
+  - `docs/operations/alert-thresholds.md`
 
 ## 2) 판매 전 필수 결정
 

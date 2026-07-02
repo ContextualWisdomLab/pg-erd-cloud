@@ -19,7 +19,8 @@
     "security_policy": "SECURITY.md",
     "incident_response": "docs/operations/incident-response.md",
     "backup_restore": "docs/operations/backup-restore.md",
-    "migration_rollback": "docs/operations/migration-rollback.md"
+    "migration_rollback": "docs/operations/migration-rollback.md",
+    "alert_thresholds": "docs/operations/alert-thresholds.md"
   },
   "data_processing_scope": [
     "application metadata",

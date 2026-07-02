@@ -69,7 +69,9 @@ The deployable Prometheus rule file is:
 - `deploy/prometheus/pg-erd-cloud-alerts.yml`
 
 Tune thresholds per environment; the checked-in defaults are the commercial
-readiness baseline.
+readiness baseline. The operational interpretation, owner, escalation rule, and
+release approval checklist are fixed in
+`docs/operations/alert-thresholds.md`.
 
 ### API
 

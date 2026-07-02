@@ -46,6 +46,7 @@ REQUIRED_DOCUMENTS = (
     "incident_response",
     "backup_restore",
     "migration_rollback",
+    "alert_thresholds",
 )
 
 PLACEHOLDER_RE = re.compile(r"\b(tbd|todo|fixme|pending|placeholder)\b|[<>]", re.IGNORECASE)
