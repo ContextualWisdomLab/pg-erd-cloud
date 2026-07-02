@@ -51,9 +51,8 @@ test('share export modal visual baseline remains stable on desktop', async ({ pa
   await expect(dialog.getByRole('heading', { name: '내보내기 산출물' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '링크 만들기' })).toBeVisible();
 
-  await expect(page).toHaveScreenshot('share-export-modal.png', {
+  await expect(dialog).toHaveScreenshot('share-export-modal.png', {
     animations: 'disabled',
-    fullPage: false,
     maxDiffPixelRatio: 0.03,
   });
 });
