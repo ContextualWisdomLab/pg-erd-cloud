@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "docs/operations/migration-rollback.md",
     "docs/operations/on-premises-package.md",
     "docs/operations/billing-provider-catalog.example.json",
+    "scripts/operations/generate_support_bundle.py",
     "scripts/ci/validate_billing_provider_catalog.py",
     "scripts/ci/validate_restore_drill_manifest.py",
 )
@@ -94,6 +95,7 @@ ONPREM_DOC_REQUIRED_SNIPPETS = (
     "Support bundle",
     "Air-gapped",
     "Billing provider catalog",
+    "python scripts/operations/generate_support_bundle.py",
     "python scripts/ci/validate_billing_provider_catalog.py",
     "python scripts/ci/validate_restore_drill_manifest.py",
 )

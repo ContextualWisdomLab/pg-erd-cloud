@@ -73,6 +73,10 @@ blocker로 분류합니다.
   검증 스크린샷을
   `docs/ui-ux/qa/2026-07-02-commercial-readiness-evidence-board.png`로 보존했습니다.
   이 섹션도 Figma Code Connect 없이 생성했습니다.
+- `Support bundle evidence · 2026-07-03`
+  <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=77-2> 프레임에
+  redaction-first support bundle gate, CI 연결, 검증 결과, 잔여 no-go 항목을 추가했습니다.
+  이 갱신도 Figma Code Connect 없이 수행했습니다.
 - desktop support diagnostics는 paid-pilot 지원 데모에 사용할 수 있는 수준입니다.
   support/billing/reactivation destination은 raw URL 대신 named link와 URL copy
   action으로 표시합니다.
@@ -149,6 +153,11 @@ blocker로 분류합니다.
   `scripts/ci/validate_restore_drill_manifest.py`로 backup artifact SHA-256,
   격리 restore target, secret source, `/healthz`, project/share/export/support bundle
   smoke 결과를 기계 검증 가능한 manifest로 고정함
+- 🆕 지원 bundle 생성 gate: `scripts/operations/generate_support_bundle.py`와
+  `scripts/operations/test_generate_support_bundle.py`로 배포 commit, billing provider
+  catalog version, `alembic current`, `/healthz`, backend error log, support diagnostics
+  JSON을 하나의 redacted bundle로 만들고 raw secret/DSN/provider metadata/share URL
+  누출을 테스트로 차단함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전

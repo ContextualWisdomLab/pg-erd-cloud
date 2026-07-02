@@ -99,6 +99,27 @@
 민감값(`APP_SECRET`, DB password, DSN, private key, billing secret, raw provider
 metadata)은 support bundle에 포함하지 않습니다.
 
+운영자는 수집값을 직접 압축해 전달하기 전에 redaction-first 생성기를 실행합니다.
+이 도구는 입력 파일에서 secret-like key, DSN credential, bearer token, raw provider
+metadata, 공개 share URL/token을 `[redacted]`로 치환하고, env 파일은 안전한
+설정 존재 여부와 verifier 종류만 기록합니다.
+
+```bash
+python scripts/operations/generate_support_bundle.py \
+  --commit-sha "$(git rev-parse HEAD)" \
+  --billing-provider-catalog-version "catalog-2026-07-02" \
+  --env-file .env.production \
+  --alembic-current-file evidence/alembic-current.txt \
+  --healthz-file evidence/healthz.json \
+  --support-account-file evidence/support-account.json \
+  --backend-log-file evidence/backend-error.log \
+  --output evidence/support-bundle.json
+```
+
+생성 후 `support-bundle.json`에서 raw `APP_SECRET`, DB password, DSN, private key,
+billing secret, raw provider metadata, 공개 share URL/token이 남아 있으면 판매
+지원 증거로 사용하지 않습니다.
+
 ## Billing provider catalog
 
 판매 후보는 결제/계약 provider의 실제 plan catalog와 event mapping을

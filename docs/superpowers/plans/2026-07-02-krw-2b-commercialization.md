@@ -394,6 +394,7 @@ Files:
 - `docs/legal/license-billing.md`
 - `deploy/*`
 - `scripts/ci/validate_onprem_package.py`
+- `scripts/operations/generate_support_bundle.py`
 
 Status:
 
@@ -401,6 +402,9 @@ Status:
 - Restore drill manifest gate implemented with
   `scripts/ci/validate_restore_drill_manifest.py` and
   `docs/operations/restore-drills/restore-drill.example.json`.
+- Support bundle generator implemented with
+  `scripts/operations/generate_support_bundle.py`, redaction tests, and CI
+  execution.
 - Remaining gap: customer-environment restore/rollback evidence from a real
   paid pilot or staging deployment.
 
@@ -411,11 +415,13 @@ Tasks:
   and support bundle collection.
 - Add a smoke command or script for validating the documented package path.
   - Implemented: `python scripts/ci/validate_restore_drill_manifest.py`.
+  - Implemented: `python scripts/operations/generate_support_bundle.py`.
 
 Verification:
 
 ```bash
 git diff --check docs/operations/backup-restore.md docs/operations/migration-rollback.md docs/legal/license-billing.md
+python -m pytest scripts/operations/test_generate_support_bundle.py -q
 python scripts/ci/validate_restore_drill_manifest.py
 ```
 

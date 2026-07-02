@@ -104,9 +104,22 @@ JSON manifest로 남깁니다. 실제 유료 파일럿이나 고객 staging dril
   support bundle redaction smoke 결과
 - backup, restore, application smoke 소요 시간
 
+Support bundle redaction smoke는 복구 DB와 동일한 배포 증거에서
+`scripts/operations/generate_support_bundle.py`를 실행해 확인합니다. 이 smoke는
+bundle 생성이 성공하고 결과 JSON에 raw `APP_SECRET`, DB password, DSN, private key,
+billing secret, raw provider metadata, 공개 share URL/token이 남지 않는지를 확인한
+뒤 `smoke_tests.support_bundle_redaction=true`로 기록합니다.
+
 검증:
 
 ```bash
+python scripts/operations/generate_support_bundle.py \
+  --commit-sha "$(git rev-parse HEAD)" \
+  --billing-provider-catalog-version "catalog-2026-07-02" \
+  --healthz-file evidence/healthz.json \
+  --support-account-file evidence/support-account.json \
+  --backend-log-file evidence/backend-error.log \
+  --output evidence/support-bundle.json
 python scripts/ci/validate_restore_drill_manifest.py
 ```
 

@@ -22,7 +22,8 @@
     "migration_rollback": "docs/operations/migration-rollback.md",
     "on_premises_package": "docs/operations/on-premises-package.md",
     "alert_thresholds": "docs/operations/alert-thresholds.md",
-    "billing_provider_catalog": "docs/operations/billing-provider-catalog.example.json"
+    "billing_provider_catalog": "docs/operations/billing-provider-catalog.example.json",
+    "support_bundle_generator": "scripts/operations/generate_support_bundle.py"
   },
   "data_processing_scope": [
     "application metadata",
