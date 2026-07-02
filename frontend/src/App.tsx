@@ -182,6 +182,14 @@ function licenseVerifierLabel(
   return "없음";
 }
 
+function billingMetadataSummaryLabel(
+  metadataSummary:
+    BillingSupportAccount["recent_billing_events"][number]["metadata_summary"],
+): string {
+  if (!metadataSummary.length) return "없음";
+  return metadataSummary.map((item) => `${item.key}=${item.value}`).join(", ");
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
@@ -1668,6 +1676,7 @@ export default function App() {
                         <span role="columnheader">Provider</span>
                         <span role="columnheader">Event</span>
                         <span role="columnheader">Plan</span>
+                        <span role="columnheader">Evidence</span>
                         <span role="columnheader">Received</span>
                       </div>
                       {supportAccount.recent_billing_events.map((event) => (
@@ -1675,6 +1684,9 @@ export default function App() {
                           <span role="cell" data-label="Provider">{event.provider}</span>
                           <strong role="cell" data-label="Event">{event.event_type}</strong>
                           <span role="cell" data-label="Plan">{event.target_plan || "없음"}</span>
+                          <span role="cell" data-label="Evidence">
+                            {billingMetadataSummaryLabel(event.metadata_summary)}
+                          </span>
                           <span role="cell" data-label="Received">{event.received_at}</span>
                         </div>
                       ))}

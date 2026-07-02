@@ -136,6 +136,7 @@ export type BillingEventSummary = {
   status: 'recorded'
   occurred_at: string
   received_at: string
+  metadata_summary: Array<{ key: string; value: string }>
 }
 
 export type BillingSupportShareLinkSummary = {
@@ -263,7 +264,12 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
             target_plan: 'onprem-enterprise-plus-krw-2b-evaluation-with-private-network-addon',
             status: 'recorded',
             occurred_at: '2026-07-02T00:00:00Z',
-            received_at: '2026-07-02T00:01:22Z'
+            received_at: '2026-07-02T00:01:22Z',
+            metadata_summary: [
+              { key: 'contract.id', value: 'krw-2b-evaluation-001' },
+              { key: 'invoice_id', value: 'in_enterprise_private_network_202607' },
+              { key: 'portal_session', value: '[redacted]' }
+            ]
           }
         ]
       }
@@ -310,7 +316,11 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
           target_plan: 'enterprise',
           status: 'recorded',
           occurred_at: '2026-07-02T00:00:00Z',
-          received_at: '2026-07-02T00:01:22Z'
+          received_at: '2026-07-02T00:01:22Z',
+          metadata_summary: [
+            { key: 'invoice_id', value: 'in_demo_001' },
+            { key: 'customer.id', value: 'cus_demo' }
+          ]
         },
         {
           billing_event_uuid: 'demo-billing-event-2',
@@ -320,7 +330,11 @@ export async function getBillingSupportAccount(subject: string): Promise<Billing
           target_plan: 'onprem-enterprise',
           status: 'recorded',
           occurred_at: '2026-07-01T09:00:00Z',
-          received_at: '2026-07-01T09:03:11Z'
+          received_at: '2026-07-01T09:03:11Z',
+          metadata_summary: [
+            { key: 'contract.id', value: 'contract-demo-renewal' },
+            { key: 'signature', value: '[redacted]' }
+          ]
         }
       ]
     }

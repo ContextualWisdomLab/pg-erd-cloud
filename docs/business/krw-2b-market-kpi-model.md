@@ -134,7 +134,8 @@ operational reliability, and support burden.
   provider event alias normalization, plan catalog validation, billing webhook outcome metrics,
   product lifecycle outcome metrics for project/connection/snapshot/share-link
   creation, LLM draft usage/failure metrics and audit logs,
-  read-only support diagnostics with recent share-link summaries,
+  read-only support diagnostics with recent share-link summaries and redacted
+  provider metadata summaries,
   operator-only support diagnostics UI, support diagnostics demo evidence,
   visual regression, accessibility, and E2E smoke paths.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation

@@ -138,6 +138,10 @@ describe('App accessibility smoke', () => {
           status: 'recorded',
           occurred_at: '2026-07-02T00:00:00Z',
           received_at: '2026-07-02T01:00:00Z',
+          metadata_summary: [
+            { key: 'invoice_id', value: 'in_123' },
+            { key: 'api_key', value: '[redacted]' },
+          ],
         },
       ],
     });
@@ -177,5 +181,7 @@ describe('App accessibility smoke', () => {
     expect(screen.getAllByText('활성')).not.toHaveLength(0);
     expect(screen.getByRole('table', { name: '최근 결제 이벤트' })).toBeInTheDocument();
     expect(screen.getByText('subscription.updated')).toBeInTheDocument();
+    expect(screen.getByText(/invoice_id=in_123/)).toBeInTheDocument();
+    expect(screen.getByText(/api_key=\[redacted\]/)).toBeInTheDocument();
   });
 });

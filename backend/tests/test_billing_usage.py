@@ -707,7 +707,11 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         event_status="recorded",
         occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
         received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
-        metadata_json={"api_key": "[redacted]"},
+        metadata_json={
+            "api_key": "[redacted]",
+            "invoice_id": "in_123",
+            "customer": {"id": "cus_123"},
+        },
     )
     session = FakeSupportSession(
         account=account,
@@ -773,6 +777,11 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
             "status": "recorded",
             "occurred_at": "2026-07-02T00:00:00Z",
             "received_at": "2026-07-02T01:00:00Z",
+            "metadata_summary": [
+                {"key": "api_key", "value": "[redacted]"},
+                {"key": "invoice_id", "value": "in_123"},
+                {"key": "customer.id", "value": "cus_123"},
+            ],
         }
     ]
     assert session.statement_count == 9

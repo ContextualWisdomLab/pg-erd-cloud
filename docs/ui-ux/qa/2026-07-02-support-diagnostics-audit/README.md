@@ -23,12 +23,14 @@ Evidence files:
    - Desktop operator view after looking up `customer-owner`.
    - Health: improved for operator review.
    - Evidence: support, billing portal, and reactivation destinations are shown
-     as named links with URL copy actions instead of raw full URLs.
+     as named links with URL copy actions instead of raw full URLs. Recent
+     billing events include redacted provider metadata summaries such as invoice
+     and customer identifiers.
 2. `02-support-diagnostics-mobile.png`
    - Narrow viewport support diagnostics view.
    - Health: stable and usable as a review/support fallback.
    - Evidence: recent share links and billing events preserve key labels in
-     stacked rows.
+     stacked rows, including redacted metadata evidence.
 3. `03-demo-dashboard-commercial.png`
    - Default commercial demo dashboard.
    - Health: solid buyer-demo entry state.
@@ -48,9 +50,9 @@ Audit conclusion:
   does not yet communicate billing or support trust signals.
 - Narrow-width support diagnostics is now readable as a review/support fallback,
   including a production-scale `stress-customer` fixture with long provider
-  events, contract IDs, plan names, and timestamps. Real customer payloads still
-  need browser-observed review before treating mobile support diagnostics as the
-  primary support workflow.
+  events, contract IDs, plan names, timestamps, and redacted metadata evidence.
+  Real customer payloads still need browser-observed review before treating
+  mobile support diagnostics as the primary support workflow.
 
 Implementation evidence:
 
@@ -62,3 +64,6 @@ Implementation evidence:
 - `frontend/e2e/app-smoke.spec.ts` also verifies that `stress-customer` support
   diagnostics keeps long billing evidence visible without overflowing the
   support event rows at a 390px viewport.
+- `backend/tests/test_billing_usage.py` verifies that support billing event
+  summaries include redacted metadata evidence without exposing raw provider
+  payloads.

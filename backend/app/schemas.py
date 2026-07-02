@@ -218,6 +218,13 @@ class BillingEventOut(BaseModel):
     message: str
 
 
+class BillingEventMetadataSummaryOut(BaseModel):
+    """Redacted billing metadata field safe for support diagnostics."""
+
+    key: str = Field(min_length=1, max_length=96)
+    value: str = Field(min_length=1, max_length=240)
+
+
 class BillingEventSummaryOut(BaseModel):
     """Billing event summary safe for support diagnostics."""
 
@@ -229,6 +236,9 @@ class BillingEventSummaryOut(BaseModel):
     status: Literal["recorded"]
     occurred_at: dt.datetime
     received_at: dt.datetime
+    metadata_summary: list[BillingEventMetadataSummaryOut] = Field(
+        default_factory=list
+    )
 
 
 class BillingSupportShareLinkSummaryOut(BaseModel):

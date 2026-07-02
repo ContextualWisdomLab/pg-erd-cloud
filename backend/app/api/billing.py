@@ -34,6 +34,7 @@ from app.models import (
 from app.metrics import BILLING_EVENTS_TOTAL
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
+    BillingEventMetadataSummaryOut,
     BillingEventIn,
     BillingEventOut,
     BillingEventSummaryOut,
@@ -58,6 +59,9 @@ _SENSITIVE_METADATA_KEY_PARTS = (
     "secret",
     "token",
 )
+_METADATA_SUMMARY_ITEM_LIMIT = 8
+_METADATA_SUMMARY_KEY_LIMIT = 96
+_METADATA_SUMMARY_VALUE_LIMIT = 240
 
 LicenseVerifierKind = Literal[
     "none", "static_key", "signed_token", "static_key_and_signed_token"
@@ -348,7 +352,59 @@ def _billing_event_summary(event: BillingEvent) -> BillingEventSummaryOut:
         status="recorded",
         occurred_at=event.occurred_at,
         received_at=event.received_at,
+        metadata_summary=_billing_metadata_summary(event.metadata_json),
     )
+
+
+def _truncate_metadata_text(value: str, *, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return f"{value[: limit - 3]}..."
+
+
+def _metadata_value_text(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int | float | str):
+        return str(value)
+    if isinstance(value, list):
+        return f"{len(value)} items"
+    return type(value).__name__
+
+
+def _billing_metadata_summary(metadata: object) -> list[BillingEventMetadataSummaryOut]:
+    items: list[BillingEventMetadataSummaryOut] = []
+
+    def add_item(path: str, value: object) -> None:
+        if len(items) >= _METADATA_SUMMARY_ITEM_LIMIT:
+            return
+        key = _truncate_metadata_text(path, limit=_METADATA_SUMMARY_KEY_LIMIT)
+        text = _truncate_metadata_text(
+            _metadata_value_text(value),
+            limit=_METADATA_SUMMARY_VALUE_LIMIT,
+        )
+        if key and text:
+            items.append(BillingEventMetadataSummaryOut(key=key, value=text))
+
+    def visit(prefix: str, value: object) -> None:
+        if len(items) >= _METADATA_SUMMARY_ITEM_LIMIT:
+            return
+        if isinstance(value, Mapping):
+            for raw_key, raw_value in value.items():
+                key = str(raw_key).strip()
+                if not key:
+                    continue
+                path = f"{prefix}.{key}" if prefix else key
+                visit(path, raw_value)
+                if len(items) >= _METADATA_SUMMARY_ITEM_LIMIT:
+                    return
+            return
+        add_item(prefix or "value", value)
+
+    visit("", metadata)
+    return items
 
 
 def _share_link_status(
