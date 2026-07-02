@@ -257,6 +257,12 @@ Files:
 - `backend/tests/test_billing_usage.py`
 - `docs/legal/license-billing.md`
 
+Status:
+
+- First provider-neutral event recording slice implemented in PR `#415`.
+- Remaining gap: provider-specific checkout/fulfillment and signature
+  verification adapters.
+
 Tasks:
 
 - Add provider-neutral billing event schema:

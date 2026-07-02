@@ -1,27 +1,51 @@
 from __future__ import annotations
 
 import datetime as dt
+import hmac
+import uuid
+from collections.abc import Mapping
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import distinct, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
 
 from app.auth import CurrentUser, get_current_user
-from app.db import get_read_session
+from app.db import get_read_session, get_session
 from app.models import (
+    BillingEvent,
     DbConnection,
     ProjectMember,
     ProjectSpace,
     SchemaSnapshot,
     ShareLink,
+    utcnow,
 )
-from app.schemas import BillingPlanChangeIn, BillingPlanChangeOut, BillingUsageOut
+from app.sanitize import sanitize_for_storage
+from app.schemas import (
+    BillingEventIn,
+    BillingEventOut,
+    BillingPlanChangeIn,
+    BillingPlanChangeOut,
+    BillingUsageOut,
+)
 from app.settings import settings
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
+_BILLING_WEBHOOK_SECRET_HEADER = "X-BILLING-WEBHOOK-SECRET"
+_SENSITIVE_METADATA_KEY_PARTS = (
+    "api_key",
+    "authorization",
+    "card",
+    "client_secret",
+    "dsn",
+    "password",
+    "secret",
+    "token",
+)
 
 LicenseVerifierKind = Literal[
     "none", "static_key", "signed_token", "static_key_and_signed_token"
@@ -62,6 +86,68 @@ def _portal_url_with_target_plan(base_url: str, target_plan: str) -> str:
             urlencode(query_items),
             parts.fragment,
         )
+    )
+
+
+def _redact_billing_metadata(value: object) -> object:
+    if isinstance(value, Mapping):
+        redacted: dict[str, object] = {}
+        for raw_key, raw_value in value.items():
+            key = str(raw_key)
+            key_lower = key.lower()
+            if any(part in key_lower for part in _SENSITIVE_METADATA_KEY_PARTS):
+                redacted[key] = "[redacted]"
+            else:
+                redacted[key] = _redact_billing_metadata(raw_value)
+        return sanitize_for_storage(redacted)
+    if isinstance(value, list):
+        return [_redact_billing_metadata(item) for item in value]
+    return sanitize_for_storage(value)
+
+
+def _redacted_billing_metadata(metadata: Mapping[str, object]) -> dict:
+    redacted = _redact_billing_metadata(metadata)
+    if isinstance(redacted, dict):
+        return redacted
+    return {}
+
+
+async def _find_billing_event(
+    session: AsyncSession,
+    provider: str,
+    provider_event_id: str,
+) -> BillingEvent | None:
+    result = await session.execute(
+        select(BillingEvent).where(
+            BillingEvent.provider == provider,
+            BillingEvent.provider_event_id == provider_event_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+def _billing_event_response(
+    *,
+    event: BillingEvent,
+    action: Literal["recorded", "duplicate"],
+) -> BillingEventOut:
+    message = (
+        "Billing event recorded for reconciliation."
+        if action == "recorded"
+        else "Billing event was already recorded; duplicate ignored."
+    )
+    return BillingEventOut(
+        action=action,
+        billing_event_uuid=event.billing_event_uuid,
+        provider=event.provider,
+        provider_event_id=event.provider_event_id,
+        event_type=event.event_type,
+        subject=event.subject,
+        target_plan=event.target_plan,
+        status="recorded",
+        occurred_at=event.occurred_at,
+        received_at=event.received_at,
+        message=message,
     )
 
 
@@ -168,3 +254,63 @@ async def request_billing_plan_change(
         status_code=503,
         detail="billing plan change path is not configured",
     )
+
+
+@router.post("/events", response_model=BillingEventOut)
+async def ingest_billing_event(
+    payload: BillingEventIn,
+    billing_webhook_secret: str | None = Header(
+        default=None,
+        alias=_BILLING_WEBHOOK_SECRET_HEADER,
+    ),
+    session: AsyncSession = Depends(get_session),
+) -> BillingEventOut:
+    """Record a provider-neutral billing event for support reconciliation."""
+    if not settings.billing_webhook_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="billing webhook secret is not configured",
+        )
+    if not billing_webhook_secret or not hmac.compare_digest(
+        billing_webhook_secret,
+        settings.billing_webhook_secret,
+    ):
+        raise HTTPException(status_code=401, detail="invalid billing webhook secret")
+
+    existing = await _find_billing_event(
+        session,
+        provider=payload.provider,
+        provider_event_id=payload.provider_event_id,
+    )
+    if existing is not None:
+        return _billing_event_response(event=existing, action="duplicate")
+
+    now = utcnow()
+    event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider=payload.provider,
+        provider_event_id=payload.provider_event_id,
+        event_type=payload.event_type,
+        subject=payload.subject,
+        target_plan=payload.target_plan,
+        event_status="recorded",
+        occurred_at=payload.occurred_at or now,
+        received_at=now,
+        metadata_json=_redacted_billing_metadata(payload.metadata),
+    )
+    session.add(event)
+
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        duplicate = await _find_billing_event(
+            session,
+            provider=payload.provider,
+            provider_event_id=payload.provider_event_id,
+        )
+        if duplicate is None:
+            raise
+        return _billing_event_response(event=duplicate, action="duplicate")
+
+    return _billing_event_response(event=event, action="recorded")

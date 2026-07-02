@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -165,4 +165,53 @@ class BillingPlanChangeOut(BaseModel):
     target_plan: str
     billing_portal_url: str | None
     billing_support_url: str | None
+    message: str
+
+
+class BillingEventIn(BaseModel):
+    """Provider-neutral billing/license event for reconciliation."""
+
+    provider: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+    )
+    provider_event_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\s\x00-\x1F\x7F]+$",
+    )
+    event_type: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+    )
+    subject: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
+    target_plan: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+    )
+    occurred_at: dt.datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BillingEventOut(BaseModel):
+    """Billing reconciliation event status returned to the caller."""
+
+    action: Literal["recorded", "duplicate"]
+    billing_event_uuid: uuid.UUID
+    provider: str
+    provider_event_id: str
+    event_type: str
+    subject: str
+    target_plan: str | None
+    status: Literal["recorded"]
+    occurred_at: dt.datetime
+    received_at: dt.datetime
     message: str

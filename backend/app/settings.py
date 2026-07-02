@@ -140,6 +140,7 @@ class Settings(BaseSettings):
     billing_max_share_links_per_project: int = Field(0, ge=0)
     billing_portal_url: str | None = None
     billing_support_url: str | None = None
+    billing_webhook_secret: str | None = None
     account_reactivation_url: str | None = None
     # Comma-separated OIDC subjects that must be denied before DB access.
     account_deactivated_subjects: str = ""

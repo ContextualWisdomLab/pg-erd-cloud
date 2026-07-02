@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Iterator
 
@@ -9,7 +10,8 @@ from fastapi.testclient import TestClient
 
 from app.api.billing import router
 from app.auth import CurrentUser, get_current_user
-from app.db import get_read_session
+from app.db import get_read_session, get_session
+from app.models import BillingEvent
 from app.settings import settings
 
 app = FastAPI()
@@ -34,6 +36,35 @@ class FakeSession:
         value = self.counts[self.statement_count]
         self.statement_count += 1
         return FakeResult(value)
+
+
+class FakeBillingEventResult:
+    def __init__(self, event: BillingEvent | None) -> None:
+        self.event = event
+
+    def scalar_one_or_none(self) -> BillingEvent | None:
+        return self.event
+
+
+class FakeBillingEventSession:
+    def __init__(self, existing_event: BillingEvent | None = None) -> None:
+        self.existing_event = existing_event
+        self.added_event: BillingEvent | None = None
+        self.committed = False
+        self.rolled_back = False
+
+    async def execute(self, stmt: object) -> FakeBillingEventResult:
+        del stmt
+        return FakeBillingEventResult(self.existing_event)
+
+    def add(self, event: BillingEvent) -> None:
+        self.added_event = event
+
+    async def commit(self) -> None:
+        self.committed = True
+
+    async def rollback(self) -> None:
+        self.rolled_back = True
 
 
 @pytest.fixture(autouse=True)
@@ -194,3 +225,128 @@ def test_billing_plan_change_requires_portal_or_support_path(
 
     assert response.status_code == 503
     assert response.json()["detail"] == "billing plan change path is not configured"
+
+
+def test_billing_event_requires_configured_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "billing_webhook_secret", None)
+    app.dependency_overrides[get_session] = lambda: FakeBillingEventSession()
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "provider-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "billing webhook secret is not configured"
+
+
+def test_billing_event_rejects_invalid_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
+    app.dependency_overrides[get_session] = lambda: FakeBillingEventSession()
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "wrong-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "invalid billing webhook secret"
+
+
+def test_billing_event_records_and_redacts_sensitive_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeBillingEventSession()
+    monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
+    app.dependency_overrides[get_session] = lambda: session
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "provider-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+            "target_plan": "enterprise",
+            "occurred_at": "2026-07-02T01:02:03Z",
+            "metadata": {
+                "invoice_id": "in_123",
+                "api_key": "sk_live_secret",
+                "nested": {"client_secret": "seti_secret"},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "recorded"
+    assert payload["provider"] == "stripe"
+    assert payload["provider_event_id"] == "evt_1"
+    assert payload["event_type"] == "subscription.updated"
+    assert payload["subject"] == "customer-owner"
+    assert payload["target_plan"] == "enterprise"
+    assert payload["status"] == "recorded"
+    assert session.committed is True
+    assert session.added_event is not None
+    assert session.added_event.metadata_json == {
+        "invoice_id": "in_123",
+        "api_key": "[redacted]",
+        "nested": {"client_secret": "[redacted]"},
+    }
+
+
+def test_billing_event_ignores_duplicate_provider_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="stripe",
+        provider_event_id="evt_1",
+        event_type="subscription.updated",
+        subject="customer-owner",
+        target_plan="enterprise",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+        metadata_json={},
+    )
+    session = FakeBillingEventSession(existing_event=existing_event)
+    monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
+    app.dependency_overrides[get_session] = lambda: session
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "provider-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+            "target_plan": "enterprise",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["action"] == "duplicate"
+    assert uuid.UUID(response.json()["billing_event_uuid"]) == (
+        existing_event.billing_event_uuid
+    )
+    assert session.added_event is None
+    assert session.committed is False

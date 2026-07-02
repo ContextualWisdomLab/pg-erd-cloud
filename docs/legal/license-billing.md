@@ -54,8 +54,9 @@
 
 ## 4) 결제/과금 연계 전제
 
-- 현재 단계는 상용화 준비 상태(POC)이며, 별도 과금 라우트(Billing, invoicing, seat API)는
-  아직 미구현입니다.
+- 현재 단계는 상용화 준비 상태이며, 외부 결제 provider별 SDK/checkout은 아직
+  제품 내부에 고정하지 않습니다. 대신 공통 usage 조회, plan-change handoff,
+  provider-neutral reconciliation event 기록 경로를 제공합니다.
 - `GET /api/billing/usage`는 현재 사용자 소유 프로젝트 범위의 과금 준비용 사용량을
   반환합니다.
   - `project_count`
@@ -76,6 +77,16 @@
   - 둘 다 없으면 `503`으로 실패해 판매 배포의 과금 경로 누락을 드러냅니다.
   - 사용자 subject 같은 식별자는 portal URL에 자동으로 넣지 않습니다. 고객 매핑은
     결제 포털 또는 계약 시스템에서 처리해야 합니다.
+- `POST /api/billing/events`는 외부 결제/계약 시스템이 보낸 provider-neutral event를
+  저장해 지원/정산 reconciliation 증거로 남깁니다.
+  - `X-BILLING-WEBHOOK-SECRET` 헤더가 `BILLING_WEBHOOK_SECRET`과 일치해야 합니다.
+  - `provider`와 `provider_event_id` 조합은 한 번만 기록됩니다. 동일 event가 다시
+    오면 duplicate로 응답하고 상태를 두 번 적용하지 않습니다.
+  - payload는 `provider`, `provider_event_id`, `event_type`, `subject`,
+    `target_plan`, `occurred_at`, `metadata`를 받을 수 있습니다.
+  - `metadata`의 `secret`, `token`, `password`, `api_key`, `client_secret`,
+    `authorization`, `card`, `dsn` 계열 키는 저장 전에 `[redacted]`로 치환됩니다.
+  - 응답에는 민감 metadata를 반환하지 않습니다.
 - 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
   - `BILLING_MAX_PROJECTS_PER_USER`
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
@@ -84,6 +95,7 @@
 - 고객 포털 또는 지원 경로는 환경 변수로 노출합니다.
   - `BILLING_PORTAL_URL`: 플랜 변경, 결제수단, 청구 내역 관리 포털
   - `BILLING_SUPPORT_URL`: 결제/계약 문의 지원 경로
+  - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
   - `ACCOUNT_REACTIVATION_URL`: 미납/계약 중단/abuse hold 해제 요청 경로
 - 계약 중단, 미납, abuse 대응으로 계정 접근을 즉시 차단해야 하면
   `ACCOUNT_DEACTIVATED_SUBJECTS`에 OIDC subject를 쉼표로 구분해 설정합니다.
@@ -97,6 +109,7 @@
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
   - 위반 탐지 시 자동 비활성화/재활성화 실행 규칙
+  - provider별 서명 검증 어댑터 또는 gateway-level signature verification
 
 ## 5) 온프레미스 체크리스트
 
