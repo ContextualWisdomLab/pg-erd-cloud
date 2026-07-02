@@ -4,6 +4,12 @@ import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, Snapshot
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+const DEMO_EMPTY_WORKSPACE_QUERY = 'demo-workspace'
+
+function isDemoEmptyWorkspace(): boolean {
+  if (!DEMO_MODE || typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get(DEMO_EMPTY_WORKSPACE_QUERY) === 'empty'
+}
 
 let demoProjects: Project[] = [
   { project_space_uuid: 'demo-shopping', project_name: '쇼핑몰 시스템' },
@@ -126,6 +132,7 @@ export async function getMe(): Promise<{ subject: string; display_name: string |
 }
 
 export async function listProjects(): Promise<Project[]> {
+  if (isDemoEmptyWorkspace()) return []
   if (DEMO_MODE) return demoProjects
   const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' })
   if (!r.ok) throw new Error(`listProjects failed: ${r.status}`)

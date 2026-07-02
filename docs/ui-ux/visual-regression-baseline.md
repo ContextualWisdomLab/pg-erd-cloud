@@ -14,10 +14,13 @@ these snapshots:
 |---|---:|---:|---|
 | Desktop ERD editor | Chromium | `1280x720` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/demo-editor.png` |
 | Mobile review/editor entry | Chromium | `390x844` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/demo-editor-mobile.png` |
+| First-run empty dashboard | Chromium | `1280x720` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/first-run-dashboard.png` |
 | Share/export modal | Chromium | `1280x720` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/share-export-modal.png` |
 
 The mobile baseline is scoped to review and navigation confidence. Full mobile
 ERD editing is not a release promise until Product Design defines that workflow.
+The first-run baseline uses demo mode with `?demo-workspace=empty` to keep the
+empty account onboarding state deterministic without touching production APIs.
 
 ## Approval Requirements
 

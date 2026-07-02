@@ -28,6 +28,17 @@ async function openDemoEditor(page: Page, viewport: { width: number; height: num
   await expect(page.getByRole('button', { name: '공유 및 내보내기' })).toBeVisible();
 }
 
+async function openEmptyFirstRunDashboard(page: Page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?demo-workspace=empty');
+
+  await expect(page.getByRole('heading', { name: '대시보드' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '주요 화면' })).toBeVisible();
+  await expect(page.getByLabel('작업 요약')).toBeVisible();
+  await expect(page.getByText('아직 프로젝트가 없습니다. 편집기에서 프로젝트를 생성하세요.')).toBeVisible();
+  await expect(page.getByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).toBeVisible();
+}
+
 for (const baseline of editorBaselines) {
   test(`demo editor visual baseline remains stable on ${baseline.name}`, async ({ page }) => {
     await openDemoEditor(page, baseline.viewport);
@@ -39,6 +50,16 @@ for (const baseline of editorBaselines) {
     });
   });
 }
+
+test('first-run empty dashboard visual baseline remains stable on desktop', async ({ page }) => {
+  await openEmptyFirstRunDashboard(page);
+
+  await expect(page).toHaveScreenshot('first-run-dashboard.png', {
+    animations: 'disabled',
+    fullPage: false,
+    maxDiffPixelRatio: 0.03,
+  });
+});
 
 test('share export modal visual baseline remains stable on desktop', async ({ page }) => {
   await openDemoEditor(page, { width: 1280, height: 720 });
