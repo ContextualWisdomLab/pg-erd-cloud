@@ -113,6 +113,31 @@ def _raise_expired(
     raise HTTPException(status_code=410, detail="share link expired")
 
 
+def _record_share_audit_error(
+    action: str,
+    outcome: str,
+    request: Request,
+    share_link_uuid: uuid.UUID,
+    *,
+    project_space_uuid: uuid.UUID | None = None,
+    schema_snapshot_uuid: uuid.UUID | None = None,
+    user_account_uuid: uuid.UUID | None = None,
+    error_detail: str | None = None,
+    mode: str | None = None,
+) -> None:
+    _record_share_audit_event(
+        action=action,
+        outcome=outcome,
+        request=request,
+        share_link_uuid=share_link_uuid,
+        project_space_uuid=project_space_uuid,
+        schema_snapshot_uuid=schema_snapshot_uuid,
+        user_account_uuid=user_account_uuid,
+        error_detail=error_detail,
+        mode=mode,
+    )
+
+
 def _require_share_link_llm_draft_enabled() -> None:
     if not settings.share_link_llm_draft_enabled:
         raise HTTPException(
@@ -489,16 +514,57 @@ async def export_shared_snapshot_reversing_spec(
         )
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        if not settings.share_link_llm_draft_enabled:
+            _record_share_audit_error(
+                action="share_snapshot.reversing_spec",
+                outcome="denied",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="share link LLM draft is disabled",
+            )
         _require_share_link_llm_draft_enabled()
         try:
             return await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.reversing_spec",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM configuration error",
+            )
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.reversing_spec",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM prompt too large",
+            )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.reversing_spec",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM provider request failed",
+            )
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
@@ -564,16 +630,57 @@ async def export_shared_snapshot_index_design(
         )
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        if not settings.share_link_llm_draft_enabled:
+            _record_share_audit_error(
+                action="share_snapshot.index_design",
+                outcome="denied",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="share link LLM draft is disabled",
+            )
         _require_share_link_llm_draft_enabled()
         try:
             return await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.index_design",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM configuration error",
+            )
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.index_design",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM prompt too large",
+            )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            _record_share_audit_error(
+                action="share_snapshot.index_design",
+                outcome="failed",
+                request=request,
+                share_link_uuid=share_link_uuid,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                mode=mode,
+                error_detail="LLM provider request failed",
+            )
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc

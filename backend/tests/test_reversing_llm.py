@@ -453,6 +453,32 @@ async def test_shared_reversing_draft_is_disabled_by_default(
 
 
 @pytest.mark.asyncio
+async def test_shared_reversing_draft_disabled_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        with pytest.raises(HTTPException) as exc_info:
+            await share.export_shared_snapshot_reversing_spec(
+                uuid.uuid4(),
+                uuid.uuid4(),
+                mode="llm-draft",
+                request=_request(),
+                session=_ShareSession(),
+            )
+    _assert_share_link_llm_draft_disabled(exc_info)
+
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_snapshot.reversing_spec"
+    assert events[-1]["outcome"] == "denied"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["error_detail"] == "share link LLM draft is disabled"
+
+
+@pytest.mark.asyncio
 async def test_shared_reversing_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -469,6 +495,33 @@ async def test_shared_reversing_draft_hides_llm_configuration_detail(
         )
 
     _assert_sanitized_config_error(exc_info)
+
+
+@pytest.mark.asyncio
+async def test_shared_reversing_draft_configuration_error_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
+    monkeypatch.setattr(share, "generate_reversing_llm_draft", _raise_config_error)
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        with pytest.raises(HTTPException) as exc_info:
+            await share.export_shared_snapshot_reversing_spec(
+                uuid.uuid4(),
+                uuid.uuid4(),
+                mode="llm-draft",
+                request=_request(),
+                session=_ShareSession(),
+            )
+
+    _assert_sanitized_config_error(exc_info)
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_snapshot.reversing_spec"
+    assert events[-1]["outcome"] == "failed"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["error_detail"] == "LLM configuration error"
 
 
 @pytest.mark.asyncio
@@ -511,6 +564,59 @@ async def test_shared_index_design_draft_hides_llm_configuration_detail(
         )
 
     _assert_sanitized_config_error(exc_info)
+
+
+@pytest.mark.asyncio
+async def test_shared_index_design_draft_disabled_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        with pytest.raises(HTTPException) as exc_info:
+            await share.export_shared_snapshot_index_design(
+                uuid.uuid4(),
+                uuid.uuid4(),
+                mode="llm-draft",
+                request=_request(),
+                session=_ShareSession(),
+            )
+
+    _assert_share_link_llm_draft_disabled(exc_info)
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_snapshot.index_design"
+    assert events[-1]["outcome"] == "denied"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["error_detail"] == "share link LLM draft is disabled"
+
+
+@pytest.mark.asyncio
+async def test_shared_index_design_draft_configuration_error_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
+    monkeypatch.setattr(share, "generate_index_design_llm_draft", _raise_config_error)
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        with pytest.raises(HTTPException) as exc_info:
+            await share.export_shared_snapshot_index_design(
+                uuid.uuid4(),
+                uuid.uuid4(),
+                mode="llm-draft",
+                request=_request(),
+                session=_ShareSession(),
+            )
+
+    _assert_sanitized_config_error(exc_info)
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["action"] == "share_snapshot.index_design"
+    assert events[-1]["outcome"] == "failed"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["error_detail"] == "LLM configuration error"
 
 
 @pytest.mark.asyncio
