@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import importlib
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -171,9 +172,8 @@ async def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
                 if not auth_lower.startswith("https://"):
                     raise ValueError("unsupported Snowflake authenticator value")
                 parsed_auth = urlparse(auth_lower)
-                if not parsed_auth.hostname or not (
-                    parsed_auth.hostname.endswith(".okta.com")
-                    or parsed_auth.hostname.endswith(".oktapreview.com")
+                if not parsed_auth.hostname or not re.match(
+                    r"^([a-zA-Z0-9-]+\.)*(okta|oktapreview)\.com$", parsed_auth.hostname
                 ):
                     raise ValueError("unsupported Snowflake authenticator URL")
 
