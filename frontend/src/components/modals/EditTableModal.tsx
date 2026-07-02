@@ -108,23 +108,15 @@ export function EditTableModal({
               </div>
 
               <div className="col" style={{ gap: 8 }}>
-                {editingNode.data.columns.map((col, idx) => {
-                  const columnLabel = (col.column_name || "").trim()
-                    ? col.column_name.trim()
-                    : `컬럼 ${idx + 1}`;
-                  return (
-                  <div
-                    key={`${col.column_name}-${idx}`}
-                    className="row"
-                    style={{ gap: 8, alignItems: "center" }}
-                  >
+                {editingNode.data.columns.map((col, idx) => (
+                  <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
                     <input
                       type="text"
                       name={`col_name_${idx}`}
                       defaultValue={col.column_name}
                       placeholder="컬럼명"
                       style={{ flex: 2 }}
-                      aria-label={`${columnLabel} 컬럼명`}
+                      aria-label="컬럼명"
                     />
                     <input
                       type="text"
@@ -132,14 +124,13 @@ export function EditTableModal({
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
                       style={{ flex: 1.5 }}
-                      aria-label={`${columnLabel} 데이터 타입`}
+                      aria-label="데이터 타입"
                     />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
-                        aria-label={`${columnLabel} 기본키 (Primary Key)`}
                       />
                       PK
                     </label>
@@ -148,14 +139,13 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
-                        aria-label={`${columnLabel} 필수 입력 (Not Null)`}
                       />
                       NN
                     </label>
                     <button
                       type="button"
                       onClick={() => {
-                        if (!window.confirm(`'${columnLabel}' 컬럼을 삭제하시겠습니까?`)) return;
+                        if (!window.confirm(`'${col.column_name}' 컬럼을 삭제하시겠습니까?`)) return;
                         setNodes((nds: Node<TableNodeData>[]) =>
                           nds.map((n: Node<TableNodeData>) => {
                             if (n.id === editingNode.id) {
@@ -182,12 +172,12 @@ export function EditTableModal({
                         });
                       }}
                       style={{ color: "#b91c1c", padding: "4px 8px" }}
-                      aria-label={`${columnLabel} 컬럼 삭제`}
+                      aria-label={`${col.column_name} 컬럼 삭제`}
                     >
                       삭제
                     </button>
                   </div>
-                )})}
+                ))}
               </div>
             </div>
           </form>

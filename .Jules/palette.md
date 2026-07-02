@@ -46,3 +46,6 @@
 ## 2026-07-01 - [Dynamic ARIA labels for dynamic lists]
 **Learning:** When rendering dynamic lists of form inputs, screen readers will announce generic labels (e.g., '데이터 타입') repeatedly if they aren't uniquely identified per row.
 **Action:** Prepend the row's specific item name to the `aria-label` (e.g., `${col.column_name} 데이터 타입`) so inputs are clearly distinguishable.
+## 2026-07-02 - [aria-describedby for disabled buttons]
+**Learning:** Screen reader users are often not informed why a button is disabled, leading to confusion.
+**Action:** When disabling a button, provide a visible helper text element and associate it with the disabled button using `aria-describedby` to programmatically convey the reason.
