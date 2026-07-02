@@ -29,11 +29,11 @@ def normalize_route_label(route: str) -> str:
     return route
 
 
-def prime_http_metrics(*, route_methods: dict[str, set[str]]) -> None:
+def prime_http_metrics(*, methods: set[str], routes: set[str]) -> None:
     """Create common label series so metrics show up before first traffic."""
-    for route, methods in sorted(route_methods.items()):
-        normalized = normalize_route_label(route)
-        for method in sorted(methods):
+    for method in sorted(methods):
+        for route in sorted(routes):
+            normalized = normalize_route_label(route)
             # Counters need an explicit sample.
             HTTP_REQUESTS_TOTAL.labels(
                 method=method,

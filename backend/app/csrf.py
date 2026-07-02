@@ -64,7 +64,10 @@ def verify_csrf_token(
     except (binascii.Error, ValueError):
         return False
 
-    if current_time - issued_at_int > ttl_seconds or issued_at_int > current_time:
+    if (
+        current_time - issued_at_int > ttl_seconds
+        or issued_at_int > current_time
+    ):
         return False
 
     expected = _csrf_signature(secret, issued_at, nonce)
@@ -76,7 +79,9 @@ def make_csrf_middleware(
     header_name: str = CSRF_HEADER_NAME,
     token_secret: str | None = None,
     ttl_seconds: int = CSRF_TOKEN_TTL_SECONDS,
-) -> Callable[[Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]]:
+) -> Callable[
+    [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
+]:
     """Require a non-simple CSRF header for state-changing API requests."""
 
     async def middleware(
@@ -84,8 +89,9 @@ def make_csrf_middleware(
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Reject unsafe API requests that do not include a CSRF token."""
-        if request.method.upper() in SAFE_METHODS or not request.url.path.startswith(
-            route_prefix
+        if (
+            request.method.upper() in SAFE_METHODS
+            or not request.url.path.startswith(route_prefix)
         ):
             return await call_next(request)
 

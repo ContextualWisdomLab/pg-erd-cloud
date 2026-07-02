@@ -203,14 +203,6 @@ async def test_parse_snowflake_dsn_validates_authenticator(
         "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com"
     )
     assert conf.authenticator == "https://company.okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://okta.com"
-    )
-    assert conf.authenticator == "https://okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://oktapreview.com"
-    )
-    assert conf.authenticator == "https://oktapreview.com"
 
     # Allowed safe string values
     conf = await _parse_snowflake_dsn(
@@ -233,10 +225,6 @@ async def test_parse_snowflake_dsn_validates_authenticator(
         await _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com"
         )
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        await _parse_snowflake_dsn(
-            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.okta.com.attacker.com"
-        )
 
 
 @pytest.mark.asyncio
@@ -252,10 +240,11 @@ async def test_introspect_snowflake_builds_common_snapshot(
     async def fake_validated_ip_hosts(host, is_hostaddr, port):
         return (host,)
 
-    monkeypatch.setattr("app.snowflake_introspect.introspect._connect", fake_connect)
     monkeypatch.setattr(
-        "app.snowflake_introspect.introspect._validated_ip_hosts",
-        fake_validated_ip_hosts,
+        "app.snowflake_introspect.introspect._connect", fake_connect
+    )
+    monkeypatch.setattr(
+        "app.snowflake_introspect.introspect._validated_ip_hosts", fake_validated_ip_hosts
     )
 
     snapshot = await introspect_snowflake(

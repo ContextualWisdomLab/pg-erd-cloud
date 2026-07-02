@@ -6,7 +6,6 @@ from collections.abc import Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dsn_redaction import redact_dsn_error_message
 from app.models import (
     DbConnection,
     JobQueue,
@@ -15,8 +14,6 @@ from app.models import (
 )
 from app.db_introspect import introspect_database
 from app.security import decrypt_text
-
-_redact_snapshot_error_message = redact_dsn_error_message
 
 
 async def handle_snapshot_job(
@@ -45,16 +42,15 @@ async def handle_snapshot_job(
     try:
         data = await introspect_database(dsn, schema_filter)
     except Exception as e:  # noqa: BLE001
-        error_message = _redact_snapshot_error_message(str(e), dsn)
         async with session_factory() as session:
             async with session.begin():
                 snapshot = await session.get(SchemaSnapshot, snapshot_id)
                 if snapshot is None:
-                    raise RuntimeError(error_message) from None
+                    raise
                 snapshot.status = "failed"
-                snapshot.error_message = error_message
+                snapshot.error_message = str(e)
                 snapshot.finished_at = dt.datetime.now(dt.timezone.utc)
-        raise RuntimeError(error_message) from None
+        raise
 
     async with session_factory() as session:
         async with session.begin():
