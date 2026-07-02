@@ -298,6 +298,12 @@ Files:
 - `frontend/src/styles.css`
 - `frontend/src/App.accessibility.test.tsx`
 
+Status:
+
+- Backend read-only support diagnostics implemented in PR `#415` via
+  `SUPPORT_OPERATOR_SUBJECTS` and `GET /api/billing/support/account`.
+- Remaining gap: operator frontend view and audited destructive admin actions.
+
 Tasks:
 
 - Expose read-only admin/support account diagnostics for account state, usage

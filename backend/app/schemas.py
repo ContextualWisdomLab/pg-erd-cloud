@@ -215,3 +215,38 @@ class BillingEventOut(BaseModel):
     occurred_at: dt.datetime
     received_at: dt.datetime
     message: str
+
+
+class BillingEventSummaryOut(BaseModel):
+    """Billing event summary safe for support diagnostics."""
+
+    billing_event_uuid: uuid.UUID
+    provider: str
+    provider_event_id: str
+    event_type: str
+    target_plan: str | None
+    status: Literal["recorded"]
+    occurred_at: dt.datetime
+    received_at: dt.datetime
+
+
+class BillingSupportAccountOut(BaseModel):
+    """Read-only account diagnostics for authorized support operators."""
+
+    subject: str
+    user_account_uuid: uuid.UUID | None
+    account_status: Literal["active", "deactivated", "unknown"]
+    license_mode: Literal["off", "required"]
+    license_verifier: Literal[
+        "none", "static_key", "signed_token", "static_key_and_signed_token"
+    ]
+    billing_portal_url: str | None
+    billing_support_url: str | None
+    account_reactivation_url: str | None
+    project_count: int = Field(ge=0)
+    seat_count: int = Field(ge=0)
+    connection_count: int = Field(ge=0)
+    snapshot_count: int = Field(ge=0)
+    share_link_count: int = Field(ge=0)
+    active_share_link_count: int = Field(ge=0)
+    recent_billing_events: list[BillingEventSummaryOut]

@@ -87,6 +87,13 @@
   - `metadata`의 `secret`, `token`, `password`, `api_key`, `client_secret`,
     `authorization`, `card`, `dsn` 계열 키는 저장 전에 `[redacted]`로 치환됩니다.
   - 응답에는 민감 metadata를 반환하지 않습니다.
+- `GET /api/billing/support/account?subject=<OIDC-subject>`는
+  `SUPPORT_OPERATOR_SUBJECTS`에 포함된 사용자만 접근할 수 있는 read-only 지원
+  진단 API입니다.
+  - 대상 계정 UUID, 활성/비활성/미확인 상태, usage counter, license verifier,
+    billing/reactivation URL, 최근 billing event summary를 반환합니다.
+  - billing event의 raw metadata는 반환하지 않습니다.
+  - allowlist에 없는 사용자는 `403 support operator role required`로 거절됩니다.
 - 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
   - `BILLING_MAX_PROJECTS_PER_USER`
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
@@ -97,6 +104,7 @@
   - `BILLING_SUPPORT_URL`: 결제/계약 문의 지원 경로
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
   - `ACCOUNT_REACTIVATION_URL`: 미납/계약 중단/abuse hold 해제 요청 경로
+  - `SUPPORT_OPERATOR_SUBJECTS`: read-only 지원 진단 API 접근 허용 subject 목록
 - 계약 중단, 미납, abuse 대응으로 계정 접근을 즉시 차단해야 하면
   `ACCOUNT_DEACTIVATED_SUBJECTS`에 OIDC subject를 쉼표로 구분해 설정합니다.
   해당 subject는 DB 사용자 upsert 전에 403으로 거절됩니다. 응답에는

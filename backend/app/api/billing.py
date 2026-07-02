@@ -4,11 +4,12 @@ import datetime as dt
 import hmac
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import distinct, func, or_, select
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import desc, distinct, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
@@ -22,14 +23,17 @@ from app.models import (
     ProjectSpace,
     SchemaSnapshot,
     ShareLink,
+    UserAccount,
     utcnow,
 )
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
     BillingEventIn,
     BillingEventOut,
+    BillingEventSummaryOut,
     BillingPlanChangeIn,
     BillingPlanChangeOut,
+    BillingSupportAccountOut,
     BillingUsageOut,
 )
 from app.settings import settings
@@ -52,6 +56,16 @@ LicenseVerifierKind = Literal[
 ]
 
 
+@dataclass(frozen=True)
+class BillingUsageCounts:
+    project_count: int
+    seat_count: int
+    connection_count: int
+    snapshot_count: int
+    share_link_count: int
+    active_share_link_count: int
+
+
 def _license_verifier_kind() -> LicenseVerifierKind:
     has_static_key = bool(settings.license_key)
     has_signed_token_verifier = bool(settings.license_public_key)
@@ -70,6 +84,26 @@ async def _scalar_count(session: AsyncSession, stmt: Executable) -> int:
     return int(value or 0)
 
 
+def _split_csv(value: str) -> set[str]:
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def _account_status_for_subject(
+    subject: str,
+    user_account_uuid: uuid.UUID | None,
+) -> Literal["active", "deactivated", "unknown"]:
+    if subject in _split_csv(settings.account_deactivated_subjects):
+        return "deactivated"
+    if user_account_uuid is None:
+        return "unknown"
+    return "active"
+
+
+def _require_support_operator(user: CurrentUser) -> None:
+    if user.subject not in _split_csv(settings.support_operator_subjects):
+        raise HTTPException(status_code=403, detail="support operator role required")
+
+
 def _portal_url_with_target_plan(base_url: str, target_plan: str) -> str:
     parts = urlsplit(base_url)
     query_items = [
@@ -86,6 +120,56 @@ def _portal_url_with_target_plan(base_url: str, target_plan: str) -> str:
             urlencode(query_items),
             parts.fragment,
         )
+    )
+
+
+async def _usage_counts_for_owner(
+    session: AsyncSession,
+    user_account_uuid: uuid.UUID,
+) -> BillingUsageCounts:
+    owned_project_ids = select(ProjectSpace.project_space_uuid).where(
+        ProjectSpace.created_by_user_uuid == user_account_uuid
+    )
+    now = dt.datetime.now(dt.timezone.utc)
+
+    return BillingUsageCounts(
+        project_count=await _scalar_count(
+            session,
+            select(func.count())
+            .select_from(ProjectSpace)
+            .where(ProjectSpace.created_by_user_uuid == user_account_uuid),
+        ),
+        seat_count=await _scalar_count(
+            session,
+            select(func.count(distinct(ProjectMember.user_account_uuid))).where(
+                ProjectMember.project_space_uuid.in_(owned_project_ids)
+            ),
+        ),
+        connection_count=await _scalar_count(
+            session,
+            select(func.count()).select_from(DbConnection).where(
+                DbConnection.project_space_uuid.in_(owned_project_ids)
+            ),
+        ),
+        snapshot_count=await _scalar_count(
+            session,
+            select(func.count()).select_from(SchemaSnapshot).where(
+                SchemaSnapshot.project_space_uuid.in_(owned_project_ids)
+            ),
+        ),
+        share_link_count=await _scalar_count(
+            session,
+            select(func.count()).select_from(ShareLink).where(
+                ShareLink.project_space_uuid.in_(owned_project_ids)
+            ),
+        ),
+        active_share_link_count=await _scalar_count(
+            session,
+            select(func.count()).select_from(ShareLink).where(
+                ShareLink.project_space_uuid.in_(owned_project_ids),
+                or_(ShareLink.expires_at.is_(None), ShareLink.expires_at > now),
+            ),
+        ),
     )
 
 
@@ -151,54 +235,39 @@ def _billing_event_response(
     )
 
 
+def _billing_event_summary(event: BillingEvent) -> BillingEventSummaryOut:
+    return BillingEventSummaryOut(
+        billing_event_uuid=event.billing_event_uuid,
+        provider=event.provider,
+        provider_event_id=event.provider_event_id,
+        event_type=event.event_type,
+        target_plan=event.target_plan,
+        status="recorded",
+        occurred_at=event.occurred_at,
+        received_at=event.received_at,
+    )
+
+
+async def _recent_billing_events(
+    session: AsyncSession,
+    subject: str,
+) -> list[BillingEventSummaryOut]:
+    result = await session.execute(
+        select(BillingEvent)
+        .where(BillingEvent.subject == subject)
+        .order_by(desc(BillingEvent.received_at))
+        .limit(10)
+    )
+    return [_billing_event_summary(event) for event in result.scalars().all()]
+
+
 @router.get("/usage", response_model=BillingUsageOut)
 async def get_billing_usage(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> BillingUsageOut:
     """Return current account usage counters for billing/license operations."""
-    owned_project_ids = select(ProjectSpace.project_space_uuid).where(
-        ProjectSpace.created_by_user_uuid == user.user_account_uuid
-    )
-    now = dt.datetime.now(dt.timezone.utc)
-
-    project_count = await _scalar_count(
-        session,
-        select(func.count())
-        .select_from(ProjectSpace)
-        .where(ProjectSpace.created_by_user_uuid == user.user_account_uuid),
-    )
-    seat_count = await _scalar_count(
-        session,
-        select(func.count(distinct(ProjectMember.user_account_uuid))).where(
-            ProjectMember.project_space_uuid.in_(owned_project_ids)
-        ),
-    )
-    connection_count = await _scalar_count(
-        session,
-        select(func.count()).select_from(DbConnection).where(
-            DbConnection.project_space_uuid.in_(owned_project_ids)
-        ),
-    )
-    snapshot_count = await _scalar_count(
-        session,
-        select(func.count()).select_from(SchemaSnapshot).where(
-            SchemaSnapshot.project_space_uuid.in_(owned_project_ids)
-        ),
-    )
-    share_link_count = await _scalar_count(
-        session,
-        select(func.count()).select_from(ShareLink).where(
-            ShareLink.project_space_uuid.in_(owned_project_ids)
-        ),
-    )
-    active_share_link_count = await _scalar_count(
-        session,
-        select(func.count()).select_from(ShareLink).where(
-            ShareLink.project_space_uuid.in_(owned_project_ids),
-            or_(ShareLink.expires_at.is_(None), ShareLink.expires_at > now),
-        ),
-    )
+    usage_counts = await _usage_counts_for_owner(session, user.user_account_uuid)
 
     return BillingUsageOut(
         scope="owned_projects",
@@ -208,16 +277,66 @@ async def get_billing_usage(
         billing_portal_url=settings.billing_portal_url,
         billing_support_url=settings.billing_support_url,
         account_reactivation_url=settings.account_reactivation_url,
-        project_count=project_count,
-        seat_count=seat_count,
-        connection_count=connection_count,
-        snapshot_count=snapshot_count,
-        share_link_count=share_link_count,
-        active_share_link_count=active_share_link_count,
+        project_count=usage_counts.project_count,
+        seat_count=usage_counts.seat_count,
+        connection_count=usage_counts.connection_count,
+        snapshot_count=usage_counts.snapshot_count,
+        share_link_count=usage_counts.share_link_count,
+        active_share_link_count=usage_counts.active_share_link_count,
         project_limit=settings.billing_max_projects_per_user,
         connection_limit=settings.billing_max_connections_per_project,
         snapshot_limit=settings.billing_max_snapshots_per_project,
         share_link_limit=settings.billing_max_share_links_per_project,
+    )
+
+
+@router.get("/support/account", response_model=BillingSupportAccountOut)
+async def get_support_account_billing(
+    subject: str = Query(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> BillingSupportAccountOut:
+    """Return read-only billing/account diagnostics for support operators."""
+    _require_support_operator(user)
+
+    account_result = await session.execute(
+        select(UserAccount).where(UserAccount.oidc_subject == subject)
+    )
+    account = account_result.scalar_one_or_none()
+    user_account_uuid = account.user_account_uuid if account is not None else None
+    usage_counts = (
+        await _usage_counts_for_owner(session, user_account_uuid)
+        if user_account_uuid is not None
+        else BillingUsageCounts(
+            project_count=0,
+            seat_count=0,
+            connection_count=0,
+            snapshot_count=0,
+            share_link_count=0,
+            active_share_link_count=0,
+        )
+    )
+
+    return BillingSupportAccountOut(
+        subject=subject,
+        user_account_uuid=user_account_uuid,
+        account_status=_account_status_for_subject(subject, user_account_uuid),
+        license_mode=settings.license_mode,
+        license_verifier=_license_verifier_kind(),
+        billing_portal_url=settings.billing_portal_url,
+        billing_support_url=settings.billing_support_url,
+        account_reactivation_url=settings.account_reactivation_url,
+        project_count=usage_counts.project_count,
+        seat_count=usage_counts.seat_count,
+        connection_count=usage_counts.connection_count,
+        snapshot_count=usage_counts.snapshot_count,
+        share_link_count=usage_counts.share_link_count,
+        active_share_link_count=usage_counts.active_share_link_count,
+        recent_billing_events=await _recent_billing_events(session, subject),
     )
 
 

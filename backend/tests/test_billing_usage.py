@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.api.billing import router
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.models import BillingEvent
+from app.models import BillingEvent, UserAccount
 from app.settings import settings
 
 app = FastAPI()
@@ -67,6 +67,55 @@ class FakeBillingEventSession:
         self.rolled_back = True
 
 
+class FakeScalars:
+    def __init__(self, values: list[object]) -> None:
+        self.values = values
+
+    def all(self) -> list[object]:
+        return self.values
+
+
+class FakeSupportResult:
+    def __init__(
+        self,
+        value: object | None = None,
+        values: list[object] | None = None,
+    ) -> None:
+        self.value = value
+        self.values = values or []
+
+    def scalar_one(self) -> object:
+        return self.value
+
+    def scalar_one_or_none(self) -> object | None:
+        return self.value
+
+    def scalars(self) -> FakeScalars:
+        return FakeScalars(self.values)
+
+
+class FakeSupportSession:
+    def __init__(
+        self,
+        account: UserAccount | None,
+        counts: list[int],
+        events: list[BillingEvent],
+    ) -> None:
+        self.account = account
+        self.counts = counts
+        self.events = events
+        self.statement_count = 0
+
+    async def execute(self, stmt: object) -> FakeSupportResult:
+        del stmt
+        self.statement_count += 1
+        if self.statement_count == 1:
+            return FakeSupportResult(self.account)
+        if 2 <= self.statement_count <= 7:
+            return FakeSupportResult(self.counts[self.statement_count - 2])
+        return FakeSupportResult(values=list(self.events))
+
+
 @pytest.fixture(autouse=True)
 def clear_dependency_overrides() -> Iterator[None]:
     yield
@@ -78,6 +127,14 @@ def fake_get_current_user() -> CurrentUser:
         user_account_uuid=uuid.uuid4(),
         subject="customer-owner",
         display_name="Customer Owner",
+    )
+
+
+def fake_get_support_operator() -> CurrentUser:
+    return CurrentUser(
+        user_account_uuid=uuid.uuid4(),
+        subject="support-operator",
+        display_name="Support Operator",
     )
 
 
@@ -350,3 +407,102 @@ def test_billing_event_ignores_duplicate_provider_event(
     )
     assert session.added_event is None
     assert session.committed is False
+
+
+def test_support_account_billing_requires_support_operator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+    app.dependency_overrides[get_read_session] = lambda: FakeSupportSession(
+        account=None,
+        counts=[],
+        events=[],
+    )
+
+    response = TestClient(app).get(
+        "/api/billing/support/account",
+        params={"subject": "customer-owner"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "support operator role required"
+
+
+def test_support_account_billing_returns_read_only_account_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    customer_uuid = uuid.uuid4()
+    account = UserAccount(
+        user_account_uuid=customer_uuid,
+        oidc_subject="customer-owner",
+        display_name="Customer Owner",
+    )
+    event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="stripe",
+        provider_event_id="evt_1",
+        event_type="subscription.updated",
+        subject="customer-owner",
+        target_plan="enterprise",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+        metadata_json={"api_key": "[redacted]"},
+    )
+    session = FakeSupportSession(
+        account=account,
+        counts=[2, 5, 3, 8, 4, 1],
+        events=[event],
+    )
+    monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    monkeypatch.setattr(settings, "account_deactivated_subjects", "")
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", "x" * 44)
+    monkeypatch.setattr(settings, "billing_portal_url", "https://billing.example.com")
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+    monkeypatch.setattr(
+        settings,
+        "account_reactivation_url",
+        "https://billing.example.com/reactivate",
+    )
+    app.dependency_overrides[get_current_user] = fake_get_support_operator
+    app.dependency_overrides[get_read_session] = lambda: session
+
+    response = TestClient(app).get(
+        "/api/billing/support/account",
+        params={"subject": "customer-owner"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["subject"] == "customer-owner"
+    assert payload["user_account_uuid"] == str(customer_uuid)
+    assert payload["account_status"] == "active"
+    assert payload["license_mode"] == "required"
+    assert payload["license_verifier"] == "signed_token"
+    assert payload["billing_portal_url"] == "https://billing.example.com"
+    assert payload["billing_support_url"] == "https://support.example.com"
+    assert payload["account_reactivation_url"] == (
+        "https://billing.example.com/reactivate"
+    )
+    assert payload["project_count"] == 2
+    assert payload["seat_count"] == 5
+    assert payload["connection_count"] == 3
+    assert payload["snapshot_count"] == 8
+    assert payload["share_link_count"] == 4
+    assert payload["active_share_link_count"] == 1
+    assert payload["recent_billing_events"] == [
+        {
+            "billing_event_uuid": str(event.billing_event_uuid),
+            "provider": "stripe",
+            "provider_event_id": "evt_1",
+            "event_type": "subscription.updated",
+            "target_plan": "enterprise",
+            "status": "recorded",
+            "occurred_at": "2026-07-02T00:00:00Z",
+            "received_at": "2026-07-02T01:00:00Z",
+        }
+    ]
+    assert session.statement_count == 8

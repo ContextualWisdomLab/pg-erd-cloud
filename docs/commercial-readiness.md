@@ -158,6 +158,9 @@ blocker로 분류합니다.
 - 🆕 결제 reconciliation: `POST /api/billing/events`로 shared secret 기반
   provider-neutral event를 기록하고, `(provider, provider_event_id)` 중복을 무시하며,
   민감 metadata를 redaction해 지원/정산 증거를 남김
+- 🆕 지원 진단: `SUPPORT_OPERATOR_SUBJECTS` allowlist 기반
+  `GET /api/billing/support/account` read-only API로 대상 계정 상태, usage counter,
+  license verifier, billing/reactivation URL, 최근 billing event summary를 조회할 수 있음
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
   provider별 checkout/fulfillment와 signature verification adapter는 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,
