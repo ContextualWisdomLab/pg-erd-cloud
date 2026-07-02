@@ -9,6 +9,11 @@ PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어입니다.
 - 앱 DB 백업/복구: [backup-restore.md](docs/operations/backup-restore.md)
 - 마이그레이션 롤백 정책: [migration-rollback.md](docs/operations/migration-rollback.md)
 - 장애 대응: [incident-response.md](docs/operations/incident-response.md)
+- 판매 준비 법무 문서:
+  - [라이선스/결제 가이드](docs/legal/license-billing.md)
+  - [개인정보 처리방침](docs/legal/privacy-policy.md)
+  - [이용약관](docs/legal/terms-of-service.md)
+  - [SLA/지원 초안](docs/legal/sla-support.md)
 
 ## 제공 기능(현재)
 

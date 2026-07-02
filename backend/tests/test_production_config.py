@@ -7,6 +7,7 @@ def _settings(**overrides: object) -> Settings:
     data: dict[str, object] = {
         "database_url": "postgresql+asyncpg://user:pass@db.example.com/app",
         "app_secret": "x" * 48,
+        "license_mode": "off",
         "app_env": "production",
         "oidc_issuer": "https://idp.example.com",
         "oidc_audience": "pg-erd-cloud",
@@ -61,3 +62,19 @@ def test_validate_production_settings_requires_llm_provider_when_shared_drafts_e
         "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
         "SHARE_LINK_LLM_DRAFT_ENABLED=true"
     ) in errors
+
+
+def test_validate_production_settings_requires_license_key_when_license_required() -> None:
+    errors = validate_production_settings(
+        _settings(license_mode="required", license_key=None)
+    )
+
+    assert "LICENSE_KEY is required when LICENSE_MODE=required" in errors
+
+
+def test_validate_production_settings_rejects_short_license_key() -> None:
+    errors = validate_production_settings(
+        _settings(license_mode="required", license_key="short-key")
+    )
+
+    assert "LICENSE_KEY must be at least 24 characters" in errors

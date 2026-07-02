@@ -120,6 +120,13 @@ class Settings(BaseSettings):
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
 
+    # Optional commercial/on-prem licensing gate.
+    #
+    # Set LICENSE_MODE=required to reject API usage without a valid
+    # X-LICENSE-KEY header when running paid/on-prem distribution.
+    license_mode: Literal["off", "required"] = "off"
+    license_key: str | None = None
+
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
     llm_api_base_url: str | None = None
@@ -178,6 +185,11 @@ def validate_production_settings(config: Settings) -> list[str]:
             "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
             "SHARE_LINK_LLM_DRAFT_ENABLED=true"
         )
+    if config.license_mode == "required":
+        if not config.license_key:
+            errors.append("LICENSE_KEY is required when LICENSE_MODE=required")
+        elif len(config.license_key) < 24:
+            errors.append("LICENSE_KEY must be at least 24 characters")
     return errors
 
 

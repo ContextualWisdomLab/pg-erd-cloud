@@ -5,7 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
@@ -25,6 +25,7 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.license_gate import require_active_license
 from app.security_headers import make_security_headers_middleware
 from app.settings import settings, validate_production_settings
 
@@ -168,9 +169,9 @@ async def csrf_token() -> dict[str, str]:
     return {"csrf_token": generate_csrf_token(settings.app_secret)}
 
 
-app.include_router(projects_router)
-app.include_router(connections_router)
-app.include_router(snapshots_router)
-app.include_router(me_router)
+app.include_router(projects_router, dependencies=[Depends(require_active_license)])
+app.include_router(connections_router, dependencies=[Depends(require_active_license)])
+app.include_router(snapshots_router, dependencies=[Depends(require_active_license)])
+app.include_router(me_router, dependencies=[Depends(require_active_license)])
+app.include_router(auth_router, dependencies=[Depends(require_active_license)])
 app.include_router(share_router)
-app.include_router(auth_router)
