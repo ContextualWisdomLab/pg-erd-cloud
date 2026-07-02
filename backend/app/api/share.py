@@ -15,6 +15,7 @@ from starlette.requests import Request
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
+from app.llm_usage import record_llm_draft_usage
 from app.metrics import SHARE_AUDIT_EVENTS_TOTAL, record_product_event
 from app.models import (
     ProjectMember,
@@ -527,6 +528,16 @@ async def export_shared_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         if not settings.share_link_llm_draft_enabled:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="reversing_spec",
+                outcome="disabled",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="disabled",
+            )
             _record_share_audit_error(
                 action="share_snapshot.reversing_spec",
                 outcome="denied",
@@ -539,8 +550,18 @@ async def export_shared_snapshot_reversing_spec(
             )
         _require_share_link_llm_draft_enabled()
         try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
+            draft = await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="reversing_spec",
+                outcome="configuration_error",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="configuration_error",
+            )
             _record_share_audit_error(
                 action="share_snapshot.reversing_spec",
                 outcome="failed",
@@ -555,6 +576,16 @@ async def export_shared_snapshot_reversing_spec(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="reversing_spec",
+                outcome="prompt_too_large",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="prompt_too_large",
+            )
             _record_share_audit_error(
                 action="share_snapshot.reversing_spec",
                 outcome="failed",
@@ -567,6 +598,16 @@ async def export_shared_snapshot_reversing_spec(
             )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="reversing_spec",
+                outcome="provider_error",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="provider_error",
+            )
             _record_share_audit_error(
                 action="share_snapshot.reversing_spec",
                 outcome="failed",
@@ -580,6 +621,17 @@ async def export_shared_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
+        record_llm_draft_usage(
+            surface="share_link",
+            artifact="reversing_spec",
+            outcome="success",
+            snapshot_json=data.snapshot_json,
+            output_text=draft,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            share_link_uuid=share_link_uuid,
+        )
+        return draft
     _record_share_audit_event(
         action="share_snapshot.reversing_spec",
         outcome="success",
@@ -643,6 +695,16 @@ async def export_shared_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         if not settings.share_link_llm_draft_enabled:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="index_design",
+                outcome="disabled",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="disabled",
+            )
             _record_share_audit_error(
                 action="share_snapshot.index_design",
                 outcome="denied",
@@ -655,8 +717,18 @@ async def export_shared_snapshot_index_design(
             )
         _require_share_link_llm_draft_enabled()
         try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
+            draft = await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="index_design",
+                outcome="configuration_error",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="configuration_error",
+            )
             _record_share_audit_error(
                 action="share_snapshot.index_design",
                 outcome="failed",
@@ -671,6 +743,16 @@ async def export_shared_snapshot_index_design(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="index_design",
+                outcome="prompt_too_large",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="prompt_too_large",
+            )
             _record_share_audit_error(
                 action="share_snapshot.index_design",
                 outcome="failed",
@@ -683,6 +765,16 @@ async def export_shared_snapshot_index_design(
             )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            record_llm_draft_usage(
+                surface="share_link",
+                artifact="index_design",
+                outcome="provider_error",
+                snapshot_json=data.snapshot_json,
+                project_space_uuid=link.project_space_uuid,
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                share_link_uuid=share_link_uuid,
+                error_code="provider_error",
+            )
             _record_share_audit_error(
                 action="share_snapshot.index_design",
                 outcome="failed",
@@ -696,6 +788,17 @@ async def export_shared_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
+        record_llm_draft_usage(
+            surface="share_link",
+            artifact="index_design",
+            outcome="success",
+            snapshot_json=data.snapshot_json,
+            output_text=draft,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            share_link_uuid=share_link_uuid,
+        )
+        return draft
     _record_share_audit_event(
         action="share_snapshot.index_design",
         outcome="success",

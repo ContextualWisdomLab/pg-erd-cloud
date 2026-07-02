@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.llm_usage import record_llm_draft_usage
 from app.metrics import record_product_event
 from app.models import (
     DbConnection,
@@ -45,6 +46,10 @@ def _snapshot_not_found(schema_snapshot_uuid: uuid.UUID) -> SnapshotDetailOut:
         error_message="snapshot not found",
         snapshot_json=None,
     )
+
+
+def _snapshot_project_space_uuid(snap: SchemaSnapshot) -> uuid.UUID | None:
+    return getattr(snap, "project_space_uuid", None)
 
 
 async def _get_authorized_snapshot(
@@ -194,17 +199,58 @@ async def export_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
+            draft = await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="reversing_spec",
+                outcome="configuration_error",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="configuration_error",
+            )
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="reversing_spec",
+                outcome="prompt_too_large",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="prompt_too_large",
+            )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="reversing_spec",
+                outcome="provider_error",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="provider_error",
+            )
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
+        record_llm_draft_usage(
+            surface="authenticated",
+            artifact="reversing_spec",
+            outcome="success",
+            snapshot_json=data.snapshot_json,
+            output_text=draft,
+            user_account_uuid=user.user_account_uuid,
+            project_space_uuid=_snapshot_project_space_uuid(snap),
+            schema_snapshot_uuid=schema_snapshot_uuid,
+        )
+        return draft
     return generate_reversing_spec(data.snapshot_json, mode=mode)
 
 
@@ -227,17 +273,58 @@ async def export_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
+            draft = await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="index_design",
+                outcome="configuration_error",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="configuration_error",
+            )
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="index_design",
+                outcome="prompt_too_large",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="prompt_too_large",
+            )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
+            record_llm_draft_usage(
+                surface="authenticated",
+                artifact="index_design",
+                outcome="provider_error",
+                snapshot_json=data.snapshot_json,
+                user_account_uuid=user.user_account_uuid,
+                project_space_uuid=_snapshot_project_space_uuid(snap),
+                schema_snapshot_uuid=schema_snapshot_uuid,
+                error_code="provider_error",
+            )
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
+        record_llm_draft_usage(
+            surface="authenticated",
+            artifact="index_design",
+            outcome="success",
+            snapshot_json=data.snapshot_json,
+            output_text=draft,
+            user_account_uuid=user.user_account_uuid,
+            project_space_uuid=_snapshot_project_space_uuid(snap),
+            schema_snapshot_uuid=schema_snapshot_uuid,
+        )
+        return draft
     return generate_index_design_spec(data.snapshot_json, mode=mode)
 
 

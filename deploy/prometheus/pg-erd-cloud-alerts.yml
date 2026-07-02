@@ -65,6 +65,17 @@ groups:
           summary: "pg-erd-cloud billing webhook reconciliation is failing"
           description: "Billing webhook authentication or configuration failures occurred in the last 10 minutes."
 
+      - alert: PgErdCloudLlmDraftFailures
+        expr: |
+          increase(llm_draft_requests_total{outcome=~"configuration_error|provider_error|prompt_too_large"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          area: llm-cost-control
+        annotations:
+          summary: "pg-erd-cloud live LLM draft requests are failing"
+          description: "Live LLM draft configuration, prompt-size, or provider failures occurred in the last 10 minutes."
+
       - alert: PgErdCloudJobFailures
         expr: |
           increase(job_queue_jobs_total{outcome="failed"}[10m]) > 0

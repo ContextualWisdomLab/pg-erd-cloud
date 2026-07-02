@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from fastapi import HTTPException
+from prometheus_client import REGISTRY
 
 from app.api import share, snapshots
 from app.auth import CurrentUser
@@ -65,6 +66,33 @@ def _share_audit_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, obje
         if payload.get("event") == "share_audit":
             events.append(payload)
     return events
+
+
+def _llm_usage_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for record in caplog.records:
+        if record.name != "app.llm_usage":
+            continue
+        try:
+            payload = json.loads(record.getMessage())
+        except json.JSONDecodeError:
+            continue
+        if payload.get("event") == "llm_draft_usage":
+            events.append(payload)
+    return events
+
+
+def _llm_draft_metric_value(
+    *,
+    surface: str,
+    artifact: str,
+    outcome: str,
+) -> float:
+    value = REGISTRY.get_sample_value(
+        "llm_draft_requests_total",
+        {"surface": surface, "artifact": artifact, "outcome": outcome},
+    )
+    return float(value or 0.0)
 
 
 @pytest.mark.asyncio
@@ -389,6 +417,61 @@ async def test_snapshot_reversing_draft_hides_llm_configuration_detail(
 
 
 @pytest.mark.asyncio
+async def test_snapshot_reversing_draft_records_usage_metric_and_audit_log(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    project_uuid = uuid.uuid4()
+    snapshot_uuid = uuid.uuid4()
+    user = _current_user()
+
+    async def _authorized_snapshot_with_project(*_: object) -> object:
+        return SimpleNamespace(project_space_uuid=project_uuid)
+
+    async def _draft(_: object) -> str:
+        return "# DB Reversing Specification\n\nDraft"
+
+    monkeypatch.setattr(
+        snapshots, "_get_authorized_snapshot", _authorized_snapshot_with_project
+    )
+    monkeypatch.setattr(snapshots, "generate_reversing_llm_draft", _draft)
+    before = _llm_draft_metric_value(
+        surface="authenticated",
+        artifact="reversing_spec",
+        outcome="success",
+    )
+
+    with caplog.at_level(logging.INFO, logger="app.llm_usage"):
+        result = await snapshots.export_snapshot_reversing_spec(
+            snapshot_uuid,
+            mode="llm-draft",
+            user=user,
+            session=_SnapshotSession(),
+        )
+
+    assert result == "# DB Reversing Specification\n\nDraft"
+    assert (
+        _llm_draft_metric_value(
+            surface="authenticated",
+            artifact="reversing_spec",
+            outcome="success",
+        )
+        == before + 1
+    )
+    events = _llm_usage_events(caplog)
+    assert events
+    assert events[-1]["surface"] == "authenticated"
+    assert events[-1]["artifact"] == "reversing_spec"
+    assert events[-1]["outcome"] == "success"
+    assert events[-1]["user_account_uuid"] == str(user.user_account_uuid)
+    assert events[-1]["project_space_uuid"] == str(project_uuid)
+    assert events[-1]["schema_snapshot_uuid"] == str(snapshot_uuid)
+    assert isinstance(events[-1]["input_chars"], int)
+    assert events[-1]["input_chars"] > 0
+    assert events[-1]["output_chars"] == len(result)
+
+
+@pytest.mark.asyncio
 async def test_snapshot_reversing_draft_rejects_oversized_prompt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -478,6 +561,36 @@ async def test_shared_reversing_draft_disabled_event_is_audited(
     assert events[-1]["outcome"] == "denied"
     assert events[-1]["mode"] == "llm-draft"
     assert events[-1]["error_detail"] == "share link LLM draft is disabled"
+
+
+@pytest.mark.asyncio
+async def test_shared_reversing_draft_disabled_records_usage_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+    before = _llm_draft_metric_value(
+        surface="share_link",
+        artifact="reversing_spec",
+        outcome="disabled",
+    )
+
+    with pytest.raises(HTTPException):
+        await share.export_shared_snapshot_reversing_spec(
+            uuid.uuid4(),
+            uuid.uuid4(),
+            mode="llm-draft",
+            request=_request(),
+            session=_ShareSession(),
+        )
+
+    assert (
+        _llm_draft_metric_value(
+            surface="share_link",
+            artifact="reversing_spec",
+            outcome="disabled",
+        )
+        == before + 1
+    )
 
 
 @pytest.mark.asyncio

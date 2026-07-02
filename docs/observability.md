@@ -52,6 +52,18 @@ When enabled, the backend exposes metrics at:
 - `http_request_duration_seconds_bucket|sum|count{method,route}`
 - `authz_failures_total{status,route,reason}`
 - `share_audit_events_total{action,outcome}`
+- `billing_events_total{provider,event_type,outcome}`
+- `llm_draft_requests_total{surface,artifact,outcome}`
+- `llm_draft_input_chars_bucket|sum|count{surface,artifact}`
+- `llm_draft_output_chars_bucket|sum|count{surface,artifact,outcome}`
+- `product_events_total{area,action,outcome}`
+
+### LLM usage logs
+
+Live LLM draft paths also emit `event=llm_draft_usage` structured logs. These
+logs include `surface`, `artifact`, `outcome`, UUID references, and input/output
+character counts. They intentionally do not include prompt contents, snapshot
+JSON, provider responses, or API keys.
 
 ### Job queue metrics (DB-backed queue)
 
@@ -87,6 +99,9 @@ release approval checklist are fixed in
   - `PgErdCloudShareAbuseOrFailureSpike`: alert when
     `sum by (action,outcome) (rate(share_audit_events_total{outcome=~"denied|failed"}[5m]))`
     > 5/s
+- LLM draft 실패
+  - `PgErdCloudLlmDraftFailures`: alert when live LLM draft configuration,
+    prompt-size, or provider failures occur in the last 10 minutes.
 
 ### Job queue
 

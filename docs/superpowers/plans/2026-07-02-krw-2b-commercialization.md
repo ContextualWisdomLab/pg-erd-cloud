@@ -119,7 +119,8 @@ https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2
 - Observability:
   alerts have owner, severity, threshold, customer impact, and first response
   guidance. Metrics cover auth failures, share failures, billing/license
-  failures, snapshot jobs, queue latency, and restore drills.
+  failures, LLM draft failures, snapshot jobs, queue latency, and restore
+  drills.
 - On-premises package:
   offline license issuance, revocation list update, air-gapped deployment notes,
   backup/restore drill, and upgrade rollback are documented and smoke-tested.

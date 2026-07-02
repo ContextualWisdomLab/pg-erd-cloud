@@ -111,6 +111,8 @@
   (default: `1200`)
   - 인증된 live LLM draft에서도 provider 호출 전 prompt 크기와 출력 토큰 상한을
     강제해 비용 폭주를 줄입니다.
+  - live draft 요청은 `llm_draft_requests_total`, input/output char histogram,
+    `event=llm_draft_usage` 로그로 기록되어 계정/스냅샷 단위 비용 조사가 가능합니다.
 
 ##### Trade-offs / 향후 계획
 

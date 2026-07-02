@@ -79,6 +79,52 @@ BILLING_EVENTS_TOTAL = Counter(
 )
 
 
+LLM_DRAFT_REQUESTS_TOTAL = Counter(
+    "llm_draft_requests_total",
+    "Total live LLM draft requests by surface, artifact, and outcome.",
+    ["surface", "artifact", "outcome"],
+)
+
+
+LLM_DRAFT_INPUT_CHARS = Histogram(
+    "llm_draft_input_chars",
+    "Approximate input snapshot JSON size for live LLM drafts.",
+    ["surface", "artifact"],
+)
+
+
+LLM_DRAFT_OUTPUT_CHARS = Histogram(
+    "llm_draft_output_chars",
+    "Output draft size for live LLM drafts by surface, artifact, and outcome.",
+    ["surface", "artifact", "outcome"],
+)
+
+
+def record_llm_draft_metrics(
+    *,
+    surface: str,
+    artifact: str,
+    outcome: str,
+    input_chars: int,
+    output_chars: int | None = None,
+) -> None:
+    """Record low-cardinality LLM draft usage metrics."""
+    LLM_DRAFT_REQUESTS_TOTAL.labels(
+        surface=surface,
+        artifact=artifact,
+        outcome=outcome,
+    ).inc()
+    LLM_DRAFT_INPUT_CHARS.labels(surface=surface, artifact=artifact).observe(
+        max(input_chars, 0)
+    )
+    if output_chars is not None:
+        LLM_DRAFT_OUTPUT_CHARS.labels(
+            surface=surface,
+            artifact=artifact,
+            outcome=outcome,
+        ).observe(max(output_chars, 0))
+
+
 PRODUCT_EVENTS_TOTAL = Counter(
     "product_events_total",
     "Total product lifecycle events by area, action, and outcome.",

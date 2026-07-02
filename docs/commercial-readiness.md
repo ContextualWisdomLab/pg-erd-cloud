@@ -155,8 +155,12 @@ blocker로 분류합니다.
 - ✅ `docs/operations/migration-rollback.md` 작성 및 운영 복구 문서화
 - ✅ `docs/operations/incident-response.md` 작성 및 1차 대응 흐름 정리
 - ✅ 운영 알림: `deploy/prometheus/pg-erd-cloud-alerts.yml`에 HTTP 5xx, p95 지연,
-  인증/인가 실패, 공유 링크 실패/거부, job 실패/대기시간 alert rule을 추가함
-- 🟡 LLM 비용/사용량의 계정별 한도 및 과금 연동 알림은 별도 사용량 집계 구현이 필요함
+  인증/인가 실패, 공유 링크 실패/거부, LLM draft 실패, job 실패/대기시간 alert rule을 추가함
+- 🆕 LLM 비용/사용량 관측성: live LLM draft 경로에서
+  `llm_draft_requests_total`, input/output char histogram, `event=llm_draft_usage`
+  구조화 로그를 기록해 계정/스냅샷 단위 비용 조사를 할 수 있음
+- 🟡 LLM 비용/사용량의 계정별 hard quota와 과금 provider 연동은 별도 사용량 저장소
+  또는 billing provider 연동이 필요함
 
 ### P2: 일반 판매 권장
 
