@@ -73,6 +73,20 @@ type CurrentUser = {
   display_name: string | null;
 };
 
+type AuthNotice = {
+  title: string;
+  message: string;
+  accountReactivationUrl?: string;
+  billingSupportUrl?: string;
+};
+
+type AccountAwareError = {
+  status?: unknown;
+  accountStatus?: unknown;
+  accountReactivationUrl?: unknown;
+  billingSupportUrl?: unknown;
+};
+
 type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor";
 
 const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
@@ -95,6 +109,54 @@ function isSupportedConnectionDsn(value: string): boolean {
   }
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function accountAwareError(error: unknown): AccountAwareError {
+  return error && typeof error === "object" ? (error as AccountAwareError) : {};
+}
+
+function authNoticeFromError(error: unknown): AuthNotice {
+  const details = accountAwareError(error);
+  const status = typeof details.status === "number" ? details.status : null;
+  const accountStatus = optionalString(details.accountStatus);
+  const accountReactivationUrl = optionalString(details.accountReactivationUrl);
+  const billingSupportUrl = optionalString(details.billingSupportUrl);
+
+  if (status === 403 && accountStatus === "deactivated") {
+    return {
+      title: "계정이 비활성화되었습니다",
+      message:
+        "결제 또는 계약 상태 때문에 계정 접근이 중지되었습니다. 재활성화 또는 지원 채널을 통해 상태를 확인하세요.",
+      accountReactivationUrl,
+      billingSupportUrl,
+    };
+  }
+
+  if (status === 401) {
+    return {
+      title: "인증이 필요합니다",
+      message: "세션이 만료되었거나 로그인되지 않았습니다. 다시 로그인한 뒤 시도하세요.",
+    };
+  }
+
+  if (status === 403) {
+    return {
+      title: "접근 권한이 없습니다",
+      message:
+        "현재 계정에 이 작업공간 접근 권한이 없습니다. 조직 관리자 또는 지원팀에 권한을 확인하세요.",
+      billingSupportUrl,
+    };
+  }
+
+  return {
+    title: "인증 상태를 확인할 수 없습니다",
+    message: "로그인 상태를 확인할 수 없습니다. 잠시 후 다시 시도하거나 지원팀에 문의하세요.",
+    billingSupportUrl,
+  };
+}
+
 function strengthLabel(strength: CardinalityStrength): string {
   if (strength === "recommended") return "추천";
   if (strength === "consider") return "검토";
@@ -105,7 +167,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<AuthNotice | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("demo");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -268,7 +330,7 @@ export default function App() {
         setSelectedProjectId(null);
         setConnections([]);
         setSelectedConnId(null);
-        setAuthError(String(e));
+        setAuthError(authNoticeFromError(e));
       })
       .finally(() => {
         if (isCurrent) setIsAuthLoading(false);
@@ -975,10 +1037,23 @@ export default function App() {
   }
 
   if (!me) {
+    const authNotice =
+      authError ??
+      authNoticeFromError(new Error("Sign in before managing database metadata."));
     return (
       <main id="main" className="authGate">
-        <h1>Authentication required</h1>
-        <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+        <h1>{authNotice.title}</h1>
+        <p role="alert">{authNotice.message}</p>
+        {authNotice.accountReactivationUrl || authNotice.billingSupportUrl ? (
+          <div className="authGate__actions">
+            {authNotice.accountReactivationUrl ? (
+              <a href={authNotice.accountReactivationUrl}>계정 재활성화</a>
+            ) : null}
+            {authNotice.billingSupportUrl ? (
+              <a href={authNotice.billingSupportUrl}>지원팀에 문의</a>
+            ) : null}
+          </div>
+        ) : null}
       </main>
     );
   }

@@ -33,6 +33,30 @@ html, body {
   border-radius: 6px;
 }
 
+.authGate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.authGate__actions a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #034ea2;
+  text-decoration: none;
+}
+
+.authGate__actions a:first-child {
+  border-color: #034ea2;
+  background: #034ea2;
+  color: #fff;
+}
+
 .skip-link {
   position: absolute;
   left: 8px;

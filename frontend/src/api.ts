@@ -6,6 +6,38 @@ const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefine
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 const DEMO_EMPTY_WORKSPACE_QUERY = 'demo-workspace'
 
+type ApiErrorOptions = {
+  accountStatus?: string | null
+  accountReactivationUrl?: string | null
+  billingSupportUrl?: string | null
+}
+
+export class ApiError extends Error {
+  readonly operation: string
+  readonly status: number
+  readonly accountStatus: string | null
+  readonly accountReactivationUrl: string | null
+  readonly billingSupportUrl: string | null
+
+  constructor(operation: string, status: number, options: ApiErrorOptions = {}) {
+    super(`${operation} failed: ${status}`)
+    this.name = 'ApiError'
+    this.operation = operation
+    this.status = status
+    this.accountStatus = options.accountStatus ?? null
+    this.accountReactivationUrl = options.accountReactivationUrl ?? null
+    this.billingSupportUrl = options.billingSupportUrl ?? null
+  }
+}
+
+function apiErrorFromResponse(operation: string, response: Response): ApiError {
+  return new ApiError(operation, response.status, {
+    accountStatus: response.headers.get('X-Account-Status'),
+    accountReactivationUrl: response.headers.get('X-Account-Reactivation-Url'),
+    billingSupportUrl: response.headers.get('X-Billing-Support-Url')
+  })
+}
+
 function isDemoEmptyWorkspace(): boolean {
   if (!DEMO_MODE || typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get(DEMO_EMPTY_WORKSPACE_QUERY) === 'empty'
@@ -127,7 +159,7 @@ export async function getMe(): Promise<{ subject: string; display_name: string |
     return { subject: 'local', display_name: 'Local Designer', user_account_uuid: 'demo-user' }
   }
   const r = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
-  if (!r.ok) throw new Error(`getMe failed: ${r.status}`)
+  if (!r.ok) throw apiErrorFromResponse('getMe', r)
   return r.json()
 }
 

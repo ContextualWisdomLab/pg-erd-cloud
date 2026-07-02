@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
+import { getMe } from './api';
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -23,7 +24,10 @@ vi.mock('./api', () => ({
   getSnapshot: vi.fn(),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe('App accessibility smoke', () => {
   it('exposes navigation, skip link, main landmark, and editor toolbar names', async () => {
@@ -54,5 +58,33 @@ describe('App accessibility smoke', () => {
     expect(
       toolbarQueries.getByRole('button', { name: '공유 및 내보내기' }),
     ).toBeInTheDocument();
+  });
+
+  it('explains account deactivation with reactivation and support links', async () => {
+    vi.mocked(getMe).mockRejectedValueOnce(
+      Object.assign(new Error('getMe failed: 403'), {
+        status: 403,
+        accountStatus: 'deactivated',
+        accountReactivationUrl: 'https://billing.example.com/reactivate',
+        billingSupportUrl: 'https://support.example.com',
+      }),
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: '계정이 비활성화되었습니다',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('결제 또는 계약 상태');
+    expect(screen.getByRole('link', { name: '계정 재활성화' })).toHaveAttribute(
+      'href',
+      'https://billing.example.com/reactivate',
+    );
+    expect(screen.getByRole('link', { name: '지원팀에 문의' })).toHaveAttribute(
+      'href',
+      'https://support.example.com',
+    );
   });
 });
