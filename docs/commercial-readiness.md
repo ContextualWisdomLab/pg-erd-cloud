@@ -236,6 +236,11 @@ blocker로 분류합니다.
 - 🆕 Plan catalog validation: `BILLING_ALLOWED_PLANS`로 plan-change 요청과 billing
   webhook `target_plan`을 configured provider/customer catalog에 대조하고, catalog
   drift는 `rejected_catalog` metric/alert로 노출함
+- 🆕 Billing provider catalog gate:
+  `docs/operations/billing-provider-catalog.example.json`와
+  `scripts/ci/validate_billing_provider_catalog.py`로 checkout/portal/support URL,
+  allowed plan, entitlement event, contract-state event, webhook secret storage
+  reference 누락을 CI에서 검증함
 - 🆕 Billing entitlement evidence/enforcement: `BILLING_ENTITLEMENT_EVENT_TYPES`에
   포함된 최신 billing event의 `target_plan`과 metadata `seat_count`/`seats`류 값을
   support diagnostics에서 현재 plan/contracted seat evidence로 표시하고, 프로젝트
@@ -254,8 +259,8 @@ blocker로 분류합니다.
   operator 화면과 billing event sample을 재현할 수 있으며, Playwright E2E로
   조회 흐름을 검증함
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
-  provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 기반
-  alias/entitlement 운영값 검증과 자동 seat provisioning/deprovisioning은 추가 설계 중
+  provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 운영값
+  승인, 자동 seat provisioning/deprovisioning은 추가 설계 중
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,
   상용 릴리즈 승인 체크리스트를 배포물에 포함함
 - ✅ 승인 기록 형식 검증: `docs/legal/release-approvals/release-approval.example.json`과

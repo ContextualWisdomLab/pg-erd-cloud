@@ -87,6 +87,7 @@
 지원 요청을 받을 때 고객에게 요청할 최소 bundle:
 
 - 배포 commit SHA
+- Billing provider catalog version
 - `alembic current` 출력
 - `compose.prod.yaml` 변경 여부
 - `/healthz` 응답
@@ -98,11 +99,25 @@
 민감값(`APP_SECRET`, DB password, DSN, private key, billing secret, raw provider
 metadata)은 support bundle에 포함하지 않습니다.
 
+## Billing provider catalog
+
+판매 후보는 결제/계약 provider의 실제 plan catalog와 event mapping을
+`docs/operations/billing-provider-catalog.example.json` 형식으로 기록해야 합니다.
+이 manifest는 `BILLING_ALLOWED_PLANS`, checkout/portal/support URL, webhook secret
+storage reference, entitlement event type, contract-state event type을 한 곳에서
+검증합니다.
+
+- `python scripts/ci/validate_billing_provider_catalog.py` 통과
+- raw webhook secret, signature secret, provider API key는 manifest에 넣지 않음
+- provider별 fulfillment SDK를 쓰는 배포라도 manifest의 plan/event 값과 배포 env가
+  일치해야 함
+
 ## Release Gate
 
 온프레미스 판매 후보는 다음을 모두 만족해야 합니다.
 
 - `python scripts/ci/validate_onprem_package.py` 통과
+- `python scripts/ci/validate_billing_provider_catalog.py` 통과
 - `python scripts/ci/validate_restore_drill_manifest.py` 통과
 - `python scripts/ci/validate_commercial_release_approval.py` 통과
 - backend tests, frontend unit/accessibility/E2E/visual/build 통과

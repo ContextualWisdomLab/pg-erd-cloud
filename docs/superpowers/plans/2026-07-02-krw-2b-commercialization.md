@@ -290,6 +290,11 @@ Status:
 - Configurable plan catalog validation is implemented through
   `BILLING_ALLOWED_PLANS` for plan-change requests and billing webhook
   `target_plan` values.
+- Billing provider catalog release gating is implemented through
+  `docs/operations/billing-provider-catalog.example.json` and
+  `scripts/ci/validate_billing_provider_catalog.py`, covering checkout, portal,
+  support URL, allowed plans, entitlement events, contract-state events, and
+  webhook secret storage references.
 - Provider-neutral checkout handoff is implemented through
   `POST /api/billing/checkout` with `BILLING_CHECKOUT_URL` or support fallback.
 - Support diagnostics derive provider-neutral entitlement evidence from the latest
@@ -299,7 +304,7 @@ Status:
   seats when the contracted seat count is already reached, while allowing role
   updates for existing seated members.
 - Remaining gap: provider-specific fulfillment SDKs, customer portal deep
-  integration, and real provider catalog operating values.
+  integration, real provider catalog approval, and automatic seat provisioning.
 
 Tasks:
 

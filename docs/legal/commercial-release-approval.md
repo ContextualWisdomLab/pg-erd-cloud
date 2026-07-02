@@ -10,6 +10,8 @@
 - 개인정보 처리 안내: `docs/legal/privacy-policy.md`
 - SLA/지원 기준: `docs/legal/sla-support.md`
 - 라이선스/결제 운영 기준: `docs/legal/license-billing.md`
+- 결제 provider catalog manifest:
+  `docs/operations/billing-provider-catalog.example.json`
 - 보안 취약점 신고 정책: `SECURITY.md`
 - 운영 runbook:
   - `docs/operations/incident-response.md`
@@ -23,6 +25,8 @@
 - 판매 형태: SaaS, 온프레미스, 또는 하이브리드
 - 계약 플랜: 평가판, 유료 베타, 일반 판매, 엔터프라이즈
 - 결제 방식: 수동 인보이스, 외부 결제 대행, 또는 리셀러 계약
+- 결제/계약 provider catalog: allowed plan, checkout/portal/support URL, entitlement
+  event, contract-state event, webhook secret storage reference
 - 데이터 처리 범위: 앱 메타데이터, 접속 DSN, 스냅샷 JSON, 감사 로그, 지원 로그
 - 보존 기간: 프로젝트/스냅샷/공유 링크/감사 로그/백업별 보존 기간
 - 지원 채널: 계약 이메일, 티켓 시스템, 보안 advisory, 긴급 연락 경로
@@ -59,5 +63,6 @@ CI에서 통과해야 합니다. example 파일은 형식 검증용이며 실제
 - 개인정보 처리 안내가 실제 배포의 제3자 처리자와 맞지 않음
 - SLA/지원 기준에 응답 시간, 제외 범위, 긴급 연락 경로가 없음
 - 라이선스 발급/회수 절차와 고객 계약 조건이 불일치함
+- 실제 결제/계약 catalog manifest가 없거나 배포 env와 불일치함
 - 보안 취약점 신고 경로 또는 triage 책임자가 없음
 - 운영 runbook 없이 데이터 복구, 배포 롤백, 장애 통지가 필요한 계약을 판매함

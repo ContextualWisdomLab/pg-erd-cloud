@@ -48,6 +48,7 @@ REQUIRED_DOCUMENTS = (
     "migration_rollback",
     "on_premises_package",
     "alert_thresholds",
+    "billing_provider_catalog",
 )
 
 PLACEHOLDER_RE = re.compile(r"\b(tbd|todo|fixme|pending|placeholder)\b|[<>]", re.IGNORECASE)

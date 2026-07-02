@@ -1,0 +1,78 @@
+{
+  "catalog_version": "2026-07-02-enterprise-catalog",
+  "effective_date": "2026-07-02",
+  "provider": "stripe",
+  "checkout_url": "https://billing.example.com/checkout",
+  "portal_url": "https://billing.example.com/portal",
+  "support_url": "https://support.example.com/billing",
+  "webhook_auth": {
+    "shared_secret_env": "BILLING_WEBHOOK_SECRET",
+    "signature_secret_env": "BILLING_WEBHOOK_SIGNATURE_SECRET"
+  },
+  "allowed_plans": [
+    {
+      "plan_id": "enterprise",
+      "display_name": "Enterprise",
+      "billing_method": "subscription",
+      "contract_currency": "KRW",
+      "fulfillment_owner": "Billing Ops billing@example.com",
+      "entitlement_event_types": [
+        "checkout.completed",
+        "invoice.paid",
+        "subscription.updated"
+      ],
+      "contract_state_active_event_types": [
+        "contract.activated",
+        "contract.reactivated"
+      ],
+      "contract_state_deactivated_event_types": [
+        "contract.suspended"
+      ],
+      "seat_count_required": true,
+      "support_sla": "business-critical"
+    },
+    {
+      "plan_id": "onprem-enterprise",
+      "display_name": "On-premises Enterprise",
+      "billing_method": "external_contract_invoice",
+      "contract_currency": "KRW",
+      "fulfillment_owner": "Contract Ops contracts@example.com",
+      "entitlement_event_types": [
+        "contract.activated",
+        "contract.reactivated"
+      ],
+      "contract_state_active_event_types": [
+        "contract.activated",
+        "contract.reactivated"
+      ],
+      "contract_state_deactivated_event_types": [
+        "contract.suspended"
+      ],
+      "seat_count_required": true,
+      "support_sla": "business-critical"
+    }
+  ],
+  "event_type_aliases": [
+    {
+      "source": "stripe:customer.subscription.deleted",
+      "target": "contract.suspended"
+    },
+    {
+      "source": "stripe:checkout.session.completed",
+      "target": "checkout.completed"
+    }
+  ],
+  "required_environment": {
+    "BILLING_ALLOWED_PLANS": "enterprise,onprem-enterprise",
+    "BILLING_CHECKOUT_URL": "https://billing.example.com/checkout",
+    "BILLING_PORTAL_URL": "https://billing.example.com/portal",
+    "BILLING_SUPPORT_URL": "https://support.example.com/billing",
+    "BILLING_WEBHOOK_SECRET": "secret-manager:pg-erd-cloud/billing-webhook-secret",
+    "BILLING_WEBHOOK_SIGNATURE_SECRET": "secret-manager:pg-erd-cloud/billing-webhook-signature",
+    "BILLING_EVENT_TYPE_ALIASES": "stripe:customer.subscription.deleted=contract.suspended,stripe:checkout.session.completed=checkout.completed",
+    "BILLING_ENTITLEMENT_EVENT_TYPES": "checkout.completed,invoice.paid,subscription.updated,contract.activated,contract.reactivated",
+    "BILLING_CONTRACT_STATE_EVENTS_ENABLED": "true",
+    "BILLING_CONTRACT_ACTIVE_EVENT_TYPES": "contract.activated,contract.reactivated",
+    "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES": "contract.suspended"
+  }
+}

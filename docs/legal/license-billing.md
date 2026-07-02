@@ -191,6 +191,11 @@
   catalog에 없으면 `422 target plan is not in configured billing catalog`로
   거절합니다. Billing webhook 거절은
   `billing_events_total{outcome="rejected_catalog"}`로 기록됩니다.
+- 판매 후보 릴리즈는 `docs/operations/billing-provider-catalog.example.json` 형식의
+  billing provider catalog manifest를 실제 provider/customer catalog 값으로 복사해
+  유지해야 합니다. `python scripts/ci/validate_billing_provider_catalog.py`는 checkout,
+  portal, support URL, allowed plan, entitlement event, contract-state event, webhook
+  secret storage reference가 빠졌는지 검증합니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙

@@ -21,6 +21,8 @@ REQUIRED_FILES = (
     "docs/operations/restore-drills/restore-drill.example.json",
     "docs/operations/migration-rollback.md",
     "docs/operations/on-premises-package.md",
+    "docs/operations/billing-provider-catalog.example.json",
+    "scripts/ci/validate_billing_provider_catalog.py",
     "scripts/ci/validate_restore_drill_manifest.py",
 )
 
@@ -63,6 +65,7 @@ LICENSE_DOC_REQUIRED_SNIPPETS = (
     "BILLING_WEBHOOK_SIGNATURE_SECRET",
     "GET /api/billing/support/account",
     "support_operator: true",
+    "billing-provider-catalog.example.json",
 )
 
 BACKUP_DOC_REQUIRED_SNIPPETS = (
@@ -90,6 +93,8 @@ ONPREM_DOC_REQUIRED_SNIPPETS = (
     "Rollback drill",
     "Support bundle",
     "Air-gapped",
+    "Billing provider catalog",
+    "python scripts/ci/validate_billing_provider_catalog.py",
     "python scripts/ci/validate_restore_drill_manifest.py",
 )
 
