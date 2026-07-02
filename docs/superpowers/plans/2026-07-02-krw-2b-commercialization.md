@@ -446,6 +446,9 @@ Tasks:
   - Implemented: repository-local non-example evidence validation, so committed
     real evidence files must pass the same validator and sample-marker checks as
     explicit external evidence paths.
+  - Implemented: top-level `sale_blockers` audit output, so a buyer or release
+    owner can see the exact schema validator failure or missing real-evidence
+    reason without reconstructing it from per-gate details.
 
 Verification:
 

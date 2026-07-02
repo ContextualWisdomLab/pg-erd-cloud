@@ -235,6 +235,43 @@ def _real_evidence_gate(
     }
 
 
+def _sale_blockers(
+    validator_results: list[dict[str, Any]],
+    evidence_gates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    for result in validator_results:
+        if result["passed"]:
+            continue
+        blockers.append(
+            {
+                "type": "schema_validator",
+                "id": result["id"],
+                "reason": "Required commercial readiness validator failed.",
+                "script": result["script"],
+                "paths": result["paths"],
+                "stderr": result["stderr"],
+            }
+        )
+    for gate in evidence_gates:
+        if gate["status"] == "ready":
+            continue
+        blockers.append(
+            {
+                "type": "real_evidence",
+                "id": gate["id"],
+                "label": gate["label"],
+                "required_for": gate["required_for"],
+                "reason": gate["no_go_reason"],
+                "repo_real_evidence_files": gate["repo_real_evidence_files"],
+                "repo_sample_markers": gate["repo_sample_markers"],
+                "explicit_evidence_files": gate["explicit_evidence_files"],
+                "explicit_sample_markers": gate["explicit_sample_markers"],
+            }
+        )
+    return blockers
+
+
 def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | None = None) -> dict[str, Any]:
     explicit_evidence_paths = explicit_evidence_paths or {}
     validator_results = [
@@ -298,6 +335,7 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
     ]
     evidence_ready = all(gate["status"] == "ready" for gate in evidence_gates)
     sale_ready = schema_ready and evidence_ready
+    sale_blockers = _sale_blockers(validator_results, evidence_gates)
     return {
         "generated_at": _utc_now(),
         "sale_ready": sale_ready,
@@ -305,6 +343,7 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
         "real_evidence_ready": evidence_ready,
         "validator_results": validator_results,
         "real_evidence_gates": evidence_gates,
+        "sale_blockers": sale_blockers,
         "decision": "ready_for_sale" if sale_ready else "not_ready_for_sale",
         "review_queue_is_blocker": False,
         "queued_checks_are_blocker": False,

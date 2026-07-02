@@ -39,6 +39,9 @@ def test_report_flags_example_only_evidence() -> None:
     assert "signed_release_approval" in no_go_ids
     assert "customer_rollback_drill" in no_go_ids
     assert "real_billing_provider_catalog" in no_go_ids
+    assert {blocker["id"] for blocker in report["sale_blockers"]} == no_go_ids
+    assert all(blocker["type"] == "real_evidence" for blocker in report["sale_blockers"])
+    assert all(blocker["reason"] for blocker in report["sale_blockers"])
     assert report["review_queue_is_blocker"] is False
     assert report["queued_checks_are_blocker"] is False
 
@@ -58,6 +61,7 @@ def test_report_can_write_json(tmp_path: pathlib.Path) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["decision"] == "not_ready_for_sale"
     assert payload["schema_ready"] is True
+    assert payload["sale_blockers"]
 
 
 def copy_example(path: pathlib.Path, target_dir: pathlib.Path, name: str) -> pathlib.Path:
@@ -204,6 +208,7 @@ def test_report_accepts_explicit_real_evidence_paths(tmp_path: pathlib.Path) -> 
     assert report["real_evidence_ready"] is True
     assert report["sale_ready"] is True
     assert report["decision"] == "ready_for_sale"
+    assert report["sale_blockers"] == []
     for gate in report["real_evidence_gates"]:
         assert gate["status"] == "ready"
         assert gate["explicit_validator_passed"] is True
@@ -262,6 +267,19 @@ def test_repo_real_evidence_rejects_sample_markers(
     assert gate["repo_validator_passed"] is True
     assert gate["repo_sample_markers"]
     assert gate["no_go_reason"] == "Repository evidence files still contain example or synthetic evidence markers."
+    assert report["sale_blockers"] == [
+        {
+            "type": "real_evidence",
+            "id": "support_bundle_evidence",
+            "label": "Redacted customer support bundle evidence",
+            "required_for": "paid_pilot_support",
+            "reason": "Repository evidence files still contain example or synthetic evidence markers.",
+            "repo_real_evidence_files": [str(evidence_dir / "support-bundle.customer.json")],
+            "repo_sample_markers": gate["repo_sample_markers"],
+            "explicit_evidence_files": [],
+            "explicit_sample_markers": [],
+        }
+    ]
 
 
 def test_repo_real_evidence_accepts_sanitized_manifest(
@@ -285,3 +303,4 @@ def test_repo_real_evidence_accepts_sanitized_manifest(
     assert gate["status"] == "ready"
     assert gate["repo_validator_passed"] is True
     assert gate["repo_sample_markers"] == []
+    assert report["sale_blockers"] == []
