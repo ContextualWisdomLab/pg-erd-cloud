@@ -75,7 +75,7 @@ operational reliability, and support burden.
 | Share/export success rate | 95% for supported export paths | 98% | share-link creation measured by `product_events_total` and share audit metrics |
 | License validation success | 99% valid commercial tokens accepted | 99.9% | partially measured by tests |
 | Billing reconciliation success | 99% provider events applied or queued for support review | 99.9% | partially measured by tests and `billing_events_total` |
-| LLM draft cost-control evidence | every live draft has usage evidence and provider failures alert | per-account quota and billing attribution | fixed-window account/share quota implemented; monthly billing attribution missing |
+| LLM draft cost-control evidence | every live draft has usage evidence and provider failures alert | per-account quota and billing attribution | fixed-window account/share quota and monthly account attribution implemented; provider invoice reconciliation still needs pilot/provider data |
 | Backup restore drill | one successful drill before paid pilot | quarterly successful drills | measured by restore drill manifest validator example; real pilot evidence pending |
 | Incident first response | within one business day | SLA-specific response time | documented, not measured |
 | Support touches per activation | under 2 support touches | under 1 | missing |
@@ -137,7 +137,8 @@ operational reliability, and support burden.
   provider event alias normalization, entitlement evidence, member-invite seat-limit
   enforcement, plan catalog validation, billing webhook outcome metrics,
   product lifecycle outcome metrics for project/connection/snapshot/share-link
-  creation, LLM draft usage/failure metrics and audit logs,
+  creation, LLM draft usage/failure metrics, audit logs, monthly account
+  attribution API,
   read-only support diagnostics with recent share-link summaries and redacted
   provider metadata summaries,
   operator-only support diagnostics UI, support diagnostics demo evidence,
@@ -145,5 +146,5 @@ operational reliability, and support burden.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation
   rates, support effort, and buyer conversion.
 - Missing today: real customer interviews, paid pilot data, procurement notes,
-  pricing sensitivity, support workload, production telemetry, and provider-backed
-  per-account LLM cost attribution.
+  pricing sensitivity, support workload, production telemetry, and provider invoice
+  reconciliation data.

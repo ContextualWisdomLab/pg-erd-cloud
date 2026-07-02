@@ -10,7 +10,7 @@ from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from sqlalchemy import desc, distinct, func, or_, select
+from sqlalchemy import case, desc, distinct, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
@@ -25,6 +25,7 @@ from app.db import get_read_session, get_session
 from app.models import (
     BillingEvent,
     DbConnection,
+    LlmDraftUsageEvent,
     ProjectMember,
     ProjectSpace,
     SchemaSnapshot,
@@ -40,6 +41,7 @@ from app.schemas import (
     BillingEventIn,
     BillingEventOut,
     BillingEventSummaryOut,
+    BillingLlmUsageOut,
     BillingPlanChangeIn,
     BillingPlanChangeOut,
     BillingSupportAccountOut,
@@ -78,6 +80,16 @@ class BillingUsageCounts:
     snapshot_count: int
     share_link_count: int
     active_share_link_count: int
+
+
+@dataclass(frozen=True)
+class BillingLlmUsageCounts:
+    request_count: int
+    success_count: int
+    failure_count: int
+    quota_exceeded_count: int
+    input_chars: int
+    output_chars: int
 
 
 def _license_verifier_kind() -> LicenseVerifierKind:
@@ -198,6 +210,75 @@ async def _usage_counts_for_owner(
                 or_(ShareLink.expires_at.is_(None), ShareLink.expires_at > now),
             ),
         ),
+    )
+
+
+def _billing_month_window(month: str | None) -> tuple[str, dt.datetime, dt.datetime]:
+    if month is None:
+        now = utcnow()
+        month = f"{now.year:04d}-{now.month:02d}"
+    try:
+        start = dt.datetime.strptime(month, "%Y-%m").replace(tzinfo=dt.timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="month must use YYYY-MM") from exc
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+    return month, start, end
+
+
+async def _llm_usage_counts_for_account(
+    session: AsyncSession,
+    user_account_uuid: uuid.UUID,
+    *,
+    start: dt.datetime,
+    end: dt.datetime,
+) -> BillingLlmUsageCounts:
+    result = await session.execute(
+        select(
+            func.count().label("request_count"),
+            func.coalesce(
+                func.sum(
+                    case((LlmDraftUsageEvent.outcome == "success", 1), else_=0)
+                ),
+                0,
+            ).label("success_count"),
+            func.coalesce(
+                func.sum(
+                    case((LlmDraftUsageEvent.outcome != "success", 1), else_=0)
+                ),
+                0,
+            ).label("failure_count"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (LlmDraftUsageEvent.outcome == "quota_exceeded", 1),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("quota_exceeded_count"),
+            func.coalesce(func.sum(LlmDraftUsageEvent.input_chars), 0).label(
+                "input_chars"
+            ),
+            func.coalesce(func.sum(LlmDraftUsageEvent.output_chars), 0).label(
+                "output_chars"
+            ),
+        ).where(
+            LlmDraftUsageEvent.user_account_uuid == user_account_uuid,
+            LlmDraftUsageEvent.occurred_at >= start,
+            LlmDraftUsageEvent.occurred_at < end,
+        )
+    )
+    row = result.one()._mapping
+    return BillingLlmUsageCounts(
+        request_count=int(row["request_count"] or 0),
+        success_count=int(row["success_count"] or 0),
+        failure_count=int(row["failure_count"] or 0),
+        quota_exceeded_count=int(row["quota_exceeded_count"] or 0),
+        input_chars=int(row["input_chars"] or 0),
+        output_chars=int(row["output_chars"] or 0),
     )
 
 
@@ -488,6 +569,32 @@ async def get_billing_usage(
         connection_limit=settings.billing_max_connections_per_project,
         snapshot_limit=settings.billing_max_snapshots_per_project,
         share_link_limit=settings.billing_max_share_links_per_project,
+    )
+
+
+@router.get("/llm-usage", response_model=BillingLlmUsageOut)
+async def get_billing_llm_usage(
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> BillingLlmUsageOut:
+    """Return monthly LLM draft usage for account-level billing attribution."""
+    normalized_month, start, end = _billing_month_window(month)
+    counts = await _llm_usage_counts_for_account(
+        session,
+        user.user_account_uuid,
+        start=start,
+        end=end,
+    )
+    return BillingLlmUsageOut(
+        scope="account",
+        month=normalized_month,
+        request_count=counts.request_count,
+        success_count=counts.success_count,
+        failure_count=counts.failure_count,
+        quota_exceeded_count=counts.quota_exceeded_count,
+        input_chars=counts.input_chars,
+        output_chars=counts.output_chars,
     )
 
 

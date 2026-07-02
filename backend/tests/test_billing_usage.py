@@ -42,6 +42,30 @@ class FakeSession:
         return FakeResult(value)
 
 
+class FakeLlmUsageRow:
+    def __init__(self, values: dict[str, int]) -> None:
+        self._mapping = values
+
+
+class FakeLlmUsageResult:
+    def __init__(self, values: dict[str, int]) -> None:
+        self.values = values
+
+    def one(self) -> FakeLlmUsageRow:
+        return FakeLlmUsageRow(self.values)
+
+
+class FakeLlmUsageSession:
+    def __init__(self, values: dict[str, int]) -> None:
+        self.values = values
+        self.statement_count = 0
+
+    async def execute(self, stmt: object) -> FakeLlmUsageResult:
+        del stmt
+        self.statement_count += 1
+        return FakeLlmUsageResult(self.values)
+
+
 class FakeBillingEventResult:
     def __init__(self, event: BillingEvent | None) -> None:
         self.event = event
@@ -257,6 +281,46 @@ def test_billing_usage_reports_no_license_verifier_when_unconfigured(
     assert response.json()["billing_portal_url"] is None
     assert response.json()["billing_support_url"] is None
     assert response.json()["account_reactivation_url"] is None
+
+
+def test_billing_llm_usage_returns_monthly_account_attribution() -> None:
+    session = FakeLlmUsageSession(
+        {
+            "request_count": 4,
+            "success_count": 2,
+            "failure_count": 2,
+            "quota_exceeded_count": 1,
+            "input_chars": 12000,
+            "output_chars": 3400,
+        }
+    )
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+    app.dependency_overrides[get_read_session] = lambda: session
+
+    response = TestClient(app).get("/api/billing/llm-usage?month=2026-07")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "scope": "account",
+        "month": "2026-07",
+        "request_count": 4,
+        "success_count": 2,
+        "failure_count": 2,
+        "quota_exceeded_count": 1,
+        "input_chars": 12000,
+        "output_chars": 3400,
+    }
+    assert session.statement_count == 1
+
+
+def test_billing_llm_usage_rejects_invalid_month() -> None:
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+    app.dependency_overrides[get_read_session] = lambda: FakeLlmUsageSession({})
+
+    response = TestClient(app).get("/api/billing/llm-usage?month=2026-13")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "month must use YYYY-MM"
 
 
 def test_billing_plan_change_returns_portal_url_with_target_plan(

@@ -179,8 +179,11 @@ blocker로 분류합니다.
 - 🆕 LLM draft fixed-window hard gate: 인증 경로는 account UUID, 공유 경로는
   share-link UUID 기준으로 `LLM_DRAFT_QUOTA_*`를 적용하고, 초과 시 provider 호출 전
   `429`와 `event=llm_draft_usage outcome=quota_exceeded`를 기록함
-- 🟡 LLM 비용/사용량의 월간 billing attribution과 provider 과금 연동은 별도 사용량
-  저장소 또는 billing provider 연동이 필요함
+- 🆕 LLM 월간 billing attribution: `llm_draft_usage_event` ledger와
+  `GET /api/billing/llm-usage?month=YYYY-MM`를 추가해 account 단위 요청 수,
+  성공/실패/quota 초과, input/output 문자량을 provider invoice 대조용으로 조회함
+- 🟡 provider 과금 연동은 여전히 실제 provider invoice/catalog와 대조하는 fulfillment
+  단계가 필요함
 - 🆕 PR #415 상용화 증거 보드: 구현 완료 항목, Product Design 증거, Data
   Analytics/KPI 계획, GitHub queued 상태, 잔여 sale-quality blocker를 Figma
   섹션과 repository screenshot으로 보존함

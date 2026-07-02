@@ -14,7 +14,7 @@ from prometheus_client import REGISTRY
 from app import llm_quota
 from app.api import share, snapshots
 from app.auth import CurrentUser
-from app.models import SchemaSnapshot, SchemaSnapshotData, ShareLink
+from app.models import LlmDraftUsageEvent, SchemaSnapshot, SchemaSnapshotData, ShareLink
 from app.settings import settings
 from app.spec.llm import (
     LlmConfigurationError,
@@ -206,14 +206,26 @@ async def test_generate_reversing_llm_draft_rejects_invalid_json(
 
 
 class _SnapshotSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+        self.committed = 0
+
     async def get(self, model: object, _: uuid.UUID) -> object:
         assert model is SchemaSnapshotData
         return SimpleNamespace(snapshot_json=_snapshot())
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        self.committed += 1
 
 
 class _ShareSession:
     def __init__(self) -> None:
         self.project_space_uuid = uuid.uuid4()
+        self.added: list[object] = []
+        self.committed = 0
 
     async def get(self, model: object, _: uuid.UUID) -> object:
         if model is ShareLink:
@@ -225,6 +237,12 @@ class _ShareSession:
             return SimpleNamespace(project_space_uuid=self.project_space_uuid)
         assert model is SchemaSnapshotData
         return SimpleNamespace(snapshot_json=_snapshot())
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        self.committed += 1
 
 
 class _ShareLinkScalars:
@@ -441,16 +459,27 @@ async def test_snapshot_reversing_draft_records_usage_metric_and_audit_log(
         artifact="reversing_spec",
         outcome="success",
     )
+    session = _SnapshotSession()
 
     with caplog.at_level(logging.INFO, logger="app.llm_usage"):
         result = await snapshots.export_snapshot_reversing_spec(
             snapshot_uuid,
             mode="llm-draft",
             user=user,
-            session=_SnapshotSession(),
+            session=session,
         )
 
     assert result == "# DB Reversing Specification\n\nDraft"
+    assert session.committed == 1
+    assert len(session.added) == 1
+    assert isinstance(session.added[0], LlmDraftUsageEvent)
+    usage_event = session.added[0]
+    assert usage_event.subject == user.subject
+    assert usage_event.user_account_uuid == user.user_account_uuid
+    assert usage_event.project_space_uuid == project_uuid
+    assert usage_event.schema_snapshot_uuid == snapshot_uuid
+    assert usage_event.outcome == "success"
+    assert usage_event.output_chars == len(result)
     assert (
         _llm_draft_metric_value(
             surface="authenticated",
@@ -626,6 +655,7 @@ async def test_shared_reversing_draft_disabled_records_usage_metric(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+    session = _ShareSession()
     before = _llm_draft_metric_value(
         surface="share_link",
         artifact="reversing_spec",
@@ -638,9 +668,13 @@ async def test_shared_reversing_draft_disabled_records_usage_metric(
             uuid.uuid4(),
             mode="llm-draft",
             request=_request(),
-            session=_ShareSession(),
+            session=session,
         )
 
+    assert session.committed == 1
+    assert len(session.added) == 1
+    assert isinstance(session.added[0], LlmDraftUsageEvent)
+    assert session.added[0].outcome == "disabled"
     assert (
         _llm_draft_metric_value(
             surface="share_link",

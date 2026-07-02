@@ -149,6 +149,19 @@ class BillingUsageOut(BaseModel):
     share_link_limit: int = Field(ge=0)
 
 
+class BillingLlmUsageOut(BaseModel):
+    """Monthly account-level LLM draft usage for billing attribution."""
+
+    scope: Literal["account"]
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    request_count: int = Field(ge=0)
+    success_count: int = Field(ge=0)
+    failure_count: int = Field(ge=0)
+    quota_exceeded_count: int = Field(ge=0)
+    input_chars: int = Field(ge=0)
+    output_chars: int = Field(ge=0)
+
+
 class BillingPlanChangeIn(BaseModel):
     """Request body for starting a billing plan-change flow."""
 

@@ -71,8 +71,11 @@
   - `billing_portal_url`, `billing_support_url`, `account_reactivation_url`
 - live LLM draft 비용 폭주는 `LLM_DRAFT_QUOTA_ENABLED`,
   `LLM_DRAFT_QUOTA_REQUESTS`, `LLM_DRAFT_QUOTA_WINDOW_SECONDS`로 provider 호출 전
-  차단합니다. 이 quota는 운영 비용 방어선이며, 월간 과금 attribution 또는 provider
-  invoice 정산을 대체하지 않습니다.
+  차단합니다.
+- live LLM draft는 `llm_draft_usage_event`에 저장되며,
+  `GET /api/billing/llm-usage?month=YYYY-MM`가 account 단위 월간 요청 수,
+  성공/실패/quota 초과, input/output 문자량을 반환합니다. 이 값은 provider invoice
+  대조용 attribution 근거이며, 실제 invoice 정산 자체를 대체하지 않습니다.
 - `POST /api/billing/checkout`은 `{ "target_plan": "enterprise-plus" }`
   요청을 받아 결제 시작 경로를 반환합니다.
   - `BILLING_CHECKOUT_URL`이 있으면 `target_plan` query를 붙인 checkout redirect

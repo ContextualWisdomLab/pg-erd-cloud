@@ -247,3 +247,56 @@ class BillingEvent(Base):
         ),
         Index("ix_billing_event__subject_received_at", "subject", "received_at"),
     )
+
+
+class LlmDraftUsageEvent(Base):
+    """Persistent LLM draft usage evidence for billing attribution."""
+
+    __tablename__ = "llm_draft_usage_event"
+
+    llm_draft_usage_event_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    surface: Mapped[str] = mapped_column(Text())
+    artifact: Mapped[str] = mapped_column(Text())
+    outcome: Mapped[str] = mapped_column(Text())
+    subject: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    user_account_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    project_space_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    schema_snapshot_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    share_link_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("share_link.share_link_uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    input_chars: Mapped[int] = mapped_column(Integer())
+    output_chars: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    occurred_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_llm_draft_usage_event__account_month",
+            "user_account_uuid",
+            "occurred_at",
+        ),
+        Index(
+            "ix_llm_draft_usage_event__project_month",
+            "project_space_uuid",
+            "occurred_at",
+        ),
+    )

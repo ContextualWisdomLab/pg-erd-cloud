@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.llm_quota import enforce_llm_draft_quota
-from app.llm_usage import record_llm_draft_usage
+from app.llm_usage import record_persistent_llm_draft_usage
 from app.metrics import record_product_event
 from app.models import (
     DbConnection,
@@ -82,6 +82,7 @@ async def _get_authorized_snapshot(
 
 async def _enforce_authenticated_llm_draft_quota(
     *,
+    session: AsyncSession,
     artifact: str,
     snapshot_json: dict,
     user: CurrentUser,
@@ -91,11 +92,13 @@ async def _enforce_authenticated_llm_draft_quota(
     try:
         await enforce_llm_draft_quota(f"account:{user.user_account_uuid}")
     except HTTPException:
-        record_llm_draft_usage(
+        await record_persistent_llm_draft_usage(
+            session,
             surface="authenticated",
             artifact=artifact,
             outcome="quota_exceeded",
             snapshot_json=snapshot_json,
+            subject=user.subject,
             user_account_uuid=user.user_account_uuid,
             project_space_uuid=_snapshot_project_space_uuid(snap),
             schema_snapshot_uuid=schema_snapshot_uuid,
@@ -213,7 +216,7 @@ async def export_snapshot_reversing_spec(
     schema_snapshot_uuid: uuid.UUID,
     mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    session: AsyncSession = Depends(get_session),
 ) -> str:
     """Export a snapshot as a DB reversing spec or LLM prompt."""
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
@@ -224,6 +227,7 @@ async def export_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         await _enforce_authenticated_llm_draft_quota(
+            session=session,
             artifact="reversing_spec",
             snapshot_json=data.snapshot_json,
             user=user,
@@ -233,11 +237,13 @@ async def export_snapshot_reversing_spec(
         try:
             draft = await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="reversing_spec",
                 outcome="configuration_error",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -247,11 +253,13 @@ async def export_snapshot_reversing_spec(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="reversing_spec",
                 outcome="prompt_too_large",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -259,11 +267,13 @@ async def export_snapshot_reversing_spec(
             )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="reversing_spec",
                 outcome="provider_error",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -272,12 +282,14 @@ async def export_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-        record_llm_draft_usage(
+        await record_persistent_llm_draft_usage(
+            session,
             surface="authenticated",
             artifact="reversing_spec",
             outcome="success",
             snapshot_json=data.snapshot_json,
             output_text=draft,
+            subject=user.subject,
             user_account_uuid=user.user_account_uuid,
             project_space_uuid=_snapshot_project_space_uuid(snap),
             schema_snapshot_uuid=schema_snapshot_uuid,
@@ -294,7 +306,7 @@ async def export_snapshot_index_design(
     schema_snapshot_uuid: uuid.UUID,
     mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    session: AsyncSession = Depends(get_session),
 ) -> str:
     """Export table/index design guidance or an LLM prompt."""
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
@@ -305,6 +317,7 @@ async def export_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         await _enforce_authenticated_llm_draft_quota(
+            session=session,
             artifact="index_design",
             snapshot_json=data.snapshot_json,
             user=user,
@@ -314,11 +327,13 @@ async def export_snapshot_index_design(
         try:
             draft = await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="index_design",
                 outcome="configuration_error",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -328,11 +343,13 @@ async def export_snapshot_index_design(
                 status_code=503, detail="LLM configuration error"
             ) from exc
         except LlmPromptTooLargeError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="index_design",
                 outcome="prompt_too_large",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -340,11 +357,13 @@ async def export_snapshot_index_design(
             )
             raise HTTPException(status_code=413, detail="LLM prompt too large") from exc
         except LlmProviderError as exc:
-            record_llm_draft_usage(
+            await record_persistent_llm_draft_usage(
+                session,
                 surface="authenticated",
                 artifact="index_design",
                 outcome="provider_error",
                 snapshot_json=data.snapshot_json,
+                subject=user.subject,
                 user_account_uuid=user.user_account_uuid,
                 project_space_uuid=_snapshot_project_space_uuid(snap),
                 schema_snapshot_uuid=schema_snapshot_uuid,
@@ -353,12 +372,14 @@ async def export_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-        record_llm_draft_usage(
+        await record_persistent_llm_draft_usage(
+            session,
             surface="authenticated",
             artifact="index_design",
             outcome="success",
             snapshot_json=data.snapshot_json,
             output_text=draft,
+            subject=user.subject,
             user_account_uuid=user.user_account_uuid,
             project_space_uuid=_snapshot_project_space_uuid(snap),
             schema_snapshot_uuid=schema_snapshot_uuid,
