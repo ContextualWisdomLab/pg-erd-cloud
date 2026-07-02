@@ -64,3 +64,41 @@ async def test_introspect_database_dispatches_by_dialect(
         ("postgresql", "postgresql://u:p@db/app", "public"),
         ("snowflake", "snowflake://u:p@acct/APP/PUBLIC", None),
     ]
+
+
+@pytest.mark.asyncio
+async def test_introspect_database_redacts_password_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_postgres(dsn: str, schema_filter: str | None) -> dict:
+        raise RuntimeError(
+            "failed to connect to postgresql://user:supersecretpass@localhost/db"
+        )
+
+    monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await db_introspect.introspect_database(
+            "postgresql://user:supersecretpass@localhost/db", None
+        )
+
+    assert "supersecretpass" not in str(exc_info.value)
+    assert "postgresql://user:***@localhost/db" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_introspect_database_redacts_query_secret_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_postgres(dsn: str, schema_filter: str | None) -> dict:
+        raise RuntimeError("driver failed with password=q/secret")
+
+    monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await db_introspect.introspect_database(
+            "postgresql://user@localhost/db?password=q%2Fsecret", None
+        )
+
+    assert "q/secret" not in str(exc_info.value)
+    assert "password=***" in str(exc_info.value)
