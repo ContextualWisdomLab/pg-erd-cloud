@@ -96,8 +96,9 @@ blocker로 분류합니다.
 - ✅ `docs/operations/backup-restore.md` 추가로 앱 DB 복구 절차 기초 정립
 - ✅ `docs/operations/migration-rollback.md` 작성 및 운영 복구 문서화
 - ✅ `docs/operations/incident-response.md` 작성 및 1차 대응 흐름 정리
-- 🟡 운영 알림(LLM 비용/오류율, 공유 링크 남용) 임계치 정책 문서·구성 미완
-- 🆕 임시 경보 임계치와 탐지 지표(`authz_failures_total`, `share_audit_events_total`)를 기준으로 1차 운영 대응 체계를 고도화함
+- ✅ 운영 알림: `deploy/prometheus/pg-erd-cloud-alerts.yml`에 HTTP 5xx, p95 지연,
+  인증/인가 실패, 공유 링크 실패/거부, job 실패/대기시간 alert rule을 추가함
+- 🟡 LLM 비용/사용량의 계정별 한도 및 과금 연동 알림은 별도 사용량 집계 구현이 필요함
 
 ### P2: 일반 판매 권장
 

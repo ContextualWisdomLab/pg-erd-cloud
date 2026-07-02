@@ -4,7 +4,7 @@ This document defines the **minimum observability baseline** for `pg-erd-cloud`:
 
 - Central **structured logs** (JSON)
 - Basic **metrics** (Prometheus exposition)
-- Suggested **alert thresholds**
+- Deployable **alert thresholds**
 
 Scope is intentionally small (issue #49) and can be expanded once the runtime
 stack (Kubernetes/VM, managed monitoring, etc.) is finalized.
@@ -62,29 +62,38 @@ When enabled, the backend exposes metrics at:
 - `job_queue_processing_seconds_bucket|sum|count{job_type,outcome}`
   - handler runtime
 
-## 3) Alerting (suggested baseline)
+## 3) Alerting baseline
 
-Tune thresholds per environment; these are reasonable starting points.
+The deployable Prometheus rule file is:
+
+- `deploy/prometheus/pg-erd-cloud-alerts.yml`
+
+Tune thresholds per environment; the checked-in defaults are the commercial
+readiness baseline.
 
 ### API
 
 - 5xx error spike
-  - alert when `5xx / total` > 1% for 5 minutes
+  - `PgErdCloudHigh5xxRate`: alert when `5xx / total` > 1% for 5 minutes
 - Latency regression
-  - alert when p95 latency > 1s for 10 minutes (per route group)
+  - `PgErdCloudHighRouteLatency`: alert when p95 latency > 1s for 10 minutes
+    (per route group)
 - 인증/인가 실패 급증
-  - alert when `sum by (route,reason) (rate(authz_failures_total[5m]))` > 10/s
-    (또는 401/403 비율이 동시간 대비 급증할 때)
+  - `PgErdCloudAuthzFailureSpike`: alert when
+    `sum by (route,reason) (rate(authz_failures_total[5m]))` > 10/s
 - 공유 감사 실패/비정상
-  - alert when `sum by (action,outcome) (rate(share_audit_events_total{outcome=~"denied|failed"}[5m]))` > 5/s
+  - `PgErdCloudShareAbuseOrFailureSpike`: alert when
+    `sum by (action,outcome) (rate(share_audit_events_total{outcome=~"denied|failed"}[5m]))`
+    > 5/s
 
 ### Job queue
 
 - Failure spike
-  - alert when `job_queue_jobs_total{outcome="failed"}` increases above baseline
-    or failure rate > 5% for 10 minutes
+  - `PgErdCloudJobFailures`: alert when
+    `increase(job_queue_jobs_total{outcome="failed"}[10m])` > 0
 - Backlog / wait time
-  - alert when p95 `job_queue_wait_seconds` > 60s for 10 minutes
+  - `PgErdCloudJobQueueWaitHigh`: alert when p95 `job_queue_wait_seconds` >
+    60s for 10 minutes
 
 ## 4) Validation (local)
 
