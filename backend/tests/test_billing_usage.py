@@ -10,6 +10,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from prometheus_client import REGISTRY
 
 from app.api.billing import router
 from app.auth import CurrentUser, get_current_user
@@ -149,6 +150,19 @@ def _signed_billing_event_body(
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return body, f"sha256={signature}"
+
+
+def _billing_metric_value(
+    *,
+    provider: str,
+    event_type: str,
+    outcome: str,
+) -> float:
+    value = REGISTRY.get_sample_value(
+        "billing_events_total",
+        {"provider": provider, "event_type": event_type, "outcome": outcome},
+    )
+    return float(value or 0.0)
 
 
 def test_billing_usage_returns_owned_project_scope_counts(
@@ -323,6 +337,11 @@ def test_billing_event_rejects_invalid_secret(
 ) -> None:
     monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
     app.dependency_overrides[get_session] = lambda: FakeBillingEventSession()
+    before = _billing_metric_value(
+        provider="stripe",
+        event_type="subscription.updated",
+        outcome="rejected_auth",
+    )
 
     response = TestClient(app).post(
         "/api/billing/events",
@@ -337,6 +356,14 @@ def test_billing_event_rejects_invalid_secret(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "invalid billing webhook secret"
+    assert (
+        _billing_metric_value(
+            provider="stripe",
+            event_type="subscription.updated",
+            outcome="rejected_auth",
+        )
+        == before + 1
+    )
 
 
 def test_billing_event_records_and_redacts_sensitive_metadata(
@@ -345,6 +372,11 @@ def test_billing_event_records_and_redacts_sensitive_metadata(
     session = FakeBillingEventSession()
     monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
     app.dependency_overrides[get_session] = lambda: session
+    before = _billing_metric_value(
+        provider="stripe",
+        event_type="subscription.updated",
+        outcome="recorded",
+    )
 
     response = TestClient(app).post(
         "/api/billing/events",
@@ -380,6 +412,14 @@ def test_billing_event_records_and_redacts_sensitive_metadata(
         "api_key": "[redacted]",
         "nested": {"client_secret": "[redacted]"},
     }
+    assert (
+        _billing_metric_value(
+            provider="stripe",
+            event_type="subscription.updated",
+            outcome="recorded",
+        )
+        == before + 1
+    )
 
 
 def test_billing_event_accepts_hmac_signature_without_shared_header_secret(
@@ -460,6 +500,11 @@ def test_billing_event_ignores_duplicate_provider_event(
     session = FakeBillingEventSession(existing_event=existing_event)
     monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
     app.dependency_overrides[get_session] = lambda: session
+    before = _billing_metric_value(
+        provider="stripe",
+        event_type="subscription.updated",
+        outcome="duplicate",
+    )
 
     response = TestClient(app).post(
         "/api/billing/events",
@@ -480,6 +525,14 @@ def test_billing_event_ignores_duplicate_provider_event(
     )
     assert session.added_event is None
     assert session.committed is False
+    assert (
+        _billing_metric_value(
+            provider="stripe",
+            event_type="subscription.updated",
+            outcome="duplicate",
+        )
+        == before + 1
+    )
 
 
 def test_support_account_billing_requires_support_operator(

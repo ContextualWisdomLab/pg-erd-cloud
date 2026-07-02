@@ -54,6 +54,17 @@ groups:
           summary: "pg-erd-cloud share audit denied/failed events are spiking"
           description: "Public share-link denied or failed events exceeded 5/s for an action/outcome pair."
 
+      - alert: PgErdCloudBillingWebhookFailures
+        expr: |
+          increase(billing_events_total{outcome=~"rejected_auth|rejected_config"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          area: billing
+        annotations:
+          summary: "pg-erd-cloud billing webhook reconciliation is failing"
+          description: "Billing webhook authentication or configuration failures occurred in the last 10 minutes."
+
       - alert: PgErdCloudJobFailures
         expr: |
           increase(job_queue_jobs_total{outcome="failed"}[10m]) > 0

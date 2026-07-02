@@ -16,6 +16,7 @@ REQUIRED_FILES = (
     "frontend/Dockerfile.prod",
     "deploy/traefik/dynamic.yaml",
     "docs/legal/license-billing.md",
+    "docs/operations/alert-thresholds.md",
     "docs/operations/backup-restore.md",
     "docs/operations/migration-rollback.md",
     "docs/operations/on-premises-package.md",
@@ -83,6 +84,12 @@ ONPREM_DOC_REQUIRED_SNIPPETS = (
     "Air-gapped",
 )
 
+ALERT_DOC_REQUIRED_SNIPPETS = (
+    "PgErdCloudBillingWebhookFailures",
+    "billing webhook rejected_auth/rejected_config",
+    "Billing owner",
+)
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -110,6 +117,11 @@ def main() -> int:
         read("docs/legal/license-billing.md"),
         LICENSE_DOC_REQUIRED_SNIPPETS,
         "docs/legal/license-billing.md",
+    )
+    require_snippets(
+        read("docs/operations/alert-thresholds.md"),
+        ALERT_DOC_REQUIRED_SNIPPETS,
+        "docs/operations/alert-thresholds.md",
     )
     require_snippets(
         read("docs/operations/backup-restore.md"),

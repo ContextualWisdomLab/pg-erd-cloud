@@ -27,6 +27,7 @@ from app.models import (
     UserAccount,
     utcnow,
 )
+from app.metrics import BILLING_EVENTS_TOTAL
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
     BillingEventIn,
@@ -291,6 +292,17 @@ def _billing_event_response(
     )
 
 
+def _record_billing_event_metric(
+    payload: BillingEventIn,
+    outcome: Literal["recorded", "duplicate", "rejected_auth", "rejected_config"],
+) -> None:
+    BILLING_EVENTS_TOTAL.labels(
+        provider=payload.provider,
+        event_type=payload.event_type,
+        outcome=outcome,
+    ).inc()
+
+
 def _billing_event_summary(event: BillingEvent) -> BillingEventSummaryOut:
     return BillingEventSummaryOut(
         billing_event_uuid=event.billing_event_uuid,
@@ -446,11 +458,18 @@ async def ingest_billing_event(
     session: AsyncSession = Depends(get_session),
 ) -> BillingEventOut:
     """Record a provider-neutral billing event for support reconciliation."""
-    await _require_valid_billing_webhook_auth(
-        request=request,
-        billing_webhook_secret=billing_webhook_secret,
-        billing_webhook_signature=billing_webhook_signature,
-    )
+    try:
+        await _require_valid_billing_webhook_auth(
+            request=request,
+            billing_webhook_secret=billing_webhook_secret,
+            billing_webhook_signature=billing_webhook_signature,
+        )
+    except HTTPException as exc:
+        _record_billing_event_metric(
+            payload,
+            "rejected_config" if exc.status_code == 503 else "rejected_auth",
+        )
+        raise
 
     existing = await _find_billing_event(
         session,
@@ -458,6 +477,7 @@ async def ingest_billing_event(
         provider_event_id=payload.provider_event_id,
     )
     if existing is not None:
+        _record_billing_event_metric(payload, "duplicate")
         return _billing_event_response(event=existing, action="duplicate")
 
     now = utcnow()
@@ -486,6 +506,8 @@ async def ingest_billing_event(
         )
         if duplicate is None:
             raise
+        _record_billing_event_metric(payload, "duplicate")
         return _billing_event_response(event=duplicate, action="duplicate")
 
+    _record_billing_event_metric(payload, "recorded")
     return _billing_event_response(event=event, action="recorded")

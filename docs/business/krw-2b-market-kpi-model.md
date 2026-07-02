@@ -74,7 +74,7 @@ operational reliability, and support burden.
 | ERD editor first render p95 | under 3 seconds for pilot-size schemas | under 2 seconds | missing |
 | Share/export success rate | 95% for supported export paths | 98% | missing |
 | License validation success | 99% valid commercial tokens accepted | 99.9% | partially measured by tests |
-| Billing reconciliation success | 99% provider events applied or queued for support review | 99.9% | partially measured by tests |
+| Billing reconciliation success | 99% provider events applied or queued for support review | 99.9% | partially measured by tests and `billing_events_total` |
 | Backup restore drill | one successful drill before paid pilot | quarterly successful drills | documented, not measured |
 | Incident first response | within one business day | SLA-specific response time | documented, not measured |
 | Support touches per activation | under 2 support touches | under 1 | missing |
@@ -103,8 +103,8 @@ operational reliability, and support burden.
 
 - Billing provider reconciliation remains a P1 gap until provider-specific
   checkout/fulfillment and contract-state application adapters exist. The common
-  event recording path and raw-body HMAC signature verification path are now
-  covered by tests.
+  event recording path, raw-body HMAC signature verification path, and
+  billing reconciliation outcome metric are now covered by tests.
 - Admin/support diagnostics are now partially measured by tests through the
   backend read-only diagnostics API and operator-only frontend view. Support
   workload and resolution-time metrics still need pilot data.
@@ -118,8 +118,8 @@ operational reliability, and support burden.
 
 - Measured today: local automated tests for license, usage limits, account
   deactivation, plan-change handoff, provider-neutral billing event ingestion,
-  read-only support diagnostics, operator-only support diagnostics UI, visual
-  regression, accessibility, and E2E smoke paths.
+  billing webhook outcome metrics, read-only support diagnostics, operator-only
+  support diagnostics UI, visual regression, accessibility, and E2E smoke paths.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation
   rates, support effort, and buyer conversion.
 - Missing today: real customer interviews, paid pilot data, procurement notes,

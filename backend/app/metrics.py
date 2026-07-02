@@ -72,6 +72,13 @@ SHARE_AUDIT_EVENTS_TOTAL = Counter(
 )
 
 
+BILLING_EVENTS_TOTAL = Counter(
+    "billing_events_total",
+    "Total billing reconciliation webhook events by provider, type, and outcome.",
+    ["provider", "event_type", "outcome"],
+)
+
+
 JOB_QUEUE_JOBS_TOTAL = Counter(
     "job_queue_jobs_total",
     "Total number of job queue executions by type/outcome.",

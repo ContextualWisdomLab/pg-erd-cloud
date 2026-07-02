@@ -115,6 +115,9 @@ blocker로 분류합니다.
   offline license, revocation, restore drill, rollback drill, support bundle
   문서/설정 누락을 CI에서 검증함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
+- 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
+  `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전
+  운영자가 볼 수 있게 함
 
 ### P1: 유료 베타 필수
 
@@ -163,6 +166,9 @@ blocker로 분류합니다.
   HMAC-SHA256 signature 기반 provider-neutral event를 기록하고,
   `(provider, provider_event_id)` 중복을 무시하며, 민감 metadata를 redaction해
   지원/정산 증거를 남김
+- 🆕 결제 reconciliation 관측성: billing webhook `recorded`, `duplicate`,
+  `rejected_auth`, `rejected_config` outcome을 `billing_events_total`로 기록하고
+  실패 outcome에 대한 Prometheus alert를 제공함
 - 🆕 지원 진단: `SUPPORT_OPERATOR_SUBJECTS` allowlist 기반
   `GET /api/billing/support/account` read-only API로 대상 계정 상태, usage counter,
   license verifier, billing/reactivation URL, 최근 billing event summary를 조회할 수 있음

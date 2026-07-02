@@ -247,6 +247,8 @@ Acceptance:
 - Figma/FigJam artifacts are linked from repository docs.
 - The design artifacts explain release gates without becoming the source of
   implementation truth.
+- The FigJam board includes the billing reconciliation observability loop for
+  `billing_events_total` and the billing webhook alert.
 
 ### 5. Billing Provider Reconciliation
 
@@ -262,6 +264,8 @@ Status:
 - First provider-neutral event recording slice implemented in PR `#415`.
 - Raw-body HMAC-SHA256 signature verification implemented in PR `#415` without
   adding provider SDK dependencies.
+- Billing webhook outcomes now emit `billing_events_total` labels for recorded,
+  duplicate, rejected authentication, and rejected configuration events.
 - Remaining gap: provider-specific checkout/fulfillment and contract-state
   application adapters.
 
@@ -275,6 +279,8 @@ Tasks:
 - Add optional raw-body HMAC-SHA256 signature verification for provider/gateway
   webhooks.
 - Record event outcomes for support diagnostics.
+- Record reconciliation outcomes as low-cardinality Prometheus metrics and
+  alert on rejected auth/config events.
 - Keep the existing portal/support handoff path.
 
 Verification:
