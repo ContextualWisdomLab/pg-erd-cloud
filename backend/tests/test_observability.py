@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
-import re
 from starlette.requests import Request
 
 from app.license_gate import require_active_license
