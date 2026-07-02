@@ -1,4 +1,4 @@
-# Observability (MVP)
+# Observability Baseline
 
 This document defines the **minimum observability baseline** for `pg-erd-cloud`:
 
