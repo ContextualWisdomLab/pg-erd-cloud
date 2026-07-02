@@ -47,12 +47,12 @@
 ## 2026-06-22 - IDOR in Project Members List
 **Learning:** The `/api/projects/{project_space_uuid}/members` endpoint exposed the full list of members and their roles to any user with `viewer` access. This excessive visibility could facilitate enumeration and social engineering attacks.
 **Action:** Implemented stricter role-based access control (RBAC) on the endpoint to require a minimum `editor` role to view project members, mitigating the IDOR risk.
-## 2026-06-22 - Rate Limiting Route Mismatch
-**Vulnerability:** The rate limit policy for the token revocation endpoint was configured with the wrong route prefix (`/api/auth/revoke`), while the actual logout endpoint was `/api/auth/logout`. This misconfiguration caused the rate limit middleware to be bypassed for token revocation requests.
-**Learning:** Security middleware (like rate limiting, CSRF, or authentication headers) relies heavily on correct route string matching. A discrepancy between the middleware’s configuration and the router’s definition effectively disables the security control.
-**Prevention:** Always verify that route prefixes or paths used in security middleware match the actual API router definitions, and write automated tests that assert the security controls are actively enforced on the specific endpoints.
 
 ## 2026-06-26 - Password Leak in Database Introspection Exceptions
 **Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
-**Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `****** style forms of the same secret.
+**Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
+## 2026-06-22 - Rate Limiting Route Mismatch
+**Vulnerability:** The rate limit policy for the token revocation endpoint was configured with the wrong route prefix (`/api/auth/revoke`), while the actual logout endpoint was `/api/auth/logout`. This misconfiguration caused the rate limit middleware to be bypassed for token revocation requests.
+**Learning:** Security middleware (like rate limiting, CSRF, or authentication headers) relies heavily on correct route string matching. A discrepancy between the middleware's configuration and the router's definition effectively disables the security control.
+**Prevention:** Always verify that route prefixes or paths used in security middleware match the actual API router definitions, and write automated tests that assert the security controls are actively enforced on the specific endpoints.
