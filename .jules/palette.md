@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2025-03-05 - Wrapping Plain Text Abbreviations for Accessibility
+**Learning:** ERD nodes and forms often use highly abbreviated terms like "PK" or "NN" inside checkboxes or badges without surrounding tags. While users familiar with databases understand them, screen readers read them literally, and new users may be confused. Wrapping these raw text strings in `<abbr>` tags with `title` and `aria-label` provides a native browser tooltip on hover and explicit readouts for assistive technologies.
+**Action:** When working on ERD-specific terminology, wrap unstyled or plain text abbreviations in `<abbr>` elements with descriptive attributes, ensuring they are accessible to both mouse and keyboard/screen-reader users.

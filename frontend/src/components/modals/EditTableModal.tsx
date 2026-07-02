@@ -132,7 +132,7 @@ export function EditTableModal({
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
                       />
-                      PK
+                      <abbr title="Primary Key" aria-label="Primary Key" style={{ textDecoration: "none", cursor: "help" }}>PK</abbr>
                     </label>
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
@@ -140,7 +140,7 @@ export function EditTableModal({
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
                       />
-                      NN
+                      <abbr title="Not Null" aria-label="필수 입력 (Not Null)" style={{ textDecoration: "none", cursor: "help" }}>NN</abbr>
                     </label>
                     <button
                       type="button"
