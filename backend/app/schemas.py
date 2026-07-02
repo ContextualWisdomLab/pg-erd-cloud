@@ -146,3 +146,23 @@ class BillingUsageOut(BaseModel):
     connection_limit: int = Field(ge=0)
     snapshot_limit: int = Field(ge=0)
     share_link_limit: int = Field(ge=0)
+
+
+class BillingPlanChangeIn(BaseModel):
+    """Request body for starting a billing plan-change flow."""
+
+    target_plan: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+    )
+
+
+class BillingPlanChangeOut(BaseModel):
+    """Billing plan-change action returned to the client."""
+
+    action: Literal["portal_redirect", "contact_support"]
+    target_plan: str
+    billing_portal_url: str | None
+    billing_support_url: str | None
+    message: str

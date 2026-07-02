@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
@@ -17,7 +18,7 @@ from app.models import (
     SchemaSnapshot,
     ShareLink,
 )
-from app.schemas import BillingUsageOut
+from app.schemas import BillingPlanChangeIn, BillingPlanChangeOut, BillingUsageOut
 from app.settings import settings
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -43,6 +44,25 @@ async def _scalar_count(session: AsyncSession, stmt: Executable) -> int:
     result = await session.execute(stmt)
     value = result.scalar_one()
     return int(value or 0)
+
+
+def _portal_url_with_target_plan(base_url: str, target_plan: str) -> str:
+    parts = urlsplit(base_url)
+    query_items = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key != "target_plan"
+    ]
+    query_items.append(("target_plan", target_plan))
+    return urlunsplit(
+        (
+            parts.scheme,
+            parts.netloc,
+            parts.path,
+            urlencode(query_items),
+            parts.fragment,
+        )
+    )
 
 
 @router.get("/usage", response_model=BillingUsageOut)
@@ -112,4 +132,39 @@ async def get_billing_usage(
         connection_limit=settings.billing_max_connections_per_project,
         snapshot_limit=settings.billing_max_snapshots_per_project,
         share_link_limit=settings.billing_max_share_links_per_project,
+    )
+
+
+@router.post("/plan-change", response_model=BillingPlanChangeOut)
+async def request_billing_plan_change(
+    payload: BillingPlanChangeIn,
+    user: CurrentUser = Depends(get_current_user),
+) -> BillingPlanChangeOut:
+    """Return the configured billing action for a requested plan change."""
+    del user
+
+    if settings.billing_portal_url:
+        return BillingPlanChangeOut(
+            action="portal_redirect",
+            target_plan=payload.target_plan,
+            billing_portal_url=_portal_url_with_target_plan(
+                settings.billing_portal_url,
+                payload.target_plan,
+            ),
+            billing_support_url=settings.billing_support_url,
+            message="Open the billing portal to request or complete this plan change.",
+        )
+
+    if settings.billing_support_url:
+        return BillingPlanChangeOut(
+            action="contact_support",
+            target_plan=payload.target_plan,
+            billing_portal_url=None,
+            billing_support_url=settings.billing_support_url,
+            message="Contact billing support to request or complete this plan change.",
+        )
+
+    raise HTTPException(
+        status_code=503,
+        detail="billing plan change path is not configured",
     )

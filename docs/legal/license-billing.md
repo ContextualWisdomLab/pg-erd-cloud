@@ -68,6 +68,14 @@
   - `project_limit`, `connection_limit`, `snapshot_limit`, `share_link_limit`
   - `account_status`
   - `billing_portal_url`, `billing_support_url`, `account_reactivation_url`
+- `POST /api/billing/plan-change`는 `{ "target_plan": "enterprise-plus" }`
+  요청을 받아 plan 변경 실행 경로를 반환합니다.
+  - `BILLING_PORTAL_URL`이 있으면 `target_plan` query를 붙인 portal redirect
+    action을 반환합니다.
+  - portal이 없고 `BILLING_SUPPORT_URL`이 있으면 support contact action을 반환합니다.
+  - 둘 다 없으면 `503`으로 실패해 판매 배포의 과금 경로 누락을 드러냅니다.
+  - 사용자 subject 같은 식별자는 portal URL에 자동으로 넣지 않습니다. 고객 매핑은
+    결제 포털 또는 계약 시스템에서 처리해야 합니다.
 - 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
   - `BILLING_MAX_PROJECTS_PER_USER`
   - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
