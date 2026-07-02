@@ -51,6 +51,7 @@ REQUIRED_DOCUMENTS = (
     "billing_provider_catalog",
     "support_bundle_generator",
     "support_bundle_example",
+    "commercial_readiness_audit",
 )
 
 PLACEHOLDER_RE = re.compile(r"\b(tbd|todo|fixme|pending|placeholder)\b|[<>]", re.IGNORECASE)

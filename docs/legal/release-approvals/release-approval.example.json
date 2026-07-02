@@ -24,7 +24,8 @@
     "alert_thresholds": "docs/operations/alert-thresholds.md",
     "billing_provider_catalog": "docs/operations/billing-provider-catalog.example.json",
     "support_bundle_generator": "scripts/operations/generate_support_bundle.py",
-    "support_bundle_example": "docs/operations/support-bundles/support-bundle.example.json"
+    "support_bundle_example": "docs/operations/support-bundles/support-bundle.example.json",
+    "commercial_readiness_audit": "scripts/ci/commercial_readiness_audit.py"
   },
   "data_processing_scope": [
     "application metadata",

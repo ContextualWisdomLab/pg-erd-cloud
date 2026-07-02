@@ -162,6 +162,11 @@ blocker로 분류합니다.
   `docs/operations/support-bundles/support-bundle.example.json`와
   `scripts/ci/validate_support_bundle.py`로 생성된 support bundle의 필수 필드,
   compose digest, redaction.applied, 민감 key/value redaction을 CI에서 검증함
+- 🆕 판매 가능성 audit:
+  `scripts/ci/commercial_readiness_audit.py`로 schema validator 통과 여부와
+  실제 판매 증거(승인 manifest, restore drill, support bundle, billing provider
+  catalog)가 예시-only인지 실제 파일인지 구분함. 기본 실행은 report를 만들고,
+  `--strict`는 실제 판매 증거가 부족하면 실패함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전
