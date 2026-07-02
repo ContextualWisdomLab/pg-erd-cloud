@@ -138,6 +138,8 @@ class Settings(BaseSettings):
     billing_max_connections_per_project: int = Field(0, ge=0)
     billing_max_snapshots_per_project: int = Field(0, ge=0)
     billing_max_share_links_per_project: int = Field(0, ge=0)
+    # Comma-separated OIDC subjects that must be denied before DB access.
+    account_deactivated_subjects: str = ""
 
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.

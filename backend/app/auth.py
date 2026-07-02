@@ -47,6 +47,15 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
     return normalized or ["RS256"]
 
 
+def _split_csv(raw: str) -> set[str]:
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _reject_deactivated_subject(subject: str) -> None:
+    if subject in _split_csv(settings.account_deactivated_subjects):
+        raise HTTPException(status_code=403, detail="account deactivated")
+
+
 @dataclass(frozen=True)
 class CurrentUser:
     """Authenticated user identity used by API handlers."""
@@ -411,6 +420,7 @@ async def get_current_user(
 ) -> CurrentUser:
     """FastAPI dependency that authenticates and returns the current user."""
     subject, display_name = await _get_subject_from_request(request)
+    _reject_deactivated_subject(subject)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
 

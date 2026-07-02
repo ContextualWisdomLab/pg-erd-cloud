@@ -539,6 +539,32 @@ async def test_ensure_user_reuses_short_lived_cache() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_current_user_rejects_deactivated_subject_before_db(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_subject(_request: Request) -> tuple[str, str | None]:
+        return "subject-1", "User One"
+
+    class NoDbSession:
+        def begin(self) -> object:
+            raise AssertionError("deactivated subjects must be rejected before DB access")
+
+    monkeypatch.setattr(auth, "_get_subject_from_request", fake_subject)
+    monkeypatch.setattr(
+        settings,
+        "account_deactivated_subjects",
+        "subject-1, subject-2",
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth.get_current_user(make_request(), NoDbSession())  # type: ignore[arg-type]
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "account deactivated"
+
+
+@pytest.mark.asyncio
 async def test_try_get_subject_for_rate_limit_error_path():
     """Verify try_get_subject_for_rate_limit returns None on auth failure."""
     req = make_request()  # No Authorization header

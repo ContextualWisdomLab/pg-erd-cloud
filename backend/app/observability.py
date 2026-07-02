@@ -49,6 +49,7 @@ _AUTHZ_DETAIL_REASON_MAP = {
     "unknown signing key": "unknown_signing_key",
     "algorithm/key type mismatch": "algorithm_key_type_mismatch",
     "token verification failed": "token_verification_failed",
+    "account deactivated": "account_deactivated",
     "owner role required": "owner_role_required",
     "share link LLM draft is disabled": "share_llm_draft_disabled",
     "license key is not configured for required mode": "license_key_not_configured",
