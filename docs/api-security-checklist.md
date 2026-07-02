@@ -48,6 +48,9 @@
     `require_project_member(...)`
 - 🟡 공유 링크(공개 엔드포인트)는 최소 권한(읽기)만 제공
   - 근거: `backend/app/api/share.py`
+- ✅ 공개 공유 링크의 live LLM draft는 기본 차단
+  - 설정: `SHARE_LINK_LLM_DRAFT_ENABLED=false` (default)
+  - 근거: `backend/app/api/share.py`, `backend/tests/test_reversing_llm.py`
 
 ### CORS
 
@@ -94,6 +97,10 @@
   - 프록시/Ingress가 `X-Forwarded-For`를 신뢰 가능한 형태로 세팅/정제하는 경우에만
     `true`
 - `API_RATE_LIMIT_MAX_KEYS` (default: `10000`)
+- `SHARE_LINK_LLM_DRAFT_ENABLED` (default: `false`)
+  - 공개 공유 링크에서 `mode=llm-draft`가 외부 LLM provider 비용을 만들 수 있으므로,
+    기본값은 차단입니다. 필요한 경우 별도 비용 한도/감사 로그/운영 승인을 갖춘 배포에서만
+    `true`로 설정하세요.
 
 ##### Trade-offs / 향후 계획
 

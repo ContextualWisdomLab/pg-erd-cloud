@@ -23,10 +23,19 @@ from app.spec.llm import (
     generate_index_design_llm_draft,
     generate_reversing_llm_draft,
 )
+from app.settings import settings
 from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
+
+
+def _require_share_link_llm_draft_enabled() -> None:
+    if not settings.share_link_llm_draft_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="share link LLM draft is disabled",
+        )
 
 
 @router.post("/projects/{project_space_uuid}/share-links")
@@ -184,6 +193,7 @@ async def export_shared_snapshot_reversing_spec(
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        _require_share_link_llm_draft_enabled()
         try:
             return await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
@@ -224,6 +234,7 @@ async def export_shared_snapshot_index_design(
     if data is None:
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
+        _require_share_link_llm_draft_enabled()
         try:
             return await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:

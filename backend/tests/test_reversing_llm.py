@@ -171,6 +171,13 @@ def _assert_sanitized_config_error(
     assert "LLM_API_BASE_URL" not in exc_info.value.detail
 
 
+def _assert_share_link_llm_draft_disabled(
+    exc_info: pytest.ExceptionInfo[HTTPException],
+) -> None:
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "share link LLM draft is disabled"
+
+
 @pytest.mark.asyncio
 async def test_snapshot_reversing_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
@@ -212,9 +219,32 @@ async def test_snapshot_index_design_draft_hides_llm_configuration_detail(
 
 
 @pytest.mark.asyncio
+async def test_shared_reversing_draft_is_disabled_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+
+    async def _unexpected_llm_call(_: object) -> str:
+        pytest.fail("public share link should not call the LLM provider by default")
+
+    monkeypatch.setattr(share, "generate_reversing_llm_draft", _unexpected_llm_call)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await share.export_shared_snapshot_reversing_spec(
+            uuid.uuid4(),
+            uuid.uuid4(),
+            mode="llm-draft",
+            session=_ShareSession(),
+        )
+
+    _assert_share_link_llm_draft_disabled(exc_info)
+
+
+@pytest.mark.asyncio
 async def test_shared_reversing_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
     monkeypatch.setattr(share, "generate_reversing_llm_draft", _raise_config_error)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -229,9 +259,32 @@ async def test_shared_reversing_draft_hides_llm_configuration_detail(
 
 
 @pytest.mark.asyncio
+async def test_shared_index_design_draft_is_disabled_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", False)
+
+    async def _unexpected_llm_call(_: object) -> str:
+        pytest.fail("public share link should not call the LLM provider by default")
+
+    monkeypatch.setattr(share, "generate_index_design_llm_draft", _unexpected_llm_call)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await share.export_shared_snapshot_index_design(
+            uuid.uuid4(),
+            uuid.uuid4(),
+            mode="llm-draft",
+            session=_ShareSession(),
+        )
+
+    _assert_share_link_llm_draft_disabled(exc_info)
+
+
+@pytest.mark.asyncio
 async def test_shared_index_design_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
     monkeypatch.setattr(share, "generate_index_design_llm_draft", _raise_config_error)
 
     with pytest.raises(HTTPException) as exc_info:

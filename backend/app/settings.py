@@ -122,6 +122,7 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
+    share_link_llm_draft_enabled: bool = False
 
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
