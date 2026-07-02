@@ -108,7 +108,9 @@ export function EditTableModal({
               </div>
 
               <div className="col" style={{ gap: 8 }}>
-                {editingNode.data.columns.map((col, idx) => (
+                {editingNode.data.columns.map((col, idx) => {
+                  const colIdent = col.column_name || `컬럼 ${idx + 1}`;
+                  return (
                   <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
                     <input
                       type="text"
@@ -116,7 +118,7 @@ export function EditTableModal({
                       defaultValue={col.column_name}
                       placeholder="컬럼명"
                       style={{ flex: 2 }}
-                      aria-label="컬럼명"
+                      aria-label={`${colIdent} 이름`}
                     />
                     <input
                       type="text"
@@ -124,13 +126,14 @@ export function EditTableModal({
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
                       style={{ flex: 1.5 }}
-                      aria-label="데이터 타입"
+                      aria-label={`${colIdent} 타입`}
                     />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
+                        aria-label={`${colIdent} PK`}
                       />
                       PK
                     </label>
@@ -139,6 +142,7 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
+                        aria-label={`${colIdent} NN`}
                       />
                       NN
                     </label>
@@ -172,12 +176,13 @@ export function EditTableModal({
                         });
                       }}
                       style={{ color: "#b91c1c", padding: "4px 8px" }}
-                      aria-label={`${col.column_name} 컬럼 삭제`}
+                        aria-label={`${colIdent} 삭제`}
                     >
                       삭제
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </form>
