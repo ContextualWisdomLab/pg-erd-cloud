@@ -18,7 +18,14 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
+
     parsed = urlsplit(dsn)
+    if not parsed.scheme and "://" in dsn:
+        # Python's urlsplit fails to parse schemes with underscores (e.g. snowflake_invalid://)
+        # falling back to parsing the whole string as a path.
+        # To fix this, we substitute the scheme with a known-safe one just for parsing secrets.
+        dsn_patched = re.sub(r"^[^:]+://", "http://", dsn)
+        parsed = urlsplit(dsn_patched)
 
     if parsed.password:
         candidates.add(parsed.password)

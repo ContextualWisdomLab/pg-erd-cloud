@@ -12,6 +12,7 @@ from jose import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contract_state import latest_contract_state_for_subject
 from app.db import get_session
 from app.models import UserAccount
 from app.settings import settings
@@ -45,6 +46,40 @@ def _parse_oidc_algorithms(raw: str) -> list[str]:
         normalized.append(alg)
 
     return normalized or ["RS256"]
+
+
+def _split_csv(raw: str) -> set[str]:
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _account_deactivation_headers() -> dict[str, str]:
+    headers = {"X-Account-Status": "deactivated"}
+    if settings.account_reactivation_url:
+        headers["X-Account-Reactivation-Url"] = settings.account_reactivation_url
+    if settings.billing_support_url:
+        headers["X-Billing-Support-Url"] = settings.billing_support_url
+    return headers
+
+
+def _reject_deactivated_subject(subject: str) -> None:
+    if subject in _split_csv(settings.account_deactivated_subjects):
+        raise HTTPException(
+            status_code=403,
+            detail="account deactivated",
+            headers=_account_deactivation_headers(),
+        )
+
+
+async def _reject_contract_deactivated_subject(
+    session: AsyncSession,
+    subject: str,
+) -> None:
+    if await latest_contract_state_for_subject(session, subject) == "deactivated":
+        raise HTTPException(
+            status_code=403,
+            detail="account deactivated",
+            headers=_account_deactivation_headers(),
+        )
 
 
 @dataclass(frozen=True)
@@ -412,7 +447,9 @@ async def get_current_user(
 ) -> CurrentUser:
     """FastAPI dependency that authenticates and returns the current user."""
     subject, display_name = await _get_subject_from_request(request)
+    _reject_deactivated_subject(subject)
     async with session.begin():
+        await _reject_contract_deactivated_subject(session, subject)
         return await _ensure_user(session, subject, display_name)
 
 

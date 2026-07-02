@@ -1,0 +1,259 @@
+from __future__ import annotations
+
+from app.settings import Settings, validate_production_settings
+
+
+def _settings(**overrides: object) -> Settings:
+    data: dict[str, object] = {
+        "database_url": "postgresql+asyncpg://user:pass@db.example.com/app",
+        "app_secret": "x" * 48,
+        "license_mode": "off",
+        "app_env": "production",
+        "oidc_issuer": "https://idp.example.com",
+        "oidc_audience": "pg-erd-cloud",
+        "cors_origins": "https://erd.example.com",
+        "db_introspection_allowed_hosts": "db.example.com",
+    }
+    data.update(overrides)
+    return Settings(**data)  # type: ignore[arg-type]
+
+
+def test_validate_production_settings_accepts_hardened_config() -> None:
+    assert validate_production_settings(_settings()) == []
+
+
+def test_validate_production_settings_is_inactive_for_development() -> None:
+    config = _settings(
+        app_env="development",
+        oidc_issuer=None,
+        oidc_audience=None,
+        app_secret="short",
+        cors_origins="http://localhost:5173",
+        db_introspection_allowed_hosts="",
+    )
+
+    assert validate_production_settings(config) == []
+
+
+def test_validate_production_settings_reports_missing_release_gates() -> None:
+    errors = validate_production_settings(
+        _settings(
+            oidc_issuer=None,
+            oidc_audience=None,
+            app_secret="short",
+            cors_origins="http://localhost:5173",
+            db_introspection_allowed_hosts="",
+            share_link_default_ttl_hours=0,
+        )
+    )
+
+    assert "OIDC_ISSUER is required when APP_ENV=production" in errors
+    assert "OIDC_AUDIENCE is required when APP_ENV=production" in errors
+    assert "APP_SECRET must be at least 32 characters in production" in errors
+    assert "DB_INTROSPECTION_ALLOWED_HOSTS must allow explicit target DB hosts" in errors
+    assert "CORS_ORIGINS must include at least one public HTTPS origin" in errors
+    assert "SHARE_LINK_DEFAULT_TTL_HOURS must be greater than 0" in errors
+
+
+def test_validate_production_settings_requires_llm_provider_when_shared_drafts_enabled() -> None:
+    errors = validate_production_settings(_settings(share_link_llm_draft_enabled=True))
+
+    assert (
+        "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
+        "SHARE_LINK_LLM_DRAFT_ENABLED=true"
+    ) in errors
+
+
+def test_validate_production_settings_requires_llm_draft_quota_when_provider_configured() -> None:
+    errors = validate_production_settings(
+        _settings(
+            llm_api_base_url="https://llm.example/v1",
+            llm_api_key="test-key",
+            llm_model="test-model",
+            llm_draft_quota_enabled=False,
+        )
+    )
+
+    assert (
+        "LLM_DRAFT_QUOTA_ENABLED must stay true when live LLM provider is configured"
+        in errors
+    )
+
+
+def test_validate_production_settings_requires_license_verifier_when_license_required() -> None:
+    errors = validate_production_settings(
+        _settings(license_mode="required", license_key=None, license_public_key=None)
+    )
+
+    assert (
+        "LICENSE_KEY or LICENSE_PUBLIC_KEY is required when LICENSE_MODE=required"
+        in errors
+    )
+
+
+def test_validate_production_settings_accepts_public_key_license_verifier() -> None:
+    errors = validate_production_settings(
+        _settings(
+            license_mode="required",
+            license_key=None,
+            license_public_key="x" * 44,
+        )
+    )
+
+    assert errors == []
+
+
+def test_validate_production_settings_rejects_short_license_key() -> None:
+    errors = validate_production_settings(
+        _settings(license_mode="required", license_key="short-key")
+    )
+
+    assert "LICENSE_KEY must be at least 24 characters" in errors
+
+
+def test_validate_production_settings_requires_reactivation_path_for_deactivated_subjects() -> None:
+    errors = validate_production_settings(
+        _settings(account_deactivated_subjects="customer-owner")
+    )
+
+    assert (
+        "ACCOUNT_DEACTIVATED_SUBJECTS requires ACCOUNT_REACTIVATION_URL or "
+        "BILLING_SUPPORT_URL in production"
+    ) in errors
+
+
+def test_validate_production_settings_accepts_reactivation_path_for_deactivated_subjects() -> None:
+    errors = validate_production_settings(
+        _settings(
+            account_deactivated_subjects="customer-owner",
+            account_reactivation_url="https://billing.example.com/reactivate",
+        )
+    )
+
+    assert errors == []
+
+
+def test_validate_production_settings_rejects_insecure_billing_urls() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_checkout_url="http://billing.example.com/checkout",
+            billing_portal_url="http://billing.example.com/portal",
+            billing_support_url="http://support.example.com",
+            account_reactivation_url="http://billing.example.com/reactivate",
+        )
+    )
+
+    assert "BILLING_CHECKOUT_URL must be a public HTTPS URL in production" in errors
+    assert "BILLING_PORTAL_URL must be a public HTTPS URL in production" in errors
+    assert "BILLING_SUPPORT_URL must be a public HTTPS URL in production" in errors
+    assert (
+        "ACCOUNT_REACTIVATION_URL must be a public HTTPS URL in production" in errors
+    )
+
+
+def test_validate_production_settings_rejects_short_billing_webhook_secrets() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_webhook_secret="short",
+            billing_webhook_signature_secret="short",
+        )
+    )
+
+    assert "BILLING_WEBHOOK_SECRET must be at least 24 characters" in errors
+    assert (
+        "BILLING_WEBHOOK_SIGNATURE_SECRET must be at least 32 characters" in errors
+    )
+
+
+def test_validate_production_settings_requires_reactivation_path_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(billing_contract_state_events_enabled=True)
+    )
+
+    assert (
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+        "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
+    ) in errors
+
+
+def test_validate_production_settings_requires_webhook_auth_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_support_url="https://support.example.com",
+        )
+    )
+
+    assert (
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires BILLING_WEBHOOK_SECRET "
+        "or BILLING_WEBHOOK_SIGNATURE_SECRET in production"
+    ) in errors
+
+
+def test_validate_production_settings_accepts_signature_auth_for_contract_state_events() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_support_url="https://support.example.com",
+            billing_webhook_signature_secret="x" * 40,
+        )
+    )
+
+    assert errors == []
+
+
+def test_validate_production_settings_requires_deactivation_event_types() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_contract_state_events_enabled=True,
+            billing_contract_deactivated_event_types="",
+            billing_support_url="https://support.example.com",
+        )
+    )
+
+    assert (
+        "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES is required when "
+        "BILLING_CONTRACT_STATE_EVENTS_ENABLED=true"
+    ) in errors
+
+
+def test_validate_production_settings_accepts_billing_event_type_aliases() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_event_type_aliases=(
+                "stripe:customer.subscription.deleted=contract.suspended,"
+                "customer.subscription.updated=contract.reactivated"
+            )
+        )
+    )
+
+    assert errors == []
+
+
+def test_validate_production_settings_rejects_invalid_billing_event_type_aliases() -> None:
+    errors = validate_production_settings(
+        _settings(billing_event_type_aliases="customer.subscription.deleted")
+    )
+
+    assert "BILLING_EVENT_TYPE_ALIASES entries must use source=target format" in errors
+
+
+def test_validate_production_settings_rejects_invalid_billing_catalog_plan() -> None:
+    errors = validate_production_settings(
+        _settings(billing_allowed_plans="team, enterprise plus")
+    )
+
+    assert (
+        "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs" in errors
+    )
+
+
+def test_validate_production_settings_rejects_invalid_entitlement_event_type() -> None:
+    errors = validate_production_settings(
+        _settings(billing_entitlement_event_types="invoice.paid, bad event")
+    )
+
+    assert (
+        "BILLING_ENTITLEMENT_EVENT_TYPES entries must be billing event type IDs"
+        in errors
+    )

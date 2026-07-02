@@ -3,7 +3,15 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, Text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -208,4 +216,34 @@ class ShareLink(Base):
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
+    )
+
+
+class BillingEvent(Base):
+    """Provider-neutral billing/license event recorded for reconciliation."""
+
+    __tablename__ = "billing_event"
+
+    billing_event_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    provider: Mapped[str] = mapped_column(Text())
+    provider_event_id: Mapped[str] = mapped_column(Text())
+    event_type: Mapped[str] = mapped_column(Text())
+    subject: Mapped[str] = mapped_column(Text())
+    target_plan: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    event_status: Mapped[str] = mapped_column(Text())
+    occurred_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    received_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB())
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "provider_event_id",
+            name="uq_billing_event__provider_event_id",
+        ),
+        Index("ix_billing_event__subject_received_at", "subject", "received_at"),
     )

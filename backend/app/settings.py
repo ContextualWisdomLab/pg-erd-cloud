@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic import model_validator
@@ -14,6 +16,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
+    app_env: Literal["development", "production"] = "development"
+    production_config_checks_enabled: bool = True
     # Optional: a read-only endpoint/replica DSN.
     database_read_only_url: str | None = None
 
@@ -90,6 +94,7 @@ class Settings(BaseSettings):
     share_link_rate_limit_requests: int = Field(30, ge=1)
     share_link_rate_limit_window_seconds: float = Field(60.0, gt=0.0)
     share_link_rate_limit_max_keys: int = Field(10_000, ge=1)
+    share_link_default_ttl_hours: int = Field(168, ge=0)
 
     # Observability (MVP)
     observability_request_logging_enabled: bool = True
@@ -116,18 +121,221 @@ class Settings(BaseSettings):
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
 
+    # Optional commercial/on-prem licensing gate.
+    #
+    # Set LICENSE_MODE=required to reject API usage without a valid
+    # X-LICENSE-KEY header when running paid/on-prem distribution.
+    license_mode: Literal["off", "required"] = "off"
+    license_key: str | None = None
+    # Optional Ed25519 public key for offline signed on-prem license tokens.
+    license_public_key: str | None = None
+    # Comma-separated signed license token IDs (jti) or customer subjects (sub)
+    # that must be rejected before their natural expiry.
+    license_revoked_token_ids: str = ""
+    license_revoked_subjects: str = ""
+
+    # Optional billing/license usage limits. A value of 0 means unlimited.
+    billing_max_projects_per_user: int = Field(0, ge=0)
+    billing_max_connections_per_project: int = Field(0, ge=0)
+    billing_max_snapshots_per_project: int = Field(0, ge=0)
+    billing_max_share_links_per_project: int = Field(0, ge=0)
+    billing_checkout_url: str | None = None
+    billing_portal_url: str | None = None
+    billing_support_url: str | None = None
+    billing_webhook_secret: str | None = None
+    billing_webhook_signature_secret: str | None = None
+    billing_allowed_plans: str = ""
+    billing_event_type_aliases: str = ""
+    billing_entitlement_event_types: str = (
+        "checkout.completed,invoice.paid,subscription.created,"
+        "subscription.updated,contract.activated,contract.reactivated"
+    )
+    billing_contract_state_events_enabled: bool = False
+    billing_contract_deactivated_event_types: str = "contract.deactivated,contract.suspended"
+    billing_contract_active_event_types: str = "contract.activated,contract.reactivated"
+    account_reactivation_url: str | None = None
+    # Comma-separated OIDC subjects that must be denied before DB access.
+    account_deactivated_subjects: str = ""
+    # Comma-separated OIDC subjects allowed to view support diagnostics.
+    support_operator_subjects: str = ""
+
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
     llm_api_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
+    llm_max_prompt_chars: int = Field(120_000, ge=1_000)
+    llm_max_output_tokens: int = Field(1_200, ge=1, le=8_192)
+    llm_draft_quota_enabled: bool = True
+    llm_draft_quota_requests: int = Field(20, ge=1)
+    llm_draft_quota_window_seconds: float = Field(3600.0, gt=0.0)
+    share_link_llm_draft_enabled: bool = False
 
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
     # NOTE: Do not trust the token header's alg; only accept algorithms from
     # this allowlist.
     oidc_algorithms: str = "RS256"
+
+
+def _split_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _invalid_key_value_csv(value: str) -> list[str]:
+    invalid: list[str] = []
+    for item in _split_csv(value):
+        key, separator, mapped = item.partition("=")
+        if separator != "=" or not key.strip() or not mapped.strip():
+            invalid.append(item)
+    return invalid
+
+
+_BILLING_PLAN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+_BILLING_EVENT_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+
+
+def _invalid_billing_plan_ids(value: str) -> list[str]:
+    return [item for item in _split_csv(value) if not _BILLING_PLAN_ID_RE.fullmatch(item)]
+
+
+def _invalid_billing_event_type_ids(value: str) -> list[str]:
+    return [
+        item for item in _split_csv(value) if not _BILLING_EVENT_TYPE_RE.fullmatch(item)
+    ]
+
+
+def _is_public_https_origin(origin: str) -> bool:
+    parsed = urlparse(origin)
+    host = parsed.hostname or ""
+    return (
+        parsed.scheme == "https"
+        and bool(parsed.netloc)
+        and host not in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+    )
+
+
+def _append_public_https_url_error(
+    errors: list[str],
+    *,
+    setting_name: str,
+    setting_value: str | None,
+) -> None:
+    if setting_value and not _is_public_https_origin(setting_value):
+        errors.append(f"{setting_name} must be a public HTTPS URL in production")
+
+
+def validate_production_settings(config: Settings) -> list[str]:
+    """Return startup-blocking configuration errors for production deployments."""
+    if config.app_env != "production" or not config.production_config_checks_enabled:
+        return []
+
+    errors: list[str] = []
+    if not config.oidc_issuer:
+        errors.append("OIDC_ISSUER is required when APP_ENV=production")
+    if not config.oidc_audience:
+        errors.append("OIDC_AUDIENCE is required when APP_ENV=production")
+    if len(config.app_secret) < 32:
+        errors.append("APP_SECRET must be at least 32 characters in production")
+    if not _split_csv(config.db_introspection_allowed_hosts):
+        errors.append(
+            "DB_INTROSPECTION_ALLOWED_HOSTS must allow explicit target DB hosts"
+        )
+    if not any(_is_public_https_origin(origin) for origin in _split_csv(config.cors_origins)):
+        errors.append("CORS_ORIGINS must include at least one public HTTPS origin")
+    if config.share_link_default_ttl_hours == 0:
+        errors.append("SHARE_LINK_DEFAULT_TTL_HOURS must be greater than 0")
+    if config.share_link_llm_draft_enabled and not (
+        config.llm_api_base_url and config.llm_api_key and config.llm_model
+    ):
+        errors.append(
+            "LLM_API_BASE_URL, LLM_API_KEY, and LLM_MODEL are required when "
+            "SHARE_LINK_LLM_DRAFT_ENABLED=true"
+        )
+    if (
+        config.llm_api_base_url
+        and config.llm_api_key
+        and config.llm_model
+        and not config.llm_draft_quota_enabled
+    ):
+        errors.append(
+            "LLM_DRAFT_QUOTA_ENABLED must stay true when live LLM provider is configured"
+        )
+    if config.license_mode == "required":
+        if not (config.license_key or config.license_public_key):
+            errors.append(
+                "LICENSE_KEY or LICENSE_PUBLIC_KEY is required when LICENSE_MODE=required"
+            )
+        if config.license_key and len(config.license_key) < 24:
+            errors.append("LICENSE_KEY must be at least 24 characters")
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_CHECKOUT_URL",
+        setting_value=config.billing_checkout_url,
+    )
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_PORTAL_URL",
+        setting_value=config.billing_portal_url,
+    )
+    _append_public_https_url_error(
+        errors,
+        setting_name="BILLING_SUPPORT_URL",
+        setting_value=config.billing_support_url,
+    )
+    _append_public_https_url_error(
+        errors,
+        setting_name="ACCOUNT_REACTIVATION_URL",
+        setting_value=config.account_reactivation_url,
+    )
+    if config.billing_webhook_secret and len(config.billing_webhook_secret) < 24:
+        errors.append("BILLING_WEBHOOK_SECRET must be at least 24 characters")
+    if config.billing_webhook_signature_secret and (
+        len(config.billing_webhook_signature_secret) < 32
+    ):
+        errors.append(
+            "BILLING_WEBHOOK_SIGNATURE_SECRET must be at least 32 characters"
+        )
+    if _split_csv(config.account_deactivated_subjects) and not (
+        config.account_reactivation_url or config.billing_support_url
+    ):
+        errors.append(
+            "ACCOUNT_DEACTIVATED_SUBJECTS requires ACCOUNT_REACTIVATION_URL or "
+            "BILLING_SUPPORT_URL in production"
+        )
+    if config.billing_contract_state_events_enabled:
+        if not _split_csv(config.billing_contract_deactivated_event_types):
+            errors.append(
+                "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES is required when "
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED=true"
+            )
+        if not (config.account_reactivation_url or config.billing_support_url):
+            errors.append(
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+                "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
+            )
+        if not (
+            config.billing_webhook_secret or config.billing_webhook_signature_secret
+        ):
+            errors.append(
+                "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
+                "BILLING_WEBHOOK_SECRET or BILLING_WEBHOOK_SIGNATURE_SECRET "
+                "in production"
+            )
+    if _invalid_key_value_csv(config.billing_event_type_aliases):
+        errors.append(
+            "BILLING_EVENT_TYPE_ALIASES entries must use source=target format"
+        )
+    if _invalid_billing_plan_ids(config.billing_allowed_plans):
+        errors.append(
+            "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs"
+        )
+    if _invalid_billing_event_type_ids(config.billing_entitlement_event_types):
+        errors.append(
+            "BILLING_ENTITLEMENT_EVENT_TYPES entries must be billing event type IDs"
+        )
+    return errors
 
 
 settings = Settings()  # type: ignore[call-arg]

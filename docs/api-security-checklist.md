@@ -36,6 +36,8 @@
 
 - ✅ Basic Auth 미사용 (OIDC Bearer Token 또는 dev fallback)
   - 근거: `backend/app/auth.py`
+- ✅ `APP_ENV=production` startup guard가 OIDC issuer/audience 누락을 차단
+  - 근거: `backend/app/settings.py`, `backend/app/main.py`
 - ✅ JWT 검증 시 알고리즘 allowlist 강제(토큰 헤더 `alg` 신뢰 금지)
   - 설정: `OIDC_ALGORITHMS` (default: `RS256`)
   - 근거: `backend/app/auth.py`, `backend/app/settings.py`
@@ -46,8 +48,12 @@
 - ✅ 프로젝트 리소스 접근은 멤버십 기반으로 제한
   - 근거: `backend/app/permissions.py` 및 각 API handler의
     `require_project_member(...)`
-- 🟡 공유 링크(공개 엔드포인트)는 최소 권한(읽기)만 제공
+- ✅ 공유 링크(공개 엔드포인트)는 최소 권한(읽기)만 제공하고 기본 만료/폐기를 지원
+  - 설정: `SHARE_LINK_DEFAULT_TTL_HOURS=168` (default, 0은 명시적 예외)
   - 근거: `backend/app/api/share.py`
+- ✅ 공개 공유 링크의 live LLM draft는 기본 차단
+  - 설정: `SHARE_LINK_LLM_DRAFT_ENABLED=false` (default)
+  - 근거: `backend/app/api/share.py`, `backend/tests/test_reversing_llm.py`
 
 ### CORS
 
@@ -94,6 +100,30 @@
   - 프록시/Ingress가 `X-Forwarded-For`를 신뢰 가능한 형태로 세팅/정제하는 경우에만
     `true`
 - `API_RATE_LIMIT_MAX_KEYS` (default: `10000`)
+- `SHARE_LINK_LLM_DRAFT_ENABLED` (default: `false`)
+  - 공개 공유 링크에서 `mode=llm-draft`가 외부 LLM provider 비용을 만들 수 있으므로,
+    기본값은 차단입니다. 필요한 경우 별도 비용 한도/감사 로그/운영 승인을 갖춘 배포에서만
+    `true`로 설정하세요.
+- `SHARE_LINK_DEFAULT_TTL_HOURS` (default: `168`)
+  - 공개 공유 링크가 영구 bearer URL로 남지 않도록 기본 만료를 적용합니다.
+  - `0`은 만료 없음이므로 승인된 운영 예외에만 사용하세요.
+- `LLM_MAX_PROMPT_CHARS` (default: `120000`) / `LLM_MAX_OUTPUT_TOKENS`
+  (default: `1200`)
+  - 인증된 live LLM draft에서도 provider 호출 전 prompt 크기와 출력 토큰 상한을
+    강제해 비용 폭주를 줄입니다.
+- `LLM_DRAFT_QUOTA_ENABLED` (default: `true`) /
+  `LLM_DRAFT_QUOTA_REQUESTS` (default: `20`) /
+  `LLM_DRAFT_QUOTA_WINDOW_SECONDS` (default: `3600`)
+  - 인증 경로는 account UUID, 공유 경로는 share-link UUID 기준으로 fixed-window
+    quota를 적용합니다.
+  - production에서 live LLM provider가 설정되면 quota를 끌 수 없습니다.
+  - live draft 요청은 `llm_draft_requests_total`, input/output char histogram,
+    `event=llm_draft_usage` 로그로 기록되어 계정/스냅샷 단위 비용 조사가 가능합니다.
+- `BILLING_ALLOWED_PLANS` (default: empty)
+  - 설정된 경우 plan-change 요청과 billing webhook `target_plan`을 configured
+    provider/customer catalog와 대조해 잘못된 plan ID를 `422`로 거절합니다.
+  - webhook 거절은 `billing_events_total{outcome="rejected_catalog"}`로 기록되어
+    운영 알림과 연결됩니다.
 
 ##### Trade-offs / 향후 계획
 
@@ -104,6 +134,9 @@
 - 필요 시 2차 개선으로 Redis/Valkey 같은 공유 스토어 기반으로 확장합니다.
 
 - 🟡 HTTPS/TLS/HSTS는 인그레스/리버스프록시 계층에서 강제 필요 (앱 단독 강제는 한계)
+- ✅ `APP_ENV=production` startup guard가 localhost/non-HTTPS CORS origin, 약한
+  secret, 대상 DB allowlist 누락, 무기한 공유 링크 기본값을 차단
+  - 근거: `backend/app/settings.py`, `backend/tests/test_production_config.py`
 
 ### Input validation / Data safety
 

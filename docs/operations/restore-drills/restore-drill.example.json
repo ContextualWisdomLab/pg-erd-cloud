@@ -1,0 +1,42 @@
+{
+  "drill_id": "restore-drill-2026-07-02-staging",
+  "drill_date": "2026-07-02",
+  "environment": "staging-restore",
+  "operator": "SRE on-call",
+  "release_version": "v2026.07.02-commercial-candidate",
+  "commit_sha": "41f8b014f68813ba50fb9dca8dfdad280920fe2c",
+  "backup_artifact": {
+    "path": "backups/pg-erd-cloud-20260702T000000Z.dump",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "created_at": "2026-07-02T00:00:00Z"
+  },
+  "restore_target": {
+    "postgres_image": "postgres:16-alpine@sha256:64b8bc2e6b2bdab4f0ce8019e9f8d71bc7f32b81a9a6ecb3f3d36cb4e5be1000",
+    "database": "erd_restore",
+    "isolated": true
+  },
+  "app_secret_source": "vault://customer-acme/pg-erd-cloud/app-secret",
+  "alembic_current": "0004_billing_event",
+  "expected_alembic_revision": "0004_billing_event",
+  "healthz": {
+    "path": "/healthz",
+    "ok": true
+  },
+  "smoke_tests": {
+    "authenticated_project_list": true,
+    "share_link_lookup": true,
+    "share_link_revoke_or_expiry": true,
+    "sql_export": true,
+    "support_bundle_redaction": true
+  },
+  "timings_minutes": {
+    "backup": 7,
+    "restore": 12,
+    "application_smoke": 9
+  },
+  "evidence_links": [
+    "https://github.com/ContextualWisdomLab/pg-erd-cloud/issues/415",
+    "docs/operations/backup-restore.md"
+  ],
+  "status": "passed"
+}

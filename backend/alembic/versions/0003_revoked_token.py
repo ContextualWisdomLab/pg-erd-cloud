@@ -1,7 +1,7 @@
 """revoked_token
 
 Revision ID: 0003
-Revises: 0002
+Revises: 0002_auth_share
 Create Date: 2026-06-22 10:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "0003"
-down_revision = "0002"
+down_revision = "0002_auth_share"
 branch_labels = None
 depends_on = None
 

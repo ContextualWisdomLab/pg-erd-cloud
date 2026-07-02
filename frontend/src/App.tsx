@@ -25,6 +25,7 @@ import {
 
 import {
   getMe,
+  getBillingSupportAccount,
   createShareLink,
   createConnection,
   createProject,
@@ -58,6 +59,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import type { BillingSupportAccount, CurrentUser } from "./api";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
@@ -68,14 +70,23 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
 
 const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
 
-type CurrentUser = {
-  subject: string;
-  display_name: string | null;
+type AuthNotice = {
+  title: string;
+  message: string;
+  accountReactivationUrl?: string;
+  billingSupportUrl?: string;
 };
 
-type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor";
+type AccountAwareError = {
+  status?: unknown;
+  accountStatus?: unknown;
+  accountReactivationUrl?: unknown;
+  billingSupportUrl?: unknown;
+};
 
-const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
+type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor" | "support";
+
+const baseWorkspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
   { id: "dashboard", label: "대시보드" },
   { id: "projects", label: "프로젝트" },
   { id: "diagrams", label: "다이어그램" },
@@ -95,17 +106,95 @@ function isSupportedConnectionDsn(value: string): boolean {
   }
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function accountAwareError(error: unknown): AccountAwareError {
+  return error && typeof error === "object" ? (error as AccountAwareError) : {};
+}
+
+function authNoticeFromError(error: unknown): AuthNotice {
+  const details = accountAwareError(error);
+  const status = typeof details.status === "number" ? details.status : null;
+  const accountStatus = optionalString(details.accountStatus);
+  const accountReactivationUrl = optionalString(details.accountReactivationUrl);
+  const billingSupportUrl = optionalString(details.billingSupportUrl);
+
+  if (status === 403 && accountStatus === "deactivated") {
+    return {
+      title: "계정이 비활성화되었습니다",
+      message:
+        "결제 또는 계약 상태 때문에 계정 접근이 중지되었습니다. 재활성화 또는 지원 채널을 통해 상태를 확인하세요.",
+      accountReactivationUrl,
+      billingSupportUrl,
+    };
+  }
+
+  if (status === 401) {
+    return {
+      title: "인증이 필요합니다",
+      message: "세션이 만료되었거나 로그인되지 않았습니다. 다시 로그인한 뒤 시도하세요.",
+    };
+  }
+
+  if (status === 403) {
+    return {
+      title: "접근 권한이 없습니다",
+      message:
+        "현재 계정에 이 작업공간 접근 권한이 없습니다. 조직 관리자 또는 지원팀에 권한을 확인하세요.",
+      billingSupportUrl,
+    };
+  }
+
+  return {
+    title: "인증 상태를 확인할 수 없습니다",
+    message: "로그인 상태를 확인할 수 없습니다. 잠시 후 다시 시도하거나 지원팀에 문의하세요.",
+    billingSupportUrl,
+  };
+}
+
 function strengthLabel(strength: CardinalityStrength): string {
   if (strength === "recommended") return "추천";
   if (strength === "consider") return "검토";
   return "보류";
 }
 
+function accountStatusLabel(status: BillingSupportAccount["account_status"]): string {
+  if (status === "active") return "활성";
+  if (status === "deactivated") return "비활성";
+  return "미확인";
+}
+
+function shareLinkStatusLabel(
+  status: BillingSupportAccount["recent_share_links"][number]["status"],
+): string {
+  if (status === "active") return "활성";
+  return "만료";
+}
+
+function licenseVerifierLabel(
+  verifier: BillingSupportAccount["license_verifier"],
+): string {
+  if (verifier === "signed_token") return "서명 토큰";
+  if (verifier === "static_key") return "정적 키";
+  if (verifier === "static_key_and_signed_token") return "정적 키 + 서명 토큰";
+  return "없음";
+}
+
+function billingMetadataSummaryLabel(
+  metadataSummary:
+    BillingSupportAccount["recent_billing_events"][number]["metadata_summary"],
+): string {
+  if (!metadataSummary.length) return "없음";
+  return metadataSummary.map((item) => `${item.key}=${item.value}`).join(", ");
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<AuthNotice | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("demo");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -138,6 +227,7 @@ export default function App() {
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
+  const supportCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -149,6 +239,11 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+  const [supportSubject, setSupportSubject] = useState("");
+  const [supportAccount, setSupportAccount] = useState<BillingSupportAccount | null>(null);
+  const [isSupportLookupLoading, setIsSupportLookupLoading] = useState(false);
+  const [supportLookupError, setSupportLookupError] = useState<string | null>(null);
+  const [copiedSupportUrlLabel, setCopiedSupportUrlLabel] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -177,6 +272,13 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+  const workspaceNavItems = useMemo(
+    () =>
+      me?.support_operator
+        ? [...baseWorkspaceNavItems, { id: "support" as const, label: "지원" }]
+        : baseWorkspaceNavItems,
+    [me?.support_operator],
+  );
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
     if (!normalizedNodeSearch) return new Set<string>();
@@ -225,6 +327,9 @@ export default function App() {
       if (shareCopyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
       }
+      if (supportCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(supportCopyFeedbackTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -257,7 +362,7 @@ export default function App() {
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
         if (!isCurrent) return;
-        setMe({ subject: m.subject, display_name: m.display_name });
+        setMe(m);
         setProjects(p);
         setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
@@ -268,7 +373,7 @@ export default function App() {
         setSelectedProjectId(null);
         setConnections([]);
         setSelectedConnId(null);
-        setAuthError(String(e));
+        setAuthError(authNoticeFromError(e));
       })
       .finally(() => {
         if (isCurrent) setIsAuthLoading(false);
@@ -278,6 +383,12 @@ export default function App() {
       isCurrent = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (activeView === "support" && !me?.support_operator) {
+      setActiveView("dashboard");
+    }
+  }, [activeView, me?.support_operator]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -603,6 +714,66 @@ export default function App() {
       setShareLinkError("공유 링크 복사에 실패했습니다.");
     }
   }, [shareLinkUrl]);
+
+  const onLookupSupportAccount = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const subject = supportSubject.trim();
+      if (!subject || isSupportLookupLoading) return;
+
+      setIsSupportLookupLoading(true);
+      setSupportLookupError(null);
+      setCopiedSupportUrlLabel(null);
+      try {
+        setSupportAccount(await getBillingSupportAccount(subject));
+      } catch {
+        setSupportAccount(null);
+        setSupportLookupError("지원 진단 정보를 불러오지 못했습니다.");
+      } finally {
+        setIsSupportLookupLoading(false);
+      }
+    },
+    [isSupportLookupLoading, supportSubject],
+  );
+
+  const onCopySupportUrl = useCallback(async (label: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setSupportLookupError(null);
+      setCopiedSupportUrlLabel(label);
+
+      if (supportCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(supportCopyFeedbackTimeoutRef.current);
+      }
+
+      supportCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setCopiedSupportUrlLabel(null);
+        supportCopyFeedbackTimeoutRef.current = null;
+      }, 2000);
+    } catch {
+      setCopiedSupportUrlLabel(null);
+      setSupportLookupError(`${label} URL 복사에 실패했습니다.`);
+    }
+  }, []);
+
+  const renderSupportUrl = useCallback(
+    (label: string, actionLabel: string, url: string | null) => {
+      if (!url) return <span className="supportLinkValue__missing">미설정</span>;
+
+      const isCopied = copiedSupportUrlLabel === label;
+      return (
+        <span className="supportLinkValue">
+          <a href={url} target="_blank" rel="noreferrer">
+            {actionLabel}
+          </a>
+          <button type="button" onClick={() => void onCopySupportUrl(label, url)}>
+            {isCopied ? "복사됨" : "URL 복사"}
+          </button>
+        </span>
+      );
+    },
+    [copiedSupportUrlLabel, onCopySupportUrl],
+  );
 
   function onDownloadSvg() {
     downloadText(
@@ -975,10 +1146,23 @@ export default function App() {
   }
 
   if (!me) {
+    const authNotice =
+      authError ??
+      authNoticeFromError(new Error("Sign in before managing database metadata."));
     return (
       <main id="main" className="authGate">
-        <h1>Authentication required</h1>
-        <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+        <h1>{authNotice.title}</h1>
+        <p role="alert">{authNotice.message}</p>
+        {authNotice.accountReactivationUrl || authNotice.billingSupportUrl ? (
+          <div className="authGate__actions">
+            {authNotice.accountReactivationUrl ? (
+              <a href={authNotice.accountReactivationUrl}>계정 재활성화</a>
+            ) : null}
+            {authNotice.billingSupportUrl ? (
+              <a href={authNotice.billingSupportUrl}>지원팀에 문의</a>
+            ) : null}
+          </div>
+        ) : null}
       </main>
     );
   }
@@ -1327,6 +1511,214 @@ export default function App() {
               }}
             />
           </section>
+        ) : activeView === "support" ? (
+          <section className="workspaceScreen" aria-labelledby="support-title">
+            <div className="workspaceHeader">
+              <div>
+                <h1 id="support-title">지원 진단</h1>
+                <p>
+                  계정 상태, 사용량, 라이선스 검증 방식, 최근 공유 링크와 결제 이벤트를
+                  read-only로 확인합니다.
+                </p>
+              </div>
+            </div>
+
+            <form className="supportLookup" onSubmit={onLookupSupportAccount}>
+              <label htmlFor="support-subject">대상 OIDC subject</label>
+              <div className="inlineCreate">
+                <input
+                  id="support-subject"
+                  aria-label="지원 진단 대상 subject"
+                  value={supportSubject}
+                  onChange={(event) => setSupportSubject(event.currentTarget.value)}
+                  placeholder="customer-owner"
+                />
+                <button
+                  type="submit"
+                  disabled={!supportSubject.trim() || isSupportLookupLoading}
+                  aria-busy={isSupportLookupLoading}
+                >
+                  {isSupportLookupLoading ? "조회 중" : "조회"}
+                </button>
+              </div>
+            </form>
+
+            {supportLookupError ? (
+              <div className="error" role="alert">
+                {supportLookupError}
+              </div>
+            ) : null}
+
+            {supportAccount ? (
+              <>
+                <div className="metricGrid metricGrid--support" aria-label="지원 진단 요약">
+                  <div className="metricCard">
+                    <span>프로젝트</span>
+                    <strong>{supportAccount.project_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>시트</span>
+                    <strong>{supportAccount.seat_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>연결</span>
+                    <strong>{supportAccount.connection_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>스냅샷</span>
+                    <strong>{supportAccount.snapshot_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>공유 링크</span>
+                    <strong>{supportAccount.share_link_count}</strong>
+                  </div>
+                  <div className="metricCard">
+                    <span>활성 공유</span>
+                    <strong>{supportAccount.active_share_link_count}</strong>
+                  </div>
+                </div>
+
+                <section className="workspaceSection" aria-labelledby="support-account-title">
+                  <div className="sectionHeader">
+                    <h2 id="support-account-title">계정 운영 정보</h2>
+                  </div>
+                  <dl className="supportDetails">
+                    <div>
+                      <dt>Subject</dt>
+                      <dd>{supportAccount.subject}</dd>
+                    </div>
+                    <div>
+                      <dt>계정 UUID</dt>
+                      <dd>{supportAccount.user_account_uuid || "미생성"}</dd>
+                    </div>
+                    <div>
+                      <dt>계정 상태</dt>
+                      <dd>{accountStatusLabel(supportAccount.account_status)}</dd>
+                    </div>
+                    <div>
+                      <dt>라이선스 모드</dt>
+                      <dd>{supportAccount.license_mode}</dd>
+                    </div>
+                    <div>
+                      <dt>검증 방식</dt>
+                      <dd>{licenseVerifierLabel(supportAccount.license_verifier)}</dd>
+                    </div>
+                    <div>
+                      <dt>계약 플랜</dt>
+                      <dd>{supportAccount.billing_entitlement.plan || "근거 없음"}</dd>
+                    </div>
+                    <div>
+                      <dt>계약 시트</dt>
+                      <dd>
+                        {supportAccount.billing_entitlement.seat_count?.toLocaleString() ||
+                          "근거 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>계약 근거</dt>
+                      <dd>
+                        {supportAccount.billing_entitlement.source_provider_event_id
+                          ? `${supportAccount.billing_entitlement.source_provider || "unknown"} / ${supportAccount.billing_entitlement.source_event_type || "unknown"}`
+                          : "근거 없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>지원 URL</dt>
+                      <dd>{renderSupportUrl("지원", "지원센터 열기", supportAccount.billing_support_url)}</dd>
+                    </div>
+                    <div>
+                      <dt>포털 URL</dt>
+                      <dd>{renderSupportUrl("포털", "결제 포털 열기", supportAccount.billing_portal_url)}</dd>
+                    </div>
+                    <div>
+                      <dt>재활성화 URL</dt>
+                      <dd>{renderSupportUrl("재활성화", "재활성화 열기", supportAccount.account_reactivation_url)}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section
+                  className="workspaceSection"
+                  aria-labelledby="support-share-links-title"
+                >
+                  <div className="sectionHeader">
+                    <h2 id="support-share-links-title">최근 공유 링크</h2>
+                  </div>
+                  {supportAccount.recent_share_links.length ? (
+                    <div
+                      className="dataTable supportEvents"
+                      role="table"
+                      aria-label="최근 공유 링크"
+                    >
+                      <div
+                        className="dataTable__row dataTable__row--head supportEvents__row"
+                        role="row"
+                      >
+                        <span role="columnheader">Project</span>
+                        <span role="columnheader">Link</span>
+                        <span role="columnheader">Status</span>
+                        <span role="columnheader">Expires</span>
+                      </div>
+                      {supportAccount.recent_share_links.map((link) => (
+                        <div
+                          className="dataTable__row supportEvents__row"
+                          role="row"
+                          key={link.share_link_uuid}
+                        >
+                          <span role="cell" data-label="Project">
+                            {link.project_space_uuid}
+                          </span>
+                          <strong role="cell" data-label="Link">
+                            {link.share_link_uuid}
+                          </strong>
+                          <span role="cell" data-label="Status">
+                            {shareLinkStatusLabel(link.status)}
+                          </span>
+                          <span role="cell" data-label="Expires">
+                            {link.expires_at || "만료 없음"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="panelEmpty">기록된 공유 링크가 없습니다.</div>
+                  )}
+                </section>
+
+                <section className="workspaceSection" aria-labelledby="support-events-title">
+                  <div className="sectionHeader">
+                    <h2 id="support-events-title">최근 결제 이벤트</h2>
+                  </div>
+                  {supportAccount.recent_billing_events.length ? (
+                    <div className="dataTable supportEvents" role="table" aria-label="최근 결제 이벤트">
+                      <div className="dataTable__row dataTable__row--head supportEvents__row" role="row">
+                        <span role="columnheader">Provider</span>
+                        <span role="columnheader">Event</span>
+                        <span role="columnheader">Plan</span>
+                        <span role="columnheader">Evidence</span>
+                        <span role="columnheader">Received</span>
+                      </div>
+                      {supportAccount.recent_billing_events.map((event) => (
+                        <div className="dataTable__row supportEvents__row" role="row" key={event.billing_event_uuid}>
+                          <span role="cell" data-label="Provider">{event.provider}</span>
+                          <strong role="cell" data-label="Event">{event.event_type}</strong>
+                          <span role="cell" data-label="Plan">{event.target_plan || "없음"}</span>
+                          <span role="cell" data-label="Evidence">
+                            {billingMetadataSummaryLabel(event.metadata_summary)}
+                          </span>
+                          <span role="cell" data-label="Received">{event.received_at}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="panelEmpty">기록된 결제 이벤트가 없습니다.</div>
+                  )}
+                </section>
+              </>
+            ) : (
+              <div className="panelEmpty">지원할 계정 subject를 입력해 진단 정보를 조회하세요.</div>
+            )}
+          </section>
         ) : (
           <div className="canvas">
           <div
@@ -1425,7 +1817,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadSvg}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
@@ -1436,7 +1828,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadUml}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
@@ -1447,7 +1839,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadMermaid}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0
@@ -1518,9 +1910,9 @@ export default function App() {
 
           <ExportModal
             isOpen={isExportModalOpen}
-            exportDdlText={exportDdlText}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
+            hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
@@ -1528,6 +1920,9 @@ export default function App() {
             canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
+            onDownloadSvg={onDownloadSvg}
+            onDownloadUml={onDownloadUml}
+            onDownloadMermaid={onDownloadMermaid}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />

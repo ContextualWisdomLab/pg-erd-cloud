@@ -1,0 +1,48 @@
+{
+  "release_version": "v2026.07.02-commercial-candidate",
+  "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+  "sale_motion": "hybrid",
+  "contract_plan": "enterprise",
+  "billing_method": "external_contract_invoice",
+  "approval_date": "2026-07-02",
+  "product_owner": "Product Owner product@example.com",
+  "legal_approver": "Legal Approver legal@example.com",
+  "security_approver": "Security Approver security@example.com",
+  "support_approver": "Support Approver support@example.com",
+  "support_channel": "contract-support@example.com",
+  "vulnerability_owner": "security@example.com",
+  "documents": {
+    "terms": "docs/legal/terms-of-service.md",
+    "privacy": "docs/legal/privacy-policy.md",
+    "sla": "docs/legal/sla-support.md",
+    "license_billing": "docs/legal/license-billing.md",
+    "security_policy": "SECURITY.md",
+    "incident_response": "docs/operations/incident-response.md",
+    "backup_restore": "docs/operations/backup-restore.md",
+    "migration_rollback": "docs/operations/migration-rollback.md",
+    "on_premises_package": "docs/operations/on-premises-package.md",
+    "alert_thresholds": "docs/operations/alert-thresholds.md"
+  },
+  "data_processing_scope": [
+    "application metadata",
+    "encrypted connection DSN",
+    "schema snapshot JSON",
+    "share-link audit log",
+    "support diagnostic log"
+  ],
+  "subprocessors": [
+    "hosting provider",
+    "billing provider",
+    "support ticket system"
+  ],
+  "unsupported_scope": [
+    "unapproved third-party LLM provider processing",
+    "non-contract regions",
+    "customer-managed database writes"
+  ],
+  "customer_notice": [
+    "Public share links expire by default.",
+    "Signed license tokens can be revoked before expiry.",
+    "Account reactivation follows the configured billing/support URL."
+  ]
+}

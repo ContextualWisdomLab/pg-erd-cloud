@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
+from app.metrics import record_product_event
 from app.permissions import require_project_member
 from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
@@ -19,6 +20,7 @@ from app.schemas import (
     ProjectOut,
 )
 from app.sanitize import sanitize_for_storage
+from app.usage_quotas import enforce_project_quota, enforce_seat_quota
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -52,6 +54,12 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
     """Create a new project and add the creator as the owner."""
+    try:
+        await enforce_project_quota(session, user.user_account_uuid)
+    except HTTPException:
+        record_product_event("project", "create", "denied")
+        raise
+
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
         project_name=str(sanitize_for_storage(body.project_name)),
@@ -69,6 +77,7 @@ async def create_project(
     )
     session.add(m)
     await session.commit()
+    record_product_event("project", "create", "success")
     return ProjectOut(
         project_space_uuid=p.project_space_uuid, project_name=p.project_name
     )
@@ -121,20 +130,22 @@ async def _ensure_owner(
         raise HTTPException(status_code=403, detail="owner role required")
 
 
-async def _ensure_user_exists(session: AsyncSession, subject: str) -> UserAccount:
+async def _find_user_by_subject(session: AsyncSession, subject: str) -> UserAccount | None:
     row2 = await session.execute(
         select(UserAccount).where(UserAccount.oidc_subject == subject)
     )
-    u = row2.scalars().first()
-    if u is None:
-        u = UserAccount(
-            user_account_uuid=uuid.uuid4(),
-            oidc_subject=subject,
-            display_name=None,
-            created_at=dt.datetime.now(dt.timezone.utc),
-        )
-        session.add(u)
-        await session.flush()
+    return row2.scalars().first()
+
+
+async def _create_user(session: AsyncSession, subject: str) -> UserAccount:
+    u = UserAccount(
+        user_account_uuid=uuid.uuid4(),
+        oidc_subject=subject,
+        display_name=None,
+        created_at=dt.datetime.now(dt.timezone.utc),
+    )
+    session.add(u)
+    await session.flush()
     return u
 
 
@@ -200,7 +211,17 @@ async def add_project_member(
     if not subject:
         raise HTTPException(status_code=400, detail="member_subject required")
 
-    u = await _ensure_user_exists(session, subject)
+    u = await _find_user_by_subject(session, subject)
+    await enforce_seat_quota(
+        session,
+        owner_user_account_uuid=user.user_account_uuid,
+        owner_subject=user.subject,
+        candidate_user_account_uuid=(
+            u.user_account_uuid if u is not None else None
+        ),
+    )
+    if u is None:
+        u = await _create_user(session, subject)
     await _ensure_not_changing_owner_role(
         session, project_space_uuid, u.user_account_uuid
     )

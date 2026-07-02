@@ -5,11 +5,12 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
 from app.api.auth_routes import router as auth_router
+from app.api.billing import router as billing_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
@@ -25,8 +26,9 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.license_gate import require_active_license
 from app.security_headers import make_security_headers_middleware
-from app.settings import settings
+from app.settings import settings, validate_production_settings
 
 
 @asynccontextmanager
@@ -36,6 +38,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     Starts a background job worker on startup and ensures it is cancelled and
     awaited on shutdown.
     """
+
+    production_errors = validate_production_settings(settings)
+    if production_errors:
+        raise RuntimeError(
+            "production configuration is invalid: " + "; ".join(production_errors)
+        )
 
     handlers = {"snapshot": handle_snapshot_job}
     task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
@@ -162,9 +170,10 @@ async def csrf_token() -> dict[str, str]:
     return {"csrf_token": generate_csrf_token(settings.app_secret)}
 
 
-app.include_router(projects_router)
-app.include_router(connections_router)
-app.include_router(snapshots_router)
-app.include_router(me_router)
+app.include_router(projects_router, dependencies=[Depends(require_active_license)])
+app.include_router(connections_router, dependencies=[Depends(require_active_license)])
+app.include_router(snapshots_router, dependencies=[Depends(require_active_license)])
+app.include_router(me_router, dependencies=[Depends(require_active_license)])
+app.include_router(auth_router, dependencies=[Depends(require_active_license)])
+app.include_router(billing_router, dependencies=[Depends(require_active_license)])
 app.include_router(share_router)
-app.include_router(auth_router)

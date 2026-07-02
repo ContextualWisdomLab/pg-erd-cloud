@@ -15,6 +15,10 @@ class LlmProviderError(RuntimeError):
     """Raised when the configured LLM provider does not return a usable draft."""
 
 
+class LlmPromptTooLargeError(RuntimeError):
+    """Raised when a generated LLM prompt exceeds the configured size guard."""
+
+
 def _required_setting(value: str | None, name: str) -> str:
     if value is None or not value.strip():
         raise LlmConfigurationError(f"{name} is required for live LLM drafts")
@@ -82,6 +86,11 @@ async def _generate_llm_draft(
     base_url = _required_setting(settings.llm_api_base_url, "LLM_API_BASE_URL")
     api_key = _required_setting(settings.llm_api_key, "LLM_API_KEY")
     model = _required_setting(settings.llm_model, "LLM_MODEL")
+    if len(prompt) > settings.llm_max_prompt_chars:
+        raise LlmPromptTooLargeError(
+            "LLM prompt exceeds LLM_MAX_PROMPT_CHARS; use llm-prompt export "
+            "or reduce snapshot scope"
+        )
     request_json = {
         "model": model,
         "messages": [
@@ -89,6 +98,7 @@ async def _generate_llm_draft(
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.2,
+        "max_tokens": settings.llm_max_output_tokens,
     }
     headers = {
         "Authorization": f"Bearer {api_key}",

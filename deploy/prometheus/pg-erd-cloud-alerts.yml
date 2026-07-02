@@ -1,0 +1,102 @@
+groups:
+  - name: pg-erd-cloud-commercial-readiness
+    rules:
+      - alert: PgErdCloudHigh5xxRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total[5m])), 1)
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: page
+          area: reliability
+        annotations:
+          summary: "pg-erd-cloud 5xx rate is above 1%"
+          description: "Backend 5xx responses are above the commercial readiness threshold for 5 minutes."
+
+      - alert: PgErdCloudHighRouteLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (rate(http_request_duration_seconds_bucket[10m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: ticket
+          area: reliability
+        annotations:
+          summary: "pg-erd-cloud p95 route latency is above 1s"
+          description: "A route has exceeded the p95 latency threshold for 10 minutes."
+
+      - alert: PgErdCloudAuthzFailureSpike
+        expr: |
+          sum by (route, reason) (rate(authz_failures_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: ticket
+          area: security
+        annotations:
+          summary: "pg-erd-cloud authz failures are spiking"
+          description: "Authentication or authorization failures exceeded 10/s for a route/reason pair."
+
+      - alert: PgErdCloudShareAbuseOrFailureSpike
+        expr: |
+          sum by (action, outcome) (
+            rate(share_audit_events_total{outcome=~"denied|failed"}[5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: ticket
+          area: abuse-control
+        annotations:
+          summary: "pg-erd-cloud share audit denied/failed events are spiking"
+          description: "Public share-link denied or failed events exceeded 5/s for an action/outcome pair."
+
+      - alert: PgErdCloudBillingWebhookFailures
+        expr: |
+          increase(billing_events_total{outcome=~"rejected_auth|rejected_config|rejected_catalog"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          area: billing
+        annotations:
+          summary: "pg-erd-cloud billing webhook reconciliation is failing"
+          description: "Billing webhook authentication, configuration, or catalog validation failures occurred in the last 10 minutes."
+
+      - alert: PgErdCloudLlmDraftFailures
+        expr: |
+          increase(llm_draft_requests_total{outcome=~"configuration_error|provider_error|prompt_too_large|quota_exceeded"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          area: llm-cost-control
+        annotations:
+          summary: "pg-erd-cloud live LLM draft requests are failing"
+          description: "Live LLM draft configuration, prompt-size, provider, or quota failures occurred in the last 10 minutes."
+
+      - alert: PgErdCloudJobFailures
+        expr: |
+          increase(job_queue_jobs_total{outcome="failed"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          area: jobs
+        annotations:
+          summary: "pg-erd-cloud background jobs are failing"
+          description: "One or more background jobs failed in the last 10 minutes."
+
+      - alert: PgErdCloudJobQueueWaitHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, job_type) (rate(job_queue_wait_seconds_bucket[10m]))
+          ) > 60
+        for: 10m
+        labels:
+          severity: ticket
+          area: jobs
+        annotations:
+          summary: "pg-erd-cloud job queue wait time is high"
+          description: "A job type exceeded the p95 queue wait threshold for 10 minutes."
