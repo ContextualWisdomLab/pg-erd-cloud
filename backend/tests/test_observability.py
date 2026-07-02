@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
@@ -66,6 +66,30 @@ def test_get_route_template_empty_path() -> None:
 
     req = Request({"type": "http", "headers": [], "route": MockRoute()})
     assert _get_route_template(req) == "unmatched"
+
+
+def test_http_exception_authz_logs(caplog: pytest.LogCaptureFixture) -> None:
+    app = FastAPI()
+    setup_observability(app)
+
+    @app.get("/api/private")
+    def private() -> None:
+        raise HTTPException(status_code=401, detail="missing bearer token")
+
+    with caplog.at_level("WARNING"):
+        with TestClient(app) as client:
+            response = client.get("/api/private")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "missing bearer token"}
+    assert any(
+        "authz_failure" in record.message and "status\":401" in record.message
+        for record in caplog.records
+    )
+    assert any(
+        "\"detail\":\"missing bearer token\"" in record.message
+        for record in caplog.records
+    )
 
 
 @pytest.mark.parametrize(

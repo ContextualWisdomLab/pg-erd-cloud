@@ -16,8 +16,9 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Response
-from starlette.requests import Request
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from starlette.responses import JSONResponse
 
 from app.metrics import (
     HTTP_REQUEST_DURATION_SECONDS,
@@ -31,6 +32,7 @@ from app.settings import settings
 _logger = logging.getLogger("app.observability")
 
 _SAFE_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_AUTHZ_HTTP_STATUS = {401, 403}
 
 
 def _utc_now_iso() -> str:
@@ -110,6 +112,58 @@ def _record_metrics_and_logs(
         )
 
 
+def _record_authz_event(request: Request, request_id: str, status: int) -> None:
+    if status not in _AUTHZ_HTTP_STATUS:
+        return
+
+    _log_json(
+        "authz_failure",
+        {
+            "request_id": request_id,
+            "method": request.method,
+            "route": _get_route_template(request),
+            "status": status,
+            "client_ip": _get_client_ip(request),
+        },
+        level=logging.WARNING,
+    )
+
+
+def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[Response]]:
+    async def handler(request: Request, exc: Exception) -> Response:
+        if not isinstance(exc, HTTPException):
+            raise exc
+
+        request_id = getattr(request.state, "request_id", None)
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+            request.state.request_id = request_id
+
+        status = int(exc.status_code)
+        if status in _AUTHZ_HTTP_STATUS and settings.observability_request_logging_enabled:
+            _log_json(
+                "authz_failure",
+                {
+                    "request_id": request_id,
+                    "method": request.method,
+                    "route": _get_route_template(request),
+                    "status": status,
+                    "detail": jsonable_encoder(exc.detail),
+                    "client_ip": _get_client_ip(request),
+                },
+                level=logging.WARNING,
+            )
+            setattr(request.state, "authz_event_emitted", True)
+
+        return JSONResponse(
+            status_code=status,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+
+    return handler
+
+
 def make_request_observability_middleware() -> Callable[
     [Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]
 ]:
@@ -128,6 +182,7 @@ def make_request_observability_middleware() -> Callable[
             request_id = raw_request_id
         else:
             request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
         start = time.perf_counter()
 
         try:
@@ -152,6 +207,11 @@ def make_request_observability_middleware() -> Callable[
         _record_metrics_and_logs(
             request, request_id, status, duration_s, is_metrics_path
         )
+        if (
+            status in _AUTHZ_HTTP_STATUS
+            and not getattr(request.state, "authz_event_emitted", False)
+        ):
+            _record_authz_event(request, request_id, status)
         return response
 
     return middleware
@@ -160,6 +220,7 @@ def make_request_observability_middleware() -> Callable[
 def setup_observability(app: FastAPI) -> None:
     """Register observability hooks on the given FastAPI app."""
     app.middleware("http")(make_request_observability_middleware())
+    app.add_exception_handler(HTTPException, _make_http_exception_handler())
 
     if not settings.observability_metrics_enabled:
         return
