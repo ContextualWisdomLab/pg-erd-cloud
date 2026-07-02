@@ -62,6 +62,7 @@ blocker로 분류합니다.
 - ✅ `Llm` prompt/output 상한으로 비용 탐색 경로 제한
 - ✅ `share 링크` TTL 기본값 7일(`SHARE_LINK_DEFAULT_TTL_HOURS=168`) 적용
 - ✅ 인증 실패 응답(`authz_failure`) 관측 이벤트 로깅 추가
+- ✅ 공유 감사(`share_audit`)에 `request_id`를 포함해 지원 티켓/로그 상관관계 분석 강화
 - ✅ 공개 공유 링크 LLM-draft 차단/실패 이벤트의 공유 감사 로그 보강(액션·결과·에러코드)
 - 🟡 사용자 안내 메시지 표준화와 보안 알림 임계치 전략은 진행 중
 

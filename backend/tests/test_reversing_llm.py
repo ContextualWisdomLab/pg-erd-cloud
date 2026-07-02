@@ -49,6 +49,7 @@ def _request() -> SimpleNamespace:
     return SimpleNamespace(
         headers={"user-agent": "pytest"},
         client=SimpleNamespace(host="127.0.0.1"),
+        state=SimpleNamespace(request_id="test-request-id"),
     )
 
 
@@ -472,6 +473,7 @@ async def test_shared_reversing_draft_disabled_event_is_audited(
 
     events = _share_audit_events(caplog)
     assert events
+    assert events[-1]["request_id"] == "test-request-id"
     assert events[-1]["action"] == "share_snapshot.reversing_spec"
     assert events[-1]["outcome"] == "denied"
     assert events[-1]["mode"] == "llm-draft"
@@ -518,6 +520,7 @@ async def test_shared_reversing_draft_configuration_error_event_is_audited(
     _assert_sanitized_config_error(exc_info)
     events = _share_audit_events(caplog)
     assert events
+    assert events[-1]["request_id"] == "test-request-id"
     assert events[-1]["action"] == "share_snapshot.reversing_spec"
     assert events[-1]["outcome"] == "failed"
     assert events[-1]["mode"] == "llm-draft"
@@ -586,6 +589,7 @@ async def test_shared_index_design_draft_disabled_event_is_audited(
     _assert_share_link_llm_draft_disabled(exc_info)
     events = _share_audit_events(caplog)
     assert events
+    assert events[-1]["request_id"] == "test-request-id"
     assert events[-1]["action"] == "share_snapshot.index_design"
     assert events[-1]["outcome"] == "denied"
     assert events[-1]["mode"] == "llm-draft"
@@ -613,6 +617,7 @@ async def test_shared_index_design_draft_configuration_error_event_is_audited(
     _assert_sanitized_config_error(exc_info)
     events = _share_audit_events(caplog)
     assert events
+    assert events[-1]["request_id"] == "test-request-id"
     assert events[-1]["action"] == "share_snapshot.index_design"
     assert events[-1]["outcome"] == "failed"
     assert events[-1]["mode"] == "llm-draft"
@@ -682,6 +687,7 @@ async def test_share_snapshot_reversing_spec_audit_event_is_emitted(
 
     events = _share_audit_events(caplog)
     assert events
+    assert events[-1]["request_id"] == "test-request-id"
     assert events[-1]["action"] == "share_snapshot.reversing_spec"
     assert events[-1]["outcome"] == "success"
     assert events[-1]["mode"] == "markdown"

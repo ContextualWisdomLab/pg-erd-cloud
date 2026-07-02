@@ -64,12 +64,18 @@ def _record_share_audit_event(
     error_detail: str | None = None,
     mode: str | None = None,
 ) -> None:
+    request_id = None
+    if request is not None:
+        request_state = getattr(request, "state", None)
+        request_id = getattr(request_state, "request_id", None)
+
     payload: dict[str, object] = {
         "event": "share_audit",
         "action": action,
         "outcome": outcome,
         "client_ip": _request_client_ip(request),
         "user_agent": (request.headers.get("user-agent") if request else None),
+        "request_id": request_id,
         "share_link_uuid": str(share_link_uuid) if share_link_uuid else None,
         "project_space_uuid": str(project_space_uuid) if project_space_uuid else None,
         "schema_snapshot_uuid": (
