@@ -1,5 +1,4 @@
 import React from 'react';
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface AddTableModalProps {
   isOpen: boolean;
@@ -16,8 +15,6 @@ export function AddTableModal({
   onAddTableCancel,
   onAddTableSubmit,
 }: AddTableModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
-
   if (!isOpen) return null;
 
   return (
@@ -36,19 +33,11 @@ export function AddTableModal({
         justifyContent: "center",
       }}
     >
-      <form
+      <div
         className="modalContent"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-table-title"
-        ref={dialogRef}
-        tabIndex={-1}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (newTableName.trim()) {
-            onAddTableSubmit();
-          }
-        }}
         style={{
           background: "#fff",
           padding: 20,
@@ -68,7 +57,6 @@ export function AddTableModal({
             onChange={(e) => setNewTableName(e.target.value)}
             placeholder="users"
             autoFocus
-            required
           />
         </div>
         <div
@@ -77,18 +65,14 @@ export function AddTableModal({
         >
           <button type="button" onClick={onAddTableCancel}>취소</button>
           <button
-            type="submit"
-            disabled={!newTableName.trim()}
-            style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
-            }
+            type="button"
+            onClick={onAddTableSubmit}
+            style={{ background: "#034ea2", color: "#fff" }}
           >
             저장
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

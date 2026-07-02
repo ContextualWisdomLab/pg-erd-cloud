@@ -64,6 +64,7 @@ app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 CORS_ALLOW_HEADERS = [
     "Authorization",
     "Content-Type",
+    "X-Dev-User",
     CSRF_HEADER_NAME,
 ]
 
@@ -94,7 +95,7 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=10,
     window_seconds=60,
-    route_prefix="/api/auth/logout",
+    route_prefix="/api/auth/revoke",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 

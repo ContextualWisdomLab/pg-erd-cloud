@@ -26,8 +26,6 @@ type TableNodeData = {
     access_method: string;
     strength?: string;
   }>;
-  isDimmed?: boolean;
-  isHighlighted?: boolean;
   badges?: { pk?: boolean; fk?: boolean };
 };
 
@@ -36,12 +34,10 @@ type TableNodeNode = Node<TableNodeData, "tableNode">;
 function AccessibleTruncatedText({
   className,
   text,
-  title,
   children,
 }: {
   className: string;
   text: string;
-  title?: string;
   children?: ReactNode;
 }) {
   const accessibleText = text.trim();
@@ -52,8 +48,8 @@ function AccessibleTruncatedText({
   return (
     <span
       className={className}
-      title={title ?? accessibleText}
-      aria-label={accessibleText}
+      title={text}
+      aria-label={text}
       tabIndex={0}
     >
       {children ?? text}
@@ -81,18 +77,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
 
   // User-supplied labels/comments are rendered as React text nodes; do not
   // switch these fields to raw HTML rendering.
-  const className = [
-    "tableNode",
-    data.businessGroup ? "tableNode--grouped" : "",
-    data.isDimmed ? "tableNode--dimmed" : "",
-    data.isHighlighted ? "tableNode--highlighted" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   return (
     <div
-      className={className}
+      className={`tableNode${data.businessGroup ? " tableNode--grouped" : ""}`}
       style={style}
       role="region"
       aria-label={`${accessibleTableName} 테이블`}
@@ -116,10 +103,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
           {data.badges?.pk ? (
-            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</abbr>
+            <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span>
           ) : null}
           {data.badges?.fk ? (
-            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</abbr>
+            <span className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</span>
           ) : null}
         </span>
       </div>
@@ -152,15 +139,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? (
-                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
-                  PK
-                </abbr>
-              ) : null}
+              {c.is_pk ? <span className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</span> : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
-                  NOT NULL
-                </span>
+                <span className="tableNode__badge" title="Not Null" aria-label="Not Null">NOT NULL</span>
               ) : null}
               <Handle
                 type="source"
@@ -191,10 +172,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                   <AccessibleTruncatedText
                     className="tableNode__indexName"
                     text={index.index_name}
-                    title={`Access method: ${index.access_method}`}
-                  >
-                    {index.index_name}
-                  </AccessibleTruncatedText>
+                  />
                   <AccessibleTruncatedText
                     className="tableNode__indexCols"
                     text={columnsText}
@@ -224,7 +202,6 @@ function isSameRenderedColumns(
   prevCols: Column[],
   nextCols: Column[],
 ): boolean {
-  if (prevCols === nextCols) return true;
   if (prevCols.length !== nextCols.length) return false;
 
   // The component only renders the first MAX_RENDERED_COLUMNS and the "… N more" count.
@@ -247,8 +224,6 @@ function isSameRenderedColumns(
 }
 
 export default memo(TableNode, (prev, next) => {
-  if (prev.data === next.data) return true;
-
   // React Flow typically provides new node objects when data changes.
   // This comparator is a conservative safeguard for the most relevant fields.
   // Note: if upstream mutates `columns` in-place between renders, no memo comparator can
@@ -261,8 +236,6 @@ export default memo(TableNode, (prev, next) => {
     prev.data.businessGroup?.id === next.data.businessGroup?.id &&
     prev.data.businessGroup?.name === next.data.businessGroup?.name &&
     prev.data.businessGroup?.color === next.data.businessGroup?.color &&
-    prev.data.isDimmed === next.data.isDimmed &&
-    prev.data.isHighlighted === next.data.isHighlighted &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk
   );

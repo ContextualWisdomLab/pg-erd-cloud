@@ -1,8 +1,7 @@
 import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
-import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import type { TableNodeData } from './convert';
 
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
@@ -53,41 +52,6 @@ function sqlDataType(value: unknown): string {
   return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
 }
 
-function fkColumnsForEdge(
-  edge: Edge,
-  sourceNode: Node<TableNodeData>,
-  targetNode: Node<TableNodeData>,
-): { sourceColumns: string[]; targetColumns: string[] } | null {
-  const data = edge.data as ForeignKeyEdgeData | undefined;
-  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
-  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
-    return { sourceColumns, targetColumns };
-  }
-
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
-  if (sourceHandleColumn && targetHandleColumn) {
-    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
-  }
-
-  const fallbackSource = (sourceNode.data.columns || [])
-    .filter((column) => !column.is_pk)
-    .map((column) => column.column_name);
-  const fallbackTarget = (targetNode.data.columns || [])
-    .filter((column) => column.is_pk)
-    .map((column) => column.column_name);
-  if (fallbackSource.length > 0 && fallbackSource.length === fallbackTarget.length) {
-    return { sourceColumns: fallbackSource, targetColumns: fallbackTarget };
-  }
-
-  return null;
-}
-
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
@@ -127,20 +91,14 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
-      const sourceColumns = fkColumns
-        ? fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ')
-        : '/* source columns */';
-      const targetColumns = fkColumns
-        ? fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ')
-        : '/* target columns */';
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
-      ddl += `  FOREIGN KEY (${sourceColumns})\n`;
-      ddl += `  REFERENCES ${targetTable} (${targetColumns});\n\n`;
+      // For simplicity in UI without detailed column mapping we just put placeholder comments
+      ddl += `  FOREIGN KEY (/* source columns */)\n`;
+      ddl += `  REFERENCES ${targetTable} (/* target columns */);\n\n`;
     }
   }
 
@@ -299,7 +257,7 @@ export function exportDiagramSvg(
   let maxX = width;
   let maxY = headerHeight;
 
-  // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
+  // Avoid spreading large coordinate arrays; JS engines cap variadic argument counts.
   for (const n of nodes) {
     const x = n.position.x;
     const y = n.position.y;

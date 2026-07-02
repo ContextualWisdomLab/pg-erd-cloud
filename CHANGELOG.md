@@ -12,3 +12,8 @@
 ### 🐛 개선 (Improvements)
 - 불필요한 백엔드 포맷팅 이슈(`ruff` 포맷) 해결.
 - 테스트 커버리지를 높이기 위해 기본 단위 테스트 환경(jsdom, @testing-library) 구축 및 활용.
+
+## [Unreleased]
+### 추가
+- 테이블 노드의 'PK', 'FK', 'NOT NULL' 뱃지에 `title` 및 `aria-label` 속성을 추가하여 접근성 및 사용성을 개선했습니다.
+- `frontend/package.json`에 CI 통과를 위한 `lint`, `coverage`, `e2e` 스크립트를 추가했습니다.
