@@ -80,6 +80,11 @@
 - `POST /api/billing/events`는 외부 결제/계약 시스템이 보낸 provider-neutral event를
   저장해 지원/정산 reconciliation 증거로 남깁니다.
   - `X-BILLING-WEBHOOK-SECRET` 헤더가 `BILLING_WEBHOOK_SECRET`과 일치해야 합니다.
+  - `BILLING_WEBHOOK_SIGNATURE_SECRET`을 설정하면 raw request body의
+    HMAC-SHA256 값도 `X-BILLING-WEBHOOK-SIGNATURE` 헤더로 검증합니다.
+    헤더 값은 `sha256=<hex>` 또는 `<hex>` 형식을 허용합니다.
+  - `BILLING_WEBHOOK_SECRET`과 `BILLING_WEBHOOK_SIGNATURE_SECRET`을 모두 설정한
+    배포에서는 두 검증을 모두 통과해야 합니다.
   - `provider`와 `provider_event_id` 조합은 한 번만 기록됩니다. 동일 event가 다시
     오면 duplicate로 응답하고 상태를 두 번 적용하지 않습니다.
   - payload는 `provider`, `provider_event_id`, `event_type`, `subject`,
@@ -107,6 +112,8 @@
   - `BILLING_PORTAL_URL`: 플랜 변경, 결제수단, 청구 내역 관리 포털
   - `BILLING_SUPPORT_URL`: 결제/계약 문의 지원 경로
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
+  - `BILLING_WEBHOOK_SIGNATURE_SECRET`: provider/gateway webhook raw-body
+    HMAC-SHA256 signature 검증용 secret
   - `ACCOUNT_REACTIVATION_URL`: 미납/계약 중단/abuse hold 해제 요청 경로
   - `SUPPORT_OPERATOR_SUBJECTS`: read-only 지원 진단 API 접근 허용 subject 목록
 - 계약 중단, 미납, abuse 대응으로 계정 접근을 즉시 차단해야 하면
@@ -121,7 +128,7 @@
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
   - 위반 탐지 시 자동 비활성화/재활성화 실행 규칙
-  - provider별 서명 검증 어댑터 또는 gateway-level signature verification
+  - provider별 checkout/fulfillment 어댑터와 계약 시스템 상태 반영 규칙
 
 ## 5) 온프레미스 체크리스트
 

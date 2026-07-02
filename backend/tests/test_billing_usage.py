@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import hmac
+import json
 import uuid
 from collections.abc import Iterator
 
@@ -136,6 +139,16 @@ def fake_get_support_operator() -> CurrentUser:
         subject="support-operator",
         display_name="Support Operator",
     )
+
+
+def _signed_billing_event_body(
+    payload: dict[str, object],
+    *,
+    secret: str,
+) -> tuple[bytes, str]:
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return body, f"sha256={signature}"
 
 
 def test_billing_usage_returns_owned_project_scope_counts(
@@ -367,6 +380,66 @@ def test_billing_event_records_and_redacts_sensitive_metadata(
         "api_key": "[redacted]",
         "nested": {"client_secret": "[redacted]"},
     }
+
+
+def test_billing_event_accepts_hmac_signature_without_shared_header_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeBillingEventSession()
+    monkeypatch.setattr(settings, "billing_webhook_secret", None)
+    monkeypatch.setattr(settings, "billing_webhook_signature_secret", "signing-secret")
+    app.dependency_overrides[get_session] = lambda: session
+    body, signature = _signed_billing_event_body(
+        {
+            "provider": "stripe",
+            "provider_event_id": "evt_signed_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+        },
+        secret="signing-secret",
+    )
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={
+            "content-type": "application/json",
+            "X-BILLING-WEBHOOK-SIGNATURE": signature,
+        },
+        content=body,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["action"] == "recorded"
+    assert response.json()["provider_event_id"] == "evt_signed_1"
+    assert session.committed is True
+
+
+def test_billing_event_rejects_invalid_hmac_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeBillingEventSession()
+    monkeypatch.setattr(settings, "billing_webhook_secret", None)
+    monkeypatch.setattr(settings, "billing_webhook_signature_secret", "signing-secret")
+    app.dependency_overrides[get_session] = lambda: session
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={
+            "content-type": "application/json",
+            "X-BILLING-WEBHOOK-SIGNATURE": "sha256=bad",
+        },
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_signed_1",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "invalid billing webhook signature"
+    assert session.added_event is None
+    assert session.committed is False
 
 
 def test_billing_event_ignores_duplicate_provider_event(

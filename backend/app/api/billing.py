@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import hmac
 import uuid
 from collections.abc import Mapping
@@ -8,7 +9,7 @@ from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import desc, distinct, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +41,7 @@ from app.settings import settings
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 _BILLING_WEBHOOK_SECRET_HEADER = "X-BILLING-WEBHOOK-SECRET"
+_BILLING_WEBHOOK_SIGNATURE_HEADER = "X-BILLING-WEBHOOK-SIGNATURE"
 _SENSITIVE_METADATA_KEY_PARTS = (
     "api_key",
     "authorization",
@@ -194,6 +196,60 @@ def _redacted_billing_metadata(metadata: Mapping[str, object]) -> dict:
     if isinstance(redacted, dict):
         return redacted
     return {}
+
+
+def _expected_billing_signature(raw_body: bytes) -> str:
+    secret = settings.billing_webhook_signature_secret
+    if secret is None:
+        raise RuntimeError("billing webhook signature secret is not configured")
+    return hmac.new(
+        secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _signature_value(header_value: str) -> str:
+    signature = header_value.strip()
+    if signature.startswith("sha256="):
+        return signature.removeprefix("sha256=")
+    return signature
+
+
+async def _require_valid_billing_webhook_auth(
+    *,
+    request: Request,
+    billing_webhook_secret: str | None,
+    billing_webhook_signature: str | None,
+) -> None:
+    if not (settings.billing_webhook_secret or settings.billing_webhook_signature_secret):
+        raise HTTPException(
+            status_code=503,
+            detail="billing webhook secret is not configured",
+        )
+
+    if settings.billing_webhook_secret and (
+        not billing_webhook_secret
+        or not hmac.compare_digest(
+            billing_webhook_secret,
+            settings.billing_webhook_secret,
+        )
+    ):
+        raise HTTPException(status_code=401, detail="invalid billing webhook secret")
+
+    if settings.billing_webhook_signature_secret:
+        if not billing_webhook_signature:
+            raise HTTPException(
+                status_code=401,
+                detail="invalid billing webhook signature",
+            )
+        expected = _expected_billing_signature(await request.body())
+        provided = _signature_value(billing_webhook_signature)
+        if not hmac.compare_digest(provided, expected):
+            raise HTTPException(
+                status_code=401,
+                detail="invalid billing webhook signature",
+            )
 
 
 async def _find_billing_event(
@@ -377,24 +433,24 @@ async def request_billing_plan_change(
 
 @router.post("/events", response_model=BillingEventOut)
 async def ingest_billing_event(
+    request: Request,
     payload: BillingEventIn,
     billing_webhook_secret: str | None = Header(
         default=None,
         alias=_BILLING_WEBHOOK_SECRET_HEADER,
     ),
+    billing_webhook_signature: str | None = Header(
+        default=None,
+        alias=_BILLING_WEBHOOK_SIGNATURE_HEADER,
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> BillingEventOut:
     """Record a provider-neutral billing event for support reconciliation."""
-    if not settings.billing_webhook_secret:
-        raise HTTPException(
-            status_code=503,
-            detail="billing webhook secret is not configured",
-        )
-    if not billing_webhook_secret or not hmac.compare_digest(
-        billing_webhook_secret,
-        settings.billing_webhook_secret,
-    ):
-        raise HTTPException(status_code=401, detail="invalid billing webhook secret")
+    await _require_valid_billing_webhook_auth(
+        request=request,
+        billing_webhook_secret=billing_webhook_secret,
+        billing_webhook_signature=billing_webhook_signature,
+    )
 
     existing = await _find_billing_event(
         session,

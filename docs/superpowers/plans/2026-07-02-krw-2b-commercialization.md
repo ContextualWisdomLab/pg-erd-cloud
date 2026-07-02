@@ -260,8 +260,10 @@ Files:
 Status:
 
 - First provider-neutral event recording slice implemented in PR `#415`.
-- Remaining gap: provider-specific checkout/fulfillment and signature
-  verification adapters.
+- Raw-body HMAC-SHA256 signature verification implemented in PR `#415` without
+  adding provider SDK dependencies.
+- Remaining gap: provider-specific checkout/fulfillment and contract-state
+  application adapters.
 
 Tasks:
 
@@ -270,6 +272,8 @@ Tasks:
   status, and metadata redaction.
 - Add idempotent event ingestion endpoint guarded by a shared secret or signed
   provider token.
+- Add optional raw-body HMAC-SHA256 signature verification for provider/gateway
+  webhooks.
 - Record event outcomes for support diagnostics.
 - Keep the existing portal/support handoff path.
 

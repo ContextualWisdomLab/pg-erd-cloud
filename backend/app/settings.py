@@ -141,6 +141,7 @@ class Settings(BaseSettings):
     billing_portal_url: str | None = None
     billing_support_url: str | None = None
     billing_webhook_secret: str | None = None
+    billing_webhook_signature_secret: str | None = None
     account_reactivation_url: str | None = None
     # Comma-separated OIDC subjects that must be denied before DB access.
     account_deactivated_subjects: str = ""
