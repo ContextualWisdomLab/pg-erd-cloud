@@ -71,6 +71,10 @@ class FakeBillingEventSession:
         self.rolled_back = True
 
 
+def fake_billing_event_session() -> FakeBillingEventSession:
+    return FakeBillingEventSession()
+
+
 class FakeScalars:
     def __init__(self, values: list[object]) -> None:
         self.values = values
@@ -418,7 +422,7 @@ def test_billing_event_requires_configured_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "billing_webhook_secret", None)
-    app.dependency_overrides[get_session] = lambda: FakeBillingEventSession()
+    app.dependency_overrides[get_session] = fake_billing_event_session
 
     response = TestClient(app).post(
         "/api/billing/events",
@@ -439,7 +443,7 @@ def test_billing_event_rejects_invalid_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
-    app.dependency_overrides[get_session] = lambda: FakeBillingEventSession()
+    app.dependency_overrides[get_session] = fake_billing_event_session
     before = _billing_metric_value(
         provider="stripe",
         event_type="subscription.updated",

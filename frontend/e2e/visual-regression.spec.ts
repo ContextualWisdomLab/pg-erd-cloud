@@ -18,11 +18,13 @@ const supportBaselines = [
     name: 'desktop',
     screenshotName: 'support-diagnostics.png',
     viewport: { width: 1280, height: 900 },
+    captureViewport: { width: 1280, height: 1220 },
   },
   {
     name: 'mobile review',
     screenshotName: 'support-diagnostics-mobile.png',
     viewport: { width: 390, height: 844 },
+    captureViewport: { width: 390, height: 3100 },
   },
 ] as const;
 
@@ -85,10 +87,15 @@ for (const baseline of editorBaselines) {
 for (const baseline of supportBaselines) {
   test(`support diagnostics visual baseline remains stable on ${baseline.name}`, async ({ page }) => {
     await openDemoSupportDiagnostics(page, baseline.viewport);
+    await page.setViewportSize(baseline.captureViewport);
+    const pageHeight = await page.evaluate(() =>
+      Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+    );
+    expect(pageHeight).toBeLessThanOrEqual(baseline.captureViewport.height);
 
     await expect(page).toHaveScreenshot(baseline.screenshotName, {
       animations: 'disabled',
-      fullPage: true,
+      fullPage: false,
       maxDiffPixelRatio: 0.04,
     });
   });
