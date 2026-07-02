@@ -259,10 +259,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     kty = jwk.get("kty")
     if not isinstance(kty, str):
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    if kty == "RSA":
+    jwk_kty = kty.upper()
+    if jwk_kty == "RSA":
         if not (header_alg.startswith("RS") or header_alg.startswith("PS")):
             raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-    elif kty == "EC":
+    elif jwk_kty == "EC":
         if not header_alg.startswith("ES"):
             raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
     else:
