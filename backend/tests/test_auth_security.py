@@ -158,10 +158,10 @@ async def test_jwks_fetch_disables_redirects(
 
     monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
-    monkeypatch.setattr(auth, "_oidc_jwks", None)
+    monkeypatch.setattr(auth, "_jwks_cache", None)
     monkeypatch.setattr(
         auth,
-        "_oidc_jwks_expires_at",
+        "_jwks_expires_at",
         auth.dt.datetime.fromtimestamp(0, tz=auth.dt.timezone.utc),
     )
 
