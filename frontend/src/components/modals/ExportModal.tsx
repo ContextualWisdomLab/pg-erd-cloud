@@ -52,6 +52,8 @@ export function ExportModal({
   if (!isOpen) return null;
 
   const shareStatusKind = shareLinkError ? 'error' : isShareLinkCopied ? 'success' : 'neutral';
+  const shareStatusRole = shareLinkError ? 'alert' : 'status';
+  const shareStatusLive = shareLinkError ? 'assertive' : 'polite';
   const shareStatusMessage = shareLinkError
     ? shareLinkError
     : isShareLinkCopied
@@ -142,7 +144,6 @@ export function ExportModal({
                   type="button"
                   className="exportModal__primaryAction"
                   onClick={onCopyShareLink}
-                  aria-live="polite"
                 >
                   {isShareLinkCopied ? '복사 완료' : '링크 복사'}
                 </button>
@@ -161,9 +162,14 @@ export function ExportModal({
                 type="button"
                 disabled
                 title="접근 권한 관리는 프로젝트 권한 설정에서 처리합니다."
+                aria-describedby="share-export-access-hint"
+                className="exportModal__disabledHintButton"
               >
                 접근 관리
               </button>
+              <p id="share-export-access-hint" className="exportModal__hint">
+                접근 권한은 프로젝트 설정에서 별도로 관리합니다.
+              </p>
             </div>
           </section>
 
@@ -198,8 +204,8 @@ export function ExportModal({
 
         <div
           className={`exportModal__state exportModal__state--${shareStatusKind}`}
-          role={shareLinkError ? 'alert' : 'status'}
-          aria-live="polite"
+          role={shareStatusRole}
+          aria-live={shareStatusLive}
         >
           {shareStatusMessage}
         </div>
