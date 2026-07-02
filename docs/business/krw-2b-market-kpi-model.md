@@ -102,8 +102,9 @@ operational reliability, and support burden.
 ## Immediate Product Implications
 
 - Billing provider reconciliation remains a P1 gap until provider-specific
-  checkout/fulfillment and provider event normalization adapters exist. The
-  common event recording path, raw-body HMAC signature verification path,
+  checkout/fulfillment, customer portal handoff, and real provider event catalog
+  validation exist. The common event recording path, raw-body HMAC signature
+  verification path, configurable provider event alias normalization,
   normalized contract-state application path, and billing reconciliation outcome
   metric are now covered by tests.
 - Admin/support diagnostics are now partially measured by tests through the
@@ -121,9 +122,10 @@ operational reliability, and support burden.
 
 - Measured today: local automated tests for license, usage limits, account
   deactivation, plan-change handoff, provider-neutral billing event ingestion,
-  billing webhook outcome metrics, read-only support diagnostics, operator-only
-  support diagnostics UI, support diagnostics demo evidence, visual regression,
-  accessibility, and E2E smoke paths.
+  provider event alias normalization, billing webhook outcome metrics,
+  read-only support diagnostics, operator-only support diagnostics UI, support
+  diagnostics demo evidence, visual regression, accessibility, and E2E smoke
+  paths.
 - Estimated today: ICP fit, packaging mix, enterprise price points, activation
   rates, support effort, and buyer conversion.
 - Missing today: real customer interviews, paid pilot data, procurement notes,

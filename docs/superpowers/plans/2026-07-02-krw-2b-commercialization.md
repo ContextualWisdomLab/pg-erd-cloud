@@ -277,10 +277,13 @@ Status:
   adding provider SDK dependencies.
 - Billing webhook outcomes now emit `billing_events_total` labels for recorded,
   duplicate, rejected authentication, and rejected configuration events.
+- Configurable provider event alias normalization is implemented through
+  `BILLING_EVENT_TYPE_ALIASES`, including provider-scoped
+  `provider:event=normalized` entries.
 - Normalized contract-state event application is implemented behind
   `BILLING_CONTRACT_STATE_EVENTS_ENABLED`.
-- Remaining gap: provider-specific checkout/fulfillment and provider event
-  normalization adapters.
+- Remaining gap: provider-specific checkout/fulfillment SDKs, customer portal
+  integration, and real provider event catalog validation.
 
 Tasks:
 
@@ -291,6 +294,7 @@ Tasks:
   provider token.
 - Add optional raw-body HMAC-SHA256 signature verification for provider/gateway
   webhooks.
+- Add configurable provider event alias normalization before storing events.
 - Record event outcomes for support diagnostics.
 - Record reconciliation outcomes as low-cardinality Prometheus metrics and
   alert on rejected auth/config events.

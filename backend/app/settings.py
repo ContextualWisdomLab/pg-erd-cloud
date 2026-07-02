@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     billing_support_url: str | None = None
     billing_webhook_secret: str | None = None
     billing_webhook_signature_secret: str | None = None
+    billing_event_type_aliases: str = ""
     billing_contract_state_events_enabled: bool = False
     billing_contract_deactivated_event_types: str = "contract.deactivated,contract.suspended"
     billing_contract_active_event_types: str = "contract.activated,contract.reactivated"
@@ -170,6 +171,15 @@ class Settings(BaseSettings):
 
 def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _invalid_key_value_csv(value: str) -> list[str]:
+    invalid: list[str] = []
+    for item in _split_csv(value):
+        key, separator, mapped = item.partition("=")
+        if separator != "=" or not key.strip() or not mapped.strip():
+            invalid.append(item)
+    return invalid
 
 
 def _is_public_https_origin(origin: str) -> bool:
@@ -234,6 +244,10 @@ def validate_production_settings(config: Settings) -> list[str]:
                 "BILLING_CONTRACT_STATE_EVENTS_ENABLED requires "
                 "ACCOUNT_REACTIVATION_URL or BILLING_SUPPORT_URL in production"
             )
+    if _invalid_key_value_csv(config.billing_event_type_aliases):
+        errors.append(
+            "BILLING_EVENT_TYPE_ALIASES entries must use source=target format"
+        )
     return errors
 
 

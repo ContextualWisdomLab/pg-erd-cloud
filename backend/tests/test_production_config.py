@@ -141,3 +141,24 @@ def test_validate_production_settings_requires_deactivation_event_types() -> Non
         "BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES is required when "
         "BILLING_CONTRACT_STATE_EVENTS_ENABLED=true"
     ) in errors
+
+
+def test_validate_production_settings_accepts_billing_event_type_aliases() -> None:
+    errors = validate_production_settings(
+        _settings(
+            billing_event_type_aliases=(
+                "stripe:customer.subscription.deleted=contract.suspended,"
+                "customer.subscription.updated=contract.reactivated"
+            )
+        )
+    )
+
+    assert errors == []
+
+
+def test_validate_production_settings_rejects_invalid_billing_event_type_aliases() -> None:
+    errors = validate_production_settings(
+        _settings(billing_event_type_aliases="customer.subscription.deleted")
+    )
+
+    assert "BILLING_EVENT_TYPE_ALIASES entries must use source=target format" in errors

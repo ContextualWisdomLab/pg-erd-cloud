@@ -94,9 +94,10 @@
     접근을 `account deactivated`로 차단합니다. 이후 최신 contract-state event가
     `BILLING_CONTRACT_ACTIVE_EVENT_TYPES`에 포함되면 차단을 해제합니다.
   - 이 기능은 provider-specific checkout/fulfillment SDK가 아닙니다. Stripe,
-    Paddle, 수기 계약 시스템 등 외부 provider의 원본 event는 gateway나 운영
-    시스템에서 `contract.suspended`, `contract.reactivated` 같은 normalized
-    event_type으로 변환한 뒤 전송해야 합니다.
+    Paddle, 수기 계약 시스템 등 외부 provider의 원본 event는 gateway에서
+    `contract.suspended`, `contract.reactivated` 같은 normalized event_type으로
+    변환한 뒤 전송하거나, `BILLING_EVENT_TYPE_ALIASES` 운영값으로 서버 저장 전에
+    정규화합니다.
   - `metadata`의 `secret`, `token`, `password`, `api_key`, `client_secret`,
     `authorization`, `card`, `dsn` 계열 키는 저장 전에 `[redacted]`로 치환됩니다.
   - 응답에는 민감 metadata를 반환하지 않습니다.
@@ -122,6 +123,10 @@
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
   - `BILLING_WEBHOOK_SIGNATURE_SECRET`: provider/gateway webhook raw-body
     HMAC-SHA256 signature 검증용 secret
+  - `BILLING_EVENT_TYPE_ALIASES`: provider 원본 event_type을 내부 normalized
+    event_type으로 바꾸는 쉼표 구분 `source=target` 목록. 공급자 충돌을 피하려면
+    `stripe:customer.subscription.deleted=contract.suspended`처럼
+    `provider:event_type=normalized_event_type` 형식을 사용합니다.
   - `BILLING_CONTRACT_STATE_EVENTS_ENABLED`: billing event에서 account
     deactivation/reactivation 상태를 적용할지 여부
   - `BILLING_CONTRACT_DEACTIVATED_EVENT_TYPES`: 접근 차단으로 해석할 normalized
@@ -137,11 +142,16 @@
   `X-Billing-Support-Url` 헤더가 포함됩니다.
 - `APP_ENV=production`에서 `ACCOUNT_DEACTIVATED_SUBJECTS`를 설정하려면
   `ACCOUNT_REACTIVATION_URL` 또는 `BILLING_SUPPORT_URL` 중 하나가 필요합니다.
+- `BILLING_EVENT_TYPE_ALIASES`가 적용되면 저장되는 `event_type`은 normalized
+  값이 되며, 원본 provider event_type은 billing metadata의 `raw_event_type`에
+  감사용으로 보존됩니다. Provider가 같은 key를 metadata로 보낸 경우에도 서버가
+  실제 원본 event_type으로 덮어씁니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
-  - provider별 checkout/fulfillment 어댑터와 provider event normalization 규칙
+  - provider별 checkout/fulfillment 어댑터, customer portal 연동, 실제
+    event catalog에 맞춘 별칭 운영값
 
 ## 5) 온프레미스 체크리스트
 

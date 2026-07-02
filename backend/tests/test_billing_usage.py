@@ -426,6 +426,57 @@ def test_billing_event_records_and_redacts_sensitive_metadata(
     )
 
 
+def test_billing_event_normalizes_provider_event_type_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeBillingEventSession()
+    monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
+    monkeypatch.setattr(settings, "billing_webhook_signature_secret", None)
+    monkeypatch.setattr(
+        settings,
+        "billing_event_type_aliases",
+        "stripe:customer.subscription.deleted=contract.suspended",
+    )
+    app.dependency_overrides[get_session] = lambda: session
+    before = _billing_metric_value(
+        provider="stripe",
+        event_type="contract.suspended",
+        outcome="recorded",
+    )
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "provider-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_subscription_deleted_1",
+            "event_type": "customer.subscription.deleted",
+            "subject": "customer-owner",
+            "target_plan": "enterprise",
+            "metadata": {"raw_event_type": "caller-supplied-value"},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "recorded"
+    assert payload["event_type"] == "contract.suspended"
+    assert session.committed is True
+    assert session.added_event is not None
+    assert session.added_event.event_type == "contract.suspended"
+    assert session.added_event.metadata_json == {
+        "raw_event_type": "customer.subscription.deleted"
+    }
+    assert (
+        _billing_metric_value(
+            provider="stripe",
+            event_type="contract.suspended",
+            outcome="recorded",
+        )
+        == before + 1
+    )
+
+
 def test_billing_event_accepts_hmac_signature_without_shared_header_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

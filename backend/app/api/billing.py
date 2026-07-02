@@ -16,7 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Executable
 
 from app.auth import CurrentUser, get_current_user
-from app.contract_state import latest_contract_state_for_subject
+from app.contract_state import (
+    latest_contract_state_for_subject,
+    normalize_billing_event_type,
+)
 from app.db import get_read_session, get_session
 from app.models import (
     BillingEvent,
@@ -201,6 +204,16 @@ def _redacted_billing_metadata(metadata: Mapping[str, object]) -> dict:
     if isinstance(redacted, dict):
         return redacted
     return {}
+
+
+def _billing_metadata_for_storage(
+    payload: BillingEventIn,
+    normalized_event_type: str,
+) -> dict:
+    metadata = _redacted_billing_metadata(payload.metadata)
+    if normalized_event_type != payload.event_type:
+        metadata["raw_event_type"] = payload.event_type
+    return metadata
 
 
 def _expected_billing_signature(raw_body: bytes) -> str:
@@ -466,6 +479,13 @@ async def ingest_billing_event(
     session: AsyncSession = Depends(get_session),
 ) -> BillingEventOut:
     """Record a provider-neutral billing event for support reconciliation."""
+    normalized_event_type = normalize_billing_event_type(
+        payload.event_type,
+        provider=payload.provider,
+    )
+    normalized_payload = payload.model_copy(
+        update={"event_type": normalized_event_type},
+    )
     try:
         await _require_valid_billing_webhook_auth(
             request=request,
@@ -474,32 +494,35 @@ async def ingest_billing_event(
         )
     except HTTPException as exc:
         _record_billing_event_metric(
-            payload,
+            normalized_payload,
             "rejected_config" if exc.status_code == 503 else "rejected_auth",
         )
         raise
 
     existing = await _find_billing_event(
         session,
-        provider=payload.provider,
-        provider_event_id=payload.provider_event_id,
+        provider=normalized_payload.provider,
+        provider_event_id=normalized_payload.provider_event_id,
     )
     if existing is not None:
-        _record_billing_event_metric(payload, "duplicate")
+        _record_billing_event_metric(normalized_payload, "duplicate")
         return _billing_event_response(event=existing, action="duplicate")
 
     now = utcnow()
     event = BillingEvent(
         billing_event_uuid=uuid.uuid4(),
-        provider=payload.provider,
-        provider_event_id=payload.provider_event_id,
-        event_type=payload.event_type,
-        subject=payload.subject,
-        target_plan=payload.target_plan,
+        provider=normalized_payload.provider,
+        provider_event_id=normalized_payload.provider_event_id,
+        event_type=normalized_payload.event_type,
+        subject=normalized_payload.subject,
+        target_plan=normalized_payload.target_plan,
         event_status="recorded",
-        occurred_at=payload.occurred_at or now,
+        occurred_at=normalized_payload.occurred_at or now,
         received_at=now,
-        metadata_json=_redacted_billing_metadata(payload.metadata),
+        metadata_json=_billing_metadata_for_storage(
+            payload,
+            normalized_payload.event_type,
+        ),
     )
     session.add(event)
 
@@ -509,13 +532,13 @@ async def ingest_billing_event(
         await session.rollback()
         duplicate = await _find_billing_event(
             session,
-            provider=payload.provider,
-            provider_event_id=payload.provider_event_id,
+            provider=normalized_payload.provider,
+            provider_event_id=normalized_payload.provider_event_id,
         )
         if duplicate is None:
             raise
-        _record_billing_event_metric(payload, "duplicate")
+        _record_billing_event_metric(normalized_payload, "duplicate")
         return _billing_event_response(event=duplicate, action="duplicate")
 
-    _record_billing_event_metric(payload, "recorded")
+    _record_billing_event_metric(normalized_payload, "recorded")
     return _billing_event_response(event=event, action="recorded")
