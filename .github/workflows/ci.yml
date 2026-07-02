@@ -43,8 +43,8 @@ jobs:
           PYTHONPATH: .
         run: pytest -q
 
-      - name: Support bundle generator tests
-        run: python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_validate_support_bundle.py scripts/ci/test_commercial_readiness_audit.py -q
+      - name: Commercial evidence tests
+        run: python -m pytest scripts/operations/test_generate_support_bundle.py scripts/ci/test_*.py -q
 
       - name: Commercial release approval manifests
         run: python scripts/ci/validate_commercial_release_approval.py
@@ -57,6 +57,9 @@ jobs:
 
       - name: Billing provider catalog manifest
         run: python scripts/ci/validate_billing_provider_catalog.py
+
+      - name: Restore drill evidence manifests
+        run: python scripts/ci/validate_restore_drill_manifest.py
 
       - name: On-premises package smoke
         run: python scripts/ci/validate_onprem_package.py
