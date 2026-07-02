@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 import re
 from starlette.requests import Request
 
+from app.license_gate import require_active_license
 from app.observability import _get_client_ip, _get_route_template, setup_observability
 from app.settings import settings
 
@@ -190,6 +191,54 @@ def test_authz_failure_metrics_are_recorded() -> None:
             for line in metric_lines
         )
     finally:
+        settings.observability_metrics_enabled = prev_metrics
+        settings.observability_request_logging_enabled = prev_logging
+        settings.observability_metrics_token = prev_token
+
+
+def test_license_gate_sets_error_code_and_metrics() -> None:
+    """License enforcement failures should emit error code headers and metrics."""
+    prev_mode = settings.license_mode
+    prev_key = settings.license_key
+    prev_metrics = settings.observability_metrics_enabled
+    prev_logging = settings.observability_request_logging_enabled
+    prev_token = settings.observability_metrics_token
+    settings.license_mode = "required"
+    settings.license_key = "x" * 32
+    settings.observability_metrics_enabled = True
+    settings.observability_request_logging_enabled = True
+    settings.observability_metrics_token = "test-token"
+
+    try:
+        app = FastAPI()
+
+        @app.get("/api/private-license", dependencies=[Depends(require_active_license)])
+        def private_license_route() -> dict[str, str]:
+            return {"ok": "true"}
+
+        setup_observability(app)
+        client = TestClient(app)
+
+        response = client.get("/api/private-license")
+        assert response.status_code == 403
+        assert response.headers["X-Error-Code"] == "license_key_invalid"
+        assert response.headers.get("X-Request-Id")
+
+        metrics = client.get(
+            "/metrics",
+            headers={"X-Metrics-Token": "test-token"},
+        ).text
+
+        assert any(
+            line.startswith("authz_failures_total")
+            and 'status="403"' in line
+            and 'route="/api/private-license"' in line
+            and 'reason="license_key_invalid"' in line
+            for line in metrics.splitlines()
+        )
+    finally:
+        settings.license_mode = prev_mode
+        settings.license_key = prev_key
         settings.observability_metrics_enabled = prev_metrics
         settings.observability_request_logging_enabled = prev_logging
         settings.observability_metrics_token = prev_token

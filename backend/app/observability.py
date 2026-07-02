@@ -180,6 +180,7 @@ def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[R
             request.state.request_id = request_id
 
         status = int(exc.status_code)
+        response_headers: dict[str, str] = dict(exc.headers or {})
         if status in _AUTHZ_HTTP_STATUS and settings.observability_request_logging_enabled:
             reason = _classify_authz_reason(exc.detail)
             if settings.observability_metrics_enabled:
@@ -188,6 +189,7 @@ def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[R
                     route=normalize_route_label(_get_route_template(request)),
                     reason=reason,
                 ).inc()
+            response_headers["X-Error-Code"] = reason
             _log_json(
                 "authz_failure",
                 {
@@ -203,10 +205,11 @@ def _make_http_exception_handler() -> Callable[[Request, Exception], Awaitable[R
             )
             setattr(request.state, "authz_event_emitted", True)
 
+        response_headers.setdefault("X-Request-Id", request_id)
         return JSONResponse(
             status_code=status,
             content={"detail": exc.detail},
-            headers=exc.headers,
+            headers=response_headers,
         )
 
     return handler
