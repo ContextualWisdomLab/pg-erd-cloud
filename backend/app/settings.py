@@ -126,6 +126,8 @@ class Settings(BaseSettings):
     # X-LICENSE-KEY header when running paid/on-prem distribution.
     license_mode: Literal["off", "required"] = "off"
     license_key: str | None = None
+    # Optional Ed25519 public key for offline signed on-prem license tokens.
+    license_public_key: str | None = None
 
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
@@ -186,9 +188,11 @@ def validate_production_settings(config: Settings) -> list[str]:
             "SHARE_LINK_LLM_DRAFT_ENABLED=true"
         )
     if config.license_mode == "required":
-        if not config.license_key:
-            errors.append("LICENSE_KEY is required when LICENSE_MODE=required")
-        elif len(config.license_key) < 24:
+        if not (config.license_key or config.license_public_key):
+            errors.append(
+                "LICENSE_KEY or LICENSE_PUBLIC_KEY is required when LICENSE_MODE=required"
+            )
+        if config.license_key and len(config.license_key) < 24:
             errors.append("LICENSE_KEY must be at least 24 characters")
     return errors
 

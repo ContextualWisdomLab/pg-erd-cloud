@@ -12,7 +12,7 @@
 - `LICENSE_MODE=required`
   - `/api/projects`, `/api/connections`, `/api/snapshots`, `/api/me`, `/api/auth/*`
     라우트가 `X-LICENSE-KEY` 헤더를 필수로 요구합니다.
-  - 환경 변수 `LICENSE_KEY`가 필요합니다.
+  - 환경 변수 `LICENSE_KEY` 또는 `LICENSE_PUBLIC_KEY` 중 하나가 필요합니다.
 
 ## 2) 라이선스 키 운영 기본값
 
@@ -21,7 +21,26 @@
 - 값은 비밀로 관리하고 정기적으로 교체합니다.
 - 노출 또는 유출 의심 시 `LICENSE_KEY`를 즉시 교체합니다.
 
-## 3) 결제/과금 연계 전제
+## 3) 서명 라이선스 토큰 운영
+
+상용 온프레미스 배포는 정적 공유 키보다 `LICENSE_PUBLIC_KEY`를 권장합니다.
+
+- `LICENSE_PUBLIC_KEY`는 Ed25519 public key입니다. PEM 문자열 또는 base64url raw public key
+  값을 사용할 수 있습니다.
+- 고객에게 전달하는 `X-LICENSE-KEY` 값은 다음 형식의 offline token입니다.
+  - `v1.<base64url-json-payload>.<base64url-ed25519-signature>`
+- signature 입력값은 `v1.<base64url-json-payload>` 문자열입니다.
+- payload는 최소한 다음 claim을 포함해야 합니다.
+  - `sub`: 고객/계약 식별자
+  - `plan`: 계약 플랜 식별자
+  - `exp`: Unix epoch seconds 만료 시각
+- 선택 claim:
+  - `nbf`: Unix epoch seconds 활성 시작 시각
+  - `seats`: 양의 정수 시트 수
+- 만료, 미활성, 잘못된 payload, 서명 변조는 각각 403으로 거절되며 관측 로그의
+  `reason`/`X-Error-Code`에 반영됩니다.
+
+## 4) 결제/과금 연계 전제
 
 - 현재 단계는 상용화 준비 상태(POC)이며, 별도 과금 라우트(Billing, invoicing, seat API)는
   아직 미구현입니다.
@@ -31,16 +50,16 @@
   - 팀별 시트/계정 할당량(프로젝트 수, 사용자 수, API 호출량) 정책
   - 위반 탐지 시 일시 사용 제한 규칙
 
-## 4) 온프레미스 체크리스트
+## 5) 온프레미스 체크리스트
 
 - `LICENSE_MODE=required`를 활성화하면 비인가 배포/임시 실행을 줄일 수 있습니다.
-- 실제 영업용 패키지는 `LICENSE_KEY` 발급·회수·재발급·사용량 제한까지 운영 시스템이
-  필요합니다.
+- 실제 영업용 패키지는 서명 토큰 발급·회수·재발급·사용량 제한까지 운영 시스템이
+  필요합니다. 정적 `LICENSE_KEY`는 기존 배포 호환용으로만 유지합니다.
 - 상업 전환 시에는 계정 포털(키 발급/회수/로그 감사)과 연동하세요.
 
-## 5) 배포 체크포인트
+## 6) 배포 체크포인트
 
-- `LICENSE_MODE`와 `LICENSE_KEY`를 배포값으로 분리
+- `LICENSE_MODE`와 `LICENSE_KEY` 또는 `LICENSE_PUBLIC_KEY`를 배포값으로 분리
 - 환경 변수 바인딩/문서화
 - 운영 키 저장소(시크릿 저장소)에서만 관리
-- 키 노출 탐지 시 비상 대응(runbook) 연동
+- 정적 키 노출 또는 서명 토큰 오남용 탐지 시 비상 대응(runbook) 연동

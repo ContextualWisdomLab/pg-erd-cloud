@@ -52,7 +52,13 @@ _AUTHZ_DETAIL_REASON_MAP = {
     "owner role required": "owner_role_required",
     "share link LLM draft is disabled": "share_llm_draft_disabled",
     "license key is not configured for required mode": "license_key_not_configured",
+    "license verification key is not configured for required mode": "license_key_not_configured",
+    "license verification key must be an Ed25519 public key": "license_public_key_invalid",
     "invalid or missing license key": "license_key_invalid",
+    "license token payload is invalid": "license_token_invalid",
+    "license token signature is invalid": "license_token_signature_invalid",
+    "license token is expired": "license_token_expired",
+    "license token is not yet valid": "license_token_not_yet_valid",
 }
 
 

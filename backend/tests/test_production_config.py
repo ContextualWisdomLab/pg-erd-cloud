@@ -64,12 +64,27 @@ def test_validate_production_settings_requires_llm_provider_when_shared_drafts_e
     ) in errors
 
 
-def test_validate_production_settings_requires_license_key_when_license_required() -> None:
+def test_validate_production_settings_requires_license_verifier_when_license_required() -> None:
     errors = validate_production_settings(
-        _settings(license_mode="required", license_key=None)
+        _settings(license_mode="required", license_key=None, license_public_key=None)
     )
 
-    assert "LICENSE_KEY is required when LICENSE_MODE=required" in errors
+    assert (
+        "LICENSE_KEY or LICENSE_PUBLIC_KEY is required when LICENSE_MODE=required"
+        in errors
+    )
+
+
+def test_validate_production_settings_accepts_public_key_license_verifier() -> None:
+    errors = validate_production_settings(
+        _settings(
+            license_mode="required",
+            license_key=None,
+            license_public_key="x" * 44,
+        )
+    )
+
+    assert errors == []
 
 
 def test_validate_production_settings_rejects_short_license_key() -> None:
