@@ -1425,36 +1425,38 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadSvg}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
+                nodes.length === 0
+                  ? "내보낼 테이블이 없습니다"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="SVG 그림 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               IMG
             </button>
             <button
               type="button"
-              onClick={onDownloadUml}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="PlantUML 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               UML
             </button>
             <button
               type="button"
-              onClick={onDownloadMermaid}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
-                  : "Mermaid 내보내기"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="Mermaid 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               {"{}"}
             </button>
@@ -1518,9 +1520,9 @@ export default function App() {
 
           <ExportModal
             isOpen={isExportModalOpen}
-            exportDdlText={exportDdlText}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
+            hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
@@ -1528,6 +1530,9 @@ export default function App() {
             canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
+            onDownloadSvg={onDownloadSvg}
+            onDownloadUml={onDownloadUml}
+            onDownloadMermaid={onDownloadMermaid}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
