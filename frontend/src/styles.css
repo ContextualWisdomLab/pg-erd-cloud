@@ -366,6 +366,12 @@ textarea:focus-visible {
   grid-template-columns: 1fr 1.7fr 1fr 1.5fr;
 }
 
+.supportEvents__row [role="cell"],
+.supportEvents__row [role="columnheader"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .panelEmpty {
   padding: 24px;
   color: #64748b;

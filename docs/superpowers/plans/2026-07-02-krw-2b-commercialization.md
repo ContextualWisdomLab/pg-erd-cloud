@@ -218,9 +218,9 @@ Tasks:
   sales-engineering and Product Design evidence path for support diagnostics.
 - Track support diagnostics UI follow-ups:
   raw billing/support URLs are now named links with copy actions, and
-  narrow-width billing events preserve their labels in stacked rows. The next
-  support-diagnostics UX gap is production-scale stress fixtures for long
-  provider events, contract IDs, plan names, and timestamps.
+  narrow-width billing events preserve their labels in stacked rows.
+  Production-scale `stress-customer` fixtures now cover long provider events,
+  contract IDs, plan names, and timestamps with Playwright overflow checks.
 - Convert every `P0` design issue into a frontend task with test coverage.
 
 Verification:

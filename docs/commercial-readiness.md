@@ -67,8 +67,9 @@ blocker로 분류합니다.
   support/billing/reactivation destination은 raw URL 대신 named link와 URL copy
   action으로 표시합니다.
 - narrow viewport에서도 billing event의 provider/event/plan/received context를
-  stacked row label로 보존합니다. 일반 판매 전 잔여 과제는 실제 provider payload와
-  장문 계약 식별자로 stress fixture를 추가하는 것입니다.
+  stacked row label로 보존합니다. `stress-customer` fixture와 Playwright overflow
+  검증으로 긴 provider event, 계약 식별자, plan name, timestamp 증거를 추가했습니다.
+  일반 판매 전 잔여 과제는 실제 provider payload 기반 브라우저 리뷰입니다.
 
 ## 상업 릴리즈 진입 판정(실시간)
 

@@ -66,8 +66,8 @@ Run the QA pass on these screens before broad UI implementation:
 14. Narrow viewport review/share state.
 15. Support diagnostics with an authorized operator, populated account summary,
     billing/reactivation URLs, recent share links, recent billing events, and
-    narrow viewport
-    fallback.
+    narrow viewport fallback. Include long provider event, contract ID, plan
+    name, and timestamp fixtures.
 
 ## Fidelity Surfaces
 

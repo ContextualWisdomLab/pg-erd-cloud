@@ -46,9 +46,11 @@ Audit conclusion:
   support demos when the operator is authorized.
 - The default dashboard remains appropriate as the buyer entry point, but it
   does not yet communicate billing or support trust signals.
-- Narrow-width support diagnostics is now readable as a review/support fallback.
-  It still needs production-scale stress testing with real provider payloads
-  before being treated as a primary mobile support workflow.
+- Narrow-width support diagnostics is now readable as a review/support fallback,
+  including a production-scale `stress-customer` fixture with long provider
+  events, contract IDs, plan names, and timestamps. Real customer payloads still
+  need browser-observed review before treating mobile support diagnostics as the
+  primary support workflow.
 
 Implementation evidence:
 
@@ -57,3 +59,6 @@ Implementation evidence:
 - `frontend/e2e/app-smoke.spec.ts` verifies that the support operator can open
   the support diagnostics screen, look up a subject, inspect recent share links
   and billing events, and see named support/billing links.
+- `frontend/e2e/app-smoke.spec.ts` also verifies that `stress-customer` support
+  diagnostics keeps long billing evidence visible without overflowing the
+  support event rows at a 390px viewport.

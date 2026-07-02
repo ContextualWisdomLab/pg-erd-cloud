@@ -127,17 +127,21 @@ Impact:
 - Narrow support diagnostics now reflows the summary cards, account details,
   URL actions, share-link summaries, and billing events without hiding key row
   context.
-- The remaining risk is scale evidence: real provider payloads can contain long
-  event names, contract IDs, timestamps, and plan names that still need
-  production-like stress testing.
+- Production-like stress fixture evidence now covers long provider names, event
+  names, contract IDs, plan names, and timestamps through the `stress-customer`
+  demo subject and Playwright overflow checks.
+- The remaining risk is real customer support data: representative production
+  payloads still need a browser-observed review before treating mobile support
+  diagnostics as the primary support workflow.
 
 Recommendation:
 
 - Keep the support diagnostics implementation as an operator-only read path.
 - Keep billing/support URLs as named links with copy actions rather than raw
   full URLs in the account detail cards.
-- Preserve the stacked narrow-width support table labels and add stress
-  fixtures before claiming mobile support workflow completeness.
+- Preserve the stacked narrow-width support table labels and keep the
+  `stress-customer` fixture in E2E before claiming mobile support workflow
+  completeness.
 - Preserve the demo-only `?demo-support=operator` path as Product Design and
   sales-engineering evidence, not as a production authorization shortcut.
 

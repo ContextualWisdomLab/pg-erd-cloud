@@ -222,8 +222,54 @@ export async function getMe(): Promise<CurrentUser> {
 
 export async function getBillingSupportAccount(subject: string): Promise<BillingSupportAccount> {
   if (DEMO_MODE) {
+    const demoSubject = subject || 'customer-owner'
+    if (demoSubject.toLowerCase().includes('stress')) {
+      return {
+        subject: demoSubject,
+        user_account_uuid: 'demo-customer-user-with-long-contract-history',
+        account_status: 'active',
+        license_mode: 'required',
+        license_verifier: 'signed_token',
+        billing_portal_url:
+          'https://billing.example.com/customer/demo-customer-user-with-long-contract-history',
+        billing_support_url: 'https://support.example.com/billing/enterprise-contracts/apac-ko',
+        account_reactivation_url:
+          'https://billing.example.com/reactivate/demo-customer-user-with-long-contract-history',
+        project_count: 12,
+        seat_count: 250,
+        connection_count: 44,
+        snapshot_count: 128,
+        share_link_count: 31,
+        active_share_link_count: 9,
+        recent_share_links: [
+          {
+            share_link_uuid:
+              'demo-share-active-enterprise-private-network-review-2026-07-02-long-id',
+            project_space_uuid:
+              'demo-project-enterprise-data-warehouse-private-network-apac-ko-01',
+            permission_kind: 'viewer',
+            status: 'active',
+            expires_at: '2026-12-31T23:59:59Z',
+            created_at: '2026-07-02T00:05:00Z'
+          }
+        ],
+        recent_billing_events: [
+          {
+            billing_event_uuid: 'demo-billing-event-stress-1',
+            provider: 'enterprise-contracting-system-apac-ko-very-long-provider-code',
+            provider_event_id:
+              'contract-2026-07-private-network-renewal-krw-2b-evaluation-001',
+            event_type: 'contract.lifecycle.enterprise_plus_private_onprem_renewal_completed',
+            target_plan: 'onprem-enterprise-plus-krw-2b-evaluation-with-private-network-addon',
+            status: 'recorded',
+            occurred_at: '2026-07-02T00:00:00Z',
+            received_at: '2026-07-02T00:01:22Z'
+          }
+        ]
+      }
+    }
     return {
-      subject: subject || 'customer-owner',
+      subject: demoSubject,
       user_account_uuid: 'demo-customer-user',
       account_status: 'active',
       license_mode: 'required',
