@@ -25,10 +25,16 @@
 
 상용 온프레미스 배포는 정적 공유 키보다 `LICENSE_PUBLIC_KEY`를 권장합니다.
 
+- 운영자는 배포 런타임과 분리된 안전한 환경에서 키와 토큰을 발급합니다.
+  - `cd backend && python -m app.license_tokens generate-keypair --format env`
+  - `LICENSE_PRIVATE_KEY`는 발급 환경의 secret으로만 보관하고 배포 환경에는 넣지 않습니다.
+  - `LICENSE_PUBLIC_KEY`만 고객 배포 환경에 설정합니다.
 - `LICENSE_PUBLIC_KEY`는 Ed25519 public key입니다. PEM 문자열 또는 base64url raw public key
   값을 사용할 수 있습니다.
 - 고객에게 전달하는 `X-LICENSE-KEY` 값은 다음 형식의 offline token입니다.
   - `v1.<base64url-json-payload>.<base64url-ed25519-signature>`
+- 토큰 발급/재발급 예시:
+  - `cd backend && python -m app.license_tokens issue --private-key "$LICENSE_PRIVATE_KEY" --sub customer-acme --plan enterprise --jti license-2026-07 --exp 2027-07-02 --seats 25`
 - signature 입력값은 `v1.<base64url-json-payload>` 문자열입니다.
 - payload는 최소한 다음 claim을 포함해야 합니다.
   - `sub`: 고객/계약 식별자
@@ -68,9 +74,9 @@
 ## 5) 온프레미스 체크리스트
 
 - `LICENSE_MODE=required`를 활성화하면 비인가 배포/임시 실행을 줄일 수 있습니다.
-- 실제 영업용 패키지는 현재 배포 환경 변수 기반 회수 목록을 사용할 수 있습니다.
-  다만 고객 포털 기반 발급·회수·재발급 자동화와 사용량 제한은 별도 운영 시스템이
-  필요합니다. 정적 `LICENSE_KEY`는 기존 배포 호환용으로만 유지합니다.
+- 실제 영업용 패키지는 현재 CLI 기반 발급/재발급과 배포 환경 변수 기반 회수 목록을
+  사용할 수 있습니다. 다만 고객 포털 기반 발급·회수·재발급 자동화와 사용량 제한은
+  별도 운영 시스템이 필요합니다. 정적 `LICENSE_KEY`는 기존 배포 호환용으로만 유지합니다.
 - 상업 전환 시에는 계정 포털(키 발급/회수/재발급/로그 감사)과 연동하세요.
 
 ## 6) 배포 체크포인트
