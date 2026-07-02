@@ -87,6 +87,29 @@ docker rm -f pg-erd-restore-drill
 - 기존 공유 링크가 만료 정책과 삭제 API에 맞게 동작합니다.
 - 최근 성공 스냅샷의 SQL export가 200 응답을 반환합니다.
 
+## Restore Drill Evidence Manifest
+
+복구 drill 결과는 `docs/operations/restore-drills/restore-drill.example.json` 형식의
+JSON manifest로 남깁니다. 실제 유료 파일럿이나 고객 staging drill에서는 example을
+복사해 날짜, commit, backup artifact, restore target, smoke test 결과, 증거 링크를
+실제 값으로 바꿉니다.
+
+필수 evidence:
+
+- backup artifact 경로, 64자 SHA-256, 생성 시각
+- digest로 고정된 `postgres:16-alpine` restore target
+- `APP_SECRET` 원문이 아닌 secret store 또는 file URI
+- `alembic current`와 기대 revision 일치
+- `/healthz`, 프로젝트 목록, 공유 링크 조회/폐기 또는 만료, SQL export,
+  support bundle redaction smoke 결과
+- backup, restore, application smoke 소요 시간
+
+검증:
+
+```bash
+python scripts/ci/validate_restore_drill_manifest.py
+```
+
 ## Failure Handling
 
 - restore가 실패하면 해당 dump는 폐기하고 직전 백업으로 재시도합니다.

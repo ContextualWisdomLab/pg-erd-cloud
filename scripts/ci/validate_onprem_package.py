@@ -18,8 +18,10 @@ REQUIRED_FILES = (
     "docs/legal/license-billing.md",
     "docs/operations/alert-thresholds.md",
     "docs/operations/backup-restore.md",
+    "docs/operations/restore-drills/restore-drill.example.json",
     "docs/operations/migration-rollback.md",
     "docs/operations/on-premises-package.md",
+    "scripts/ci/validate_restore_drill_manifest.py",
 )
 
 COMPOSE_REQUIRED_SNIPPETS = (
@@ -65,6 +67,8 @@ BACKUP_DOC_REQUIRED_SNIPPETS = (
     "/healthz",
     "alembic current",
     "docker run --rm --name pg-erd-restore-drill",
+    "restore-drill.example.json",
+    "python scripts/ci/validate_restore_drill_manifest.py",
 )
 
 ROLLBACK_DOC_REQUIRED_SNIPPETS = (
@@ -82,6 +86,7 @@ ONPREM_DOC_REQUIRED_SNIPPETS = (
     "Rollback drill",
     "Support bundle",
     "Air-gapped",
+    "python scripts/ci/validate_restore_drill_manifest.py",
 )
 
 ALERT_DOC_REQUIRED_SNIPPETS = (

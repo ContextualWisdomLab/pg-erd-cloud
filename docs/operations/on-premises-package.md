@@ -15,11 +15,14 @@
 - `deploy/traefik/dynamic.yaml`
 - `docs/legal/license-billing.md`
 - `docs/operations/backup-restore.md`
+- `docs/operations/restore-drills/restore-drill.example.json`
 - `docs/operations/migration-rollback.md`
 - `docs/operations/incident-response.md`
 - `docs/operations/alert-thresholds.md`
 
 `scripts/ci/validate_onprem_package.py`는 위 파일과 필수 문구를 정적으로 검사합니다.
+`scripts/ci/validate_restore_drill_manifest.py`는 restore drill evidence manifest의
+필수 smoke 결과와 secret redaction 기준을 검사합니다.
 
 ## Offline license
 
@@ -65,7 +68,9 @@
 - restore DB는 운영 DB가 아닌 격리 PostgreSQL입니다.
 - restore 후 `/healthz`, `alembic current`, 프로젝트 조회, 공유 링크 조회/폐기,
   SQL export smoke를 확인합니다.
-- 결과는 릴리즈 승인 기록 또는 운영 이슈에 남깁니다.
+- 결과는 릴리즈 승인 기록 또는 운영 이슈에 남기고,
+  `docs/operations/restore-drills/restore-drill.example.json` 형식의 manifest로
+  보존합니다.
 
 ## Rollback drill
 
@@ -96,6 +101,7 @@ metadata)은 support bundle에 포함하지 않습니다.
 온프레미스 판매 후보는 다음을 모두 만족해야 합니다.
 
 - `python scripts/ci/validate_onprem_package.py` 통과
+- `python scripts/ci/validate_restore_drill_manifest.py` 통과
 - `python scripts/ci/validate_commercial_release_approval.py` 통과
 - backend tests, frontend unit/accessibility/E2E/visual/build 통과
 - 실제 판매 버전의 release approval manifest에 설치/지원 책임자와 승인일 기재

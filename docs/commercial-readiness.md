@@ -145,6 +145,10 @@ blocker로 분류합니다.
   `scripts/ci/validate_onprem_package.py`로 production compose, secret file,
   offline license, revocation, restore drill, rollback drill, support bundle
   문서/설정 누락을 CI에서 검증함
+- 🆕 복구 drill evidence gate: `docs/operations/restore-drills/restore-drill.example.json`와
+  `scripts/ci/validate_restore_drill_manifest.py`로 backup artifact SHA-256,
+  격리 restore target, secret source, `/healthz`, project/share/export/support bundle
+  smoke 결과를 기계 검증 가능한 manifest로 고정함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전

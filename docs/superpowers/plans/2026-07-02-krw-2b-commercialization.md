@@ -385,6 +385,9 @@ Files:
 Status:
 
 - Static package smoke gate implemented in PR `#415`.
+- Restore drill manifest gate implemented with
+  `scripts/ci/validate_restore_drill_manifest.py` and
+  `docs/operations/restore-drills/restore-drill.example.json`.
 - Remaining gap: customer-environment restore/rollback evidence from a real
   paid pilot or staging deployment.
 
@@ -394,11 +397,13 @@ Tasks:
   revocation-list update, secret rotation, backup, restore, upgrade, rollback,
   and support bundle collection.
 - Add a smoke command or script for validating the documented package path.
+  - Implemented: `python scripts/ci/validate_restore_drill_manifest.py`.
 
 Verification:
 
 ```bash
 git diff --check docs/operations/backup-restore.md docs/operations/migration-rollback.md docs/legal/license-billing.md
+python scripts/ci/validate_restore_drill_manifest.py
 ```
 
 Acceptance:

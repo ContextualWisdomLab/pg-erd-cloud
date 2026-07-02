@@ -76,7 +76,7 @@ operational reliability, and support burden.
 | License validation success | 99% valid commercial tokens accepted | 99.9% | partially measured by tests |
 | Billing reconciliation success | 99% provider events applied or queued for support review | 99.9% | partially measured by tests and `billing_events_total` |
 | LLM draft cost-control evidence | every live draft has usage evidence and provider failures alert | per-account quota and billing attribution | request outcomes and char counts measured by `llm_draft_requests_total`; hard quota missing |
-| Backup restore drill | one successful drill before paid pilot | quarterly successful drills | documented, not measured |
+| Backup restore drill | one successful drill before paid pilot | quarterly successful drills | measured by restore drill manifest validator example; real pilot evidence pending |
 | Incident first response | within one business day | SLA-specific response time | documented, not measured |
 | Support touches per activation | under 2 support touches | under 1 | missing |
 
@@ -98,6 +98,8 @@ operational reliability, and support burden.
    Initial low-cardinality lifecycle events now use
    `product_events_total(area, action, outcome)` for project, connection,
    snapshot, and share-link creation.
+   Restore drill evidence now uses `docs/operations/restore-drills/*.json`
+   manifests validated by `scripts/ci/validate_restore_drill_manifest.py`.
 2. Keep customer identifiers redacted or pseudonymous in telemetry.
 3. Make each KPI auditable from logs, metrics, or release artifacts.
 4. Add sample dashboard queries after the event taxonomy is implemented.
