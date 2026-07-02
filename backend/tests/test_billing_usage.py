@@ -57,6 +57,10 @@ def test_billing_usage_returns_owned_project_scope_counts(
     monkeypatch.setattr(settings, "license_mode", "required")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", "x" * 44)
+    monkeypatch.setattr(settings, "billing_max_projects_per_user", 10)
+    monkeypatch.setattr(settings, "billing_max_connections_per_project", 20)
+    monkeypatch.setattr(settings, "billing_max_snapshots_per_project", 30)
+    monkeypatch.setattr(settings, "billing_max_share_links_per_project", 40)
 
     app.dependency_overrides[get_current_user] = fake_get_current_user
     app.dependency_overrides[get_read_session] = lambda: session
@@ -74,6 +78,10 @@ def test_billing_usage_returns_owned_project_scope_counts(
         "snapshot_count": 8,
         "share_link_count": 4,
         "active_share_link_count": 1,
+        "project_limit": 10,
+        "connection_limit": 20,
+        "snapshot_limit": 30,
+        "share_link_limit": 40,
     }
     assert session.statement_count == 6
 
@@ -85,6 +93,10 @@ def test_billing_usage_reports_no_license_verifier_when_unconfigured(
     monkeypatch.setattr(settings, "license_mode", "off")
     monkeypatch.setattr(settings, "license_key", None)
     monkeypatch.setattr(settings, "license_public_key", None)
+    monkeypatch.setattr(settings, "billing_max_projects_per_user", 0)
+    monkeypatch.setattr(settings, "billing_max_connections_per_project", 0)
+    monkeypatch.setattr(settings, "billing_max_snapshots_per_project", 0)
+    monkeypatch.setattr(settings, "billing_max_share_links_per_project", 0)
 
     app.dependency_overrides[get_current_user] = fake_get_current_user
     app.dependency_overrides[get_read_session] = lambda: session

@@ -65,18 +65,25 @@
   - `share_link_count`
   - `active_share_link_count`
   - `license_mode`, `license_verifier`
+  - `project_limit`, `connection_limit`, `snapshot_limit`, `share_link_limit`
+- 유료 플랜 한도는 환경 변수로 적용합니다. 값이 `0`이면 해당 항목은 무제한입니다.
+  - `BILLING_MAX_PROJECTS_PER_USER`
+  - `BILLING_MAX_CONNECTIONS_PER_PROJECT`
+  - `BILLING_MAX_SNAPSHOTS_PER_PROJECT`
+  - `BILLING_MAX_SHARE_LINKS_PER_PROJECT`
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
-  - 팀별 시트/계정 할당량(프로젝트 수, 사용자 수, API 호출량) 정책
+  - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
   - 위반 탐지 시 일시 사용 제한 규칙
 
 ## 5) 온프레미스 체크리스트
 
 - `LICENSE_MODE=required`를 활성화하면 비인가 배포/임시 실행을 줄일 수 있습니다.
-- 실제 영업용 패키지는 현재 CLI 기반 발급/재발급과 배포 환경 변수 기반 회수 목록을
-  사용할 수 있습니다. 다만 고객 포털 기반 발급·회수·재발급 자동화와 사용량 제한은
-  별도 운영 시스템이 필요합니다. 정적 `LICENSE_KEY`는 기존 배포 호환용으로만 유지합니다.
+- 실제 영업용 패키지는 현재 CLI 기반 발급/재발급, 배포 환경 변수 기반 회수 목록,
+  기본 사용량 한도를 사용할 수 있습니다. 다만 고객 포털 기반 발급·회수·재발급
+  자동화와 계정 비활성 정책은 별도 운영 시스템이 필요합니다. 정적 `LICENSE_KEY`는
+  기존 배포 호환용으로만 유지합니다.
 - 상업 전환 시에는 계정 포털(키 발급/회수/재발급/로그 감사)과 연동하세요.
 
 ## 6) 배포 체크포인트

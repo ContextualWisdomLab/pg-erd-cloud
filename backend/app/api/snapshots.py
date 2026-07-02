@@ -29,6 +29,7 @@ from app.spec.llm import (
 )
 from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
+from app.usage_quotas import enforce_snapshot_quota
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
@@ -88,6 +89,7 @@ async def create_snapshot(
     conn = await session.get(DbConnection, body.db_connection_uuid)
     if conn is None or conn.project_space_uuid != project_space_uuid:
         raise HTTPException(status_code=404, detail="connection not found")
+    await enforce_snapshot_quota(session, project_space_uuid)
 
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),

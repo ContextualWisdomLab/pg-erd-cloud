@@ -19,6 +19,7 @@ from app.schemas import (
     ProjectOut,
 )
 from app.sanitize import sanitize_for_storage
+from app.usage_quotas import enforce_project_quota
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -52,6 +53,8 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
 ) -> ProjectOut:
     """Create a new project and add the creator as the owner."""
+    await enforce_project_quota(session, user.user_account_uuid)
+
     p = ProjectSpace(
         project_space_uuid=uuid.uuid4(),
         project_name=str(sanitize_for_storage(body.project_name)),

@@ -33,6 +33,7 @@ from app.settings import settings
 from app.schemas import ShareLinkCreateIn, ShareLinkOut
 from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
+from app.usage_quotas import enforce_share_link_quota
 
 router = APIRouter(prefix="/api", tags=["share"])
 _LOGGER = logging.getLogger("app.share")
@@ -199,6 +200,7 @@ async def create_share_link(
     """Create a share link for a project (owner-only)."""
     try:
         await _ensure_project_owner(session, project_space_uuid, user.user_account_uuid)
+        await enforce_share_link_quota(session, project_space_uuid)
     except HTTPException as exc:
         _record_share_audit_event(
             action="share_link.create",

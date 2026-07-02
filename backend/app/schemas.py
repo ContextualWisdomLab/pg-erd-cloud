@@ -138,3 +138,7 @@ class BillingUsageOut(BaseModel):
     snapshot_count: int = Field(ge=0)
     share_link_count: int = Field(ge=0)
     active_share_link_count: int = Field(ge=0)
+    project_limit: int = Field(ge=0)
+    connection_limit: int = Field(ge=0)
+    snapshot_limit: int = Field(ge=0)
+    share_link_limit: int = Field(ge=0)

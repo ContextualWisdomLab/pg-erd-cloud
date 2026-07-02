@@ -104,4 +104,8 @@ async def get_billing_usage(
         snapshot_count=snapshot_count,
         share_link_count=share_link_count,
         active_share_link_count=active_share_link_count,
+        project_limit=settings.billing_max_projects_per_user,
+        connection_limit=settings.billing_max_connections_per_project,
+        snapshot_limit=settings.billing_max_snapshots_per_project,
+        share_link_limit=settings.billing_max_share_links_per_project,
     )

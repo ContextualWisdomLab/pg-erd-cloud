@@ -14,6 +14,7 @@ from app.permissions import require_project_member
 from app.schemas import ConnectionCreateIn, ConnectionOut
 from app.security import encrypt_text
 from app.sanitize import sanitize_for_storage
+from app.usage_quotas import enforce_connection_quota
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
@@ -49,6 +50,8 @@ async def create_connection(
     await require_project_member(
         session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
+    await enforce_connection_quota(session, project_space_uuid)
+
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
         db_connection_uuid=uuid.uuid4(),

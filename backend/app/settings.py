@@ -133,6 +133,12 @@ class Settings(BaseSettings):
     license_revoked_token_ids: str = ""
     license_revoked_subjects: str = ""
 
+    # Optional billing/license usage limits. A value of 0 means unlimited.
+    billing_max_projects_per_user: int = Field(0, ge=0)
+    billing_max_connections_per_project: int = Field(0, ge=0)
+    billing_max_snapshots_per_project: int = Field(0, ge=0)
+    billing_max_share_links_per_project: int = Field(0, ge=0)
+
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
     llm_api_base_url: str | None = None
