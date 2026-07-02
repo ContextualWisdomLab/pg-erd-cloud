@@ -20,6 +20,7 @@
     "incident_response": "docs/operations/incident-response.md",
     "backup_restore": "docs/operations/backup-restore.md",
     "migration_rollback": "docs/operations/migration-rollback.md",
+    "on_premises_package": "docs/operations/on-premises-package.md",
     "alert_thresholds": "docs/operations/alert-thresholds.md"
   },
   "data_processing_scope": [

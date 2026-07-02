@@ -340,8 +340,16 @@ Files:
 
 - `docs/operations/backup-restore.md`
 - `docs/operations/migration-rollback.md`
+- `docs/operations/on-premises-package.md`
 - `docs/legal/license-billing.md`
 - `deploy/*`
+- `scripts/ci/validate_onprem_package.py`
+
+Status:
+
+- Static package smoke gate implemented in PR `#415`.
+- Remaining gap: customer-environment restore/rollback evidence from a real
+  paid pilot or staging deployment.
 
 Tasks:
 

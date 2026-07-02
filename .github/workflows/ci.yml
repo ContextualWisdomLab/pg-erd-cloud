@@ -46,6 +46,9 @@ jobs:
       - name: Commercial release approval manifests
         run: python scripts/ci/validate_commercial_release_approval.py
 
+      - name: On-premises package smoke
+        run: python scripts/ci/validate_onprem_package.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:

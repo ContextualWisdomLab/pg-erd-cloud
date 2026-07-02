@@ -110,6 +110,10 @@ blocker로 분류합니다.
 - ✅ 보안/운영 알림 임계치: `docs/operations/alert-thresholds.md`로 alert별 severity,
   고객 영향, 1차 대응, owner, escalation rule을 고정하고 release approval manifest의
   필수 운영 문서로 검증함
+- 🆕 온프레미스 패키지 gate: `docs/operations/on-premises-package.md`와
+  `scripts/ci/validate_onprem_package.py`로 production compose, secret file,
+  offline license, revocation, restore drill, rollback drill, support bundle
+  문서/설정 누락을 CI에서 검증함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 
 ### P1: 유료 베타 필수

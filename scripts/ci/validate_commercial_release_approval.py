@@ -46,6 +46,7 @@ REQUIRED_DOCUMENTS = (
     "incident_response",
     "backup_restore",
     "migration_rollback",
+    "on_premises_package",
     "alert_thresholds",
 )
 
