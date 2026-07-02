@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "test:a11y": "vitest run src/App.accessibility.test.tsx src/components/modals/DialogAccessibility.test.tsx",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test e2e/app-smoke.spec.ts",
+    "test:visual": "playwright test e2e/visual-regression.spec.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.1",
