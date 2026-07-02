@@ -285,6 +285,24 @@ def test_billing_plan_change_returns_portal_url_with_target_plan(
     }
 
 
+def test_billing_plan_change_rejects_unknown_catalog_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "billing_portal_url", "https://billing.example.com")
+    monkeypatch.setattr(settings, "billing_support_url", "https://support.example.com")
+    monkeypatch.setattr(settings, "billing_allowed_plans", "team,enterprise")
+
+    app.dependency_overrides[get_current_user] = fake_get_current_user
+
+    response = TestClient(app).post(
+        "/api/billing/plan-change",
+        json={"target_plan": "unsupported-plan"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "target plan is not in configured billing catalog"
+
+
 def test_billing_plan_change_falls_back_to_support_when_portal_unconfigured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -431,6 +449,46 @@ def test_billing_event_records_and_redacts_sensitive_metadata(
             provider="stripe",
             event_type="subscription.updated",
             outcome="recorded",
+        )
+        == before + 1
+    )
+
+
+def test_billing_event_rejects_unknown_catalog_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeBillingEventSession()
+    monkeypatch.setattr(settings, "billing_webhook_secret", "provider-secret")
+    monkeypatch.setattr(settings, "billing_webhook_signature_secret", None)
+    monkeypatch.setattr(settings, "billing_allowed_plans", "team,enterprise")
+    app.dependency_overrides[get_session] = lambda: session
+    before = _billing_metric_value(
+        provider="stripe",
+        event_type="subscription.updated",
+        outcome="rejected_catalog",
+    )
+
+    response = TestClient(app).post(
+        "/api/billing/events",
+        headers={"X-BILLING-WEBHOOK-SECRET": "provider-secret"},
+        json={
+            "provider": "stripe",
+            "provider_event_id": "evt_unknown_plan",
+            "event_type": "subscription.updated",
+            "subject": "customer-owner",
+            "target_plan": "unsupported-plan",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "target plan is not in configured billing catalog"
+    assert session.added_event is None
+    assert session.committed is False
+    assert (
+        _billing_metric_value(
+            provider="stripe",
+            event_type="subscription.updated",
+            outcome="rejected_catalog",
         )
         == before + 1
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
@@ -142,6 +143,7 @@ class Settings(BaseSettings):
     billing_support_url: str | None = None
     billing_webhook_secret: str | None = None
     billing_webhook_signature_secret: str | None = None
+    billing_allowed_plans: str = ""
     billing_event_type_aliases: str = ""
     billing_contract_state_events_enabled: bool = False
     billing_contract_deactivated_event_types: str = "contract.deactivated,contract.suspended"
@@ -180,6 +182,13 @@ def _invalid_key_value_csv(value: str) -> list[str]:
         if separator != "=" or not key.strip() or not mapped.strip():
             invalid.append(item)
     return invalid
+
+
+_BILLING_PLAN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+
+
+def _invalid_billing_plan_ids(value: str) -> list[str]:
+    return [item for item in _split_csv(value) if not _BILLING_PLAN_ID_RE.fullmatch(item)]
 
 
 def _is_public_https_origin(origin: str) -> bool:
@@ -247,6 +256,10 @@ def validate_production_settings(config: Settings) -> list[str]:
     if _invalid_key_value_csv(config.billing_event_type_aliases):
         errors.append(
             "BILLING_EVENT_TYPE_ALIASES entries must use source=target format"
+        )
+    if _invalid_billing_plan_ids(config.billing_allowed_plans):
+        errors.append(
+            "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs"
         )
     return errors
 

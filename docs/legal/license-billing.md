@@ -126,6 +126,9 @@
   - `BILLING_WEBHOOK_SECRET`: provider-neutral billing event 기록용 shared secret
   - `BILLING_WEBHOOK_SIGNATURE_SECRET`: provider/gateway webhook raw-body
     HMAC-SHA256 signature 검증용 secret
+  - `BILLING_ALLOWED_PLANS`: plan-change 요청과 billing webhook `target_plan`을
+    provider/customer catalog와 대조하는 쉼표 구분 plan ID 목록. 비어 있으면
+    호환성을 위해 catalog 검증을 비활성화합니다.
   - `BILLING_EVENT_TYPE_ALIASES`: provider 원본 event_type을 내부 normalized
     event_type으로 바꾸는 쉼표 구분 `source=target` 목록. 공급자 충돌을 피하려면
     `stripe:customer.subscription.deleted=contract.suspended`처럼
@@ -149,12 +152,16 @@
   값이 되며, 원본 provider event_type은 billing metadata의 `raw_event_type`에
   감사용으로 보존됩니다. Provider가 같은 key를 metadata로 보낸 경우에도 서버가
   실제 원본 event_type으로 덮어씁니다.
+- `BILLING_ALLOWED_PLANS`가 설정된 경우 `POST /api/billing/plan-change`와
+  `POST /api/billing/events`의 `target_plan`이 catalog에 없으면 `422 target plan
+  is not in configured billing catalog`로 거절합니다. Billing webhook 거절은
+  `billing_events_total{outcome="rejected_catalog"}`로 기록됩니다.
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙
   - 팀별 시트/계정 할당량(사용자 수, API 호출량) 정책
   - provider별 checkout/fulfillment 어댑터, customer portal 연동, 실제
-    event catalog에 맞춘 별칭 운영값
+    event catalog에 맞춘 별칭 및 plan catalog 운영값
 
 ## 5) 온프레미스 체크리스트
 

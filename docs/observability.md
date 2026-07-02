@@ -106,6 +106,9 @@ release approval checklist are fixed in
 - LLM draft 실패
   - `PgErdCloudLlmDraftFailures`: alert when live LLM draft configuration,
     prompt-size, or provider failures occur in the last 10 minutes.
+- 결제 webhook/catalog 실패
+  - `PgErdCloudBillingWebhookFailures`: alert when billing webhook auth,
+    configuration, or configured plan catalog validation fails.
 
 ### Job queue
 

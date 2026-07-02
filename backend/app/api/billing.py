@@ -96,6 +96,17 @@ def _split_csv(value: str) -> set[str]:
     return {item.strip() for item in value.split(",") if item.strip()}
 
 
+def _require_allowed_target_plan(target_plan: str | None) -> None:
+    if target_plan is None:
+        return
+    allowed_plans = _split_csv(settings.billing_allowed_plans)
+    if allowed_plans and target_plan not in allowed_plans:
+        raise HTTPException(
+            status_code=422,
+            detail="target plan is not in configured billing catalog",
+        )
+
+
 async def _account_status_for_subject(
     session: AsyncSession,
     subject: str,
@@ -312,7 +323,13 @@ def _billing_event_response(
 
 def _record_billing_event_metric(
     payload: BillingEventIn,
-    outcome: Literal["recorded", "duplicate", "rejected_auth", "rejected_config"],
+    outcome: Literal[
+        "recorded",
+        "duplicate",
+        "rejected_auth",
+        "rejected_config",
+        "rejected_catalog",
+    ],
 ) -> None:
     BILLING_EVENTS_TOTAL.labels(
         provider=payload.provider,
@@ -482,6 +499,7 @@ async def request_billing_plan_change(
 ) -> BillingPlanChangeOut:
     """Return the configured billing action for a requested plan change."""
     del user
+    _require_allowed_target_plan(payload.target_plan)
 
     if settings.billing_portal_url:
         return BillingPlanChangeOut(
@@ -553,6 +571,11 @@ async def ingest_billing_event(
     if existing is not None:
         _record_billing_event_metric(normalized_payload, "duplicate")
         return _billing_event_response(event=existing, action="duplicate")
+    try:
+        _require_allowed_target_plan(normalized_payload.target_plan)
+    except HTTPException:
+        _record_billing_event_metric(normalized_payload, "rejected_catalog")
+        raise
 
     now = utcnow()
     event = BillingEvent(

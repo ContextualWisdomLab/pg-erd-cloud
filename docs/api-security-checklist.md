@@ -113,6 +113,11 @@
     강제해 비용 폭주를 줄입니다.
   - live draft 요청은 `llm_draft_requests_total`, input/output char histogram,
     `event=llm_draft_usage` 로그로 기록되어 계정/스냅샷 단위 비용 조사가 가능합니다.
+- `BILLING_ALLOWED_PLANS` (default: empty)
+  - 설정된 경우 plan-change 요청과 billing webhook `target_plan`을 configured
+    provider/customer catalog와 대조해 잘못된 plan ID를 `422`로 거절합니다.
+  - webhook 거절은 `billing_events_total{outcome="rejected_catalog"}`로 기록되어
+    운영 알림과 연결됩니다.
 
 ##### Trade-offs / 향후 계획
 

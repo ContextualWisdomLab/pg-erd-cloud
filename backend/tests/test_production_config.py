@@ -162,3 +162,13 @@ def test_validate_production_settings_rejects_invalid_billing_event_type_aliases
     )
 
     assert "BILLING_EVENT_TYPE_ALIASES entries must use source=target format" in errors
+
+
+def test_validate_production_settings_rejects_invalid_billing_catalog_plan() -> None:
+    errors = validate_production_settings(
+        _settings(billing_allowed_plans="team, enterprise plus")
+    )
+
+    assert (
+        "BILLING_ALLOWED_PLANS entries must be provider catalog plan IDs" in errors
+    )

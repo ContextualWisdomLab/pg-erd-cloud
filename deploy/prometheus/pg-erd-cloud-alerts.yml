@@ -56,14 +56,14 @@ groups:
 
       - alert: PgErdCloudBillingWebhookFailures
         expr: |
-          increase(billing_events_total{outcome=~"rejected_auth|rejected_config"}[10m]) > 0
+          increase(billing_events_total{outcome=~"rejected_auth|rejected_config|rejected_catalog"}[10m]) > 0
         for: 0m
         labels:
           severity: ticket
           area: billing
         annotations:
           summary: "pg-erd-cloud billing webhook reconciliation is failing"
-          description: "Billing webhook authentication or configuration failures occurred in the last 10 minutes."
+          description: "Billing webhook authentication, configuration, or catalog validation failures occurred in the last 10 minutes."
 
       - alert: PgErdCloudLlmDraftFailures
         expr: |

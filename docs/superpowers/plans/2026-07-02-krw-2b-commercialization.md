@@ -280,14 +280,18 @@ Status:
 - Raw-body HMAC-SHA256 signature verification implemented in PR `#415` without
   adding provider SDK dependencies.
 - Billing webhook outcomes now emit `billing_events_total` labels for recorded,
-  duplicate, rejected authentication, and rejected configuration events.
+  duplicate, rejected authentication, rejected configuration, and rejected
+  catalog events.
 - Configurable provider event alias normalization is implemented through
   `BILLING_EVENT_TYPE_ALIASES`, including provider-scoped
   `provider:event=normalized` entries.
 - Normalized contract-state event application is implemented behind
   `BILLING_CONTRACT_STATE_EVENTS_ENABLED`.
+- Configurable plan catalog validation is implemented through
+  `BILLING_ALLOWED_PLANS` for plan-change requests and billing webhook
+  `target_plan` values.
 - Remaining gap: provider-specific checkout/fulfillment SDKs, customer portal
-  integration, and real provider event catalog validation.
+  integration, and real provider catalog operating values.
 
 Tasks:
 
@@ -301,7 +305,7 @@ Tasks:
 - Add configurable provider event alias normalization before storing events.
 - Record event outcomes for support diagnostics.
 - Record reconciliation outcomes as low-cardinality Prometheus metrics and
-  alert on rejected auth/config events.
+  alert on rejected auth/config/catalog events.
 - Keep the existing portal/support handoff path.
 
 Verification:
