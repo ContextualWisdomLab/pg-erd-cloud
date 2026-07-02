@@ -6,6 +6,8 @@ import pathlib
 import shutil
 from typing import Any
 
+import pytest
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ci" / "commercial_readiness_audit.py"
@@ -227,3 +229,59 @@ def test_strict_mode_accepts_explicit_real_evidence_paths(tmp_path: pathlib.Path
             str(paths["real_billing_provider_catalog"][0]),
         ]
     ) == 0
+
+
+def support_bundle_rule(directory: pathlib.Path) -> dict[str, Any]:
+    return {
+        "id": "support_bundle_evidence",
+        "label": "Redacted customer support bundle evidence",
+        "required_for": "paid_pilot_support",
+        "directory": str(directory),
+        "pattern": "*.json",
+        "example_names": {"support-bundle.example.json"},
+        "no_go_reason": "Only the example support bundle manifest is present.",
+    }
+
+
+def test_repo_real_evidence_rejects_sample_markers(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = load_audit()
+    evidence_dir = tmp_path / "support-bundles"
+    evidence_dir.mkdir()
+    sample = load_json(ROOT / "docs" / "operations" / "support-bundles" / "support-bundle.example.json")
+    write_json(evidence_dir / "support-bundle.customer.json", sample)
+    monkeypatch.setattr(audit, "REAL_EVIDENCE_RULES", (support_bundle_rule(evidence_dir),))
+
+    report = audit.generate_report()
+
+    gate = report["real_evidence_gates"][0]
+    assert report["real_evidence_ready"] is False
+    assert gate["status"] == "no_go"
+    assert gate["repo_validator_passed"] is True
+    assert gate["repo_sample_markers"]
+    assert gate["no_go_reason"] == "Repository evidence files still contain example or synthetic evidence markers."
+
+
+def test_repo_real_evidence_accepts_sanitized_manifest(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = load_audit()
+    evidence_dir = tmp_path / "support-bundles"
+    evidence_dir.mkdir()
+    payload = load_json(ROOT / "docs" / "operations" / "support-bundles" / "support-bundle.example.json")
+    payload["deployment"]["commit_sha"] = "8f92cb06e9d6145f6aa1a047c2ef98ea2dc0b613"
+    payload["deployment"]["compose_prod"]["sha256"] = "cd" * 32
+    payload["support_account_summary"]["billing_support_url"] = "https://support.acme-corp.internal/pg-erd-cloud"
+    write_json(evidence_dir / "support-bundle.customer.json", payload)
+    monkeypatch.setattr(audit, "REAL_EVIDENCE_RULES", (support_bundle_rule(evidence_dir),))
+
+    report = audit.generate_report()
+
+    gate = report["real_evidence_gates"][0]
+    assert report["real_evidence_ready"] is True
+    assert gate["status"] == "ready"
+    assert gate["repo_validator_passed"] is True
+    assert gate["repo_sample_markers"] == []

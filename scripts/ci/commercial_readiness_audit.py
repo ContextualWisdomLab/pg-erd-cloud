@@ -171,6 +171,8 @@ def _real_evidence_gate(
     explicit_paths: list[pathlib.Path],
     explicit_validator_passed: bool | None,
     explicit_sample_markers: list[str],
+    repo_validator_passed: bool | None,
+    repo_sample_markers: list[str],
 ) -> dict[str, Any]:
     directory = ROOT / str(rule["directory"])
     example_names = set(rule["example_names"])
@@ -179,22 +181,35 @@ def _real_evidence_gate(
     real_files = [path for path in files if path.name not in example_names]
     explicit_real_paths = [path for path in explicit_paths if path.name not in example_names]
     explicit_example_paths = [path for path in explicit_paths if path.name in example_names]
+    has_valid_repo_evidence = (
+        bool(real_files)
+        and repo_validator_passed is True
+        and not repo_sample_markers
+    )
     has_valid_explicit_evidence = (
         bool(explicit_real_paths)
         and explicit_validator_passed is True
         and not explicit_sample_markers
     )
     status = "ready"
-    if explicit_paths and explicit_validator_passed is False:
+    if repo_validator_passed is False:
+        status = "no_go"
+    elif repo_sample_markers:
+        status = "no_go"
+    elif explicit_paths and explicit_validator_passed is False:
         status = "no_go"
     elif explicit_sample_markers:
         status = "no_go"
-    elif not real_files and not has_valid_explicit_evidence:
+    elif not has_valid_repo_evidence and not has_valid_explicit_evidence:
         status = "no_go"
 
     no_go_reason = None
     if status != "ready":
-        if explicit_paths and explicit_validator_passed is False:
+        if repo_validator_passed is False:
+            no_go_reason = "Repository evidence files failed the required validator."
+        elif repo_sample_markers:
+            no_go_reason = "Repository evidence files still contain example or synthetic evidence markers."
+        elif explicit_paths and explicit_validator_passed is False:
             no_go_reason = "Explicit evidence paths failed the required validator."
         elif explicit_sample_markers:
             no_go_reason = "Explicit evidence paths still contain example or synthetic evidence markers."
@@ -209,6 +224,8 @@ def _real_evidence_gate(
         "status": status,
         "real_evidence_files": [_relative(path) for path in [*real_files, *explicit_real_paths]],
         "repo_real_evidence_files": [_relative(path) for path in real_files],
+        "repo_validator_passed": repo_validator_passed,
+        "repo_sample_markers": repo_sample_markers,
         "explicit_evidence_files": [_relative(path) for path in explicit_real_paths],
         "explicit_example_files": [_relative(path) for path in explicit_example_paths],
         "explicit_validator_passed": explicit_validator_passed,
@@ -226,6 +243,30 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
     ]
     explicit_validator_passed: dict[str, bool | None] = {}
     explicit_sample_markers: dict[str, list[str]] = {}
+    repo_validator_passed: dict[str, bool | None] = {}
+    repo_sample_markers: dict[str, list[str]] = {}
+    for rule in REAL_EVIDENCE_RULES:
+        evidence_id = str(rule["id"])
+        directory = ROOT / str(rule["directory"])
+        example_names = set(rule["example_names"])
+        files = sorted(directory.glob(str(rule["pattern"]))) if directory.is_dir() else []
+        real_files = [path for path in files if path.name not in example_names]
+        if not real_files:
+            repo_validator_passed[evidence_id] = None
+            repo_sample_markers[evidence_id] = []
+            continue
+        result = {
+            "id": f"repo_{evidence_id}",
+            **_run_validator(EVIDENCE_VALIDATORS[evidence_id], real_files),
+        }
+        validator_results.append(result)
+        repo_validator_passed[evidence_id] = result["passed"]
+        repo_sample_markers[evidence_id] = [
+            marker
+            for path in real_files
+            for marker in _sample_markers(path)
+        ]
+
     for evidence_id, paths in explicit_evidence_paths.items():
         if not paths:
             explicit_validator_passed[evidence_id] = None
@@ -250,6 +291,8 @@ def generate_report(explicit_evidence_paths: dict[str, list[pathlib.Path]] | Non
             explicit_evidence_paths.get(str(rule["id"]), []),
             explicit_validator_passed.get(str(rule["id"])),
             explicit_sample_markers.get(str(rule["id"]), []),
+            repo_validator_passed.get(str(rule["id"])),
+            repo_sample_markers.get(str(rule["id"]), []),
         )
         for rule in REAL_EVIDENCE_RULES
     ]

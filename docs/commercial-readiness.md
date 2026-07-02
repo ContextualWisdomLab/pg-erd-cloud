@@ -178,7 +178,8 @@ blocker로 분류합니다.
   커밋하지 않고 `--release-approval`, `--restore-drill`, `--rollback-drill`,
   `--support-bundle`, `--billing-provider-catalog` 경로로 직접 주입할 수 있으며, `*.example.json`
   이름 또는 `example.com`, fake commit SHA, 반복 SHA-256, `customer-acme`
-  같은 샘플 표식이 남은 파일은 실제 판매 증거로 집계하지 않음
+  같은 샘플 표식이 남은 파일은 실제 판매 증거로 집계하지 않음. 저장소에 커밋한
+  non-example 증거 파일도 같은 validator와 샘플 표식 검사를 통과해야 함
 - 🆕 운영 감시 항목 보완: authz 실패/공유 감사 이벤트 메트릭(`authz_failures_total`, `share_audit_events_total`)을 추가해 알람 임계치 운영을 시작함
 - 🆕 결제 감시 항목 보완: billing reconciliation outcome 메트릭(`billing_events_total`)과
   `PgErdCloudBillingWebhookFailures` alert로 webhook 인증/설정 실패를 유료 pilot 전

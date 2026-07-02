@@ -443,6 +443,9 @@ Tasks:
   - Implemented: explicit real-evidence hardening so renamed example manifests
     with reserved sample domains, fake commit SHA, repeated SHA-256, or
     `customer-acme` placeholders do not satisfy `--strict`.
+  - Implemented: repository-local non-example evidence validation, so committed
+    real evidence files must pass the same validator and sample-marker checks as
+    explicit external evidence paths.
 
 Verification:
 
