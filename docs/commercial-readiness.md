@@ -151,6 +151,7 @@ blocker로 분류합니다.
 현재 상태
 
 - ✅ 공유 링크 운영 감사 로그 JSON 이벤트(`event=share_audit`) 추가 및 경로별 테스트
+  (공유 live LLM draft 성공 경로 포함)
 - ✅ `docs/operations/backup-restore.md` 추가로 앱 DB 복구 절차 기초 정립
 - ✅ `docs/operations/migration-rollback.md` 작성 및 운영 복구 문서화
 - ✅ `docs/operations/incident-response.md` 작성 및 1차 대응 흐름 정리

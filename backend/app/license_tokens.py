@@ -4,6 +4,7 @@ import argparse
 import base64
 import binascii
 import json
+import sys
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from typing import Sequence
@@ -176,9 +177,29 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _coalesce_private_key_arg(argv: Sequence[str] | None) -> list[str]:
+    args = list(sys.argv[1:] if argv is None else argv)
+    normalized: list[str] = []
+    index = 0
+    while index < len(args):
+        # Base64url Ed25519 private keys can start with "-", which argparse
+        # otherwise treats as the next option instead of the option value.
+        if (
+            args[index] == "--private-key"
+            and index + 1 < len(args)
+            and args[index + 1].startswith("-")
+        ):
+            normalized.append(f"--private-key={args[index + 1]}")
+            index += 2
+            continue
+        normalized.append(args[index])
+        index += 1
+    return normalized
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_coalesce_private_key_arg(argv))
 
     if args.command == "generate-keypair":
         key_pair = generate_license_key_pair()

@@ -594,6 +594,42 @@ async def test_shared_reversing_draft_disabled_records_usage_metric(
 
 
 @pytest.mark.asyncio
+async def test_shared_reversing_draft_success_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
+
+    async def _draft(_: object) -> str:
+        return "# DB Reversing Specification\n\nDraft"
+
+    monkeypatch.setattr(share, "generate_reversing_llm_draft", _draft)
+    session = _ShareSession()
+    share_link_uuid = uuid.uuid4()
+    schema_snapshot_uuid = uuid.uuid4()
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        result = await share.export_shared_snapshot_reversing_spec(
+            share_link_uuid,
+            schema_snapshot_uuid,
+            mode="llm-draft",
+            request=_request(),
+            session=session,
+        )
+
+    assert result == "# DB Reversing Specification\n\nDraft"
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["request_id"] == "test-request-id"
+    assert events[-1]["action"] == "share_snapshot.reversing_spec"
+    assert events[-1]["outcome"] == "success"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["share_link_uuid"] == str(share_link_uuid)
+    assert events[-1]["schema_snapshot_uuid"] == str(schema_snapshot_uuid)
+    assert events[-1]["project_space_uuid"] == str(session.project_space_uuid)
+
+
+@pytest.mark.asyncio
 async def test_shared_reversing_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -661,6 +697,42 @@ async def test_shared_index_design_draft_is_disabled_by_default(
         )
 
     _assert_share_link_llm_draft_disabled(exc_info)
+
+
+@pytest.mark.asyncio
+async def test_shared_index_design_draft_success_event_is_audited(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "share_link_llm_draft_enabled", True)
+
+    async def _draft(_: object) -> str:
+        return "# ERD Index Design\n\nDraft"
+
+    monkeypatch.setattr(share, "generate_index_design_llm_draft", _draft)
+    session = _ShareSession()
+    share_link_uuid = uuid.uuid4()
+    schema_snapshot_uuid = uuid.uuid4()
+
+    with caplog.at_level(logging.INFO, logger="app.share"):
+        result = await share.export_shared_snapshot_index_design(
+            share_link_uuid,
+            schema_snapshot_uuid,
+            mode="llm-draft",
+            request=_request(),
+            session=session,
+        )
+
+    assert result == "# ERD Index Design\n\nDraft"
+    events = _share_audit_events(caplog)
+    assert events
+    assert events[-1]["request_id"] == "test-request-id"
+    assert events[-1]["action"] == "share_snapshot.index_design"
+    assert events[-1]["outcome"] == "success"
+    assert events[-1]["mode"] == "llm-draft"
+    assert events[-1]["share_link_uuid"] == str(share_link_uuid)
+    assert events[-1]["schema_snapshot_uuid"] == str(schema_snapshot_uuid)
+    assert events[-1]["project_space_uuid"] == str(session.project_space_uuid)
 
 
 @pytest.mark.asyncio

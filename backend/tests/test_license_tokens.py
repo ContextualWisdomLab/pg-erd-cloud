@@ -101,6 +101,43 @@ def test_license_token_cli_issues_verifiable_token(
     require_active_license(x_license_key=completed.stdout.strip())
 
 
+def test_license_token_cli_accepts_private_key_starting_with_dash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = "-DNzy9Xc4FKHCSOB1CS4l3AkCugmRPaanmOhcBq2ylo"
+    public_key = "oQRzrVEGW_lxl1QbHutxr4gVh1TTnKLvdXDTGevdC8I"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "app.license_tokens",
+            "issue",
+            "--private-key",
+            private_key,
+            "--sub",
+            "customer-acme",
+            "--plan",
+            "enterprise",
+            "--jti",
+            "license-2026-07",
+            "--exp",
+            str(int(time.time()) + 3600),
+        ],
+        cwd=BACKEND_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    monkeypatch.setattr(settings, "license_mode", "required")
+    monkeypatch.setattr(settings, "license_key", None)
+    monkeypatch.setattr(settings, "license_public_key", public_key)
+    monkeypatch.setattr(settings, "license_revoked_token_ids", "")
+    monkeypatch.setattr(settings, "license_revoked_subjects", "")
+
+    require_active_license(x_license_key=completed.stdout.strip())
+
+
 def test_license_keypair_cli_outputs_public_verifier() -> None:
     completed = subprocess.run(
         [

@@ -65,6 +65,10 @@ logs include `surface`, `artifact`, `outcome`, UUID references, and input/output
 character counts. They intentionally do not include prompt contents, snapshot
 JSON, provider responses, or API keys.
 
+Shared live LLM draft exports also emit `event=share_audit` with
+`outcome=success`, so support can correlate a successful public export with the
+share link, project, snapshot, and request ID without seeing prompt contents.
+
 ### Job queue metrics (DB-backed queue)
 
 - `job_queue_jobs_total{job_type,outcome}`

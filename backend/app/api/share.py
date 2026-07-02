@@ -631,6 +631,15 @@ async def export_shared_snapshot_reversing_spec(
             schema_snapshot_uuid=schema_snapshot_uuid,
             share_link_uuid=share_link_uuid,
         )
+        _record_share_audit_event(
+            action="share_snapshot.reversing_spec",
+            outcome="success",
+            request=request,
+            share_link_uuid=share_link_uuid,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            mode=mode,
+        )
         return draft
     _record_share_audit_event(
         action="share_snapshot.reversing_spec",
@@ -797,6 +806,15 @@ async def export_shared_snapshot_index_design(
             project_space_uuid=link.project_space_uuid,
             schema_snapshot_uuid=schema_snapshot_uuid,
             share_link_uuid=share_link_uuid,
+        )
+        _record_share_audit_event(
+            action="share_snapshot.index_design",
+            outcome="success",
+            request=request,
+            share_link_uuid=share_link_uuid,
+            project_space_uuid=link.project_space_uuid,
+            schema_snapshot_uuid=schema_snapshot_uuid,
+            mode=mode,
         )
         return draft
     _record_share_audit_event(
