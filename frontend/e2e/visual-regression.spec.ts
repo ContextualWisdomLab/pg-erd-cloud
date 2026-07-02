@@ -13,6 +13,19 @@ const editorBaselines = [
   },
 ] as const;
 
+const supportBaselines = [
+  {
+    name: 'desktop',
+    screenshotName: 'support-diagnostics.png',
+    viewport: { width: 1280, height: 900 },
+  },
+  {
+    name: 'mobile review',
+    screenshotName: 'support-diagnostics-mobile.png',
+    viewport: { width: 390, height: 844 },
+  },
+] as const;
+
 async function openDemoEditor(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize(viewport);
   await page.goto('/');
@@ -39,6 +52,24 @@ async function openEmptyFirstRunDashboard(page: Page) {
   await expect(page.getByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).toBeVisible();
 }
 
+async function openDemoSupportDiagnostics(
+  page: Page,
+  viewport: { width: number; height: number },
+) {
+  await page.setViewportSize(viewport);
+  await page.goto('/?demo-support=operator');
+
+  const navigation = page.getByRole('navigation', { name: '주요 화면' });
+  await expect(navigation.getByRole('button', { name: '지원' })).toBeVisible();
+  await navigation.getByRole('button', { name: '지원' }).click();
+
+  await expect(page.getByRole('heading', { name: '지원 진단' })).toBeVisible();
+  await page.getByRole('textbox', { name: '지원 진단 대상 subject' }).fill('customer-owner');
+  await page.getByRole('button', { name: '조회' }).click();
+  await expect(page.getByRole('table', { name: '최근 공유 링크' })).toBeVisible();
+  await expect(page.getByRole('table', { name: '최근 결제 이벤트' })).toBeVisible();
+}
+
 for (const baseline of editorBaselines) {
   test(`demo editor visual baseline remains stable on ${baseline.name}`, async ({ page }) => {
     await openDemoEditor(page, baseline.viewport);
@@ -47,6 +78,18 @@ for (const baseline of editorBaselines) {
       animations: 'disabled',
       fullPage: false,
       maxDiffPixelRatio: 0.03,
+    });
+  });
+}
+
+for (const baseline of supportBaselines) {
+  test(`support diagnostics visual baseline remains stable on ${baseline.name}`, async ({ page }) => {
+    await openDemoSupportDiagnostics(page, baseline.viewport);
+
+    await expect(page).toHaveScreenshot(baseline.screenshotName, {
+      animations: 'disabled',
+      fullPage: true,
+      maxDiffPixelRatio: 0.04,
     });
   });
 }
