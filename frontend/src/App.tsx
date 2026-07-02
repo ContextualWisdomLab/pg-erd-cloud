@@ -182,28 +182,14 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      if (node.data.title.toLocaleLowerCase().includes(normalizedNodeSearch)) {
-        matches.add(node.id);
-        continue;
-      }
-      if (node.data.comment?.toLocaleLowerCase().includes(normalizedNodeSearch)) {
-        matches.add(node.id);
-        continue;
-      }
-
-      let matched = false;
+      let haystack = `${node.data.title} ${node.data.comment ?? ""}`;
       for (const column of node.data.columns) {
-        if (
-          column.column_name.toLocaleLowerCase().includes(normalizedNodeSearch) ||
-          column.data_type.toLocaleLowerCase().includes(normalizedNodeSearch) ||
-          column.column_comment?.toLocaleLowerCase().includes(normalizedNodeSearch)
-        ) {
-          matched = true;
-          break;
-        }
+        haystack += ` ${column.column_name} ${column.data_type} ${
+          column.column_comment ?? ""
+        }`;
       }
 
-      if (matched) {
+      if (haystack.toLocaleLowerCase().includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }
     }
