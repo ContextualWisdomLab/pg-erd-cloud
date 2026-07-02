@@ -14,6 +14,7 @@ these snapshots:
 |---|---:|---:|---|
 | Desktop ERD editor | Chromium | `1280x720` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/demo-editor.png` |
 | Mobile review/editor entry | Chromium | `390x844` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/demo-editor-mobile.png` |
+| Share/export modal | Chromium | `1280x720` | `frontend/e2e/__screenshots__/chromium/visual-regression.spec/share-export-modal.png` |
 
 The mobile baseline is scoped to review and navigation confidence. Full mobile
 ERD editing is not a release promise until Product Design defines that workflow.

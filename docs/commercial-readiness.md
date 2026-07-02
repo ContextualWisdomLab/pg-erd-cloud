@@ -45,7 +45,7 @@ blocker로 분류합니다.
 | P1 | 라이선스·사용량·과금 체계 | 서명 토큰 발급 CLI + 검증 + env 기반 회수 목록 + 사용량 summary API + 기본 한도 enforcement + billing/reactivation URL 노출 도입 | 교체/비정상 탐지 SOP + 실제 과금 포털 연동 |
 | P1 | 운영 자동화 | 부분 완료 | 장애 대응·백업·마이그레이션 절차를 CI 재시작 플로우와 연결 |
 | P2 | 법무 문서 고도화 | 약관/개인정보/SLA/보안 신고/승인 gate 문서화 | 지역/계약별 승인 기록 첨부 |
-| P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + desktop/mobile 픽셀 baseline 시각 회귀 CI + baseline 갱신 승인 절차 도입 | 추가 브라우저/핵심 workflow baseline 검토 |
+| P2 | 품질 게이트 | 접근성 + 브라우저 E2E smoke + desktop/mobile editor baseline + share/export modal baseline + baseline 갱신 승인 절차 도입 | 추가 브라우저/핵심 workflow baseline 검토 |
 
 위 항목 중 하나라도 미완이면 “판매 전 검수 합격”으로 보기 어렵습니다.
 
@@ -134,10 +134,11 @@ blocker로 분류합니다.
 - ✅ 브라우저 E2E smoke: `npm run test:e2e`와 CI `Browser E2E smoke` 단계를 추가해
   demo workspace load, editor toolbar interaction, screenshot rendering을 Chromium에서 검증함
 - ✅ 시각 회귀 gate: `npm run test:visual`과 CI `Visual regression` 단계로 demo editor
-  desktop 1280x720 및 mobile review 390x844 픽셀 baseline을 검증함
+  desktop 1280x720, mobile review 390x844, share/export modal 1280x720 픽셀
+  baseline을 검증함
 - ✅ baseline 갱신 승인 절차: `docs/ui-ux/visual-regression-baseline.md`에 변경 사유,
   Figma/참조 증거, 브라우저 증거, 승인자, No-Go 조건, 갱신 명령 순서를 고정함
-- 🟡 고급 운영 테스트: Firefox/WebKit 등 추가 브라우저와 share/export modal 등 핵심
+- 🟡 고급 운영 테스트: Firefox/WebKit 등 추가 브라우저와 first-run setup 등 다른 핵심
   workflow별 baseline은 후속 보강 필요
 
 ## First Implementation Slice
