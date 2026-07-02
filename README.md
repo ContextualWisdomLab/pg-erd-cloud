@@ -46,6 +46,9 @@ curl -X POST "http://localhost:8000/api/projects/<project_uuid>/share-links"
 ```
 
 반환된 `url_path`로 동료가 최신 스냅샷 목록/스냅샷 JSON/DDL export를 조회할 수 있습니다.
+공유 링크는 기본적으로 `SHARE_LINK_DEFAULT_TTL_HOURS=168`(7일) 뒤 만료됩니다.
+오너는 `GET /api/projects/{project_uuid}/share-links`로 링크를 조회하고,
+`DELETE /api/projects/{project_uuid}/share-links/{share_uuid}`로 폐기할 수 있습니다.
 `/api/share/*` 공개 조회/내보내기 경로는 전역 `/api/*` 제한보다 더 엄격한 별도
 IP 기반 rate limit을 적용합니다.
 공유 링크의 `markdown`/`llm-prompt` export는 로컬 생성만 수행하지만, `llm-draft`

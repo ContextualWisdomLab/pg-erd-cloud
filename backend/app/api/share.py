@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from app.spec.llm import (
     generate_reversing_llm_draft,
 )
 from app.settings import settings
+from app.schemas import ShareLinkCreateIn, ShareLinkOut
 from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
@@ -38,38 +39,98 @@ def _require_share_link_llm_draft_enabled() -> None:
         )
 
 
-@router.post("/projects/{project_space_uuid}/share-links")
-async def create_share_link(
-    project_space_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Create a share link for a project (owner-only)."""
-    # owner only
+async def _ensure_project_owner(
+    session: AsyncSession, project_space_uuid: uuid.UUID, user_account_uuid: uuid.UUID
+) -> None:
     row = await session.execute(
         select(ProjectMember.project_role).where(
             ProjectMember.project_space_uuid == project_space_uuid,
-            ProjectMember.user_account_uuid == user.user_account_uuid,
+            ProjectMember.user_account_uuid == user_account_uuid,
         )
     )
     if row.scalar_one_or_none() != "owner":
         raise HTTPException(status_code=403, detail="owner role required")
 
+
+def _share_link_expiry(body: ShareLinkCreateIn | None) -> dt.datetime | None:
+    ttl_hours = (
+        settings.share_link_default_ttl_hours
+        if body is None or body.expires_in_hours is None
+        else body.expires_in_hours
+    )
+    if ttl_hours == 0:
+        return None
+    return dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=ttl_hours)
+
+
+def _share_link_out(link: ShareLink) -> ShareLinkOut:
+    return ShareLinkOut(
+        share_link_uuid=link.share_link_uuid,
+        permission_kind=link.permission_kind,
+        url_path=f"/api/share/{link.share_link_uuid}",
+        expires_at=link.expires_at,
+        created_at=link.created_at,
+    )
+
+
+@router.post("/projects/{project_space_uuid}/share-links")
+async def create_share_link(
+    project_space_uuid: uuid.UUID,
+    body: ShareLinkCreateIn | None = Body(default=None),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ShareLinkOut:
+    """Create a share link for a project (owner-only)."""
+    await _ensure_project_owner(session, project_space_uuid, user.user_account_uuid)
+
+    now = dt.datetime.now(dt.timezone.utc)
     link = ShareLink(
         share_link_uuid=uuid.uuid4(),
         project_space_uuid=project_space_uuid,
         created_by_user_uuid=user.user_account_uuid,
         permission_kind="viewer",
-        expires_at=None,
-        created_at=dt.datetime.now(dt.timezone.utc),
+        expires_at=_share_link_expiry(body),
+        created_at=now,
     )
     session.add(link)
     await session.commit()
-    return {
-        "share_link_uuid": str(link.share_link_uuid),
-        "permission_kind": link.permission_kind,
-        "url_path": f"/api/share/{link.share_link_uuid}",
-    }
+    return _share_link_out(link)
+
+
+@router.get("/projects/{project_space_uuid}/share-links")
+async def list_share_links(
+    project_space_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> list[ShareLinkOut]:
+    """List share links for a project (owner-only)."""
+    await _ensure_project_owner(session, project_space_uuid, user.user_account_uuid)
+
+    rows = await session.execute(
+        select(ShareLink)
+        .where(ShareLink.project_space_uuid == project_space_uuid)
+        .order_by(ShareLink.created_at.desc())
+    )
+    return [_share_link_out(link) for link in rows.scalars().all()]
+
+
+@router.delete("/projects/{project_space_uuid}/share-links/{share_link_uuid}")
+async def delete_share_link(
+    project_space_uuid: uuid.UUID,
+    share_link_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Revoke a project share link by deleting it (owner-only)."""
+    await _ensure_project_owner(session, project_space_uuid, user.user_account_uuid)
+
+    link = await session.get(ShareLink, share_link_uuid)
+    if link is None or link.project_space_uuid != project_space_uuid:
+        raise HTTPException(status_code=404, detail="share link not found")
+
+    await session.delete(link)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @router.get("/share/{share_link_uuid}")

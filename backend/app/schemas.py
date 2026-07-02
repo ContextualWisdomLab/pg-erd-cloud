@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Literal
 
@@ -89,6 +90,30 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class ShareLinkCreateIn(BaseModel):
+    """Request body for creating a public project share link."""
+
+    expires_in_hours: int | None = Field(
+        default=None,
+        ge=0,
+        le=8760,
+        description=(
+            "Override the default share-link TTL. Use 0 only for an explicit "
+            "non-expiring operational exception."
+        ),
+    )
+
+
+class ShareLinkOut(BaseModel):
+    """Share link representation returned by API."""
+
+    share_link_uuid: uuid.UUID
+    permission_kind: str
+    url_path: str
+    expires_at: dt.datetime | None
+    created_at: dt.datetime
 
 
 class MeOut(BaseModel):

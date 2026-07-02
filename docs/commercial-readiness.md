@@ -21,14 +21,14 @@ blocker로 분류합니다.
 - 인가: 프로젝트 멤버십, 오너 권한, 공유 링크 권한이 테스트로 보호되어야 합니다.
 - 데이터 보호: 저장 DSN 암호화, secret 파일 주입, DSN/error redaction, 대상 DB
   allowlist가 기본 방어선으로 동작해야 합니다.
-- 공개 엔드포인트 남용 방지: `/api/share/*`는 별도 rate limit을 적용하고, 외부
-  비용을 만들 수 있는 live LLM draft는 기본 차단해야 합니다.
+- 공개 엔드포인트 남용 방지: `/api/share/*`는 별도 rate limit과 기본 만료를 적용하고,
+  외부 비용을 만들 수 있는 live LLM draft는 기본 차단해야 합니다.
 - 배포 재현성: Docker/prod compose, backend/frontend lockfile, 런타임 버전이 일관되어야 합니다.
 - 검증: backend mypy/pytest, frontend typecheck/test/build가 main 기준에서 통과해야 합니다.
 
 ### P1: 유료 베타 필수
 
-- 공유 링크 만료 기본값, revoke/list API, 링크별 감사 로그를 제공해야 합니다.
+- 공유 링크별 감사 로그를 제공해야 합니다.
 - 프로덕션 설정 guard를 추가해 약한 `APP_SECRET`, localhost-only CORS, OIDC 누락,
   target DB allowlist 누락을 조기 탐지해야 합니다.
 - 백업/복구 runbook, migration rollback policy, 장애 대응 runbook을 문서화해야 합니다.
@@ -45,11 +45,14 @@ blocker로 분류합니다.
 
 ## First Implementation Slice
 
-이번 1차 구현은 판매 전 P0 중 “공개 엔드포인트 비용 남용 방지”를 닫습니다.
+이번 1차 구현은 판매 전 P0 중 “공개 엔드포인트 비용/노출 남용 방지”를 닫습니다.
 
 - `SHARE_LINK_LLM_DRAFT_ENABLED=false`를 기본값으로 추가합니다.
 - 공개 공유 링크의 `mode=llm-draft` 호출은 기본적으로 `403`으로 차단합니다.
 - 인증된 snapshot API의 live LLM draft는 기존 동작을 유지합니다.
+- `SHARE_LINK_DEFAULT_TTL_HOURS=168`을 기본값으로 추가해 공개 공유 링크를 7일 뒤
+  만료시킵니다.
+- 프로젝트 오너가 공유 링크를 목록 조회하고 삭제 방식으로 폐기할 수 있게 합니다.
 - 운영자가 공개 공유 링크 LLM draft를 의도적으로 열 수는 있지만, 별도 비용 한도,
   감사 로그, 운영 승인 정책을 갖춘 배포에서만 사용하도록 문서화합니다.
 
