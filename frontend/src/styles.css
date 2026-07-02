@@ -331,6 +331,37 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.supportLinkValue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.supportLinkValue a {
+  color: #034ea2;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.supportLinkValue a:hover {
+  text-decoration: underline;
+}
+
+.supportLinkValue button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+}
+
+.supportLinkValue__missing {
+  color: #64748b;
+}
+
 .supportEvents__row {
   grid-template-columns: 1fr 1.7fr 1fr 1.5fr;
 }
@@ -1119,8 +1150,39 @@ button:disabled {
     min-width: 440px;
   }
 
+  .supportEvents {
+    overflow-x: visible;
+  }
+
+  .supportEvents .dataTable__row--head {
+    display: none;
+  }
+
   .supportEvents__row {
-    min-width: 720px;
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    align-items: stretch;
+    padding: 14px 18px;
+  }
+
+  .supportEvents__row + .supportEvents__row {
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .supportEvents__row [role="cell"] {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .supportEvents__row [role="cell"]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: #64748b;
+    font-weight: 700;
   }
 
   .canvasToolbar {

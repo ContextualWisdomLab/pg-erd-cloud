@@ -212,6 +212,7 @@ export default function App() {
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
+  const supportCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -227,6 +228,7 @@ export default function App() {
   const [supportAccount, setSupportAccount] = useState<BillingSupportAccount | null>(null);
   const [isSupportLookupLoading, setIsSupportLookupLoading] = useState(false);
   const [supportLookupError, setSupportLookupError] = useState<string | null>(null);
+  const [copiedSupportUrlLabel, setCopiedSupportUrlLabel] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -309,6 +311,9 @@ export default function App() {
       }
       if (shareCopyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      }
+      if (supportCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(supportCopyFeedbackTimeoutRef.current);
       }
     };
   }, []);
@@ -703,6 +708,7 @@ export default function App() {
 
       setIsSupportLookupLoading(true);
       setSupportLookupError(null);
+      setCopiedSupportUrlLabel(null);
       try {
         setSupportAccount(await getBillingSupportAccount(subject));
       } catch {
@@ -713,6 +719,45 @@ export default function App() {
       }
     },
     [isSupportLookupLoading, supportSubject],
+  );
+
+  const onCopySupportUrl = useCallback(async (label: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setSupportLookupError(null);
+      setCopiedSupportUrlLabel(label);
+
+      if (supportCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(supportCopyFeedbackTimeoutRef.current);
+      }
+
+      supportCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setCopiedSupportUrlLabel(null);
+        supportCopyFeedbackTimeoutRef.current = null;
+      }, 2000);
+    } catch {
+      setCopiedSupportUrlLabel(null);
+      setSupportLookupError(`${label} URL 복사에 실패했습니다.`);
+    }
+  }, []);
+
+  const renderSupportUrl = useCallback(
+    (label: string, actionLabel: string, url: string | null) => {
+      if (!url) return <span className="supportLinkValue__missing">미설정</span>;
+
+      const isCopied = copiedSupportUrlLabel === label;
+      return (
+        <span className="supportLinkValue">
+          <a href={url} target="_blank" rel="noreferrer">
+            {actionLabel}
+          </a>
+          <button type="button" onClick={() => void onCopySupportUrl(label, url)}>
+            {isCopied ? "복사됨" : "URL 복사"}
+          </button>
+        </span>
+      );
+    },
+    [copiedSupportUrlLabel, onCopySupportUrl],
   );
 
   function onDownloadSvg() {
@@ -1542,15 +1587,15 @@ export default function App() {
                     </div>
                     <div>
                       <dt>지원 URL</dt>
-                      <dd>{supportAccount.billing_support_url || "미설정"}</dd>
+                      <dd>{renderSupportUrl("지원", "지원센터 열기", supportAccount.billing_support_url)}</dd>
                     </div>
                     <div>
                       <dt>포털 URL</dt>
-                      <dd>{supportAccount.billing_portal_url || "미설정"}</dd>
+                      <dd>{renderSupportUrl("포털", "결제 포털 열기", supportAccount.billing_portal_url)}</dd>
                     </div>
                     <div>
                       <dt>재활성화 URL</dt>
-                      <dd>{supportAccount.account_reactivation_url || "미설정"}</dd>
+                      <dd>{renderSupportUrl("재활성화", "재활성화 열기", supportAccount.account_reactivation_url)}</dd>
                     </div>
                   </dl>
                 </section>
@@ -1569,10 +1614,10 @@ export default function App() {
                       </div>
                       {supportAccount.recent_billing_events.map((event) => (
                         <div className="dataTable__row supportEvents__row" role="row" key={event.billing_event_uuid}>
-                          <span role="cell">{event.provider}</span>
-                          <strong role="cell">{event.event_type}</strong>
-                          <span role="cell">{event.target_plan || "없음"}</span>
-                          <span role="cell">{event.received_at}</span>
+                          <span role="cell" data-label="Provider">{event.provider}</span>
+                          <strong role="cell" data-label="Event">{event.event_type}</strong>
+                          <span role="cell" data-label="Plan">{event.target_plan || "없음"}</span>
+                          <span role="cell" data-label="Received">{event.received_at}</span>
                         </div>
                       ))}
                     </div>

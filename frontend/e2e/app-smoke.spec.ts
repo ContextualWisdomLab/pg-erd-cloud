@@ -32,6 +32,14 @@ test('demo support operator can inspect billing diagnostics', async ({ page }) =
 
   await expect(page.getByText('demo-customer-user', { exact: true })).toBeVisible();
   await expect(page.getByText('서명 토큰')).toBeVisible();
+  await expect(page.getByRole('link', { name: '지원센터 열기' })).toHaveAttribute(
+    'href',
+    'https://support.example.com/billing',
+  );
+  await expect(page.getByRole('link', { name: '결제 포털 열기' })).toHaveAttribute(
+    'href',
+    'https://billing.example.com/customer/demo-customer-user',
+  );
   await expect(page.getByRole('table', { name: '최근 결제 이벤트' })).toBeVisible();
   await expect(page.getByText('subscription.updated')).toBeVisible();
 });

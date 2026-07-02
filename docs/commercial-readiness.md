@@ -64,11 +64,11 @@ blocker로 분류합니다.
   디자인 파일의 `Support diagnostics commercial-readiness audit` 섹션
   <https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si?node-id=48-2>에 배치했습니다.
 - desktop support diagnostics는 paid-pilot 지원 데모에 사용할 수 있는 수준입니다.
-  다만 narrow viewport에서는 billing event의 plan/received context가 표 밖으로
-  밀려나므로, 일반 판매 전에는 stacked event card 또는 명확한 horizontal-scroll
-  cue가 필요합니다.
-- raw billing/support URL은 카드 안에서 줄바꿈되어 보입니다. 다음 UI slice에서는
-  named link와 copy action으로 바꾸는 것이 구매자 신뢰 관점에서 적절합니다.
+  support/billing/reactivation destination은 raw URL 대신 named link와 URL copy
+  action으로 표시합니다.
+- narrow viewport에서도 billing event의 provider/event/plan/received context를
+  stacked row label로 보존합니다. 일반 판매 전 잔여 과제는 실제 provider payload와
+  장문 계약 식별자로 stress fixture를 추가하는 것입니다.
 
 ## 상업 릴리즈 진입 판정(실시간)
 

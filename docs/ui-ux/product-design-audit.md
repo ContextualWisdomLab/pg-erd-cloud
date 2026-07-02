@@ -105,7 +105,7 @@ the next focused code PR, not as proof that the production UI already changed.
 
 ## Findings
 
-### P1. Support diagnostics is now demoable, but narrow-width billing evidence loses context
+### P1. Support diagnostics is now demoable, with narrow-width evidence improved
 
 Evidence:
 
@@ -121,24 +121,22 @@ Evidence:
 Impact:
 
 - Desktop support diagnostics are credible for paid-pilot support demos: counts,
-  account state, license verifier, support URL, billing portal URL,
-  reactivation URL, and recent billing events are all visible in one operator
+  account state, license verifier, named support/billing/reactivation links,
+  URL copy actions, and recent billing events are all visible in one operator
   flow.
-- Narrow support diagnostics reflows the summary cards and account details, but
-  the recent billing events table loses `Plan` and `Received` context off-screen.
-  That is acceptable as fallback evidence, but not as a polished buyer-critical
-  mobile support workflow.
-- Long billing and reactivation URLs wrap inside cards, which can reduce trust
-  during live support calls even though the data is available.
+- Narrow support diagnostics now reflows the summary cards, account details,
+  URL actions, and billing events without hiding `Plan` or `Received` context.
+- The remaining risk is scale evidence: real provider payloads can contain long
+  event names, contract IDs, timestamps, and plan names that still need
+  production-like stress testing.
 
 Recommendation:
 
 - Keep the support diagnostics implementation as an operator-only read path.
-- For the next UI slice, convert recent billing events to stacked cards below
-  narrow widths or add an explicit horizontal-scroll affordance with preserved
-  column labels.
-- Format billing/support URLs as named links with copy actions instead of raw
+- Keep billing/support URLs as named links with copy actions rather than raw
   full URLs in the account detail cards.
+- Preserve the stacked narrow-width billing event labels and add stress fixtures
+  before claiming mobile support workflow completeness.
 - Preserve the demo-only `?demo-support=operator` path as Product Design and
   sales-engineering evidence, not as a production authorization shortcut.
 

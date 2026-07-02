@@ -150,6 +150,18 @@ describe('App accessibility smoke', () => {
     expect(getBillingSupportAccount).toHaveBeenCalledWith('customer-owner');
     expect(await screen.findByText('customer-user-uuid')).toBeInTheDocument();
     expect(screen.getByText('서명 토큰')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '지원센터 열기' })).toHaveAttribute(
+      'href',
+      'https://support.example.com',
+    );
+    expect(screen.getByRole('link', { name: '결제 포털 열기' })).toHaveAttribute(
+      'href',
+      'https://billing.example.com',
+    );
+    expect(screen.getByRole('link', { name: '재활성화 열기' })).toHaveAttribute(
+      'href',
+      'https://billing.example.com/reactivate',
+    );
     expect(screen.getByRole('table', { name: '최근 결제 이벤트' })).toBeInTheDocument();
     expect(screen.getByText('subscription.updated')).toBeInTheDocument();
   });

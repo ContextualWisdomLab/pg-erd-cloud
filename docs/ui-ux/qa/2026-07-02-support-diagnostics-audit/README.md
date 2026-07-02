@@ -21,16 +21,14 @@ Evidence files:
 
 1. `01-support-diagnostics-desktop.png`
    - Desktop operator view after looking up `customer-owner`.
-   - Health: usable for operator review.
-   - Risk: long billing and reactivation URLs wrap awkwardly inside detail
-     cards.
+   - Health: improved for operator review.
+   - Evidence: support, billing portal, and reactivation destinations are shown
+     as named links with URL copy actions instead of raw full URLs.
 2. `02-support-diagnostics-mobile.png`
    - Narrow viewport support diagnostics view.
-   - Health: stable and reachable.
-   - Risk: recent billing event table hides plan and received-at context
-     off-screen, so the narrow support view needs stacked events or an explicit
-     horizontal-scroll cue before it can be treated as a buyer-critical mobile
-     support workflow.
+   - Health: stable and usable as a review/support fallback.
+   - Evidence: recent billing events preserve `Provider`, `Event`, `Plan`, and
+     `Received` labels in stacked rows.
 3. `03-demo-dashboard-commercial.png`
    - Default commercial demo dashboard.
    - Health: solid buyer-demo entry state.
@@ -48,13 +46,14 @@ Audit conclusion:
   support demos when the operator is authorized.
 - The default dashboard remains appropriate as the buyer entry point, but it
   does not yet communicate billing or support trust signals.
-- Narrow-width support diagnostics should remain a review/support fallback, not
-  a primary mobile workflow, until event rows are redesigned for stacked reading.
+- Narrow-width support diagnostics is now readable as a review/support fallback.
+  It still needs production-scale stress testing with real provider payloads
+  before being treated as a primary mobile support workflow.
 
 Implementation evidence:
 
 - `frontend/src/api.ts` exposes demo-only support-operator state through
   `?demo-support=operator`.
 - `frontend/e2e/app-smoke.spec.ts` verifies that the support operator can open
-  the support diagnostics screen, look up a subject, and inspect recent billing
-  events.
+  the support diagnostics screen, look up a subject, inspect recent billing
+  events, and see named support/billing links.
