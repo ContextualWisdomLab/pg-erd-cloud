@@ -44,6 +44,15 @@
 
 - 현재 단계는 상용화 준비 상태(POC)이며, 별도 과금 라우트(Billing, invoicing, seat API)는
   아직 미구현입니다.
+- `GET /api/billing/usage`는 현재 사용자 소유 프로젝트 범위의 과금 준비용 사용량을
+  반환합니다.
+  - `project_count`
+  - `seat_count`
+  - `connection_count`
+  - `snapshot_count`
+  - `share_link_count`
+  - `active_share_link_count`
+  - `license_mode`, `license_verifier`
 - 운영 전에는 다음 항목을 추가해야 합니다.
   - 계약 단위 플랜(월 구독/온프레미스 라이선스) 매핑
   - 청구 주기, 미납 정책, 계정 비활성 규칙

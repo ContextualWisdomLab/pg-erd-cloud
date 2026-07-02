@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.connections import router as connections_router
 from app.api.auth_routes import router as auth_router
+from app.api.billing import router as billing_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
@@ -174,4 +175,5 @@ app.include_router(connections_router, dependencies=[Depends(require_active_lice
 app.include_router(snapshots_router, dependencies=[Depends(require_active_license)])
 app.include_router(me_router, dependencies=[Depends(require_active_license)])
 app.include_router(auth_router, dependencies=[Depends(require_active_license)])
+app.include_router(billing_router, dependencies=[Depends(require_active_license)])
 app.include_router(share_router)

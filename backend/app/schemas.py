@@ -122,3 +122,19 @@ class MeOut(BaseModel):
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class BillingUsageOut(BaseModel):
+    """Read-only usage counters for billing and license operations."""
+
+    scope: Literal["owned_projects"]
+    license_mode: Literal["off", "required"]
+    license_verifier: Literal[
+        "none", "static_key", "signed_token", "static_key_and_signed_token"
+    ]
+    project_count: int = Field(ge=0)
+    seat_count: int = Field(ge=0)
+    connection_count: int = Field(ge=0)
+    snapshot_count: int = Field(ge=0)
+    share_link_count: int = Field(ge=0)
+    active_share_link_count: int = Field(ge=0)
