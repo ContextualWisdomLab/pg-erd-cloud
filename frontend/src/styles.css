@@ -8,16 +8,23 @@ html, body {
  * Minimal semantic design-token layer.
  * Mirrors the "PG ERD Color" semantic variable collection in the
  * Figma design system (see docs/design-system/README.md):
- *   --color-border-focus  <-> color/border/focus
- *   --color-border-error  <-> color/border/error
- *   --color-text-disabled <-> color/text/disabled
- * Values below match the colors already hardcoded elsewhere in this
- * file so introducing the tokens does not change any rendered output.
- * A broader token layer covering brand/surface/spacing colors is
+ *   --color-action-primary       <-> color/action/primary
+ *   --color-action-primary-hover <-> color/action/primary-hover
+ *   --color-border-focus         <-> color/border/focus
+ *   --color-border-error         <-> color/border/error
+ *   --color-text-disabled        <-> color/text/disabled
+ * Values below match the brand color (#034ea2) already hardcoded across
+ * this file, so introducing the tokens does not change rendered output.
+ * NOTE (Gap): the Figma `color/action/primary` variable is currently
+ * #2563eb and should be reconciled to the KRDS-aligned code value
+ * #034ea2 (tracked on the Figma "07. Dev Handoff" page).
+ * A broader token layer covering all brand/surface/spacing colors is
  * proposed separately in PR #406 (codex/css-token-layer) and is not
  * duplicated here to avoid conflicting with that in-flight change.
  */
 :root {
+  --color-action-primary: #034ea2;
+  --color-action-primary-hover: #023d80;
   --color-border-focus: #034ea2;
   --color-border-error: #b91c1c;
   --color-text-disabled: #9ca3af;
@@ -402,6 +409,61 @@ button:disabled {
   cursor: not-allowed;
   background-color: #f3f4f6;
   color: var(--color-text-disabled);
+}
+
+/*
+ * Reusable Button component styles (see frontend/src/components/Button.tsx).
+ * Encodes the "PG ERD Button" design-system component variants
+ * (Primary / Secondary / Ghost) documented in the Figma design system.
+ */
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.btn--sm {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.btn--primary {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: #fff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--color-action-primary-hover);
+  border-color: var(--color-action-primary-hover);
+}
+
+.btn--secondary {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #334155;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .tableNode {

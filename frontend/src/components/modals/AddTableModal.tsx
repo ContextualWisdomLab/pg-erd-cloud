@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDialogAccessibility } from './useDialogAccessibility';
+import { Button } from '../Button';
 
 interface AddTableModalProps {
   isOpen: boolean;
@@ -75,18 +76,16 @@ export function AddTableModal({
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
         >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
-          <button
+          <Button variant="secondary" onClick={onAddTableCancel}>
+            취소
+          </Button>
+          <Button
+            variant="primary"
             type="submit"
             disabled={!newTableName.trim()}
-            style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
-            }
           >
             저장
-          </button>
+          </Button>
         </div>
       </form>
     </div>
