@@ -49,8 +49,8 @@
 | Component | Selection/Input wrappers | Checkbox, Radio, Select, TextInput are code-only review components; Figma variants now exist for all | Medium | Add focused tests, adopt where used | Design/Dev | TBD |
 | Component | Toast | Figma `PG ERD Toast` now has 4 tones (Info/Success/Warning/Danger); only Info/Success are adopted in code | Low | Add Warning/Danger tone support to `Toast.tsx` if/when needed | Dev | TBD |
 | Component | Snackbar | No feedback-with-action component exists | Low | Add only when undo/retry action is needed | Design/Dev | TBD |
-| Pattern | Service flows | 방문/검색 have a real 4-screen prototype with connectors; 로그인 (auth gate) has no Figma prototype screen despite code (`AuthGate`) existing; 신청/정책 정보 확인 are N/A for product scope | Medium | Build Login entry/error/success screens and connect to the existing Core Flow prototype | Design | TBD |
-| Foundation | Icon (style_06) | No icon component set/standard | Medium | Define icon set (size/stroke/color rules) | Design | TBD |
+| Pattern | Service flows | **Resolved** — 방문/검색/로그인 all now have real Figma prototype reactions (`setReactionsAsync`, ON_CLICK/AFTER_TIMEOUT → NAVIGATE), not just visual connector lines; Login screens (Loading/Error/Success) are grounded in the real `AuthGate` branch in `App.tsx`. 신청/정책 정보 확인 remain N/A for product scope | N/A | None | – | ✔ |
+| Component | Toolbar Button (Action) | `PG ERD Toolbar Button` Icon/Format kinds exist but aren't cross-referenced with the new `PG ERD Icon` set | Low | Swap Toolbar Button's icon slots to use `PG ERD Icon` instances via INSTANCE_SWAP | Design | TBD |
 | Accessibility | Component matrix | Per-component keyboard/screen-reader/high-contrast matrix is incomplete; automated WCAG 4.5:1 contrast reporting doesn't exist | Medium | Extend `06. Accessibility` inventory and tests for adopted components | Design/Dev | TBD |
 
 Severity follows the KRDS task definition: Critical for legal/accessibility or

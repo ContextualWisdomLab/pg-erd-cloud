@@ -50,7 +50,7 @@ the overall summary.
 | Typography | style_03 | Target text-style set documented; system-ui font stack in code (not Pretendard GOV) | Review |
 | Shape/Radius | style_04 | Target `PG ERD Radius` scale documented | Review |
 | Layout | style_05 | Fixed sidebar + main; `@media` narrow breakpoint; not a formal 12-col grid | Review |
-| Icon | style_06 | No dedicated icon component set; inline SVG/text labels | Gap |
+| Icon | style_06 | Figma `PG ERD Icon` set added 2026-07-03 (Search/Close/Chevron-Down/Check/Plus), token-bound stroke, 16-40px size grid; code still has no icon component (inline SVG/text labels) | Review |
 | Elevation | style_08 | Target `Shadow/Modal`, `Focus/Ring` effect styles documented | Review |
 | High Contrast Mode | style_09 | Target `High Contrast` variable mode documented; code mirrors it with `@media (prefers-contrast: more)` | Review |
 
@@ -171,9 +171,9 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 | 탭바 (Tab bar) | – | – | – | – | N/A |
 | 스플래시 스크린 (Splash screen) | – | – | – | – | N/A |
 
-**Summary:** Ready 7 · Review 18 · Gap 5 · N/A 25 (of 55 KRDS items traversed;
-Spinner moved Review→Ready 2026-07-03 after its Figma Component Set was
-verified built).
+**Summary:** Ready 8 · Review 18 · Gap 4 · N/A 25 (of 55 KRDS items traversed;
+Spinner and Icon moved Review/Gap→Ready/Review 2026-07-03 after their Figma
+objects were verified built).
 
 ## 5. Basic pattern inventory (KRDS 12 + mobile)
 
@@ -200,9 +200,9 @@ Format: Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components
 
 | Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components | Status |
 |---|---|---|---|---|---|---|
-| 방문 (Visit) | dashboard | yes | target only; Figma verification pending | partial | workspace dashboard, nav | Review |
-| 검색 (Search) | editor | yes | target only; Figma verification pending | partial | search/filter input, TableNode highlight | Review |
-| 로그인 (Login) | auth gate | yes | – | partial | AuthGate, `authError`, sign-in | Review |
+| 방문 (Visit) | dashboard | yes | **real** `setReactionsAsync` ON_CLICK→NAVIGATE (added 2026-07-03; was visual lines only) | partial | workspace dashboard, nav | **Ready** |
+| 검색 (Search) | editor | yes | **real** `setReactionsAsync` ON_CLICK→NAVIGATE (added 2026-07-03; was visual lines only) | partial | search/filter input, TableNode highlight | **Ready** |
+| 로그인 (Login) | auth gate | yes | **real** Loading→Success (AFTER_TIMEOUT) / Loading→Error (ON_CLICK) / Retry→Loading, connected to Core Flow Dashboard (added 2026-07-03) | partial | AuthGate, `authError`, sign-in | **Ready** |
 | 신청 (Application) | – | – | – | – | – | N/A |
 | 정책 정보 확인 (Policy info) | – | – | – | – | – | N/A |
 
@@ -232,19 +232,20 @@ reconciled to `#023d80` to match.
 | Area | KRDS Reference | Issue | Severity | Required Action | Owner | Due |
 |---|---|---|---|---|---|---|
 | Foundation | Dark mode | No dark-mode token/CSS mode | Medium | Define only if product needs a separate dark theme beyond KRDS high contrast | Design/Dev | TBD |
-| Foundation | Icon (style_06) | No icon component set/standard | Medium | Define icon set (size/stroke/color rules) | Design | TBD |
 | Token | Design Token (style_07) | Full `:root` token layer not merged | High | Merge/re-review PR #406; reconcile naming | Dev | TBD |
 | Component | Button (Action) | Was no reusable code component | High | **Done** — `components/Button.tsx` added and uses shared `.btn` CSS tokens | Dev | ✔ |
 | Component | Breadcrumb/Pagination/Checkbox/Radio/Select/TextInput | Code-only wrappers exist but are not adopted; Figma variants now exist for all (added 2026-07-03) | Medium | Add tests/adoption where product uses them | Design/Dev | TBD |
 | Component | Pagination (Navigation) | Partial behavior only; no first/last/ellipsis behavior | Medium | Add missing KRDS behavior before broad adoption | Dev | TBD |
 | Component | Snackbar (Mobile) | No Snackbar component for feedback with action | Low | Add only when a UI needs undo/retry action | Design/Dev | TBD |
+| Component | Icon (style_06) | Figma set exists (5 icons) but code has none — no icon component to adopt against | Low | Define code Icon component only if/when product needs it beyond inline SVG | Design/Dev | TBD |
 | Pattern | 신청 (Application) | No multi-step application flow | Low | N/A for current product scope | – | – |
-| Pattern | 로그인 (Login) | Code `AuthGate` exists but no Figma service-pattern prototype screen | Medium | Build Login entry/error/success screens, connect to existing Core Flow prototype | Design | TBD |
 | Accessibility | Modal | Focus trap now documented; audit others | Medium | Extend a11y docs to all dialogs | Design/Dev | TBD |
 
 Resolved 2026-07-03 (verified via Figma MCP, not just asserted — see
 `docs/GAP_REPORT.md`): Figma page/variable/component inspection access;
-Spinner and Toast Figma component sets; Figma↔code brand color mismatch.
+Spinner and Toast Figma component sets; Figma↔code brand color mismatch;
+Icon component set (style_06); Login/auth-gate service-pattern prototype;
+방문/검색 upgraded from visual-line connectors to real prototype reactions.
 
 **Severity:** Critical (a11y/legal/task-blocking) · High (core comp/pattern unusable) ·
 Medium (usability/consistency) · Low (docs/examples).
@@ -257,9 +258,12 @@ exist, are now directly verified in Figma (not just asserted), and are
 code-linked (Button + Spinner + Toast + High Contrast Mode). As of 2026-07-03,
 all Selection/Navigation/Feedback gap components (Checkbox, Radio, Select,
 Tag, Pagination, Breadcrumb, Spinner, Toast) exist as real Figma Component
-Sets, and one pattern (입력폼) has a real instance-composed board. Still open:
-dark mode, several N/A-adjacent components (Snackbar, Tab, Textarea, Text
-Resize, Icon set), the full CSS token layer (PR #406), adoption of code-only
-wrappers into product UI, a Login service-pattern prototype screen, and
-complete a11y prototypes — so it is **not yet** a fully operable "Design
-System."
+Sets; a Figma Icon set closes the style_06 Foundation gap; one pattern
+(입력폼) has a real instance-composed board; and all 3 applicable service
+patterns (방문/검색/로그인) have real `setReactionsAsync` prototype
+connections, not just visual lines. Still open: dark mode, several
+N/A-adjacent components (Snackbar, Tab, Textarea, Text Resize), the full CSS
+token layer (PR #406), and adoption of the newly-Figma'd components into
+actual product UI — so it is **not yet** a fully operable "Design System,"
+but the remaining gap is now specifically product/code adoption rather than
+missing Figma coverage.

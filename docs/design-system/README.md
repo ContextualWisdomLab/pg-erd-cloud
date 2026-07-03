@@ -136,10 +136,12 @@ convention.
 - Snackbar remains a component gap. Pagination now has a Figma component set
   and a partial code component, but neither is adopted and the code lacks the
   KRDS first/last/ellipsis behavior.
-- No Figma icon component set exists yet (KRDS style_06).
-- No Login/auth-gate service-pattern prototype screen exists, despite the
-  code `AuthGate` flow being real — 방문/검색 have a 4-screen prototype with
-  connectors, 로그인 doesn't.
+- `PG ERD Icon` (5 icons, token-bound) exists as of 2026-07-03, but no code
+  Icon component exists to adopt it against — product still uses inline
+  SVG/text labels.
+- All 3 applicable service patterns (방문/검색/로그인) now have real Figma
+  prototype connections (`setReactionsAsync`, added 2026-07-03) — previously
+  방문/검색 only had visual connector lines and 로그인 had no screens at all.
 
 ### Known gaps (code has it, Figma doesn't yet)
 
@@ -161,15 +163,16 @@ via `@media (prefers-contrast: more)`.
 
 ## 5. Classification
 
-**Design System Draft** — Foundation, tokens (incl. High Contrast Mode), a
-repo-backed component inventory, basic/service patterns, accessibility
-grounding, dev mapping and versioning all exist, are verified directly in
-Figma (not just asserted, as of 2026-07-03), and are code-linked
+**Design System Draft** — Foundation (incl. an Icon set), tokens (incl. High
+Contrast Mode), a repo-backed component inventory, basic/service patterns
+(all 3 applicable service patterns now have real prototype connections),
+accessibility grounding, dev mapping and versioning all exist, are verified
+directly in Figma (not just asserted, as of 2026-07-03), and are code-linked
 (`Button.tsx`, `Spinner.tsx`, `Toast.tsx`, `--color-action-primary`,
 `prefers-contrast`). Still open: dark mode, several applicable components
-(Snackbar, Tab, Textarea, Text Resize, Icon set), the full CSS token layer
-(PR #406), adoption of code-only components into product UI, and a Login
-service-pattern prototype — so it is **not yet** a fully operable "Design
+(Snackbar, Tab, Textarea, Text Resize), the full CSS token layer (PR #406),
+and adoption of the newly-Figma'd components into product UI — so it is
+**not yet** a fully operable "Design
 System."
 
 ## 6. Follow-ups
@@ -180,15 +183,16 @@ System."
 3. Finish/adopt Pagination first/last/ellipsis states; add Snackbar only when a
    UI needs undo/retry action; define a dark-mode variable mode only if product
    scope requires it.
-4. Build a Login service-pattern prototype screen and connect it to the
-   existing Core Flow prototype.
-5. Model the ERD canvas keyboard-navigation flow as a Figma prototype.
-6. Define a Figma icon component set (KRDS style_06).
+4. Model the ERD canvas keyboard-navigation flow as a Figma prototype.
+5. Decide whether a code Icon component is worth building against the new
+   `PG ERD Icon` Figma set, or whether inline SVG remains fine for this
+   product's scope.
 
 ## 7. Version notes
 
 | Version | Date | Area | Change Type | Changed Item | Reason | Impact | Migration | Owner |
 |---|---|---|---|---|---|---|---|---|
+| v0.8 | 2026-07-03 | Foundation / Service Pattern | Added | `PG ERD Icon` set (5 icons) + size grid; `PG ERD Login Flow` (Loading/Error/Success); real `setReactionsAsync` prototype connections on all 3 applicable service patterns | Close the style_06 Icon gap and the missing Login-flow gap; upgrade 방문/검색 from visual-line-only connectors (not real prototype interactions) to real ones | KRDS Foundation/Service Pattern coverage now has no missing applicable items; remaining gaps are code-adoption, not Figma-object gaps | No code migration; Figma-only + docs | Design |
 | v0.7 | 2026-07-03 | Component / Docs | Added | 8 Figma Component Sets (Checkbox, Radio, Select, Tag, Pagination Item, Breadcrumb Item, Spinner, Toast) + brand color reconciliation | Close the Figma-side gap `krds-inventory.md` had flagged for these; direct Figma MCP access confirmed working this session | These components now have real, variant-bound Figma Component Sets, not just code; `color/action/primary`/`-hover` now match code brand | No code migration; Figma-only + docs | Design/Dev |
 | v0.6 | 2026-07-03 | Component / Docs | Fixed | Button token mapping and Figma verification notes | Remove duplicate inline token path; avoid unverifiable Figma claims | Button styling uses shared `.btn` CSS tokens; docs distinguish code-linked vs Figma-verified | No migration; keep using `Button` | Dev |
 | v0.5 | 2026-07-03 | Component / Mobile | Added | Toast dev component | Close KRDS Toast dev-mapping gap | Export copy feedback now has visual + screen-reader status | Use `Toast` for short action results without extra actions | Dev |
