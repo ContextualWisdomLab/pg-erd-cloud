@@ -110,8 +110,10 @@ export function EditTableModal({
               <div className="col" style={{ gap: 8 }}>
                 {editingNode.data.columns.map((col, idx) => {
                   const colIdent = col.column_name || `컬럼 ${idx + 1}`;
+                  // Use a stable key that won't remount the entire row if column name is edited
+                  const rowKey = col.column_name ? `${col.column_name}-${idx}` : `new-col-${idx}`;
                   return (
-                  <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
+                  <div key={rowKey} className="row" style={{ gap: 8, alignItems: "center" }}>
                     <input
                       type="text"
                       name={`col_name_${idx}`}
@@ -126,14 +128,14 @@ export function EditTableModal({
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
                       style={{ flex: 1.5 }}
-                      aria-label={`${colIdent} 타입`}
+                      aria-label={`${colIdent} 데이터 타입`}
                     />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
-                        aria-label={`${colIdent} PK`}
+                        aria-label={`${colIdent} Primary Key`}
                       />
                       PK
                     </label>
@@ -142,7 +144,7 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
-                        aria-label={`${colIdent} NN`}
+                        aria-label={`${colIdent} Not Null`}
                       />
                       NN
                     </label>
