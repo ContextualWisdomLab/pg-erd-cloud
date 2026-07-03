@@ -50,7 +50,7 @@ async def handle_snapshot_job(
             async with session.begin():
                 snapshot = await session.get(SchemaSnapshot, snapshot_id)
                 if snapshot is None:
-                    raise
+                    raise RuntimeError(error_message) from None
                 snapshot.status = "failed"
                 snapshot.error_message = error_message
                 snapshot.finished_at = dt.datetime.now(dt.timezone.utc)
