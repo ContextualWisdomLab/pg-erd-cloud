@@ -18,6 +18,9 @@
 ## 2024-06-21 - Optimize O(N^2) Map building
 **Learning:** Building Maps inside loops using `map.set(key, [...(map.get(key) || []), item])` leads to O(N^2) complexity and enormous intermediate garbage generation for large datasets.
 **Action:** Use an O(1) amortized append instead: pull the list with `.get(key)` and use `.push(item)`. Create the array only when inserting the first item.
+## 2024-06-22 - Avoid Call Stack Overflow with Math.min/max on Large Arrays
+**Learning:** Using `Math.min(...array.map())` or `Math.max(...array.map())` on large datasets creates multiple O(N) intermediate arrays and, more critically, spreads the entire array into function arguments. This can trigger a "Maximum call stack size exceeded" runtime error.
+**Action:** Replace `Math.min(...array)` and `Math.max(...array)` patterns with a single O(N) `reduce` pass (or simple `for` loop) to compute bounds safely and concurrently without call stack limitations or excessive memory allocation.
 
 ## 2024-05-18 - 인증 핫 패스에서 O(N) 백그라운드 정리 작업 회피
 **Learning:** `is_token_jti_revoked` 함수는 매 인증 요청마다 폐기된 토큰의 전체 캐시를 순회(`_prune_revoked_token_jtis`)하여 O(N) 복잡도를 가졌습니다. 이는 활성 토큰 폐기 건수가 많아질수록 응답 지연을 초래합니다.
@@ -53,3 +56,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-06-25 - Avoid O(N) Map.set inside Loops for Existing Arrays/Sets
 **Learning:** When building Maps containing arrays or Sets in a loop, continually calling `map.set(key, list)` even after `list` is retrieved from `map.get()` causes unnecessary hashing and re-balancing overhead.
 **Action:** Only call `map.set()` when the array or Set doesn't exist yet (during creation). If the collection already exists in the Map, mutate it directly (e.g. `list.push` or `set.add`) without re-setting it in the Map.
+
+## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
+**Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
+**Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.

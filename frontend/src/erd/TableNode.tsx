@@ -36,10 +36,12 @@ type TableNodeNode = Node<TableNodeData, "tableNode">;
 function AccessibleTruncatedText({
   className,
   text,
+  title,
   children,
 }: {
   className: string;
   text: string;
+  title?: string;
   children?: ReactNode;
 }) {
   const accessibleText = text.trim();
@@ -50,8 +52,8 @@ function AccessibleTruncatedText({
   return (
     <span
       className={className}
-      title={text}
-      aria-label={text}
+      title={title ?? accessibleText}
+      aria-label={accessibleText}
       tabIndex={0}
     >
       {children ?? text}
@@ -114,10 +116,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
           {data.badges?.pk ? (
-            <abbr className="tableNode__badge" title="Primary Key">PK</abbr>
+            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</abbr>
           ) : null}
           {data.badges?.fk ? (
-            <abbr className="tableNode__badge" title="Foreign Key">FK</abbr>
+            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</abbr>
           ) : null}
         </span>
       </div>
@@ -151,12 +153,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
               {c.is_pk ? (
-                <abbr className="tableNode__badge" title="Primary Key">
+                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
                   PK
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge" title="Not Null">
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
                   NOT NULL
                 </span>
               ) : null}
@@ -172,8 +174,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div
             className="tableNode__more"
-            title={`생략된 컬럼이 ${data.columns.length - MAX_RENDERED_COLUMNS}개 더 있습니다`}
-            aria-label={`생략된 컬럼이 ${data.columns.length - MAX_RENDERED_COLUMNS}개 더 있습니다`}
+            title="생략된 컬럼이 더 있습니다"
+            aria-label="생략된 컬럼이 더 있습니다"
             tabIndex={0}
           >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
@@ -189,7 +191,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                   <AccessibleTruncatedText
                     className="tableNode__indexName"
                     text={index.index_name}
-                  />
+                    title={`Access method: ${index.access_method}`}
+                  >
+                    {index.index_name}
+                  </AccessibleTruncatedText>
                   <AccessibleTruncatedText
                     className="tableNode__indexCols"
                     text={columnsText}
@@ -200,8 +205,8 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             {data.indexes.length > 4 ? (
               <div
                 className="tableNode__more"
-                title={`생략된 인덱스가 ${data.indexes.length - 4}개 더 있습니다`}
-                aria-label={`생략된 인덱스가 ${data.indexes.length - 4}개 더 있습니다`}
+                title="생략된 인덱스가 더 있습니다"
+                aria-label="생략된 인덱스가 더 있습니다"
                 tabIndex={0}
               >
                 … {data.indexes.length - 4} more indexes
