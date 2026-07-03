@@ -30,6 +30,23 @@ html, body {
   --color-text-disabled: #9ca3af;
 }
 
+/*
+ * High Contrast Mode (KRDS 선명한 화면 모드, style_09).
+ * Mirrors the "High Contrast" mode of the Figma "PG ERD Color" variable
+ * collection: when the user requests more contrast, strengthen the
+ * action / focus / error / disabled tokens so text, borders and focus
+ * indicators exceed the KRDS high-contrast ratio targets.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --color-action-primary: #003a7a;
+    --color-action-primary-hover: #001f40;
+    --color-border-focus: #002d5c;
+    --color-border-error: #8a0000;
+    --color-text-disabled: #595959;
+  }
+}
+
 #root {
   height: 100vh;
 }
