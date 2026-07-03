@@ -2,16 +2,21 @@
   "fileKey": "OTN0rBGtnVy0P7yq4Iv9Si",
   "url": "https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si/",
   "status": "resolved_verified_2026-07-03",
-  "note": "Figma MCP (use_figma / get_metadata / get_screenshot via the Figma plugin server) was confirmed working in this session and used to inspect and mutate the file directly. The file already contained a substantial pre-existing design system (20 pages, 4 variable collections with Light+High Contrast modes, 6 text styles, 2 effect styles, and Component Sets for Button, Toolbar Button, Input Field, Table Node, Status Pill, Share Export Modal) that prior GAP_REPORT entries had incorrectly described as never built. This session verified that state via get_metadata/get_screenshot (not just claimed it), then: added 8 confirmed-missing Component Sets (Checkbox, Radio, Select, Tag, Pagination Item, Breadcrumb Item, Spinner, Toast); reconciled color/action/primary and color/action/primary-hover Light-mode values to the code brand (#034ea2 / #023d80, previously aliased to an unrelated blue); built the first real instance-composed Basic Pattern board (입력폼/테이블 추가 — Default/Error/Success); added a PG ERD Icon component set (5 icons, token-bound stroke) with a size grid and icon+text alignment sample, closing the style_06 Foundation gap; built a real Login Flow (Loading/Error/Success) grounded in the App.tsx AuthGate code; and upgraded the existing Core Flow's visual-only connector lines to real setReactionsAsync prototype connections (ON_CLICK/AFTER_TIMEOUT -> NAVIGATE). All additions were verified with get_screenshot after creation, not just asserted. See docs/GAP_REPORT.md for what remains open (notably: PR #406 CSS token layer still unmerged, Snackbar/Tab/Textarea still missing, code adoption of the newly-Figma'd components still pending).",
+  "note": "Figma MCP (use_figma / get_metadata / get_screenshot via the Figma plugin server) was confirmed working in this session and used to inspect and mutate the file directly, across three build passes in one continuous session. The file already contained a substantial pre-existing design system (20 pages, 4 variable collections with Light+High Contrast modes, 6 text styles, 2 effect styles, and 6 Component Sets) that prior GAP_REPORT entries had incorrectly described as never built. Pass 1: added 8 Component Sets (Checkbox/Radio/Select/Tag/Pagination Item/Breadcrumb Item/Spinner/Toast), reconciled color/action/primary(-hover) to the code brand, built the first real instance-composed Basic Pattern board. Pass 2: added a PG ERD Icon set, a real Login Flow, and upgraded the Core Flow's visual-only connectors to real setReactionsAsync prototype connections. Pass 3: traversed real KRDS pages via WebFetch and confirmed the repo's scoping was accurate; added 8 more Component Sets including the two explicitly required by the completion criteria (generic Modal, Header) plus Footer/Tab/Snackbar/Text Area/Link/Tooltip; built 2 more real pattern boards (확인/목록 탐색); rebuilt the Accessibility Lab around 7 real UI objects instead of checklist text; added a KRDS Source Inventory table. Also found and fixed a real Figma Plugin API gotcha (shared TEXT property defaults across variants in one Component Set) that had silently produced wrong instance text in two of this session's own pattern boards before being caught. All additions verified with get_screenshot after creation. See docs/GAP_REPORT.md for what remains open.",
   "verifiedCounts": {
     "pages": 21,
     "variableCollections": 4,
     "variables": 57,
     "textStyles": 6,
     "effectStyles": 2,
-    "componentSetsAddedThisSession": 9,
+    "componentSetsTotal": 23,
+    "componentSetsAddedThisSession": 17,
     "componentSetsPreExisting": 6,
+    "totalVariantsAcrossAllSets": 97,
+    "totalComponentPropertyDefinitions": 48,
     "servicePatternScreensAddedThisSession": 3,
-    "realPrototypeReactionsAdded": 5
+    "realPrototypeReactionsAdded": 5,
+    "basicPatternBoardsAddedThisSession": 3,
+    "accessibilityLabRealObjectsAdded": 7
   }
 }
