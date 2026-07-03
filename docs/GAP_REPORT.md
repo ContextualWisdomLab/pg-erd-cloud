@@ -71,6 +71,18 @@
   post-hoc, contrary to the "add before combineAsVariants" guidance for
   per-variant properties) and demonstrated working via a live `Icon=true`
   instance referencing `PG ERD Icon/Check`.
+- **Pass 5 (same day, via `/loop`, user-updated spec added a Visual QA
+  requirement):** Added a dedicated `17. Visual QA` page (renumbered Dev
+  Handoff/Changelog/Gap Report to 18/19/20) with real evidence boards, not a
+  checklist: `Visual QA / Core Components` (4 rows, real instances, Pass),
+  `Visual QA / Component States` (5 rows, Focus/Error/Disabled across
+  Checkbox/Radio/Select/Input Field/Text Area), `Visual QA / Before & After
+  Fixes` (3 documented bugs with before/after text evidence). Running the QA
+  loop caught a **live recurrence** of the shared-TEXT-property-default bug
+  (logged as a gap in Pass 3) on the Input Field/Text Area state row — all 3
+  instances showed the Default variant's "Read-only" hint regardless of
+  their own state — and fixed it in place with `setProperties()` before
+  marking the row Pass, per the spec's "fix don't leave as Gap" rule.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
