@@ -7,7 +7,12 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:*;" />
   </head>
   <body>
-    <noscript>이 앱을 사용하려면 JavaScript를 활성화해주세요.</noscript>
+    <noscript>
+      <div style="font-family: sans-serif; padding: 2rem; text-align: center;">
+        <h1>JavaScript를 활성화해주세요</h1>
+        <p>이 앱을 정상적으로 사용하려면 브라우저 설정에서 JavaScript를 활성화해야 합니다.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
