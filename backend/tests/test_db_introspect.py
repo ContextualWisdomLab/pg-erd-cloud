@@ -15,6 +15,8 @@ from app import db_introspect
         ("POSTGRESQL://u:p@db/app", "postgresql"),
         ("snowflake://u:p@acct/DB", "snowflake"),
         ("SNOWFLAKE://u:p@acct/DB", "snowflake"),
+        ("snowflake+snowflake-connector-python://u:p@acct/DB", "snowflake"),
+        ("snowflake+async://u:p@acct/DB", "snowflake"),
     ],
 )
 def test_detect_dsn_dialect_valid(
@@ -27,6 +29,14 @@ def test_detect_dsn_dialect_valid(
     "dsn,expected_error",
     [
         ("mysql://u:p@db/app", "unsupported database DSN scheme: mysql"),
+        (
+            "snowflake_invalid://u:p@acct/DB",
+            "unsupported database DSN scheme: <empty>",
+        ),
+        (
+            "snowflake-connector-python://u:p@acct/DB",
+            "unsupported database DSN scheme: snowflake-connector-python",
+        ),
         ("http://google.com", "unsupported database DSN scheme: http"),
         ("", "unsupported database DSN scheme: <empty>"),
         ("just_a_string", "unsupported database DSN scheme: <empty>"),
@@ -64,3 +74,41 @@ async def test_introspect_database_dispatches_by_dialect(
         ("postgresql", "postgresql://u:p@db/app", "public"),
         ("snowflake", "snowflake://u:p@acct/APP/PUBLIC", None),
     ]
+
+
+@pytest.mark.asyncio
+async def test_introspect_database_redacts_password_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_postgres(dsn: str, schema_filter: str | None) -> dict:
+        raise RuntimeError(
+            "failed to connect to postgresql://user:supersecretpass@localhost/db"
+        )
+
+    monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await db_introspect.introspect_database(
+            "postgresql://user:supersecretpass@localhost/db", None
+        )
+
+    assert "supersecretpass" not in str(exc_info.value)
+    assert "postgresql://user:***@localhost/db" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_introspect_database_redacts_query_secret_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_postgres(dsn: str, schema_filter: str | None) -> dict:
+        raise RuntimeError("driver failed with password=q/secret")
+
+    monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await db_introspect.introspect_database(
+            "postgresql://user@localhost/db?password=q%2Fsecret", None
+        )
+
+    assert "q/secret" not in str(exc_info.value)
+    assert "password=***" in str(exc_info.value)
