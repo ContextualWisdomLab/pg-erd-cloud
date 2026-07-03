@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Edge } from "@xyflow/react";
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditEdgeModalProps {
   editingEdge: Edge | null;
@@ -18,6 +19,8 @@ export function EditEdgeModal({
   onRelCancel,
   onRelSubmit,
 }: EditEdgeModalProps) {
+  const dialogRef = useDialogAccessibility(Boolean(editingEdge), onRelCancel);
+
   if (!editingEdge) return null;
 
   return (
@@ -41,6 +44,8 @@ export function EditEdgeModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-rel-title"
+        ref={dialogRef}
+        tabIndex={-1}
         style={{
           background: "#fff",
           padding: 20,

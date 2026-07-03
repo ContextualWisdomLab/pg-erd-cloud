@@ -36,10 +36,12 @@ type TableNodeNode = Node<TableNodeData, "tableNode">;
 function AccessibleTruncatedText({
   className,
   text,
+  title,
   children,
 }: {
   className: string;
   text: string;
+  title?: string;
   children?: ReactNode;
 }) {
   const accessibleText = text.trim();
@@ -50,8 +52,8 @@ function AccessibleTruncatedText({
   return (
     <span
       className={className}
-      title={text}
-      aria-label={text}
+      title={title ?? accessibleText}
+      aria-label={accessibleText}
       tabIndex={0}
     >
       {children ?? text}
@@ -156,7 +158,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge" title="Not Null" aria-label="Not Null">
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
                   NOT NULL
                 </span>
               ) : null}
@@ -189,7 +191,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                   <AccessibleTruncatedText
                     className="tableNode__indexName"
                     text={index.index_name}
-                  />
+                    title={`Access method: ${index.access_method}`}
+                  >
+                    {index.index_name}
+                  </AccessibleTruncatedText>
                   <AccessibleTruncatedText
                     className="tableNode__indexCols"
                     text={columnsText}
