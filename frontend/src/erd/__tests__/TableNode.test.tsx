@@ -80,9 +80,9 @@ describe('TableNode', () => {
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
     expect(indexName).toHaveAttribute('tabindex', '0');
 
-    const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
-    expect(notNullBadge).toHaveAttribute('title', 'Not Null');
-    expect(notNullBadge).toHaveTextContent('NOT NULL');
+    const notNullBadges = screen.getAllByText('NOT NULL');
+    expect(notNullBadges[0]).toHaveAttribute('lang', 'en');
+    expect(notNullBadges[0]).toHaveAttribute('aria-label', 'Not Null');
   });
 
   it('uses a fallback accessible name for blank table titles', () => {
