@@ -1,7 +1,8 @@
 import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
-import type { TableNodeData } from './convert';
+import type { ForeignKeyEdgeData, TableNodeData } from './convert';
+import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
@@ -52,6 +53,41 @@ function sqlDataType(value: unknown): string {
   return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
 }
 
+function fkColumnsForEdge(
+  edge: Edge,
+  sourceNode: Node<TableNodeData>,
+  targetNode: Node<TableNodeData>,
+): { sourceColumns: string[]; targetColumns: string[] } | null {
+  const data = edge.data as ForeignKeyEdgeData | undefined;
+  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
+  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
+  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
+    return { sourceColumns, targetColumns };
+  }
+
+  const sourceHandleColumn = (sourceNode.data.columns || [])
+    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
+    ?.column_name;
+  const targetHandleColumn = (targetNode.data.columns || [])
+    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
+    ?.column_name;
+  if (sourceHandleColumn && targetHandleColumn) {
+    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+  }
+
+  const fallbackSource = (sourceNode.data.columns || [])
+    .filter((column) => !column.is_pk)
+    .map((column) => column.column_name);
+  const fallbackTarget = (targetNode.data.columns || [])
+    .filter((column) => column.is_pk)
+    .map((column) => column.column_name);
+  if (fallbackSource.length > 0 && fallbackSource.length === fallbackTarget.length) {
+    return { sourceColumns: fallbackSource, targetColumns: fallbackTarget };
+  }
+
+  return null;
+}
+
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
@@ -91,14 +127,20 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
+      const sourceColumns = fkColumns
+        ? fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* source columns */';
+      const targetColumns = fkColumns
+        ? fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* target columns */';
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
-      // For simplicity in UI without detailed column mapping we just put placeholder comments
-      ddl += `  FOREIGN KEY (/* source columns */)\n`;
-      ddl += `  REFERENCES ${targetTable} (/* target columns */);\n\n`;
+      ddl += `  FOREIGN KEY (${sourceColumns})\n`;
+      ddl += `  REFERENCES ${targetTable} (${targetColumns});\n\n`;
     }
   }
 
@@ -246,22 +288,25 @@ export function exportDiagramSvg(
   const padding = 40;
   const indexes = indexesByRelation(snapshot);
   const heights = new Map<string, number>();
-
   let minX = 0;
   let minY = 0;
   let maxX = width;
   let maxY = headerHeight;
 
+  // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     // ponytail: cap rendered index rows; add full index export when the canvas carries index nodes.
     const indexRows = Math.min((indexes.get(node.id)?.length || 0) + (node.data.indexes?.length || 0), 8);
     const height = headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0));
     heights.set(node.id, height);
-    if (node.position.x < minX) minX = node.position.x;
-    if (node.position.y < minY) minY = node.position.y;
-    if (node.position.x + width > maxX) maxX = node.position.x + width;
-    if (node.position.y + height > maxY) maxY = node.position.y + height;
+
+    const x = node.position.x;
+    const y = node.position.y;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x + width > maxX) maxX = x + width;
+    if (y + height > maxY) maxY = y + height;
   }
   const offsetX = padding - minX;
   const offsetY = padding - minY;

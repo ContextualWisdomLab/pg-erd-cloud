@@ -86,11 +86,7 @@ async def create_snapshot(
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
     if conn is None or conn.project_space_uuid != project_space_uuid:
-        return SnapshotOut(
-            schema_snapshot_uuid=uuid.uuid4(),
-            status="failed",
-            schema_filter=body.schema_filter,
-        )
+        raise HTTPException(status_code=404, detail="connection not found")
 
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),
@@ -186,7 +182,9 @@ async def export_snapshot_reversing_spec(
         try:
             return await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=503, detail="LLM configuration error"
+            ) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
@@ -215,7 +213,9 @@ async def export_snapshot_index_design(
         try:
             return await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=503, detail="LLM configuration error"
+            ) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
