@@ -182,18 +182,13 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
+      // ⚡ Bolt: Optimize search filter by concatenating strings in a loop rather than using
+      // flatMap/join, which creates excessive intermediate arrays and GC pressure on large graphs.
+      let haystack = node.data.title + " " + (node.data.comment ?? "");
+      for (const column of node.data.columns) {
+        haystack += " " + column.column_name + " " + column.data_type + " " + (column.column_comment ?? "");
+      }
+      if (haystack.toLocaleLowerCase().includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }
     }
