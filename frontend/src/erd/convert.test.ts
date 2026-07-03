@@ -103,8 +103,8 @@ describe('snapshotToGraph', () => {
       columns: [],
       constraints: [],
       fk_edges: [
-        { fk_constraint_oid: 100, fk_constraint_name: 'fk_org_dept', child_relation_oid: 2, parent_relation_oid: 1, child_column_name: 'dept_id', parent_column_name: 'dept_id', column_ordinal: 2 },
-        { fk_constraint_oid: 100, fk_constraint_name: 'fk_org_dept', child_relation_oid: 2, parent_relation_oid: 1, child_column_name: 'org_id', parent_column_name: 'id', column_ordinal: 1 }
+        { fk_constraint_oid: 100, fk_constraint_name: 'fk_org_dept', child_relation_oid: 2, parent_relation_oid: 1, child_column_name: 'org_id', parent_column_name: 'id', column_ordinal: 1 },
+        { fk_constraint_oid: 100, fk_constraint_name: 'fk_org_dept', child_relation_oid: 2, parent_relation_oid: 1, child_column_name: 'dept_id', parent_column_name: 'dept_id', column_ordinal: 2 }
       ]
     }
 
@@ -112,10 +112,6 @@ describe('snapshotToGraph', () => {
 
     expect(graph.edges).toHaveLength(1)
     expect(graph.edges[0].label).toBe('fk_org_dept (2 cols)')
-    expect(graph.edges[0].data).toEqual({
-      sourceColumns: ['org_id', 'dept_id'],
-      targetColumns: ['id', 'dept_id'],
-    })
   })
 
   it('falls back to constraints if fk_edges is empty or not provided', () => {

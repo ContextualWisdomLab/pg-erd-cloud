@@ -25,7 +25,6 @@ import {
 
 import {
   getMe,
-  createShareLink,
   createConnection,
   createProject,
   createSnapshot,
@@ -58,7 +57,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
-import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
+import type { Connection, Project, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -72,15 +71,6 @@ type CurrentUser = {
   subject: string;
   display_name: string | null;
 };
-
-type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor";
-
-const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
-  { id: "dashboard", label: "대시보드" },
-  { id: "projects", label: "프로젝트" },
-  { id: "diagrams", label: "다이어그램" },
-  { id: "editor", label: "편집기" },
-];
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -102,7 +92,7 @@ function strengthLabel(strength: CardinalityStrength): string {
 }
 
 export default function App() {
-  const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
+  const [devUser, setDevUser] = useState<string>("local");
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -113,7 +103,6 @@ export default function App() {
   );
 
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [connName, setConnName] = useState("target-db");
   const [isDsnPresent, setIsDsnPresent] = useState(false);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
@@ -137,7 +126,6 @@ export default function App() {
     Edge
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
-  const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -145,10 +133,6 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
-  const [shareLinkUrl, setShareLinkUrl] = useState("");
-  const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
-  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
-  const [shareLinkError, setShareLinkError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -222,17 +206,8 @@ export default function App() {
       if (copyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(copyFeedbackTimeoutRef.current);
       }
-      if (shareCopyFeedbackTimeoutRef.current !== null) {
-        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
-      }
     };
   }, []);
-
-  useEffect(() => {
-    setShareLinkUrl("");
-    setIsShareLinkCopied(false);
-    setShareLinkError(null);
-  }, [selectedProjectId]);
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -249,6 +224,12 @@ export default function App() {
     },
     [setEdges],
   );
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+      window.localStorage.setItem("devUser", devUser.trim() || "local");
+    }
+  }, [devUser]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -277,35 +258,16 @@ export default function App() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [devUser]);
 
   useEffect(() => {
-    if (!selectedProjectId) {
-      setConnections([]);
-      setSelectedConnId(null);
-      setSnapshots([]);
-      return;
-    }
-    let isCurrent = true;
+    if (!selectedProjectId) return;
     listConnections(selectedProjectId)
       .then((c) => {
-        if (!isCurrent) return;
         setConnections(c);
         if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
-      .catch((e) => {
-        if (isCurrent) setError(String(e));
-      });
-    listSnapshots(selectedProjectId)
-      .then((items) => {
-        if (isCurrent) setSnapshots(items);
-      })
-      .catch((e) => {
-        if (isCurrent) setError(String(e));
-      });
-    return () => {
-      isCurrent = false;
-    };
+      .catch((e) => setError(String(e)));
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -316,17 +278,12 @@ export default function App() {
           setSnapshot(s);
           if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
             clearInterval(timer);
-            if (selectedProjectId) {
-              listSnapshots(selectedProjectId)
-                .then(setSnapshots)
-                .catch((e) => setError(String(e)));
-            }
           }
         })
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
-  }, [selectedProjectId, snapshotId]);
+  }, [snapshotId]);
 
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
@@ -352,18 +309,8 @@ export default function App() {
     [cardinalityRowCount],
   );
   const businessGroupsById = useMemo(() => {
-    // ⚡ Bolt: Removed array mapping before Map creation to avoid intermediate array allocations.
-    const map = new Map<string, BusinessGroup>();
-    for (const group of businessGroups) {
-      map.set(group.id, group);
-    }
-    return map;
+    return new Map(businessGroups.map((group) => [group.id, group]));
   }, [businessGroups]);
-  const selectedProject = projects.find(
-    (project) => project.project_space_uuid === selectedProjectId,
-  );
-  const recentProjects = projects.slice(0, 4);
-  const recentSnapshots = snapshots.slice(0, 5);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
   // Using nodes.find() for single lookups is O(N) but avoids Map construction overhead, providing ~10x speedup and reducing GC pressure.
@@ -421,11 +368,7 @@ export default function App() {
     setEdges(graph.edges);
 
     setNodes((prev) => {
-      // ⚡ Bolt: Replaced prev.map with a for loop to avoid intermediate array allocations during Map creation.
-      const prevPos = new Map<string, { x: number; y: number }>();
-      for (const n of prev) {
-        prevPos.set(n.id, n.position);
-      }
+      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
       return graph.nodes.map((n) => {
         const position = prevPos.get(n.id);
         return position ? { ...n, position } : n;
@@ -532,8 +475,8 @@ export default function App() {
   }
 
   function onOpenExport() {
-    setExportDdlText(nodes.length > 0 ? exportDDL(nodes, edges) : "");
-    setShareLinkError(null);
+    const ddl = exportDDL(nodes, edges);
+    setExportDdlText(ddl);
     setIsExportModalOpen(true);
   }
 
@@ -544,12 +487,6 @@ export default function App() {
       window.clearTimeout(copyFeedbackTimeoutRef.current);
       copyFeedbackTimeoutRef.current = null;
     }
-    if (shareCopyFeedbackTimeoutRef.current !== null) {
-      window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
-      shareCopyFeedbackTimeoutRef.current = null;
-    }
-    setIsShareLinkCopied(false);
-    setShareLinkError(null);
   }
 
   const onCopyExportDdl = useCallback(() => {
@@ -565,44 +502,6 @@ export default function App() {
       copyFeedbackTimeoutRef.current = null;
     }, 2000);
   }, [exportDdlText]);
-
-  const onCreateShareLink = useCallback(async () => {
-    if (!selectedProjectId || isCreatingShareLink) return;
-
-    setIsCreatingShareLink(true);
-    setShareLinkError(null);
-    setIsShareLinkCopied(false);
-
-    try {
-      const link = await createShareLink(selectedProjectId);
-      setShareLinkUrl(link.url);
-    } catch (error) {
-      setShareLinkError(String(error));
-    } finally {
-      setIsCreatingShareLink(false);
-    }
-  }, [isCreatingShareLink, selectedProjectId]);
-
-  const onCopyShareLink = useCallback(async () => {
-    if (!shareLinkUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareLinkUrl);
-      setShareLinkError(null);
-      setIsShareLinkCopied(true);
-
-      if (shareCopyFeedbackTimeoutRef.current !== null) {
-        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
-      }
-
-      shareCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
-        setIsShareLinkCopied(false);
-        shareCopyFeedbackTimeoutRef.current = null;
-      }, 2000);
-    } catch {
-      setIsShareLinkCopied(false);
-      setShareLinkError("공유 링크 복사에 실패했습니다.");
-    }
-  }, [shareLinkUrl]);
 
   function onDownloadSvg() {
     downloadText(
@@ -979,6 +878,13 @@ export default function App() {
       <main id="main" className="authGate">
         <h1>Authentication required</h1>
         <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+        <label htmlFor="dev-user-auth">User (dev)</label>
+        <input
+          id="dev-user-auth"
+          value={devUser}
+          onChange={(e) => setDevUser(e.target.value)}
+          placeholder="local"
+        />
       </main>
     );
   }
@@ -989,27 +895,20 @@ export default function App() {
         본문 바로가기
       </a>
       <aside className="sidebar">
-        <div className="brandLockup">
-          <span className="brandLockup__mark" aria-hidden="true" />
-          <h2>Cloud ERD</h2>
+        <h2>pg-erd-cloud</h2>
+
+        <div className="field">
+          <label htmlFor="dev-user">User (dev)</label>
+          <input
+            id="dev-user"
+            value={devUser}
+            onChange={(e) => setDevUser(e.target.value)}
+            placeholder="local"
+          />
+          <div style={{ fontSize: 12, color: "#4b5563" }}>
+            Subject: <code>{me?.subject || "—"}</code>
+          </div>
         </div>
-
-        <nav className="workspaceNav" aria-label="주요 화면">
-          {workspaceNavItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={activeView === item.id ? "workspaceNav__item workspaceNav__item--active" : "workspaceNav__item"}
-              onClick={() => setActiveView(item.id)}
-              aria-current={activeView === item.id ? "page" : undefined}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        {activeView === "editor" ? (
-          <>
 
         <div className="field">
           <label htmlFor="project-select">Project</label>
@@ -1162,173 +1061,10 @@ export default function App() {
             {error}
           </div>
         ) : null}
-          </>
-        ) : (
-          <div className="sidebarSummary" aria-label="작업공간 상태">
-            <div>
-              <span>현재 사용자</span>
-              <strong>{me?.display_name || me?.subject || "인증 필요"}</strong>
-            </div>
-            <div>
-              <span>선택 프로젝트</span>
-              <strong>{selectedProject?.project_name || "선택 안 됨"}</strong>
-            </div>
-            <button type="button" onClick={() => setActiveView("editor")}>
-              편집기로 이동
-            </button>
-          </div>
-        )}
       </aside>
 
       <main id="main" className="main" tabIndex={-1}>
-        {activeView === "dashboard" ? (
-          <section className="workspaceScreen" aria-labelledby="dashboard-title">
-            <div className="workspaceHeader">
-              <div>
-                <h1 id="dashboard-title">대시보드</h1>
-                <p>최근 프로젝트와 다이어그램을 빠르게 확인합니다.</p>
-              </div>
-              <button type="button" onClick={() => setActiveView("editor")}>
-                새 모델링
-              </button>
-            </div>
-
-            <div className="metricGrid" aria-label="작업 요약">
-              <div className="metricCard">
-                <span>프로젝트</span>
-                <strong>{projects.length}</strong>
-              </div>
-              <div className="metricCard">
-                <span>연결</span>
-                <strong>{connections.length}</strong>
-              </div>
-              <div className="metricCard">
-                <span>다이어그램</span>
-                <strong>{snapshots.length}</strong>
-              </div>
-            </div>
-
-            <section className="workspaceSection" aria-labelledby="recent-projects-title">
-              <div className="sectionHeader">
-                <h2 id="recent-projects-title">최근 프로젝트</h2>
-                <button type="button" onClick={() => setActiveView("projects")}>
-                  전체 보기
-                </button>
-              </div>
-              {recentProjects.length ? (
-                <div className="projectCards">
-                  {recentProjects.map((project) => (
-                    <button
-                      key={project.project_space_uuid}
-                      type="button"
-                      className="projectCard"
-                      onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
-                        setActiveView("diagrams");
-                      }}
-                    >
-                      <span className="projectCard__icon" aria-hidden="true" />
-                      <strong>{project.project_name}</strong>
-                      <span>다이어그램 보기</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="panelEmpty">아직 프로젝트가 없습니다. 편집기에서 프로젝트를 생성하세요.</div>
-              )}
-            </section>
-
-            <section className="workspaceSection" aria-labelledby="recent-diagrams-title">
-              <div className="sectionHeader">
-                <h2 id="recent-diagrams-title">최근 다이어그램</h2>
-                <button type="button" onClick={() => setActiveView("diagrams")}>
-                  목록 보기
-                </button>
-              </div>
-              <DiagramTable
-                snapshots={recentSnapshots}
-                selectedProjectName={selectedProject?.project_name}
-                onOpenEditor={(id) => {
-                  setSnapshotId(id);
-                  setSnapshot(null);
-                  setActiveView("editor");
-                }}
-              />
-            </section>
-          </section>
-        ) : activeView === "projects" ? (
-          <section className="workspaceScreen" aria-labelledby="projects-title">
-            <div className="workspaceHeader">
-              <div>
-                <h1 id="projects-title">프로젝트</h1>
-                <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
-              </div>
-              <div className="inlineCreate">
-                <input
-                  aria-label="새 프로젝트 이름"
-                  value={projectName}
-                  onChange={(event) => setProjectName(event.currentTarget.value)}
-                />
-                <button
-                  type="button"
-                  onClick={onCreateProject}
-                  disabled={!projectName.trim() || isCreatingProject}
-                >
-                  {isCreatingProject ? "생성 중" : "새 프로젝트"}
-                </button>
-              </div>
-            </div>
-            <div className="dataTable" role="table" aria-label="프로젝트 목록">
-              <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
-                <span role="columnheader">이름</span>
-                <span role="columnheader">연결</span>
-                <span role="columnheader">동작</span>
-              </div>
-              {projects.map((project) => (
-                <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
-                  <strong role="cell">{project.project_name}</strong>
-                  <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
-                  <span role="cell">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
-                        setActiveView("diagrams");
-                      }}
-                    >
-                      열기
-                    </button>
-                  </span>
-                </div>
-              ))}
-              {!projects.length ? (
-                <div className="panelEmpty">프로젝트가 없습니다. 이름을 입력해 새 프로젝트를 만드세요.</div>
-              ) : null}
-            </div>
-          </section>
-        ) : activeView === "diagrams" ? (
-          <section className="workspaceScreen" aria-labelledby="diagrams-title">
-            <div className="workspaceHeader">
-              <div>
-                <h1 id="diagrams-title">다이어그램</h1>
-                <p>{selectedProject ? `${selectedProject.project_name} 프로젝트의 스냅샷` : "프로젝트를 선택하세요."}</p>
-              </div>
-              <button type="button" onClick={() => setActiveView("editor")}>
-                편집기 열기
-              </button>
-            </div>
-            <DiagramTable
-              snapshots={snapshots}
-              selectedProjectName={selectedProject?.project_name}
-              onOpenEditor={(id) => {
-                setSnapshotId(id);
-                setSnapshot(null);
-                setActiveView("editor");
-              }}
-            />
-          </section>
-        ) : (
-          <div className="canvas">
+        <div className="canvas">
           <div
             className="canvasToolbar"
             role="toolbar"
@@ -1354,7 +1090,7 @@ export default function App() {
                 nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
               }
             >
-              {isLayouting ? "…" : "↔"}
+              {isLayouting ? "정렬 중…" : "정렬"}
             </button>
             <button
               type="button"
@@ -1365,7 +1101,7 @@ export default function App() {
               }
               aria-label="정렬 되돌리기"
             >
-              ↶
+              되돌리기
             </button>
             <button
               type="button"
@@ -1373,7 +1109,7 @@ export default function App() {
               title="테이블 추가"
               aria-label="테이블 추가"
             >
-              +
+              테이블 추가
             </button>
             <button
               type="button"
@@ -1384,7 +1120,7 @@ export default function App() {
               }
               aria-label="업무 그룹"
             >
-              ◇
+              그룹
             </button>
             <button
               type="button"
@@ -1397,7 +1133,7 @@ export default function App() {
               }
               aria-label="인덱스 카디널리티 계산"
             >
-              #
+              카디널리티
             </button>
             <button
               type="button"
@@ -1408,20 +1144,7 @@ export default function App() {
               }
               aria-label="DDL 내보내기"
             >
-              SQL
-            </button>
-            <button
-              type="button"
-              onClick={onOpenExport}
-              disabled={!selectedProjectId}
-              title={
-                !selectedProjectId
-                  ? "공유할 프로젝트를 먼저 선택하세요"
-                  : "공유 및 내보내기"
-              }
-              aria-label="공유 및 내보내기"
-            >
-              ↗
+              DDL
             </button>
             <button
               type="button"
@@ -1432,7 +1155,7 @@ export default function App() {
               }
               aria-label="SVG 그림 내보내기"
             >
-              IMG
+              SVG
             </button>
             <button
               type="button"
@@ -1456,7 +1179,7 @@ export default function App() {
               }
               aria-label="Mermaid 내보내기"
             >
-              {"{}"}
+              Mermaid
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
@@ -1500,14 +1223,14 @@ export default function App() {
                   <div className="emptyState__mark" aria-hidden="true" />
                   <div className="emptyState__title">ERD 캔버스가 비어 있습니다</div>
                   <div className="emptyState__desc">
-                    작업 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
+                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
                   </div>
                   <button
                     type="button"
                     title="테이블 추가"
                     aria-label="테이블 추가"
                     onClick={onOpenAddTable}
-                    style={{ marginTop: 16 }}
+                    style={{ marginTop: 16, pointerEvents: "auto" }}
                   >
                     + 테이블 추가
                   </button>
@@ -1520,16 +1243,8 @@ export default function App() {
             isOpen={isExportModalOpen}
             exportDdlText={exportDdlText}
             isCopied={isCopied}
-            hasDdlExport={nodes.length > 0}
-            shareLinkUrl={shareLinkUrl}
-            isCreatingShareLink={isCreatingShareLink}
-            isShareLinkCopied={isShareLinkCopied}
-            shareLinkError={shareLinkError}
-            canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
-            onCreateShareLink={onCreateShareLink}
-            onCopyShareLink={onCopyShareLink}
           />
 
           <EditEdgeModal
@@ -1595,58 +1310,7 @@ export default function App() {
             onAddTableSubmit={onAddTableSubmit}
           />
         </div>
-        )}
       </main>
-    </div>
-  );
-}
-
-function DiagramTable({
-  snapshots,
-  selectedProjectName,
-  onOpenEditor,
-}: {
-  snapshots: Snapshot[];
-  selectedProjectName?: string;
-  onOpenEditor: (snapshotId: string) => void;
-}) {
-  if (!snapshots.length) {
-    return (
-      <div className="panelEmpty">
-        아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.
-      </div>
-    );
-  }
-
-  return (
-    <div className="dataTable" role="table" aria-label="다이어그램 목록">
-      <div className="dataTable__row dataTable__row--head" role="row">
-        <span role="columnheader">이름</span>
-        <span role="columnheader">프로젝트</span>
-        <span role="columnheader">상태</span>
-        <span role="columnheader">동작</span>
-      </div>
-      {snapshots.map((item, index) => (
-        <div className="dataTable__row" role="row" key={item.schema_snapshot_uuid}>
-          <strong role="cell">
-            ERD_{item.schema_filter || "all"}_{index + 1}
-          </strong>
-          <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
-          <span role="cell">
-            <span className={`statusPill statusPill--${item.status}`}>
-              {item.status}
-            </span>
-          </span>
-          <span role="cell">
-            <button
-              type="button"
-              onClick={() => onOpenEditor(item.schema_snapshot_uuid)}
-            >
-              열기
-            </button>
-          </span>
-        </div>
-      ))}
     </div>
   );
 }

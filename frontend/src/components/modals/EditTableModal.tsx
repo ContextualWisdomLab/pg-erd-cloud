@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditTableModalProps {
   isOpen: boolean;
@@ -22,13 +21,11 @@ export function EditTableModal({
   onEditTableSubmit,
   onDeleteTable,
 }: EditTableModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), onEditTableCancel);
-
   if (!isOpen || !editingNode) return null;
 
   return (
     <div className="modalOverlay">
-      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
+      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title">
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
           <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>

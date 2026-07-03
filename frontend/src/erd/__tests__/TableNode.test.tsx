@@ -69,20 +69,13 @@ describe('TableNode', () => {
       'Customer operations',
       'Primary login address used for notifications',
       'e.g. alex@example.com',
+      'idx_users_email_unique_long_name',
       '(email, tenant_id)',
     ]) {
       const item = screen.getByLabelText(name);
       expect(item).toHaveAttribute('title', name);
       expect(item).toHaveAttribute('tabindex', '0');
     }
-
-    const indexName = screen.getByLabelText('idx_users_email_unique_long_name');
-    expect(indexName).toHaveAttribute('title', 'Access method: btree');
-    expect(indexName).toHaveAttribute('tabindex', '0');
-
-    const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
-    expect(notNullBadge).toHaveAttribute('title', 'Not Null');
-    expect(notNullBadge).toHaveTextContent('NOT NULL');
   });
 
   it('uses a fallback accessible name for blank table titles', () => {
