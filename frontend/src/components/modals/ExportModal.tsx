@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDialogAccessibility } from './useDialogAccessibility';
+import { Toast } from '../Toast';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -33,6 +34,11 @@ export function ExportModal({
   onCopyShareLink,
 }: ExportModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseExport);
+  const toastMessage = isShareLinkCopied
+    ? '공유 링크를 복사했습니다.'
+    : isCopied
+      ? 'DDL을 복사했습니다.'
+      : null;
 
   if (!isOpen) return null;
 
@@ -127,6 +133,7 @@ export function ExportModal({
             </span>
           )}
         </section>
+        {toastMessage ? <Toast message={toastMessage} tone="success" /> : null}
       </div>
     </div>
   );

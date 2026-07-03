@@ -27,6 +27,11 @@ describe('App edit functionality', () => {
         expect(screen.getByText('pg-erd-cloud')).toBeInTheDocument();
     });
 
+    it('shows an accessible spinner while authentication is loading', () => {
+        render(<App />);
+        expect(screen.getByRole('status', { name: '로딩 중' })).toHaveClass('spinner');
+    });
+
     it('renders compact visual labels while preserving toolbar accessible names', async () => {
         const user = userEvent.setup();
         render(<App />);

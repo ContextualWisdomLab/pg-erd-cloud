@@ -1,0 +1,28 @@
+/* KRDS Design System Tokens */
+:root {
+  /* Colors */
+  --krds-primary-color: #0052cc;
+  --krds-secondary-color: #f4f5f7;
+  --krds-text-color: #172b4d;
+  --krds-danger-color: #de350b;
+  --krds-success-color: #00875a;
+  
+  /* Typography */
+  --krds-font-family: "Pretendard", "Noto Sans KR", sans-serif;
+  --krds-font-size-base: 16px;
+  --krds-font-size-sm: 14px;
+  --krds-font-size-lg: 18px;
+  --krds-font-size-xl: 24px;
+  
+  /* Spacing */
+  --krds-spacing-xs: 4px;
+  --krds-spacing-sm: 8px;
+  --krds-spacing-md: 16px;
+  --krds-spacing-lg: 24px;
+  --krds-spacing-xl: 32px;
+  
+  /* Radii */
+  --krds-border-radius-sm: 4px;
+  --krds-border-radius-md: 8px;
+  --krds-border-radius-lg: 12px;
+}

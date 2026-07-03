@@ -1,3 +1,5 @@
+@import './design-system/tokens.css';
+
 html, body {
   margin: 0;
   height: 100%;
@@ -17,7 +19,7 @@ html, body {
  * this file, so introducing the tokens does not change rendered output.
  * NOTE (Gap): the Figma `color/action/primary` variable is currently
  * #2563eb and should be reconciled to the KRDS-aligned code value
- * #034ea2 (tracked on the Figma "07. Dev Handoff" page).
+ * #034ea2 (tracked on the Figma "17. Dev Handoff" page).
  * A broader token layer covering all brand/surface/spacing colors is
  * proposed separately in PR #406 (codex/css-token-layer) and is not
  * duplicated here to avoid conflicting with that in-flight change.
@@ -28,6 +30,9 @@ html, body {
   --color-border-focus: #034ea2;
   --color-border-error: #b91c1c;
   --color-text-disabled: #9ca3af;
+  --toast-background: #0f172a;
+  --toast-text: #fff;
+  --toast-success-background: #14532d;
 }
 
 /*
@@ -44,6 +49,8 @@ html, body {
     --color-border-focus: #002d5c;
     --color-border-error: #8a0000;
     --color-text-disabled: #595959;
+    --toast-background: #000;
+    --toast-success-background: #003d1f;
   }
 }
 
@@ -481,6 +488,53 @@ button:disabled {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-grid;
+  place-items: center;
+}
+
+.spinner__mark {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #d1d5db;
+  border-top-color: var(--color-action-primary);
+  border-radius: 50%;
+  animation: emptyStateSpin 900ms linear infinite;
+}
+
+.spinner--sm .spinner__mark {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 200;
+  transform: translateX(-50%);
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--toast-background);
+  color: var(--toast-text);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.toast--success {
+  background: var(--toast-success-background);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner__mark,
+  .emptyState__mark--busy {
+    animation: none;
+  }
 }
 
 .tableNode {

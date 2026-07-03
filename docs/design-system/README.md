@@ -39,7 +39,7 @@ by KRDS category, plus a dedicated Gap Report):
 | `15. Service Patterns` | KRDS 5 service patterns inventory + ERD core flow prototype |
 | `16. Accessibility` | Grounded in shipped a11y work (skip-link, focus-visible, `<abbr>`, noscript) |
 | `17. Dev Handoff` | Figma↔code component mapping + token gap analysis |
-| `18. Version & Changelog` | Changelog (v0.1–v0.3), deprecation policy, classification |
+| `18. Version & Changelog` | Changelog (v0.1–v0.5), deprecation policy, classification |
 | `19. Gap Report` | KRDS Area / Reference / Issue / Severity / Action / Owner / Due |
 | `99. Archive / Deprecated` | Superseded/legacy exploration frames |
 
@@ -93,12 +93,13 @@ output:
 
 **This intentionally does not replace or duplicate PR #406
 (`codex/css-token-layer`)**, which proposes a much larger, complete
-primitive+semantic token layer (~968 lines). That PR is open, `MERGEABLE`,
-but blocked on an automated review bot ("OpenCode") that failed due to model
-pool exhaustion — not a real content objection (a human/Copilot review found
-no issues). Recommendation: re-run/dismiss the stale automated review and
-merge #406, then reconcile its token names against the Figma `02. Tokens`
-page naming convention.
+primitive+semantic token layer (~968 lines). As of 2026-07-03, that PR is open
+but `BLOCKED` with `CHANGES_REQUESTED` from the automated OpenCode review body
+because the model pool was exhausted; the GitHub checks, including
+`opencode-review`, are green. Recommendation: re-run/dismiss that automated
+review blocker or address any newly surfaced source-backed findings, then merge
+#406 and reconcile its token names against the Figma `02. Tokens` page naming
+convention.
 
 ## 3. Components — Figma ↔ code mapping
 
@@ -110,13 +111,17 @@ page naming convention.
 | PG ERD Status Pill (05. Layout & Expression) | existing, documented | inline status/badge usages in table/edge UI |
 | PG ERD Toolbar Button (06. Action) | existing, documented | toolbar buttons in `frontend/src/App.tsx` |
 | PG ERD Share Export Modal (05. Layout & Expression) | existing, documented | `frontend/src/components/modals/ExportModal.tsx`, `useDialogAccessibility.ts` |
+| PG ERD Spinner (08. Feedback) | Indeterminate + small/medium sizes | **`frontend/src/components/Spinner.tsx`** — adopted in auth loading |
+| PG ERD Toast (13. Mobile) | Info/Success, no action | **`frontend/src/components/Toast.tsx`** — adopted in export copy feedback |
 
 ### Known gaps (Figma has it, code doesn't)
 
 - Dark mode: Figma `PG ERD Color` collection defines `Light` + `High Contrast`
   modes, but no dark mode.
-- Spinner / Toast / Pagination components are inventoried as Gaps (see
-  [`krds-inventory.md`](./krds-inventory.md) §4).
+- Snackbar / Pagination components are inventoried as Gaps (see
+  [`krds-inventory.md`](./krds-inventory.md) §4). Spinner and Toast are
+  code-linked, but their Figma component sets still need direct verification
+  when Figma MCP is available.
 
 ### Known gaps (code has it, Figma doesn't yet)
 
@@ -129,24 +134,34 @@ page naming convention.
 Grounded in real shipped work referenced on the `16. Accessibility` Figma
 page: skip-link (`styles.css` `.skip-link`), global `:focus-visible` outline
 (now token-driven via `--color-border-focus`), `noscript` fallback,
-`role="alert"`/`aria-live` regions, and accessibility PRs #417, #418, #309, #383.
-High Contrast Mode is now supported via `@media (prefers-contrast: more)`.
+`role="alert"`/`aria-live` regions, accessible `Spinner`, `Toast`, and
+accessibility PRs #417, #418, #309, #383. High Contrast Mode is now supported
+via `@media (prefers-contrast: more)`.
 
 ## 5. Classification
 
 **Design System Draft** — Foundation, tokens (incl. High Contrast Mode), a real
 component library (6 sets), basic/service patterns, accessibility grounding, dev
 mapping and versioning all exist and are now code-linked (`Button.tsx`,
-`--color-action-primary`, `prefers-contrast`). But dark mode, several applicable
-components (Spinner, Toast, Pagination), and the full CSS token layer (PR #406)
-remain open, so it is **not yet** a fully operable "Design System."
+`Spinner.tsx`, `Toast.tsx`, `--color-action-primary`, `prefers-contrast`). But
+dark mode, several applicable components (Snackbar, Pagination), the full CSS
+token layer (PR #406), and direct Figma verification for the Spinner/Toast
+component sets remain open, so it is **not yet** a fully operable "Design
+System."
 
 ## 6. Follow-ups
 
-1. Merge/re-review PR #406 (`codex/css-token-layer`) — currently blocked by
-   a stale automated review, not a real content issue.
+1. Merge/re-review PR #406 (`codex/css-token-layer`) — currently open but
+   blocked by automated review `CHANGES_REQUESTED` from model-pool exhaustion.
 2. Extend `Button.tsx` adoption to remaining ad-hoc `<button>` call sites.
-3. Add Spinner (`aria-busy`/`role=status`), Toast (reusing `aria-live`), and
-   Pagination components; define a dark-mode variable mode.
-4. Model the ERD canvas keyboard-navigation flow as a Figma prototype.
-5. Reconcile Figma `color/action/primary` (`#2563eb`) to the code brand `#034ea2`.
+3. Add Snackbar and Pagination components; define a dark-mode variable mode.
+4. Verify/create the Figma Spinner and Toast component sets once Figma MCP is available.
+5. Model the ERD canvas keyboard-navigation flow as a Figma prototype.
+6. Reconcile Figma `color/action/primary` (`#2563eb`) to the code brand `#034ea2`.
+
+## 7. Version notes
+
+| Version | Date | Area | Change Type | Changed Item | Reason | Impact | Migration | Owner |
+|---|---|---|---|---|---|---|---|---|
+| v0.5 | 2026-07-03 | Component / Mobile | Added | Toast dev component | Close KRDS Toast dev-mapping gap | Export copy feedback now has visual + screen-reader status | Use `Toast` for short action results without extra actions | Dev |
+| v0.4 | 2026-07-03 | Component / Feedback | Added | Spinner dev component | Close KRDS Spinner dev-mapping gap | Auth loading now has visual + screen-reader status | Use `Spinner` for indeterminate waits | Dev |

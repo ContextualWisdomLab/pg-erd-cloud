@@ -40,13 +40,13 @@ Report. See [`README.md`](./README.md) for the overall summary.
 
 | Area | KRDS ref | Product state | Status |
 |---|---|---|---|
-| Color | style_02 | `PG ERD Primitives` (23) + `PG ERD Color` (19 semantic, Light mode) Figma vars; brand `#034ea2` now tokenized as `--color-action-primary` | Review |
+| Color | style_02 | `PG ERD Primitives` (23) + `PG ERD Color` (22 semantic, Light + High Contrast modes) Figma vars; brand `#034ea2` now tokenized as `--color-action-primary` | Review |
 | Typography | style_03 | 6 Figma text styles (Heading/Body/Caption/Mono); system-ui font stack in code (not Pretendard GOV) | Review |
 | Shape/Radius | style_04 | `PG ERD Radius` (4 steps) | Review |
 | Layout | style_05 | Fixed sidebar + main; `@media` narrow breakpoint; not a formal 12-col grid | Review |
 | Icon | style_06 | No dedicated icon component set; inline SVG/text labels | Gap |
 | Elevation | style_08 | `Shadow/Modal`, `Focus/Ring` effect styles | Review |
-| High Contrast Mode | style_09 | **No** high-contrast variable mode (Light only) in Figma or code | Gap |
+| High Contrast Mode | style_09 | Figma `High Contrast` variable mode exists and code mirrors it with `@media (prefers-contrast: more)` | Review |
 
 ## 3. Token inventory (3-tier)
 
@@ -57,8 +57,9 @@ Report. See [`README.md`](./README.md) for the overall summary.
 | Component | `button.*`, `input.*` | `.btn--*` classes in `styles.css`; Figma component docs | Review |
 
 Key gap: the full `:root` CSS token layer is proposed in **PR #406**
-(`codex/css-token-layer`, blocked by a stale automated review). This repo adds
-only a minimal, non-duplicative subset to avoid conflict.
+(`codex/css-token-layer`, open but blocked as of 2026-07-03 by automated review
+`CHANGES_REQUESTED` from model-pool exhaustion). This repo adds only a minimal,
+non-duplicative subset to avoid conflict.
 
 ## 4. Component inventory (KRDS full traversal)
 
@@ -119,7 +120,7 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 | Component | Variant | State | A11y | Dev Mapping | Status |
 |---|---|---|---|---|---|
 | 단계 표시기 (Step indicator) | – | – | – | – | N/A (no multi-step flow) |
-| 스피너 (Spinner) | – | – | – | – | Gap (no loading indicator component) |
+| 스피너 (Spinner) | Small/Medium | Loading | `role="status"` + reduced motion | `components/Spinner.tsx`, auth loading | Review |
 
 ### Help (09)
 | Component | Variant | State | A11y | Dev Mapping | Status |
@@ -158,12 +159,12 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 | 뒤로가기 버튼 (Back button) | – | – | partial | `App.tsx` view-switch buttons | Review |
 | 바텀시트 (Bottom sheet) | – | – | – | – | N/A (desktop-first) |
 | 수량 토글 (Quantity toggle) | – | – | – | – | N/A |
-| 토스트 (Toast) | – | – | `aria-live` regions exist | no visual toast | Gap |
+| 토스트 (Toast) | Info/Success | Visible | `role="status"` / `aria-live` | `components/Toast.tsx`, `ExportModal` copy feedback | Review |
 | 스낵바 (Snackbar) | – | – | – | – | Gap |
 | 탭바 (Tab bar) | – | – | – | – | N/A |
 | 스플래시 스크린 (Splash screen) | – | – | – | – | N/A |
 
-**Summary:** Ready 6 · Review 15 · Gap 8 · N/A 26 (of 55 KRDS items traversed).
+**Summary:** Ready 7 · Review 17 · Gap 6 · N/A 25 (of 55 KRDS items traversed).
 
 ## 5. Basic pattern inventory (KRDS 12 + mobile)
 
@@ -203,8 +204,11 @@ Format: Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components
 - [x] Modal focus trap + Esc + focus restore (`useDialogAccessibility`)
 - [x] Icon/abbr `aria-label` (PK/FK/NN) — PR #417
 - [x] `role="alert"` / `aria-live="polite"` feedback regions
+- [x] Spinner `role="status"` and reduced-motion handling
+- [x] Toast `role="status"` for short copy-feedback results
 - [x] `noscript` fallback
-- [ ] High-contrast mode (Gap)
+- [x] High-contrast mode (`PG ERD Color` mode + `prefers-contrast: more`)
+- [ ] Dark mode variable/CSS mode (Gap, optional product theme)
 - [ ] Full keyboard nav for ERD canvas modeled/prototyped (Gap)
 
 ## 8. Dev handoff mapping
@@ -216,13 +220,14 @@ Figma `color/action/primary` (`#2563eb`) vs code brand (`#034ea2`) — reconcile
 
 | Area | KRDS Reference | Issue | Severity | Required Action | Owner | Due |
 |---|---|---|---|---|---|---|
-| Foundation | 선명한 화면 모드 (style_09) | No high-contrast mode (token/variable/CSS) | High | Add HC variable mode + `prefers-contrast` CSS | Design/Dev | TBD |
+| Foundation | Dark mode | No dark-mode token/CSS mode | Medium | Define only if product needs a separate dark theme beyond KRDS high contrast | Design/Dev | TBD |
 | Foundation | Icon (style_06) | No icon component set/standard | Medium | Define icon set (size/stroke/color rules) | Design | TBD |
 | Token | Design Token (style_07) | Full `:root` token layer not merged | High | Merge/re-review PR #406; reconcile naming | Dev | TBD |
 | Component | Button (Action) | Was no reusable code component | High | **Done** — `components/Button.tsx` added | Dev | ✔ |
 | Component | Text input (Input) | Error-state `aria-invalid` wiring unverified | Medium | Verify/attach `aria-invalid` on error | Dev | TBD |
-| Component | Spinner (Feedback) | No loading indicator component | Medium | Add Spinner + `aria-busy`/`role=status` | Design/Dev | TBD |
-| Component | Toast/Snackbar (Mobile) | No visual toast (only aria-live) | Low | Add Toast component reusing aria-live | Design/Dev | TBD |
+| Component | Spinner (Feedback) | Figma Spinner component set not directly verified | Medium | Verify/create Figma Spinner variants when Figma MCP is available | Design | TBD |
+| Component | Toast (Mobile) | Figma Toast component set not directly verified | Low | Verify/create Figma Toast variants when Figma MCP is available | Design | TBD |
+| Component | Snackbar (Mobile) | No Snackbar component for feedback with action | Low | Add only when a UI needs undo/retry action | Design/Dev | TBD |
 | Pattern | 신청 (Application) | No multi-step application flow | Low | N/A for current product scope | – | – |
 | Accessibility | Modal | Focus trap now documented; audit others | Medium | Extend a11y docs to all dialogs | Design/Dev | TBD |
 | Brand color | Color (style_02) | Figma `color/action/primary` ≠ code `#034ea2` | Medium | Reconcile Figma var to `#034ea2` | Design | TBD |
@@ -234,7 +239,8 @@ Medium (usability/consistency) · Low (docs/examples).
 
 **Design System Draft.** Foundation, tokens, a real component library (6 sets),
 basic/service patterns, accessibility grounding, dev mapping, and versioning all
-exist and are now code-linked (Button). But high-contrast mode, several
-applicable components (Spinner, Toast, Pagination), the full CSS token layer
-(PR #406), and complete a11y prototypes remain open — so it is **not yet** a
-fully operable "Design System."
+exist and are now code-linked (Button + Spinner + Toast + High Contrast Mode).
+But dark mode, several applicable components (Snackbar, Pagination), the full
+CSS token layer (PR #406), direct Figma verification for Spinner/Toast, and
+complete a11y prototypes remain open — so it is **not yet** a fully operable
+"Design System."

@@ -22,6 +22,7 @@ import {
   ExportModal,
   GroupModal,
 } from "./components/modals";
+import { Spinner } from "./components/Spinner";
 
 import {
   getMe,
@@ -969,7 +970,10 @@ export default function App() {
         aria-live="polite"
       >
         <h1>pg-erd-cloud</h1>
-        <p>Authenticating…</p>
+        <div className="row">
+          <Spinner />
+          <p>Authenticating…</p>
+        </div>
       </main>
     );
   }

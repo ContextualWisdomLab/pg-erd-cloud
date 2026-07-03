@@ -69,6 +69,19 @@ describe('ExportModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('공유 링크 복사에 실패했습니다.');
   });
 
+  it('shows a toast when DDL copy feedback is active', () => {
+    render(
+      <ExportModal
+        {...baseProps}
+        isCopied
+      />,
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'DDL을 복사했습니다.' }),
+    ).toHaveClass('toast', 'toast--success');
+  });
+
   it('explains when DDL cannot be generated yet', () => {
     render(
       <ExportModal
