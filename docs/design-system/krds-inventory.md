@@ -4,9 +4,13 @@ This document is the **authoritative, version-controlled record** of the KRDS
 (Korea Design System) traversal performed for pg-erd-cloud. It is the repo
 mirror for the target Figma "Product Design Kit" (`OTN0rBGtnVy0P7yq4Iv9Si`)
 pages and is the durable source for the component/pattern/service-pattern
-inventories and the Gap Report. Direct Figma MCP inspection/mutation was not
-available in this environment, so Figma node/page/component existence remains a
-verification gap. See [`README.md`](./README.md) for the overall summary.
+inventories and the Gap Report. **Update (2026-07-03):** Figma MCP access was
+confirmed working and used to directly verify and extend the target file —
+see `docs/GAP_REPORT.md` and `docs/figma-meta.json` for the verified state.
+The statuses below have been spot-corrected for components touched in that
+session; components not mentioned as updated below have not been
+re-verified since the original traversal. See [`README.md`](./README.md) for
+the overall summary.
 
 > **Scope reality:** pg-erd-cloud is a specialized **B2B ERD-diagramming SaaS**,
 > not a citizen-facing government portal. Many KRDS components/patterns are
@@ -81,10 +85,10 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 |---|---|---|---|---|---|
 | 건너뛰기 링크 (Skip link) | – | Focus | yes | `styles.css .skip-link` | Ready |
 | 메인 메뉴 (Main menu) | – | Active | `aria-current="page"` | `App.tsx .workspaceNav` | Review |
-| 브레드크럼 (Breadcrumb) | code-only | Current | `aria-current="page"` | `components/Breadcrumb.tsx` (not adopted) | Review |
+| 브레드크럼 (Breadcrumb) | code-only | Current | `aria-current="page"` | `components/Breadcrumb.tsx` (not adopted); Figma `PG ERD Breadcrumb Item` added 2026-07-03 (Design Only) | Review |
 | 사이드 메뉴 (Side menu) | – | – | partial | `App.tsx .sidebar` | Review |
 | 콘텐츠 내 탐색 (In-page nav) | – | – | – | – | N/A |
-| 페이지네이션 (Pagination) | code-only partial | Current/Disabled | `aria-current`, button labels | `components/Pagination.tsx` (not adopted; no first/last/ellipsis) | Review |
+| 페이지네이션 (Pagination) | code-only partial | Current/Disabled | `aria-current`, button labels | `components/Pagination.tsx` (not adopted; no first/last/ellipsis); Figma `PG ERD Pagination Item` added 2026-07-03 | Review |
 
 ### Layout & Expression (05)
 | Component | Variant | State | A11y | Dev Mapping | Status |
@@ -113,17 +117,17 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 ### Selection (07)
 | Component | Variant | State | A11y | Dev Mapping | Status |
 |---|---|---|---|---|---|
-| 라디오 버튼 (Radio) | code-only | Checked/Disabled/Error | partial | `components/Radio.tsx` (not adopted) | Review |
-| 체크박스 (Checkbox) | code-only | Checked/Disabled/Error | partial | `components/Checkbox.tsx` (not adopted) | Review |
-| 셀렉트 (Select) | code-only | Native select/Error/Disabled | partial | `components/Select.tsx` (not adopted) | Review |
-| 태그 (Tag) | color | – | partial | `businessGroups` tags | Review |
+| 라디오 버튼 (Radio) | code-only | Checked/Disabled/Error | partial | `components/Radio.tsx` (not adopted); Figma `PG ERD Radio` (5 states incl. Focus) added 2026-07-03 | Review |
+| 체크박스 (Checkbox) | code-only | Checked/Disabled/Error | partial | `components/Checkbox.tsx` (not adopted); Figma `PG ERD Checkbox` (6 states incl. Indeterminate/Focus) added 2026-07-03 | Review |
+| 셀렉트 (Select) | code-only | Native select/Error/Disabled | partial | `components/Select.tsx` (not adopted); Figma `PG ERD Select` (5 states incl. Expanded dropdown) added 2026-07-03 | Review |
+| 태그 (Tag) | color | – | partial | `businessGroups` tags; Figma `PG ERD Tag` (4 tones) added 2026-07-03 | Review |
 | 토글 스위치 (Toggle) | – | – | – | – | N/A |
 
 ### Feedback (08)
 | Component | Variant | State | A11y | Dev Mapping | Status |
 |---|---|---|---|---|---|
 | 단계 표시기 (Step indicator) | – | – | – | – | N/A (no multi-step flow) |
-| 스피너 (Spinner) | Small/Medium | Loading | `role="status"` + reduced motion | `components/Spinner.tsx`, auth loading | Review |
+| 스피너 (Spinner) | Small/Medium | Loading | `role="status"` + reduced motion | `components/Spinner.tsx`, auth loading; Figma `PG ERD Spinner` added 2026-07-03 | **Ready** |
 
 ### Help (09)
 | Component | Variant | State | A11y | Dev Mapping | Status |
@@ -162,12 +166,14 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 | 뒤로가기 버튼 (Back button) | – | – | partial | `App.tsx` view-switch buttons | Review |
 | 바텀시트 (Bottom sheet) | – | – | – | – | N/A (desktop-first) |
 | 수량 토글 (Quantity toggle) | – | – | – | – | N/A |
-| 토스트 (Toast) | Info/Success | Visible | `role="status"` / `aria-live` | `components/Toast.tsx`, `ExportModal` copy feedback | Review |
+| 토스트 (Toast) | Info/Success | Visible | `role="status"` / `aria-live` | `components/Toast.tsx`, `ExportModal` copy feedback; Figma `PG ERD Toast` (Info/Success/Warning/Danger, latter 2 Design Only) added 2026-07-03 | Review |
 | 스낵바 (Snackbar) | – | – | – | – | Gap |
 | 탭바 (Tab bar) | – | – | – | – | N/A |
 | 스플래시 스크린 (Splash screen) | – | – | – | – | N/A |
 
-**Summary:** Ready 6 · Review 19 · Gap 5 · N/A 25 (of 55 KRDS items traversed).
+**Summary:** Ready 7 · Review 18 · Gap 5 · N/A 25 (of 55 KRDS items traversed;
+Spinner moved Review→Ready 2026-07-03 after its Figma Component Set was
+verified built).
 
 ## 5. Basic pattern inventory (KRDS 12 + mobile)
 
@@ -216,28 +222,29 @@ Format: Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components
 - [ ] Full keyboard nav for ERD canvas modeled/prototyped (Gap)
 
 ## 8. Dev handoff mapping
-See target Figma `17. Dev Handoff` and [`README.md`](./README.md) §3. Key
-mismatch to verify when Figma MCP is available: target `color/action/primary`
-(`#2563eb`) vs code brand (`#034ea2`) — reconcile to `#034ea2` (KRDS-aligned,
-higher contrast).
+See target Figma `07. Dev Handoff` and [`README.md`](./README.md) §3.
+`color/action/primary` was reconciled 2026-07-03 to `#034ea2` (was aliased to
+an unrelated blue primitive, `#2563eb`); `color/action/primary-hover` was
+reconciled to `#023d80` to match.
 
 ## 9. Gap Report
 
 | Area | KRDS Reference | Issue | Severity | Required Action | Owner | Due |
 |---|---|---|---|---|---|---|
 | Foundation | Dark mode | No dark-mode token/CSS mode | Medium | Define only if product needs a separate dark theme beyond KRDS high contrast | Design/Dev | TBD |
-| Foundation | Figma file | Direct Figma page/variable/component inspection unavailable | Critical | Re-run with Figma MCP enabled; verify/create pages 00–19/99 and component sets | Design | TBD |
 | Foundation | Icon (style_06) | No icon component set/standard | Medium | Define icon set (size/stroke/color rules) | Design | TBD |
 | Token | Design Token (style_07) | Full `:root` token layer not merged | High | Merge/re-review PR #406; reconcile naming | Dev | TBD |
 | Component | Button (Action) | Was no reusable code component | High | **Done** — `components/Button.tsx` added and uses shared `.btn` CSS tokens | Dev | ✔ |
-| Component | Breadcrumb/Pagination/Checkbox/Radio/Select/TextInput | Code-only wrappers exist but are not adopted and lack Figma variants | Medium | Add tests/adoption where product uses them; verify/create Figma variants | Design/Dev | TBD |
+| Component | Breadcrumb/Pagination/Checkbox/Radio/Select/TextInput | Code-only wrappers exist but are not adopted; Figma variants now exist for all (added 2026-07-03) | Medium | Add tests/adoption where product uses them | Design/Dev | TBD |
 | Component | Pagination (Navigation) | Partial behavior only; no first/last/ellipsis behavior | Medium | Add missing KRDS behavior before broad adoption | Dev | TBD |
-| Component | Spinner (Feedback) | Figma Spinner component set not directly verified | Medium | Verify/create Figma Spinner variants when Figma MCP is available | Design | TBD |
-| Component | Toast (Mobile) | Figma Toast component set not directly verified | Low | Verify/create Figma Toast variants when Figma MCP is available | Design | TBD |
 | Component | Snackbar (Mobile) | No Snackbar component for feedback with action | Low | Add only when a UI needs undo/retry action | Design/Dev | TBD |
 | Pattern | 신청 (Application) | No multi-step application flow | Low | N/A for current product scope | – | – |
+| Pattern | 로그인 (Login) | Code `AuthGate` exists but no Figma service-pattern prototype screen | Medium | Build Login entry/error/success screens, connect to existing Core Flow prototype | Design | TBD |
 | Accessibility | Modal | Focus trap now documented; audit others | Medium | Extend a11y docs to all dialogs | Design/Dev | TBD |
-| Brand color | Color (style_02) | Figma `color/action/primary` ≠ code `#034ea2` | Medium | Reconcile Figma var to `#034ea2` | Design | TBD |
+
+Resolved 2026-07-03 (verified via Figma MCP, not just asserted — see
+`docs/GAP_REPORT.md`): Figma page/variable/component inspection access;
+Spinner and Toast Figma component sets; Figma↔code brand color mismatch.
 
 **Severity:** Critical (a11y/legal/task-blocking) · High (core comp/pattern unusable) ·
 Medium (usability/consistency) · Low (docs/examples).
@@ -246,8 +253,13 @@ Medium (usability/consistency) · Low (docs/examples).
 
 **Design System Draft.** Foundation, tokens, a repo-backed component inventory,
 basic/service patterns, accessibility grounding, dev mapping, and versioning all
-exist and are now code-linked (Button + Spinner + Toast + High Contrast Mode).
-But direct Figma verification/mutation, dark mode, several applicable
-components (Snackbar, Tab, Textarea, Text Resize, Icon set), the full CSS token
-layer (PR #406), adoption of code-only wrappers, and complete a11y prototypes
-remain open — so it is **not yet** a fully operable "Design System."
+exist, are now directly verified in Figma (not just asserted), and are
+code-linked (Button + Spinner + Toast + High Contrast Mode). As of 2026-07-03,
+all Selection/Navigation/Feedback gap components (Checkbox, Radio, Select,
+Tag, Pagination, Breadcrumb, Spinner, Toast) exist as real Figma Component
+Sets, and one pattern (입력폼) has a real instance-composed board. Still open:
+dark mode, several N/A-adjacent components (Snackbar, Tab, Textarea, Text
+Resize, Icon set), the full CSS token layer (PR #406), adoption of code-only
+wrappers into product UI, a Login service-pattern prototype screen, and
+complete a11y prototypes — so it is **not yet** a fully operable "Design
+System."

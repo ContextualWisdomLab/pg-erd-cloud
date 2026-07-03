@@ -5,10 +5,13 @@ Target Figma file: `Product Design Kit` — file key `OTN0rBGtnVy0P7yq4Iv9Si`
 Related docs: [`docs/ui-ux/README.md`](../ui-ux/README.md)
 
 This document summarizes the repo-backed KRDS design-system inventory for
-pg-erd-cloud and its current mapping to the real codebase. Direct Figma MCP
-tools (`use_figma`, screenshots, metadata, library search) were unavailable in
-this environment, so Figma pages/components/variables are treated as target
-structure until they can be inspected or mutated directly.
+pg-erd-cloud and its current mapping to the real codebase. **Update
+(2026-07-03):** Direct Figma MCP tools (`use_figma`, `get_screenshot`,
+`get_metadata`) were confirmed working in this environment and used to
+directly inspect and mutate the target file. See `docs/GAP_REPORT.md` and
+`docs/figma-meta.json` for the verified state and object counts. The "target"
+language below predates that verification; items confirmed built are noted
+inline, everything else should still be treated as target structure.
 
 For the **full KRDS traversal** (all 37+ components, 12 basic patterns, 5
 service patterns) with per-item status and the machine-checkable Gap Report,
@@ -44,25 +47,29 @@ The target Figma file should follow the KRDS-aligned **21-page** structure
 | `19. Gap Report` | KRDS Area / Reference / Issue / Severity / Action / Owner / Due |
 | `99. Archive / Deprecated` | Superseded/legacy exploration frames |
 
-The repo mirror records 6 component-set targets distributed to their KRDS
-categories: Button & Toolbar Button → Action (06); Input Field → Input (10);
-Table Node, Status Pill (Badge) & Share/Export Modal → Layout & Expression
-(05). These still need direct Figma verification.
+The repo mirror records 6 pre-existing component-set targets distributed to
+their KRDS categories: Button & Toolbar Button → Action (06); Input Field →
+Input (10); Table Node, Status Pill (Badge) & Share/Export Modal → Layout &
+Expression (05) — all confirmed present via Figma MCP on 2026-07-03. 8 more
+were added the same session: Checkbox, Radio, Select, Tag → Selection (07);
+Pagination Item, Breadcrumb Item → Navigation (04); Spinner → Feedback (08);
+Toast → Mobile (13).
 
 ## 2. Tokens
 
-### Target Figma variable collections (pending direct verification)
+### Figma variable collections (verified present, 2026-07-03)
 
 - `PG ERD Primitives` — 23 primitive colors (blue/slate/red/green/amber scales)
-- `PG ERD Color` — 22 semantic colors, **two modes: `Light` + `High Contrast`** (선명한 화면 모드, KRDS style_09; 12 tokens overridden for high contrast). Dark mode still undefined — Gap.
+- `PG ERD Color` — 22 semantic colors, **two modes: `Light` + `High Contrast`** (선명한 화면 모드, KRDS style_09; 12 tokens overridden for high contrast). Dark mode still undefined — Gap. `color/action/primary` and `color/action/primary-hover` (Light mode) were reconciled 2026-07-03 from an unrelated aliased blue to the code brand `#034ea2`/`#023d80`.
 - `PG ERD Spacing` — 11-step spacing scale
 - `PG ERD Radius` — 4 radius values
 - Text styles: `Heading/Large`, `Heading/Medium`, `Body/Default`, `Body/Strong`, `Caption`, `Mono/Small`
 - Effect styles: `Shadow/Modal`, `Focus/Ring`
 
-The repo mirror records three semantic variables to close variant gaps:
-`color/border/focus`, `color/text/disabled`, `color/border/error`; plus a
-`High Contrast` mode on `PG ERD Color`. Direct Figma verification remains open.
+The repo mirror records three semantic variables that close variant gaps:
+`color/border/focus`, `color/text/disabled`, `color/border/error`; plus the
+`High Contrast` mode on `PG ERD Color`. All confirmed bound to real component
+fills/strokes (not hardcoded) via Figma MCP inspection.
 
 ### Code-side CSS tokens
 
@@ -107,31 +114,32 @@ convention.
 
 | Target Figma component | Code / target status | Real dev component |
 |---|---|---|
-| PG ERD Button (06. Action) | Code: Primary/Secondary/Ghost/Danger + sm/md/lg; target Figma variants pending verification | **`frontend/src/components/Button.tsx`** — adopted in `AddTableModal` |
-| PG ERD Breadcrumb (04. Navigation) | Code-only component | `frontend/src/components/Breadcrumb.tsx` — not adopted yet |
-| PG ERD Pagination (04. Navigation) | Code-only partial: prev/next/current | `frontend/src/components/Pagination.tsx` — missing first/last/ellipsis and not adopted yet |
-| PG ERD Input Field (10. Input) | Code-only component with helper/error wiring | `frontend/src/components/TextInput.tsx` — modal raw inputs still need adoption |
-| PG ERD Checkbox (07. Selection) | Code-only native control wrapper | `frontend/src/components/Checkbox.tsx` — not adopted yet |
-| PG ERD Radio (07. Selection) | Code-only native control wrapper | `frontend/src/components/Radio.tsx` — not adopted yet |
-| PG ERD Select (07. Selection) | Code-only native control wrapper | `frontend/src/components/Select.tsx` — not adopted yet |
-| PG ERD Table Node (05. Layout & Expression) | existing, documented | `frontend/src/erd/TableNode.tsx` (PK/NN `<abbr>` a11y from PR #417) |
-| PG ERD Status Pill (05. Layout & Expression) | existing, documented | inline status/badge usages in table/edge UI |
-| PG ERD Toolbar Button (06. Action) | existing, documented | toolbar buttons in `frontend/src/App.tsx` |
-| PG ERD Share Export Modal (05. Layout & Expression) | existing, documented | `frontend/src/components/modals/ExportModal.tsx`, `useDialogAccessibility.ts` |
-| PG ERD Spinner (08. Feedback) | Indeterminate + small/medium sizes | **`frontend/src/components/Spinner.tsx`** — adopted in auth loading |
-| PG ERD Toast (13. Mobile) | Info/Success, no action | **`frontend/src/components/Toast.tsx`** — adopted in export copy feedback |
+| PG ERD Button (06. Action) | Code: Primary/Secondary/Ghost/Danger + sm/md/lg; Figma set verified (Style×State incl. Hover/Focus) | **`frontend/src/components/Button.tsx`** — adopted in `AddTableModal` |
+| PG ERD Breadcrumb Item (04. Navigation) | Code-only component; Figma set added 2026-07-03 (Design Only) | `frontend/src/components/Breadcrumb.tsx` — not adopted yet |
+| PG ERD Pagination Item (04. Navigation) | Code-only partial: prev/next/current; Figma set added 2026-07-03 | `frontend/src/components/Pagination.tsx` — missing first/last/ellipsis and not adopted yet |
+| PG ERD Input Field (10. Input) | Code-only component with helper/error wiring; Figma set verified (5 states) | `frontend/src/components/TextInput.tsx` — modal raw inputs still need adoption |
+| PG ERD Checkbox (07. Selection) | Code-only native control wrapper; Figma set added 2026-07-03 (6 states incl. Indeterminate/Focus) | `frontend/src/components/Checkbox.tsx` — not adopted yet |
+| PG ERD Radio (07. Selection) | Code-only native control wrapper; Figma set added 2026-07-03 (5 states incl. Focus) | `frontend/src/components/Radio.tsx` — not adopted yet |
+| PG ERD Select (07. Selection) | Code-only native control wrapper; Figma set added 2026-07-03 (5 states incl. Expanded dropdown) | `frontend/src/components/Select.tsx` — not adopted yet |
+| PG ERD Tag (07. Selection) | No dedicated code component; Figma set added 2026-07-03 (4 tones) | inline `businessGroups` tag styling in `App.tsx` |
+| PG ERD Table Node (05. Layout & Expression) | existing, verified | `frontend/src/erd/TableNode.tsx` (PK/NN `<abbr>` a11y from PR #417) |
+| PG ERD Status Pill (05. Layout & Expression) | existing, verified | inline status/badge usages in table/edge UI |
+| PG ERD Toolbar Button (06. Action) | existing, verified | toolbar buttons in `frontend/src/App.tsx` |
+| PG ERD Share Export Modal (05. Layout & Expression) | existing, verified | `frontend/src/components/modals/ExportModal.tsx`, `useDialogAccessibility.ts` |
+| PG ERD Spinner (08. Feedback) | Small/Medium sizes; Figma set added 2026-07-03 | **`frontend/src/components/Spinner.tsx`** — adopted in auth loading |
+| PG ERD Toast (13. Mobile) | Info/Success adopted in code; Figma set added 2026-07-03 with 2 more Design-Only tones (Warning/Danger) | **`frontend/src/components/Toast.tsx`** — adopted in export copy feedback |
 
-### Known gaps (target Figma / design inventory)
+### Known gaps (design inventory)
 
-- Direct Figma verification: all target pages, variables, and component sets
-  need inspection once Figma MCP is available.
-- Dark mode: target `PG ERD Color` collection defines `Light` + `High Contrast`
+- Dark mode: `PG ERD Color` collection defines `Light` + `High Contrast`
   modes, but no dark mode.
-- Snackbar remains a component gap. Pagination now has a partial code
-  component, but it is not adopted and lacks the KRDS first/last/ellipsis
-  behavior.
-- Spinner and Toast are code-linked, but their Figma component sets still need
-  direct verification when Figma MCP is available.
+- Snackbar remains a component gap. Pagination now has a Figma component set
+  and a partial code component, but neither is adopted and the code lacks the
+  KRDS first/last/ellipsis behavior.
+- No Figma icon component set exists yet (KRDS style_06).
+- No Login/auth-gate service-pattern prototype screen exists, despite the
+  code `AuthGate` flow being real — 방문/검색 have a 4-screen prototype with
+  connectors, 로그인 doesn't.
 
 ### Known gaps (code has it, Figma doesn't yet)
 
@@ -139,8 +147,8 @@ convention.
   modeled as a Figma interactive prototype — only the static "ERD Editor"
   screen exists on `15. Service Patterns`.
 - Breadcrumb, Pagination, Checkbox, Radio, Select, and TextInput are currently
-  code-only review components and need Figma variants plus product adoption
-  before they can be marked Ready.
+  code-only review components; Figma variants now exist for all of them
+  (added 2026-07-03), but product adoption in the actual UI is still open.
 
 ## 4. Accessibility
 
@@ -155,12 +163,14 @@ via `@media (prefers-contrast: more)`.
 
 **Design System Draft** — Foundation, tokens (incl. High Contrast Mode), a
 repo-backed component inventory, basic/service patterns, accessibility
-grounding, dev mapping and versioning all exist and are code-linked
+grounding, dev mapping and versioning all exist, are verified directly in
+Figma (not just asserted, as of 2026-07-03), and are code-linked
 (`Button.tsx`, `Spinner.tsx`, `Toast.tsx`, `--color-action-primary`,
-`prefers-contrast`). But direct Figma verification/mutation, dark mode, several
-applicable components (Snackbar, Tab, Textarea, Text Resize, Icon set), the
-full CSS token layer (PR #406), and adoption of code-only components remain
-open, so it is **not yet** a fully operable "Design System."
+`prefers-contrast`). Still open: dark mode, several applicable components
+(Snackbar, Tab, Textarea, Text Resize, Icon set), the full CSS token layer
+(PR #406), adoption of code-only components into product UI, and a Login
+service-pattern prototype — so it is **not yet** a fully operable "Design
+System."
 
 ## 6. Follow-ups
 
@@ -170,14 +180,16 @@ open, so it is **not yet** a fully operable "Design System."
 3. Finish/adopt Pagination first/last/ellipsis states; add Snackbar only when a
    UI needs undo/retry action; define a dark-mode variable mode only if product
    scope requires it.
-4. Verify/create the Figma component sets once Figma MCP is available.
+4. Build a Login service-pattern prototype screen and connect it to the
+   existing Core Flow prototype.
 5. Model the ERD canvas keyboard-navigation flow as a Figma prototype.
-6. Reconcile target Figma `color/action/primary` (`#2563eb`) to the code brand `#034ea2`.
+6. Define a Figma icon component set (KRDS style_06).
 
 ## 7. Version notes
 
 | Version | Date | Area | Change Type | Changed Item | Reason | Impact | Migration | Owner |
 |---|---|---|---|---|---|---|---|---|
+| v0.7 | 2026-07-03 | Component / Docs | Added | 8 Figma Component Sets (Checkbox, Radio, Select, Tag, Pagination Item, Breadcrumb Item, Spinner, Toast) + brand color reconciliation | Close the Figma-side gap `krds-inventory.md` had flagged for these; direct Figma MCP access confirmed working this session | These components now have real, variant-bound Figma Component Sets, not just code; `color/action/primary`/`-hover` now match code brand | No code migration; Figma-only + docs | Design/Dev |
 | v0.6 | 2026-07-03 | Component / Docs | Fixed | Button token mapping and Figma verification notes | Remove duplicate inline token path; avoid unverifiable Figma claims | Button styling uses shared `.btn` CSS tokens; docs distinguish code-linked vs Figma-verified | No migration; keep using `Button` | Dev |
 | v0.5 | 2026-07-03 | Component / Mobile | Added | Toast dev component | Close KRDS Toast dev-mapping gap | Export copy feedback now has visual + screen-reader status | Use `Toast` for short action results without extra actions | Dev |
 | v0.4 | 2026-07-03 | Component / Feedback | Added | Spinner dev component | Close KRDS Spinner dev-mapping gap | Auth loading now has visual + screen-reader status | Use `Spinner` for indeterminate waits | Dev |

@@ -1,6 +1,15 @@
 {
-  "fileKey": "MANUAL_REQUIRED",
-  "url": "https://www.figma.com/",
-  "status": "pending_manual_creation",
-  "note": "Figma 자동 연동(MCP) 환경 제한으로 인해 빈 파일 자동 생성이 스킵되었습니다. 차후 사용자가 직접 파일을 생성하여 연결해야 합니다."
+  "fileKey": "OTN0rBGtnVy0P7yq4Iv9Si",
+  "url": "https://www.figma.com/design/OTN0rBGtnVy0P7yq4Iv9Si/",
+  "status": "resolved_verified_2026-07-03",
+  "note": "Figma MCP (use_figma / get_metadata / get_screenshot via the Figma plugin server) was confirmed working in this session and used to inspect and mutate the file directly. The file already contained a substantial pre-existing design system (20 pages, 4 variable collections with Light+High Contrast modes, 6 text styles, 2 effect styles, and Component Sets for Button, Toolbar Button, Input Field, Table Node, Status Pill, Share Export Modal) that prior GAP_REPORT entries had incorrectly described as never built. This session verified that state via get_metadata/get_screenshot (not just claimed it), then added the 8 confirmed-missing Component Sets (Checkbox, Radio, Select, Tag, Pagination Item, Breadcrumb Item, Spinner, Toast), reconciled the color/action/primary and color/action/primary-hover Light-mode variable values to match the code brand (#034ea2 / #023d80, previously aliased to an unrelated blue), and built the first real instance-composed Basic Pattern board (입력폼/테이블 추가 — Default/Error/Success). All additions were verified with get_screenshot after creation, not just asserted. See docs/GAP_REPORT.md for what remains open (notably: no Login/auth-gate service pattern screen, no icon component set, PR #406 CSS token layer still unmerged).",
+  "verifiedCounts": {
+    "pages": 21,
+    "variableCollections": 4,
+    "variables": 57,
+    "textStyles": 6,
+    "effectStyles": 2,
+    "componentSetsAddedThisSession": 8,
+    "componentSetsPreExisting": 6
+  }
 }
