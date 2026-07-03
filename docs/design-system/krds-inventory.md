@@ -78,10 +78,10 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 |---|---|---|---|---|---|
 | 건너뛰기 링크 (Skip link) | – | Focus | yes | `styles.css .skip-link` | Ready |
 | 메인 메뉴 (Main menu) | – | Active | `aria-current="page"` | `App.tsx .workspaceNav` | Review |
-| 브레드크럼 (Breadcrumb) | – | – | – | – | N/A |
+| 브레드크럼 (Breadcrumb) | – | – | – | `components/Breadcrumb.tsx` | **Ready** |
 | 사이드 메뉴 (Side menu) | – | – | partial | `App.tsx .sidebar` | Review |
 | 콘텐츠 내 탐색 (In-page nav) | – | – | – | – | N/A |
-| 페이지네이션 (Pagination) | – | – | – | – | Gap (needed if lists grow) |
+| 페이지네이션 (Pagination) | – | – | – | `components/Pagination.tsx` | **Ready** |
 
 ### Layout & Expression (05)
 | Component | Variant | State | A11y | Dev Mapping | Status |
@@ -110,9 +110,9 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 ### Selection (07)
 | Component | Variant | State | A11y | Dev Mapping | Status |
 |---|---|---|---|---|---|
-| 라디오 버튼 (Radio) | – | – | partial | `CardinalityModal` | Review |
-| 체크박스 (Checkbox) | – | Checked | partial | `EditTableModal` PK/NN (3 native) | Review |
-| 셀렉트 (Select) | – | – | partial | modals + `App.tsx` (native `<select>`) | Review |
+| 라디오 버튼 (Radio) | – | – | partial | `components/Radio.tsx` | **Ready** |
+| 체크박스 (Checkbox) | – | Checked | partial | `components/Checkbox.tsx` | **Ready** |
+| 셀렉트 (Select) | – | – | partial | `components/Select.tsx` | **Ready** |
 | 태그 (Tag) | color | – | partial | `businessGroups` tags | Review |
 | 토글 스위치 (Toggle) | – | – | – | – | N/A |
 
@@ -137,7 +137,7 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 |---|---|---|---|---|---|
 | 날짜 입력 필드 (Date input) | – | – | – | – | N/A |
 | 텍스트 영역 (Textarea) | – | – | – | – | Gap |
-| 텍스트 입력 필드 (Text input) | Default/Focus/Error/Read-only | many | yes | `Input Field` set + modal inputs | **Ready** |
+| 텍스트 입력 필드 (Text input) | Default/Focus/Error/Read-only | many | yes | `components/TextInput.tsx` | **Ready** |
 | 파일 업로드 (File upload) | – | – | – | – | N/A |
 
 ### Setting (11)
