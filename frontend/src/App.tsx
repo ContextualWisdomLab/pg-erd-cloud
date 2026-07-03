@@ -181,19 +181,29 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
+
+    // ⚡ Bolt: Optimized search filtering
+    // Replaced expensive array spreading, flatMap(), and string joining with explicit loops.
+    // Early return (break) on first match avoids processing remaining fields.
+    // This reduces memory allocations and garbage collection overhead during search.
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
+      let isMatch = false;
+      const title = node.data.title.toLocaleLowerCase();
+      if (title.includes(normalizedNodeSearch)) {
+        isMatch = true;
+      } else if (node.data.comment && node.data.comment.toLocaleLowerCase().includes(normalizedNodeSearch)) {
+        isMatch = true;
+      } else {
+        for (const column of node.data.columns) {
+          if (column.column_name.toLocaleLowerCase().includes(normalizedNodeSearch) ||
+              column.data_type.toLocaleLowerCase().includes(normalizedNodeSearch) ||
+              (column.column_comment && column.column_comment.toLocaleLowerCase().includes(normalizedNodeSearch))) {
+            isMatch = true;
+            break;
+          }
+        }
+      }
+      if (isMatch) {
         matches.add(node.id);
       }
     }
