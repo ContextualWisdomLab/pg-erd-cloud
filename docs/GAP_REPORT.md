@@ -101,6 +101,20 @@
   mandatory subpages) that was **not** attempted this cycle — logged as a
   real open item below rather than silently skipped or falsely claimed
   done.
+- **Pass 7 (same day, via `/loop`):** Fetched the actual KRDS official color
+  reference — `style_02.html` plus its linked demo image
+  (`color_visual.png`, downloaded and viewed via the `Read` tool, not
+  guessed) — revealing a real 13-step 0–100 lightness scale with semantic
+  role labels (background/surface, disabled@3:1, disabled@4.5:1, subtle@7:1,
+  basic@15:1, bolder) and named contrast-ratio "Magic Numbers." Rebuilt this
+  as a real Figma swatch on `3.1 Color`, checked against the source image.
+  This surfaced a genuine gap: `PG ERD Primitives` uses ad-hoc named steps
+  (`blue/50,100,600,700`, etc.), not this systematic KRDS scale — logged as
+  a Medium-effort remap decision for the owner, not attempted (existing
+  components already reference the current names; remapping is a real
+  breaking-change risk). Also completed the Layer Layout Audit: scanned the
+  remaining 9 pages, bringing total coverage to all 22 of 22 pages with 0
+  defects found file-wide.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
@@ -121,7 +135,8 @@
 | Accessibility | Component matrix | Per-component keyboard/screen-reader/high-contrast matrix is incomplete; automated WCAG 4.5:1 contrast reporting doesn't exist | Medium | Extend `06. Accessibility` inventory and tests for adopted components | Design/Dev | TBD |
 | Structure | 1-based page numbering + subpage hierarchy | This iteration's spec asks for all 22 pages renumbered from 1 (not 0) with ~150 mandatory subpages (`3.1 Color`, `8.2 Button`, etc.); the file has kept its own pre-existing 0-based, section-only structure for consistency across all 6 passes | Medium | Owner decision: commit to the full renumber + subpage restructure (large, multi-cycle effort) or keep the current structure | Design | TBD |
 | Wireframe | Auto-layout/Undo/SVG/UML/Mermaid export | Coverage Matrix found 5 more bare-inline-element functions beyond the search results gap (already wireframed); these are 1-click/download actions that may not need a dedicated screen | Low | Owner judgment: wireframe only if these should show a preview/confirmation step, not just fire-and-download | Design | TBD |
-| Layer Layout | 9 of 22 pages not yet scanned | Programmatic scan covered 13 pages (0 defects); Components - Identity/Navigation/Feedback/Help/Input/Setting/Content/Mobile and Accessibility not yet scanned | Low | Scan remaining 9 pages in a future cycle | Design | TBD |
+| Layer Layout | Page scan coverage | **Resolved** — all 22 of 22 pages now scanned programmatically (was 13 of 22); 0 defects found file-wide | N/A | None | – | ✔ |
+| Token | Primitive scale vs KRDS official lightness scale | Fetched the real KRDS color demo image (`color_visual.png`); it defines a systematic 0-100 13-step lightness+semantic-role scale that `PG ERD Primitives` does not follow (uses ad-hoc named steps instead) | Medium | Owner decision: remap primitives to the KRDS 0-100 scale (breaking-change risk — existing components reference current names) or document the deviation as intentional | Design | TBD |
 
 Severity follows the KRDS task definition: Critical for legal/accessibility or
 task-blocking gaps, High for unusable core system parts, Medium for

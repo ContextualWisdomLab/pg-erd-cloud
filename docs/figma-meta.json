@@ -26,7 +26,9 @@
     "visualQaBugsFoundAndFixed": 1,
     "functionCoverageMatrixRows": 14,
     "wireframesAdded": 3,
-    "layerLayoutPagesScanned": 13,
-    "layerLayoutDefectsFound": 0
+    "layerLayoutPagesScanned": 22,
+    "layerLayoutPagesTotal": 22,
+    "layerLayoutDefectsFound": 0,
+    "krdsOfficialColorImageFetched": true
   }
 }
