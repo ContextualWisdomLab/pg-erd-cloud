@@ -115,6 +115,28 @@
   breaking-change risk). Also completed the Layer Layout Audit: scanned the
   remaining 9 pages, bringing total coverage to all 22 of 22 pages with 0
   defects found file-wide.
+- **Pass 8 (via `/loop`, spec added `19. Source-to-Figma Reconstruction` and
+  `20. Implementation Visual Parity` pages with a Web DOM bounding-box
+  measurement requirement):** Found and used real legacy design assets —
+  `docs/ui-ux/*.png` (9 mockups) — that were not previously registered
+  anywhere. Uploaded the login-screen mockup as a real Figma image fill (via
+  `upload_assets`, not a description) and built a genuine `19.1 Image Source
+  Intake` board for all 9, surfacing a real finding: the mockups show a
+  divergent legacy concept (password login, "Cloud ERD" branding, a richer
+  sidebar IA) that doesn't match the current `App.tsx` implementation —
+  logged as Legacy/superseded rather than reconstructed as if current. Built
+  `19.3-19.4 Code Source Intake` cross-referencing the Component
+  Sets/Wireframes already built in prior cycles from real repo code. For
+  page 20, actually attempted the Implementation Visual Parity gate before
+  giving up on it: started the real frontend dev server (vite, confirmed
+  HTTP 200) and tried `generate_figma_design`'s local-capture flow, which
+  requires a GUI browser to inject a script and POST to Figma's capture
+  endpoint. Verified directly that this environment has no
+  chrome/chromium/firefox binary and no Playwright MCP tool — confirmed,
+  not assumed. Logged this as a genuine environment/tool Gap (not a skipped
+  step) rather than faking DOM bounding-box numbers or claiming a
+  screenshot-only "parity pass." Built the buildable parts (page structure,
+  Parity Target Inventory) and left the measurement rows honestly `Gap`.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
@@ -137,6 +159,8 @@
 | Wireframe | Auto-layout/Undo/SVG/UML/Mermaid export | Coverage Matrix found 5 more bare-inline-element functions beyond the search results gap (already wireframed); these are 1-click/download actions that may not need a dedicated screen | Low | Owner judgment: wireframe only if these should show a preview/confirmation step, not just fire-and-download | Design | TBD |
 | Layer Layout | Page scan coverage | **Resolved** — all 22 of 22 pages now scanned programmatically (was 13 of 22); 0 defects found file-wide | N/A | None | – | ✔ |
 | Token | Primitive scale vs KRDS official lightness scale | Fetched the real KRDS color demo image (`color_visual.png`); it defines a systematic 0-100 13-step lightness+semantic-role scale that `PG ERD Primitives` does not follow (uses ad-hoc named steps instead) | Medium | Owner decision: remap primitives to the KRDS 0-100 scale (breaking-change risk — existing components reference current names) or document the deviation as intentional | Design | TBD |
+| Environment | Web DOM bounding-box measurement (Implementation Visual Parity gate) | No GUI browser or Playwright MCP tool exists in this session's environment (verified directly: no chrome/chromium/firefox binary; xdg-open falls back to a text-mode browser); `generate_figma_design`'s local-capture flow needs a real browser to inject a script and POST to Figma's capture endpoint | High | Started the real dev server (HTTP 200 confirmed) and attempted `generate_figma_design`; confirmed the gap is environmental, not a missed step | Add a Playwright-capable environment/session, then re-run `20. Implementation Visual Parity` for the 5 targets already logged in `20.1 Parity Target Inventory` | Dev/Infra | TBD |
+| Source | Legacy `docs/ui-ux/*.png` mockups (9 files) diverge from current app | Newly discovered this pass (were not previously registered anywhere): password-based login, "Cloud ERD" branding, and a richer sidebar IA (프로젝트/즐겨찾기/휴지통/설정) that don't match the current session-based `AuthGate` or the tab-based `activeView` state machine in `App.tsx` | Low | Registered all 9 as `Legacy — superseded` in `19.1 Image Source Intake` rather than reconstructed as current design | Owner decision: archive these images formally, or confirm they're historical-only and safe to leave as-is | Design | TBD |
 
 Severity follows the KRDS task definition: Critical for legal/accessibility or
 task-blocking gaps, High for unusable core system parts, Medium for
