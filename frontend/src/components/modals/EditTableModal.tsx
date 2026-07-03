@@ -126,21 +126,23 @@ export function EditTableModal({
                       style={{ flex: 1.5 }}
                       aria-label="데이터 타입"
                     />
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }} title="Primary Key">
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
+                        aria-label="Primary Key"
                       />
-                      PK
+                      <span aria-hidden="true">PK</span>
                     </label>
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }} title="Not Null">
                       <input
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
+                        aria-label="Not Null"
                       />
-                      NN
+                      <span aria-hidden="true">NN</span>
                     </label>
                     <button
                       type="button"
