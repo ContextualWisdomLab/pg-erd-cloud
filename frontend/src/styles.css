@@ -485,6 +485,12 @@ button:disabled {
   background: #f1f5f9;
 }
 
+.btn--danger {
+  background: var(--color-border-error);
+  border-color: var(--color-border-error);
+  color: #fff;
+}
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;

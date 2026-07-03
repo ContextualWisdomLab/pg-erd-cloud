@@ -68,4 +68,11 @@ describe('Button', () => {
       'custom',
     );
   });
+
+  it('uses shared CSS classes instead of inline token styles by default', () => {
+    render(<Button variant="primary">Tokenized</Button>);
+    expect(screen.getByRole('button', { name: 'Tokenized' })).not.toHaveAttribute(
+      'style',
+    );
+  });
 });

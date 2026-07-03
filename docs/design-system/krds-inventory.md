@@ -1,10 +1,12 @@
 # KRDS Traversal & Inventory — pg-erd-cloud Design System
 
 This document is the **authoritative, version-controlled record** of the KRDS
-(Korea Design System) traversal performed for pg-erd-cloud. It mirrors the
-Figma "Product Design Kit" (`OTN0rBGtnVy0P7yq4Iv9Si`) inventory pages and is the
-durable source for the component/pattern/service-pattern inventories and the Gap
-Report. See [`README.md`](./README.md) for the overall summary.
+(Korea Design System) traversal performed for pg-erd-cloud. It is the repo
+mirror for the target Figma "Product Design Kit" (`OTN0rBGtnVy0P7yq4Iv9Si`)
+pages and is the durable source for the component/pattern/service-pattern
+inventories and the Gap Report. Direct Figma MCP inspection/mutation was not
+available in this environment, so Figma node/page/component existence remains a
+verification gap. See [`README.md`](./README.md) for the overall summary.
 
 > **Scope reality:** pg-erd-cloud is a specialized **B2B ERD-diagramming SaaS**,
 > not a citizen-facing government portal. Many KRDS components/patterns are
@@ -40,23 +42,24 @@ Report. See [`README.md`](./README.md) for the overall summary.
 
 | Area | KRDS ref | Product state | Status |
 |---|---|---|---|
-| Color | style_02 | `PG ERD Primitives` (23) + `PG ERD Color` (22 semantic, Light + High Contrast modes) Figma vars; brand `#034ea2` now tokenized as `--color-action-primary` | Review |
-| Typography | style_03 | 6 Figma text styles (Heading/Body/Caption/Mono); system-ui font stack in code (not Pretendard GOV) | Review |
-| Shape/Radius | style_04 | `PG ERD Radius` (4 steps) | Review |
+| Color | style_02 | Target `PG ERD Primitives` + `PG ERD Color` variable collections documented; code brand `#034ea2` tokenized as `--color-action-primary`; direct Figma verification pending | Review |
+| Typography | style_03 | Target text-style set documented; system-ui font stack in code (not Pretendard GOV) | Review |
+| Shape/Radius | style_04 | Target `PG ERD Radius` scale documented | Review |
 | Layout | style_05 | Fixed sidebar + main; `@media` narrow breakpoint; not a formal 12-col grid | Review |
 | Icon | style_06 | No dedicated icon component set; inline SVG/text labels | Gap |
-| Elevation | style_08 | `Shadow/Modal`, `Focus/Ring` effect styles | Review |
-| High Contrast Mode | style_09 | Figma `High Contrast` variable mode exists and code mirrors it with `@media (prefers-contrast: more)` | Review |
+| Elevation | style_08 | Target `Shadow/Modal`, `Focus/Ring` effect styles documented | Review |
+| High Contrast Mode | style_09 | Target `High Contrast` variable mode documented; code mirrors it with `@media (prefers-contrast: more)` | Review |
 
 ## 3. Token inventory (3-tier)
 
 | Tier | KRDS naming | Product mapping | Status |
 |---|---|---|---|
-| Primitive | `color.primary.*`, `color.gray.*`, `space.*`, `radius.*` | Figma `PG ERD Primitives`/`Spacing`/`Radius` collections | Review (naming differs from KRDS scale) |
-| Semantic | `color.text.*`, `color.background.*`, `color.border.*` | Figma `PG ERD Color`; code `--color-action-primary/-hover`, `--color-border-focus/-error`, `--color-text-disabled` | Review (partial in code) |
-| Component | `button.*`, `input.*` | `.btn--*` classes in `styles.css`; Figma component docs | Review |
+| Primitive | `color.primary.*`, `color.gray.*`, `space.*`, `radius.*` | Target Figma `PG ERD Primitives`/`Spacing`/`Radius` collections; code also has `frontend/src/design-system/tokens.css` | Review (naming differs from KRDS scale; Figma unverified) |
+| Semantic | `color.text.*`, `color.background.*`, `color.border.*` | Target Figma `PG ERD Color`; code `--color-action-primary/-hover`, `--color-border-focus/-error`, `--color-text-disabled` | Review (partial in code) |
+| Component | `button.*`, `input.*` | `.btn--*` classes in `styles.css`; code-only `krds-*` wrappers need adoption and Figma variants | Review |
 
-Key gap: the full `:root` CSS token layer is proposed in **PR #406**
+Key gap: direct Figma variable verification is blocked by unavailable Figma MCP
+tools. The full `:root` CSS token layer is separately proposed in **PR #406**
 (`codex/css-token-layer`, open but blocked as of 2026-07-03 by automated review
 `CHANGES_REQUESTED` from model-pool exhaustion). This repo adds only a minimal,
 non-duplicative subset to avoid conflict.
@@ -78,10 +81,10 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 |---|---|---|---|---|---|
 | 건너뛰기 링크 (Skip link) | – | Focus | yes | `styles.css .skip-link` | Ready |
 | 메인 메뉴 (Main menu) | – | Active | `aria-current="page"` | `App.tsx .workspaceNav` | Review |
-| 브레드크럼 (Breadcrumb) | – | – | – | `components/Breadcrumb.tsx` | **Ready** |
+| 브레드크럼 (Breadcrumb) | code-only | Current | `aria-current="page"` | `components/Breadcrumb.tsx` (not adopted) | Review |
 | 사이드 메뉴 (Side menu) | – | – | partial | `App.tsx .sidebar` | Review |
 | 콘텐츠 내 탐색 (In-page nav) | – | – | – | – | N/A |
-| 페이지네이션 (Pagination) | – | – | – | `components/Pagination.tsx` | **Ready** |
+| 페이지네이션 (Pagination) | code-only partial | Current/Disabled | `aria-current`, button labels | `components/Pagination.tsx` (not adopted; no first/last/ellipsis) | Review |
 
 ### Layout & Expression (05)
 | Component | Variant | State | A11y | Dev Mapping | Status |
@@ -110,9 +113,9 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 ### Selection (07)
 | Component | Variant | State | A11y | Dev Mapping | Status |
 |---|---|---|---|---|---|
-| 라디오 버튼 (Radio) | – | – | partial | `components/Radio.tsx` | **Ready** |
-| 체크박스 (Checkbox) | – | Checked | partial | `components/Checkbox.tsx` | **Ready** |
-| 셀렉트 (Select) | – | – | partial | `components/Select.tsx` | **Ready** |
+| 라디오 버튼 (Radio) | code-only | Checked/Disabled/Error | partial | `components/Radio.tsx` (not adopted) | Review |
+| 체크박스 (Checkbox) | code-only | Checked/Disabled/Error | partial | `components/Checkbox.tsx` (not adopted) | Review |
+| 셀렉트 (Select) | code-only | Native select/Error/Disabled | partial | `components/Select.tsx` (not adopted) | Review |
 | 태그 (Tag) | color | – | partial | `businessGroups` tags | Review |
 | 토글 스위치 (Toggle) | – | – | – | – | N/A |
 
@@ -137,7 +140,7 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 |---|---|---|---|---|---|
 | 날짜 입력 필드 (Date input) | – | – | – | – | N/A |
 | 텍스트 영역 (Textarea) | – | – | – | – | Gap |
-| 텍스트 입력 필드 (Text input) | Default/Focus/Error/Read-only | many | yes | `components/TextInput.tsx` | **Ready** |
+| 텍스트 입력 필드 (Text input) | code-only | Default/Error/Required | `aria-invalid` / `aria-describedby` | `components/TextInput.tsx` (modal adoption pending) | Review |
 | 파일 업로드 (File upload) | – | – | – | – | N/A |
 
 ### Setting (11)
@@ -164,7 +167,7 @@ Format: Category | Component (KRDS) | Variant | State | Accessibility | Dev Mapp
 | 탭바 (Tab bar) | – | – | – | – | N/A |
 | 스플래시 스크린 (Splash screen) | – | – | – | – | N/A |
 
-**Summary:** Ready 7 · Review 17 · Gap 6 · N/A 25 (of 55 KRDS items traversed).
+**Summary:** Ready 6 · Review 19 · Gap 5 · N/A 25 (of 55 KRDS items traversed).
 
 ## 5. Basic pattern inventory (KRDS 12 + mobile)
 
@@ -191,8 +194,8 @@ Format: Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components
 
 | Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components | Status |
 |---|---|---|---|---|---|---|
-| 방문 (Visit) | dashboard | yes | partial (Figma flow) | partial | workspace dashboard, nav | Review |
-| 검색 (Search) | editor | yes | partial | partial | search/filter input, TableNode highlight | Review |
+| 방문 (Visit) | dashboard | yes | target only; Figma verification pending | partial | workspace dashboard, nav | Review |
+| 검색 (Search) | editor | yes | target only; Figma verification pending | partial | search/filter input, TableNode highlight | Review |
 | 로그인 (Login) | auth gate | yes | – | partial | AuthGate, `authError`, sign-in | Review |
 | 신청 (Application) | – | – | – | – | – | N/A |
 | 정책 정보 확인 (Policy info) | – | – | – | – | – | N/A |
@@ -207,24 +210,28 @@ Format: Service Pattern | Entry | Flow | Prototype | Do/Better/Best | Components
 - [x] Spinner `role="status"` and reduced-motion handling
 - [x] Toast `role="status"` for short copy-feedback results
 - [x] `noscript` fallback
-- [x] High-contrast mode (`PG ERD Color` mode + `prefers-contrast: more`)
+- [x] High-contrast mode documented and code-linked (`prefers-contrast: more`);
+      target Figma mode still needs direct verification
 - [ ] Dark mode variable/CSS mode (Gap, optional product theme)
 - [ ] Full keyboard nav for ERD canvas modeled/prototyped (Gap)
 
 ## 8. Dev handoff mapping
-See Figma `17. Dev Handoff` and [`README.md`](./README.md) §3. Key mismatch:
-Figma `color/action/primary` (`#2563eb`) vs code brand (`#034ea2`) — reconcile to
-`#034ea2` (KRDS-aligned, higher contrast).
+See target Figma `17. Dev Handoff` and [`README.md`](./README.md) §3. Key
+mismatch to verify when Figma MCP is available: target `color/action/primary`
+(`#2563eb`) vs code brand (`#034ea2`) — reconcile to `#034ea2` (KRDS-aligned,
+higher contrast).
 
 ## 9. Gap Report
 
 | Area | KRDS Reference | Issue | Severity | Required Action | Owner | Due |
 |---|---|---|---|---|---|---|
 | Foundation | Dark mode | No dark-mode token/CSS mode | Medium | Define only if product needs a separate dark theme beyond KRDS high contrast | Design/Dev | TBD |
+| Foundation | Figma file | Direct Figma page/variable/component inspection unavailable | Critical | Re-run with Figma MCP enabled; verify/create pages 00–19/99 and component sets | Design | TBD |
 | Foundation | Icon (style_06) | No icon component set/standard | Medium | Define icon set (size/stroke/color rules) | Design | TBD |
 | Token | Design Token (style_07) | Full `:root` token layer not merged | High | Merge/re-review PR #406; reconcile naming | Dev | TBD |
-| Component | Button (Action) | Was no reusable code component | High | **Done** — `components/Button.tsx` added | Dev | ✔ |
-| Component | Text input (Input) | Error-state `aria-invalid` wiring unverified | Medium | Verify/attach `aria-invalid` on error | Dev | TBD |
+| Component | Button (Action) | Was no reusable code component | High | **Done** — `components/Button.tsx` added and uses shared `.btn` CSS tokens | Dev | ✔ |
+| Component | Breadcrumb/Pagination/Checkbox/Radio/Select/TextInput | Code-only wrappers exist but are not adopted and lack Figma variants | Medium | Add tests/adoption where product uses them; verify/create Figma variants | Design/Dev | TBD |
+| Component | Pagination (Navigation) | Partial behavior only; no first/last/ellipsis behavior | Medium | Add missing KRDS behavior before broad adoption | Dev | TBD |
 | Component | Spinner (Feedback) | Figma Spinner component set not directly verified | Medium | Verify/create Figma Spinner variants when Figma MCP is available | Design | TBD |
 | Component | Toast (Mobile) | Figma Toast component set not directly verified | Low | Verify/create Figma Toast variants when Figma MCP is available | Design | TBD |
 | Component | Snackbar (Mobile) | No Snackbar component for feedback with action | Low | Add only when a UI needs undo/retry action | Design/Dev | TBD |
@@ -237,10 +244,10 @@ Medium (usability/consistency) · Low (docs/examples).
 
 ## 10. Final classification
 
-**Design System Draft.** Foundation, tokens, a real component library (6 sets),
+**Design System Draft.** Foundation, tokens, a repo-backed component inventory,
 basic/service patterns, accessibility grounding, dev mapping, and versioning all
 exist and are now code-linked (Button + Spinner + Toast + High Contrast Mode).
-But dark mode, several applicable components (Snackbar, Pagination), the full
-CSS token layer (PR #406), direct Figma verification for Spinner/Toast, and
-complete a11y prototypes remain open — so it is **not yet** a fully operable
-"Design System."
+But direct Figma verification/mutation, dark mode, several applicable
+components (Snackbar, Tab, Textarea, Text Resize, Icon set), the full CSS token
+layer (PR #406), adoption of code-only wrappers, and complete a11y prototypes
+remain open — so it is **not yet** a fully operable "Design System."
