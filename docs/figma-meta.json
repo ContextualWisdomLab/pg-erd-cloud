@@ -4,7 +4,7 @@
   "status": "resolved_verified_2026-07-03",
   "note": "Figma MCP (use_figma / get_metadata / get_screenshot via the Figma plugin server) was confirmed working in this session and used to inspect and mutate the file directly, across five build passes (passes 4-5 via /loop dynamic self-pacing) in one continuous session. The file already contained a substantial pre-existing design system (20 pages, 4 variable collections with Light+High Contrast modes, 6 text styles, 2 effect styles, and 6 Component Sets) that prior GAP_REPORT entries had incorrectly described as never built. Pass 1: added 8 Component Sets, reconciled brand color, built the first real pattern board. Pass 2: added a PG ERD Icon set, a real Login Flow, real prototype reactions on the Core Flow. Pass 3: traversed real KRDS pages via WebFetch, added 8 more Component Sets (incl. the two required by the completion criteria: generic Modal, Header), 2 more pattern boards, rebuilt Accessibility Lab around real objects, added a KRDS Source Inventory table, found a real shared-TEXT-property-default Plugin API bug. Pass 4: added 3 real Grid Styles with visible column overlays, and the file's first Boolean + Instance Swap component properties on PG ERD Button. Pass 5 (spec updated by user to add a Visual QA requirement): added a dedicated 17. Visual QA page with real evidence boards (Core Components, Component States, Before & After Fixes); the QA loop caught and fixed a live recurrence of the shared-TEXT-property-default bug on Input Field/Text Area state instances. All additions verified with get_screenshot after creation. See docs/GAP_REPORT.md for what remains open.",
   "verifiedCounts": {
-    "pages": 22,
+    "pages": 24,
     "variableCollections": 4,
     "variables": 57,
     "textStyles": 6,
@@ -18,11 +18,15 @@
     "booleanProperties": 1,
     "instanceSwapProperties": 1,
     "servicePatternScreensAddedThisSession": 3,
-    "realPrototypeReactionsAdded": 5,
+    "realPrototypeReactionsAdded": 8,
     "basicPatternBoardsAddedThisSession": 3,
     "accessibilityLabRealObjectsAdded": 7,
     "visualQaBoardsAdded": 3,
     "visualQaRowsVerified": 13,
-    "visualQaBugsFoundAndFixed": 1
+    "visualQaBugsFoundAndFixed": 1,
+    "functionCoverageMatrixRows": 14,
+    "wireframesAdded": 3,
+    "layerLayoutPagesScanned": 13,
+    "layerLayoutDefectsFound": 0
   }
 }

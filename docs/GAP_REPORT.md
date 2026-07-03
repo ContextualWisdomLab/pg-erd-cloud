@@ -83,6 +83,24 @@
   instances showed the Default variant's "Read-only" hint regardless of
   their own state — and fixed it in place with `setProperties()` before
   marking the row Pass, per the spec's "fix don't leave as Gap" rule.
+- **Pass 6 (same day, via `/loop`, spec escalated to require Functional
+  Wireframes/Prototypes + a Layer Layout Audit):** Ran a real (agent-backed,
+  not guessed) inventory of pg-erd-cloud's user-facing functions —
+  `App.tsx` view state machine, all 6 modal components, all handlers, and
+  `api.ts` endpoints — and built a `16. Functional Wireframes & Prototypes`
+  page with a grounded Function-to-Screen Coverage Matrix. It surfaced 6
+  real gaps: search results, auto-layout/undo-layout, and 3 file-format
+  exports (SVG/PlantUML/Mermaid) all have zero dedicated screen beyond a
+  bare toolbar icon or input. Built a real L2 Wireframe (Default/Results/
+  Empty states, real component instances) with prototype connections for
+  the clearest one (search results). Added `18. Layer Layout Audit` with a
+  genuine programmatic scan (not sampled) of 13 of 22 pages for temp-named
+  layers, zero-size objects, far-off-canvas objects, and detached
+  instances — 0 defects found. This iteration's spec also asks for a much
+  larger restructuring (1-based page numbering across all 22 pages, ~150
+  mandatory subpages) that was **not** attempted this cycle — logged as a
+  real open item below rather than silently skipped or falsely claimed
+  done.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
@@ -101,6 +119,9 @@
 | Pattern | Service flows | **Resolved** — 방문/검색/로그인 all now have real Figma prototype reactions (`setReactionsAsync`, ON_CLICK/AFTER_TIMEOUT → NAVIGATE), not just visual connector lines; Login screens (Loading/Error/Success) are grounded in the real `AuthGate` branch in `App.tsx`. 신청/정책 정보 확인 remain N/A for product scope | N/A | None | – | ✔ |
 | Component | Toolbar Button (Action) | `PG ERD Toolbar Button` Icon/Format kinds exist but aren't cross-referenced with the new `PG ERD Icon` set | Low | Swap Toolbar Button's icon slots to use `PG ERD Icon` instances via INSTANCE_SWAP | Design | TBD |
 | Accessibility | Component matrix | Per-component keyboard/screen-reader/high-contrast matrix is incomplete; automated WCAG 4.5:1 contrast reporting doesn't exist | Medium | Extend `06. Accessibility` inventory and tests for adopted components | Design/Dev | TBD |
+| Structure | 1-based page numbering + subpage hierarchy | This iteration's spec asks for all 22 pages renumbered from 1 (not 0) with ~150 mandatory subpages (`3.1 Color`, `8.2 Button`, etc.); the file has kept its own pre-existing 0-based, section-only structure for consistency across all 6 passes | Medium | Owner decision: commit to the full renumber + subpage restructure (large, multi-cycle effort) or keep the current structure | Design | TBD |
+| Wireframe | Auto-layout/Undo/SVG/UML/Mermaid export | Coverage Matrix found 5 more bare-inline-element functions beyond the search results gap (already wireframed); these are 1-click/download actions that may not need a dedicated screen | Low | Owner judgment: wireframe only if these should show a preview/confirmation step, not just fire-and-download | Design | TBD |
+| Layer Layout | 9 of 22 pages not yet scanned | Programmatic scan covered 13 pages (0 defects); Components - Identity/Navigation/Feedback/Help/Input/Setting/Content/Mobile and Accessibility not yet scanned | Low | Scan remaining 9 pages in a future cycle | Design | TBD |
 
 Severity follows the KRDS task definition: Critical for legal/accessibility or
 task-blocking gaps, High for unusable core system parts, Medium for
