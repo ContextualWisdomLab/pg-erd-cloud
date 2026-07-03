@@ -98,7 +98,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
       aria-label={`${accessibleTableName} 테이블`}
     >
       <Handle type="target" position={Position.Top} />
-      <div className="tableNode__title">
+      <div className="tableNode__title" aria-label={`${data.title}${data.badges?.pk ? ' Primary Key' : ''}${data.badges?.fk ? ' Foreign Key' : ''}`} tabIndex={0}>
         <span className="tableNode__titleText">
           <span>{data.title}</span>
           {data.comment ? (
@@ -116,10 +116,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
           {data.badges?.pk ? (
-            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key" tabIndex={0}>PK</abbr>
+            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key" tabIndex={-1}>PK</abbr>
           ) : null}
           {data.badges?.fk ? (
-            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key" tabIndex={0}>FK</abbr>
+            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key" tabIndex={-1}>FK</abbr>
           ) : null}
         </span>
       </div>
@@ -134,7 +134,11 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 id={targetColumnHandleId(c.column_name)}
                 className="colHandle"
               />
-              <span className="tableNode__colIdentity">
+              <span
+                className="tableNode__colIdentity"
+                aria-label={`${c.column_name}${c.is_pk ? ' Primary Key' : ''}${c.is_not_null ? ' 필수 입력 (Not Null)' : ''}`}
+                tabIndex={0}
+              >
                 <span className="tableNode__colName">{c.column_name}</span>
                 {c.column_comment ? (
                   <AccessibleTruncatedText
@@ -153,12 +157,12 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
               {c.is_pk ? (
-                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key" tabIndex={0}>
+                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key" tabIndex={-1}>
                   PK
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)" tabIndex={0}>
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)" tabIndex={-1}>
                   NOT NULL
                 </span>
               ) : null}
