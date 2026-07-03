@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2024-03-24 - Make Badges Keyboard Accessible
+**Learning:** Non-interactive semantic elements (`abbr`, `span`) used as badges require `tabIndex={0}` for their `title` and `aria-label` to be accessible via keyboard.
+**Action:** When adding informative badges using `<abbr>` or `<span>`, always include `tabIndex={0}` to ensure keyboard-only users can access their `title` or `aria-label` text.
