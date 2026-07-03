@@ -31,4 +31,3 @@ frontend/coverage/
 registered_agents.json
 task_agent_mapping.json
 backend/venv/
-frontend/coverage/

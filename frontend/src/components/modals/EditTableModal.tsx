@@ -109,7 +109,7 @@ export function EditTableModal({
 
               <div className="col" style={{ gap: 8 }}>
                 {editingNode.data.columns.map((col, idx) => {
-                  const colIdent = col.column_name || `컬럼 ${idx + 1}`;
+                  const colIdent = `컬럼 ${idx + 1}`;
                   // Use a stable key that won't remount the entire row if column name is edited
                   const rowKey = col.column_name ? `${col.column_name}-${idx}` : `new-col-${idx}`;
                   return (
