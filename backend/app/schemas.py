@@ -286,6 +286,24 @@ class BillingEntitlementOut(BaseModel):
     source_occurred_at: dt.datetime | None
 
 
+class BillingSeatReconciliationCandidateOut(BaseModel):
+    """Support-visible member candidate for manual seat deprovisioning review."""
+
+    member_subject: str
+    project_count: int = Field(ge=0)
+
+
+class BillingSeatReconciliationOut(BaseModel):
+    """Read-only comparison between contracted seats and active app seats."""
+
+    status: Literal["unknown_account", "not_configured", "within_limit", "over_limit"]
+    contracted_seat_count: int | None = Field(default=None, ge=1)
+    active_seat_count: int = Field(ge=0)
+    seats_over_limit: int = Field(ge=0)
+    deprovisioning_required: bool
+    deprovisioning_candidates: list[BillingSeatReconciliationCandidateOut]
+
+
 class BillingSupportAccountOut(BaseModel):
     """Read-only account diagnostics for authorized support operators."""
 
@@ -306,6 +324,7 @@ class BillingSupportAccountOut(BaseModel):
     share_link_count: int = Field(ge=0)
     active_share_link_count: int = Field(ge=0)
     billing_entitlement: BillingEntitlementOut
+    billing_seat_reconciliation: BillingSeatReconciliationOut
     llm_usage_current_month: BillingLlmUsageOut
     recent_share_links: list[BillingSupportShareLinkSummaryOut]
     recent_billing_events: list[BillingEventSummaryOut]

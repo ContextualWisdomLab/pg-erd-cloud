@@ -37,6 +37,7 @@ from app.metrics import BILLING_EVENTS_TOTAL
 from app.sanitize import sanitize_for_storage
 from app.schemas import (
     BillingCheckoutOut,
+    BillingEntitlementOut,
     BillingEventMetadataSummaryOut,
     BillingEventIn,
     BillingEventOut,
@@ -44,6 +45,8 @@ from app.schemas import (
     BillingLlmUsageOut,
     BillingPlanChangeIn,
     BillingPlanChangeOut,
+    BillingSeatReconciliationCandidateOut,
+    BillingSeatReconciliationOut,
     BillingSupportAccountOut,
     BillingSupportShareLinkSummaryOut,
     BillingUsageOut,
@@ -90,6 +93,12 @@ class BillingLlmUsageCounts:
     quota_exceeded_count: int
     input_chars: int
     output_chars: int
+
+
+@dataclass(frozen=True)
+class BillingSeatReconciliationCandidate:
+    member_subject: str
+    project_count: int
 
 
 def _license_verifier_kind() -> LicenseVerifierKind:
@@ -210,6 +219,84 @@ async def _usage_counts_for_owner(
                 or_(ShareLink.expires_at.is_(None), ShareLink.expires_at > now),
             ),
         ),
+    )
+
+
+async def _seat_deprovisioning_candidates_for_owner(
+    session: AsyncSession,
+    user_account_uuid: uuid.UUID,
+    *,
+    limit: int,
+) -> list[BillingSeatReconciliationCandidate]:
+    if limit <= 0:
+        return []
+
+    owned_project_ids = select(ProjectSpace.project_space_uuid).where(
+        ProjectSpace.created_by_user_uuid == user_account_uuid
+    )
+    project_count = func.count(distinct(ProjectMember.project_space_uuid))
+    result = await session.execute(
+        select(UserAccount.oidc_subject, project_count.label("project_count"))
+        .select_from(ProjectMember)
+        .join(
+            UserAccount,
+            UserAccount.user_account_uuid == ProjectMember.user_account_uuid,
+        )
+        .where(ProjectMember.project_space_uuid.in_(owned_project_ids))
+        .group_by(UserAccount.oidc_subject)
+        .order_by(project_count.asc(), UserAccount.oidc_subject.asc())
+        .limit(limit)
+    )
+    return [
+        BillingSeatReconciliationCandidate(
+            member_subject=str(row[0]),
+            project_count=int(row[1] or 0),
+        )
+        for row in result.all()
+    ]
+
+
+def _billing_seat_reconciliation_response(
+    *,
+    user_account_uuid: uuid.UUID | None,
+    usage_counts: BillingUsageCounts,
+    entitlement: BillingEntitlementOut,
+    candidates: list[BillingSeatReconciliationCandidate],
+) -> BillingSeatReconciliationOut:
+    if user_account_uuid is None:
+        return BillingSeatReconciliationOut(
+            status="unknown_account",
+            contracted_seat_count=None,
+            active_seat_count=0,
+            seats_over_limit=0,
+            deprovisioning_required=False,
+            deprovisioning_candidates=[],
+        )
+
+    if entitlement.seat_count is None:
+        return BillingSeatReconciliationOut(
+            status="not_configured",
+            contracted_seat_count=None,
+            active_seat_count=usage_counts.seat_count,
+            seats_over_limit=0,
+            deprovisioning_required=False,
+            deprovisioning_candidates=[],
+        )
+
+    seats_over_limit = max(usage_counts.seat_count - entitlement.seat_count, 0)
+    return BillingSeatReconciliationOut(
+        status="over_limit" if seats_over_limit > 0 else "within_limit",
+        contracted_seat_count=entitlement.seat_count,
+        active_seat_count=usage_counts.seat_count,
+        seats_over_limit=seats_over_limit,
+        deprovisioning_required=seats_over_limit > 0,
+        deprovisioning_candidates=[
+            BillingSeatReconciliationCandidateOut(
+                member_subject=candidate.member_subject,
+                project_count=candidate.project_count,
+            )
+            for candidate in candidates
+        ],
     )
 
 
@@ -662,6 +749,23 @@ async def get_support_account_billing(
         session,
         subject,
     )
+    billing_entitlement = billing_entitlement_from_events(
+        recent_billing_event_models,
+    )
+    seats_over_limit = (
+        max(usage_counts.seat_count - billing_entitlement.seat_count, 0)
+        if billing_entitlement.seat_count is not None
+        else 0
+    )
+    seat_deprovisioning_candidates = (
+        await _seat_deprovisioning_candidates_for_owner(
+            session,
+            user_account_uuid,
+            limit=seats_over_limit,
+        )
+        if user_account_uuid is not None and seats_over_limit > 0
+        else []
+    )
     llm_month, llm_start, llm_end = _billing_month_window(None)
     llm_usage_counts = (
         await _llm_usage_counts_for_account(
@@ -689,8 +793,12 @@ async def get_support_account_billing(
         snapshot_count=usage_counts.snapshot_count,
         share_link_count=usage_counts.share_link_count,
         active_share_link_count=usage_counts.active_share_link_count,
-        billing_entitlement=billing_entitlement_from_events(
-            recent_billing_event_models,
+        billing_entitlement=billing_entitlement,
+        billing_seat_reconciliation=_billing_seat_reconciliation_response(
+            user_account_uuid=user_account_uuid,
+            usage_counts=usage_counts,
+            entitlement=billing_entitlement,
+            candidates=seat_deprovisioning_candidates,
         ),
         llm_usage_current_month=_llm_usage_response(
             month=llm_month,

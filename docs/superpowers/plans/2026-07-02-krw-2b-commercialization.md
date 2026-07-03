@@ -309,8 +309,13 @@ Status:
 - Project member invite now uses the same entitlement evidence to reject new
   seats when the contracted seat count is already reached, while allowing role
   updates for existing seated members.
+- Support diagnostics now compare contracted seat count against active app seats
+  and return read-only deprovisioning candidates when the account is over limit.
+  This supports audited manual review without deleting customer access before a
+  customer-specific approval policy exists.
 - Remaining gap: provider-specific fulfillment SDKs, customer portal deep
-  integration, real provider catalog approval, and automatic seat provisioning.
+  integration, real provider catalog approval, and customer-approved automatic
+  seat provisioning/deprovisioning.
 
 Tasks:
 

@@ -310,7 +310,9 @@ blocker로 분류합니다.
   조회 흐름을 검증함
 - 🟡 결제/라이선스: 정적 `LICENSE_KEY`는 기존 배포 호환용으로 유지하며, 외부 결제
   provider별 fulfillment SDK, customer portal 심화 연동, 실제 provider catalog 운영값
-  승인, 자동 seat provisioning/deprovisioning은 추가 설계 중
+  승인, 고객 승인까지 포함한 자동 seat provisioning/deprovisioning은 추가 설계 중.
+  다만 support diagnostics는 최신 entitlement의 계약 좌석 수와 실제 active seat를
+  비교하고 초과 시 read-only deprovisioning 후보를 반환함
 - ✅ 법무/지원 패키지: 개인정보 처리, 이용약관, SLA/지원, 보안 취약점 신고,
   상용 릴리즈 승인 체크리스트를 배포물에 포함함
 - ✅ 승인 기록 형식 검증: `docs/legal/release-approvals/release-approval.example.json`과

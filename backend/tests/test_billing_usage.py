@@ -130,6 +130,9 @@ class FakeSupportResult:
     def scalars(self) -> FakeScalars:
         return FakeScalars(self.values)
 
+    def all(self) -> list[object]:
+        return self.values
+
 
 class FakeSupportSession:
     def __init__(
@@ -140,12 +143,14 @@ class FakeSupportSession:
         share_links: list[ShareLink] | None = None,
         contract_event: BillingEvent | None = None,
         llm_usage_counts: dict[str, int] | None = None,
+        seat_deprovisioning_candidates: list[tuple[str, int]] | None = None,
     ) -> None:
         self.account = account
         self.counts = counts
         self.events = events
         self.share_links = share_links or []
         self.contract_event = contract_event
+        self.seat_deprovisioning_candidates = seat_deprovisioning_candidates
         self.llm_usage_counts = llm_usage_counts or {
             "request_count": 0,
             "success_count": 0,
@@ -173,6 +178,18 @@ class FakeSupportSession:
             return FakeSupportResult(values=list(self.share_links))
         if self.statement_count == events_index:
             return FakeSupportResult(values=list(self.events))
+        candidate_index = (
+            events_index + 1
+            if self.seat_deprovisioning_candidates is not None
+            else None
+        )
+        llm_index = events_index + (
+            2 if self.seat_deprovisioning_candidates is not None else 1
+        )
+        if self.statement_count == candidate_index:
+            return FakeSupportResult(
+                values=list(self.seat_deprovisioning_candidates or []),
+            )
         if self.statement_count == llm_index:
             return FakeSupportResult(mapping=self.llm_usage_counts)
         raise AssertionError(f"unexpected support query #{self.statement_count}")
@@ -969,6 +986,14 @@ def test_support_account_billing_returns_read_only_account_diagnostics(
         "source_event_type": "subscription.updated",
         "source_occurred_at": "2026-07-02T00:00:00Z",
     }
+    assert payload["billing_seat_reconciliation"] == {
+        "status": "not_configured",
+        "contracted_seat_count": None,
+        "active_seat_count": 5,
+        "seats_over_limit": 0,
+        "deprovisioning_required": False,
+        "deprovisioning_candidates": [],
+    }
     assert session.statement_count == 10
 
 
@@ -1034,6 +1059,74 @@ def test_support_account_billing_derives_entitlement_from_latest_active_event(
         "source_event_type": "subscription.updated",
         "source_occurred_at": "2026-07-02T00:00:00Z",
     }
+    assert response.json()["billing_seat_reconciliation"] == {
+        "status": "within_limit",
+        "contracted_seat_count": 25,
+        "active_seat_count": 3,
+        "seats_over_limit": 0,
+        "deprovisioning_required": False,
+        "deprovisioning_candidates": [],
+    }
+
+
+def test_support_account_billing_reports_over_limit_seat_reconciliation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    customer_uuid = uuid.uuid4()
+    account = UserAccount(
+        user_account_uuid=customer_uuid,
+        oidc_subject="customer-owner",
+        display_name="Customer Owner",
+    )
+    event = BillingEvent(
+        billing_event_uuid=uuid.uuid4(),
+        provider="stripe",
+        provider_event_id="evt_over_limit",
+        event_type="subscription.updated",
+        subject="customer-owner",
+        target_plan="enterprise",
+        event_status="recorded",
+        occurred_at=dt.datetime(2026, 7, 2, tzinfo=dt.timezone.utc),
+        received_at=dt.datetime(2026, 7, 2, 1, tzinfo=dt.timezone.utc),
+        metadata_json={"seat_count": 3},
+    )
+    session = FakeSupportSession(
+        account=account,
+        counts=[1, 5, 2, 0, 0, 0],
+        events=[event],
+        seat_deprovisioning_candidates=[
+            ("member-a", 1),
+            ("member-b", 2),
+        ],
+    )
+    monkeypatch.setattr(settings, "support_operator_subjects", "support-operator")
+    monkeypatch.setattr(settings, "account_deactivated_subjects", "")
+    monkeypatch.setattr(
+        settings,
+        "billing_entitlement_event_types",
+        "subscription.updated",
+    )
+    app.dependency_overrides[get_current_user] = fake_get_support_operator
+    app.dependency_overrides[get_read_session] = lambda: session
+
+    response = TestClient(app).get(
+        "/api/billing/support/account",
+        params={"subject": "customer-owner"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["billing_seat_reconciliation"] == {
+        "status": "over_limit",
+        "contracted_seat_count": 3,
+        "active_seat_count": 5,
+        "seats_over_limit": 2,
+        "deprovisioning_required": True,
+        "deprovisioning_candidates": [
+            {"member_subject": "member-a", "project_count": 1},
+            {"member_subject": "member-b", "project_count": 2},
+        ],
+    }
+    assert session.statement_count == 11
 
 
 def test_support_account_billing_applies_contract_deactivation_event(

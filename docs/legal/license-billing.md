@@ -124,15 +124,20 @@
     `subscription.updated`, `contract.activated`, `contract.reactivated`입니다.
   - event metadata의 `seat_count`, `seats`, `seat_limit`, `licensed_seats`,
     `quantity` 값이 양의 정수이면 contracted seat count로 표시합니다.
-  - 이 계산은 지원/정산 증거 및 기본 seat-limit enforcement용입니다. provider
-    fulfillment 완료, 자동 seat provisioning/deprovisioning, invoice settlement의
-    원장 시스템을 대체하지 않습니다.
+  - support diagnostics는 contracted seat count와 실제 active seat count를 비교해
+    `billing_seat_reconciliation` 상태를 반환합니다. 계약 좌석 수를 초과하면
+    초과 좌석 수와 프로젝트 수가 적은 deprovisioning 후보 subject를 read-only로
+    표시해 수동 검토와 고객 승인 절차를 지원합니다.
+  - 이 계산은 지원/정산 증거, 기본 seat-limit enforcement, 감사 가능한
+    deprovisioning 검토용입니다. provider fulfillment 완료, 자동 계정 제거,
+    invoice settlement의 원장 시스템을 대체하지 않습니다.
 - `GET /api/billing/support/account?subject=<OIDC-subject>`는
   `SUPPORT_OPERATOR_SUBJECTS`에 포함된 사용자만 접근할 수 있는 read-only 지원
   진단 API입니다.
   - 대상 계정 UUID, 활성/비활성/미확인 상태, usage counter, license verifier,
-    billing/reactivation URL, 현재 entitlement evidence, 현재 월 LLM draft usage
-    summary, 최근 share link summary, 최근 billing event summary를 반환합니다.
+    billing/reactivation URL, 현재 entitlement evidence, seat reconciliation,
+    현재 월 LLM draft usage summary, 최근 share link summary, 최근 billing event
+    summary를 반환합니다.
   - LLM usage summary는 account 단위 월, 요청 수, 성공/실패/quota 초과, input/output
     문자량만 포함하며 prompt, snapshot JSON, provider response는 반환하지 않습니다.
   - share link summary는 UUID, project UUID, 권한, 활성/만료 상태, 생성/만료
