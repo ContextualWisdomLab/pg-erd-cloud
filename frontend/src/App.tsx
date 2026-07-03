@@ -58,6 +58,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
+import { exportDbml } from "./erd/dbml";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
@@ -623,6 +624,10 @@ export default function App() {
 
   function onDownloadMermaid() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
+  }
+
+  function onDownloadDbml() {
+    downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
   }
 
   function onRelDelete() {
@@ -1494,6 +1499,17 @@ export default function App() {
               aria-label="Mermaid 내보내기"
             >
               {"{}"}
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadDbml}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DBML 내보내기"
+              }
+              aria-label="DBML 내보내기"
+            >
+              DBML
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
