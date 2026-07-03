@@ -63,4 +63,4 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 
 ## 2025-03-05 - Optimize Search Filter String Creation
 **Learning:** In frontend performance loops filtering large lists of graph nodes, using `.flatMap()` and `.join()` inside the search loop causes severe garbage collection pressure and intermediate array allocations.
-**Action:** Always favor manual string concatenation loops (`+=`) over array-based functional chains in hot rendering or filtering paths for large graph nodes.
+**Action:** Prefer manual string concatenation loops (`+=`) over array-based functional chains in hot rendering or filtering paths for large graph nodes when profiling shows performance benefits.
