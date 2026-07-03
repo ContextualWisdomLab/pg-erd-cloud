@@ -60,6 +60,17 @@
   fixed) in this session's own Confirmation/List Navigation pattern boards;
   logged as a new Gap Report row in the Figma file itself so it isn't
   forgotten for older or future instances.
+- **Pass 4 (same day, via `/loop`):** Closed the two remaining self-audit
+  gaps from the final report: added 3 real Figma Grid Styles (`PG ERD Grid /
+  Desktop` 1200px-12col, `Tablet` 768px-8col, `Mobile` 360px-4col) — since
+  layout grids don't render in exported screenshots, also added visible
+  column-overlay rectangles so the grid is a genuine visual specimen, not
+  just an invisible property. Added the file's first Boolean (`Icon`) and
+  Instance Swap (`Leading Icon`) component properties, added directly to the
+  `PG ERD Button` `ComponentSetNode` (confirmed the Plugin API allows this
+  post-hoc, contrary to the "add before combineAsVariants" guidance for
+  per-variant properties) and demonstrated working via a live `Icon=true`
+  instance referencing `PG ERD Icon/Check`.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
