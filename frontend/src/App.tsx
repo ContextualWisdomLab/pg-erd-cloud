@@ -182,18 +182,13 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
+      // ⚡ Bolt: Iterate through strings directly instead of array flatMap and join, which reduces GC and allocations
+      let haystack = node.data.title + " " + (node.data.comment ?? "") + " ";
+      for (let i = 0; i < node.data.columns.length; i++) {
+        const column = node.data.columns[i];
+        haystack += column.column_name + " " + column.data_type + " " + (column.column_comment ?? "") + " ";
+      }
+      if (haystack.toLocaleLowerCase().includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }
     }
