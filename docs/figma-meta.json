@@ -1,0 +1,6 @@
+{
+  "fileKey": "MANUAL_REQUIRED",
+  "url": "https://www.figma.com/",
+  "status": "pending_manual_creation",
+  "note": "Figma 자동 연동(MCP) 환경 제한으로 인해 빈 파일 자동 생성이 스킵되었습니다. 차후 사용자가 직접 파일을 생성하여 연결해야 합니다."
+}

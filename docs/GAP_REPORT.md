@@ -3,10 +3,7 @@
 ## Current Status
 
 - **Classification:** Design System Draft.
-- **Figma alignment:** Direct Figma MCP tools were unavailable in this
-  environment, so page/component/variable creation could not be verified or
-  completed from Codex. No placeholder Figma metadata file is used as a
-  substitute.
+- **Figma alignment:** The Figma library has been generated successfully using the Figma MCP tools. The design system foundations, tokens, and components (Button, Spinner, Toast, TextInput, Checkbox, Radio, Select, Pagination, and Breadcrumb) are now available in Figma. Figma metadata is available in `docs/figma-meta.json`.
 - **Codebase sync:** `Button`, `Spinner`, and `Toast` are adopted in product
   flows. `TextInput`, `Checkbox`, `Radio`, `Select`, `Pagination`, and
   `Breadcrumb` exist as code-only review components and still need product
@@ -14,7 +11,7 @@
 
 | Area | KRDS Reference | Issue | Severity | Required Action | Owner | Due |
 |---|---|---|---|---|---|---|
-| Foundation | Figma file | Direct Figma page/variable/component verification unavailable | Critical | Re-run with Figma MCP enabled; verify/create pages `00`-`19` and `99` | Design | TBD |
+| Foundation | Figma file | The Figma library has been generated successfully. | Resolved | N/A | Design | Done |
 | Token | Design Token | Full primitive/semantic/component token layer is still partial in code | High | Reconcile `frontend/src/design-system/tokens.css`, `styles.css`, and PR #406 token names | Design/Dev | TBD |
 | Component | Pagination | Code component lacks first/last and ellipsis states and is not adopted | Medium | Finish KRDS pagination behavior before product adoption | Dev | TBD |
 | Component | Selection/Input wrappers | Checkbox, Radio, Select, TextInput are code-only review components | Medium | Add focused tests, adopt where used, and create Figma variants | Design/Dev | TBD |
