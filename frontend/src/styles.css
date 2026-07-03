@@ -4,6 +4,25 @@ html, body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+/*
+ * Minimal semantic design-token layer.
+ * Mirrors the "PG ERD Color" semantic variable collection in the
+ * Figma design system (see docs/design-system/README.md):
+ *   --color-border-focus  <-> color/border/focus
+ *   --color-border-error  <-> color/border/error
+ *   --color-text-disabled <-> color/text/disabled
+ * Values below match the colors already hardcoded elsewhere in this
+ * file so introducing the tokens does not change any rendered output.
+ * A broader token layer covering brand/surface/spacing colors is
+ * proposed separately in PR #406 (codex/css-token-layer) and is not
+ * duplicated here to avoid conflicting with that in-flight change.
+ */
+:root {
+  --color-border-focus: #034ea2;
+  --color-border-error: #b91c1c;
+  --color-text-disabled: #9ca3af;
+}
+
 #root {
   height: 100vh;
 }
@@ -53,7 +72,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #034ea2;
+  outline: 3px solid var(--color-border-focus);
   outline-offset: 2px;
 }
 
@@ -382,7 +401,7 @@ button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   background-color: #f3f4f6;
-  color: #9ca3af;
+  color: var(--color-text-disabled);
 }
 
 .tableNode {
@@ -547,7 +566,7 @@ button:disabled {
 }
 
 .error {
-  color: #b91c1c;
+  color: var(--color-border-error);
   font-size: 13px;
 }
 
