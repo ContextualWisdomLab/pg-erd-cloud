@@ -43,3 +43,7 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+
+## 2024-07-04 - [EditEdgeModal 삭제 버튼 접근성 개선]
+**Learning:** 모달 대화상자 내에 위치한 일반적인 "삭제"와 같은 액션 버튼은 시각적으로는 맥락(예: 어떤 관계를 삭제하는지)이 주어지지만, 스크린 리더 사용자에게는 단순한 "삭제" 버튼으로만 읽혀서 어떤 항목이 삭제되는지 모호함을 유발할 수 있습니다.
+**Action:** 대화상자에서 항목을 삭제하는 일반적인 버튼에는 `aria-label`을 사용하여 동적 맥락(예: `${source}에서 ${target}로의 관계 삭제`)을 명확히 제공함으로써 스크린 리더 환경의 모호함을 방지해야 합니다.
