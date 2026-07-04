@@ -182,19 +182,23 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
+      if (node.data.title.toLocaleLowerCase().includes(normalizedNodeSearch)) {
         matches.add(node.id);
+        continue;
+      }
+      if (node.data.comment?.toLocaleLowerCase().includes(normalizedNodeSearch)) {
+        matches.add(node.id);
+        continue;
+      }
+      for (const column of node.data.columns) {
+        if (
+          column.column_name.toLocaleLowerCase().includes(normalizedNodeSearch) ||
+          column.data_type.toLocaleLowerCase().includes(normalizedNodeSearch) ||
+          column.column_comment?.toLocaleLowerCase().includes(normalizedNodeSearch)
+        ) {
+          matches.add(node.id);
+          break;
+        }
       }
     }
     return matches;
