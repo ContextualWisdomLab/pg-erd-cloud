@@ -18,7 +18,15 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
+    parse_dsn = dsn
+    # Workaround for Python's urllib.parse not extracting password/netloc
+    # when the URL scheme contains an underscore.
+    if "://" in dsn:
+        scheme, rest = dsn.split("://", 1)
+        if "_" in scheme:
+            parse_dsn = f"http://{rest}"
+
+    parsed = urlsplit(parse_dsn)
 
     if parsed.password:
         candidates.add(parsed.password)
