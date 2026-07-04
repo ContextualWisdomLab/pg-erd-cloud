@@ -43,3 +43,7 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+
+## 2026-07-04 - Pair disabled buttons with visible helper text
+**Learning:** When buttons are conditionally disabled and an explanation is conditionally rendered as helper text, using `aria-describedby` to link them ensures screen readers announce the reason for the disabled state, greatly improving accessibility.
+**Action:** Always link conditionally rendered disabled-state helper text to the corresponding button using `aria-describedby` and an `id`.
