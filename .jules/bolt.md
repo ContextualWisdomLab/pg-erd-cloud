@@ -60,3 +60,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
+## 2024-07-25 - Avoid flatMap and join for High-Frequency String Building
+**Learning:** During real-time operations like typing in a search bar, iterating over dynamically sized React state arrays with `.flatMap()` and `.join(" ")` creates excessive short-lived intermediate arrays and strings, causing severe garbage collection pressure and main thread blocking.
+**Action:** Replace functional `.flatMap().join()` chains with explicit loops and standard iterative string concatenation (`+=`) for performance-critical string searching over collections of nodes.
