@@ -98,6 +98,9 @@ textarea:focus-visible {
 
 .workspaceNav__item {
   width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   padding: 10px 12px;
   text-align: left;
   border-color: transparent;
@@ -887,7 +890,8 @@ button:disabled {
   }
 
   .workspaceNav__item {
-    min-height: 42px;
+    min-height: 44px;
+    justify-content: center;
     padding: 8px 6px;
     text-align: center;
     font-size: 13px;
