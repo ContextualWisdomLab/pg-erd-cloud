@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2023-07-04 - Native Form Submission for Modals
+**Learning:** React flow properties and components often lack default native form interactions. Converting modal contents strictly to `<form>` tags rather than `<div>` allows "Enter" key submissions, significantly increasing accessibility and UX.
+**Action:** Always wrap interactive input and button groups in a `<form>` component and ensure the submit action is bounded natively, especially for data entries and edits in overlays.
