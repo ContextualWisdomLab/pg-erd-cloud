@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type { Connection, DiagramView, DiagramViewDetail, Project, SchemaDiff, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotDiffResult, SnapshotJson, ViewLayout } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -19,7 +19,8 @@ const demoConnectionsByProject: Record<string, Connection[]> = {
 
 const demoSnapshotsByProject: Record<string, Snapshot[]> = {
   'demo-shopping': [
-    { schema_snapshot_uuid: 'demo-shopping-snapshot', status: 'succeeded', schema_filter: 'public' }
+    { schema_snapshot_uuid: 'demo-shopping-snapshot', status: 'succeeded', schema_filter: 'public' },
+    { schema_snapshot_uuid: 'demo-shopping-snapshot-prev', status: 'succeeded', schema_filter: 'public' }
   ],
   'demo-hr': [
     { schema_snapshot_uuid: 'demo-hr-snapshot', status: 'succeeded', schema_filter: 'hr' }
@@ -253,4 +254,149 @@ export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
   if (!r.ok) throw new Error(`getSnapshot failed: ${r.status}`)
   const response = (await r.json()) as SnapshotDetailResponse
   return snapshotDetailFromResponse(response)
+}
+
+const demoSchemaDiff: SchemaDiff = {
+  base_table_count: 3,
+  target_table_count: 4,
+  tables: {
+    added: ['public.order_item'],
+    removed: [],
+    changed: [
+      {
+        table: 'public.member',
+        columns: {
+          added: ['phone'],
+          removed: [],
+          changed: [
+            {
+              column: 'email',
+              from: { data_type: 'varchar(100)', is_not_null: false },
+              to: { data_type: 'varchar(255)', is_not_null: true }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  foreign_keys: {
+    added: [
+      {
+        name: 'fk_order_item_order',
+        child_table: 'public.order_item',
+        child_columns: ['order_id'],
+        parent_table: 'public.orders',
+        parent_columns: ['order_id']
+      }
+    ],
+    removed: []
+  },
+  summary: {
+    tables_added: 1,
+    tables_removed: 0,
+    tables_changed: 1,
+    columns_added: 1,
+    columns_removed: 0,
+    columns_changed: 1,
+    fks_added: 1,
+    fks_removed: 0,
+    has_changes: true
+  }
+}
+
+export async function diffSnapshots(targetId: string, againstId: string): Promise<SnapshotDiffResult> {
+  if (DEMO_MODE) {
+    return {
+      base_snapshot_uuid: againstId,
+      target_snapshot_uuid: targetId,
+      status: 'ok',
+      diff: demoSchemaDiff
+    }
+  }
+  const params = new URLSearchParams({ against: againstId })
+  const r = await fetch(
+    `${API_BASE}/api/snapshots/${encodeURIComponent(targetId)}/diff?${params.toString()}`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`diffSnapshots failed: ${r.status}`)
+  return r.json()
+}
+
+const demoViewsByProject: Record<string, DiagramViewDetail[]> = {}
+
+export async function listViews(projectId: string): Promise<DiagramView[]> {
+  if (DEMO_MODE) {
+    return (demoViewsByProject[projectId] ?? []).map(
+      ({ layout_json: _layout, ...summary }) => summary
+    )
+  }
+  const r = await fetch(
+    `${API_BASE}/api/diagram-views/by-project/${encodeURIComponent(projectId)}`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`listViews failed: ${r.status}`)
+  return r.json()
+}
+
+export async function createView(projectId: string, name: string, layout_json: ViewLayout): Promise<DiagramView> {
+  if (DEMO_MODE) {
+    const now = new Date().toISOString()
+    const view: DiagramViewDetail = {
+      diagram_view_uuid: `demo-view-${Date.now()}`,
+      name,
+      created_at: now,
+      updated_at: now,
+      layout_json
+    }
+    demoViewsByProject[projectId] = [view, ...(demoViewsByProject[projectId] ?? [])]
+    const { layout_json: _layout, ...summary } = view
+    return summary
+  }
+  const r = await fetch(
+    `${API_BASE}/api/diagram-views/by-project/${encodeURIComponent(projectId)}`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: await jsonHeaders(),
+      body: JSON.stringify({ name, layout_json })
+    }
+  )
+  if (!r.ok) throw new Error(`createView failed: ${r.status}`)
+  return r.json()
+}
+
+export async function getView(viewId: string): Promise<DiagramViewDetail> {
+  if (DEMO_MODE) {
+    for (const list of Object.values(demoViewsByProject)) {
+      const found = list.find((v) => v.diagram_view_uuid === viewId)
+      if (found) return found
+    }
+    throw new Error('getView failed: 404')
+  }
+  const r = await fetch(
+    `${API_BASE}/api/diagram-views/${encodeURIComponent(viewId)}`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`getView failed: ${r.status}`)
+  return r.json()
+}
+
+export async function deleteView(viewId: string): Promise<void> {
+  if (DEMO_MODE) {
+    for (const projectId of Object.keys(demoViewsByProject)) {
+      demoViewsByProject[projectId] = demoViewsByProject[projectId].filter(
+        (v) => v.diagram_view_uuid !== viewId
+      )
+    }
+    return
+  }
+  const r = await fetch(
+    `${API_BASE}/api/diagram-views/${encodeURIComponent(viewId)}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'X-CSRF-Token': await csrfToken() }
+    }
+  )
+  if (!r.ok) throw new Error(`deleteView failed: ${r.status}`)
 }

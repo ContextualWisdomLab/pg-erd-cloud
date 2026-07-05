@@ -17,10 +17,12 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   AddTableModal,
   CardinalityModal,
+  DiffModal,
   EditEdgeModal,
   EditTableModal,
   ExportModal,
   GroupModal,
+  ViewsModal,
 } from "./components/modals";
 
 import {
@@ -29,11 +31,17 @@ import {
   createConnection,
   createProject,
   createSnapshot,
+  createView,
+  deleteView,
+  diffSnapshots,
   getSnapshot,
+  getView,
   listConnections,
   listProjects,
   listSnapshots,
+  listViews,
 } from "./api";
+import { applyLayout, captureLayout } from "./diagramViews";
 import TableNode from "./erd/TableNode";
 import {
   BUSINESS_GROUP_COLORS,
@@ -58,7 +66,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
-import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
+import type { Connection, DiagramView, Project, SchemaDiff, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -149,6 +157,19 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+
+  const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
+  const [diffBaseId, setDiffBaseId] = useState<string | null>(null);
+  const [diffResult, setDiffResult] = useState<SchemaDiff | null>(null);
+  const [diffNotFound, setDiffNotFound] = useState(false);
+  const [isDiffLoading, setIsDiffLoading] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
+
+  const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
+  const [savedViews, setSavedViews] = useState<DiagramView[]>([]);
+  const [newViewName, setNewViewName] = useState("");
+  const [isSavingView, setIsSavingView] = useState(false);
+  const [viewsError, setViewsError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -535,6 +556,87 @@ export default function App() {
     setExportDdlText(nodes.length > 0 ? exportDDL(nodes, edges) : "");
     setShareLinkError(null);
     setIsExportModalOpen(true);
+  }
+
+  function onOpenDiff() {
+    setDiffBaseId(null);
+    setDiffResult(null);
+    setDiffNotFound(false);
+    setDiffError(null);
+    setIsDiffModalOpen(true);
+  }
+
+  function onCloseDiff() {
+    setIsDiffModalOpen(false);
+  }
+
+  function onOpenViews() {
+    setViewsError(null);
+    setNewViewName("");
+    setIsViewsModalOpen(true);
+    if (!selectedProjectId) return;
+    listViews(selectedProjectId)
+      .then(setSavedViews)
+      .catch(() => setViewsError("저장된 뷰를 불러오지 못했습니다."));
+  }
+
+  function onCloseViews() {
+    setIsViewsModalOpen(false);
+  }
+
+  function onSaveCurrentView() {
+    if (!selectedProjectId || nodes.length === 0) return;
+    const name = newViewName.trim();
+    if (!name) return;
+    setIsSavingView(true);
+    setViewsError(null);
+    createView(selectedProjectId, name, captureLayout(nodes))
+      .then((view) => {
+        setSavedViews((prev) => [view, ...prev]);
+        setNewViewName("");
+      })
+      .catch(() => setViewsError("뷰 저장에 실패했습니다."))
+      .finally(() => setIsSavingView(false));
+  }
+
+  function onLoadView(viewId: string) {
+    setViewsError(null);
+    getView(viewId)
+      .then((detail) => {
+        setNodes((prev) => applyLayout(prev, detail.layout_json));
+        setIsViewsModalOpen(false);
+      })
+      .catch(() => setViewsError("뷰를 불러오지 못했습니다."));
+  }
+
+  function onDeleteView(viewId: string) {
+    setViewsError(null);
+    deleteView(viewId)
+      .then(() => {
+        setSavedViews((prev) =>
+          prev.filter((v) => v.diagram_view_uuid !== viewId),
+        );
+      })
+      .catch(() => setViewsError("뷰 삭제에 실패했습니다."));
+  }
+
+  function onSelectDiffBase(baseSnapshotId: string) {
+    setDiffBaseId(baseSnapshotId);
+    if (!snapshotId) return;
+    setIsDiffLoading(true);
+    setDiffError(null);
+    setDiffNotFound(false);
+    setDiffResult(null);
+    diffSnapshots(snapshotId, baseSnapshotId)
+      .then((res) => {
+        if (res.status === "not_found") {
+          setDiffNotFound(true);
+        } else {
+          setDiffResult(res.diff);
+        }
+      })
+      .catch(() => setDiffError("스키마 비교를 불러오지 못했습니다."))
+      .finally(() => setIsDiffLoading(false));
   }
 
   function onCloseExport() {
@@ -1425,6 +1527,34 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenDiff}
+              disabled={!snapshotId || snapshots.length < 2}
+              title={
+                !snapshotId
+                  ? "스냅샷을 먼저 불러오세요"
+                  : snapshots.length < 2
+                    ? "비교하려면 스냅샷이 2개 이상 필요합니다"
+                    : "스키마 비교"
+              }
+              aria-label="스키마 비교"
+            >
+              Δ
+            </button>
+            <button
+              type="button"
+              onClick={onOpenViews}
+              disabled={!selectedProjectId}
+              title={
+                !selectedProjectId
+                  ? "프로젝트를 먼저 선택하세요"
+                  : "저장된 뷰"
+              }
+              aria-label="저장된 뷰"
+            >
+              ⧉
+            </button>
+            <button
+              type="button"
               onClick={onDownloadSvg}
               disabled={nodes.length === 0}
               title={
@@ -1530,6 +1660,35 @@ export default function App() {
             onCopyExportDdl={onCopyExportDdl}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
+          />
+
+          <DiffModal
+            isOpen={isDiffModalOpen}
+            targetLabel={snapshotId ? snapshotId.slice(0, 8) : ""}
+            baseCandidates={snapshots.filter(
+              (s) => s.schema_snapshot_uuid !== snapshotId,
+            )}
+            selectedBaseId={diffBaseId}
+            diff={diffResult}
+            isLoading={isDiffLoading}
+            error={diffError}
+            notFound={diffNotFound}
+            onSelectBase={onSelectDiffBase}
+            onClose={onCloseDiff}
+          />
+
+          <ViewsModal
+            isOpen={isViewsModalOpen}
+            views={savedViews}
+            newViewName={newViewName}
+            setNewViewName={setNewViewName}
+            isSaving={isSavingView}
+            error={viewsError}
+            canSave={Boolean(selectedProjectId) && nodes.length > 0}
+            onSaveCurrent={onSaveCurrentView}
+            onLoadView={onLoadView}
+            onDeleteView={onDeleteView}
+            onClose={onCloseViews}
           />
 
           <EditEdgeModal

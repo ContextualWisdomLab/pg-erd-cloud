@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Literal
 
@@ -89,6 +90,44 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class SnapshotDiffOut(BaseModel):
+    """Structured diff between two schema snapshots.
+
+    ``status`` is ``"not_found"`` when either snapshot is missing or the caller
+    is not authorized for it (uniform response avoids existence enumeration);
+    ``"ok"`` with a populated ``diff`` otherwise.
+    """
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    diff: dict | None
+
+
+class DiagramViewCreateIn(BaseModel):
+    """Request body for saving an ERD canvas view."""
+
+    name: str = Field(min_length=1, max_length=200)
+    # Opaque client layout (node positions, hidden tables, viewport). The API
+    # bounds the serialized size in the endpoint to prevent abuse.
+    layout_json: dict
+
+
+class DiagramViewOut(BaseModel):
+    """Diagram view summary."""
+
+    diagram_view_uuid: uuid.UUID
+    name: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+class DiagramViewDetailOut(DiagramViewOut):
+    """Diagram view including its layout payload."""
+
+    layout_json: dict
 
 
 class MeOut(BaseModel):
