@@ -58,6 +58,14 @@ class ConnectionOut(BaseModel):
     conn_name: str
 
 
+class ConnectionTestOut(BaseModel):
+    """Result of a connection health probe (DSN-redacted on failure)."""
+
+    ok: bool
+    server_version: str | None = None
+    error: str | None = None
+
+
 class SnapshotCreateIn(BaseModel):
     """Request body for creating a schema snapshot."""
 
