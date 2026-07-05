@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2025-07-05 - Unique aria-labels for dynamic forms & Semantic Tags for Badges
+**Learning:** In dynamically generated forms within arrays or mapped lists, generic `aria-label`s (like `aria-label="컬럼명"`) are read identically across all rows, making it impossible for screen readers to identify which row's input they are currently focused on. Furthermore, non-semantic tags like `<span>` often drop `aria-label`s in assistive technologies because they lack an inherent role.
+**Action:** Always interpolate unique identifiers into `aria-label`s within list maps (e.g., ``aria-label={`${itemName} 데이터 타입`}``). Replace generic `<span>` elements used as UI badges with `<abbr>` or explicit semantic roles to ensure `aria-label` texts are consistently exposed to screen readers.
