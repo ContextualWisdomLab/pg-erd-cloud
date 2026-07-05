@@ -130,6 +130,25 @@ class DiagramViewDetailOut(DiagramViewOut):
     layout_json: dict
 
 
+class TableAnnotationUpsertIn(BaseModel):
+    """Request body for creating/updating a table annotation."""
+
+    schema_name: str = Field(min_length=1, max_length=255)
+    relation_name: str = Field(min_length=1, max_length=255)
+    body: str = Field(min_length=1, max_length=10_000)
+
+
+class TableAnnotationOut(BaseModel):
+    """A table annotation."""
+
+    table_annotation_uuid: uuid.UUID
+    schema_name: str
+    relation_name: str
+    body: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
