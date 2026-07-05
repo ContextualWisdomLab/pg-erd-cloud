@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    MigrationSafetyOut,
     NamingLintOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
@@ -27,6 +28,7 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
+from app.ddl.migration_safety import analyze_migration_safety
 from app.diff.schema_diff import diff_snapshots
 from app.spec.naming_lint import lint_naming
 from app.spec.wide_tables import detect_wide_tables
@@ -191,6 +193,46 @@ async def diff_snapshot(
         target_snapshot_uuid=schema_snapshot_uuid,
         status="ok",
         diff=diff,
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/migration-safety", response_model=MigrationSafetyOut
+)
+async def migration_safety(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to analyze migrating from"
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> MigrationSafetyOut:
+    """Risk-classify the migration from the base snapshot to this one.
+
+    Each change is labelled safe / warning / destructive with an explanation so
+    a reviewer can spot data loss and table-locking operations before applying.
+    Both snapshots are authorized independently (uniform not-found).
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return MigrationSafetyOut(
+            base_snapshot_uuid=against,
+            target_snapshot_uuid=schema_snapshot_uuid,
+            status="not_found",
+            analysis=None,
+        )
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    analysis = analyze_migration_safety(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+    )
+    return MigrationSafetyOut(
+        base_snapshot_uuid=against,
+        target_snapshot_uuid=schema_snapshot_uuid,
+        status="ok",
+        analysis=analysis,
     )
 
 
