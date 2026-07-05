@@ -165,6 +165,17 @@ export type TableAnnotation = {
   updated_at: string
 }
 
+export type InferredRelationship = {
+  child_schema: string
+  child_table: string
+  child_column: string
+  parent_schema: string
+  parent_table: string
+  parent_column: string
+  confidence: string
+  reason: string
+}
+
 export type SnapshotDetailResponse = Omit<SnapshotDetail, 'error_message'> & {
   error_message: unknown
 }

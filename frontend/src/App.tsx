@@ -18,6 +18,7 @@ import {
   AddTableModal,
   CardinalityModal,
   AnnotationsModal,
+  InferredRelationshipsModal,
   DiffModal,
   EditEdgeModal,
   EditTableModal,
@@ -36,6 +37,7 @@ import {
   deleteAnnotation,
   deleteView,
   diffSnapshots,
+  fetchInferredRelationships,
   getSnapshot,
   getView,
   listAnnotations,
@@ -71,7 +73,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
-import type { Connection, ConnectionTestResult, DiagramView, Project, SchemaDiff, Snapshot, SnapshotDetail, TableAnnotation } from "./types";
+import type { Connection, ConnectionTestResult, DiagramView, InferredRelationship, Project, SchemaDiff, Snapshot, SnapshotDetail, TableAnnotation } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -183,6 +185,11 @@ export default function App() {
 
   const [connTestResult, setConnTestResult] = useState<ConnectionTestResult | null>(null);
   const [isTestingConn, setIsTestingConn] = useState(false);
+
+  const [isInferredModalOpen, setIsInferredModalOpen] = useState(false);
+  const [inferredRelationships, setInferredRelationships] = useState<InferredRelationship[]>([]);
+  const [isInferredLoading, setIsInferredLoading] = useState(false);
+  const [inferredError, setInferredError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -697,6 +704,22 @@ export default function App() {
         }),
       )
       .finally(() => setIsTestingConn(false));
+  }
+
+  function onOpenInferredRelationships() {
+    setInferredError(null);
+    setInferredRelationships([]);
+    setIsInferredModalOpen(true);
+    if (!snapshotId) return;
+    setIsInferredLoading(true);
+    fetchInferredRelationships(snapshotId)
+      .then(setInferredRelationships)
+      .catch(() => setInferredError("추론된 관계를 불러오지 못했습니다."))
+      .finally(() => setIsInferredLoading(false));
+  }
+
+  function onCloseInferredRelationships() {
+    setIsInferredModalOpen(false);
   }
 
   function onSelectDiffBase(baseSnapshotId: string) {
@@ -1666,6 +1689,19 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenInferredRelationships}
+              disabled={!snapshotId}
+              title={
+                !snapshotId
+                  ? "스냅샷을 먼저 생성하세요"
+                  : "추론된 관계 (선언되지 않은 외래키)"
+              }
+              aria-label="추론된 관계"
+            >
+              🔗
+            </button>
+            <button
+              type="button"
               onClick={onDownloadSvg}
               disabled={nodes.length === 0}
               title={
@@ -1800,6 +1836,14 @@ export default function App() {
             onLoadView={onLoadView}
             onDeleteView={onDeleteView}
             onClose={onCloseViews}
+          />
+
+          <InferredRelationshipsModal
+            isOpen={isInferredModalOpen}
+            relationships={inferredRelationships}
+            isLoading={isInferredLoading}
+            error={inferredError}
+            onClose={onCloseInferredRelationships}
           />
 
           <AnnotationsModal

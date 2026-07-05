@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, ConnectionTestResult, DiagramView, DiagramViewDetail, Project, SchemaDiff, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotDiffResult, SnapshotJson, TableAnnotation, ViewLayout } from './types'
+import type { Connection, ConnectionTestResult, DiagramView, DiagramViewDetail, InferredRelationship, Project, SchemaDiff, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotDiffResult, SnapshotJson, TableAnnotation, ViewLayout } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -399,6 +399,24 @@ export async function deleteView(viewId: string): Promise<void> {
     }
   )
   if (!r.ok) throw new Error(`deleteView failed: ${r.status}`)
+}
+
+export async function fetchInferredRelationships(snapshotId: string): Promise<InferredRelationship[]> {
+  if (DEMO_MODE) {
+    return [
+      {
+        child_schema: 'public', child_table: 'orders', child_column: 'member_id',
+        parent_schema: 'public', parent_table: 'member', parent_column: 'member_id',
+        confidence: 'high', reason: "column 'member_id' matches table 'member'"
+      }
+    ]
+  }
+  const r = await fetch(
+    `${API_BASE}/api/snapshots/${encodeURIComponent(snapshotId)}/inferred-relationships`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`fetchInferredRelationships failed: ${r.status}`)
+  return r.json()
 }
 
 export async function testConnection(connectionId: string): Promise<ConnectionTestResult> {
