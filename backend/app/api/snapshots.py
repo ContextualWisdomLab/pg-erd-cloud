@@ -15,10 +15,12 @@ from app.models import (
     JobQueue,
     SchemaSnapshot,
     SchemaSnapshotData,
+    TableAnnotation,
 )
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
@@ -159,6 +161,38 @@ async def export_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/data-dictionary.md", response_class=PlainTextResponse
+)
+async def export_data_dictionary(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Export a snapshot as a Markdown data dictionary, merged with the
+    project's table annotations (living documentation)."""
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "-- snapshot not found\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "-- snapshot data not found\n"
+    rows = await session.execute(
+        select(TableAnnotation).where(
+            TableAnnotation.project_space_uuid == snap.project_space_uuid
+        )
+    )
+    annotations = [
+        {
+            "schema_name": a.schema_name,
+            "relation_name": a.relation_name,
+            "body": a.body,
+        }
+        for a in rows.scalars().all()
+    ]
+    return snapshot_to_data_dictionary_md(data.snapshot_json, annotations)
 
 
 @router.get(
