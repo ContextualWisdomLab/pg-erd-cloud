@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    InferredRelationshipOut,
     NamingLintOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
@@ -26,6 +27,7 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.spec.naming_lint import lint_naming
+from app.spec.relationship_inference import infer_relationships
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -150,6 +152,29 @@ async def get_snapshot(
         error_message=snap.error_message,
         snapshot_json=data.snapshot_json if data else None,
     )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/inferred-relationships",
+    response_model=list[InferredRelationshipOut],
+)
+async def inferred_relationships(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> list[InferredRelationshipOut]:
+    """Suggest implicit (undeclared) foreign keys inferred from naming.
+
+    Useful for reverse-engineering databases that never declared their FKs.
+    Returns an empty list for missing/unauthorized snapshots (uniform response).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return []
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return []
+    return [InferredRelationshipOut(**rel) for rel in infer_relationships(data.snapshot_json)]
 
 
 @router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
