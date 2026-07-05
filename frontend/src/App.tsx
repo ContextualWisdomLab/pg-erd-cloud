@@ -182,17 +182,13 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
+      // ⚡ Bolt: Optimize node search by replacing array allocation, flatMap, and join with direct string concatenation.
+      // This prevents severe garbage collection pressure on high-frequency search renders.
+      let haystack = node.data.title + " " + (node.data.comment ?? "");
+      for (const column of node.data.columns) {
+        haystack += " " + column.column_name + " " + column.data_type + " " + (column.column_comment ?? "");
+      }
+      haystack = haystack.toLocaleLowerCase();
       if (haystack.includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }
