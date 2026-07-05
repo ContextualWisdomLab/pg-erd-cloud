@@ -32,7 +32,7 @@ now cross into **act** (migration SQL). The gaps below are ordered by value-per-
 
 ### P0 — Actionability (turns insight into change teams pay for)
 - **✅ Migration SQL from diff** _(delivered in this PR)_ — `GET /api/snapshots/{uuid}/migration.sql?against=…&dialect=…`. Diff two snapshots and get the `CREATE`/`ALTER`/`DROP` + FK statements to apply. Bridges the previously-disconnected `diff` and `ddl` modules the graph flagged.
-- **Migration safety review** — classify each statement as safe/destructive/lock-heavy; emit a summary header. (Foundation is in place: destructive ops already emitted with review comments.)
+- **✅ Migration safety review** _(delivered)_ — `GET /api/snapshots/{uuid}/migration-safety?against=…` classifies every change as **safe / warning / destructive** with a plain-language reason (drop = data loss; type change / `SET NOT NULL` / new FK = lock or fail against real data) plus a summary (`has_destructive`, `has_blocking`). Directly targets the #1 reason teams fear migrations.
 - **CI drift check** — a documented `GET .../migration.sql` recipe + exit-code semantics so teams can gate deploys on "no unexpected drift."
 
 ### P1 — Breadth & documentation (expands addressable market)

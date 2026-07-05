@@ -114,6 +114,15 @@ class SnapshotDiffOut(BaseModel):
     diff: dict | None
 
 
+class MigrationSafetyOut(BaseModel):
+    """Risk-classified analysis of migrating one snapshot to another."""
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    analysis: dict | None
+
+
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
