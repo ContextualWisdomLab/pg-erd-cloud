@@ -100,6 +100,19 @@ class SnapshotDetailOut(BaseModel):
     snapshot_json: dict | None
 
 
+class InferredRelationshipOut(BaseModel):
+    """An implicit (undeclared) foreign-key relationship inferred from names."""
+
+    child_schema: str
+    child_table: str
+    child_column: str
+    parent_schema: str
+    parent_table: str
+    parent_column: str
+    confidence: str
+    reason: str
+
+
 class SnapshotDiffOut(BaseModel):
     """Structured diff between two schema snapshots.
 
