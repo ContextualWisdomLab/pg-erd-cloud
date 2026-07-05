@@ -67,6 +67,22 @@ class ConnectionTestOut(BaseModel):
     error: str | None = None
 
 
+class ApplySqlIn(BaseModel):
+    """Request body for forward-engineering: apply DDL/SQL to a connection."""
+
+    sql: str = Field(min_length=1, max_length=262_144)
+    # Default to a rolled-back pre-flight; the caller must opt in to persist.
+    dry_run: bool = True
+
+
+class ApplySqlOut(BaseModel):
+    """Result of applying SQL (DSN-redacted on failure)."""
+
+    ok: bool
+    dry_run: bool
+    error: str | None = None
+
+
 class SnapshotCreateIn(BaseModel):
     """Request body for creating a schema snapshot."""
 

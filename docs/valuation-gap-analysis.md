@@ -40,6 +40,11 @@ now cross into **act** (migration SQL). The gaps below are ordered by value-per-
 - **Data dictionary export** — Markdown/HTML doc of schema + **annotations** (now that annotations exist) + PK/FK/index. High value for the "living documentation" buyer; pure-logic, testable.
 - **Relationship inference** — suggest implicit FKs by naming/type heuristics (`*_id` → `id`). Composes with existing cardinality logic.
 
+### P0b — Forward engineering (closes the round-trip: model → database)
+The product was reverse-only (DB → model). **Forward engineering** — materializing a designed schema / applying a migration to a real database — is the other half and a major value unlock: design → deploy in one tool.
+- **Apply DDL/migration to a connection** _(backend delivered — SECURITY REVIEW REQUIRED)_: `POST /api/connections/{uuid}/apply-sql` runs DDL against the connection's DB inside one transaction, **dry-run by default** (rolls back = pre-flight validation), editor-only, IDOR-safe, SSRF-guarded (reuses `validate_postgres_dsn_target` + pinned IP), DSN-redacted errors. Because it writes to a live DB, it must pass human security review before merge and needs a careful confirmation UI.
+- **Next**: down-migration generation (up+down = full change management), framework-formatted migrations (Alembic/Flyway), and a guarded "deploy schema" UX with explicit confirm + dry-run preview.
+
 ### P2 — Scale, governance, monetization (justifies a valuation, not just a product)
 - **Robust async jobs** — `jobs` is DB-queue MVP; harden the valkey worker path (retries/backoff/idempotency) for large-schema introspection at scale.
 - **Audit log + org multi-tenancy + usage quotas** — table-stakes for enterprise/SOC2 and for billing.
