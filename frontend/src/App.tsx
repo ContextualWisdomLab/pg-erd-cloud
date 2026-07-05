@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   AddTableModal,
   CardinalityModal,
+  AnnotationsModal,
   DiffModal,
   EditEdgeModal,
   EditTableModal,
@@ -32,14 +33,18 @@ import {
   createProject,
   createSnapshot,
   createView,
+  deleteAnnotation,
   deleteView,
   diffSnapshots,
   getSnapshot,
   getView,
+  listAnnotations,
   listConnections,
   listProjects,
   listSnapshots,
   listViews,
+  testConnection,
+  upsertAnnotation,
 } from "./api";
 import { applyLayout, captureLayout } from "./diagramViews";
 import TableNode from "./erd/TableNode";
@@ -66,7 +71,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
-import type { Connection, DiagramView, Project, SchemaDiff, Snapshot, SnapshotDetail } from "./types";
+import type { Connection, ConnectionTestResult, DiagramView, Project, SchemaDiff, Snapshot, SnapshotDetail, TableAnnotation } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -170,6 +175,14 @@ export default function App() {
   const [newViewName, setNewViewName] = useState("");
   const [isSavingView, setIsSavingView] = useState(false);
   const [viewsError, setViewsError] = useState<string | null>(null);
+
+  const [isAnnotationsModalOpen, setIsAnnotationsModalOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<TableAnnotation[]>([]);
+  const [isSavingAnnotation, setIsSavingAnnotation] = useState(false);
+  const [annotationsError, setAnnotationsError] = useState<string | null>(null);
+
+  const [connTestResult, setConnTestResult] = useState<ConnectionTestResult | null>(null);
+  const [isTestingConn, setIsTestingConn] = useState(false);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -618,6 +631,72 @@ export default function App() {
         );
       })
       .catch(() => setViewsError("뷰 삭제에 실패했습니다."));
+  }
+
+  function onOpenAnnotations() {
+    setAnnotationsError(null);
+    setIsAnnotationsModalOpen(true);
+    if (!selectedProjectId) return;
+    listAnnotations(selectedProjectId)
+      .then(setAnnotations)
+      .catch(() => setAnnotationsError("주석을 불러오지 못했습니다."));
+  }
+
+  function onCloseAnnotations() {
+    setIsAnnotationsModalOpen(false);
+  }
+
+  function onSaveAnnotation(
+    schemaName: string,
+    relationName: string,
+    body: string,
+  ) {
+    if (!selectedProjectId) return;
+    setIsSavingAnnotation(true);
+    setAnnotationsError(null);
+    upsertAnnotation(selectedProjectId, schemaName, relationName, body)
+      .then((saved) => {
+        setAnnotations((prev) => [
+          saved,
+          ...prev.filter(
+            (a) =>
+              !(
+                a.schema_name === saved.schema_name &&
+                a.relation_name === saved.relation_name
+              ),
+          ),
+        ]);
+      })
+      .catch(() => setAnnotationsError("주석 저장에 실패했습니다."))
+      .finally(() => setIsSavingAnnotation(false));
+  }
+
+  function onDeleteAnnotation(annotationId: string) {
+    if (!selectedProjectId) return;
+    setAnnotationsError(null);
+    deleteAnnotation(selectedProjectId, annotationId)
+      .then(() => {
+        setAnnotations((prev) =>
+          prev.filter((a) => a.table_annotation_uuid !== annotationId),
+        );
+      })
+      .catch(() => setAnnotationsError("주석 삭제에 실패했습니다."));
+  }
+
+  function onTestConnection() {
+    if (!selectedConnId) return;
+    setIsTestingConn(true);
+    setConnTestResult(null);
+    testConnection(selectedConnId)
+      .then(setConnTestResult)
+      .catch(() =>
+        setConnTestResult({
+          ok: false,
+          server_version: null,
+          error: "연결 테스트에 실패했습니다.",
+        }),
+      )
+      .finally(() => setIsTestingConn(false));
   }
 
   function onSelectDiffBase(baseSnapshotId: string) {
@@ -1180,6 +1259,25 @@ export default function App() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={onTestConnection}
+            disabled={!selectedConnId || isTestingConn}
+            aria-busy={isTestingConn}
+            aria-label="연결 테스트"
+          >
+            {isTestingConn ? "테스트 중…" : "연결 테스트"}
+          </button>
+          {connTestResult ? (
+            <span
+              className={connTestResult.ok ? "statusPill statusPill--succeeded" : "statusPill statusPill--failed"}
+              role="status"
+            >
+              {connTestResult.ok
+                ? `연결 성공${connTestResult.server_version ? ` · ${connTestResult.server_version}` : ""}`
+                : `연결 실패${connTestResult.error ? ` · ${connTestResult.error}` : ""}`}
+            </span>
+          ) : null}
         </div>
 
         <div className="field">
@@ -1555,6 +1653,19 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={onOpenAnnotations}
+              disabled={!selectedProjectId}
+              title={
+                !selectedProjectId
+                  ? "프로젝트를 먼저 선택하세요"
+                  : "테이블 주석"
+              }
+              aria-label="테이블 주석"
+            >
+              🗒
+            </button>
+            <button
+              type="button"
               onClick={onDownloadSvg}
               disabled={nodes.length === 0}
               title={
@@ -1689,6 +1800,16 @@ export default function App() {
             onLoadView={onLoadView}
             onDeleteView={onDeleteView}
             onClose={onCloseViews}
+          />
+
+          <AnnotationsModal
+            isOpen={isAnnotationsModalOpen}
+            annotations={annotations}
+            isSaving={isSavingAnnotation}
+            error={annotationsError}
+            onSave={onSaveAnnotation}
+            onDelete={onDeleteAnnotation}
+            onClose={onCloseAnnotations}
           />
 
           <EditEdgeModal

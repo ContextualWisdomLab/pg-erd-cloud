@@ -150,6 +150,21 @@ export type DiagramViewDetail = DiagramView & {
   layout_json: ViewLayout
 }
 
+export type ConnectionTestResult = {
+  ok: boolean
+  server_version: string | null
+  error: string | null
+}
+
+export type TableAnnotation = {
+  table_annotation_uuid: string
+  schema_name: string
+  relation_name: string
+  body: string
+  created_at: string
+  updated_at: string
+}
+
 export type SnapshotDetailResponse = Omit<SnapshotDetail, 'error_message'> & {
   error_message: unknown
 }

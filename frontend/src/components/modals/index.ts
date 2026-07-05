@@ -1,4 +1,5 @@
 export { AddTableModal } from './AddTableModal';
+export { AnnotationsModal } from './AnnotationsModal';
 export { CardinalityModal } from './CardinalityModal';
 export { DiffModal } from './DiffModal';
 export { EditEdgeModal } from './EditEdgeModal';

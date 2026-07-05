@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, DiagramView, DiagramViewDetail, Project, SchemaDiff, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotDiffResult, SnapshotJson, ViewLayout } from './types'
+import type { Connection, ConnectionTestResult, DiagramView, DiagramViewDetail, Project, SchemaDiff, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotDiffResult, SnapshotJson, TableAnnotation, ViewLayout } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -399,4 +399,89 @@ export async function deleteView(viewId: string): Promise<void> {
     }
   )
   if (!r.ok) throw new Error(`deleteView failed: ${r.status}`)
+}
+
+export async function testConnection(connectionId: string): Promise<ConnectionTestResult> {
+  if (DEMO_MODE) {
+    return { ok: true, server_version: 'PostgreSQL 16.2 (demo)', error: null }
+  }
+  const r = await fetch(
+    `${API_BASE}/api/connections/${encodeURIComponent(connectionId)}/test`,
+    { method: 'POST', credentials: 'include', headers: await jsonHeaders() }
+  )
+  if (!r.ok) throw new Error(`testConnection failed: ${r.status}`)
+  return r.json()
+}
+
+const demoAnnotationsByProject: Record<string, TableAnnotation[]> = {}
+
+export async function listAnnotations(projectId: string): Promise<TableAnnotation[]> {
+  if (DEMO_MODE) return demoAnnotationsByProject[projectId] ?? []
+  const r = await fetch(
+    `${API_BASE}/api/annotations/by-project/${encodeURIComponent(projectId)}`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`listAnnotations failed: ${r.status}`)
+  return r.json()
+}
+
+export async function upsertAnnotation(
+  projectId: string,
+  schema_name: string,
+  relation_name: string,
+  body: string
+): Promise<TableAnnotation> {
+  if (DEMO_MODE) {
+    const now = new Date().toISOString()
+    const list = demoAnnotationsByProject[projectId] ?? []
+    const idx = list.findIndex(
+      (a) => a.schema_name === schema_name && a.relation_name === relation_name
+    )
+    let ann: TableAnnotation
+    if (idx >= 0) {
+      ann = { ...list[idx], body, updated_at: now }
+      list[idx] = ann
+    } else {
+      ann = {
+        table_annotation_uuid: `demo-ann-${list.length + 1}`,
+        schema_name,
+        relation_name,
+        body,
+        created_at: now,
+        updated_at: now
+      }
+      list.unshift(ann)
+    }
+    demoAnnotationsByProject[projectId] = list
+    return ann
+  }
+  const r = await fetch(
+    `${API_BASE}/api/annotations/by-project/${encodeURIComponent(projectId)}`,
+    {
+      method: 'PUT',
+      credentials: 'include',
+      headers: await jsonHeaders(),
+      body: JSON.stringify({ schema_name, relation_name, body })
+    }
+  )
+  if (!r.ok) throw new Error(`upsertAnnotation failed: ${r.status}`)
+  return r.json()
+}
+
+export async function deleteAnnotation(projectId: string, annotationId: string): Promise<void> {
+  if (DEMO_MODE) {
+    demoAnnotationsByProject[projectId] = (demoAnnotationsByProject[projectId] ?? []).filter(
+      (a) => a.table_annotation_uuid !== annotationId
+    )
+    return
+  }
+  const r = await fetch(
+    `${API_BASE}/api/annotations/${encodeURIComponent(annotationId)}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'X-CSRF-Token': await csrfToken() }
+    }
+  )
+  if (!r.ok) throw new Error(`deleteAnnotation failed: ${r.status}`)
 }
