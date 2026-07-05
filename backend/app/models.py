@@ -3,7 +3,15 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, Text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -183,6 +191,75 @@ class JobQueue(Base):
     )
 
     __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+
+
+class DiagramView(Base):
+    """A saved ERD canvas view (node layout + hidden tables) for a project."""
+
+    __tablename__ = "diagram_view"
+
+    diagram_view_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(Text())
+    # Opaque, client-defined layout payload (node positions, hidden tables,
+    # viewport). Stored as JSONB; the API bounds its size.
+    layout_json: Mapped[dict] = mapped_column(JSONB())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class TableAnnotation(Base):
+    """A user note attached to a table within a project.
+
+    Tables are identified by ``(schema_name, relation_name)`` -- never by the
+    volatile ``relation_oid``, which is reassigned on every introspection run.
+    At most one annotation exists per (project, schema, table).
+    """
+
+    __tablename__ = "table_annotation"
+
+    table_annotation_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    schema_name: Mapped[str] = mapped_column(Text())
+    relation_name: Mapped[str] = mapped_column(Text())
+    body: Mapped[str] = mapped_column(Text())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid",
+            "schema_name",
+            "relation_name",
+            name="uq_table_annotation__project_table",
+        ),
+    )
 
 
 class ShareLink(Base):
