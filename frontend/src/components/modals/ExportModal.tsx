@@ -67,6 +67,7 @@ export function ExportModal({
               onClick={onCreateShareLink}
               disabled={!canCreateShareLink || isCreatingShareLink}
               aria-busy={isCreatingShareLink}
+              aria-describedby={(!canCreateShareLink || isCreatingShareLink) && !shareLinkUrl ? "share-link-hint" : undefined}
             >
               {isCreatingShareLink ? "생성 중..." : "링크 만들기"}
             </button>
@@ -88,7 +89,7 @@ export function ExportModal({
               </button>
             </div>
           ) : (
-            <span className="field-hint">
+            <span id="share-link-hint" className="field-hint">
               프로젝트가 선택되면 서버에서 새 공유 링크를 발급할 수 있습니다.
             </span>
           )}
@@ -109,6 +110,7 @@ export function ExportModal({
               onClick={onCopyExportDdl}
               disabled={!hasDdlExport}
               aria-live="polite"
+              aria-describedby={!hasDdlExport ? "ddl-export-hint" : undefined}
             >
               {isCopied ? "복사 완료" : "DDL 복사"}
             </button>
@@ -122,7 +124,7 @@ export function ExportModal({
               className="exportModal__ddl"
             />
           ) : (
-            <span className="field-hint">
+            <span id="ddl-export-hint" className="field-hint">
               DDL을 만들려면 먼저 스냅샷을 생성하거나 테이블을 추가하세요.
             </span>
           )}
