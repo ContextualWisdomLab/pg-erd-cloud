@@ -60,3 +60,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
+
+## 2025-01-20 - Avoid array map allocations when initializing large Maps
+**Learning:** Initializing Maps with `new Map(array.map(...))` creates large intermediate arrays in memory (`[key, value][]`), resulting in unnecessary memory allocation, high GC pressure, and significantly worse performance during iterative processes (like diagram exports).
+**Action:** Prefer explicitly initializing a `new Map()` and populating it within a standard `for...of` loop over `new Map(array.map(...))` for high-frequency or large-scale data processing in the frontend.
