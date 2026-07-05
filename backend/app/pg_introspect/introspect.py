@@ -10,6 +10,29 @@ from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
 
 
+async def probe_postgres(dsn: str) -> str:
+    """SSRF-guarded connectivity check: connect and return the server version.
+
+    Reuses ``validate_postgres_dsn_target`` and connects to the pinned IP, so
+    the same anti-SSRF guarantees as full introspection apply.
+    """
+    target = await validate_postgres_dsn_target(dsn)
+    connect_host: str | list[str] = (
+        target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
+    )
+    if target.port is not None:
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, port=target.port, timeout=10
+        )
+    else:
+        conn = await asyncpg.connect(dsn, host=connect_host, timeout=10)
+    try:
+        await conn.fetchval("SELECT 1")
+        return str(await conn.fetchval("SHOW server_version"))
+    finally:
+        await conn.close()
+
+
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
