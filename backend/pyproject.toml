@@ -37,7 +37,7 @@ snowflake = [
   "snowflake-connector-python>=4,<5",
 ]
 dev = [
-  "pytest>=9.0.3",
+  "pytest>=9.1.1",
   "pytest-asyncio>=1.4.0",
   "pytest-cov>=7.0.0",
   "mypy>=2.1.0",
@@ -48,7 +48,7 @@ dev = [
 
 [dependency-groups]
 dev = [
-  "pytest>=9.0.3",
+  "pytest>=9.1.1",
   "pytest-asyncio>=1.4.0",
   "pytest-cov>=7.0.0",
   "mypy>=2.1.0",
