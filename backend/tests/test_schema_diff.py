@@ -203,3 +203,60 @@ def test_none_and_empty_snapshots_are_safe():
     d = diff_snapshots(None, _base())
     assert d["summary"]["tables_added"] == 2
     assert diff_snapshots(_base(), None)["summary"]["tables_removed"] == 2
+
+
+def test_diff_skips_orphan_nameless_rows_and_detects_comment_change():
+    # Rows referencing an unknown relation_oid or missing a name must be skipped,
+    # not treated as spurious changes; a table-comment change is a real change.
+    base = _snap(
+        relations=[
+            {
+                "relation_oid": 1,
+                "schema_name": "public",
+                "relation_name": "t",
+                "relation_comment": "old note",
+            }
+        ],
+        columns=[
+            {"relation_oid": 1, "column_name": "id", "data_type": "int", "is_not_null": True},
+            {"relation_oid": 999, "column_name": "ghost", "data_type": "int"},  # orphan oid
+            {"relation_oid": 1, "column_name": None, "data_type": "int"},  # no name
+        ],
+        pk_columns=[
+            {"relation_oid": 999, "column_name": "id", "column_ordinal": 1},  # orphan oid
+            {"relation_oid": 1, "column_name": None, "column_ordinal": 1},  # no name
+        ],
+        fk_edges=[
+            {
+                "fk_constraint_name": "x",
+                "child_relation_oid": 999,  # orphan child -> skipped
+                "parent_relation_oid": 1,
+                "child_column_name": "a",
+                "parent_column_name": "b",
+                "column_ordinal": 1,
+            }
+        ],
+    )
+    target = _snap(
+        relations=[
+            {
+                "relation_oid": 1,
+                "schema_name": "public",
+                "relation_name": "t",
+                "relation_comment": "new note",  # comment changed
+            }
+        ],
+        columns=[
+            {"relation_oid": 1, "column_name": "id", "data_type": "int", "is_not_null": True}
+        ],
+    )
+    d = diff_snapshots(base, target)
+    changed = d["tables"]["changed"]
+    assert len(changed) == 1
+    assert changed[0]["table"] == "public.t"
+    assert changed[0]["comment"] == {"from": "old note", "to": "new note"}
+    # orphan/nameless rows and the orphan FK produced no spurious changes
+    assert changed[0]["columns"]["added"] == []
+    assert changed[0]["columns"]["removed"] == []
+    assert d["summary"]["fks_added"] == 0
+    assert d["summary"]["fks_removed"] == 0
