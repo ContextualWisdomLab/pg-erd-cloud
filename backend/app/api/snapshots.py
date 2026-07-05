@@ -24,6 +24,7 @@ from app.schemas import (
     SnapshotOut,
 )
 from app.ddl.export import snapshot_json_to_sql
+from app.ddl.migration import snapshot_diff_to_migration_sql
 from app.diff.schema_diff import diff_snapshots
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -204,6 +205,35 @@ async def export_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+
+
+@router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
+async def export_migration_sql(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to migrate from"
+    ),
+    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate migration SQL moving the base snapshot to this (target) snapshot.
+
+    Both snapshots are authorized independently via project membership; a uniform
+    not-found marker is returned if either is missing/unauthorized so existence
+    cannot be enumerated.
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return "-- snapshot not found\n"
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    return snapshot_diff_to_migration_sql(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+        target_dialect=dialect,
+    )
 
 
 @router.get(

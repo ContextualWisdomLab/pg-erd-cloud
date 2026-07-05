@@ -39,6 +39,8 @@ def _index_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         key = _table_key(rel.get("schema_name"), rel.get("relation_name"))
         oid_to_table[rel.get("relation_oid")] = key
         tables[key] = {
+            "schema_name": str(rel.get("schema_name") or ""),
+            "relation_name": str(rel.get("relation_name") or ""),
             "comment": rel.get("relation_comment"),
             "kind": rel.get("relation_kind"),
             "columns": {},
