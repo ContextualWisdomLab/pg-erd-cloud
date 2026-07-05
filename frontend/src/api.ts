@@ -401,6 +401,18 @@ export async function deleteView(viewId: string): Promise<void> {
   if (!r.ok) throw new Error(`deleteView failed: ${r.status}`)
 }
 
+export async function fetchDataDictionaryMarkdown(snapshotId: string): Promise<string> {
+  if (DEMO_MODE) {
+    return '# Data Dictionary (demo)\n\n## public.member\n회원 마스터\n\n| # | Column | Type | Null | Key |\n|---|--------|------|------|-----|\n| 1 | member_id | bigint | NOT NULL | PK |\n'
+  }
+  const r = await fetch(
+    `${API_BASE}/api/snapshots/${encodeURIComponent(snapshotId)}/data-dictionary.md`,
+    { credentials: 'include' }
+  )
+  if (!r.ok) throw new Error(`fetchDataDictionaryMarkdown failed: ${r.status}`)
+  return r.text()
+}
+
 export async function testConnection(connectionId: string): Promise<ConnectionTestResult> {
   if (DEMO_MODE) {
     return { ok: true, server_version: 'PostgreSQL 16.2 (demo)', error: null }

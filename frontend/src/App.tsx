@@ -36,6 +36,7 @@ import {
   deleteAnnotation,
   deleteView,
   diffSnapshots,
+  fetchDataDictionaryMarkdown,
   getSnapshot,
   getView,
   listAnnotations,
@@ -803,6 +804,16 @@ export default function App() {
 
   function onDownloadMermaid() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
+  }
+
+  async function onDownloadDataDictionary() {
+    if (!snapshotId) return;
+    try {
+      const md = await fetchDataDictionaryMarkdown(snapshotId);
+      downloadText("data-dictionary.md", md, "text/markdown");
+    } catch {
+      window.alert("데이터 사전을 불러오지 못했습니다.");
+    }
   }
 
   function onRelDelete() {
@@ -1698,6 +1709,19 @@ export default function App() {
               aria-label="Mermaid 내보내기"
             >
               {"{}"}
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadDataDictionary}
+              disabled={!snapshotId}
+              title={
+                !snapshotId
+                  ? "스냅샷을 먼저 생성하세요"
+                  : "데이터 사전 (Markdown) 내보내기"
+              }
+              aria-label="데이터 사전 내보내기"
+            >
+              📖
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
