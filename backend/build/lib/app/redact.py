@@ -2,10 +2,10 @@ import copy
 from typing import Any, Dict
 
 
-def redact_sensitive_schema_data(snapshot_json: Dict[str, Any] | None) -> Dict[str, Any]:
+def redact_sensitive_schema_data(snapshot_json: Dict[str, Any] | None) -> Dict[str, Any] | None:
     """Redacts sensitive properties like comments or example values from snapshot data."""
     if not snapshot_json:
-        return {}
+        return snapshot_json
 
     redacted = copy.deepcopy(snapshot_json)
 
