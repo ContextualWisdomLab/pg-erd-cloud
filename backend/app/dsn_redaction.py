@@ -20,16 +20,24 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
     parsed = urlsplit(dsn)
 
+    def add_variations(pw: str) -> None:
+        if not pw:
+            return
+
+        decoded = unquote_plus(pw)
+        candidates.add(pw)
+        candidates.add(decoded)
+        candidates.add(quote(decoded, safe=""))
+        candidates.add(quote_plus(decoded, safe=""))
+
     if parsed.password:
-        candidates.add(parsed.password)
-        candidates.add(quote(parsed.password, safe=""))
+        add_variations(parsed.password)
 
     if "@" in parsed.netloc:
         userinfo = parsed.netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
-            candidates.add(raw_password)
-            candidates.add(unquote(raw_password))
+            add_variations(raw_password)
 
     for part in parsed.query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -37,19 +45,19 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
             continue
         if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
             continue
-        decoded_value = unquote_plus(raw_value)
-        candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
+        add_variations(raw_value)
 
     return {candidate for candidate in candidates if candidate}
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
     """Redact DSN-derived secrets from a driver error message."""
-
     redacted = error_message
+
+    # Apply naive replacements for all candidates.
+    # While this may cause over-redaction for very short passwords, it is
+    # the safest approach to ensure no secrets leak in error messages.
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
         redacted = redacted.replace(secret, "***")
+
     return _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)
