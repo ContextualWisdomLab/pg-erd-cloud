@@ -57,3 +57,8 @@
 **Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
 **Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
+
+## 2025-07-06 - [urllib.parse Scheme Underscore Bug]
+**Vulnerability:** DSNs containing underscores in the scheme (e.g., `invalid_scheme://...`) caused `urllib.parse.urlsplit` to silently fail, resulting in an empty scheme. This bypassed credential extraction during DSN redaction, meaning passwords inside such DSNs could be leaked directly into error logs unredacted.
+**Learning:** `urllib.parse.urlsplit` strictly adheres to RFC specs which don't allow underscores in schemes. Instead of raising an error, Python evaluates it as an empty scheme, leading to unpredictable parsing for the rest of the URL structure.
+**Prevention:** Before parsing DSNs specifically for secret redaction or SSRF protection, normalize the scheme portion (e.g., replace `_` with `-`) or perform regex-based extractions.

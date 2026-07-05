@@ -16,9 +16,17 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 )
 
 
+def _normalize_dsn_for_parsing(dsn: str) -> str:
+    match = re.match(r"^([a-zA-Z][a-zA-Z0-9+\-._]*):", dsn)
+    if match and "_" in match.group(1):
+        scheme = match.group(1).replace("_", "-")
+        return f"{scheme}:{dsn[match.end():]}"
+    return dsn
+
+
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
+    parsed = urlsplit(_normalize_dsn_for_parsing(dsn))
 
     if parsed.password:
         candidates.add(parsed.password)
