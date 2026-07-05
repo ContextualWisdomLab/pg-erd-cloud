@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-07-04 - Focus Trap Anti-Pattern in Non-Interactive Badges
+**Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like truncated text spans or abbreviation `abbr` tags) just to expose their native `title` or `aria-label` to keyboard users creates an accessibility anti-pattern. This significantly bloats the page's tab sequence, degrading keyboard navigation and frustrating screen reader users who expect interactive elements upon focus.
+**Action:** Do not use `tabIndex={0}` as a shortcut for making non-interactive tooltips accessible. Truncated static text or badges should be paired with proper `aria-label` attributes without adding them to the focus order unless they are actionable.
