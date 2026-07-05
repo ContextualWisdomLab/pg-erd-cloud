@@ -17,8 +17,15 @@ from app.models import (
     SchemaSnapshotData,
 )
 from app.permissions import require_project_member
-from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
+from app.schemas import (
+    SnapshotCreateIn,
+    SnapshotDetailOut,
+    SnapshotDiffOut,
+    SnapshotOut,
+)
 from app.ddl.export import snapshot_json_to_sql
+from app.ddl.migration import snapshot_diff_to_migration_sql
+from app.diff.schema_diff import diff_snapshots
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
@@ -141,6 +148,74 @@ async def get_snapshot(
         schema_filter=snap.schema_filter,
         error_message=snap.error_message,
         snapshot_json=data.snapshot_json if data else None,
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/diff", response_model=SnapshotDiffOut)
+async def diff_snapshot(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to compare this snapshot against"
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SnapshotDiffOut:
+    """Diff this snapshot (target) against another (base).
+
+    Both snapshots are authorized independently via project membership, so a
+    caller can only diff snapshots they may already read. If either is missing
+    or unauthorized, a uniform ``not_found`` response is returned so existence
+    cannot be enumerated.
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return SnapshotDiffOut(
+            base_snapshot_uuid=against,
+            target_snapshot_uuid=schema_snapshot_uuid,
+            status="not_found",
+            diff=None,
+        )
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    diff = diff_snapshots(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+    )
+    return SnapshotDiffOut(
+        base_snapshot_uuid=against,
+        target_snapshot_uuid=schema_snapshot_uuid,
+        status="ok",
+        diff=diff,
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
+async def export_migration_sql(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to migrate from"
+    ),
+    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate migration SQL moving the base snapshot to this (target) snapshot.
+
+    Both snapshots are authorized independently via project membership; a uniform
+    not-found marker is returned if either is missing/unauthorized so existence
+    cannot be enumerated.
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return "-- snapshot not found\n"
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    return snapshot_diff_to_migration_sql(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+        target_dialect=dialect,
     )
 
 
