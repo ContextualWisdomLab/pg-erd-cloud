@@ -96,6 +96,8 @@ async def test_connection(
         raise
 
     conn = await session.get(DbConnection, db_connection_uuid)
+    if conn is None:
+        raise HTTPException(status_code=404, detail="connection not found")
     dsn = decrypt_text(conn.dsn_ciphertext, conn.dsn_nonce)
     try:
         version = await probe_database(dsn)
