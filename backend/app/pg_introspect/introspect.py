@@ -10,6 +10,47 @@ from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.sanitize import sanitize_for_storage
 
 
+async def apply_postgres_sql(dsn: str, sql: str, dry_run: bool = True) -> None:
+    """Execute DDL/SQL against a target Postgres DB inside one transaction.
+
+    Forward engineering: materialize a designed schema / apply a migration.
+    SSRF-guarded exactly like introspection (``validate_postgres_dsn_target`` +
+    pinned IP). The whole batch runs in a single transaction:
+
+    * ``dry_run=True`` (default) rolls back, so nothing persists -- a pre-flight
+      validation that the SQL executes cleanly against the real database.
+    * ``dry_run=False`` commits.
+
+    PostgreSQL DDL is transactional, so a mid-batch failure rolls everything
+    back. Statements that cannot run inside a transaction (e.g.
+    ``CREATE INDEX CONCURRENTLY``) will raise here -- that is expected.
+    """
+    target = await validate_postgres_dsn_target(dsn)
+    connect_host: str | list[str] = (
+        target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
+    )
+    if target.port is not None:
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, port=target.port, timeout=15
+        )
+    else:
+        conn = await asyncpg.connect(dsn, host=connect_host, timeout=15)
+    try:
+        tx = conn.transaction()
+        await tx.start()
+        try:
+            await conn.execute(sql)
+        except BaseException:
+            await tx.rollback()
+            raise
+        if dry_run:
+            await tx.rollback()
+        else:
+            await tx.commit()
+    finally:
+        await conn.close()
+
+
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
