@@ -19,6 +19,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import (
     NamingLintOut,
+    SensitiveColumnsOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
     SnapshotOut,
@@ -26,6 +27,7 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.spec.naming_lint import lint_naming
+from app.spec.sensitive_columns import detect_sensitive_columns
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -193,6 +195,32 @@ async def wide_tables(
         info_threshold=info_threshold,
     )
     return WideTablesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/sensitive-columns", response_model=SensitiveColumnsOut
+)
+async def sensitive_columns(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SensitiveColumnsOut:
+    """Compliance-scoping inventory: which columns likely hold PII / card /
+    credential data, mapped to the relevant framework (PCI DSS, GDPR/PIPA).
+
+    Detection only -- it does not encrypt, mask, or tokenize anything.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SensitiveColumnsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_sensitive_columns(data.snapshot_json if data else None)
+    return SensitiveColumnsOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
