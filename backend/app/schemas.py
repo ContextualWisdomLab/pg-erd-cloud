@@ -99,6 +99,14 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class AuditColumnsOut(BaseModel):
+    """Audit-column (created_at/updated_at) convention findings."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
