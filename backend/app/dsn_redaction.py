@@ -18,7 +18,21 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
+
+    # Workaround for Python's urllib.parse not parsing schemes with underscores.
+    # If the scheme has an underscore, replace it with a hyphen before parsing
+    # so that urlsplit() correctly identifies the netloc and credentials.
+    colon_idx = dsn.find(":")
+    if colon_idx > 0 and "_" in dsn[:colon_idx]:
+        prefix = dsn[:colon_idx]
+        if all(c.isalnum() or c in "+-." or c == "_" for c in prefix):
+            parsed_dsn = prefix.replace("_", "-") + dsn[colon_idx:]
+        else:
+            parsed_dsn = dsn
+    else:
+        parsed_dsn = dsn
+
+    parsed = urlsplit(parsed_dsn)
 
     if parsed.password:
         candidates.add(parsed.password)

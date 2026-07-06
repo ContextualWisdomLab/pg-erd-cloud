@@ -73,6 +73,16 @@ def test_redacts_custom_secret_query_parameter_values() -> None:
     assert "tenant_secret=***" in redacted
 
 
+def test_redacts_password_with_underscore_in_scheme() -> None:
+    dsn = "snowflake_invalid://user:my_super_secret_pwd@db.example.com/app"
+    error = "driver failed with user:my_super_secret_pwd"
+
+    redacted = _redact_snapshot_error_message(error, dsn)
+
+    assert "my_super_secret_pwd" not in redacted
+    assert "user:***" in redacted
+
+
 def test_redacts_secret_assignments_without_dsn_candidates() -> None:
     dsn = "postgresql://user@db.example.com/app"
     error = "driver failed with api_key=abc123 and private-key: top-secret"

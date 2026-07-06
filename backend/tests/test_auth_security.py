@@ -594,6 +594,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "token verification failed"
 
+
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch: pytest.MonkeyPatch,
@@ -617,7 +618,9 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
 
     def fail_decode(*_: object, **__: object) -> dict:
-        raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
+        raise AssertionError(
+            "jwt.decode must not run for mismatched algorithm/key type"
+        )
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
@@ -626,6 +629,8 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,

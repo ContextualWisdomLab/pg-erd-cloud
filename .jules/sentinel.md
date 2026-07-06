@@ -57,3 +57,8 @@
 **Vulnerability:** Database driver exceptions can echo DSN fragments, query parameters, or assignment-style secrets after connection failures, leaking plaintext passwords through snapshot error messages and queue logs.
 **Learning:** Redacting only the literal DSN is not enough. Error messages may contain decoded, percent-encoded, query-string, or `password=`/`api_key=` style forms of the same secret.
 **Prevention:** Sanitize snapshot job errors before persisting or re-raising them, and raise sanitized exceptions with `from None` so Python exception chaining does not reattach the original secret-bearing exception.
+
+## $(date +%Y-%m-%d) - [CRITICAL] DSN Password Redaction Bypass Vulnerability
+**Vulnerability:** The DSN password redaction function `_password_candidates_from_dsn` failed to properly extract and redact passwords when the DSN contained an underscore in its scheme (e.g., `snowflake_invalid://`). As a result, sensitive credentials such as passwords could be leaked in error logs when connection exceptions occurred.
+**Learning:** This vulnerability existed due to how Python's `urllib.parse.urlsplit` function operates. According to RFC 3986, URL schemes cannot contain underscores, so when `urlsplit` encounters a scheme like `snowflake_invalid://`, it parses the entire string differently (often treating the scheme as empty), leading to an empty `password` attribute on the parsed result.
+**Prevention:** Always normalize non-standard or custom URL schemes before attempting to parse them for security reasons. For DSN connection strings which might use custom dialects containing underscores, temporarily replace the underscores with hyphens before passing them to `urlsplit()` to extract network location and password data reliably.
