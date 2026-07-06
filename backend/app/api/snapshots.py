@@ -197,14 +197,21 @@ async def export_migration_sql(
         ..., description="Base snapshot UUID to migrate from"
     ),
     dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
+    direction: str = Query(
+        "up",
+        pattern="^(up|down)$",
+        description="up = base→target (apply), down = target→base (rollback)",
+    ),
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
-    """Generate migration SQL moving the base snapshot to this (target) snapshot.
+    """Generate migration SQL between the base and this (target) snapshot.
 
-    Both snapshots are authorized independently via project membership; a uniform
-    not-found marker is returned if either is missing/unauthorized so existence
-    cannot be enumerated.
+    ``direction=up`` (default) moves base → target; ``direction=down`` emits the
+    rollback (target → base) — the same generator with the endpoints swapped, so
+    up and down are always exact mirrors. Both snapshots are authorized
+    independently via project membership; a uniform not-found marker is returned
+    if either is missing/unauthorized so existence cannot be enumerated.
     """
     target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     base_snap = await _get_authorized_snapshot(session, against, user)
@@ -212,9 +219,13 @@ async def export_migration_sql(
         return "-- snapshot not found\n"
     base_data = await session.get(SchemaSnapshotData, against)
     target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    base_json = base_data.snapshot_json if base_data else None
+    target_json = target_data.snapshot_json if target_data else None
+    if direction == "down":
+        base_json, target_json = target_json, base_json
     return snapshot_diff_to_migration_sql(
-        base_data.snapshot_json if base_data else None,
-        target_data.snapshot_json if target_data else None,
+        base_json,
+        target_json,
         target_dialect=dialect,
     )
 
