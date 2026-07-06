@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-07-06 - Remove tabIndex from static elements
+**Learning:** Do not add tabIndex={0} to static, non-interactive text badges (like abbr or span) just to expose their title or aria-label attributes to keyboard users. This is an accessibility anti-pattern that creates excessive tab stops and severely degrades keyboard navigation.
+**Action:** Only use tabIndex={0} on genuinely interactive elements.

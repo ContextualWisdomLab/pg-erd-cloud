@@ -54,7 +54,6 @@ function AccessibleTruncatedText({
       className={className}
       title={title ?? accessibleText}
       aria-label={accessibleText}
-      tabIndex={0}
     >
       {children ?? text}
     </span>
@@ -116,10 +115,22 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
           {data.badges?.pk ? (
-            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</abbr>
+            <abbr
+              className="tableNode__badge"
+              title="Primary Key"
+              aria-label="Primary Key"
+            >
+              PK
+            </abbr>
           ) : null}
           {data.badges?.fk ? (
-            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</abbr>
+            <abbr
+              className="tableNode__badge"
+              title="Foreign Key"
+              aria-label="Foreign Key"
+            >
+              FK
+            </abbr>
           ) : null}
         </span>
       </div>
@@ -153,12 +164,20 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
               {c.is_pk ? (
-                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
+                <abbr
+                  className="tableNode__badge"
+                  title="Primary Key"
+                  aria-label="Primary Key"
+                >
                   PK
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
+                <span
+                  className="tableNode__badge"
+                  title="Not Null"
+                  aria-label="필수 입력 (Not Null)"
+                >
                   NOT NULL
                 </span>
               ) : null}
@@ -176,13 +195,16 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             className="tableNode__more"
             title="생략된 컬럼이 더 있습니다"
             aria-label="생략된 컬럼이 더 있습니다"
-            tabIndex={0}
           >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
         {data.indexes?.length ? (
-          <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
+          <div
+            className="tableNode__indexes"
+            role="group"
+            aria-label="추천 인덱스"
+          >
             <div className="tableNode__indexHeading">Indexes</div>
             {data.indexes.slice(0, 4).map((index) => {
               const columnsText = `(${index.columns.join(", ")})`;
@@ -207,7 +229,6 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 className="tableNode__more"
                 title="생략된 인덱스가 더 있습니다"
                 aria-label="생략된 인덱스가 더 있습니다"
-                tabIndex={0}
               >
                 … {data.indexes.length - 4} more indexes
               </div>
