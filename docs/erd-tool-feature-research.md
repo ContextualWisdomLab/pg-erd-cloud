@@ -83,9 +83,9 @@ pg-erd-cloud는 **다이어그램 툴(ChartDB류)과 schema-ops(Atlas류)의 교
 | # | 갭 | 상태 | PR |
 | - | --- | --- | --- |
 | 1 | DBML import (design-first) | ✅ 구현 | #487 |
-| 2 | MySQL 리버스 엔지니어링 | 🚧 진행 | (this cycle) |
-| 3 | ORM 코드 생성 (SQLAlchemy/Prisma) | ⬜ 대기 | — |
-| 4 | 공개 스키마 문서 페이지 (dbdocs형) | ⬜ 대기 | — |
+| 2 | MySQL 리버스 엔지니어링 | ✅ 구현 | #488 |
+| 3 | ORM 코드 생성 (SQLAlchemy/Prisma) | ✅ 구현 | #489 |
+| 4 | 공개 스키마 문서 페이지 (dbdocs형) | ✅ 구현 | #490 |
 | 5 | 감사 로그 | ⬜ 대기 (#467/#485 머지 후 체인) | — |
 | 6 | AI 방언 변환 / 실시간 협업 / 논리 모델 | ⬜ 설계 필요 | — |
 
