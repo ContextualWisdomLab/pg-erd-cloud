@@ -26,7 +26,6 @@ def test_renders_tables_columns_badges_and_comments():
 
 
 def test_fk_badge_points_to_parent():
-    snap = dict(SNAP)
     snap = {**SNAP, "relations": SNAP["relations"] + [
         {"relation_oid": 3, "relation_kind": "r", "schema_name": "public", "relation_name": "orders"},
     ], "columns": SNAP["columns"] + [
