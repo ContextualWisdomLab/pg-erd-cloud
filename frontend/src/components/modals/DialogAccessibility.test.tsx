@@ -72,7 +72,7 @@ describe('modal dialog accessibility', () => {
       />,
     );
 
-    const tableNameInput = screen.getByLabelText('테이블 이름');
+    const tableNameInput = screen.getByLabelText(/테이블 이름/);
     const saveButton = screen.getByRole('button', { name: '저장' });
 
     await waitFor(() => expect(tableNameInput).toHaveFocus());

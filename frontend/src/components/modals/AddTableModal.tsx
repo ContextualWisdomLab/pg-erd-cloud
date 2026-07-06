@@ -61,7 +61,11 @@ export function AddTableModal({
       >
         <h3 id="add-table-title">테이블 추가</h3>
         <div className="field">
-          <label htmlFor="new-table-name">테이블 이름</label>
+          <label htmlFor="new-table-name">
+            테이블 이름
+            <span aria-hidden="true" style={{ color: "#ef4444", marginLeft: "4px" }}>*</span>
+            <span className="srOnly"> (필수)</span>
+          </label>
           <input
             id="new-table-name"
             value={newTableName}
@@ -69,8 +73,14 @@ export function AddTableModal({
             placeholder="users"
             autoFocus
             required
+            aria-describedby={!newTableName.trim() ? "add-table-disabled-hint" : undefined}
           />
         </div>
+        {!newTableName.trim() && (
+          <span id="add-table-disabled-hint" className="field-hint">
+            테이블 이름을 입력해야 저장할 수 있습니다.
+          </span>
+        )}
         <div
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
@@ -79,6 +89,7 @@ export function AddTableModal({
           <button
             type="submit"
             disabled={!newTableName.trim()}
+            aria-describedby={!newTableName.trim() ? "add-table-disabled-hint" : undefined}
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }
