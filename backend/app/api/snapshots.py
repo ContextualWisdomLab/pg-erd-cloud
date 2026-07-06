@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    IndexRedundancyOut,
     NamingLintOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
@@ -25,6 +26,7 @@ from app.schemas import (
     WideTablesOut,
 )
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.naming_lint import lint_naming
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
@@ -193,6 +195,32 @@ async def wide_tables(
         info_threshold=info_threshold,
     )
     return WideTablesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/index-redundancy", response_model=IndexRedundancyOut
+)
+async def index_redundancy(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> IndexRedundancyOut:
+    """Report duplicate and prefix-shadowed indexes (safe drop candidates).
+
+    Unique indexes are never suggested for dropping (they enforce constraints);
+    expression/partial indexes are skipped rather than guessed.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return IndexRedundancyOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_index_redundancy(data.snapshot_json if data else None)
+    return IndexRedundancyOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 

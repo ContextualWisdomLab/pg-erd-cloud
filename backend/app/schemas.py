@@ -99,6 +99,14 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class IndexRedundancyOut(BaseModel):
+    """Duplicate / prefix-redundant index findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
