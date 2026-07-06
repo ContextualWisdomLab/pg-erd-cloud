@@ -411,7 +411,14 @@ API_KEY_PREFIX = "pgerd_"
 
 
 def hash_api_key(token: str) -> str:
-    """Deterministic SHA-256 hex digest of an API key (indexable lookup)."""
+    """Deterministic SHA-256 hex digest of an API key (indexable lookup).
+
+    SHA-256 (not bcrypt/argon2) is deliberate and safe here: the input is a
+    server-generated 256-bit random token (``secrets.token_urlsafe(32)``), not
+    a human password, so brute-force over the input space is infeasible and a
+    slow KDF adds nothing. A deterministic digest is required for the unique-
+    indexed O(1) lookup. This mirrors how GitHub stores its own PATs.
+    """
 
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
