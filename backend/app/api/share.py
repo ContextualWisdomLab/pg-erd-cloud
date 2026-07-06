@@ -4,13 +4,14 @@ import datetime as dt
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.schema_docs_html import render_schema_docs_html
 from app.models import (
     ProjectMember,
     SchemaSnapshot,
@@ -235,3 +236,46 @@ async def export_shared_snapshot_index_design(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     return generate_index_design_spec(data.snapshot_json, mode=mode)
+
+
+@router.get(
+    "/share/{share_link_uuid}/snapshots/{schema_snapshot_uuid}/docs",
+    response_class=HTMLResponse,
+)
+async def get_shared_snapshot_docs(
+    share_link_uuid: uuid.UUID,
+    schema_snapshot_uuid: uuid.UUID,
+    session: AsyncSession = Depends(get_read_session),
+) -> HTMLResponse:
+    """Public, read-only schema documentation page for a shared snapshot.
+
+    Same validation as the shared-snapshot JSON endpoint (link exists, not
+    expired, snapshot belongs to the link's project). Every rendered value is
+    HTML-escaped and the page is self-contained (no scripts), so a strict CSP
+    is applied.
+    """
+    link = await session.get(ShareLink, share_link_uuid)
+    if link is None:
+        raise HTTPException(status_code=404, detail="share link not found")
+    if link.expires_at is not None and link.expires_at <= dt.datetime.now(
+        dt.timezone.utc
+    ):
+        raise HTTPException(status_code=410, detail="share link expired")
+
+    snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
+    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    html_page = render_schema_docs_html(
+        data.snapshot_json if data else None, title="Schema documentation"
+    )
+    return HTMLResponse(
+        content=html_page,
+        headers={
+            "Content-Security-Policy": (
+                "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
