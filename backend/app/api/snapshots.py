@@ -19,6 +19,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.orm_codegen import generate_prisma_schema, generate_sqlalchemy_models
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
@@ -159,6 +160,29 @@ async def export_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+
+
+@router.get("/{schema_snapshot_uuid}/orm-models", response_class=PlainTextResponse)
+async def export_orm_models(
+    schema_snapshot_uuid: uuid.UUID,
+    flavor: str = Query("sqlalchemy", pattern="^(sqlalchemy|prisma)$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate ORM model code from a snapshot (SQLAlchemy 2.0 or Prisma).
+
+    Forward engineering to application code: hand developers ready-to-edit
+    models instead of retyped tables. IDOR-safe (uniform not-found marker).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "-- snapshot not found\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "-- snapshot data not found\n"
+    if flavor == "prisma":
+        return generate_prisma_schema(data.snapshot_json)
+    return generate_sqlalchemy_models(data.snapshot_json)
 
 
 @router.get(
