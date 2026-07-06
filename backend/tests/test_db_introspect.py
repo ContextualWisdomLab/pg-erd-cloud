@@ -28,7 +28,7 @@ def test_detect_dsn_dialect_valid(
 @pytest.mark.parametrize(
     "dsn,expected_error",
     [
-        ("mysql://u:p@db/app", "unsupported database DSN scheme: mysql"),
+        ("oracle://u:p@db/app", "unsupported database DSN scheme: oracle"),
         (
             "snowflake_invalid://u:p@acct/DB",
             "unsupported database DSN scheme: <empty>",

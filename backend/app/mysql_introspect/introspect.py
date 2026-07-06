@@ -195,22 +195,22 @@ def rows_to_snapshot(
             }
         )
     for edge in fk_edges:
-        child = rel_by_oid[edge["child_relation_oid"]]
-        parent = rel_by_oid[edge["parent_relation_oid"]]
+        child_rel = rel_by_oid[edge["child_relation_oid"]]
+        parent_rel = rel_by_oid[edge["parent_relation_oid"]]
         constraints.append(
             {
                 "constraint_oid": 300000 + edge["fk_constraint_oid"],
                 "constraint_name": edge["fk_constraint_name"],
                 "constraint_type": "f",
-                "schema_name": child["schema_name"],
+                "schema_name": child_rel["schema_name"],
                 "relation_oid": edge["child_relation_oid"],
-                "relation_name": child["relation_name"],
+                "relation_name": child_rel["relation_name"],
                 "constrained_attnums": [
                     pos_by_oid_col.get((edge["child_relation_oid"], edge["child_column_name"]), 1)
                 ],
                 "constraint_def": (
                     f'FOREIGN KEY ("{edge["child_column_name"]}") REFERENCES '
-                    f'"{parent["schema_name"]}"."{parent["relation_name"]}" '
+                    f'"{parent_rel["schema_name"]}"."{parent_rel["relation_name"]}" '
                     f'("{edge["parent_column_name"]}")'
                 ),
             }
@@ -219,8 +219,8 @@ def rows_to_snapshot(
     # group STATISTICS rows into per-index column lists
     grouped: dict[tuple[str, str, str], list[tuple[int, str, bool]]] = {}
     for row in indexes:
-        key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
-        grouped.setdefault(key, []).append(
+        ix_key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
+        grouped.setdefault(ix_key, []).append(
             (
                 int(row.get("SEQ_IN_INDEX") or 1),
                 str(row["COLUMN_NAME"]),
@@ -228,16 +228,16 @@ def rows_to_snapshot(
             )
         )
     out_indexes: list[dict[str, Any]] = []
-    for (schema, table, name), cols in sorted(grouped.items()):
-        oid = oid_by_table.get((schema, table))
-        if oid is None:
+    for (schema, table, name), ix_cols in sorted(grouped.items()):
+        ix_oid = oid_by_table.get((schema, table))
+        if ix_oid is None:
             continue
-        ordered = [c for _, c, _ in sorted(cols)]
-        unique = cols[0][2]
+        ordered = [c for _, c, _ in sorted(ix_cols)]
+        unique = ix_cols[0][2]
         cols_sql = ", ".join(ordered)
         out_indexes.append(
             {
-                "relation_oid": oid,
+                "relation_oid": ix_oid,
                 "index_name": name,
                 "is_unique": unique,
                 "is_primary": name == "PRIMARY",
