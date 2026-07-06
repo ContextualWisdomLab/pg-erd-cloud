@@ -99,6 +99,14 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class SchemaStatsOut(BaseModel):
+    """Overview statistics for a schema snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    stats: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 

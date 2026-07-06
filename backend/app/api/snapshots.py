@@ -19,6 +19,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import (
     NamingLintOut,
+    SchemaStatsOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
     SnapshotOut,
@@ -26,6 +27,7 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.spec.naming_lint import lint_naming
+from app.spec.schema_stats import compute_schema_stats
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -194,6 +196,29 @@ async def wide_tables(
     )
     return WideTablesOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/stats", response_model=SchemaStatsOut)
+async def schema_stats(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SchemaStatsOut:
+    """Overview statistics for a snapshot (object counts, column & type
+    distribution, widest tables, PK/FK/index coverage).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SchemaStatsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", stats=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    stats = compute_schema_stats(data.snapshot_json if data else None)
+    return SchemaStatsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", stats=stats
     )
 
 
