@@ -113,3 +113,20 @@ class NamingLintOut(BaseModel):
     schema_snapshot_uuid: uuid.UUID
     status: str
     report: dict | None
+
+
+class DbmlConvertIn(BaseModel):
+    """Request body for converting DBML text into a snapshot."""
+
+    dbml: str = Field(min_length=1, max_length=524_288)
+    include_ddl: bool = True
+    dialect: Literal["postgresql", "snowflake"] = "postgresql"
+
+
+class DbmlConvertOut(BaseModel):
+    """DBML conversion result: snapshot JSON plus optional DDL."""
+
+    snapshot_json: dict
+    ddl: str | None = None
+    tables: int
+    foreign_keys: int
