@@ -30,7 +30,7 @@ def test_up_creates_what_down_drops():
 
     assert 'CREATE TABLE "public"."orders"' in up
     assert 'ADD COLUMN "email"' in up
-    assert 'DROP TABLE "public"."orders"' in down
+    assert 'DROP TABLE IF EXISTS "public"."orders"' in down
     assert 'DROP COLUMN "email"' in down
 
 
