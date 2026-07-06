@@ -116,7 +116,7 @@ export function EditTableModal({
                       defaultValue={col.column_name}
                       placeholder="컬럼명"
                       style={{ flex: 2 }}
-                      aria-label={`${col.column_name || '새 컬럼'} 컬럼명`}
+                      aria-label="컬럼명"
                     />
                     <input
                       type="text"
@@ -124,14 +124,13 @@ export function EditTableModal({
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
                       style={{ flex: 1.5 }}
-                      aria-label={`${col.column_name || '새 컬럼'} 데이터 타입`}
+                      aria-label="데이터 타입"
                     />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
-                        aria-label={`${col.column_name || '새 컬럼'} PK`}
                       />
                       PK
                     </label>
@@ -140,7 +139,6 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
-                        aria-label={`${col.column_name || '새 컬럼'} NN (Not Null)`}
                       />
                       NN
                     </label>
