@@ -80,3 +80,19 @@ def test_composite_pk_and_empty_snapshot():
     assert "@@id([a_id, b_id])" in schema
     assert "@id\n" not in schema.replace("@@id", "")  # no single-column @id emitted
     ast.parse(generate_sqlalchemy_models({}))  # empty snapshot still valid
+
+
+def test_typeorm_entities_decorators_and_relations():
+    from app.spec.orm_codegen import generate_typeorm_entities
+
+    code = generate_typeorm_entities(SNAP)
+    assert "@Entity('member')" in code
+    assert "export class Member {" in code
+    assert "@PrimaryColumn()" in code
+    assert "member_id!: number;" in code
+    assert "joined_at?: Date | null;" in code
+    assert "@ManyToOne(() => Member)" in code
+    assert "@JoinColumn({ name: 'member_id' })" in code
+    assert "@OneToMany(() => Orders" in code
+    # balanced braces => structurally sound TS
+    assert code.count("{") == code.count("}")

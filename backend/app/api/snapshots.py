@@ -26,7 +26,11 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.spec.naming_lint import lint_naming
-from app.spec.orm_codegen import generate_prisma_schema, generate_sqlalchemy_models
+from app.spec.orm_codegen import (
+    generate_prisma_schema,
+    generate_sqlalchemy_models,
+    generate_typeorm_entities,
+)
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -201,7 +205,7 @@ async def wide_tables(
 @router.get("/{schema_snapshot_uuid}/orm-models", response_class=PlainTextResponse)
 async def export_orm_models(
     schema_snapshot_uuid: uuid.UUID,
-    flavor: str = Query("sqlalchemy", pattern="^(sqlalchemy|prisma)$"),
+    flavor: str = Query("sqlalchemy", pattern="^(sqlalchemy|prisma|typeorm)$"),
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
@@ -218,6 +222,8 @@ async def export_orm_models(
         return "-- snapshot data not found\n"
     if flavor == "prisma":
         return generate_prisma_schema(data.snapshot_json)
+    if flavor == "typeorm":
+        return generate_typeorm_entities(data.snapshot_json)
     return generate_sqlalchemy_models(data.snapshot_json)
 
 
