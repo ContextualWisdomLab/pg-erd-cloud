@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import hashlib
 import uuid
 from dataclasses import dataclass
 from typing import Any, cast
@@ -13,7 +14,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import UserAccount
+from app.models import ApiKey, UserAccount
 from app.settings import settings
 
 
@@ -406,11 +407,50 @@ async def _ensure_user(
     return user
 
 
+API_KEY_PREFIX = "pgerd_"
+
+
+def hash_api_key(token: str) -> str:
+    """Deterministic SHA-256 hex digest of an API key (indexable lookup)."""
+
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
+    """Authenticate an ``Authorization: Bearer pgerd_...`` API key.
+
+    Looks up the SHA-256 hash (constant-shape errors: any failure is the same
+    401 so keys cannot be probed) and rejects revoked keys.
+    """
+
+    row = await session.execute(
+        select(ApiKey, UserAccount)
+        .join(UserAccount, UserAccount.user_account_uuid == ApiKey.user_account_uuid)
+        .where(ApiKey.key_hash == hash_api_key(token))
+    )
+    pair = row.first()
+    if pair is None or pair[0].revoked_at is not None:
+        raise HTTPException(status_code=401, detail="invalid API key")
+    user = pair[1]
+    return CurrentUser(
+        user_account_uuid=user.user_account_uuid,
+        subject=user.oidc_subject,
+        display_name=user.display_name,
+    )
+
+
 async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> CurrentUser:
-    """FastAPI dependency that authenticates and returns the current user."""
+    """FastAPI dependency that authenticates and returns the current user.
+
+    Accepts either the standard OIDC bearer token or a ``pgerd_``-prefixed
+    API key (programmatic access for CI/CD and SDKs).
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer " + API_KEY_PREFIX):
+        return await _user_from_api_key(session, auth_header[len("Bearer "):])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

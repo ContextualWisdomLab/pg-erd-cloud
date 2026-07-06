@@ -286,3 +286,33 @@ class ShareLink(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
+
+
+class ApiKey(Base):
+    """A long-lived API key for programmatic access (CI/CD, SDKs).
+
+    Only a SHA-256 hash of the secret is stored; the plaintext is shown once at
+    creation. ``key_prefix`` (the first characters of the token) lets users
+    recognize a key without exposing it. Revocation is a timestamp so it is
+    auditable and cannot be un-revoked silently.
+    """
+
+    __tablename__ = "api_key"
+
+    api_key_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_account_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    key_name: Mapped[str] = mapped_column(Text())
+    key_hash: Mapped[str] = mapped_column(Text(), unique=True, index=True)
+    key_prefix: Mapped[str] = mapped_column(Text())
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

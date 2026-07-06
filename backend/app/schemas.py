@@ -141,3 +141,25 @@ class MeOut(BaseModel):
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class ApiKeyCreateIn(BaseModel):
+    """Request body for creating an API key."""
+
+    key_name: str = Field(min_length=1, max_length=128)
+
+
+class ApiKeyOut(BaseModel):
+    """API key metadata (never contains the secret)."""
+
+    api_key_uuid: uuid.UUID
+    key_name: str
+    key_prefix: str
+    created_at: dt.datetime
+    revoked_at: dt.datetime | None
+
+
+class ApiKeyCreatedOut(ApiKeyOut):
+    """Creation response: includes the secret exactly once."""
+
+    secret: str

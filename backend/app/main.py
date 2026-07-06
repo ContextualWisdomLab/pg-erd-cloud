@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.annotations import router as annotations_router
+from app.api.api_keys import router as api_keys_router
 from app.api.connections import router as connections_router
 from app.api.auth_routes import router as auth_router
 from app.api.diagram_views import router as diagram_views_router
@@ -169,6 +170,7 @@ app.include_router(connections_router)
 app.include_router(snapshots_router)
 app.include_router(diagram_views_router)
 app.include_router(annotations_router)
+app.include_router(api_keys_router)
 app.include_router(me_router)
 app.include_router(share_router)
 app.include_router(auth_router)
