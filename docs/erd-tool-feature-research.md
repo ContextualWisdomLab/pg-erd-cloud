@@ -77,3 +77,17 @@ pg-erd-cloud는 **다이어그램 툴(ChartDB류)과 schema-ops(Atlas류)의 교
 - https://www.holistics.io/blog/top-database-documentation-tools/
 - https://dbdocs.io/
 - https://www.dbvis.com/thetable/top-database-cicd-and-schema-change-tools-in-2025/
+
+## 4. 갭 구현 트래커 (문서-갭-구현 추적)
+
+| # | 갭 | 상태 | PR |
+| - | --- | --- | --- |
+| 1 | DBML import (design-first) | ✅ 구현 | #487 |
+| 2 | MySQL 리버스 엔지니어링 | 🚧 진행 | (this cycle) |
+| 3 | ORM 코드 생성 (SQLAlchemy/Prisma) | ⬜ 대기 | — |
+| 4 | 공개 스키마 문서 페이지 (dbdocs형) | ⬜ 대기 | — |
+| 5 | 감사 로그 | ⬜ 대기 (#467/#485 머지 후 체인) | — |
+| 6 | AI 방언 변환 / 실시간 협업 / 논리 모델 | ⬜ 설계 필요 | — |
+
+기반 완료(참고): drift 게이트 #483 · migration up/down #465/#484 · safety #468 ·
+분석기 10종 #470–#482 · API keys #485 · forward apply #464(보안리뷰).
