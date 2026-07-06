@@ -2,7 +2,6 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import type { IndexRecommendation } from "../../erd/cardinality";
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface CardinalityModalProps {
   isOpen: boolean;
@@ -47,8 +46,6 @@ export function CardinalityModal({
   formatPercent,
   strengthLabel,
 }: CardinalityModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(cardinalityNode), onCloseCardinalityWizard);
-
   if (!isOpen || !cardinalityNode) return null;
 
   return (
@@ -58,8 +55,6 @@ export function CardinalityModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cardinality-title"
-        ref={dialogRef}
-        tabIndex={-1}
       >
         <div className="modalHeader">
           <h3 id="cardinality-title">인덱스 카디널리티</h3>
@@ -76,7 +71,6 @@ export function CardinalityModal({
           <div className="field">
             <label htmlFor="cardinality-table">테이블</label>
             <select
-              autoFocus
               id="cardinality-table"
               value={cardinalityNode.id}
               onChange={(event) =>

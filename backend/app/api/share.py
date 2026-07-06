@@ -187,9 +187,7 @@ async def export_shared_snapshot_reversing_spec(
         try:
             return await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(
-                status_code=503, detail="LLM configuration error"
-            ) from exc
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
@@ -227,9 +225,7 @@ async def export_shared_snapshot_index_design(
         try:
             return await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(
-                status_code=503, detail="LLM configuration error"
-            ) from exc
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"

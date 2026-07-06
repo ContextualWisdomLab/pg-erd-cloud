@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Edge } from "@xyflow/react";
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditEdgeModalProps {
   editingEdge: Edge | null;
@@ -19,8 +18,6 @@ export function EditEdgeModal({
   onRelCancel,
   onRelSubmit,
 }: EditEdgeModalProps) {
-  const dialogRef = useDialogAccessibility(Boolean(editingEdge), onRelCancel);
-
   if (!editingEdge) return null;
 
   return (
@@ -44,8 +41,6 @@ export function EditEdgeModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-rel-title"
-        ref={dialogRef}
-        tabIndex={-1}
         style={{
           background: "#fff",
           padding: 20,
@@ -76,16 +71,14 @@ export function EditEdgeModal({
           style={{ justifyContent: "space-between", marginTop: 8 }}
         >
           <button
-            type="button"
             onClick={onRelDelete}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
           >
             삭제
           </button>
           <div className="row">
-            <button type="button" onClick={onRelCancel}>취소</button>
+            <button onClick={onRelCancel}>취소</button>
             <button
-              type="button"
               onClick={onRelSubmit}
               style={{ background: "#034ea2", color: "#fff" }}
             >

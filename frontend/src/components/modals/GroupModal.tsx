@@ -2,7 +2,6 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -31,8 +30,6 @@ export function GroupModal({
   onDeleteBusinessGroup,
   onAssignBusinessGroup,
 }: GroupModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
-
   if (!isOpen) return null;
 
   return (
@@ -42,8 +39,6 @@ export function GroupModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="group-manager-title"
-        ref={dialogRef}
-        tabIndex={-1}
       >
         <div className="modalHeader">
           <h3 id="group-manager-title">업무 그룹</h3>
@@ -60,7 +55,6 @@ export function GroupModal({
           <div className="field">
             <label htmlFor="business-group-name">그룹 이름</label>
             <input
-              autoFocus
               id="business-group-name"
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}
@@ -124,13 +118,7 @@ export function GroupModal({
           <div className="groupManager__assignments">
             {nodes.map((node) => (
               <label className="groupManager__assignment" key={node.id}>
-                <span
-                  title={node.data.title}
-                  aria-label={node.data.title}
-                  tabIndex={0}
-                >
-                  {node.data.title}
-                </span>
+                <span>{node.data.title}</span>
                 <select
                   value={node.data.businessGroup?.id ?? ""}
                   onChange={(event) =>
