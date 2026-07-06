@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-06-31 - Accessible Dynamic Inputs in Forms
+**Learning:** When rendering a dynamic list of column properties in custom dialogues (like `EditTableModal`), screen readers receive identical labels (e.g., "컬럼명", "PK") for each row unless uniquely scoped, creating a highly ambiguous user experience. Adding dynamic names to `aria-label` (like `aria-label={`${col.column_name} 컬럼명`}`) makes each input completely distinguishable.
+**Action:** When creating editable lists or grids, always generate unique `aria-label` attributes using the item's key identifier to provide sufficient context for screen reader users navigating row by row.
