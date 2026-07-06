@@ -78,6 +78,10 @@ def parse_dbml(text: str) -> dict[str, Any]:
     in_indexes = False
 
     for raw_line in text.splitlines():
+        # ReDoS guard: no legitimate DBML line approaches this length; capping
+        # input size per regex call bounds worst-case backtracking to O(1).
+        if len(raw_line) > 4096:
+            continue
         line = raw_line.split("//", 1)[0].strip()
         if not line:
             continue

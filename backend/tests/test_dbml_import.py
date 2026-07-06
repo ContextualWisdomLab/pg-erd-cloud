@@ -88,3 +88,13 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert 'CREATE TABLE IF NOT EXISTS "public"."users"' in ddl
     assert 'CREATE TABLE IF NOT EXISTS "public"."posts"' in ddl
     assert "PRIMARY KEY" in ddl
+
+
+def test_pathological_long_line_is_skipped_fast():
+    import time
+
+    hostile = 'Table t {\n  id int [pk]\n}\nRef: ' + '"a' * 100_000 + "\n"
+    start = time.monotonic()
+    snap = parse_dbml(hostile)
+    assert time.monotonic() - start < 1.0  # no catastrophic backtracking
+    assert len(snap["relations"]) == 1
