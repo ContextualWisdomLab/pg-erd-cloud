@@ -182,17 +182,14 @@ export default function App() {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
+      // ⚡ Bolt: Replaced flatMap and join with direct string concatenation.
+      // This prevents intermediate array allocation, significantly reducing memory allocation
+      // and GC pressure during high-frequency search updates across large ERD graphs.
+      let haystack = (node.data.title + " " + (node.data.comment ?? "")).toLocaleLowerCase();
+      for (const column of node.data.columns) {
+        haystack += " " + column.column_name.toLocaleLowerCase() + " " + column.data_type.toLocaleLowerCase() + " " + (column.column_comment ?? "").toLocaleLowerCase();
+      }
+
       if (haystack.includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }

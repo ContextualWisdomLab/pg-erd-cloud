@@ -60,3 +60,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
+## 2024-07-26 - Prevent memory churn in high-frequency React Flow filtering
+**Learning:** In `frontend/src/App.tsx`, building search indexes on-the-fly during render using array manipulation methods like `.flatMap(...)` and spread syntax created massive intermediate memory allocation and severe garbage collection pressure when dealing with large ERD graphs (hundreds of nodes/columns).
+**Action:** When filtering across large, complex graph state objects during render cycles or high-frequency callbacks (like keystrokes), use primitive string concatenation within loops instead of mapping to temporary arrays to minimize GC pauses and maintain smooth 60fps rendering.
