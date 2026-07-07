@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
 from dataclasses import dataclass
@@ -66,10 +67,15 @@ class VerifiedToken:
 
 
 _oidc_config: dict[str, Any] | None = None
+_oidc_jwks: dict[str, Any] | None = None
 _oidc_config_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+_oidc_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 OIDC_ALLOWED_ALGORITHMS = tuple(_parse_oidc_algorithms(settings.oidc_algorithms))
 OIDC_CONFIG_CACHE_TTL = dt.timedelta(minutes=10)
 OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
+OIDC_JWKS_MIN_REFRESH_INTERVAL = dt.timedelta(seconds=60)
+_last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+_jwks_lock = asyncio.Lock()
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 
@@ -98,10 +104,6 @@ async def _get_oidc_config() -> dict:
     return cast(dict, config)
 
 
-_jwks_cache: dict | None = None
-_jwks_expires_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
-
-
 async def _get_jwks(force_refresh: bool = False) -> dict:
     """Fetch and cache the OIDC JWKS (signing keys)."""
     config = await _get_oidc_config()
@@ -109,20 +111,40 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    global _jwks_cache, _jwks_expires_at
     now = dt.datetime.now(dt.timezone.utc)
-    if not force_refresh and _jwks_cache is not None and now < _jwks_expires_at:
-        return cast(dict, _jwks_cache)
 
-    async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
-        r = await client.get(jwks_uri)
-        if r.is_redirect:
-            raise RuntimeError("OIDC JWKS endpoint must not redirect")
-        r.raise_for_status()
-        jwks = cast(dict[str, Any], r.json())
-    _jwks_cache = jwks
-    _jwks_expires_at = now + OIDC_JWKS_CACHE_TTL
-    return cast(dict, jwks)
+    if _oidc_jwks is not None:
+        if not force_refresh and now < _oidc_jwks_expires_at:
+            return cast(dict, _oidc_jwks)
+        if (
+            force_refresh
+            and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
+        ):
+            return cast(dict, _oidc_jwks)
+
+    async with _jwks_lock:
+        now = dt.datetime.now(dt.timezone.utc)
+        if _oidc_jwks is not None:
+            if not force_refresh and now < _oidc_jwks_expires_at:
+                return cast(dict, _oidc_jwks)
+            if (
+                force_refresh
+                and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
+            ):
+                return cast(dict, _oidc_jwks)
+
+        async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
+            r = await client.get(jwks_uri)
+            if r.is_redirect:
+                raise RuntimeError("OIDC JWKS endpoint must not redirect")
+            r.raise_for_status()
+            jwks = cast(dict[str, Any], r.json())
+
+        refreshed_at = dt.datetime.now(dt.timezone.utc)
+        globals()["_oidc_jwks"] = jwks
+        globals()["_oidc_jwks_expires_at"] = refreshed_at + OIDC_JWKS_CACHE_TTL
+        globals()["_last_jwks_refresh_at"] = refreshed_at
+        return cast(dict, jwks)
 
 
 def _pick_jwk(jwks: dict, kid: str | None) -> dict | None:
@@ -233,6 +255,19 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         jwk = _pick_jwk(jwks, header.get("kid"))
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
+
+    kty = jwk.get("kty")
+    if not isinstance(kty, str):
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+    jwk_kty = kty.upper()
+    if jwk_kty == "RSA":
+        if not (header_alg.startswith("RS") or header_alg.startswith("PS")):
+            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+    elif jwk_kty == "EC":
+        if not header_alg.startswith("ES"):
+            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+    else:
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
         claims = jwt.decode(

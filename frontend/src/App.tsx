@@ -13,8 +13,19 @@ import {
   type Connection as FlowConnection,
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
+import {
+  AddTableModal,
+  CardinalityModal,
+  EditEdgeModal,
+  EditTableModal,
+  ExportModal,
+  GroupModal,
+} from "./components/modals";
+
 import {
   getMe,
+  createShareLink,
   createConnection,
   createProject,
   createSnapshot,
@@ -45,8 +56,9 @@ import {
   exportDiagramSvg,
   exportPlantUml,
 } from "./erd/export";
+import { exportMermaid } from "./erd/mermaid";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
-import type { Connection, Project, SnapshotDetail } from "./types";
+import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -54,8 +66,33 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "not_found",
 ]);
 
+const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
+
+type CurrentUser = {
+  subject: string;
+  display_name: string | null;
+};
+
+type WorkspaceView = "dashboard" | "projects" | "diagrams" | "editor";
+
+const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
+  { id: "dashboard", label: "대시보드" },
+  { id: "projects", label: "프로젝트" },
+  { id: "diagrams", label: "다이어그램" },
+  { id: "editor", label: "편집기" },
+];
+
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function isSupportedConnectionDsn(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return SUPPORTED_DSN_PROTOCOLS.has(url.protocol) && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function strengthLabel(strength: CardinalityStrength): string {
@@ -65,11 +102,10 @@ function strengthLabel(strength: CardinalityStrength): string {
 }
 
 export default function App() {
-  const [devUser, setDevUser] = useState<string>("local");
-  const [me, setMe] = useState<{
-    subject: string;
-    display_name: string | null;
-  } | null>(null);
+  const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
+  const [me, setMe] = useState<CurrentUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("demo");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -77,6 +113,7 @@ export default function App() {
   );
 
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [connName, setConnName] = useState("target-db");
   const [isDsnPresent, setIsDsnPresent] = useState(false);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
@@ -89,6 +126,7 @@ export default function App() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [nodeSearch, setNodeSearch] = useState("");
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
     [],
@@ -99,6 +137,7 @@ export default function App() {
     Edge
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -106,6 +145,10 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [shareLinkUrl, setShareLinkUrl] = useState("");
+  const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
+  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
+  const [shareLinkError, setShareLinkError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -134,14 +177,62 @@ export default function App() {
   > | null>(null);
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
+  const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
+  const searchMatchedNodeIds = useMemo(() => {
+    if (!normalizedNodeSearch) return new Set<string>();
+    const matches = new Set<string>();
+    for (const node of nodes) {
+      const haystack = [
+        node.data.title,
+        node.data.comment ?? "",
+        ...node.data.columns.flatMap((column) => [
+          column.column_name,
+          column.data_type,
+          column.column_comment ?? "",
+        ]),
+      ]
+        .join(" ")
+        .toLocaleLowerCase();
+      if (haystack.includes(normalizedNodeSearch)) {
+        matches.add(node.id);
+      }
+    }
+    return matches;
+  }, [nodes, normalizedNodeSearch]);
+  const visibleNodes = useMemo(() => {
+    if (!normalizedNodeSearch) return nodes;
+    return nodes.map((node) => {
+      const isHighlighted = searchMatchedNodeIds.has(node.id);
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          isDimmed: !isHighlighted,
+          isHighlighted,
+        },
+      };
+    });
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  const nodeSearchStatus = normalizedNodeSearch
+    ? `${searchMatchedNodeIds.size}개 테이블 일치`
+    : "";
 
   useEffect(() => {
     return () => {
       if (copyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(copyFeedbackTimeoutRef.current);
       }
+      if (shareCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    setShareLinkUrl("");
+    setIsShareLinkCopied(false);
+    setShareLinkError(null);
+  }, [selectedProjectId]);
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
@@ -160,23 +251,61 @@ export default function App() {
   );
 
   useEffect(() => {
+    let isCurrent = true;
+    setIsAuthLoading(true);
+    setAuthError(null);
     Promise.all([getMe(), listProjects()])
       .then(([m, p]) => {
+        if (!isCurrent) return;
         setMe({ subject: m.subject, display_name: m.display_name });
         setProjects(p);
         setSelectedProjectId(p[0]?.project_space_uuid || null);
       })
-      .catch((e) => setError(String(e)));
-  }, [devUser]);
+      .catch((e) => {
+        if (!isCurrent) return;
+        setMe(null);
+        setProjects([]);
+        setSelectedProjectId(null);
+        setConnections([]);
+        setSelectedConnId(null);
+        setAuthError(String(e));
+      })
+      .finally(() => {
+        if (isCurrent) setIsAuthLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId) {
+      setConnections([]);
+      setSelectedConnId(null);
+      setSnapshots([]);
+      return;
+    }
+    let isCurrent = true;
     listConnections(selectedProjectId)
       .then((c) => {
+        if (!isCurrent) return;
         setConnections(c);
         if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (isCurrent) setError(String(e));
+      });
+    listSnapshots(selectedProjectId)
+      .then((items) => {
+        if (isCurrent) setSnapshots(items);
+      })
+      .catch((e) => {
+        if (isCurrent) setError(String(e));
+      });
+    return () => {
+      isCurrent = false;
+    };
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -187,12 +316,17 @@ export default function App() {
           setSnapshot(s);
           if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
             clearInterval(timer);
+            if (selectedProjectId) {
+              listSnapshots(selectedProjectId)
+                .then(setSnapshots)
+                .catch((e) => setError(String(e)));
+            }
           }
         })
         .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
-  }, [snapshotId]);
+  }, [selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
@@ -218,8 +352,18 @@ export default function App() {
     [cardinalityRowCount],
   );
   const businessGroupsById = useMemo(() => {
-    return new Map(businessGroups.map((group) => [group.id, group]));
+    // ⚡ Bolt: Removed array mapping before Map creation to avoid intermediate array allocations.
+    const map = new Map<string, BusinessGroup>();
+    for (const group of businessGroups) {
+      map.set(group.id, group);
+    }
+    return map;
   }, [businessGroups]);
+  const selectedProject = projects.find(
+    (project) => project.project_space_uuid === selectedProjectId,
+  );
+  const recentProjects = projects.slice(0, 4);
+  const recentSnapshots = snapshots.slice(0, 5);
 
   // ⚡ Bolt: Removed nodesById Map creation inside useMemo which iterates over all nodes and allocates memory.
   // Using nodes.find() for single lookups is O(N) but avoids Map construction overhead, providing ~10x speedup and reducing GC pressure.
@@ -277,7 +421,11 @@ export default function App() {
     setEdges(graph.edges);
 
     setNodes((prev) => {
-      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
+      // ⚡ Bolt: Replaced prev.map with a for loop to avoid intermediate array allocations during Map creation.
+      const prevPos = new Map<string, { x: number; y: number }>();
+      for (const n of prev) {
+        prevPos.set(n.id, n.position);
+      }
       return graph.nodes.map((n) => {
         const position = prevPos.get(n.id);
         return position ? { ...n, position } : n;
@@ -384,8 +532,8 @@ export default function App() {
   }
 
   function onOpenExport() {
-    const ddl = exportDDL(nodes, edges);
-    setExportDdlText(ddl);
+    setExportDdlText(nodes.length > 0 ? exportDDL(nodes, edges) : "");
+    setShareLinkError(null);
     setIsExportModalOpen(true);
   }
 
@@ -396,6 +544,12 @@ export default function App() {
       window.clearTimeout(copyFeedbackTimeoutRef.current);
       copyFeedbackTimeoutRef.current = null;
     }
+    if (shareCopyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      shareCopyFeedbackTimeoutRef.current = null;
+    }
+    setIsShareLinkCopied(false);
+    setShareLinkError(null);
   }
 
   const onCopyExportDdl = useCallback(() => {
@@ -412,6 +566,44 @@ export default function App() {
     }, 2000);
   }, [exportDdlText]);
 
+  const onCreateShareLink = useCallback(async () => {
+    if (!selectedProjectId || isCreatingShareLink) return;
+
+    setIsCreatingShareLink(true);
+    setShareLinkError(null);
+    setIsShareLinkCopied(false);
+
+    try {
+      const link = await createShareLink(selectedProjectId);
+      setShareLinkUrl(link.url);
+    } catch (error) {
+      setShareLinkError(String(error));
+    } finally {
+      setIsCreatingShareLink(false);
+    }
+  }, [isCreatingShareLink, selectedProjectId]);
+
+  const onCopyShareLink = useCallback(async () => {
+    if (!shareLinkUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareLinkUrl);
+      setShareLinkError(null);
+      setIsShareLinkCopied(true);
+
+      if (shareCopyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      }
+
+      shareCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setIsShareLinkCopied(false);
+        shareCopyFeedbackTimeoutRef.current = null;
+      }, 2000);
+    } catch {
+      setIsShareLinkCopied(false);
+      setShareLinkError("공유 링크 복사에 실패했습니다.");
+    }
+  }, [shareLinkUrl]);
+
   function onDownloadSvg() {
     downloadText(
       "pg-erd-diagram.svg",
@@ -426,6 +618,10 @@ export default function App() {
       exportPlantUml(nodes, edges, snapshot?.snapshot_json),
       "text/plain",
     );
+  }
+
+  function onDownloadMermaid() {
+    downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
   }
 
   function onRelDelete() {
@@ -720,8 +916,20 @@ export default function App() {
     const nextConnectionName = connName.trim();
     const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
     if (!nextConnectionName || !connectionDsn) return;
+    if (!isSupportedConnectionDsn(connectionDsn)) {
+      setError("Connection DSN must use postgresql://, postgres://, or snowflake:// with a host.");
+      if (dsnInputRef.current) {
+        dsnInputRef.current.value = "";
+      }
+      setIsDsnPresent(false);
+      return;
+    }
     setError(null);
     setIsCreatingConnection(true);
+    if (dsnInputRef.current) {
+      dsnInputRef.current.value = "";
+    }
+    setIsDsnPresent(false);
     try {
       const c = await createConnection(
         selectedProjectId,
@@ -730,10 +938,6 @@ export default function App() {
       );
       setConnections((prev) => [c, ...prev]);
       setSelectedConnId(c.db_connection_uuid);
-      if (dsnInputRef.current) {
-        dsnInputRef.current.value = "";
-      }
-      setIsDsnPresent(false);
     } finally {
       setIsCreatingConnection(false);
     }
@@ -756,26 +960,56 @@ export default function App() {
     }
   }
 
+  if (isAuthLoading) {
+    return (
+      <main
+        id="main"
+        className="authGate"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <h1>pg-erd-cloud</h1>
+        <p>Authenticating…</p>
+      </main>
+    );
+  }
+
+  if (!me) {
+    return (
+      <main id="main" className="authGate">
+        <h1>Authentication required</h1>
+        <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+      </main>
+    );
+  }
+
   return (
     <div className="layout">
       <a className="skip-link" href="#main">
         본문 바로가기
       </a>
       <aside className="sidebar">
-        <h2>pg-erd-cloud</h2>
-
-        <div className="field">
-          <label htmlFor="dev-user">User (dev)</label>
-          <input
-            id="dev-user"
-            value={devUser}
-            onChange={(e) => setDevUser(e.target.value)}
-            placeholder="local"
-          />
-          <div style={{ fontSize: 12, color: "#4b5563" }}>
-            Subject: <code>{me?.subject || "—"}</code>
-          </div>
+        <div className="brandLockup">
+          <span className="brandLockup__mark" aria-hidden="true" />
+          <h2>Cloud ERD</h2>
         </div>
+
+        <nav className="workspaceNav" aria-label="주요 화면">
+          {workspaceNavItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={activeView === item.id ? "workspaceNav__item workspaceNav__item--active" : "workspaceNav__item"}
+              onClick={() => setActiveView(item.id)}
+              aria-current={activeView === item.id ? "page" : undefined}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {activeView === "editor" ? (
+          <>
 
         <div className="field">
           <label htmlFor="project-select">Project</label>
@@ -807,6 +1041,7 @@ export default function App() {
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
+              type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
@@ -864,6 +1099,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
+            type="button"
             onClick={onCreateConnection}
             disabled={
               !selectedProjectId ||
@@ -896,6 +1132,7 @@ export default function App() {
         </div>
 
         <button
+          type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
           aria-busy={isCreatingSnapshot}
@@ -925,15 +1162,188 @@ export default function App() {
             {error}
           </div>
         ) : null}
+          </>
+        ) : (
+          <div className="sidebarSummary" aria-label="작업공간 상태">
+            <div>
+              <span>현재 사용자</span>
+              <strong>{me?.display_name || me?.subject || "인증 필요"}</strong>
+            </div>
+            <div>
+              <span>선택 프로젝트</span>
+              <strong>{selectedProject?.project_name || "선택 안 됨"}</strong>
+            </div>
+            <button type="button" onClick={() => setActiveView("editor")}>
+              편집기로 이동
+            </button>
+          </div>
+        )}
       </aside>
 
       <main id="main" className="main" tabIndex={-1}>
-        <div className="canvas">
+        {activeView === "dashboard" ? (
+          <section className="workspaceScreen" aria-labelledby="dashboard-title">
+            <div className="workspaceHeader">
+              <div>
+                <h1 id="dashboard-title">대시보드</h1>
+                <p>최근 프로젝트와 다이어그램을 빠르게 확인합니다.</p>
+              </div>
+              <button type="button" onClick={() => setActiveView("editor")}>
+                새 모델링
+              </button>
+            </div>
+
+            <div className="metricGrid" aria-label="작업 요약">
+              <div className="metricCard">
+                <span>프로젝트</span>
+                <strong>{projects.length}</strong>
+              </div>
+              <div className="metricCard">
+                <span>연결</span>
+                <strong>{connections.length}</strong>
+              </div>
+              <div className="metricCard">
+                <span>다이어그램</span>
+                <strong>{snapshots.length}</strong>
+              </div>
+            </div>
+
+            <section className="workspaceSection" aria-labelledby="recent-projects-title">
+              <div className="sectionHeader">
+                <h2 id="recent-projects-title">최근 프로젝트</h2>
+                <button type="button" onClick={() => setActiveView("projects")}>
+                  전체 보기
+                </button>
+              </div>
+              {recentProjects.length ? (
+                <div className="projectCards">
+                  {recentProjects.map((project) => (
+                    <button
+                      key={project.project_space_uuid}
+                      type="button"
+                      className="projectCard"
+                      onClick={() => {
+                        setSelectedProjectId(project.project_space_uuid);
+                        setActiveView("diagrams");
+                      }}
+                    >
+                      <span className="projectCard__icon" aria-hidden="true" />
+                      <strong>{project.project_name}</strong>
+                      <span>다이어그램 보기</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="panelEmpty">아직 프로젝트가 없습니다. 편집기에서 프로젝트를 생성하세요.</div>
+              )}
+            </section>
+
+            <section className="workspaceSection" aria-labelledby="recent-diagrams-title">
+              <div className="sectionHeader">
+                <h2 id="recent-diagrams-title">최근 다이어그램</h2>
+                <button type="button" onClick={() => setActiveView("diagrams")}>
+                  목록 보기
+                </button>
+              </div>
+              <DiagramTable
+                snapshots={recentSnapshots}
+                selectedProjectName={selectedProject?.project_name}
+                onOpenEditor={(id) => {
+                  setSnapshotId(id);
+                  setSnapshot(null);
+                  setActiveView("editor");
+                }}
+              />
+            </section>
+          </section>
+        ) : activeView === "projects" ? (
+          <section className="workspaceScreen" aria-labelledby="projects-title">
+            <div className="workspaceHeader">
+              <div>
+                <h1 id="projects-title">프로젝트</h1>
+                <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
+              </div>
+              <div className="inlineCreate">
+                <input
+                  aria-label="새 프로젝트 이름"
+                  value={projectName}
+                  onChange={(event) => setProjectName(event.currentTarget.value)}
+                />
+                <button
+                  type="button"
+                  onClick={onCreateProject}
+                  disabled={!projectName.trim() || isCreatingProject}
+                >
+                  {isCreatingProject ? "생성 중" : "새 프로젝트"}
+                </button>
+              </div>
+            </div>
+            <div className="dataTable" role="table" aria-label="프로젝트 목록">
+              <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
+                <span role="columnheader">이름</span>
+                <span role="columnheader">연결</span>
+                <span role="columnheader">동작</span>
+              </div>
+              {projects.map((project) => (
+                <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
+                  <strong role="cell">{project.project_name}</strong>
+                  <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
+                  <span role="cell">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProjectId(project.project_space_uuid);
+                        setActiveView("diagrams");
+                      }}
+                    >
+                      열기
+                    </button>
+                  </span>
+                </div>
+              ))}
+              {!projects.length ? (
+                <div className="panelEmpty">프로젝트가 없습니다. 이름을 입력해 새 프로젝트를 만드세요.</div>
+              ) : null}
+            </div>
+          </section>
+        ) : activeView === "diagrams" ? (
+          <section className="workspaceScreen" aria-labelledby="diagrams-title">
+            <div className="workspaceHeader">
+              <div>
+                <h1 id="diagrams-title">다이어그램</h1>
+                <p>{selectedProject ? `${selectedProject.project_name} 프로젝트의 스냅샷` : "프로젝트를 선택하세요."}</p>
+              </div>
+              <button type="button" onClick={() => setActiveView("editor")}>
+                편집기 열기
+              </button>
+            </div>
+            <DiagramTable
+              snapshots={snapshots}
+              selectedProjectName={selectedProject?.project_name}
+              onOpenEditor={(id) => {
+                setSnapshotId(id);
+                setSnapshot(null);
+                setActiveView("editor");
+              }}
+            />
+          </section>
+        ) : (
+          <div className="canvas">
           <div
             className="canvasToolbar"
             role="toolbar"
             aria-label="ERD 캔버스 도구"
           >
+            <label className="canvasToolbar__search">
+              <span className="srOnly">테이블 또는 컬럼 검색</span>
+              <input
+                aria-label="테이블 또는 컬럼 검색"
+                placeholder="테이블/컬럼 검색"
+                type="search"
+                value={nodeSearch}
+                onChange={(event) => setNodeSearch(event.currentTarget.value)}
+              />
+            </label>
             <button
               type="button"
               onClick={onAutoLayout}
@@ -944,16 +1354,18 @@ export default function App() {
                 nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
               }
             >
-              {isLayouting ? "정렬 중…" : "정렬"}
+              {isLayouting ? "…" : "↔"}
             </button>
             <button
               type="button"
               onClick={onUndoLayout}
               disabled={!undoPositions || isLayouting}
-              title="정렬 되돌리기"
+              title={
+                !undoPositions ? "되돌릴 작업이 없습니다" : "정렬 되돌리기"
+              }
               aria-label="정렬 되돌리기"
             >
-              되돌리기
+              ↶
             </button>
             <button
               type="button"
@@ -961,7 +1373,7 @@ export default function App() {
               title="테이블 추가"
               aria-label="테이블 추가"
             >
-              테이블 추가
+              +
             </button>
             <button
               type="button"
@@ -972,7 +1384,7 @@ export default function App() {
               }
               aria-label="업무 그룹"
             >
-              그룹
+              ◇
             </button>
             <button
               type="button"
@@ -985,7 +1397,7 @@ export default function App() {
               }
               aria-label="인덱스 카디널리티 계산"
             >
-              카디널리티
+              #
             </button>
             <button
               type="button"
@@ -996,7 +1408,20 @@ export default function App() {
               }
               aria-label="DDL 내보내기"
             >
-              DDL
+              SQL
+            </button>
+            <button
+              type="button"
+              onClick={onOpenExport}
+              disabled={!selectedProjectId}
+              title={
+                !selectedProjectId
+                  ? "공유할 프로젝트를 먼저 선택하세요"
+                  : "공유 및 내보내기"
+              }
+              aria-label="공유 및 내보내기"
+            >
+              ↗
             </button>
             <button
               type="button"
@@ -1007,7 +1432,7 @@ export default function App() {
               }
               aria-label="SVG 그림 내보내기"
             >
-              SVG
+              IMG
             </button>
             <button
               type="button"
@@ -1020,13 +1445,26 @@ export default function App() {
             >
               UML
             </button>
+            <button
+              type="button"
+              onClick={onDownloadMermaid}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0
+                  ? "내보낼 테이블이 없습니다"
+                  : "Mermaid 내보내기"
+              }
+              aria-label="Mermaid 내보내기"
+            >
+              {"{}"}
+            </button>
             <div className="srOnly" aria-live="polite">
-              {layoutMessage}
+              {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
             </div>
           </div>
 
           <ReactFlow
-            nodes={nodes}
+            nodes={visibleNodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -1062,676 +1500,153 @@ export default function App() {
                   <div className="emptyState__mark" aria-hidden="true" />
                   <div className="emptyState__title">ERD 캔버스가 비어 있습니다</div>
                   <div className="emptyState__desc">
-                    좌측 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
+                    작업 패널에서 스냅샷을 생성하거나 상단의 <b>테이블 추가</b> 버튼을 눌러 시작하세요.
                   </div>
+                  <button
+                    type="button"
+                    title="테이블 추가"
+                    aria-label="테이블 추가"
+                    onClick={onOpenAddTable}
+                    style={{ marginTop: 16 }}
+                  >
+                    + 테이블 추가
+                  </button>
                 </>
               )}
             </div>
           )}
 
-          {isExportModalOpen && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="export-ddl-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 500,
-                  maxWidth: "90%",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="export-ddl-title">DDL 내보내기</h3>
-                <textarea
-                  readOnly
-                  aria-label="DDL Export"
-                  value={exportDdlText}
-                  style={{
-                    width: "100%",
-                    height: 300,
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    padding: 8,
-                  }}
-                />
-                <div
-                  className="row"
-                  style={{ justifyContent: "flex-end", marginTop: 8 }}
-                >
-                  <button onClick={onCloseExport}>닫기</button>
-                  <button
-                    onClick={onCopyExportDdl}
-                    style={{ background: "#034ea2", color: "#fff" }}
-                    aria-live="polite"
-                  >
-                    {isCopied ? "복사 완료 ✓" : "복사하기"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <ExportModal
+            isOpen={isExportModalOpen}
+            exportDdlText={exportDdlText}
+            isCopied={isCopied}
+            hasDdlExport={nodes.length > 0}
+            shareLinkUrl={shareLinkUrl}
+            isCreatingShareLink={isCreatingShareLink}
+            isShareLinkCopied={isShareLinkCopied}
+            shareLinkError={shareLinkError}
+            canCreateShareLink={Boolean(selectedProjectId)}
+            onCloseExport={onCloseExport}
+            onCopyExportDdl={onCopyExportDdl}
+            onCreateShareLink={onCreateShareLink}
+            onCopyShareLink={onCopyShareLink}
+          />
 
-          {editingEdge && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="edit-rel-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 320,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="edit-rel-title">관계 설정</h3>
-                <div style={{ fontSize: 13, color: "#4b5563" }}>
-                  From: {editingEdge.source} <br />
-                  To: {editingEdge.target}
-                </div>
-                <div className="field">
-                  <label htmlFor="rel-label">제약조건 이름 (Label)</label>
-                  <input
-                    id="rel-label"
-                    value={relLabel}
-                    onChange={(e) => setRelLabel(e.target.value)}
-                    placeholder="fk_constraint_name"
-                    autoFocus
-                  />
-                </div>
-                <div
-                  className="row"
-                  style={{ justifyContent: "space-between", marginTop: 8 }}
-                >
-                  <button
-                    onClick={onRelDelete}
-                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-                  >
-                    삭제
-                  </button>
-                  <div className="row">
-                    <button onClick={onRelCancel}>취소</button>
-                    <button
-                      onClick={onRelSubmit}
-                      style={{ background: "#034ea2", color: "#fff" }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <EditEdgeModal
+            editingEdge={editingEdge}
+            relLabel={relLabel}
+            setRelLabel={setRelLabel}
+            onRelDelete={onRelDelete}
+            onRelCancel={onRelCancel}
+            onRelSubmit={onRelSubmit}
+          />
 
-          {isGroupModalOpen && (
-            <div className="modalOverlay">
-              <div
-                className="modalContent groupManager"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="group-manager-title"
-              >
-                <div className="modalHeader">
-                  <h3 id="group-manager-title">업무 그룹</h3>
-                  <button
-                    type="button"
-                    onClick={onCloseGroupManager}
-                    aria-label="업무 그룹 닫기"
-                  >
-                    닫기
-                  </button>
-                </div>
+          <GroupModal
+            isOpen={isGroupModalOpen}
+            businessGroups={businessGroups}
+            newGroupName={newGroupName}
+            setNewGroupName={setNewGroupName}
+            newGroupColor={newGroupColor}
+            setNewGroupColor={setNewGroupColor}
+            nodes={nodes}
+            onCloseGroupManager={onCloseGroupManager}
+            onCreateBusinessGroup={onCreateBusinessGroup}
+            onDeleteBusinessGroup={onDeleteBusinessGroup}
+            onAssignBusinessGroup={onAssignBusinessGroup}
+          />
 
-                <div className="groupManager__create">
-                  <div className="field">
-                    <label htmlFor="business-group-name">그룹 이름</label>
-                    <input
-                      id="business-group-name"
-                      value={newGroupName}
-                      onChange={(event) => setNewGroupName(event.target.value)}
-                      placeholder="Billing"
-                    />
-                  </div>
-                  <div
-                    className="groupManager__swatches"
-                    role="radiogroup"
-                    aria-label="그룹 색상"
-                  >
-                    {BUSINESS_GROUP_COLORS.map((color) => (
-                      <button
-                        type="button"
-                        aria-label={`색상 ${color}`}
-                        aria-pressed={newGroupColor === color}
-                        className="groupManager__swatch"
-                        key={color}
-                        onClick={() => setNewGroupColor(color)}
-                        style={{ background: color }}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onCreateBusinessGroup}
-                    disabled={!newGroupName.trim()}
-                  >
-                    추가
-                  </button>
-                </div>
+          <CardinalityModal
+            isOpen={isCardinalityModalOpen}
+            cardinalityNode={cardinalityNode}
+            nodes={nodes}
+            cardinalityRowCount={cardinalityRowCount}
+            setCardinalityRowCount={setCardinalityRowCount}
+            cardinalityRowCountNumber={cardinalityRowCountNumber}
+            cardinalityDistinctCounts={cardinalityDistinctCounts}
+            cardinalityColumnSelections={cardinalityColumnSelections}
+            cardinalityRecommendations={cardinalityRecommendations}
+            appliedCardinalitySignatures={appliedCardinalitySignatures}
+            onCloseCardinalityWizard={onCloseCardinalityWizard}
+            onCardinalityTableChange={onCardinalityTableChange}
+            onCardinalityColumnToggle={onCardinalityColumnToggle}
+            onCardinalityDistinctCountChange={onCardinalityDistinctCountChange}
+            onApplyCardinalityRecommendation={onApplyCardinalityRecommendation}
+            parsePositiveInteger={parsePositiveInteger}
+            calculateCardinalityRatio={calculateCardinalityRatio}
+            formatPercent={formatPercent}
+            strengthLabel={strengthLabel}
+          />
 
-                <div className="groupManager__section">
-                  <h4>그룹</h4>
-                  {businessGroups.length === 0 ? (
-                    <div className="field-hint">등록된 그룹이 없습니다.</div>
-                  ) : (
-                    <div className="groupManager__list">
-                      {businessGroups.map((group) => (
-                        <div className="groupManager__group" key={group.id}>
-                          <span
-                            className="groupManager__dot"
-                            style={{ background: group.color }}
-                          />
-                          <strong>{group.name}</strong>
-                          <button
-                            type="button"
-                            aria-label={`${group.name} 그룹 삭제`}
-                            onClick={() => onDeleteBusinessGroup(group.id)}
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+          <EditTableModal
+            isOpen={isEditTableModalOpen}
+            editingNode={editingNode}
+            setEditingNode={setEditingNode}
+            setNodes={setNodes}
+            onEditTableCancel={onEditTableCancel}
+            onEditTableSubmit={onEditTableSubmit}
+            onDeleteTable={onDeleteTable}
+          />
 
-                <div className="groupManager__section">
-                  <h4>테이블 배정</h4>
-                  <div className="groupManager__assignments">
-                    {nodes.map((node) => (
-                      <label className="groupManager__assignment" key={node.id}>
-                        <span>{node.data.title}</span>
-                        <select
-                          value={node.data.businessGroup?.id ?? ""}
-                          onChange={(event) =>
-                            onAssignBusinessGroup(node.id, event.target.value)
-                          }
-                        >
-                          <option value="">없음</option>
-                          {businessGroups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                              {group.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isCardinalityModalOpen && cardinalityNode && (
-            <div className="modalOverlay">
-              <div
-                className="modalContent cardinalityWizard"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="cardinality-title"
-              >
-                <div className="modalHeader">
-                  <h3 id="cardinality-title">인덱스 카디널리티</h3>
-                  <button
-                    type="button"
-                    onClick={onCloseCardinalityWizard}
-                    aria-label="카디널리티 계산 닫기"
-                  >
-                    닫기
-                  </button>
-                </div>
-
-                <div className="cardinalityWizard__controls">
-                  <div className="field">
-                    <label htmlFor="cardinality-table">테이블</label>
-                    <select
-                      id="cardinality-table"
-                      value={cardinalityNode.id}
-                      onChange={(event) =>
-                        onCardinalityTableChange(event.target.value)
-                      }
-                    >
-                      {nodes.map((node) => (
-                        <option key={node.id} value={node.id}>
-                          {node.data.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="cardinality-row-count">행 수</label>
-                    <input
-                      id="cardinality-row-count"
-                      inputMode="numeric"
-                      min="1"
-                      type="number"
-                      value={cardinalityRowCount}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (/^\d*$/.test(value)) {
-                          setCardinalityRowCount(value);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="cardinalityWizard__columns">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">사용</th>
-                        <th scope="col">컬럼</th>
-                        <th scope="col">Distinct</th>
-                        <th scope="col">비율</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cardinalityNode.data.columns.map((column, index) => {
-                        const distinctCount = parsePositiveInteger(
-                          cardinalityDistinctCounts[column.column_name] ?? "",
-                        );
-                        const ratio =
-                          cardinalityRowCountNumber !== null &&
-                          distinctCount !== null
-                            ? calculateCardinalityRatio(
-                                cardinalityRowCountNumber,
-                                distinctCount,
-                              )
-                            : null;
-                        const inputId = `cardinality-${index}`;
-                        return (
-                          <tr key={column.column_name}>
-                            <td>
-                              <input
-                                aria-label={`${column.column_name} 사용`}
-                                checked={
-                                  cardinalityColumnSelections[
-                                    column.column_name
-                                  ] ?? false
-                                }
-                                onChange={(event) =>
-                                  onCardinalityColumnToggle(
-                                    column.column_name,
-                                    event.target.checked,
-                                  )
-                                }
-                                type="checkbox"
-                              />
-                            </td>
-                            <td>
-                              <span className="cardinalityWizard__columnIdentity">
-                                <label htmlFor={inputId}>
-                                  {column.column_name}
-                                </label>
-                                <span>{column.data_type}</span>
-                              </span>
-                            </td>
-                            <td>
-                              <input
-                                id={inputId}
-                                inputMode="numeric"
-                                min="1"
-                                type="number"
-                                value={
-                                  cardinalityDistinctCounts[
-                                    column.column_name
-                                  ] ?? ""
-                                }
-                                onChange={(event) =>
-                                  onCardinalityDistinctCountChange(
-                                    column.column_name,
-                                    event.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>{ratio === null ? "—" : formatPercent(ratio)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="cardinalityWizard__recommendations">
-                  <h4>추천 결과</h4>
-                  {cardinalityRowCountNumber === null ? (
-                    <div className="field-hint">Rows 값을 입력하세요.</div>
-                  ) : null}
-                  {cardinalityRowCountNumber !== null &&
-                  cardinalityRecommendations.length === 0 ? (
-                    <div className="field-hint">
-                      사용할 컬럼과 distinct 값을 선택하세요.
-                    </div>
-                  ) : null}
-                  {cardinalityRecommendations.map((recommendation) => {
-                    const isApplied =
-                      (recommendation.index_name && appliedCardinalitySignatures.names.has(recommendation.index_name)) ||
-                      (recommendation.columns && recommendation.columns.length > 0 && appliedCardinalitySignatures.columns.has(recommendation.columns.join(",")));
-                    return (
-                      <div
-                        className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
-                        key={`${recommendation.index_name}-${recommendation.columns.join("-")}`}
-                      >
-                        <div>
-                          <div className="cardinalityRecommendation__title">
-                            <span>{strengthLabel(recommendation.strength)}</span>
-                            <strong>{recommendation.index_name}</strong>
-                          </div>
-                          <div className="field-hint">
-                            {recommendation.columns.join(", ")} ·{" "}
-                            {formatPercent(recommendation.cardinality_ratio)} ·{" "}
-                            {recommendation.reason}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={
-                            recommendation.strength === "skip" || isApplied
-                          }
-                          onClick={() =>
-                            onApplyCardinalityRecommendation(recommendation)
-                          }
-                        >
-                          {isApplied ? "적용됨" : "적용"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {isEditTableModalOpen && editingNode && (
-            <div className="modalOverlay">
-              <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
-                <div className="modal__header">
-                  <h3>테이블 편집</h3>
-                  <button onClick={onEditTableCancel}>X</button>
-                </div>
-                <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
-                  <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
-                    <div className="col">
-                      <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
-                      <input
-                        id="editTableTitle"
-                        name="title"
-                        defaultValue={editingNode.data.title}
-                        placeholder="public.users"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="col">
-                      <label htmlFor="editTableComment">코멘트 (선택)</label>
-                      <input
-                        id="editTableComment"
-                        name="comment"
-                        defaultValue={editingNode.data.comment || ""}
-                        placeholder="사용자 테이블"
-                      />
-                    </div>
-
-                    <div className="col" style={{ marginTop: 16 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <h4 style={{ margin: 0 }}>컬럼</h4>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNodes((nds) =>
-                              nds.map((n) => {
-                                if (n.id === editingNode.id) {
-                                  return {
-                                    ...n,
-                                    data: {
-                                      ...n.data,
-                                      columns: [
-                                        ...n.data.columns,
-                                        {
-                                          column_name: `new_col_${Date.now()}`,
-                                          data_type: "text",
-                                          is_not_null: false,
-                                          is_pk: false,
-                                        }
-                                      ]
-                                    }
-                                  };
-                                }
-                                return n;
-                              })
-                            );
-                            setEditingNode((prev) => {
-                               if (!prev) return prev;
-                               return {
-                                 ...prev,
-                                 data: {
-                                   ...prev.data,
-                                   columns: [
-                                     ...prev.data.columns,
-                                     {
-                                       column_name: `new_col_${Date.now()}`,
-                                       data_type: "text",
-                                       is_not_null: false,
-                                       is_pk: false,
-                                     }
-                                   ]
-                                 }
-                               }
-                            });
-                          }}
-                        >
-                          컬럼 추가
-                        </button>
-                      </div>
-
-                      <div className="col" style={{ gap: 8 }}>
-                        {editingNode.data.columns.map((col, idx) => (
-                          <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
-                            <input
-                              type="text"
-                              name={`col_name_${idx}`}
-                              defaultValue={col.column_name}
-                              placeholder="컬럼명"
-                              style={{ flex: 2 }}
-                              aria-label="컬럼명"
-                            />
-                            <input
-                              type="text"
-                              name={`col_type_${idx}`}
-                              defaultValue={col.data_type}
-                              placeholder="데이터 타입"
-                              style={{ flex: 1.5 }}
-                              aria-label="데이터 타입"
-                            />
-                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
-                              <input
-                                type="checkbox"
-                                name={`col_pk_${idx}`}
-                                defaultChecked={col.is_pk}
-                              />
-                              PK
-                            </label>
-                            <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
-                              <input
-                                type="checkbox"
-                                name={`col_nn_${idx}`}
-                                defaultChecked={col.is_not_null}
-                              />
-                              NN
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!window.confirm(`'${col.column_name}' 컬럼을 삭제하시겠습니까?`)) return;
-                                setNodes((nds) =>
-                                  nds.map((n) => {
-                                    if (n.id === editingNode.id) {
-                                      return {
-                                        ...n,
-                                        data: {
-                                          ...n.data,
-                                          columns: n.data.columns.filter((_, i) => i !== idx)
-                                        }
-                                      };
-                                    }
-                                    return n;
-                                  })
-                                );
-                                setEditingNode((prev) => {
-                                   if (!prev) return prev;
-                                   return {
-                                     ...prev,
-                                     data: {
-                                       ...prev.data,
-                                       columns: prev.data.columns.filter((_, i) => i !== idx)
-                                     }
-                                   };
-                                });
-                              }}
-                              style={{ color: "#b91c1c", padding: "4px 8px" }}
-                              aria-label={`${col.column_name} 컬럼 삭제`}
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
-                  <button
-                    type="button"
-                    onClick={onDeleteTable}
-                    style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-                  >
-                    테이블 삭제
-                  </button>
-                  <div className="row">
-                    <button type="button" onClick={onEditTableCancel}>취소</button>
-                    <button
-                      type="submit"
-                      form="editTableForm"
-                      style={{ background: "#034ea2", color: "#fff" }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {isAddTableModalOpen && (
-            <div
-              className="modalOverlay"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                className="modalContent"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="add-table-title"
-                style={{
-                  background: "#fff",
-                  padding: 20,
-                  borderRadius: 8,
-                  width: 300,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                }}
-              >
-                <h3 id="add-table-title">테이블 추가</h3>
-                <div className="field">
-                  <label htmlFor="new-table-name">테이블 이름</label>
-                  <input
-                    id="new-table-name"
-                    value={newTableName}
-                    onChange={(e) => setNewTableName(e.target.value)}
-                    placeholder="users"
-                    autoFocus
-                  />
-                </div>
-                <div
-                  className="row"
-                  style={{ justifyContent: "flex-end", marginTop: 8 }}
-                >
-                  <button onClick={onAddTableCancel}>취소</button>
-                  <button
-                    onClick={onAddTableSubmit}
-                    style={{ background: "#034ea2", color: "#fff" }}
-                  >
-                    저장
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <AddTableModal
+            isOpen={isAddTableModalOpen}
+            newTableName={newTableName}
+            setNewTableName={setNewTableName}
+            onAddTableCancel={onAddTableCancel}
+            onAddTableSubmit={onAddTableSubmit}
+          />
         </div>
+        )}
       </main>
+    </div>
+  );
+}
+
+function DiagramTable({
+  snapshots,
+  selectedProjectName,
+  onOpenEditor,
+}: {
+  snapshots: Snapshot[];
+  selectedProjectName?: string;
+  onOpenEditor: (snapshotId: string) => void;
+}) {
+  if (!snapshots.length) {
+    return (
+      <div className="panelEmpty">
+        아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.
+      </div>
+    );
+  }
+
+  return (
+    <div className="dataTable" role="table" aria-label="다이어그램 목록">
+      <div className="dataTable__row dataTable__row--head" role="row">
+        <span role="columnheader">이름</span>
+        <span role="columnheader">프로젝트</span>
+        <span role="columnheader">상태</span>
+        <span role="columnheader">동작</span>
+      </div>
+      {snapshots.map((item, index) => (
+        <div className="dataTable__row" role="row" key={item.schema_snapshot_uuid}>
+          <strong role="cell">
+            ERD_{item.schema_filter || "all"}_{index + 1}
+          </strong>
+          <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
+          <span role="cell">
+            <span className={`statusPill statusPill--${item.status}`}>
+              {item.status}
+            </span>
+          </span>
+          <span role="cell">
+            <button
+              type="button"
+              onClick={() => onOpenEditor(item.schema_snapshot_uuid)}
+            >
+              열기
+            </button>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
