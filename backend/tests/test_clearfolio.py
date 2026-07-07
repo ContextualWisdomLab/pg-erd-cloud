@@ -97,3 +97,22 @@ async def test_http_error_becomes_clearfolio_error(monkeypatch):
     monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
     with pytest.raises(cf.ClearfolioError):
         await cf.get_viewer_bootstrap("dev:alice", "doc-1")
+
+
+def test_permissions_canonicalized_to_match_clearfolio():
+    # messy config: spaces, a duplicate, a trailing empty entry
+    messy = " viewer:read , job:create,viewer:read, job:read ,"
+    assert cf.canonicalize_permissions(messy) == "viewer:read,job:create,job:read"
+    cfg = cf.ClearfolioConfig(
+        gateway_url="https://cf.example.com", hmac_secret=SECRET,
+        tenant_id=" pg-erd-cloud ", permissions=messy, timeout_seconds=10.0,
+    )
+    h = cf.build_tenant_headers(cfg, " dev:alice ", issued_at=100)
+    # sent header equals canonical form (no spaces/dupes), tenant/subject stripped
+    assert h["X-Clearfolio-Permissions"] == "viewer:read,job:create,job:read"
+    assert h["X-Clearfolio-Tenant-Id"] == "pg-erd-cloud"
+    assert h["X-Clearfolio-Subject-Id"] == "dev:alice"
+    # signature is over the canonical values, so Clearfolio's re-derivation matches
+    assert h["X-Clearfolio-Claims-Signature"] == cf.sign_tenant_claims(
+        SECRET, "pg-erd-cloud", "dev:alice", "viewer:read,job:create,job:read", 100
+    )

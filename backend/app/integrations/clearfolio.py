@@ -32,6 +32,27 @@ import httpx
 from app.pg_introspect.dsn_guard import _validated_ip_hosts
 from app.settings import settings
 
+def _sanitize(value: str) -> str:
+    """Match Clearfolio's claim sanitizer: drop NUL, strip surrounding space."""
+    return value.replace("\x00", "").strip()
+
+
+def canonicalize_permissions(raw: str) -> str:
+    """Reduce a permission string to Clearfolio's canonical form.
+
+    Clearfolio verifies the signature against ``canonicalPermissions`` — the
+    header split on ``,``, each entry sanitized, empties dropped, de-duplicated
+    preserving order, re-joined with ``,``. The gateway must sign (and send)
+    this exact form or every request 401s, so we canonicalize identically.
+    """
+    seen: dict[str, None] = {}
+    for part in raw.split(","):
+        cleaned = _sanitize(part)
+        if cleaned:
+            seen.setdefault(cleaned, None)
+    return ",".join(seen)
+
+
 _H_TENANT = "X-Clearfolio-Tenant-Id"
 _H_SUBJECT = "X-Clearfolio-Subject-Id"
 _H_PERMS = "X-Clearfolio-Permissions"
@@ -89,13 +110,18 @@ def build_tenant_headers(
     """Build the full signed Clearfolio tenant header set for a subject."""
     if issued_at is None:
         issued_at = int(dt.datetime.now(dt.timezone.utc).timestamp())
+    # Sign and send the exact canonical values Clearfolio re-derives on verify,
+    # otherwise a config with spaces/duplicates would 401.
+    tenant_id = _sanitize(config.tenant_id)
+    subject = _sanitize(subject_id)
+    permissions = canonicalize_permissions(config.permissions)
     signature = sign_tenant_claims(
-        config.hmac_secret, config.tenant_id, subject_id, config.permissions, issued_at
+        config.hmac_secret, tenant_id, subject, permissions, issued_at
     )
     return {
-        _H_TENANT: config.tenant_id,
-        _H_SUBJECT: subject_id,
-        _H_PERMS: config.permissions,
+        _H_TENANT: tenant_id,
+        _H_SUBJECT: subject,
+        _H_PERMS: permissions,
         _H_ISSUED: str(issued_at),
         _H_SIG: signature,
     }
