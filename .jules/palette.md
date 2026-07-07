@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2025-02-24 - Accessibility and tabIndex on Static Text
+**Learning:** Adding `tabIndex={0}` to static text elements (like `span` or `div` tags displaying truncated labels) forces them into the keyboard navigation flow. While this makes `title` or `aria-label` readable on hover/focus, it is an accessibility anti-pattern. It creates excessive tab stops for users navigating via keyboard, making it harder to reach actual interactive elements like buttons and inputs.
+**Action:** Do not use `tabIndex={0}` on static, non-interactive UI elements. Screen readers can read standard HTML without needing focus, and hovering a mouse triggers tooltips regardless of `tabIndex`.

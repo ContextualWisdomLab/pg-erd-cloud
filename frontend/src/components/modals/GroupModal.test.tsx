@@ -40,6 +40,5 @@ describe('GroupModal', () => {
       .find((element) => element.tagName === 'SPAN');
     expect(tableLabel).toBeDefined();
     expect(tableLabel).toHaveAttribute('title', tableName);
-    expect(tableLabel).toHaveAttribute('tabindex', '0');
   });
 });

@@ -73,12 +73,10 @@ describe('TableNode', () => {
     ]) {
       const item = screen.getByLabelText(name);
       expect(item).toHaveAttribute('title', name);
-      expect(item).toHaveAttribute('tabindex', '0');
     }
 
     const indexName = screen.getByLabelText('idx_users_email_unique_long_name');
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
-    expect(indexName).toHaveAttribute('tabindex', '0');
 
     const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
     expect(notNullBadge).toHaveAttribute('title', 'Not Null');
