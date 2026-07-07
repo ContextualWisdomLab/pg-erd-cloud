@@ -655,4 +655,6 @@ async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:
     """Introspect Snowflake metadata into the common snapshot JSON shape."""
 
     config = await _parse_snowflake_dsn(dsn)
-    return await asyncio.to_thread(_introspect_snowflake_sync_with_config, config, schema_filter)
+    return await asyncio.to_thread(
+        _introspect_snowflake_sync_with_config, config, schema_filter
+    )
