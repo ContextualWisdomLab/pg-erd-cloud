@@ -116,11 +116,11 @@ def infer_column_example(column: dict) -> str:
 
 
 def add_column_examples(columns: list[dict]) -> list[dict]:
-    """Return copied column dictionaries with generated examples when missing."""
-    enriched: list[dict] = []
-    for column in columns:
-        next_column = dict(column)
-        next_column.setdefault("example_value", infer_column_example(next_column))
-        next_column.setdefault("example_value_source", "generated")
-        enriched.append(next_column)
-    return enriched
+    # ⚡ Bolt: Mutate dictionaries in-place to avoid allocating new dicts for each column.
+    # Snapshot introspectors pass freshly built payload dictionaries, so callers do not share these objects.
+    for col in columns:
+        if "example_value" not in col:
+            col["example_value"] = infer_column_example(col)
+        if "example_value_source" not in col:
+            col["example_value_source"] = "generated"
+    return columns

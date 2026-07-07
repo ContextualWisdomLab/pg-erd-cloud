@@ -82,7 +82,9 @@ async def list_project_members(
 ) -> list[ProjectMemberOut]:
     """List members of a project (MVP: any member can view)."""
     # Remediation for IDOR: Only owners or editors can view all members.
-    await require_project_member(session, project_space_uuid, user.user_account_uuid, minimum_role="editor")
+    await require_project_member(
+        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+    )
 
     rows = await session.execute(
         select(ProjectMember, UserAccount)
