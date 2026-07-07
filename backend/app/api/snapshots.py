@@ -18,12 +18,14 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    NamingLintOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
     SnapshotOut,
     WideTablesOut,
 )
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.naming_lint import lint_naming
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -279,3 +281,26 @@ async def list_snapshots(
         )
         for s in snaps
     ]
+
+
+@router.get("/{schema_snapshot_uuid}/naming-lint", response_model=NamingLintOut)
+async def naming_lint(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> NamingLintOut:
+    """Lint identifier names: reserved words and quoting-required names (breaking),
+    discouraged keywords, and case inconsistency vs the schema's own dominant style.
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return NamingLintOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = lint_naming(data.snapshot_json if data else None)
+    return NamingLintOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
