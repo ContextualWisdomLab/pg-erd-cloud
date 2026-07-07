@@ -60,3 +60,11 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
+
+## 2024-07-25 - Prevent Array Allocation in Map Values during Iteration
+**Learning:** Initializing array values dynamically inside `useMemo` dependencies such as `.flatMap` combined with `.join(" ")` on high-frequency React interactions creates huge Garbage Collection pressure and can heavily degrade performance.
+**Action:** Replace `flatMap` and `join` combinations with a fast O(N) iterative `for` loop executing standard string concatenation for creating dynamic search strings on high frequency components.
+
+## 2024-07-25 - Do not document hallucinated optimizations
+**Learning:** Sometimes the code structure might be slightly different than what was previously logged in the memory as a problem. Documenting an optimization that was not actually implemented adds misleading noise to code reviews and PRs.
+**Action:** Carefully read the diff before writing PR comments. If a planned optimization is already present, do not add comments claiming to have made that specific optimization. Focus only on the changes actually made.
