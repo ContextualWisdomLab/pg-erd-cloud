@@ -1,0 +1,6 @@
+1. **Reply to the PR comment:**
+   - Use `reply_to_pr_comments` to acknowledge the comment about the PR being closed/obsolete.
+   - Acknowledge that this work is considered obsolete and that I should stop working on it.
+2. **Close/Stop task:**
+   - I have no more actionable steps since the PR is being closed by the user/bot.
+   - I will submit the current state (if required) or stop working.
