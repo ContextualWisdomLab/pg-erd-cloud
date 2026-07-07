@@ -6,7 +6,7 @@ If you believe you have found a security vulnerability in this project, please *
 
 Preferred: report privately via GitHub Security Advisories:
 
-- [Report a security advisory](https://github.com/ContextualWisdomLab/pg-erd-cloud/security/advisories/new)
+- [Report a security advisory](https://github.com/HYOSUNG-ITX-AI-Business-Department/pg-erd-cloud/security/advisories/new)
 
 Include, when possible:
 

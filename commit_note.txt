@@ -1,0 +1,2 @@
+The user closed the PR saying it's a duplicate of #498 and that one is newer, requesting to reopen if this approach is better.
+I've acknowledged this instruction and replied to the comment indicating that I will stop work on this obsolete task.

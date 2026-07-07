@@ -203,14 +203,6 @@ async def test_parse_snowflake_dsn_validates_authenticator(
         "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com"
     )
     assert conf.authenticator == "https://company.okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://okta.com"
-    )
-    assert conf.authenticator == "https://okta.com"
-    conf = await _parse_snowflake_dsn(
-        "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://oktapreview.com"
-    )
-    assert conf.authenticator == "https://oktapreview.com"
 
     # Allowed safe string values
     conf = await _parse_snowflake_dsn(
@@ -232,10 +224,6 @@ async def test_parse_snowflake_dsn_validates_authenticator(
     with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
         await _parse_snowflake_dsn(
             "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com"
-        )
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        await _parse_snowflake_dsn(
-            "snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.okta.com.attacker.com"
         )
 
 

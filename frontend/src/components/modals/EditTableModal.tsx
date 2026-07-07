@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditTableModalProps {
   isOpen: boolean;
@@ -13,8 +12,6 @@ interface EditTableModalProps {
   onDeleteTable: () => void;
 }
 
-const abbrStyle = { textDecoration: "none", cursor: "help" };
-
 export function EditTableModal({
   isOpen,
   editingNode,
@@ -24,13 +21,11 @@ export function EditTableModal({
   onEditTableSubmit,
   onDeleteTable,
 }: EditTableModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), onEditTableCancel);
-
   if (!isOpen || !editingNode) return null;
 
   return (
     <div className="modalOverlay">
-      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
+      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title">
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
           <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
@@ -133,16 +128,18 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
+                        aria-label="Primary Key"
                       />
-                      <abbr title="Primary Key" aria-label="Primary Key" style={abbrStyle}>PK</abbr>
+                      <abbr title="Primary Key" aria-label="Primary Key" style={{ textDecoration: "none" }}>PK</abbr>
                     </label>
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
+                        aria-label="Not Null"
                       />
-                      <abbr title="Not Null" aria-label="Not Null" style={abbrStyle}>NN</abbr>
+                      <abbr title="Not Null" aria-label="Not Null" style={{ textDecoration: "none" }}>NN</abbr>
                     </label>
                     <button
                       type="button"

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface AddTableModalProps {
   isOpen: boolean;
@@ -16,8 +15,6 @@ export function AddTableModal({
   onAddTableCancel,
   onAddTableSubmit,
 }: AddTableModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
-
   if (!isOpen) return null;
 
   return (
@@ -41,8 +38,6 @@ export function AddTableModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-table-title"
-        ref={dialogRef}
-        tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
           if (newTableName.trim()) {
