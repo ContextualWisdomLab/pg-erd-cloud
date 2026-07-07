@@ -47,9 +47,7 @@ class ConnectionCreateIn(BaseModel):
     dsn: str = Field(
         min_length=1,
         max_length=4096,
-        description=(
-            "PostgreSQL or Snowflake connection string. Not logged."
-        ),
+        description=("PostgreSQL or Snowflake connection string. Not logged."),
     )
 
 
@@ -91,6 +89,14 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class WideTablesOut(BaseModel):
+    """Wide / denormalized table findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
 
 
 class MeOut(BaseModel):

@@ -104,20 +104,12 @@ def test_rate_limit_separates_by_subject_when_provided() -> None:
     client = TestClient(app)
 
     # subject A: first ok, second blocked
-    assert (
-        client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
-    )
-    assert (
-        client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
-    )
+    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
+    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
 
     # subject B: independent key -> first ok
-    assert (
-        client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
-    )
-    assert (
-        client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
-    )
+    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
+    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
 
 
 def test_rate_limit_disabled_allows_all_requests() -> None:
@@ -173,21 +165,15 @@ def test_rate_limit_trusts_x_forwarded_for_when_enabled() -> None:
 
     client = TestClient(app)
     assert (
-        client.get(
-            "/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}
-        ).status_code
+        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
         == 200
     )
     assert (
-        client.get(
-            "/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}
-        ).status_code
+        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
         == 429
     )
     assert (
-        client.get(
-            "/api/ping", headers={"X-Forwarded-For": "2.2.2.2"}
-        ).status_code
+        client.get("/api/ping", headers={"X-Forwarded-For": "2.2.2.2"}).status_code
         == 200
     )
 
