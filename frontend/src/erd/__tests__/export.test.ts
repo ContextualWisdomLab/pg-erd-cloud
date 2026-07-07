@@ -535,29 +535,3 @@ describe('exportDiagramSvg additional edge cases', () => {
     expect(plantUml).not.toContain('test_idx');
   });
 });
-
-  describe('exportDDL with snapshot indexes', () => {
-    it('exports snapshot indexes', () => {
-      const snapshot = {
-        indexes: [
-          { relation_oid: 1, index_name: 'idx1', index_def: 'CREATE INDEX idx1 ON t1 (c1)' },
-          { relation_oid: 1, index_name: 'idx2' },
-          { table_oid: 2, index_name: 'idx_invalid' }
-        ]
-      };
-
-      const nodes = [
-        { id: '1', position: { x: 0, y: 0 }, data: { title: 'table1', columns: [], badges: { pk: false, fk: false }, indexes: [
-           { index_name: 'idx1', columns: ['c1'], access_method: 'btree' }, // duplicate handled by set
-           { index_name: 'idx3', columns: ['c3'], access_method: 'hash' }
-        ] } },
-        { id: '2', position: { x: 0, y: 0 }, data: { title: 'table2', columns: [], badges: { pk: false, fk: false } } }
-      ] as any;
-
-      // @ts-expect-error test
-      const ddl = exportDDL(nodes, [], snapshot);
-      expect(ddl).toContain('CREATE INDEX idx1 ON t1 (c1);');
-      expect(ddl).not.toContain('idx2');
-      expect(ddl).toContain('USING hash');
-    });
-  });

@@ -52,7 +52,7 @@ function sqlDataType(value: unknown): string {
   return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
 }
 
-export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[], snapshot?: SnapshotJson | null): string {
+export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
@@ -104,18 +104,8 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[], snapshot?
 
   const emittedIndexes = new Set<string>();
   const indexLines: string[] = [];
-  const snapshotIndexes = indexesByRelation(snapshot);
-
   for (const node of nodes) {
     const tableTitle = node.data.title || node.id;
-
-    for (const ix of snapshotIndexes.get(node.id) || []) {
-      if (ix.index_name && ix.index_def) {
-        indexLines.push(ix.index_def + ';');
-        emittedIndexes.add(ix.index_name);
-      }
-    }
-
     for (const index of node.data.indexes || []) {
       if (emittedIndexes.has(index.index_name) || index.columns.length === 0) {
         continue;
