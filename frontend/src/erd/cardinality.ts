@@ -161,7 +161,6 @@ export function buildIndexRecommendations({
 }
 
 export function parsePositiveInteger(value: string): number | null {
-  if (!/^\s*\+?\d+\s*$/.test(value)) return null;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
   return parsed;

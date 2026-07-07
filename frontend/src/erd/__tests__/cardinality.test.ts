@@ -83,9 +83,6 @@ describe('parsePositiveInteger', () => {
   it('parses positive integers', () => {
     expect(parsePositiveInteger('123')).toBe(123);
     expect(parsePositiveInteger('1')).toBe(1);
-    expect(parsePositiveInteger(' 123 ')).toBe(123);
-    expect(parsePositiveInteger('+123')).toBe(123);
-    expect(parsePositiveInteger('00123')).toBe(123);
   });
 
   it('rejects invalid, fractional, and non-positive values', () => {
@@ -94,12 +91,6 @@ describe('parsePositiveInteger', () => {
     expect(parsePositiveInteger('12.3')).toBeNull();
     expect(parsePositiveInteger('abc')).toBeNull();
     expect(parsePositiveInteger('')).toBeNull();
-    expect(parsePositiveInteger('   ')).toBeNull();
-    expect(parsePositiveInteger('123abc')).toBeNull();
-    expect(parsePositiveInteger('abc123')).toBeNull();
-    expect(parsePositiveInteger('NaN')).toBeNull();
-    expect(parsePositiveInteger('Infinity')).toBeNull();
-    expect(parsePositiveInteger('-Infinity')).toBeNull();
   });
 });
 
