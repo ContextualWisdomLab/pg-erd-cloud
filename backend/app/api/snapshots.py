@@ -17,8 +17,14 @@ from app.models import (
     SchemaSnapshotData,
 )
 from app.permissions import require_project_member
-from app.schemas import SnapshotCreateIn, SnapshotDetailOut, SnapshotOut
+from app.schemas import (
+    SnapshotCreateIn,
+    SnapshotDetailOut,
+    SnapshotOut,
+    WideTablesOut,
+)
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
     LlmConfigurationError,
@@ -86,11 +92,7 @@ async def create_snapshot(
     # Ensure connection belongs to this project
     conn = await session.get(DbConnection, body.db_connection_uuid)
     if conn is None or conn.project_space_uuid != project_space_uuid:
-        return SnapshotOut(
-            schema_snapshot_uuid=uuid.uuid4(),
-            status="failed",
-            schema_filter=body.schema_filter,
-        )
+        raise HTTPException(status_code=404, detail="connection not found")
 
     snap = SchemaSnapshot(
         schema_snapshot_uuid=uuid.uuid4(),
@@ -165,6 +167,34 @@ async def export_snapshot_sql(
     return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
 
 
+@router.get("/{schema_snapshot_uuid}/wide-tables", response_model=WideTablesOut)
+async def wide_tables(
+    schema_snapshot_uuid: uuid.UUID,
+    warn_threshold: int = Query(40, ge=1, le=1600),
+    info_threshold: int = Query(25, ge=1, le=1600),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> WideTablesOut:
+    """Flag wide / denormalized tables by column count (configurable thresholds).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return WideTablesOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_wide_tables(
+        data.snapshot_json if data else None,
+        warn_threshold=warn_threshold,
+        info_threshold=info_threshold,
+    )
+    return WideTablesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
 @router.get(
     "/{schema_snapshot_uuid}/reversing-spec.md",
     response_class=PlainTextResponse,
@@ -186,7 +216,9 @@ async def export_snapshot_reversing_spec(
         try:
             return await generate_reversing_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=503, detail="LLM configuration error"
+            ) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
@@ -215,7 +247,9 @@ async def export_snapshot_index_design(
         try:
             return await generate_index_design_llm_draft(data.snapshot_json)
         except LlmConfigurationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=503, detail="LLM configuration error"
+            ) from exc
         except LlmProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"

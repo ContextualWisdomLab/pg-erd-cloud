@@ -91,6 +91,14 @@ class SnapshotDetailOut(BaseModel):
     snapshot_json: dict | None
 
 
+class WideTablesOut(BaseModel):
+    """Wide / denormalized table findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
