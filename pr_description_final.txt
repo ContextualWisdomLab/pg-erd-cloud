@@ -1,0 +1,17 @@
+🧹 [code health improvement] 버그 11 해결: Timeout 발생 시 동일 모델 재시도 대신 바로 Fallback 처리
+
+🎯 What
+- `is_timeout_error` 함수에서 `provider_signal_fail_closed_enabled` 조건 확인을 제거하여 timeout 에러가 모델 재시도 가능(model-retryable) 에러로 분류되도록 수정했습니다.
+
+💡 Why
+- Bug 11 "Timeout should move directly to fallback instead of retrying the same model" 요구사항을 충족시키기 위함입니다.
+- Timeout 발생 시 동일 모델로 재시도(`same-model retry`)하는 대신 즉시 fallback 모델로 넘어가도록 에러 분류 로직을 변경해야 했습니다.
+
+✅ Verification
+- 특정 버그 테스트를 성공적으로 마쳤습니다:
+  - `vertex-primary-timeout-retry-same-model-success`
+  - `vertex-primary-timeout-exhausted-fallback-success`
+- 전체 테스트(`scripts/ci/test_strix_quick_gate.sh`)를 성공적으로 통과했습니다.
+
+✨ Result
+- 이제 timeout 발생 시 동일 모델 재시도 없이 적절히 fallback 모델로 전환됩니다.
