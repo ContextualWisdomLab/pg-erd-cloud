@@ -91,8 +91,8 @@ class SnapshotDetailOut(BaseModel):
     snapshot_json: dict | None
 
 
-class NamingLintOut(BaseModel):
-    """Naming-convention findings for a snapshot's identifiers."""
+class WideTablesOut(BaseModel):
+    """Wide / denormalized table findings for a snapshot."""
 
     schema_snapshot_uuid: uuid.UUID
     status: str
@@ -105,3 +105,11 @@ class MeOut(BaseModel):
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class NamingLintOut(BaseModel):
+    """Naming-convention findings for a snapshot's identifiers."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
