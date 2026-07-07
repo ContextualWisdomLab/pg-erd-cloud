@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import importlib
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -89,7 +90,7 @@ VERSION_SQL = "SELECT CURRENT_VERSION() AS server_version"
 SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConstraintContext:
     """Parameters for building a constraint."""
 
@@ -184,9 +185,8 @@ async def _parse_snowflake_dsn(dsn: str) -> SnowflakeDsnConfig:
                 if not auth_lower.startswith("https://"):
                     raise ValueError("unsupported Snowflake authenticator value")
                 parsed_auth = urlparse(auth_lower)
-                if not parsed_auth.hostname or not (
-                    parsed_auth.hostname.endswith(".okta.com")
-                    or parsed_auth.hostname.endswith(".oktapreview.com")
+                if not parsed_auth.hostname or not re.match(
+                    r"^([a-zA-Z0-9-]+\.)*(okta|oktapreview)\.com$", parsed_auth.hostname
                 ):
                     raise ValueError("unsupported Snowflake authenticator URL")
 
@@ -414,11 +414,9 @@ def _build_foreign_key(
     return constraint, fk_edges
 
 
-def _build_constraints(
+def _group_constraint_rows(
     rows: list[dict],
-    relation_ids: dict[tuple[str, str], int],
-    column_positions: dict[tuple[str, str], dict[str, int]],
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> dict[tuple[str, str, str, str], list[dict]]:
     grouped: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
     for row in rows:
         ctype = _constraint_type(row.get("constraint_type"))
@@ -429,73 +427,94 @@ def _build_constraints(
         if not (ctype and schema and table and name and constraint_schema):
             continue
         grouped[(constraint_schema, name, schema, table)].append(row)
+    return grouped
+
+
+def _process_constraint_group(
+    group_rows: list[dict],
+    name: str,
+    schema: str,
+    table: str,
+    relation_ids: dict[tuple[str, str], int],
+    column_positions: dict[tuple[str, str], dict[str, int]],
+    constraint_oid: int,
+) -> tuple[dict | None, list[dict], list[dict]]:
+    sorted_rows = sorted(
+        group_rows,
+        key=lambda row: int(row.get("ordinal_position") or 0),
+    )
+    ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
+    relation_oid = relation_ids.get((schema, table))
+    if relation_oid is None:
+        return None, [], []
+
+    columns = [
+        str(row["column_name"])
+        for row in sorted_rows
+        if isinstance(row.get("column_name"), str)
+    ]
+    attnums = [
+        column_positions.get((schema, table), {}).get(column) for column in columns
+    ]
+    constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
+    ctx = ConstraintContext(
+        name=name,
+        schema=schema,
+        table=table,
+        relation_oid=relation_oid,
+        columns=columns,
+        constrained_attnums=constrained_attnums,
+        constraint_oid=constraint_oid,
+    )
+    if ctype == "p":
+        constraint, new_pk_columns = _build_primary_key(ctx)
+        return constraint, new_pk_columns, []
+    elif ctype == "u":
+        constraint = _build_unique_constraint(ctx)
+        return constraint, [], []
+    elif ctype == "f":
+        constraint, new_fk_edges = _build_foreign_key(
+            ctx,
+            relation_ids,
+            sorted_rows,
+        )
+        return constraint, [], new_fk_edges
+
+    return None, [], []
+
+
+def _build_constraints(
+    rows: list[dict],
+    relation_ids: dict[tuple[str, str], int],
+    column_positions: dict[tuple[str, str], dict[str, int]],
+) -> tuple[list[dict], list[dict], list[dict]]:
+    grouped = _group_constraint_rows(rows)
 
     constraints: list[dict] = []
     pk_columns: list[dict] = []
     fk_edges: list[dict] = []
 
     for (_, name, schema, table), group_rows in grouped.items():
-        sorted_rows = sorted(
-            group_rows,
-            key=lambda row: int(row.get("ordinal_position") or 0),
-        )
-        ctype = _constraint_type(sorted_rows[0].get("constraint_type"))
-        relation_oid = relation_ids.get((schema, table))
-        if relation_oid is None:
-            continue
-
-        columns = [
-            str(row["column_name"])
-            for row in sorted_rows
-            if isinstance(row.get("column_name"), str)
-        ]
-        attnums = [
-            column_positions.get((schema, table), {}).get(column) for column in columns
-        ]
-        constrained_attnums = [attnum for attnum in attnums if isinstance(attnum, int)]
         constraint_oid = len(constraints) + 1
-        ctx = ConstraintContext(
-            name=name,
-            schema=schema,
-            table=table,
-            relation_oid=relation_oid,
-            columns=columns,
-            constrained_attnums=constrained_attnums,
-            constraint_oid=constraint_oid,
+        constraint, new_pk_columns, new_fk_edges = _process_constraint_group(
+            group_rows,
+            name,
+            schema,
+            table,
+            relation_ids,
+            column_positions,
+            constraint_oid,
         )
-        if ctype == "p":
-            constraint, new_pk_columns = _build_primary_key(ctx)
+        if constraint:
             constraints.append(constraint)
             pk_columns.extend(new_pk_columns)
-        elif ctype == "u":
-            constraint = _build_unique_constraint(ctx)
-            constraints.append(constraint)
-        elif ctype == "f":
-            constraint, new_fk_edges = _build_foreign_key(
-                ctx,
-                relation_ids,
-                sorted_rows,
-            )
-            constraints.append(constraint)
             fk_edges.extend(new_fk_edges)
 
     return constraints, pk_columns, fk_edges
 
 
-def _build_snapshot(
-    config: SnowflakeDsnConfig,
-    effective_schema: str | None,
-    version_rows: list[dict],
-    schema_rows: list[dict],
-    table_rows: list[dict],
-    column_rows: list[dict],
-    constraint_rows: list[dict],
-) -> dict:
-    relation_keys = sorted({_table_key(row) for row in table_rows})
-    relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
-    column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
-
-    schemas = [
+def _build_schemas(schema_rows: list[dict]) -> list[dict]:
+    return [
         {
             "schema_oid": index,
             "schema_name": str(row.get("schema_name")),
@@ -504,6 +523,12 @@ def _build_snapshot(
         if isinstance(row.get("schema_name"), str)
     ]
 
+
+def _build_relations(
+    table_rows: list[dict],
+    relation_keys: list[tuple[str, str]],
+    relation_ids: dict[tuple[str, str], int],
+) -> list[dict]:
     relations = []
     table_row_by_key = {_table_key(row): row for row in table_rows}
     for schema, table in relation_keys:
@@ -524,7 +549,14 @@ def _build_snapshot(
                 "tablespace_name": None,
             }
         )
+    return relations
 
+
+def _build_columns(
+    column_rows: list[dict],
+    relation_ids: dict[tuple[str, str], int],
+    column_positions: dict[tuple[str, str], dict[str, int]],
+) -> list[dict]:
     columns = []
     for row in column_rows:
         schema, table = _table_key(row)
@@ -564,6 +596,25 @@ def _build_snapshot(
                 "column_comment": row.get("comment"),
             }
         )
+    return columns
+
+
+def _build_snapshot(
+    config: SnowflakeDsnConfig,
+    effective_schema: str | None,
+    version_rows: list[dict],
+    schema_rows: list[dict],
+    table_rows: list[dict],
+    column_rows: list[dict],
+    constraint_rows: list[dict],
+) -> dict:
+    relation_keys = sorted({_table_key(row) for row in table_rows})
+    relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
+    column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
+
+    schemas = _build_schemas(schema_rows)
+    relations = _build_relations(table_rows, relation_keys, relation_ids)
+    columns = _build_columns(column_rows, relation_ids, column_positions)
 
     constraints, pk_columns, fk_edges = _build_constraints(
         constraint_rows, relation_ids, column_positions

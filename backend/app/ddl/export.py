@@ -384,6 +384,65 @@ def snapshot_json_to_sql(snapshot: dict, target_dialect: str = "postgresql") -> 
     return _snapshot_json_to_postgresql_sql(snapshot)
 
 
+def _render_table_pg(
+    t: dict,
+    cols_by_oid: dict[int, list[dict]],
+    constraints_by_oid: dict[int, list[dict]],
+    source_dialect: DdlDialect,
+) -> list[str]:
+    schema = t.get("schema_name")
+    name = t.get("relation_name")
+    oid = t.get("relation_oid")
+    kind = t.get("relation_kind")
+    tablespace = t.get("tablespace_name")
+    partition_key = t.get("partition_key")
+    partition_bound = t.get("partition_bound")
+    partition_parent_schema = t.get("partition_parent_schema")
+    partition_parent_name = t.get("partition_parent_name")
+    is_partition = t.get("is_partition") is True
+    if not (isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)):
+        return []
+
+    lines: list[str] = []
+    table_options = _tablespace_clause(tablespace)
+    if (
+        is_partition
+        and isinstance(partition_parent_schema, str)
+        and isinstance(partition_parent_name, str)
+        and isinstance(partition_bound, str)
+    ):
+        partition_clause = (
+            f" PARTITION BY {partition_key}" if isinstance(partition_key, str) else ""
+        )
+        lines.append(
+            f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} PARTITION OF {_qname(partition_parent_schema, partition_parent_name)} {partition_bound}{partition_clause}{table_options};"
+        )
+        lines.append("")
+        return lines
+
+    if kind == "p" and not isinstance(partition_key, str):
+        lines.append(
+            f"-- NOTE: {_qname(schema, name)} is partitioned; partition definition not included in MVP export"
+        )
+
+    col_defs = _render_table_columns_pg(oid, cols_by_oid, source_dialect)
+    table_cons = _render_table_constraints_pg(oid, constraints_by_oid)
+
+    all_defs = col_defs + table_cons
+    lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
+    for i, d in enumerate(all_defs):
+        comma = "," if i < len(all_defs) - 1 else ""
+        lines.append(f"  {d}{comma}")
+    partition_clause = (
+        f" PARTITION BY {partition_key}"
+        if kind == "p" and isinstance(partition_key, str)
+        else ""
+    )
+    lines.append(f"){partition_clause}{table_options};")
+    lines.append("")
+    return lines
+
+
 def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
     """Generate PostgreSQL DDL from a captured snapshot.
 
@@ -413,60 +472,9 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
 
     # CREATE TABLE + inline constraints (PK/UNIQUE/CHECK)
     for t in tables:
-        schema = t.get("schema_name")
-        name = t.get("relation_name")
-        oid = t.get("relation_oid")
-        kind = t.get("relation_kind")
-        tablespace = t.get("tablespace_name")
-        partition_key = t.get("partition_key")
-        partition_bound = t.get("partition_bound")
-        partition_parent_schema = t.get("partition_parent_schema")
-        partition_parent_name = t.get("partition_parent_name")
-        is_partition = t.get("is_partition") is True
-        if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
-        ):
-            continue
-
-        table_options = _tablespace_clause(tablespace)
-        if (
-            is_partition
-            and isinstance(partition_parent_schema, str)
-            and isinstance(partition_parent_name, str)
-            and isinstance(partition_bound, str)
-        ):
-            partition_clause = (
-                f" PARTITION BY {partition_key}"
-                if isinstance(partition_key, str)
-                else ""
-            )
-            lines.append(
-                f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} PARTITION OF {_qname(partition_parent_schema, partition_parent_name)} {partition_bound}{partition_clause}{table_options};"
-            )
-            lines.append("")
-            continue
-
-        if kind == "p" and not isinstance(partition_key, str):
-            lines.append(
-                f"-- NOTE: {_qname(schema, name)} is partitioned; partition definition not included in MVP export"
-            )
-
-        col_defs = _render_table_columns_pg(oid, cols_by_oid, source_dialect)
-
-        table_cons = _render_table_constraints_pg(oid, constraints_by_oid)
-
-        all_defs = col_defs + table_cons
-        lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
-        for i, d in enumerate(all_defs):
-            comma = "," if i < len(all_defs) - 1 else ""
-            lines.append(f"  {d}{comma}")
-        partition_clause = (
-            f" PARTITION BY {partition_key}"
-            if kind == "p" and isinstance(partition_key, str)
-            else ""
+        lines.extend(
+            _render_table_pg(t, cols_by_oid, constraints_by_oid, source_dialect)
         )
-        lines.append(f"){partition_clause}{table_options};")
-        lines.append("")
 
     # FKs after tables
     _render_foreign_keys(constraints, lines)

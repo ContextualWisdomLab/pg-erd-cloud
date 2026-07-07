@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from "react";
+import { memo, type CSSProperties, type ReactNode } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { normalizeBusinessGroupColor } from "./businessGroups";
@@ -26,10 +26,40 @@ type TableNodeData = {
     access_method: string;
     strength?: string;
   }>;
+  isDimmed?: boolean;
+  isHighlighted?: boolean;
   badges?: { pk?: boolean; fk?: boolean };
 };
 
 type TableNodeNode = Node<TableNodeData, "tableNode">;
+
+function AccessibleTruncatedText({
+  className,
+  text,
+  title,
+  children,
+}: {
+  className: string;
+  text: string;
+  title?: string;
+  children?: ReactNode;
+}) {
+  const accessibleText = text.trim();
+  if (!accessibleText) {
+    return <span className={className}>{children ?? text}</span>;
+  }
+
+  return (
+    <span
+      className={className}
+      title={title ?? accessibleText}
+      aria-label={accessibleText}
+      tabIndex={0}
+    >
+      {children ?? text}
+    </span>
+  );
+}
 
 function formatExample(value: Column["example_value"]): string | null {
   if (value === null || value === undefined) return null;
@@ -39,6 +69,7 @@ function formatExample(value: Column["example_value"]): string | null {
 
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
+  const accessibleTableName = data.title.trim() || "이름 없는";
   const groupColor = data.businessGroup
     ? normalizeBusinessGroupColor(data.businessGroup.color)
     : undefined;
@@ -50,32 +81,45 @@ function TableNode(props: NodeProps<TableNodeNode>) {
 
   // User-supplied labels/comments are rendered as React text nodes; do not
   // switch these fields to raw HTML rendering.
+  const className = [
+    "tableNode",
+    data.businessGroup ? "tableNode--grouped" : "",
+    data.isDimmed ? "tableNode--dimmed" : "",
+    data.isHighlighted ? "tableNode--highlighted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      className={`tableNode${data.businessGroup ? " tableNode--grouped" : ""}`}
+      className={className}
       style={style}
+      role="region"
+      aria-label={`${accessibleTableName} 테이블`}
     >
       <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
         <span className="tableNode__titleText">
           <span>{data.title}</span>
           {data.comment ? (
-            <span className="tableNode__titleComment">
-              {data.comment}
-            </span>
+            <AccessibleTruncatedText
+              className="tableNode__titleComment"
+              text={data.comment}
+            />
           ) : null}
         </span>
         <span style={{ display: "inline-flex", gap: 6 }}>
           {data.businessGroup ? (
-            <span className="tableNode__groupBadge">
-              {data.businessGroup.name}
-            </span>
+            <AccessibleTruncatedText
+              className="tableNode__groupBadge"
+              text={data.businessGroup.name}
+            />
           ) : null}
           {data.badges?.pk ? (
-            <span className="tableNode__badge">PK</span>
+            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</abbr>
           ) : null}
           {data.badges?.fk ? (
-            <span className="tableNode__badge">FK</span>
+            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</abbr>
           ) : null}
         </span>
       </div>
@@ -93,20 +137,30 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               <span className="tableNode__colIdentity">
                 <span className="tableNode__colName">{c.column_name}</span>
                 {c.column_comment ? (
-                  <span className="tableNode__colComment">
-                    {c.column_comment}
-                  </span>
+                  <AccessibleTruncatedText
+                    className="tableNode__colComment"
+                    text={c.column_comment}
+                  />
                 ) : null}
                 {example ? (
-                  <span className="tableNode__colExample">
+                  <AccessibleTruncatedText
+                    className="tableNode__colExample"
+                    text={`e.g. ${example}`}
+                  >
                     e.g. {example}
-                  </span>
+                  </AccessibleTruncatedText>
                 ) : null}
               </span>
               <span className="tableNode__colType">{c.data_type}</span>
-              {c.is_pk ? <span className="tableNode__badge">PK</span> : null}
+              {c.is_pk ? (
+                <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
+                  PK
+                </abbr>
+              ) : null}
               {c.is_not_null ? (
-                <span className="tableNode__badge">NOT NULL</span>
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
+                  NOT NULL
+                </span>
               ) : null}
               <Handle
                 type="source"
@@ -118,25 +172,43 @@ function TableNode(props: NodeProps<TableNodeNode>) {
           );
         })}
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
-          <div className="tableNode__more">
+          <div
+            className="tableNode__more"
+            title="생략된 컬럼이 더 있습니다"
+            aria-label="생략된 컬럼이 더 있습니다"
+            tabIndex={0}
+          >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
         ) : null}
         {data.indexes?.length ? (
           <div className="tableNode__indexes" role="group" aria-label="추천 인덱스">
             <div className="tableNode__indexHeading">Indexes</div>
-            {data.indexes.slice(0, 4).map((index) => (
-              <div key={index.index_name} className="tableNode__index">
-                <span className="tableNode__indexName">
-                  {index.index_name}
-                </span>
-                <span className="tableNode__indexCols">
-                  ({index.columns.join(", ")})
-                </span>
-              </div>
-            ))}
+            {data.indexes.slice(0, 4).map((index) => {
+              const columnsText = `(${index.columns.join(", ")})`;
+              return (
+                <div key={index.index_name} className="tableNode__index">
+                  <AccessibleTruncatedText
+                    className="tableNode__indexName"
+                    text={index.index_name}
+                    title={`Access method: ${index.access_method}`}
+                  >
+                    {index.index_name}
+                  </AccessibleTruncatedText>
+                  <AccessibleTruncatedText
+                    className="tableNode__indexCols"
+                    text={columnsText}
+                  />
+                </div>
+              );
+            })}
             {data.indexes.length > 4 ? (
-              <div className="tableNode__more">
+              <div
+                className="tableNode__more"
+                title="생략된 인덱스가 더 있습니다"
+                aria-label="생략된 인덱스가 더 있습니다"
+                tabIndex={0}
+              >
                 … {data.indexes.length - 4} more indexes
               </div>
             ) : null}
@@ -152,6 +224,7 @@ function isSameRenderedColumns(
   prevCols: Column[],
   nextCols: Column[],
 ): boolean {
+  if (prevCols === nextCols) return true;
   if (prevCols.length !== nextCols.length) return false;
 
   // The component only renders the first MAX_RENDERED_COLUMNS and the "… N more" count.
@@ -174,6 +247,8 @@ function isSameRenderedColumns(
 }
 
 export default memo(TableNode, (prev, next) => {
+  if (prev.data === next.data) return true;
+
   // React Flow typically provides new node objects when data changes.
   // This comparator is a conservative safeguard for the most relevant fields.
   // Note: if upstream mutates `columns` in-place between renders, no memo comparator can
@@ -186,6 +261,8 @@ export default memo(TableNode, (prev, next) => {
     prev.data.businessGroup?.id === next.data.businessGroup?.id &&
     prev.data.businessGroup?.name === next.data.businessGroup?.name &&
     prev.data.businessGroup?.color === next.data.businessGroup?.color &&
+    prev.data.isDimmed === next.data.isDimmed &&
+    prev.data.isHighlighted === next.data.isHighlighted &&
     prev.data.badges?.pk === next.data.badges?.pk &&
     prev.data.badges?.fk === next.data.badges?.fk
   );
