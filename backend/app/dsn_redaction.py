@@ -54,10 +54,32 @@ def redact_dsn_error_message(error_message: str, dsn: str) -> str:
     """Redact DSN-derived secrets from a driver error message."""
     redacted = error_message
 
-    # Apply naive replacements for all candidates.
-    # While this may cause over-redaction for very short passwords, it is
-    # the safest approach to ensure no secrets leak in error messages.
+    parsed = urlsplit(dsn)
+    redacted_dsn = dsn
+    if parsed.password:
+        # Avoid naive string replacement of short passwords.
+        # Target the exact credential section in the full DSN first.
+        # Note: parsed.password is URL-decoded by urlsplit, but we need
+        # the exact string from the raw DSN to replace it reliably.
+        # We can extract it by splitting the netloc.
+        if "@" in parsed.netloc:
+            userinfo = parsed.netloc.rsplit("@", 1)[0]
+            if ":" in userinfo:
+                raw_password = userinfo.split(":", 1)[1]
+                redacted_dsn = redacted_dsn.replace(f":{raw_password}@", ":***@")
+
+    redacted = redacted.replace(dsn, redacted_dsn)
+
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
-        redacted = redacted.replace(secret, "***")
+        if len(secret) > 4:
+            redacted = redacted.replace(secret, "***")
+        else:
+            # For short secrets, only replace them if they are adjacent to boundaries
+            # to prevent aggressive over-redaction (e.g. replacing every '1' with '***')
+            # Use regex to match the secret with word boundaries or punctuation.
+            escaped = re.escape(secret)
+            # Match the secret only if it's not surrounded by alphanumeric characters
+            pattern = re.compile(rf"(?<![a-zA-Z0-9]){escaped}(?![a-zA-Z0-9])")
+            redacted = pattern.sub("***", redacted)
 
     return _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)
