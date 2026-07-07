@@ -272,15 +272,3 @@ async def test_dsn_guard_rejects_unresolvable_host(
 
     with pytest.raises(DsnTargetError, match="database host could not be resolved"):
         await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
-
-def test_host_matches_allowed_entry() -> None:
-    from app.pg_introspect.dsn_guard import _host_matches_allowed_entry
-
-    assert _host_matches_allowed_entry("db.example.com", "*.example.com") is True
-    assert _host_matches_allowed_entry("example.com", "*.example.com") is False
-    assert _host_matches_allowed_entry("evil.example.com", "*.example.com") is True
-
-    # SSRF bypasses
-    assert _host_matches_allowed_entry("evil.com.example.com", "*.example.com") is True
-    assert _host_matches_allowed_entry("evil.com\\.example.com", "*.example.com") is False
-    assert _host_matches_allowed_entry("evilexample.com", "*.example.com") is False

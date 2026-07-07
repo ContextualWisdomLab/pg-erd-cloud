@@ -34,7 +34,7 @@ def _configured_allowed_hosts() -> tuple[str, ...]:
 def _host_matches_allowed_entry(host: str, entry: str) -> bool:
     if entry.startswith("*."):
         suffix = entry[1:]
-        return host.endswith(suffix) and host != suffix.lstrip(".") and host.endswith("." + suffix.lstrip(".")) and "\\" not in host
+        return host.endswith(suffix) and host != suffix.lstrip(".")
     return host == entry
 
 

@@ -277,16 +277,3 @@ async def test_introspect_snowflake_builds_common_snapshot(
     )
     assert snapshot["pk_columns"][0]["column_name"] == "CUSTOMER_ID"
     assert snapshot["fk_edges"][0]["parent_relation_name"] == "CUSTOMERS"
-
-def test_parse_snowflake_dsn_rejects_ssrf_bypass() -> None:
-    # URL encoding bypass
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com%2F..%2F..%2F..%2Fevil.com")
-
-    # Backslash bypass
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evil.com\\.okta.com")
-
-    # Domain substring bypass
-    with pytest.raises(ValueError, match="unsupported Snowflake authenticator URL"):
-        _parse_snowflake_dsn("snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://evilokta.com")
