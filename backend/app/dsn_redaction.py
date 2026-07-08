@@ -18,7 +18,16 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
+
+    # Python's urlsplit treats schemes with underscores as an empty scheme,
+    # moving the credentials into the path. Temporarily substitute the scheme
+    # so we can parse out the network location properly.
+    safe_dsn = dsn
+    scheme_match = re.match(r"^([^:/?#]+)://", dsn)
+    if scheme_match and "_" in scheme_match.group(1):
+        safe_dsn = "http://" + dsn[scheme_match.end() :]
+
+    parsed = urlsplit(safe_dsn)
 
     if parsed.password:
         candidates.add(parsed.password)
