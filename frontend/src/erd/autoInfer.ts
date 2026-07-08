@@ -10,13 +10,16 @@ export function inferRelationships(
   nodes: Node<TableNodeData>[]
 ): Edge[] {
   const newEdges: Edge[] = [];
-  const tableNames = new Set(
-    nodes.map((n) => {
-      // 테이블 이름에서 스키마 부분 제거
-      const parts = n.data.title.split(".");
-      return parts[parts.length - 1];
-    })
-  );
+  const nodesByTableName = new Map<string, Node<TableNodeData>>();
+  for (const n of nodes) {
+    const parts = n.data.title.split(".");
+    const tableName = parts[parts.length - 1];
+    // To preserve original .find() behavior, we only keep the first matching node for a table name
+    // (in case multiple schemas have the same table name)
+    if (!nodesByTableName.has(tableName)) {
+      nodesByTableName.set(tableName, n);
+    }
+  }
 
   for (const sourceNode of nodes) {
     const srcParts = sourceNode.data.title.split(".");
@@ -32,20 +35,18 @@ export function inferRelationships(
         let targetTableName = "";
 
         // 대상 테이블 이름 추측 (단수형/복수형 등 간단히)
-        if (tableNames.has(targetEntity)) {
+        if (nodesByTableName.has(targetEntity)) {
           targetTableName = targetEntity;
-        } else if (tableNames.has(targetEntity + "s")) {
+        } else if (nodesByTableName.has(targetEntity + "s")) {
           targetTableName = targetEntity + "s";
-        } else if (tableNames.has(targetEntity + "es")) {
+        } else if (nodesByTableName.has(targetEntity + "es")) {
           targetTableName = targetEntity + "es";
         }
 
         // 자기 참조는 일단 제외
         if (targetTableName && targetTableName !== srcTableName) {
-          // 대상 테이블의 노드 찾기 (스키마명 포함될 수 있으므로 title의 끝부분 비교)
-          const targetNode = nodes.find(
-            (n) => n.data.title.split(".").pop() === targetTableName
-          );
+          // 대상 테이블의 노드 찾기 (O(1) lookup instead of O(N) array search)
+          const targetNode = nodesByTableName.get(targetTableName);
 
           if (targetNode) {
             // 대상 테이블에 'id' 필드가 있는지, 혹은 PK 컬럼이 하나인지 확인
