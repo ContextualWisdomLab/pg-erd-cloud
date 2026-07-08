@@ -57,7 +57,6 @@ import {
   exportPlantUml,
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
-import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
@@ -737,20 +736,6 @@ export default function App() {
     setIsGroupModalOpen(true);
   }
 
-  function onAutoInferRelationships() {
-    const inferredEdges = inferRelationships(nodes);
-    if (inferredEdges.length > 0) {
-      setEdges((eds) => [...eds, ...inferredEdges]);
-    }
-  }
-
-  function onClearCanvas() {
-    if (window.confirm("캔버스의 모든 노드와 관계를 삭제하시겠습니까?")) {
-      setNodes([]);
-      setEdges([]);
-    }
-  }
-
   function onCloseGroupManager() {
     setIsGroupModalOpen(false);
   }
@@ -1386,28 +1371,6 @@ export default function App() {
               aria-label="정렬 되돌리기"
             >
               ↶
-            </button>
-            <button
-              type="button"
-              onClick={onAutoInferRelationships}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "추론할 테이블이 없습니다" : "관계 자동 추론"
-              }
-              aria-label="관계 자동 추론"
-            >
-              🪄
-            </button>
-            <button
-              type="button"
-              onClick={onClearCanvas}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "지울 노드가 없습니다" : "모든 노드 지우기"
-              }
-              aria-label="모든 노드 지우기"
-            >
-              🗑️
             </button>
             <button
               type="button"
