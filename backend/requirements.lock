@@ -33,8 +33,10 @@ cryptography==49.0.0
     # via
     #   pg-erd-cloud-backend (pyproject.toml)
     #   python-jose
-ecdsa==0.19.2
-    # via python-jose
+ecdsa==0.19.1
+    # via
+    #   pg-erd-cloud-backend (pyproject.toml)
+    #   python-jose
 fastapi==0.137.1
     # via pg-erd-cloud-backend (pyproject.toml)
 frozenlist==1.8.0
