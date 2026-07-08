@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import hashlib
+import hmac
 import uuid
 from dataclasses import dataclass
 from typing import Any, cast
@@ -411,16 +412,25 @@ API_KEY_PREFIX = "pgerd_"
 
 
 def hash_api_key(token: str) -> str:
-    """Deterministic SHA-256 hex digest of an API key (indexable lookup).
+    """Deterministic keyed digest of an API key (indexable lookup).
 
-    SHA-256 (not bcrypt/argon2) is deliberate and safe here: the input is a
-    server-generated 256-bit random token (``secrets.token_urlsafe(32)``), not
-    a human password, so brute-force over the input space is infeasible and a
-    slow KDF adds nothing. A deterministic digest is required for the unique-
-    indexed O(1) lookup. This mirrors how GitHub stores its own PATs.
+    A plain KDF (bcrypt/argon2) is deliberately *not* used: the input is a
+    server-generated 256-bit random token (``secrets.token_urlsafe(32)``), not a
+    human password, so brute-force over the input space is infeasible and a slow
+    KDF only adds latency to every request. A deterministic digest is required
+    for the unique-indexed O(1) lookup (GitHub stores its own PATs this way).
+
+    We use HMAC-SHA-256 keyed with ``settings.app_secret`` rather than a bare
+    SHA-256 digest: the server secret acts as a pepper, so a database-only
+    disclosure of ``key_hash`` values cannot be reversed or matched against
+    pre-computed tables without also compromising the application secret.
     """
 
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return hmac.new(
+        settings.app_secret.encode("utf-8"),
+        token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
