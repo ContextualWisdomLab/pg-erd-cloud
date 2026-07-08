@@ -91,9 +91,25 @@ class SnapshotDetailOut(BaseModel):
     snapshot_json: dict | None
 
 
+class WideTablesOut(BaseModel):
+    """Wide / denormalized table findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class NamingLintOut(BaseModel):
+    """Naming-convention findings for a snapshot's identifiers."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
