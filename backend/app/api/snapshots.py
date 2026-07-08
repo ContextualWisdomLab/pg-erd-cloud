@@ -19,6 +19,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import (
     NamingLintOut,
+    SchemaHealthOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
     SnapshotOut,
@@ -26,6 +27,7 @@ from app.schemas import (
 )
 from app.ddl.export import snapshot_json_to_sql
 from app.spec.naming_lint import lint_naming
+from app.spec.schema_health import analyze_schema_health
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -193,6 +195,29 @@ async def wide_tables(
         info_threshold=info_threshold,
     )
     return WideTablesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/schema-health", response_model=SchemaHealthOut)
+async def schema_health(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SchemaHealthOut:
+    """Report schema smells for a snapshot (no-PK tables, unindexed FKs, orphans).
+
+    IDOR-safe: a uniform not-found status is returned for missing/unauthorized
+    snapshots so existence cannot be enumerated.
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SchemaHealthOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = analyze_schema_health(data.snapshot_json if data else None)
+    return SchemaHealthOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
