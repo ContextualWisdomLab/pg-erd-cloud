@@ -26,6 +26,7 @@ from app.schemas import (
     WideTablesOut,
 )
 from app.ddl.export import snapshot_json_to_sql
+from app.spec.graphql_sdl import generate_graphql_sdl
 from app.spec.naming_lint import lint_naming
 from app.spec.schema_health import analyze_schema_health
 from app.spec.wide_tables import detect_wide_tables
@@ -220,6 +221,27 @@ async def schema_health(
     return SchemaHealthOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/schema.graphql", response_class=PlainTextResponse
+)
+async def export_graphql_sdl(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate GraphQL SDL from a snapshot (types + FK-derived relations).
+
+    Forward engineering to the API layer. IDOR-safe (uniform not-found marker).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "# snapshot not found\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "# snapshot data not found\n"
+    return generate_graphql_sdl(data.snapshot_json)
 
 
 @router.get(
