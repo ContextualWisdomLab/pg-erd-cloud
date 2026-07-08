@@ -70,6 +70,16 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
 
 const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
 
+function sanitizeHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 type CurrentUser = {
   subject: string;
   display_name: string | null;
@@ -1248,7 +1258,7 @@ export default function App() {
                       }}
                     >
                       <span className="projectCard__icon" aria-hidden="true" />
-                      <strong>{project.project_name}</strong>
+                      <strong>{sanitizeHtml(project.project_name)}</strong>
                       <span>다이어그램 보기</span>
                     </button>
                   ))}
@@ -1267,7 +1277,7 @@ export default function App() {
               </div>
               <DiagramTable
                 snapshots={recentSnapshots}
-                selectedProjectName={selectedProject?.project_name}
+                selectedProjectName={sanitizeHtml(selectedProject?.project_name)}
                 onOpenEditor={(id) => {
                   setSnapshotId(id);
                   setSnapshot(null);
@@ -1306,7 +1316,7 @@ export default function App() {
               </div>
               {projects.map((project) => (
                 <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
-                  <strong role="cell">{project.project_name}</strong>
+                  <strong role="cell">{sanitizeHtml(project.project_name)}</strong>
                   <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
                   <span role="cell">
                     <button
@@ -1339,7 +1349,7 @@ export default function App() {
             </div>
             <DiagramTable
               snapshots={snapshots}
-              selectedProjectName={selectedProject?.project_name}
+              selectedProjectName={sanitizeHtml(selectedProject?.project_name)}
               onOpenEditor={(id) => {
                 setSnapshotId(id);
                 setSnapshot(null);
@@ -1686,8 +1696,8 @@ function DiagramTable({
           </strong>
           <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
           <span role="cell">
-            <span className={`statusPill statusPill--${item.status}`}>
-              {item.status}
+            <span className={`statusPill statusPill--${sanitizeHtml(item.status)}`}>
+              {sanitizeHtml(item.status)}
             </span>
           </span>
           <span role="cell">
