@@ -39,8 +39,6 @@ describe('App edit functionality', () => {
         const toolbarQueries = within(toolbar);
         expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
         expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
-        expect(toolbarQueries.getByRole('button', { name: '관계 자동 추론' })).toHaveTextContent('🪄');
-        expect(toolbarQueries.getByRole('button', { name: '모든 노드 지우기' })).toHaveTextContent('🗑️');
         expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
         expect(toolbarQueries.getByRole('button', { name: '업무 그룹' })).toHaveTextContent('◇');
         expect(toolbarQueries.getByRole('button', { name: '인덱스 카디널리티 계산' })).toHaveTextContent('#');

@@ -4,29 +4,18 @@ import hashlib
 from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
 
 from app.settings import settings
 
 
 def _derive_key() -> bytes:
-    """Derive a stable 32-byte key from APP_SECRET using HKDF.
+    """Derive a stable 32-byte key from APP_SECRET (MVP).
 
-    HKDF ensures optimal entropy distribution for the derived key,
-    mitigating weaknesses if the application secret is sub-optimal.
+    In production, prefer KMS/HKDF with rotation.
     """
-    hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"pg-erd-cloud-v1",
-        info=b"aes-gcm-encryption",
-    )
-    return hkdf.derive(settings.app_secret.encode("utf-8"))
 
-
-def _derive_legacy_key() -> bytes:
-    """Legacy key derivation (raw SHA256) for backward compatibility."""
+    # MVP key derivation: stable 32-bytes from APP_SECRET.
+    # In production prefer KMS/HKDF with rotation.
     return hashlib.sha256(settings.app_secret.encode("utf-8")).digest()
 
 
@@ -50,20 +39,10 @@ def encrypt_text(plaintext: str) -> EncryptedBlob:
 
 
 def decrypt_text(ciphertext: bytes, nonce: bytes) -> str:
-    """Decrypt a blob produced by encrypt_text (with legacy fallback)."""
-    from cryptography.exceptions import InvalidTag
-
-    try:
-        # Attempt to decrypt with the secure HKDF key
-        key = _derive_key()
-        aes = AESGCM(key)
-        plaintext = aes.decrypt(nonce, ciphertext, None)
-    except InvalidTag:
-        # Fallback to legacy raw SHA-256 derivation for older ciphertexts
-        legacy_key = _derive_legacy_key()
-        aes = AESGCM(legacy_key)
-        plaintext = aes.decrypt(nonce, ciphertext, None)
-
+    """Decrypt a blob produced by encrypt_text."""
+    key = _derive_key()
+    aes = AESGCM(key)
+    plaintext = aes.decrypt(nonce, ciphertext, None)
     return plaintext.decode("utf-8")
 
 
