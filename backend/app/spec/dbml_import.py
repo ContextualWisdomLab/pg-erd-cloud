@@ -23,8 +23,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
+# Match the ``Table <name>`` head only, then validate the remainder with plain
+# string ops in ``_table_header_tail_ok``. A single greedy ``.*`` for the tail
+# has no ambiguous, adjacent whitespace quantifiers, so matching stays strictly
+# linear in the line length. The previous ``(?:\s+as\s+\w+)?\s*\{?\s*$`` tail
+# back-tracked polynomially on inputs like ``"table ." + " " * n`` (CodeQL
+# py/polynomial-redos).
 _TABLE_RE = re.compile(
-    r"^table\s+(?:\"(?P<qname>[^\"]+)\"|(?P<name>[\w.]+))(?:\s+as\s+\w+)?\s*\{?\s*$",
+    r"^table\s+(?:\"(?P<qname>[^\"]+)\"|(?P<name>[\w.]+))(?P<tail>.*)$",
     re.IGNORECASE,
 )
 _COLUMN_RE = re.compile(
@@ -41,6 +47,30 @@ _REF_RE = re.compile(
 )
 _INLINE_REF_RE = re.compile(rf"ref:\s*(?P<op>[<>-])\s*(?P<to>{_PATH})", re.IGNORECASE)
 _PATH_SEGMENT_RE = re.compile(r'"[^"]+"|[^.]+')
+
+
+def _table_header_tail_ok(tail: str) -> bool:
+    """Validate what may follow a ``Table <name>`` header on the same line.
+
+    Grammar (whitespace-insensitive): an optional ``as <alias>`` rename followed
+    by an optional opening ``{`` (dbdiagram also allows the brace on the next
+    line). Implemented with plain string scanning rather than a regex so there
+    is no back-tracking — the ReDoS-safe counterpart to ``_TABLE_RE``.
+    """
+    rest = tail.strip()
+    if not rest:
+        return True
+    if rest[:2].lower() == "as" and (len(rest) == 2 or rest[2].isspace()):
+        rest = rest[2:].lstrip()
+        alias_len = 0
+        while alias_len < len(rest) and (
+            rest[alias_len].isalnum() or rest[alias_len] == "_"
+        ):
+            alias_len += 1
+        if alias_len == 0:
+            return False
+        rest = rest[alias_len:].lstrip()
+    return rest in ("", "{")
 
 
 def _split_table_name(raw: str) -> tuple[str, str]:
@@ -97,7 +127,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
             continue
 
         m = _TABLE_RE.match(line)
-        if m:
+        if m and _table_header_tail_ok(m.group("tail")):
             schema, name = _split_table_name(m.group("qname") or m.group("name"))
             current = (schema, name)
             if current not in oid_by_table:
