@@ -60,3 +60,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
+## 2024-07-08 - Avoid O(N^2) Complexity in Relationship Inference
+**Learning:** In frontend/src/erd/autoInfer.ts, looking up target nodes by traversing the array with `.find()` inside a nested column loop causes O(N^2) performance degradation (or worse, depending on columns) and excessive garbage collection when inferring relationships in large ERDs.
+**Action:** Pre-compute a lookup Map in O(N) when a large collection needs to be queried iteratively inside a loop. Retain exact `.find()` array semantics by only setting the first matched item in the map (`if (!map.has(key)) map.set(key, val);`).
