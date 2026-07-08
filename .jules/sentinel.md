@@ -61,6 +61,7 @@
 **Vulnerability:** Python's `urllib.parse.urlsplit` fails to properly parse DSN strings where the scheme contains an underscore (e.g., `my_custom_db://`). This results in passwords and netloc information not being extracted, which causes the application's DSN redaction logic (`redact_dsn_error_message`) to bypass redaction, leaking plaintext credentials into logs and error messages.
 **Learning:** URL parsing libraries conform strictly to RFC 3986 (where schemes cannot contain underscores). To perform security redaction on non-standard DSNs, we must sanitize or workaround the scheme before parsing.
 **Prevention:** Temporarily swap non-compliant schemes (containing `_`) with standard ones (like `http://`) before utilizing `urlsplit` for password extraction to ensure robust credential redaction.
+
 ## 2025-02-28 - [Opencode Review CI Block on package.json]
 **Vulnerability:** Not a direct security vulnerability, but a process blocker. The `opencode-review` strict CI gate enforces that `package.json` contains `lint`, `coverage`, and `e2e` scripts. If absent, it times out or blocks security PRs.
 **Learning:** Even when security fixes are constrained to the backend (like the `urlsplit` bug), strict cross-project CI gates might fail if standard scaffolding is missing in other parts of the monorepo (like the frontend).
