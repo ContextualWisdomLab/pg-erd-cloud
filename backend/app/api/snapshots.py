@@ -48,6 +48,7 @@ async def _get_authorized_snapshot(
     session: AsyncSession,
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser,
+    minimum_role: str | None = None,
 ) -> SchemaSnapshot | None:
     """Fetch a snapshot only after project membership has been checked."""
 
@@ -61,7 +62,10 @@ async def _get_authorized_snapshot(
 
     try:
         await require_project_member(
-            session, project_space_uuid, user.user_account_uuid
+            session,
+            project_space_uuid,
+            user.user_account_uuid,
+            minimum_role=minimum_role,
         )
     except HTTPException as exc:
         if exc.status_code == 403:
@@ -172,7 +176,10 @@ async def export_snapshot_reversing_spec(
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a snapshot as a DB reversing spec or LLM prompt."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    min_role = "editor" if mode == "llm-draft" else None
+    snap = await _get_authorized_snapshot(
+        session, schema_snapshot_uuid, user, minimum_role=min_role
+    )
     if snap is None:
         return "# DB Reversing Specification\n\nSnapshot not found.\n"
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
@@ -203,7 +210,10 @@ async def export_snapshot_index_design(
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export table/index design guidance or an LLM prompt."""
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    min_role = "editor" if mode == "llm-draft" else None
+    snap = await _get_authorized_snapshot(
+        session, schema_snapshot_uuid, user, minimum_role=min_role
+    )
     if snap is None:
         return "# ERD Index Design\n\nSnapshot not found.\n"
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)

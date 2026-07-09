@@ -77,6 +77,18 @@ _rate_limit_policy = RateLimitPolicy(
     route_prefix="/api",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
+
+_llm_draft_rate_limiter = InMemoryFixedWindowRateLimiter(
+    max_keys=settings.api_rate_limit_max_keys
+)
+_llm_draft_rate_limit_policy = RateLimitPolicy(
+    enabled=settings.api_rate_limit_enabled,
+    requests=10,  # Stricter rate limit for LLM generation
+    window_seconds=60,
+    route_prefix="/api/snapshots",  # This captures the LLM snapshot endpoints
+    trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+)
+
 _share_link_rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.share_link_rate_limit_max_keys
 )
@@ -98,6 +110,13 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 
+app.middleware("http")(
+    make_rate_limit_middleware(
+        limiter=_llm_draft_rate_limiter,
+        policy=_llm_draft_rate_limit_policy,
+        get_subject=try_get_subject_for_rate_limit,
+    )
+)
 app.middleware("http")(
     make_rate_limit_middleware(
         limiter=_rate_limiter,
