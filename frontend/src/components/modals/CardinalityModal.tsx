@@ -161,6 +161,7 @@ export function CardinalityModal({
                     </td>
                     <td>
                       <input
+                        aria-label={`${column.column_name} distinct count`}
                         id={inputId}
                         inputMode="numeric"
                         min="1"

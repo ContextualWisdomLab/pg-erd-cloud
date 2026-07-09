@@ -46,3 +46,7 @@
 ## 2026-07-05 - Accessible Disabled Buttons
 **Learning:** Adding `aria-describedby` to disabled buttons and explicitly linking them to visible helper text elements allows screen readers to announce the reason for being disabled, significantly improving accessibility for interactive elements that depend on prior state (like selecting a project).
 **Action:** Always pair disabled interactive elements with visible helper text and use `aria-describedby` to semantically link them, ensuring the context is available to assistive technologies.
+
+## 2026-07-09 - [UX improvement] Accessible table-based form controls
+**Learning:** In table-based forms where inputs or `<select>` elements correspond to a specific row/column property (e.g., Distinct Count, Group Assignment), the visual context or `<label>` often only provides the row identity. Always provide an explicit `aria-label` directly on the input/select to give screen readers full context (e.g., `${column.column_name} distinct count`), even if it is linked to a label via `id`.
+**Action:** Add explicit `aria-label` attributes to form controls in table layouts to ensure complete context is read by screen readers.
