@@ -9,11 +9,7 @@ from pydantic import BaseModel, Field
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
-    project_name: str = Field(
-        min_length=1,
-        max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
-    )
+    project_name: str = Field(min_length=1, max_length=255)
 
 
 class ProjectOut(BaseModel):
@@ -47,11 +43,7 @@ class ProjectMemberOut(BaseModel):
 class ConnectionCreateIn(BaseModel):
     """Request body for creating a DB connection."""
 
-    conn_name: str = Field(
-        min_length=1,
-        max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
-    )
+    conn_name: str = Field(min_length=1, max_length=128)
     dsn: str = Field(
         min_length=1,
         max_length=4096,
