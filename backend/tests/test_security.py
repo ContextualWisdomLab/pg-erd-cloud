@@ -74,3 +74,16 @@ def test_encrypt_decrypt_with_mocked_secret() -> None:
     with patch("app.security.settings.app_secret", "secret-key-2"):
         with pytest.raises(InvalidTag):
             decrypt_text(blob.ciphertext, blob.nonce)
+
+def test_decrypt_text_fallback() -> None:
+    from app.security import settings, decrypt_text
+    import os
+    import hashlib
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    old_key = hashlib.sha256(settings.app_secret.encode("utf-8")).digest()
+    aes = AESGCM(old_key)
+    nonce = os.urandom(12)
+    ciphertext = aes.encrypt(nonce, b"legacy_text", None)
+
+    assert decrypt_text(ciphertext, nonce) == "legacy_text"

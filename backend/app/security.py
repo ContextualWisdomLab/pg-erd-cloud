@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from dataclasses import dataclass
 
 from cryptography.hazmat.primitives import hashes
@@ -55,8 +56,6 @@ def decrypt_text(ciphertext: bytes, nonce: bytes) -> str:
         plaintext = aes.decrypt(nonce, actual_ciphertext, None)
         return plaintext.decode("utf-8")
     except Exception:
-        import hashlib
-
         old_key = hashlib.sha256(settings.app_secret.encode("utf-8")).digest()
         aes = AESGCM(old_key)
         plaintext = aes.decrypt(nonce, ciphertext, None)

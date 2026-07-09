@@ -147,7 +147,7 @@ class _ShareSession:
         return SimpleNamespace(snapshot_json=_snapshot())
 
 
-async def _authorized_snapshot(*_: object) -> object:
+async def _authorized_snapshot(*_: object, **__: object) -> object:
     return SimpleNamespace()
 
 
