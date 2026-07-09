@@ -79,15 +79,17 @@ export function EditEdgeModal({
             type="button"
             onClick={onRelDelete}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+            aria-label="관계 삭제"
           >
             삭제
           </button>
           <div className="row">
-            <button type="button" onClick={onRelCancel}>취소</button>
+            <button type="button" onClick={onRelCancel} aria-label="관계 설정 취소">취소</button>
             <button
               type="button"
               onClick={onRelSubmit}
               style={{ background: "#034ea2", color: "#fff" }}
+              aria-label="관계 설정 저장"
             >
               저장
             </button>
