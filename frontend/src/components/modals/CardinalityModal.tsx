@@ -162,6 +162,7 @@ export function CardinalityModal({
                     <td>
                       <input
                         id={inputId}
+                        aria-label={`${index + 1}번째 컬럼 고유 값(Distinct) 수`}
                         inputMode="numeric"
                         min="1"
                         type="number"

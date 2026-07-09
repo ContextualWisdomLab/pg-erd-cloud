@@ -43,3 +43,7 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+
+## 2024-07-09 - 동적 목록 내의 고유한 접근성 이름 지정
+**Learning:** 동적으로 생성되는 폼 입력 요소 목록(예: `CardinalityModal.tsx`의 "Distinct" 컬럼 입력 같은 표/그리드 레이아웃)에서는 인접한 시각적 레이블이 제대로 연결되지 않거나 스크린 리더에서 모두 동일한 제네릭 이름으로 읽히는 문제가 발생할 수 있습니다. 단순한 컬럼명 텍스트 노드에 의존하는 것으로는 부족합니다.
+**Action:** 스크린 리더 사용자가 각 행을 확실히 구별하여 읽을 수 있도록 각 `<input>` 요소에 행 인덱스나 특정 아이템 이름을 포함한 동적으로 고유한 `aria-label` 속성을 명시적으로 추가해야 합니다.
