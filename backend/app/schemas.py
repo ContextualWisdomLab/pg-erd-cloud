@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
-    project_name: str = Field(min_length=1, max_length=255)
+    project_name: str = Field(
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
 
 
 class ProjectOut(BaseModel):
@@ -43,7 +47,11 @@ class ProjectMemberOut(BaseModel):
 class ConnectionCreateIn(BaseModel):
     """Request body for creating a DB connection."""
 
-    conn_name: str = Field(min_length=1, max_length=128)
+    conn_name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
     dsn: str = Field(
         min_length=1,
         max_length=4096,
@@ -56,6 +64,37 @@ class ConnectionOut(BaseModel):
 
     db_connection_uuid: uuid.UUID
     conn_name: str
+
+
+class ApplySqlIn(BaseModel):
+    """Request body for forward-engineering DDL against a connection."""
+
+    sql: str = Field(
+        min_length=1,
+        max_length=262_144,
+        description=(
+            "Conservative PostgreSQL DDL subset with unquoted snake_case "
+            "identifiers. Arbitrary SQL is rejected."
+        ),
+    )
+    # Default to a rolled-back pre-flight; the caller must opt in to persist.
+    dry_run: bool = True
+
+
+class ApplySqlOut(BaseModel):
+    """Result of applying forward DDL (DSN-redacted on failure)."""
+
+    ok: bool
+    dry_run: bool
+    error: str | None = None
+
+
+class ConnectionTestOut(BaseModel):
+    """Result of a connection health probe (DSN-redacted on failure)."""
+
+    ok: bool
+    server_version: str | None = None
+    error: str | None = None
 
 
 class SnapshotCreateIn(BaseModel):
@@ -105,6 +144,42 @@ class IndexRedundancyOut(BaseModel):
     schema_snapshot_uuid: uuid.UUID
     status: str
     report: dict | None
+
+
+class InferredRelationshipOut(BaseModel):
+    """An implicit (undeclared) foreign-key relationship inferred from names."""
+
+    child_schema: str
+    child_table: str
+    child_column: str
+    parent_schema: str
+    parent_table: str
+    parent_column: str
+    confidence: str
+    reason: str
+
+
+class SnapshotDiffOut(BaseModel):
+    """Structured diff between two schema snapshots.
+
+    ``status`` is ``"not_found"`` when either snapshot is missing or the caller
+    is not authorized for it (uniform response avoids existence enumeration);
+    ``"ok"`` with a populated ``diff`` otherwise.
+    """
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    diff: dict | None
+
+
+class MigrationSafetyOut(BaseModel):
+    """Risk-classified analysis of migrating one snapshot to another."""
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    analysis: dict | None
 
 
 class MeOut(BaseModel):
