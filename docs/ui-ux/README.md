@@ -1,6 +1,8 @@
 # Cloud ERD UI/UX Reference
 
 These reference screens define the intended product direction for Cloud ERD UI work.
+See `product-spec.md` for the information architecture, screen definitions,
+key screens, wireframes, user stories, and implementation checklist.
 
 - Use a quiet, work-focused application layout with a persistent left sidebar.
 - Keep the main palette light with blue as the primary action and active-state color.
