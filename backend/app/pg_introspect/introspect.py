@@ -59,6 +59,37 @@ def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     return context
 
 
+async def probe_postgres(dsn: str) -> str:
+    """SSRF-guarded connectivity check: connect and return the server version."""
+
+    target = await validate_postgres_dsn_target(dsn)
+    connect_host: str | list[str] = (
+        target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
+    )
+    ssl_context = (
+        _verified_tls_context(dsn, target.hostname)
+        if _requires_verified_tls_hostname(dsn)
+        else None
+    )
+    if target.port is not None:
+        conn = await asyncpg.connect(
+            dsn,
+            host=connect_host,
+            port=target.port,
+            timeout=10,
+            ssl=ssl_context,
+        )
+    else:
+        conn = await asyncpg.connect(
+            dsn, host=connect_host, timeout=10, ssl=ssl_context
+        )
+    try:
+        await conn.fetchval("SELECT 1")
+        return str(await conn.fetchval("SHOW server_version"))
+    finally:
+        await conn.close()
+
+
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
