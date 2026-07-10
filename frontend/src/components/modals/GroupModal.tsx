@@ -131,6 +131,7 @@ export function GroupModal({
                   {node.data.title}
                 </span>
                 <select
+                  aria-label={`${node.data.title} 업무 그룹 배정`}
                   value={node.data.businessGroup?.id ?? ""}
                   onChange={(event) =>
                     onAssignBusinessGroup(node.id, event.target.value)
