@@ -58,6 +58,7 @@ import {
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
+import { exportDbml } from "./erd/dbml";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
@@ -68,6 +69,16 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
 ]);
 
 const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
+
+function sanitizeHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 type CurrentUser = {
   subject: string;
@@ -127,6 +138,7 @@ export default function App() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [diagramSearch, setDiagramSearch] = useState("");
   const [nodeSearch, setNodeSearch] = useState("");
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
@@ -623,6 +635,10 @@ export default function App() {
 
   function onDownloadMermaid() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
+  }
+
+  function onDownloadDbml() {
+    downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
   }
 
   function onRelDelete() {
@@ -1243,7 +1259,7 @@ export default function App() {
                       }}
                     >
                       <span className="projectCard__icon" aria-hidden="true" />
-                      <strong>{project.project_name}</strong>
+                      <strong>{sanitizeHtml(project.project_name)}</strong>
                       <span>다이어그램 보기</span>
                     </button>
                   ))}
@@ -1262,7 +1278,7 @@ export default function App() {
               </div>
               <DiagramTable
                 snapshots={recentSnapshots}
-                selectedProjectName={selectedProject?.project_name}
+                selectedProjectName={sanitizeHtml(selectedProject?.project_name)}
                 onOpenEditor={(id) => {
                   setSnapshotId(id);
                   setSnapshot(null);
@@ -1301,7 +1317,7 @@ export default function App() {
               </div>
               {projects.map((project) => (
                 <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
-                  <strong role="cell">{project.project_name}</strong>
+                  <strong role="cell">{sanitizeHtml(project.project_name)}</strong>
                   <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
                   <span role="cell">
                     <button
@@ -1332,9 +1348,20 @@ export default function App() {
                 편집기 열기
               </button>
             </div>
+            <label className="workspaceSearch">
+              <span className="srOnly">다이어그램 검색</span>
+              <input
+                aria-label="다이어그램 검색"
+                placeholder="다이어그램 검색"
+                type="search"
+                value={diagramSearch}
+                onChange={(event) => setDiagramSearch(event.currentTarget.value)}
+              />
+            </label>
             <DiagramTable
               snapshots={snapshots}
-              selectedProjectName={selectedProject?.project_name}
+              searchText={diagramSearch}
+              selectedProjectName={sanitizeHtml(selectedProject?.project_name)}
               onOpenEditor={(id) => {
                 setSnapshotId(id);
                 setSnapshot(null);
@@ -1462,38 +1489,51 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onDownloadSvg}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG 내보내기"
+                nodes.length === 0
+                  ? "내보낼 테이블이 없습니다"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="SVG 그림 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               IMG
             </button>
             <button
               type="button"
-              onClick={onDownloadUml}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "UML 내보내기"
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="PlantUML 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               UML
             </button>
             <button
               type="button"
-              onClick={onDownloadMermaid}
+              onClick={onOpenExport}
               disabled={nodes.length === 0}
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
-                  : "Mermaid 내보내기"
+                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
-              aria-label="Mermaid 내보내기"
+              aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               {"{}"}
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadDbml}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DBML 내보내기"
+              }
+              aria-label="DBML 내보내기"
+            >
+              DBML
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
@@ -1555,9 +1595,9 @@ export default function App() {
 
           <ExportModal
             isOpen={isExportModalOpen}
-            exportDdlText={exportDdlText}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
+            hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
@@ -1565,6 +1605,9 @@ export default function App() {
             canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
+            onDownloadSvg={onDownloadSvg}
+            onDownloadUml={onDownloadUml}
+            onDownloadMermaid={onDownloadMermaid}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
@@ -1640,17 +1683,35 @@ export default function App() {
 
 function DiagramTable({
   snapshots,
+  searchText = "",
   selectedProjectName,
   onOpenEditor,
 }: {
   snapshots: Snapshot[];
+  searchText?: string;
   selectedProjectName?: string;
   onOpenEditor: (snapshotId: string) => void;
 }) {
-  if (!snapshots.length) {
+  const normalizedSearchText = searchText.trim().toLocaleLowerCase();
+  const rows = snapshots
+    .map((item, index) => ({
+      item,
+      name: `ERD_${item.schema_filter || "all"}_${index + 1}`,
+    }))
+    .filter(({ item, name }) => {
+      if (!normalizedSearchText) return true;
+      return (
+        name.toLocaleLowerCase().includes(normalizedSearchText) ||
+        item.status.toLocaleLowerCase().includes(normalizedSearchText)
+      );
+    });
+
+  if (!rows.length) {
     return (
       <div className="panelEmpty">
-        아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.
+        {snapshots.length
+          ? "검색 결과가 없습니다."
+          : "아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요."}
       </div>
     );
   }
@@ -1663,15 +1724,13 @@ function DiagramTable({
         <span role="columnheader">상태</span>
         <span role="columnheader">동작</span>
       </div>
-      {snapshots.map((item, index) => (
+      {rows.map(({ item, name }) => (
         <div className="dataTable__row" role="row" key={item.schema_snapshot_uuid}>
-          <strong role="cell">
-            ERD_{item.schema_filter || "all"}_{index + 1}
-          </strong>
+          <strong role="cell">{name}</strong>
           <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
           <span role="cell">
-            <span className={`statusPill statusPill--${item.status}`}>
-              {item.status}
+            <span className={`statusPill statusPill--${sanitizeHtml(item.status)}`}>
+              {sanitizeHtml(item.status)}
             </span>
           </span>
           <span role="cell">
