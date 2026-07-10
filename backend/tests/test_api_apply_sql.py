@@ -20,7 +20,7 @@ def _conn():
 
 
 def _body(dry_run=True):
-    return ApplySqlIn(sql="CREATE TABLE t (id bigint);", dry_run=dry_run)
+    return ApplySqlIn(sql="CREATE TABLE safe_table (id bigint);", dry_run=dry_run)
 
 
 @pytest.mark.asyncio
@@ -103,21 +103,64 @@ async def test_apply_sql_reports_ok_false_on_error():
 @pytest.mark.asyncio
 async def test_apply_database_sql_rejects_non_postgres():
     with pytest.raises(RuntimeError):
-        await apply_database_sql("snowflake://u@acct/db", "CREATE TABLE t (id int);")
+        await apply_database_sql(
+            "snowflake://u@acct/db", "CREATE TABLE safe_table (id int);"
+        )
 
 
 @pytest.mark.asyncio
 async def test_apply_database_sql_routes_postgres_and_redacts():
-    with patch("app.db_introspect.apply_postgres_sql", new_callable=AsyncMock) as m:
+    with patch("app.db_introspect.apply_postgres_ddl", new_callable=AsyncMock) as m:
         await apply_database_sql(
-            "postgresql://u@db.example.com/x", "CREATE TABLE t (id int);", dry_run=True
+            "postgresql://u@db.example.com/x",
+            "CREATE TABLE safe_table (id int);",
+            dry_run=True,
         )
     m.assert_awaited_once()
+    assert m.await_args.args[1].sql == "CREATE TABLE safe_table (id int);"
     with patch(
-        "app.db_introspect.apply_postgres_sql",
+        "app.db_introspect.apply_postgres_ddl",
         new_callable=AsyncMock,
         side_effect=OSError("connect to postgresql://user:s3cret@db"),
     ):
         with pytest.raises(RuntimeError) as e:
-            await apply_database_sql("postgresql://user:s3cret@db.example.com/x", "X")
+            await apply_database_sql(
+                "postgresql://user:s3cret@db.example.com/x",
+                "CREATE TABLE safe_table (id int);",
+            )
+    assert "s3cret" not in str(e.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sql", "expected_error"),
+    [
+        ("SELECT 1;", "SELECT is not allowed"),
+        ("DROP TABLE user_account;", "DROP is not allowed"),
+        (
+            "CREATE TABLE bad_table (id bigint DEFAULT now());",
+            "DEFAULT is not allowed",
+        ),
+        (
+            'CREATE TABLE "BadTable" (id bigint);',
+            "quoted literals and quoted identifiers are not allowed",
+        ),
+        (
+            "CREATE TABLE BadTable (id bigint);",
+            "table identifier must be unquoted snake_case",
+        ),
+        (
+            "CREATE TABLE safe_table (id bigint); -- comment",
+            "comments are not allowed",
+        ),
+    ],
+)
+async def test_apply_database_sql_rejects_unsafe_forward_ddl(
+    sql: str, expected_error: str
+):
+    with patch("app.db_introspect.apply_postgres_ddl", new_callable=AsyncMock) as m:
+        with pytest.raises(RuntimeError) as e:
+            await apply_database_sql("postgresql://user:s3cret@db.example.com/x", sql)
+    m.assert_not_awaited()
+    assert expected_error in str(e.value)
     assert "s3cret" not in str(e.value)

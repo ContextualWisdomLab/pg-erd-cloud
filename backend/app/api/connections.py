@@ -72,12 +72,14 @@ async def apply_sql(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> ApplySqlOut:
-    """Forward engineering: apply DDL/SQL to a stored connection's database.
+    """Forward engineering: apply allow-listed DDL to a stored connection.
 
     SECURITY-SENSITIVE (writes to a live database):
     * Requires the **editor** role on the connection's project.
     * IDOR-safe: non-members get a uniform 404 (no enumeration); members
       lacking editor get 403.
+    * Rejects arbitrary SQL and requires unquoted snake_case database object
+      identifiers in a conservative PostgreSQL DDL subset.
     * The DSN is decrypted only in memory; the connection reuses the
       introspectors' SSRF guard (validated + pinned IP).
     * Runs the whole batch in one transaction; ``dry_run`` (default True) rolls

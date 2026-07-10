@@ -127,7 +127,6 @@ export function GroupModal({
                 <span
                   title={node.data.title}
                   aria-label={node.data.title}
-                  tabIndex={0}
                 >
                   {node.data.title}
                 </span>

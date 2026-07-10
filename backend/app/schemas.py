@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
-    project_name: str = Field(min_length=1, max_length=255)
+    project_name: str = Field(
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
 
 
 class ProjectOut(BaseModel):
@@ -43,7 +47,11 @@ class ProjectMemberOut(BaseModel):
 class ConnectionCreateIn(BaseModel):
     """Request body for creating a DB connection."""
 
-    conn_name: str = Field(min_length=1, max_length=128)
+    conn_name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
     dsn: str = Field(
         min_length=1,
         max_length=4096,
@@ -59,15 +67,22 @@ class ConnectionOut(BaseModel):
 
 
 class ApplySqlIn(BaseModel):
-    """Request body for forward-engineering: apply DDL/SQL to a connection."""
+    """Request body for forward-engineering DDL against a connection."""
 
-    sql: str = Field(min_length=1, max_length=262_144)
+    sql: str = Field(
+        min_length=1,
+        max_length=262_144,
+        description=(
+            "Conservative PostgreSQL DDL subset with unquoted snake_case "
+            "identifiers. Arbitrary SQL is rejected."
+        ),
+    )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
 
 
 class ApplySqlOut(BaseModel):
-    """Result of applying SQL (DSN-redacted on failure)."""
+    """Result of applying forward DDL (DSN-redacted on failure)."""
 
     ok: bool
     dry_run: bool
@@ -107,9 +122,25 @@ class SnapshotDetailOut(BaseModel):
     snapshot_json: dict | None
 
 
+class WideTablesOut(BaseModel):
+    """Wide / denormalized table findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
     user_account_uuid: uuid.UUID
     subject: str
     display_name: str | None
+
+
+class NamingLintOut(BaseModel):
+    """Naming-convention findings for a snapshot's identifiers."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None

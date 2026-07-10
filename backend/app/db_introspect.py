@@ -4,7 +4,8 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from app.dsn_redaction import redact_dsn_error_message
-from app.pg_introspect.introspect import apply_postgres_sql, introspect_postgres
+from app.pg_introspect.forward_ddl import validate_forward_ddl
+from app.pg_introspect.introspect import apply_postgres_ddl, introspect_postgres
 from app.snowflake_introspect import introspect_snowflake
 
 DatabaseDialect = Literal["postgresql", "snowflake"]
@@ -35,17 +36,20 @@ async def introspect_database(dsn: str, schema_filter: str | None) -> dict:
 
 
 async def apply_database_sql(dsn: str, sql: str, dry_run: bool = True) -> None:
-    """Forward engineering: apply DDL/SQL to a target database.
+    """Forward engineering: apply allow-listed DDL to a target database.
 
     PostgreSQL only for now (Snowflake DDL apply differs and is connector-gated).
-    Errors are DSN-redacted so credentials never surface in an API response.
+    User-provided text is first reduced to a validated DDL batch; arbitrary SQL
+    execution is rejected before opening a database connection. Errors are
+    DSN-redacted so credentials never surface in an API response.
     """
 
     try:
         dialect = detect_dsn_dialect(dsn)
         if dialect != "postgresql":
             raise ValueError("forward apply is only supported for PostgreSQL")
-        await apply_postgres_sql(dsn, sql, dry_run=dry_run)
+        ddl = validate_forward_ddl(sql)
+        await apply_postgres_ddl(dsn, ddl, dry_run=dry_run)
     except Exception as exc:
         message = str(exc) or type(exc).__name__
         raise RuntimeError(redact_dsn_error_message(message, dsn)) from None
