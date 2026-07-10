@@ -49,8 +49,8 @@ async def create_api_key(
 ) -> ApiKeyCreatedOut:
     """Create an API key. The secret is returned ONCE and never stored.
 
-    Only its SHA-256 hash is persisted; ``key_prefix`` lets the user recognize
-    the key later without exposing it.
+    Only its PBKDF2-HMAC hash is persisted; ``key_prefix`` lets the user
+    recognize the key later without exposing it.
     """
     token = API_KEY_PREFIX + secrets.token_urlsafe(32)
     key = ApiKey(

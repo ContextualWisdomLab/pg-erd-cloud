@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import hashlib
-import hmac
 import uuid
 from dataclasses import dataclass
 from typing import Any, cast
@@ -409,34 +408,32 @@ async def _ensure_user(
 
 
 API_KEY_PREFIX = "pgerd_"
+API_KEY_PBKDF2_ITERATIONS = 210_000
 
 
 def hash_api_key(token: str) -> str:
-    """Deterministic keyed digest of an API key (indexable lookup).
+    """Deterministic PBKDF2-HMAC digest of an API key (indexable lookup).
 
-    A plain KDF (bcrypt/argon2) is deliberately *not* used: the input is a
-    server-generated 256-bit random token (``secrets.token_urlsafe(32)``), not a
-    human password, so brute-force over the input space is infeasible and a slow
-    KDF only adds latency to every request. A deterministic digest is required
-    for the unique-indexed O(1) lookup (GitHub stores its own PATs this way).
-
-    We use HMAC-SHA-256 keyed with ``settings.app_secret`` rather than a bare
-    SHA-256 digest: the server secret acts as a pepper, so a database-only
-    disclosure of ``key_hash`` values cannot be reversed or matched against
-    pre-computed tables without also compromising the application secret.
+    API keys are server-generated random bearer credentials, but CodeQL treats
+    bearer tokens as sensitive password-like inputs. PBKDF2-HMAC-SHA256 keeps
+    storage deterministic for the unique-indexed lookup while avoiding a fast
+    raw SHA-256/HMAC digest if the API-key table is disclosed. ``app_secret`` is
+    used as a deployment pepper, so database-only disclosure is not enough to
+    test guessed keys offline.
     """
 
-    return hmac.new(
-        settings.app_secret.encode("utf-8"),
+    return hashlib.pbkdf2_hmac(
+        "sha256",
         token.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
+        settings.app_secret.encode("utf-8"),
+        API_KEY_PBKDF2_ITERATIONS,
+    ).hex()
 
 
 async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     """Authenticate an ``Authorization: Bearer pgerd_...`` API key.
 
-    Looks up the SHA-256 hash (constant-shape errors: any failure is the same
+    Looks up the PBKDF2 hash (constant-shape errors: any failure is the same
     401 so keys cannot be probed) and rejects revoked keys.
     """
 

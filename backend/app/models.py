@@ -291,8 +291,8 @@ class ShareLink(Base):
 class ApiKey(Base):
     """A long-lived API key for programmatic access (CI/CD, SDKs).
 
-    Only a SHA-256 hash of the secret is stored; the plaintext is shown once at
-    creation. ``key_prefix`` (the first characters of the token) lets users
+    Only a PBKDF2-HMAC hash of the secret is stored; the plaintext is shown once
+    at creation. ``key_prefix`` (the first characters of the token) lets users
     recognize a key without exposing it. Revocation is a timestamp so it is
     auditable and cannot be un-revoked silently.
     """

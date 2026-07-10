@@ -7,7 +7,13 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.api_keys import create_api_key, list_api_keys, revoke_api_key
-from app.auth import API_KEY_PREFIX, CurrentUser, _user_from_api_key, hash_api_key
+from app.auth import (
+    API_KEY_PBKDF2_ITERATIONS,
+    API_KEY_PREFIX,
+    CurrentUser,
+    _user_from_api_key,
+    hash_api_key,
+)
 from app.schemas import ApiKeyCreateIn
 
 
@@ -21,7 +27,8 @@ def test_hash_is_deterministic_and_not_reversible():
     token = API_KEY_PREFIX + "abc123"
     assert hash_api_key(token) == hash_api_key(token)
     assert token not in hash_api_key(token)
-    assert len(hash_api_key(token)) == 64  # sha256 hex
+    assert len(hash_api_key(token)) == 64  # pbkdf2-hmac-sha256 hex
+    assert API_KEY_PBKDF2_ITERATIONS >= 200_000
 
 
 @pytest.mark.asyncio
