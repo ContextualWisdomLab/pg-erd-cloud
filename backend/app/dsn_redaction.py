@@ -19,6 +19,9 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
     parsed = urlsplit(dsn)
+    if "://" in dsn and not parsed.netloc:
+        # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+        parsed = urlsplit("http://" + dsn.split("://", 1)[1])
 
     if parsed.password:
         candidates.add(parsed.password)
