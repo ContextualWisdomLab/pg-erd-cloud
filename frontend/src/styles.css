@@ -262,6 +262,21 @@ textarea:focus-visible {
   border-radius: 6px;
 }
 
+.workspaceSearch {
+  display: block;
+  max-width: 420px;
+  margin: 0 0 16px;
+}
+
+.workspaceSearch input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .panelEmpty {
   padding: 24px;
   color: #64748b;
@@ -931,6 +946,10 @@ button:disabled {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+  }
+
+  .workspaceSearch {
+    max-width: none;
   }
 
   .dataTable {
