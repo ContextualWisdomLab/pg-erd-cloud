@@ -66,6 +66,29 @@ class ConnectionOut(BaseModel):
     conn_name: str
 
 
+class ApplySqlIn(BaseModel):
+    """Request body for forward-engineering DDL against a connection."""
+
+    sql: str = Field(
+        min_length=1,
+        max_length=262_144,
+        description=(
+            "Conservative PostgreSQL DDL subset with unquoted snake_case "
+            "identifiers. Arbitrary SQL is rejected."
+        ),
+    )
+    # Default to a rolled-back pre-flight; the caller must opt in to persist.
+    dry_run: bool = True
+
+
+class ApplySqlOut(BaseModel):
+    """Result of applying forward DDL (DSN-redacted on failure)."""
+
+    ok: bool
+    dry_run: bool
+    error: str | None = None
+
+
 class ConnectionTestOut(BaseModel):
     """Result of a connection health probe (DSN-redacted on failure)."""
 
