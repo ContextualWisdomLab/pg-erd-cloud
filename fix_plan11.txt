@@ -1,4 +1,0 @@
-Oh, memory says:
-`To run specific test cases in scripts/ci/test_strix_quick_gate.sh and avoid timeouts from running the entire test suite in bash sessions, pass the specific test case name as a positional argument`
-Wait! `scripts/ci/test_strix_quick_gate.sh` doesn't exist?
-Let's see what's in `scripts/ci`.
