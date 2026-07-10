@@ -11,10 +11,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run",
-    "lint": "eslint .",
-    "coverage": "vitest run --coverage",
-    "e2e": "playwright test"
+    "test": "vitest run"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.1",
