@@ -138,6 +138,7 @@ export default function App() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [diagramSearch, setDiagramSearch] = useState("");
   const [nodeSearch, setNodeSearch] = useState("");
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(
@@ -1347,8 +1348,19 @@ export default function App() {
                 편집기 열기
               </button>
             </div>
+            <label className="workspaceSearch">
+              <span className="srOnly">다이어그램 검색</span>
+              <input
+                aria-label="다이어그램 검색"
+                placeholder="다이어그램 검색"
+                type="search"
+                value={diagramSearch}
+                onChange={(event) => setDiagramSearch(event.currentTarget.value)}
+              />
+            </label>
             <DiagramTable
               snapshots={snapshots}
+              searchText={diagramSearch}
               selectedProjectName={sanitizeHtml(selectedProject?.project_name)}
               onOpenEditor={(id) => {
                 setSnapshotId(id);
@@ -1666,17 +1678,35 @@ export default function App() {
 
 function DiagramTable({
   snapshots,
+  searchText = "",
   selectedProjectName,
   onOpenEditor,
 }: {
   snapshots: Snapshot[];
+  searchText?: string;
   selectedProjectName?: string;
   onOpenEditor: (snapshotId: string) => void;
 }) {
-  if (!snapshots.length) {
+  const normalizedSearchText = searchText.trim().toLocaleLowerCase();
+  const rows = snapshots
+    .map((item, index) => ({
+      item,
+      name: `ERD_${item.schema_filter || "all"}_${index + 1}`,
+    }))
+    .filter(({ item, name }) => {
+      if (!normalizedSearchText) return true;
+      return (
+        name.toLocaleLowerCase().includes(normalizedSearchText) ||
+        item.status.toLocaleLowerCase().includes(normalizedSearchText)
+      );
+    });
+
+  if (!rows.length) {
     return (
       <div className="panelEmpty">
-        아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.
+        {snapshots.length
+          ? "검색 결과가 없습니다."
+          : "아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요."}
       </div>
     );
   }
@@ -1689,11 +1719,9 @@ function DiagramTable({
         <span role="columnheader">상태</span>
         <span role="columnheader">동작</span>
       </div>
-      {snapshots.map((item, index) => (
+      {rows.map(({ item, name }) => (
         <div className="dataTable__row" role="row" key={item.schema_snapshot_uuid}>
-          <strong role="cell">
-            ERD_{item.schema_filter || "all"}_{index + 1}
-          </strong>
+          <strong role="cell">{name}</strong>
           <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
           <span role="cell">
             <span className={`statusPill statusPill--${sanitizeHtml(item.status)}`}>

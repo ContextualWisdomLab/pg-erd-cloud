@@ -99,14 +99,6 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
-class SchemaHealthOut(BaseModel):
-    """Schema-smell findings for a single snapshot."""
-
-    schema_snapshot_uuid: uuid.UUID
-    status: str
-    report: dict | None
-
-
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
