@@ -152,6 +152,25 @@ def _drop_fk_sql(fk: dict[str, Any], tables: dict[str, Any]) -> str | None:
     )
 
 
+def _create_missing_schema_sql(
+    base_tables: dict[str, Any], target_tables: dict[str, Any]
+) -> list[str]:
+    base_schemas = {
+        tbl.get("schema_name")
+        for tbl in base_tables.values()
+        if isinstance(tbl.get("schema_name"), str) and tbl.get("schema_name")
+    }
+    missing = {
+        tbl.get("schema_name")
+        for key, tbl in target_tables.items()
+        if key not in base_tables
+        and isinstance(tbl.get("schema_name"), str)
+        and tbl.get("schema_name")
+        and tbl.get("schema_name") not in base_schemas
+    }
+    return [f"CREATE SCHEMA IF NOT EXISTS {_q(schema)};" for schema in sorted(missing)]
+
+
 def snapshot_diff_to_migration_sql(
     base: dict[str, Any] | None,
     target: dict[str, Any] | None,
@@ -169,13 +188,27 @@ def snapshot_diff_to_migration_sql(
     b_tables, t_tables = b["tables"], t["tables"]
 
     stmts: list[str] = []
+    removed_tables = set(b_tables) - set(t_tables)
 
-    # Drop removed tables first (frees names/constraints), then create/alter.
+    base_fks, target_fks = b["fks"], t["fks"]
+    for sig, fk in base_fks.items():
+        if sig in target_fks:
+            continue
+        child_table = fk.get("child_table")
+        parent_table = fk.get("parent_table")
+        if child_table in removed_tables and parent_table not in removed_tables:
+            continue
+        sql = _drop_fk_sql(fk, b_tables)
+        if sql:
+            stmts.append(sql)
+
+    # Drop constraints before table/column removals so referenced objects unlock.
     for key, tbl in b_tables.items():
         if key not in t_tables:
             stmts.append(
                 f"DROP TABLE IF EXISTS {_qname(tbl['schema_name'], tbl['relation_name'])};"
             )
+    stmts.extend(_create_missing_schema_sql(b_tables, t_tables))
     for key, tbl in t_tables.items():
         if key not in b_tables:
             stmts.append(_create_table_sql(tbl, source, dialect))
@@ -183,12 +216,6 @@ def snapshot_diff_to_migration_sql(
         if key in b_tables:
             stmts.extend(_alter_table_sql(b_tables[key], tbl, source, dialect))
 
-    base_fks, target_fks = b["fks"], t["fks"]
-    for sig, fk in base_fks.items():
-        if sig not in target_fks:
-            sql = _drop_fk_sql(fk, b_tables)
-            if sql:
-                stmts.append(sql)
     for sig, fk in target_fks.items():
         if sig not in base_fks:
             sql = _add_fk_sql(fk, t_tables)

@@ -117,6 +117,150 @@ def test_foreign_key_add_and_drop():
     assert 'ALTER TABLE "public"."orders" DROP CONSTRAINT "fk_orders_member";' in drop_sql
 
 
+def test_foreign_key_is_dropped_before_referenced_table_is_dropped():
+    member_rel = {"relation_oid": 1, "schema_name": "public", "relation_name": "member"}
+    orders_rel = {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"}
+    fk = {
+        "fk_constraint_name": "fk_orders_member",
+        "child_relation_oid": 2,
+        "parent_relation_oid": 1,
+        "child_column_name": "member_id",
+        "parent_column_name": "member_id",
+        "column_ordinal": 1,
+    }
+    base = _snap(
+        relations=[member_rel, orders_rel],
+        columns=[
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+        ],
+        fk_edges=[fk],
+    )
+    target = _snap(
+        relations=[orders_rel],
+        columns=[
+            {
+                "relation_oid": 2,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+        ],
+    )
+
+    sql = snapshot_diff_to_migration_sql(base, target)
+
+    drop_fk = 'ALTER TABLE "public"."orders" DROP CONSTRAINT "fk_orders_member";'
+    drop_table = 'DROP TABLE IF EXISTS "public"."member";'
+    assert drop_fk in sql
+    assert drop_table in sql
+    assert sql.index(drop_fk) < sql.index(drop_table)
+
+
+def test_foreign_key_on_dropped_child_table_is_not_dropped_separately():
+    member_rel = {"relation_oid": 1, "schema_name": "public", "relation_name": "member"}
+    orders_rel = {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"}
+    fk = {
+        "fk_constraint_name": "fk_orders_member",
+        "child_relation_oid": 2,
+        "parent_relation_oid": 1,
+        "child_column_name": "member_id",
+        "parent_column_name": "member_id",
+        "column_ordinal": 1,
+    }
+    base = _snap(
+        relations=[member_rel, orders_rel],
+        columns=[
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+        ],
+        fk_edges=[fk],
+    )
+    target = _snap(
+        relations=[member_rel],
+        columns=[
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            }
+        ],
+    )
+
+    sql = snapshot_diff_to_migration_sql(base, target)
+
+    assert 'DROP TABLE IF EXISTS "public"."orders";' in sql
+    assert 'ALTER TABLE "public"."orders" DROP CONSTRAINT' not in sql
+
+
+def test_added_table_in_new_schema_creates_schema_first():
+    base = _snap(relations=[], columns=[])
+    target = _snap(
+        relations=[
+            {
+                "relation_oid": 1,
+                "schema_name": "analytics",
+                "relation_name": "event_log",
+            }
+        ],
+        columns=[
+            {
+                "relation_oid": 1,
+                "column_name": "event_log_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            }
+        ],
+    )
+
+    sql = snapshot_diff_to_migration_sql(base, target)
+
+    create_schema = 'CREATE SCHEMA IF NOT EXISTS "analytics";'
+    create_table = 'CREATE TABLE "analytics"."event_log"'
+    assert create_schema in sql
+    assert create_table in sql
+    assert sql.index(create_schema) < sql.index(create_table)
+
+
 def test_snowflake_dialect_uses_set_data_type():
     base = _member_table()
     target = _snap(
