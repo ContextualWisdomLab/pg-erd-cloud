@@ -6,6 +6,21 @@ from typing import Literal
 DdlDialect = Literal["postgresql", "snowflake"]
 
 
+def _rows(snapshot: dict, key: str) -> list[dict]:
+    """Return ``snapshot[key]`` as a list of dict rows, tolerating junk.
+
+    Snapshot payloads are weakly-typed JSON; a malformed key (missing, or not a
+    list, or holding non-dict entries) must degrade to "no rows" rather than
+    raise. Mirrors the defensive contract already used by the spec/lint
+    generators (``app.spec.reversing._rows`` etc.).
+    """
+
+    value = snapshot.get(key)
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, dict)]
+
+
 def _normalize_dialect(dialect: str) -> DdlDialect:
     normalized = dialect.lower().replace("_", "-")
     if normalized in ("postgres", "postgresql", "pg"):
@@ -65,7 +80,12 @@ def _normalize_type_text(data_type: str) -> str:
 def _postgres_type_to_snowflake(column: dict) -> str:
     base_type = column.get("domain_base_type")
     if isinstance(base_type, str):
-        return _postgres_type_to_snowflake({**column, "data_type": base_type})
+        # Re-map using the domain's base type, but clear domain_base_type so the
+        # recursion terminates (otherwise a column carrying a string
+        # domain_base_type recurses forever -> RecursionError / DoS).
+        return _postgres_type_to_snowflake(
+            {**column, "data_type": base_type, "domain_base_type": None}
+        )
 
     data_type = column.get("data_type")
     if not isinstance(data_type, str):
@@ -237,11 +257,10 @@ def _column_default_clause(default_expr: object, target: DdlDialect) -> str | No
 
 
 def _snapshot_tables(snapshot: dict) -> list[dict]:
-    relations = snapshot.get("relations", [])
     return [
         r
-        for r in relations
-        if isinstance(r, dict) and r.get("relation_kind") in ("r", "p")
+        for r in _rows(snapshot, "relations")
+        if r.get("relation_kind") in ("r", "p")
     ]
 
 
@@ -455,13 +474,12 @@ def _snapshot_json_to_postgresql_sql(snapshot: dict) -> str:
     Limitations (intentional, MVP): partitioning clauses and some table options are not reconstructed.
     """
 
-    relations = snapshot.get("relations", [])
-    columns = snapshot.get("columns", [])
-    constraints = snapshot.get("constraints", [])
-    indexes = snapshot.get("indexes", [])
+    columns = _rows(snapshot, "columns")
+    constraints = _rows(snapshot, "constraints")
+    indexes = _rows(snapshot, "indexes")
     source_dialect = _snapshot_source_dialect(snapshot)
 
-    tables = [r for r in relations if r.get("relation_kind") in ("r", "p")]
+    tables = _snapshot_tables(snapshot)
 
     cols_by_oid = _group_by_relation(columns)
     constraints_by_oid = _group_by_relation(constraints)
@@ -563,9 +581,9 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     """Generate Snowflake DDL from a captured PostgreSQL/Snowflake snapshot."""
 
     source_dialect = _snapshot_source_dialect(snapshot)
-    columns = snapshot.get("columns", [])
-    constraints = snapshot.get("constraints", [])
-    indexes = snapshot.get("indexes", [])
+    columns = _rows(snapshot, "columns")
+    constraints = _rows(snapshot, "constraints")
+    indexes = _rows(snapshot, "indexes")
 
     tables = _snapshot_tables(snapshot)
     cols_by_oid = _group_by_relation(columns)
