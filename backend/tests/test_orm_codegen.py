@@ -38,7 +38,7 @@ def test_sqlalchemy_output_is_valid_python_with_expected_shapes():
     assert "class VReport" not in code  # views excluded
     assert "member_id: Mapped[int] = mapped_column(primary_key=True)" in code
     assert "joined_at: Mapped[dt.datetime | None] = mapped_column()" in code
-    assert 'ForeignKey("member.member_id")' in code
+    assert "ForeignKey('member.member_id')" in code
     assert "total: Mapped[Decimal | None]" in code
 
 
@@ -86,13 +86,56 @@ def test_typeorm_entities_decorators_and_relations():
     from app.spec.orm_codegen import generate_typeorm_entities
 
     code = generate_typeorm_entities(SNAP)
-    assert "@Entity('member')" in code
+    assert '@Entity("member")' in code
     assert "export class Member {" in code
     assert "@PrimaryColumn()" in code
     assert "member_id!: number;" in code
     assert "joined_at?: Date | null;" in code
     assert "@ManyToOne(() => Member)" in code
-    assert "@JoinColumn({ name: 'member_id' })" in code
+    assert '@JoinColumn({ name: "member_id" })' in code
     assert "@OneToMany(() => Orders" in code
     # balanced braces => structurally sound TS
     assert code.count("{") == code.count("}")
+
+
+def test_non_snake_db_names_are_mapped_to_safe_identifiers():
+    from app.spec.orm_codegen import generate_typeorm_entities
+
+    snap = {
+        "relations": [
+            {
+                "relation_oid": 1,
+                "relation_kind": "r",
+                "schema_name": "public",
+                "relation_name": "Order Items",
+                "relation_comment": 'quote " is fine',
+            }
+        ],
+        "columns": [
+            {"relation_oid": 1, "column_name": "Order ID", "column_position": 1, "data_type": "bigint", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "class", "column_position": 2, "data_type": "text", "is_not_null": False},
+            {"relation_oid": 1, "column_name": "2FA Enabled", "column_position": 3, "data_type": "boolean", "is_not_null": True},
+        ],
+        "pk_columns": [{"relation_oid": 1, "column_name": "Order ID"}],
+        "fk_edges": [],
+    }
+
+    py_code = generate_sqlalchemy_models(snap)
+    ast.parse(py_code)
+    assert "class OrderItems(Base):" in py_code
+    assert "order_id: Mapped[int] = mapped_column('Order ID', primary_key=True)" in py_code
+    assert "class_: Mapped[str | None] = mapped_column('class')" in py_code
+    assert "column_2_fa_enabled: Mapped[bool] = mapped_column('2FA Enabled')" in py_code
+
+    prisma = generate_prisma_schema(snap)
+    assert "model OrderItems {" in prisma
+    assert 'order_id BigInt @id @map("Order ID")' in prisma
+    assert 'class_ String? @map("class")' in prisma
+    assert 'column_2_fa_enabled Boolean @map("2FA Enabled")' in prisma
+
+    ts_code = generate_typeorm_entities(snap)
+    assert '@Entity("Order Items")' in ts_code
+    assert '@PrimaryColumn({name: "Order ID"})' in ts_code
+    assert 'order_id!: number;' in ts_code
+    assert '@Column({name: "class", nullable: true})' in ts_code
+    assert 'class_?: string | null;' in ts_code

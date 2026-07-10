@@ -12,6 +12,8 @@ output always imports/parses.
 
 from __future__ import annotations
 
+import json
+import keyword
 import re
 from typing import Any
 
@@ -49,10 +51,27 @@ def _map_type(data_type: str, table: list[tuple[re.Pattern[str], str]], default:
     return default
 
 
+def _snake_name(value: object, fallback: str) -> str:
+    name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value or ""))
+    name = re.sub(r"[^0-9a-zA-Z]+", "_", name).strip("_").lower()
+    name = name or fallback
+    if name[0].isdigit():
+        name = f"{fallback}_{name}"
+    if keyword.iskeyword(name):
+        name = f"{name}_"
+    return name
+
+
 def _class_name(table_name: str) -> str:
     parts = re.split(r"[^0-9a-zA-Z]+", table_name)
-    name = "".join(p.capitalize() for p in parts if p)
-    return name or "Table"
+    name = "".join(p[:1].upper() + p[1:] for p in parts if p)
+    if not name or name[0].isdigit():
+        name = f"Table{name}"
+    return f"{name}Model" if keyword.iskeyword(name) else name
+
+
+def _column_names(cols: list[dict[str, Any]]) -> dict[str, str]:
+    return {str(col.get("column_name")): _snake_name(col.get("column_name"), "column") for col in cols}
 
 
 def _index(snapshot: dict[str, Any] | None) -> dict[str, Any]:
@@ -106,22 +125,24 @@ def generate_sqlalchemy_models(snapshot: dict[str, Any] | None) -> str:
         schema = str(rel.get("schema_name"))
         lines += ["", "", f"class {_class_name(table)}(Base):"]
         if rel.get("relation_comment"):
-            lines.append(f'    """{rel["relation_comment"]}"""')
+            lines.append(f"    {str(rel['relation_comment'])!r}")
             lines.append("")
-        lines.append(f'    __tablename__ = "{table}"')
+        lines.append(f"    __tablename__ = {table!r}")
         if schema and schema != "public":
-            lines.append(f'    __table_args__ = {{"schema": "{schema}"}}')
+            lines.append(f"    __table_args__ = {{'schema': {schema!r}}}")
         cols = ix["cols_by_oid"].get(oid, [])
+        col_names = _column_names(cols)
         if not cols:
             lines.append("    pass")
             continue
         for col in cols:
             name = str(col.get("column_name"))
+            attr = col_names[name]
             raw_type = str(col.get("data_type") or "")
             py_type = _map_type(raw_type, _PY_TYPES, "str")
             not_null = bool(col.get("is_not_null"))
             annotated = py_type if not_null else f"{py_type} | None"
-            args = []
+            args = [repr(name)] if attr != name else []
             fk = ix["fk_by_child"].get((oid, name))
             if fk is not None:
                 parent = ix["rel_by_oid"].get(fk.get("parent_relation_oid"))
@@ -129,12 +150,12 @@ def generate_sqlalchemy_models(snapshot: dict[str, Any] | None) -> str:
                     target = f'{parent.get("schema_name")}.{parent.get("relation_name")}.{fk.get("parent_column_name")}'
                     if parent.get("schema_name") == "public":
                         target = f'{parent.get("relation_name")}.{fk.get("parent_column_name")}'
-                    args.append(f'ForeignKey("{target}")')
+                    args.append(f"ForeignKey({target!r})")
             if name in ix["pk_by_oid"].get(oid, set()):
                 args.append("primary_key=True")
             comment = "" if _map_type(raw_type, _PY_TYPES, "?") != "?" else f"  # type: {raw_type}"
             call = f"mapped_column({', '.join(args)})" if args else "mapped_column()"
-            lines.append(f"    {name}: Mapped[{annotated}] = {call}{comment}")
+            lines.append(f"    {attr}: Mapped[{annotated}] = {call}{comment}")
     return "\n".join(lines) + "\n"
 
 
@@ -159,17 +180,21 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
         model = _class_name(table)
         lines += ["", f"model {model} {{"]
         cols = ix["cols_by_oid"].get(oid, [])
+        col_names = _column_names(cols)
         pk_cols = ix["pk_by_oid"].get(oid, set())
         for col in cols:
             name = str(col.get("column_name"))
+            field_name = col_names[name]
             raw_type = str(col.get("data_type") or "")
             p_type = _map_type(raw_type, _PRISMA_TYPES, "String")
             optional = "" if col.get("is_not_null") else "?"
             attrs = []
             if name in pk_cols and len(pk_cols) == 1:
                 attrs.append("@id")
+            if field_name != name:
+                attrs.append(f"@map({json.dumps(name)})")
             comment = "" if _map_type(raw_type, _PRISMA_TYPES, "?") != "?" and p_type != "String" or raw_type.lower().startswith(("text", "varchar", "char")) else f" // {raw_type}"
-            lines.append(f"  {name} {p_type}{optional}{' ' + ' '.join(attrs) if attrs else ''}{comment}")
+            lines.append(f"  {field_name} {p_type}{optional}{' ' + ' '.join(attrs) if attrs else ''}{comment}")
         # relation fields
         for (child_oid, child_col), e in ix["fk_by_child"].items():
             if child_oid != oid:
@@ -178,9 +203,12 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
             if parent is None:
                 continue
             pmodel = _class_name(str(parent.get("relation_name")))
-            field = re.sub(r"_id$", "", child_col) or pmodel.lower()
+            child_field = col_names.get(child_col, _snake_name(child_col, "column"))
+            parent_cols = ix["cols_by_oid"].get(e.get("parent_relation_oid"), [])
+            parent_field = _column_names(parent_cols).get(str(e.get("parent_column_name")), _snake_name(e.get("parent_column_name"), "column"))
+            field = re.sub(r"_id$", "", child_field) or _snake_name(pmodel, "relation")
             lines.append(
-                f"  {field} {pmodel} @relation(fields: [{child_col}], references: [{e.get('parent_column_name')}])"
+                f"  {field} {pmodel} @relation(fields: [{child_field}], references: [{parent_field}])"
             )
         for e in children_of.get(oid, []):
             child = ix["rel_by_oid"].get(e.get("child_relation_oid"))
@@ -189,9 +217,9 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
             cmodel = _class_name(str(child.get("relation_name")))
             lines.append(f"  {cmodel[0].lower() + cmodel[1:]}s {cmodel}[]")
         if len(pk_cols) > 1:
-            ordered = [str(c.get("column_name")) for c in cols if str(c.get("column_name")) in pk_cols]
+            ordered = [col_names[str(c.get("column_name"))] for c in cols if str(c.get("column_name")) in pk_cols]
             lines.append(f"  @@id([{', '.join(ordered)}])")
-        lines.append(f'  @@map("{table}")')
+        lines.append(f"  @@map({json.dumps(table)})")
         lines.append("}")
     return "\n".join(lines) + "\n"
 
@@ -229,20 +257,27 @@ def generate_typeorm_entities(snapshot: dict[str, Any] | None) -> str:
         table = str(rel.get("relation_name"))
         schema = str(rel.get("schema_name"))
         cls = _class_name(table)
-        entity_args = f"'{table}'" if schema == "public" else f"{{ name: '{table}', schema: '{schema}' }}"
+        entity_args = json.dumps(table) if schema == "public" else f"{{ name: {json.dumps(table)}, schema: {json.dumps(schema)} }}"
         lines += ["", f"@Entity({entity_args})", f"export class {cls} {{"]
-        for col in ix["cols_by_oid"].get(oid, []):
+        cols = ix["cols_by_oid"].get(oid, [])
+        col_names = _column_names(cols)
+        for col in cols:
             name = str(col.get("column_name"))
+            field_name = col_names[name]
             raw_type = str(col.get("data_type") or "")
             ts_type = _map_type(raw_type, _TS_TYPES, "string")
             nullable = not col.get("is_not_null")
             is_pk = name in ix["pk_by_oid"].get(oid, set())
-            decorator = "@PrimaryColumn()" if is_pk else (
-                "@Column({ nullable: true })" if nullable else "@Column()"
-            )
+            options = []
+            if field_name != name:
+                options.append(f"name: {json.dumps(name)}")
+            if nullable and not is_pk:
+                options.append("nullable: true")
+            decorator = "@PrimaryColumn" if is_pk else "@Column"
+            decorator = f"{decorator}({{{', '.join(options)}}})" if options else f"{decorator}()"
             comment = "" if _map_type(raw_type, _TS_TYPES, "?") != "?" and ts_type != "string" or raw_type.lower().startswith(("text", "varchar", "char")) else f" // {raw_type}"
             lines.append(f"  {decorator}")
-            lines.append(f"  {name}{'?' if nullable else '!'}: {ts_type}{' | null' if nullable else ''};{comment}")
+            lines.append(f"  {field_name}{'?' if nullable else '!'}: {ts_type}{' | null' if nullable else ''};{comment}")
             lines.append("")
         for (child_oid, child_col), e in ix["fk_by_child"].items():
             if child_oid != oid:
@@ -251,9 +286,10 @@ def generate_typeorm_entities(snapshot: dict[str, Any] | None) -> str:
             if parent is None:
                 continue
             pcls = _class_name(str(parent.get("relation_name")))
-            field = re.sub(r"_id$", "", child_col) or pcls.lower()
+            child_field = col_names.get(child_col, _snake_name(child_col, "column"))
+            field = re.sub(r"_id$", "", child_field) or _snake_name(pcls, "relation")
             lines.append(f"  @ManyToOne(() => {pcls})")
-            lines.append(f"  @JoinColumn({{ name: '{child_col}' }})")
+            lines.append(f"  @JoinColumn({{ name: {json.dumps(child_col)} }})")
             lines.append(f"  {field}?: {pcls};")
             lines.append("")
         for e in children_of.get(oid, []):
