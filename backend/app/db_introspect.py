@@ -4,8 +4,14 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from app.dsn_redaction import redact_dsn_error_message
-from app.pg_introspect.introspect import introspect_postgres
+from app.pg_introspect.forward_ddl import validate_forward_ddl
+from app.pg_introspect.introspect import (
+    apply_postgres_ddl,
+    introspect_postgres,
+    probe_postgres,
+)
 from app.snowflake_introspect import introspect_snowflake
+from app.snowflake_introspect.introspect import probe_snowflake
 
 DatabaseDialect = Literal["postgresql", "snowflake"]
 
@@ -29,6 +35,43 @@ async def introspect_database(dsn: str, schema_filter: str | None) -> dict:
         if dialect == "snowflake":
             return await introspect_snowflake(dsn, schema_filter)
         return await introspect_postgres(dsn, schema_filter)
+    except Exception as exc:
+        message = str(exc) or type(exc).__name__
+        raise RuntimeError(redact_dsn_error_message(message, dsn)) from None
+
+
+async def apply_database_sql(dsn: str, sql: str, dry_run: bool = True) -> None:
+    """Forward engineering: apply allow-listed DDL to a target database.
+
+    PostgreSQL only for now (Snowflake DDL apply differs and is connector-gated).
+    User-provided text is first reduced to a validated DDL batch; arbitrary SQL
+    execution is rejected before opening a database connection. Errors are
+    DSN-redacted so credentials never surface in an API response.
+    """
+
+    try:
+        dialect = detect_dsn_dialect(dsn)
+        if dialect != "postgresql":
+            raise ValueError("forward apply is only supported for PostgreSQL")
+        ddl = validate_forward_ddl(sql)
+        await apply_postgres_ddl(dsn, ddl, dry_run=dry_run)
+    except Exception as exc:
+        message = str(exc) or type(exc).__name__
+        raise RuntimeError(redact_dsn_error_message(message, dsn)) from None
+
+
+async def probe_database(dsn: str) -> str:
+    """Lightweight connectivity probe; returns the server version string.
+
+    Reuses the dialect introspectors' SSRF-guarded connection setup. Errors are
+    DSN-redacted so credentials never surface in an API response.
+    """
+
+    try:
+        dialect = detect_dsn_dialect(dsn)
+        if dialect == "snowflake":
+            return await probe_snowflake(dsn)
+        return await probe_postgres(dsn)
     except Exception as exc:
         message = str(exc) or type(exc).__name__
         raise RuntimeError(redact_dsn_error_message(message, dsn)) from None
