@@ -25,7 +25,7 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -51,6 +51,10 @@ def canonicalize_permissions(raw: str) -> str:
         if cleaned:
             seen.setdefault(cleaned, None)
     return ",".join(seen)
+
+
+def _path_segment(value: str) -> str:
+    return quote(value, safe="")
 
 
 _H_TENANT = "X-Clearfolio-Tenant-Id"
@@ -174,18 +178,25 @@ async def submit_conversion_job(
 async def get_job_status(subject_id: str, job_id: str) -> dict[str, Any]:
     """GET /api/v1/convert/jobs/{jobId} — read conversion lifecycle status."""
     config = ClearfolioConfig.from_settings()
-    return await _request(config, "GET", f"/api/v1/convert/jobs/{job_id}", subject_id)
+    return await _request(
+        config, "GET", f"/api/v1/convert/jobs/{_path_segment(job_id)}", subject_id
+    )
 
 
 async def get_viewer_bootstrap(subject_id: str, doc_id: str) -> dict[str, Any]:
     """GET /api/v1/viewer/{docId} — viewer bootstrap (signed previewResourcePath)."""
     config = ClearfolioConfig.from_settings()
-    return await _request(config, "GET", f"/api/v1/viewer/{doc_id}", subject_id)
+    return await _request(
+        config, "GET", f"/api/v1/viewer/{_path_segment(doc_id)}", subject_id
+    )
 
 
 async def create_artifact_link(subject_id: str, doc_id: str) -> dict[str, Any]:
     """POST /api/v1/viewer/{docId}/artifact-links — short-lived signed artifact URL."""
     config = ClearfolioConfig.from_settings()
     return await _request(
-        config, "POST", f"/api/v1/viewer/{doc_id}/artifact-links", subject_id
+        config,
+        "POST",
+        f"/api/v1/viewer/{_path_segment(doc_id)}/artifact-links",
+        subject_id,
     )

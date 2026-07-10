@@ -99,6 +99,33 @@ async def test_http_error_becomes_clearfolio_error(monkeypatch):
         await cf.get_viewer_bootstrap("dev:alice", "doc-1")
 
 
+@pytest.mark.asyncio
+async def test_ids_are_url_encoded_as_path_segments(monkeypatch):
+    monkeypatch.setattr(cf.settings, "clearfolio_gateway_url", "https://cf.example.com")
+    monkeypatch.setattr(cf.settings, "clearfolio_tenant_claims_hmac_secret", SECRET)
+    captured = []
+
+    async def fake_validate(config):
+        return None
+
+    async def fake_request(self, method, url, headers=None, files=None):
+        captured.append((method, url))
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(cf, "_validate_gateway", fake_validate)
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+
+    await cf.get_job_status("dev:alice", "../job 1?x=y")
+    await cf.get_viewer_bootstrap("dev:alice", "folder/doc 1")
+    await cf.create_artifact_link("dev:alice", "folder/doc 1")
+
+    assert captured == [
+        ("GET", "https://cf.example.com/api/v1/convert/jobs/..%2Fjob%201%3Fx%3Dy"),
+        ("GET", "https://cf.example.com/api/v1/viewer/folder%2Fdoc%201"),
+        ("POST", "https://cf.example.com/api/v1/viewer/folder%2Fdoc%201/artifact-links"),
+    ]
+
+
 def test_permissions_canonicalized_to_match_clearfolio():
     # messy config: spaces, a duplicate, a trailing empty entry
     messy = " viewer:read , job:create,viewer:read, job:read ,"
