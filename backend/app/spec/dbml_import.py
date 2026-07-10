@@ -23,16 +23,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# Match the ``Table <name>`` head only, then validate the remainder with plain
-# string ops in ``_table_header_tail_ok``. A single greedy ``.*`` for the tail
-# has no ambiguous, adjacent whitespace quantifiers, so matching stays strictly
-# linear in the line length. The previous ``(?:\s+as\s+\w+)?\s*\{?\s*$`` tail
-# back-tracked polynomially on inputs like ``"table ." + " " * n`` (CodeQL
-# py/polynomial-redos).
-_TABLE_RE = re.compile(
-    r"^table\s+(?:\"(?P<qname>[^\"]+)\"|(?P<name>[\w.]+))(?P<tail>.*)$",
-    re.IGNORECASE,
-)
 _COLUMN_RE = re.compile(
     r"^(?:\"(?P<qname>[^\"]+)\"|(?P<name>\w+))\s+"
     r"(?P<type>[\w]+(?:\([^)]*\))?(?:\[\])?)"
@@ -49,13 +39,36 @@ _INLINE_REF_RE = re.compile(rf"ref:\s*(?P<op>[<>-])\s*(?P<to>{_PATH})", re.IGNOR
 _PATH_SEGMENT_RE = re.compile(r'"[^"]+"|[^.]+')
 
 
+def _consume_table_name(line: str, start: int) -> tuple[str, int] | None:
+    """Return the table identifier and the offset after it, using only linear scans."""
+    if start >= len(line):
+        return None
+    if line[start] == '"':
+        end = line.find('"', start + 1)
+        if end <= start + 1:
+            return None
+        return line[start + 1 : end], end + 1
+
+    pos = start
+    while pos < len(line) and (line[pos].isalnum() or line[pos] in "_."):
+        pos += 1
+    if pos == start:
+        return None
+
+    raw = line[start:pos]
+    parts = raw.split(".")
+    if any(part == "" for part in parts):
+        return None
+    return raw, pos
+
+
 def _table_header_tail_ok(tail: str) -> bool:
     """Validate what may follow a ``Table <name>`` header on the same line.
 
     Grammar (whitespace-insensitive): an optional ``as <alias>`` rename followed
     by an optional opening ``{`` (dbdiagram also allows the brace on the next
     line). Implemented with plain string scanning rather than a regex so there
-    is no back-tracking — the ReDoS-safe counterpart to ``_TABLE_RE``.
+    is no backtracking.
     """
     rest = tail.strip()
     if not rest:
@@ -71,6 +84,22 @@ def _table_header_tail_ok(tail: str) -> bool:
             return False
         rest = rest[alias_len:].lstrip()
     return rest in ("", "{")
+
+
+def _parse_table_header(line: str) -> tuple[str, str] | None:
+    """Parse ``Table [schema.]name`` headers without regex backtracking."""
+    if len(line) < 6 or line[:5].lower() != "table" or not line[5].isspace():
+        return None
+    pos = 5
+    while pos < len(line) and line[pos].isspace():
+        pos += 1
+    consumed = _consume_table_name(line, pos)
+    if consumed is None:
+        return None
+    raw_name, pos = consumed
+    if not _table_header_tail_ok(line[pos:]):
+        return None
+    return _split_table_name(raw_name)
 
 
 def _split_table_name(raw: str) -> tuple[str, str]:
@@ -126,9 +155,9 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 in_ignored_block = 1  # block opens on a following line
             continue
 
-        m = _TABLE_RE.match(line)
-        if m and _table_header_tail_ok(m.group("tail")):
-            schema, name = _split_table_name(m.group("qname") or m.group("name"))
+        table_name = _parse_table_header(line)
+        if table_name is not None:
+            schema, name = table_name
             current = (schema, name)
             if current not in oid_by_table:
                 oid_by_table[current] = next_oid
