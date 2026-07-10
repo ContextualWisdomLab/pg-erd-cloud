@@ -62,7 +62,11 @@ async def _get_authorized_snapshot(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser,
 ) -> SchemaSnapshot | None:
-    """Fetch a snapshot only after project membership has been checked."""
+    """Fetch a snapshot only after project membership has been checked.
+
+    A missing snapshot and a snapshot in another project both return ``None`` so
+    UUID-based read endpoints cannot be used to enumerate snapshot existence.
+    """
 
     project_space_uuid = await session.scalar(
         select(SchemaSnapshot.project_space_uuid).where(
@@ -143,7 +147,12 @@ async def get_snapshot(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
-    """Get a snapshot's status and (if present) captured JSON."""
+    """Get a project-authorized snapshot status and captured JSON.
+
+    The snapshot payload is loaded only after ``_get_authorized_snapshot`` has
+    verified project membership. Missing and unauthorized snapshots share the
+    same not-found response.
+    """
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
         return _snapshot_not_found(schema_snapshot_uuid)
