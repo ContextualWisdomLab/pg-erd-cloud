@@ -1,7 +1,7 @@
 import datetime as dt
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -41,6 +41,7 @@ async def test_delete_annotation_returns_404_when_missing_or_unauthorized():
 @pytest.mark.asyncio
 async def test_upsert_creates_new_annotation_when_absent():
     session = AsyncMock()
+    session.add = Mock()
     session.scalar = AsyncMock(return_value=None)  # no existing row
     body = TableAnnotationUpsertIn(
         schema_name="public", relation_name="orders", body="핵심 주문 테이블"
@@ -64,6 +65,7 @@ async def test_upsert_creates_new_annotation_when_absent():
 @pytest.mark.asyncio
 async def test_upsert_updates_existing_annotation_without_insert():
     session = AsyncMock()
+    session.add = Mock()
     now = dt.datetime.now(dt.timezone.utc)
     existing = SimpleNamespace(
         table_annotation_uuid=uuid.uuid4(),

@@ -1,7 +1,7 @@
 import datetime as dt
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -34,6 +34,7 @@ def test_hash_is_deterministic_and_not_reversible():
 @pytest.mark.asyncio
 async def test_create_returns_secret_once_and_stores_only_hash():
     session = AsyncMock()
+    session.add = Mock()
     user = _user()
     out = await create_api_key(
         body=ApiKeyCreateIn(key_name="ci"), user=user, session=session
