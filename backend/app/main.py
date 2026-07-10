@@ -85,7 +85,7 @@ _llm_draft_rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=10,  # Stricter rate limit for LLM generation
     window_seconds=60,
-    route_prefix="/api/snapshots", # This captures the LLM snapshot endpoints
+    route_prefix="/api/snapshots",  # This captures the LLM snapshot endpoints
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
 
@@ -109,11 +109,6 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     route_prefix="/api/auth/logout",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
-
-# Apply middlewares in reverse order (outermost first)
-# Wait, Starlette middleware order: the **last** registered middleware wraps earlier ones
-# Rate limit middlewares wrap each other. We must be careful that route_prefix overlapping
-# behaves correctly. Starlette executes from bottom up.
 
 app.middleware("http")(
     make_rate_limit_middleware(

@@ -75,6 +75,7 @@ def test_encrypt_decrypt_with_mocked_secret() -> None:
         with pytest.raises(InvalidTag):
             decrypt_text(blob.ciphertext, blob.nonce)
 
+
 def test_decrypt_text_fallback() -> None:
     from app.security import settings, decrypt_text
     import os

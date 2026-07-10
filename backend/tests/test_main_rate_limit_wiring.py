@@ -8,7 +8,9 @@ from app.csrf import CSRF_HEADER_NAME, generate_csrf_token
 from app.settings import settings
 
 
-def test_logout_route_uses_tighter_revocation_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_logout_route_uses_tighter_revocation_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     main_app._rate_limiter._buckets.clear()
     main_app._share_link_rate_limiter._buckets.clear()
     main_app._revoke_rate_limiter._buckets.clear()
