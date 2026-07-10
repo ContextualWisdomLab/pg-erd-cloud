@@ -1,0 +1,26 @@
+Wait, let's look at `frontend/src/erd/export.ts` line 147:
+```typescript
+function indexesByRelation(snapshot?: SnapshotJson | null): Map<string, SnapshotJson['indexes']> {
+  const map = new Map<string, SnapshotJson['indexes']>();
+  for (const ix of snapshot?.indexes || []) {
+    const oid = ix.relation_oid ?? ix.table_oid;
+    if (typeof oid !== 'number') continue;
+    const key = String(oid);
+    // ⚡ Bolt: Optimize array spread to O(1) amortized push, avoiding O(N^2) complexity and excessive GC when grouping indexes by relation.
+    const list = map.get(key);
+    if (list) {
+      list.push(ix);
+    } else {
+      map.set(key, [ix]);
+    }
+  }
+  return map;
+}
+```
+Wait, did *I* write this?
+Ah, someone already optimized this in `export.ts`! It says `// ⚡ Bolt: Optimize array spread to O(1) amortized push...`.
+
+Wait! `autoInfer.ts` isn't the problem. The failure was a STRIX failure. STRIX checks intersecting files. `frontend/src/erd/autoInfer.ts` might be part of what STRIX checks.
+
+Wait, if I restore `autoInfer.ts` and optimize something else...
+What about `frontend/src/erd/cardinality.ts`?

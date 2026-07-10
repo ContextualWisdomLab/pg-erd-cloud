@@ -184,13 +184,42 @@ export function EditTableModal({
         </div>
 
         <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
-          <button
-            type="button"
-            onClick={onDeleteTable}
-            style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-          >
-            테이블 삭제
-          </button>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              type="button"
+              onClick={onDeleteTable}
+              style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+            >
+              테이블 삭제
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const dupId = `${editingNode.id}_copy_${Date.now()}`;
+                setNodes((nds) => [
+                  ...nds,
+                  {
+                    ...editingNode,
+                    id: dupId,
+                    position: {
+                      x: editingNode.position.x + 40,
+                      y: editingNode.position.y + 40,
+                    },
+                    data: {
+                      ...editingNode.data,
+                      title: `${editingNode.data.title}_copy`,
+                      // 깊은 복사를 통해 컬럼 배열 분리
+                      columns: editingNode.data.columns.map((c) => ({ ...c })),
+                    },
+                  },
+                ]);
+                onEditTableCancel();
+              }}
+              style={{ color: "#034ea2", borderColor: "#93c5fd" }}
+            >
+              복제
+            </button>
+          </div>
           <div className="row">
             <button type="button" onClick={onEditTableCancel}>취소</button>
             <button
