@@ -51,6 +51,10 @@ def apply_security_headers(request: Request, response: Response) -> None:
     _set_if_missing("X-Content-Type-Options", "nosniff")
     _set_if_missing("X-Frame-Options", "DENY")
     _set_if_missing("Referrer-Policy", "no-referrer")
+    # Defense in depth: API responses can carry sensitive data (DB connection
+    # info, schema snapshots, auth payloads). Prevent intermediary proxies,
+    # CDNs, and browser caches from persisting them.
+    _set_if_missing("Cache-Control", "no-store")
     _set_if_missing(
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=()",
