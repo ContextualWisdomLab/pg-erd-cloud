@@ -18,14 +18,21 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    InferredRelationshipOut,
+    MigrationSafetyOut,
     NamingLintOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
+    SnapshotDiffOut,
     SnapshotOut,
     WideTablesOut,
 )
 from app.ddl.export import snapshot_json_to_sql
+from app.ddl.migration import snapshot_diff_to_migration_sql
+from app.ddl.migration_safety import analyze_migration_safety
+from app.diff.schema_diff import diff_snapshots
 from app.spec.naming_lint import lint_naming
+from app.spec.relationship_inference import infer_relationships
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -57,7 +64,11 @@ async def _get_authorized_snapshot(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser,
 ) -> SchemaSnapshot | None:
-    """Fetch a snapshot only after project membership has been checked."""
+    """Fetch a snapshot only after project membership has been checked.
+
+    A missing snapshot and a snapshot in another project both return ``None`` so
+    UUID-based read endpoints cannot be used to enumerate snapshot existence.
+    """
 
     project_space_uuid = await session.scalar(
         select(SchemaSnapshot.project_space_uuid).where(
@@ -138,7 +149,12 @@ async def get_snapshot(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
-    """Get a snapshot's status and (if present) captured JSON."""
+    """Get a project-authorized snapshot status and captured JSON.
+
+    The snapshot payload is loaded only after ``_get_authorized_snapshot`` has
+    verified project membership. Missing and unauthorized snapshots share the
+    same not-found response.
+    """
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
         return _snapshot_not_found(schema_snapshot_uuid)
@@ -149,6 +165,151 @@ async def get_snapshot(
         schema_filter=snap.schema_filter,
         error_message=snap.error_message,
         snapshot_json=data.snapshot_json if data else None,
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/inferred-relationships",
+    response_model=list[InferredRelationshipOut],
+)
+async def inferred_relationships(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> list[InferredRelationshipOut]:
+    """Suggest implicit (undeclared) foreign keys inferred from naming.
+
+    Useful for reverse-engineering databases that never declared their FKs.
+    Returns an empty list for missing/unauthorized snapshots (uniform response).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return []
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return []
+    return [
+        InferredRelationshipOut(**rel)
+        for rel in infer_relationships(data.snapshot_json)
+    ]
+
+
+@router.get("/{schema_snapshot_uuid}/diff", response_model=SnapshotDiffOut)
+async def diff_snapshot(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to compare this snapshot against"
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SnapshotDiffOut:
+    """Diff this snapshot (target) against another (base).
+
+    Both snapshots are authorized independently via project membership, so a
+    caller can only diff snapshots they may already read. If either is missing
+    or unauthorized, a uniform ``not_found`` response is returned so existence
+    cannot be enumerated.
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return SnapshotDiffOut(
+            base_snapshot_uuid=against,
+            target_snapshot_uuid=schema_snapshot_uuid,
+            status="not_found",
+            diff=None,
+        )
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    diff = diff_snapshots(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+    )
+    return SnapshotDiffOut(
+        base_snapshot_uuid=against,
+        target_snapshot_uuid=schema_snapshot_uuid,
+        status="ok",
+        diff=diff,
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/migration-safety", response_model=MigrationSafetyOut
+)
+async def migration_safety(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to analyze migrating from"
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> MigrationSafetyOut:
+    """Risk-classify the migration from the base snapshot to this one.
+
+    Each change is labelled safe / warning / destructive with an explanation so
+    a reviewer can spot data loss and table-locking operations before applying.
+    Both snapshots are authorized independently (uniform not-found).
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return MigrationSafetyOut(
+            base_snapshot_uuid=against,
+            target_snapshot_uuid=schema_snapshot_uuid,
+            status="not_found",
+            analysis=None,
+        )
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    analysis = analyze_migration_safety(
+        base_data.snapshot_json if base_data else None,
+        target_data.snapshot_json if target_data else None,
+    )
+    return MigrationSafetyOut(
+        base_snapshot_uuid=against,
+        target_snapshot_uuid=schema_snapshot_uuid,
+        status="ok",
+        analysis=analysis,
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
+async def export_migration_sql(
+    schema_snapshot_uuid: uuid.UUID,
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to migrate from"
+    ),
+    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
+    direction: str = Query(
+        "up",
+        pattern="^(up|down)$",
+        description="up = base→target (apply), down = target→base (rollback)",
+    ),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate migration SQL between the base and this (target) snapshot.
+
+    ``direction=up`` (default) moves base → target; ``direction=down`` emits the
+    rollback (target → base) — the same generator with the endpoints swapped, so
+    up and down are always exact mirrors. Both snapshots are authorized
+    independently via project membership; a uniform not-found marker is returned
+    if either is missing/unauthorized so existence cannot be enumerated.
+    """
+    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    base_snap = await _get_authorized_snapshot(session, against, user)
+    if target_snap is None or base_snap is None:
+        return "-- snapshot not found\n"
+    base_data = await session.get(SchemaSnapshotData, against)
+    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    base_json = base_data.snapshot_json if base_data else None
+    target_json = target_data.snapshot_json if target_data else None
+    if direction == "down":
+        base_json, target_json = target_json, base_json
+    return snapshot_diff_to_migration_sql(
+        base_json,
+        target_json,
+        target_dialect=dialect,
     )
 
 

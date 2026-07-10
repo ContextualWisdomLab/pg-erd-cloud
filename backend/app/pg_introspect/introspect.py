@@ -91,6 +91,17 @@ async def _connect_guarded_postgres(
     return await asyncpg.connect(dsn, host=connect_host, timeout=timeout)
 
 
+async def probe_postgres(dsn: str) -> str:
+    """SSRF-guarded connectivity check: connect and return the server version."""
+
+    conn = await _connect_guarded_postgres(dsn, timeout=10)
+    try:
+        await conn.fetchval("SELECT 1")
+        return str(await conn.fetchval("SHOW server_version"))
+    finally:
+        await conn.close()
+
+
 async def apply_postgres_ddl(
     dsn: str, ddl: ForwardDdlBatch, dry_run: bool = True
 ) -> None:
