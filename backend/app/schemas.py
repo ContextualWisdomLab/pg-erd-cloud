@@ -107,6 +107,29 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class SnapshotDiffOut(BaseModel):
+    """Structured diff between two schema snapshots.
+
+    ``status`` is ``"not_found"`` when either snapshot is missing or the caller
+    is not authorized for it (uniform response avoids existence enumeration);
+    ``"ok"`` with a populated ``diff`` otherwise.
+    """
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    diff: dict | None
+
+
+class MigrationSafetyOut(BaseModel):
+    """Risk-classified analysis of migrating one snapshot to another."""
+
+    base_snapshot_uuid: uuid.UUID
+    target_snapshot_uuid: uuid.UUID
+    status: str
+    analysis: dict | None
+
+
 class MeOut(BaseModel):
     """Current user payload returned by /me."""
 
