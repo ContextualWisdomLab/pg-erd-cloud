@@ -139,6 +139,14 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class SchemaStatsOut(BaseModel):
+    """Overview statistics for a schema snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    stats: dict | None
+
+
 class FkCyclesOut(BaseModel):
     """Circular foreign-key dependency findings for a snapshot."""
 

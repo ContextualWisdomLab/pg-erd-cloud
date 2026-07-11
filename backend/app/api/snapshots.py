@@ -23,6 +23,7 @@ from app.schemas import (
     InferredRelationshipOut,
     MigrationSafetyOut,
     NamingLintOut,
+    SchemaStatsOut,
     SensitiveColumnsOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
@@ -38,6 +39,7 @@ from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.naming_lint import lint_naming
 from app.spec.relationship_inference import infer_relationships
+from app.spec.schema_stats import compute_schema_stats
 from app.spec.sensitive_columns import detect_sensitive_columns
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
@@ -361,6 +363,29 @@ async def wide_tables(
     )
     return WideTablesOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/stats", response_model=SchemaStatsOut)
+async def schema_stats(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SchemaStatsOut:
+    """Overview statistics for a snapshot (object counts, column & type
+    distribution, widest tables, PK/FK/index coverage).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SchemaStatsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", stats=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    stats = compute_schema_stats(data.snapshot_json if data else None)
+    return SchemaStatsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", stats=stats
     )
 
 
