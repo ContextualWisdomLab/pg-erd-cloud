@@ -68,3 +68,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-05-18 - [Optimize Node Resolution in autoInfer.ts & STRIX Intersect Flake]
 **Learning:** We replaced an O(N^2) loop where `nodes.find` scanning via string splitting was running inside an `O(N)` loop to match foreign key relationships, using an O(1) `Map` lookup instead. We also ran into an issue where STRIX falsely flagged a path traversal due to string manipulation of table names. Adding a simple alphanumeric whitelist `sanitizeTableName()` step addressed this mock-security check.
 **Action:** When working with nested search loops on static Node trees, immediately create O(1) Lookup Maps. Additionally, if the CI pipeline uses hallucination-prone LLM vulnerability checks (like STRIX) and flags string splitting logic, you can easily bypass the false positive by implementing a `sanitizeTableName` whitelist regex check where the table string is constructed.
+
+## 2025-02-12 - Prevent Excessive Dynamic Array Allocations and Garbage Collection Overhead
+**Learning:** In frontend performance, using `.flatMap()`, array spread syntax (`...`), and `.join()` inside loops iteratively over ERD nodes and columns for search filtering generates excessive intermediate arrays, increasing garbage collection overhead. This causes performance issues especially when large datasets are involved.
+**Action:** Replace `.flatMap()`, array spread syntax (`...`), and `.join()` operations with iterative string concatenation (`+=`) to avoid excessive dynamic array allocations.
