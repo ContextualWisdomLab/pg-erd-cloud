@@ -139,6 +139,54 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class SchemaStatsOut(BaseModel):
+    """Overview statistics for a schema snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    stats: dict | None
+
+
+class FkCyclesOut(BaseModel):
+    """Circular foreign-key dependency findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
+class SensitiveColumnsOut(BaseModel):
+    """Compliance-scoping inventory of likely-sensitive columns."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
+class AuditColumnsOut(BaseModel):
+    """Audit-column (created_at/updated_at) convention findings."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
+class ConstraintInventoryOut(BaseModel):
+    """CHECK-rule inventory and FK delete-action risks for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
+class IndexRedundancyOut(BaseModel):
+    """Duplicate / prefix-redundant index findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
@@ -232,6 +280,23 @@ class NamingLintOut(BaseModel):
     schema_snapshot_uuid: uuid.UUID
     status: str
     report: dict | None
+
+
+class DbmlConvertIn(BaseModel):
+    """Request body for converting DBML text into a snapshot."""
+
+    dbml: str = Field(min_length=1, max_length=524_288)
+    include_ddl: bool = True
+    dialect: Literal["postgresql", "snowflake"] = "postgresql"
+
+
+class DbmlConvertOut(BaseModel):
+    """DBML conversion result: snapshot JSON plus optional DDL."""
+
+    snapshot_json: dict
+    ddl: str | None = None
+    tables: int
+    foreign_keys: int
 
 
 class ApiKeyCreateIn(BaseModel):
