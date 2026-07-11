@@ -147,6 +147,14 @@ class FkCyclesOut(BaseModel):
     report: dict | None
 
 
+class SensitiveColumnsOut(BaseModel):
+    """Compliance-scoping inventory of likely-sensitive columns."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
