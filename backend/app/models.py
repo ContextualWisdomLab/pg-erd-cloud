@@ -3,7 +3,15 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, Text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -185,6 +193,75 @@ class JobQueue(Base):
     __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
 
 
+class DiagramView(Base):
+    """A saved ERD canvas view (node layout + hidden tables) for a project."""
+
+    __tablename__ = "diagram_view"
+
+    diagram_view_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(Text())
+    # Opaque, client-defined layout payload (node positions, hidden tables,
+    # viewport). Stored as JSONB; the API bounds its size.
+    layout_json: Mapped[dict] = mapped_column(JSONB())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class TableAnnotation(Base):
+    """A user note attached to a table within a project.
+
+    Tables are identified by ``(schema_name, relation_name)`` -- never by the
+    volatile ``relation_oid``, which is reassigned on every introspection run.
+    At most one annotation exists per (project, schema, table).
+    """
+
+    __tablename__ = "table_annotation"
+
+    table_annotation_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    schema_name: Mapped[str] = mapped_column(Text())
+    relation_name: Mapped[str] = mapped_column(Text())
+    body: Mapped[str] = mapped_column(Text())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid",
+            "schema_name",
+            "relation_name",
+            name="uq_table_annotation__project_table",
+        ),
+    )
+
+
 class ShareLink(Base):
     """Public share link granting read access to a project's snapshots."""
 
@@ -208,4 +285,34 @@ class ShareLink(Base):
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
+    )
+
+
+class ApiKey(Base):
+    """A long-lived API key for programmatic access (CI/CD, SDKs).
+
+    Only a PBKDF2-HMAC hash of the secret is stored; the plaintext is shown once
+    at creation. ``key_prefix`` (the first characters of the token) lets users
+    recognize a key without exposing it. Revocation is a timestamp so it is
+    auditable and cannot be un-revoked silently.
+    """
+
+    __tablename__ = "api_key"
+
+    api_key_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_account_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    key_name: Mapped[str] = mapped_column(Text())
+    key_hash: Mapped[str] = mapped_column(Text(), unique=True, index=True)
+    key_prefix: Mapped[str] = mapped_column(Text())
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
