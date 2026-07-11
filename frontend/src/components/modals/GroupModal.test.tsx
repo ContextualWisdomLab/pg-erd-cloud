@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { GroupModal } from './GroupModal';
 
@@ -42,4 +42,5 @@ describe('GroupModal', () => {
     expect(tableLabel).toHaveAttribute('title', tableName);
     expect(tableLabel).not.toHaveAttribute('tabindex', '0');
   });
-});
+
+  });

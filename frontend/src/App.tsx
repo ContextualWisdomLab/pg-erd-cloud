@@ -890,7 +890,17 @@ export default function App() {
   }
 
 
+
+  function onClearAll() {
+    if (nodes.length === 0) return;
+    if (window.confirm("모든 테이블과 관계를 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+      setNodes([]);
+      setEdges([]);
+    }
+  }
+
   function onAddTableSubmit() {
+
     if (!newTableName.trim()) return;
     const newId = `new_table_${Date.now()}`;
 
@@ -1449,6 +1459,16 @@ export default function App() {
               aria-label="업무 그룹"
             >
               ◇
+            </button>
+            <button
+              type="button"
+              onClick={onClearAll}
+              disabled={nodes.length === 0}
+              title={nodes.length === 0 ? "지울 항목이 없습니다" : "전체 지우기"}
+              aria-label="전체 지우기"
+              style={{ color: "#b91c1c" }}
+            >
+              지우기
             </button>
             <button
               type="button"
