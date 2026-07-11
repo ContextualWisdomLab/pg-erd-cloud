@@ -171,6 +171,22 @@ class AuditColumnsOut(BaseModel):
     report: dict | None
 
 
+class ConstraintInventoryOut(BaseModel):
+    """CHECK-rule inventory and FK delete-action risks for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
+class IndexRedundancyOut(BaseModel):
+    """Duplicate / prefix-redundant index findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
