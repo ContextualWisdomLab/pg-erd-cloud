@@ -19,7 +19,10 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    AuditColumnsOut,
+    ConstraintInventoryOut,
     FkCyclesOut,
+    IndexRedundancyOut,
     InferredRelationshipOut,
     MigrationSafetyOut,
     NamingLintOut,
@@ -35,7 +38,10 @@ from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
 from app.ddl.migration_safety import analyze_migration_safety
 from app.diff.schema_diff import diff_snapshots
+from app.spec.audit_columns import check_audit_columns
+from app.spec.constraint_inventory import build_constraint_inventory
 from app.spec.fk_cycles import detect_fk_cycles
+from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.naming_lint import lint_naming
 from app.spec.relationship_inference import infer_relationships
@@ -434,6 +440,81 @@ async def sensitive_columns(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = detect_sensitive_columns(data.snapshot_json if data else None)
     return SensitiveColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/audit-columns", response_model=AuditColumnsOut)
+async def audit_columns(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> AuditColumnsOut:
+    """Flag tables missing created_at/updated_at when the schema's own
+    majority follows that convention (no external style imposed).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return AuditColumnsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = check_audit_columns(data.snapshot_json if data else None)
+    return AuditColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/constraint-inventory",
+    response_model=ConstraintInventoryOut,
+)
+async def constraint_inventory(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> ConstraintInventoryOut:
+    """Inventory CHECK-constraint business rules and FK delete-action risks
+    (ON DELETE CASCADE = warning, SET NULL = info).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return ConstraintInventoryOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_constraint_inventory(data.snapshot_json if data else None)
+    return ConstraintInventoryOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/index-redundancy", response_model=IndexRedundancyOut
+)
+async def index_redundancy(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> IndexRedundancyOut:
+    """Report duplicate and prefix-shadowed indexes (safe drop candidates).
+
+    Unique indexes are never suggested for dropping (they enforce constraints);
+    expression/partial indexes are skipped rather than guessed.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return IndexRedundancyOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_index_redundancy(data.snapshot_json if data else None)
+    return IndexRedundancyOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
