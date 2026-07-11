@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Literal
 
@@ -138,6 +139,49 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class DiagramViewCreateIn(BaseModel):
+    """Request body for saving an ERD canvas view."""
+
+    name: str = Field(min_length=1, max_length=200)
+    # Opaque client layout (node positions, hidden tables, viewport). The API
+    # bounds the serialized size in the endpoint to prevent abuse.
+    layout_json: dict
+
+
+class DiagramViewOut(BaseModel):
+    """Diagram view summary."""
+
+    diagram_view_uuid: uuid.UUID
+    name: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+class DiagramViewDetailOut(DiagramViewOut):
+    """Diagram view including its layout payload."""
+
+    layout_json: dict
+
+
+class TableAnnotationUpsertIn(BaseModel):
+    """Request body for creating/updating a table annotation."""
+
+    schema_name: str = Field(min_length=1, max_length=255)
+    relation_name: str = Field(min_length=1, max_length=255)
+    body: str = Field(min_length=1, max_length=10_000)
+
+
+class TableAnnotationOut(BaseModel):
+    """A table annotation."""
+
+    table_annotation_uuid: uuid.UUID
+    schema_name: str
+    relation_name: str
+    body: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
 class InferredRelationshipOut(BaseModel):
     """An implicit (undeclared) foreign-key relationship inferred from names."""
 
@@ -188,3 +232,25 @@ class NamingLintOut(BaseModel):
     schema_snapshot_uuid: uuid.UUID
     status: str
     report: dict | None
+
+
+class ApiKeyCreateIn(BaseModel):
+    """Request body for creating an API key."""
+
+    key_name: str = Field(min_length=1, max_length=128)
+
+
+class ApiKeyOut(BaseModel):
+    """API key metadata (never contains the secret)."""
+
+    api_key_uuid: uuid.UUID
+    key_name: str
+    key_prefix: str
+    created_at: dt.datetime
+    revoked_at: dt.datetime | None
+
+
+class ApiKeyCreatedOut(ApiKeyOut):
+    """Creation response: includes the secret exactly once."""
+
+    secret: str
