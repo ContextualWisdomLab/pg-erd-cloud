@@ -14,3 +14,5 @@
 
 ### 변경됨
 - `GroupModal` 테스트 코드 구조를 개선하여 안정성을 높였습니다.
+
+- GroupModal.test.tsx에서 불필요한 import(`fireEvent`)를 제거하여 코드 유지보수성을 개선했습니다.
