@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    AuditColumnsOut,
     ConstraintInventoryOut,
     FkCyclesOut,
     IndexRedundancyOut,
@@ -37,6 +38,7 @@ from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
 from app.ddl.migration_safety import analyze_migration_safety
 from app.diff.schema_diff import diff_snapshots
+from app.spec.audit_columns import check_audit_columns
 from app.spec.constraint_inventory import build_constraint_inventory
 from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.index_redundancy import detect_index_redundancy
@@ -438,6 +440,29 @@ async def sensitive_columns(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = detect_sensitive_columns(data.snapshot_json if data else None)
     return SensitiveColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/audit-columns", response_model=AuditColumnsOut)
+async def audit_columns(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> AuditColumnsOut:
+    """Flag tables missing created_at/updated_at when the schema's own
+    majority follows that convention (no external style imposed).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return AuditColumnsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = check_audit_columns(data.snapshot_json if data else None)
+    return AuditColumnsOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
