@@ -189,6 +189,7 @@ export function EditTableModal({
               type="button"
               onClick={onDeleteTable}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+              aria-label={`${editingNode.data.title} 테이블 삭제`}
             >
               테이블 삭제
             </button>
@@ -216,16 +217,24 @@ export function EditTableModal({
                 onEditTableCancel();
               }}
               style={{ color: "#034ea2", borderColor: "#93c5fd" }}
+              aria-label={`${editingNode.data.title} 테이블 복제`}
             >
               복제
             </button>
           </div>
           <div className="row">
-            <button type="button" onClick={onEditTableCancel}>취소</button>
+            <button
+              type="button"
+              onClick={onEditTableCancel}
+              aria-label={`${editingNode.data.title} 테이블 편집 취소`}
+            >
+              취소
+            </button>
             <button
               type="submit"
               form="editTableForm"
               style={{ background: "#034ea2", color: "#fff" }}
+              aria-label={`${editingNode.data.title} 테이블 편집 저장`}
             >
               저장
             </button>
