@@ -139,6 +139,14 @@ class WideTablesOut(BaseModel):
     report: dict | None
 
 
+class FkCyclesOut(BaseModel):
+    """Circular foreign-key dependency findings for a snapshot."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class SensitiveColumnsOut(BaseModel):
     """Compliance-scoping inventory of likely-sensitive columns."""
 
