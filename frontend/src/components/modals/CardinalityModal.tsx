@@ -161,6 +161,7 @@ export function CardinalityModal({
                     </td>
                     <td>
                       <input
+                        aria-label={`${column.column_name} distinct count`}
                         id={inputId}
                         inputMode="numeric"
                         min="1"
@@ -225,6 +226,7 @@ export function CardinalityModal({
                   onClick={() =>
                     onApplyCardinalityRecommendation(recommendation)
                   }
+                  aria-label={`${recommendation.index_name} 추천 ${isApplied ? "적용됨" : "적용"}`}
                 >
                   {isApplied ? "적용됨" : "적용"}
                 </button>
