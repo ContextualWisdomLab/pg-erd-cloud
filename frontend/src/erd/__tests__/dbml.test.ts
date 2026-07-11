@@ -131,17 +131,45 @@ describe('exportDbml', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'public.my-table',
-          comment: "test ' comment",
+          comment: "test ' comment \\ next\nline",
           badges: { pk: true, fk: false },
           columns: [
-            { column_name: 'my-col', data_type: 'integer', is_pk: true, is_not_null: true, column_comment: "col ' comment" },
+            { column_name: 'my-col', data_type: 'integer', is_pk: true, is_not_null: true, column_comment: "col ' comment \\ path\rline" },
           ],
         },
       },
     ];
     const result = exportDbml(nodes, []);
     expect(result).toContain('Table public."my-table" {');
-    expect(result).toContain('"my-col" integer [pk, note: \'col \'\' comment\']');
-    expect(result).toContain('Note: \'test \'\' comment\'');
+    expect(result).toContain('"my-col" integer [pk, note: \'col \'\' comment \\\\ path\\rline\']');
+    expect(result).toContain('Note: \'test \'\' comment \\\\ next\\nline\'');
+  });
+
+  it('should prevent identifiers and types from injecting DBML lines', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.bad\\table',
+          badges: { pk: false, fk: false },
+          columns: [
+            {
+              column_name: 'weird"col\\name\nx',
+              data_type: 'varchar\nRef: evil',
+              is_pk: false,
+              is_not_null: false,
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = exportDbml(nodes, []);
+
+    expect(result).toContain('Table public."bad\\\\table" {');
+    expect(result).toContain('"weird""col\\\\name x" "varchar Ref: evil"');
+    expect(result).not.toContain('\nRef: evil');
   });
 });

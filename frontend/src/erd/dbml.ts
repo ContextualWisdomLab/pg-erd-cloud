@@ -1,9 +1,18 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
 
+const DBML_NOTE_ESCAPE_RE = /[\\'\r\n]/g;
+const DBML_IDENTIFIER_ESCAPE_RE = /[\\"\r\n]/g;
+const DBML_TYPE_RE = /^[A-Za-z0-9_ .,[\]()]+$/;
+
 function escapeString(str: string): string {
   if (!str) return "";
-  return str.replace(/'/g, "''");
+  return str.replace(DBML_NOTE_ESCAPE_RE, (char) => {
+    if (char === "\\") return "\\\\";
+    if (char === "'") return "''";
+    if (char === "\n") return "\\n";
+    return "\\r";
+  });
 }
 
 function safeId(str: string): string {
@@ -11,7 +20,16 @@ function safeId(str: string): string {
   if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(str)) {
     return str;
   }
-  return `"${str.replace(/"/g, '""')}"`;
+  return `"${str.replace(DBML_IDENTIFIER_ESCAPE_RE, (char) => {
+    if (char === '"') return '""';
+    if (char === "\\") return "\\\\";
+    return " ";
+  })}"`;
+}
+
+function safeType(value: string | null | undefined): string {
+  const text = value || 'varchar';
+  return DBML_TYPE_RE.test(text) ? text : safeId(text);
 }
 
 export function exportDbml(
@@ -45,7 +63,7 @@ export function exportDbml(
     output += `Table ${fullTableName} {\n`;
 
     for (const col of node.data.columns) {
-      const type = col.data_type || 'varchar';
+      const type = safeType(col.data_type);
       let settings = [];
       if (col.is_pk) settings.push("pk");
       if (col.is_not_null && !col.is_pk) settings.push("not null");
