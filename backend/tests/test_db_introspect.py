@@ -17,6 +17,10 @@ from app import db_introspect
         ("SNOWFLAKE://u:p@acct/DB", "snowflake"),
         ("snowflake+snowflake-connector-python://u:p@acct/DB", "snowflake"),
         ("snowflake+async://u:p@acct/DB", "snowflake"),
+        ("mysql://u:p@db/app", "mysql"),
+        ("mysql+pymysql://u:p@db/app", "mysql"),
+        ("mariadb://u:p@db/app", "mysql"),
+        ("MARIADB://u:p@db/app", "mysql"),
     ],
 )
 def test_detect_dsn_dialect_valid(
@@ -28,7 +32,7 @@ def test_detect_dsn_dialect_valid(
 @pytest.mark.parametrize(
     "dsn,expected_error",
     [
-        ("mysql://u:p@db/app", "unsupported database DSN scheme: mysql"),
+        ("oracle://u:p@db/app", "unsupported database DSN scheme: oracle"),
         (
             "snowflake_invalid://u:p@acct/DB",
             "unsupported database DSN scheme: <empty>",
@@ -61,8 +65,13 @@ async def test_introspect_database_dispatches_by_dialect(
         calls.append(("snowflake", dsn, schema_filter))
         return {"source_dialect": "snowflake"}
 
+    async def fake_mysql(dsn: str, schema_filter: str | None) -> dict:
+        calls.append(("mysql", dsn, schema_filter))
+        return {"source_dialect": "mysql"}
+
     monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
     monkeypatch.setattr(db_introspect, "introspect_snowflake", fake_snowflake)
+    monkeypatch.setattr(db_introspect, "introspect_mysql", fake_mysql)
 
     assert await db_introspect.introspect_database(
         "postgresql://u:p@db/app", "public"
@@ -70,9 +79,53 @@ async def test_introspect_database_dispatches_by_dialect(
     assert await db_introspect.introspect_database(
         "snowflake://u:p@acct/APP/PUBLIC", None
     ) == {"source_dialect": "snowflake"}
+    assert await db_introspect.introspect_database(
+        "mariadb://u:p@db/app", "shop"
+    ) == {"source_dialect": "mysql"}
     assert calls == [
         ("postgresql", "postgresql://u:p@db/app", "public"),
         ("snowflake", "snowflake://u:p@acct/APP/PUBLIC", None),
+        ("mysql", "mariadb://u:p@db/app", "shop"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_probe_database_dispatches_by_dialect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    async def fake_postgres(dsn: str) -> str:
+        calls.append(("postgresql", dsn))
+        return "postgresql 17"
+
+    async def fake_snowflake(dsn: str) -> str:
+        calls.append(("snowflake", dsn))
+        return "snowflake 9"
+
+    async def fake_mysql(dsn: str) -> str:
+        calls.append(("mysql", dsn))
+        return "mysql 8"
+
+    monkeypatch.setattr(db_introspect, "probe_postgres", fake_postgres)
+    monkeypatch.setattr(db_introspect, "probe_snowflake", fake_snowflake)
+    monkeypatch.setattr(db_introspect, "probe_mysql", fake_mysql)
+
+    assert (
+        await db_introspect.probe_database("postgres://u:p@db/app")
+        == "postgresql 17"
+    )
+    assert (
+        await db_introspect.probe_database("snowflake://u:p@acct/APP")
+        == "snowflake 9"
+    )
+    assert (
+        await db_introspect.probe_database("mysql+pymysql://u:p@db/app") == "mysql 8"
+    )
+    assert calls == [
+        ("postgresql", "postgres://u:p@db/app"),
+        ("snowflake", "snowflake://u:p@acct/APP"),
+        ("mysql", "mysql+pymysql://u:p@db/app"),
     ]
 
 
