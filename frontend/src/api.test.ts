@@ -19,9 +19,9 @@ describe('shareLinkUrlFromPath', () => {
 
 describe('api functions', () => {
   beforeEach(() => {
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
     // Mock csrf endpoint to succeed
-    (global.fetch as any).mockImplementation((url: string) => {
+    (globalThis.fetch as any).mockImplementation((url: string) => {
       if (url === '/api/csrf-token') {
         return Promise.resolve({ ok: true, json: async () => ({ csrf_token: 'fake_token' }) });
       }
@@ -34,7 +34,7 @@ describe('api functions', () => {
   });
 
   it('getMe fetches user data', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (globalThis.fetch as any).mockImplementation((url: string) => {
       if (url === '/api/me') return Promise.resolve({ ok: true, json: async () => ({ id: 1, email: 'test@example.com' }) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -43,7 +43,7 @@ describe('api functions', () => {
   });
 
   it('listProjects fetches projects', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (globalThis.fetch as any).mockImplementation((url: string) => {
       if (url === '/api/projects') return Promise.resolve({ ok: true, json: async () => ([]) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -52,7 +52,7 @@ describe('api functions', () => {
   });
 
   it('listConnections fetches connections', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (globalThis.fetch as any).mockImplementation((url: string) => {
       if (url === '/api/connections/by-project/proj_1') return Promise.resolve({ ok: true, json: async () => ([]) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -61,7 +61,7 @@ describe('api functions', () => {
   });
 
   it('listSnapshots fetches snapshots', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (globalThis.fetch as any).mockImplementation((url: string) => {
       if (url === '/api/snapshots/by-project/proj_1') return Promise.resolve({ ok: true, json: async () => ([]) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
