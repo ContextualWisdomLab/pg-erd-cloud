@@ -194,19 +194,13 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     if (!normalizedNodeSearch) return new Set<string>();
     const matches = new Set<string>();
+    // ⚡ Bolt: Replace map/flatMap array allocation with direct string concatenation for high-frequency ERD search filtering to prevent severe GC pressure.
     for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
+      let haystack = `${node.data.title} ${node.data.comment ?? ""}`;
+      for (const column of node.data.columns) {
+        haystack += ` ${column.column_name} ${column.data_type} ${column.column_comment ?? ""}`;
+      }
+      if (haystack.toLocaleLowerCase().includes(normalizedNodeSearch)) {
         matches.add(node.id);
       }
     }
