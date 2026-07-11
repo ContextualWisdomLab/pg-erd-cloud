@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    ConstraintInventoryOut,
     FkCyclesOut,
     IndexRedundancyOut,
     InferredRelationshipOut,
@@ -36,6 +37,7 @@ from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
 from app.ddl.migration_safety import analyze_migration_safety
 from app.diff.schema_diff import diff_snapshots
+from app.spec.constraint_inventory import build_constraint_inventory
 from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
@@ -436,6 +438,32 @@ async def sensitive_columns(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = detect_sensitive_columns(data.snapshot_json if data else None)
     return SensitiveColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/constraint-inventory",
+    response_model=ConstraintInventoryOut,
+)
+async def constraint_inventory(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> ConstraintInventoryOut:
+    """Inventory CHECK-constraint business rules and FK delete-action risks
+    (ON DELETE CASCADE = warning, SET NULL = info).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return ConstraintInventoryOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_constraint_inventory(data.snapshot_json if data else None)
+    return ConstraintInventoryOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
