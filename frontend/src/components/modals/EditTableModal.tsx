@@ -1,12 +1,14 @@
-import React from 'react';
+import React from "react";
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { useDialogAccessibility } from "./useDialogAccessibility";
 
 interface EditTableModalProps {
   isOpen: boolean;
   editingNode: Node<TableNodeData> | null;
-  setEditingNode: React.Dispatch<React.SetStateAction<Node<TableNodeData> | null>>;
+  setEditingNode: React.Dispatch<
+    React.SetStateAction<Node<TableNodeData> | null>
+  >;
   setNodes: React.Dispatch<React.SetStateAction<Node<TableNodeData>[]>>;
   onEditTableCancel: () => void;
   onEditTableSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
@@ -22,19 +24,43 @@ export function EditTableModal({
   onEditTableSubmit,
   onDeleteTable,
 }: EditTableModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), onEditTableCancel);
+  const dialogRef = useDialogAccessibility(
+    isOpen && Boolean(editingNode),
+    onEditTableCancel,
+  );
 
   if (!isOpen || !editingNode) return null;
 
   return (
     <div className="modalOverlay">
-      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
+      <div
+        className="modal"
+        style={{
+          width: 800,
+          maxWidth: "90vw",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-table-title"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
-          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
+          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>
+            X
+          </button>
         </div>
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
-          <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
+          <form
+            id="editTableForm"
+            onSubmit={onEditTableSubmit}
+            className="col"
+            style={{ gap: 12 }}
+          >
             <div className="col">
               <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
               <input
@@ -56,7 +82,14 @@ export function EditTableModal({
             </div>
 
             <div className="col" style={{ marginTop: 16 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div
+                className="row"
+                style={{
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
                 <h4 style={{ margin: 0 }}>컬럼</h4>
                 <button
                   type="button"
@@ -75,31 +108,31 @@ export function EditTableModal({
                                   data_type: "text",
                                   is_not_null: false,
                                   is_pk: false,
-                                }
-                              ]
-                            }
+                                },
+                              ],
+                            },
                           };
                         }
                         return n;
-                      })
+                      }),
                     );
                     setEditingNode((prev: Node<TableNodeData> | null) => {
-                       if (!prev) return prev;
-                       return {
-                         ...prev,
-                         data: {
-                           ...prev.data,
-                           columns: [
-                             ...prev.data.columns,
-                             {
-                               column_name: `new_col_${Date.now()}`,
-                               data_type: "text",
-                               is_not_null: false,
-                               is_pk: false,
-                             }
-                           ]
-                         }
-                       }
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        data: {
+                          ...prev.data,
+                          columns: [
+                            ...prev.data.columns,
+                            {
+                              column_name: `new_col_${Date.now()}`,
+                              data_type: "text",
+                              is_not_null: false,
+                              is_pk: false,
+                            },
+                          ],
+                        },
+                      };
                     });
                   }}
                 >
@@ -109,7 +142,11 @@ export function EditTableModal({
 
               <div className="col" style={{ gap: 8 }}>
                 {editingNode.data.columns.map((col, idx) => (
-                  <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
+                  <div
+                    key={`${col.column_name}-${idx}`}
+                    className="row"
+                    style={{ gap: 8, alignItems: "center" }}
+                  >
                     <input
                       type="text"
                       name={`col_name_${idx}`}
@@ -126,7 +163,10 @@ export function EditTableModal({
                       style={{ flex: 1.5 }}
                       aria-label="데이터 타입"
                     />
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label
+                      className="row"
+                      style={{ gap: 4, whiteSpace: "nowrap" }}
+                    >
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
@@ -134,7 +174,10 @@ export function EditTableModal({
                       />
                       PK
                     </label>
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label
+                      className="row"
+                      style={{ gap: 4, whiteSpace: "nowrap" }}
+                    >
                       <input
                         type="checkbox"
                         name={`col_nn_${idx}`}
@@ -145,7 +188,12 @@ export function EditTableModal({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!window.confirm(`'${col.column_name}' 컬럼을 삭제하시겠습니까?`)) return;
+                        if (
+                          !window.confirm(
+                            `'${col.column_name}' 컬럼을 삭제하시겠습니까?`,
+                          )
+                        )
+                          return;
                         setNodes((nds: Node<TableNodeData>[]) =>
                           nds.map((n: Node<TableNodeData>) => {
                             if (n.id === editingNode.id) {
@@ -153,22 +201,26 @@ export function EditTableModal({
                                 ...n,
                                 data: {
                                   ...n.data,
-                                  columns: n.data.columns.filter((_, i) => i !== idx)
-                                }
+                                  columns: n.data.columns.filter(
+                                    (_, i) => i !== idx,
+                                  ),
+                                },
                               };
                             }
                             return n;
-                          })
+                          }),
                         );
                         setEditingNode((prev: Node<TableNodeData> | null) => {
-                           if (!prev) return prev;
-                           return {
-                             ...prev,
-                             data: {
-                               ...prev.data,
-                               columns: prev.data.columns.filter((_, i) => i !== idx)
-                             }
-                           };
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              columns: prev.data.columns.filter(
+                                (_, i) => i !== idx,
+                              ),
+                            },
+                          };
                         });
                       }}
                       style={{ color: "#b91c1c", padding: "4px 8px" }}
@@ -183,11 +235,20 @@ export function EditTableModal({
           </form>
         </div>
 
-        <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
+        <div
+          className="row"
+          style={{
+            justifyContent: "space-between",
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: "1px solid #e2e8f0",
+          }}
+        >
           <div className="row" style={{ gap: 8 }}>
             <button
               type="button"
               onClick={onDeleteTable}
+              aria-label={`${editingNode.data.title} 테이블 삭제`}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
             >
               테이블 삭제
@@ -221,7 +282,13 @@ export function EditTableModal({
             </button>
           </div>
           <div className="row">
-            <button type="button" onClick={onEditTableCancel}>취소</button>
+            <button
+              type="button"
+              onClick={onEditTableCancel}
+              aria-label="테이블 편집 취소"
+            >
+              취소
+            </button>
             <button
               type="submit"
               form="editTableForm"

@@ -46,3 +46,6 @@
 ## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
 **Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
 **Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
+## 2026-07-11 - Add context to generic dialog buttons
+**Learning:** Generic action buttons in dialogs should provide full context via aria-label to prevent ambiguous screen reader experiences.
+**Action:** Always add aria-label to generic buttons like Delete or Cancel inside dialogs.
