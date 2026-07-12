@@ -14,7 +14,6 @@ let lastFocusedElement: HTMLElement | null = null;
 let lastInteractedElement: HTMLElement | null = null;
 
 function isHTMLElement(ownerDocument: Document, value: EventTarget | Element | null): value is HTMLElement {
-  /* v8 ignore next -- browser-owned documents always expose their matching window constructor */
   const HTMLElementCtor = ownerDocument.defaultView?.HTMLElement ?? HTMLElement;
   return value instanceof HTMLElementCtor;
 }
@@ -41,7 +40,6 @@ function ensureFocusTracking(ownerDocument: Document) {
   ownerDocument.addEventListener("keydown", rememberInteractedElement, true);
 }
 
-/* v8 ignore else -- this browser module is only executed where document exists */
 if (typeof document !== "undefined") {
   ensureFocusTracking(document);
 }

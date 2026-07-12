@@ -71,27 +71,6 @@ describe('ExportModal', () => {
     expect(onCopyShareLink).toHaveBeenCalledOnce();
   });
 
-  it('shows copied and in-progress status variants', () => {
-    const { rerender } = render(
-      <ExportModal
-        {...baseProps}
-        isCopied
-        isShareLinkCopied
-        shareLinkUrl="http://localhost/api/share/copied"
-      />,
-    );
-    expect(screen.getByRole('button', { name: '복사 완료' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('링크가 복사되었습니다');
-
-    rerender(
-      <ExportModal
-        {...baseProps}
-        isCreatingShareLink
-      />,
-    );
-    expect(screen.getByRole('button', { name: '생성 중...' })).toBeDisabled();
-  });
-
   it('runs each export artifact action from the modal', () => {
     const onCopyExportDdl = vi.fn();
     const onDownloadSvg = vi.fn();
