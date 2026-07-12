@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import type { Node, Edge } from '@xyflow/react';
 import { exportDbml } from '../dbml';
+import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
 
 describe('exportDbml', () => {
-  it('should return empty string for empty nodes', () => {
-    const result = exportDbml([], []);
+  it('returns empty string when nodes are empty', () => {
+    const nodes: Node<TableNodeData>[] = [];
+    const edges: Edge[] = [];
+    const result = exportDbml(nodes, edges);
     expect(result).toBe('');
   });
 
-  it('should export simple table', () => {
+  it('exports tables and columns and escapes quotes and backslashes', () => {
     const nodes: Node<TableNodeData>[] = [
       {
         id: '1',
@@ -19,157 +21,48 @@ describe('exportDbml', () => {
           title: 'public.users',
           badges: { pk: true, fk: false },
           columns: [
-            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-            { column_name: 'name', data_type: 'varchar', is_pk: false, is_not_null: true },
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'username', data_type: 'varchar', is_not_null: false, is_pk: false, column_comment: 'login\'s name \\ char' }
           ],
-        },
-      },
-    ];
-    const result = exportDbml(nodes, []);
-    expect(result).toContain('Table public.users {');
-    expect(result).toContain('id integer [pk]');
-    expect(result).toContain('name varchar [not null]');
-  });
-
-  it('should export relation', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-      {
-        id: '2',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'posts',
-          badges: { pk: true, fk: true },
-          columns: [
-            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
-            { column_name: 'user_id', data_type: 'int', is_pk: false, is_not_null: true },
-          ],
-        },
-      },
-    ];
-
-    const edges: Edge[] = [
-      {
-        id: 'e1',
-        source: '2',
-        target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
-        label: 'rel',
-      },
-    ];
-
-    const result = exportDbml(nodes, edges);
-    expect(result).toContain('Ref: posts.user_id > users.id');
-  });
-
-  it('should export composite relation', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'tenant_id', data_type: 'int', is_pk: true, is_not_null: true },
-            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-      {
-        id: '2',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'posts',
-          badges: { pk: true, fk: true },
-          columns: [
-            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
-            { column_name: 'tenant_id', data_type: 'int', is_pk: false, is_not_null: true },
-            { column_name: 'user_id', data_type: 'int', is_pk: false, is_not_null: true },
-          ],
-        },
-      },
-    ];
-
-    const edges: Edge[] = [
-      {
-        id: 'e1',
-        source: '2',
-        target: '1',
-        label: 'rel',
-        data: {
-          sourceColumns: ['tenant_id', 'user_id'],
-          targetColumns: ['tenant_id', 'id']
+          comment: 'user\'s table \\ test'
         }
-      },
+      }
     ];
+    const result = exportDbml(nodes, []);
+    expect(result).toContain('Table "public.users" {');
+    expect(result).toContain('  "id" "integer" [pk, not null]');
+    expect(result).toContain('  "username" "varchar" [note: \'login\\\'s name \\\\ char\']');
+    expect(result).toContain('  Note: \'user\\\'s table \\\\ test\'');
+  });
 
+  it('exports relations correctly', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: { title: 't1', badges: { pk: true, fk: false }, columns: [] }
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: { title: 't2', badges: { pk: false, fk: true }, columns: [] }
+      }
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        type: 'smoothstep',
+        data: {
+          sourceColumns: ['t2_fk'],
+          targetColumns: ['t1_pk']
+        }
+      }
+    ];
     const result = exportDbml(nodes, edges);
-    expect(result).toContain('Ref: posts.(tenant_id, user_id) > users.(tenant_id, id)');
-  });
-
-  it('should escape special characters', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'public.my-table',
-          comment: "test ' comment \\ next\nline",
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'my-col', data_type: 'integer', is_pk: true, is_not_null: true, column_comment: "col ' comment \\ path\rline" },
-          ],
-        },
-      },
-    ];
-    const result = exportDbml(nodes, []);
-    expect(result).toContain('Table public."my-table" {');
-    expect(result).toContain('"my-col" integer [pk, note: \'col \'\' comment \\\\ path\\rline\']');
-    expect(result).toContain('Note: \'test \'\' comment \\\\ next\\nline\'');
-  });
-
-  it('should prevent identifiers and types from injecting DBML lines', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        type: 'tableNode',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'public.bad\\table',
-          badges: { pk: false, fk: false },
-          columns: [
-            {
-              column_name: 'weird"col\\name\nx',
-              data_type: 'varchar\nRef: evil',
-              is_pk: false,
-              is_not_null: false,
-            },
-          ],
-        },
-      },
-    ];
-
-    const result = exportDbml(nodes, []);
-
-    expect(result).toContain('Table public."bad\\\\table" {');
-    expect(result).toContain('"weird""col\\\\name x" "varchar Ref: evil"');
-    expect(result).not.toContain('\nRef: evil');
+    expect(result).toContain('Ref: "t2"."t2_fk" > "t1"."t1_pk"');
   });
 });

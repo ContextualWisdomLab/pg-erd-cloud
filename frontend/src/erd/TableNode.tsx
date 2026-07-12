@@ -54,6 +54,7 @@ function AccessibleTruncatedText({
       className={className}
       title={title ?? accessibleText}
       aria-label={accessibleText}
+      tabIndex={0}
     >
       {children ?? text}
     </span>
@@ -157,13 +158,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <abbr
-                  className="tableNode__badge"
-                  title="Not Null"
-                  aria-label="필수 입력 (Not Null)"
-                >
-                  NN
-                </abbr>
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
+                  NOT NULL
+                </span>
               ) : null}
               <Handle
                 type="source"
@@ -179,6 +176,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             className="tableNode__more"
             title="생략된 컬럼이 더 있습니다"
             aria-label="생략된 컬럼이 더 있습니다"
+            tabIndex={0}
           >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
@@ -209,6 +207,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 className="tableNode__more"
                 title="생략된 인덱스가 더 있습니다"
                 aria-label="생략된 인덱스가 더 있습니다"
+                tabIndex={0}
               >
                 … {data.indexes.length - 4} more indexes
               </div>

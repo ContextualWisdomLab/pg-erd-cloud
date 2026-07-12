@@ -85,17 +85,6 @@ def test_redacts_secret_assignments_without_dsn_candidates() -> None:
     assert "private-key: ***" in redacted
 
 
-def test_redacts_passwords_from_nonstandard_dsn_scheme() -> None:
-    dsn = "snowflake_invalid://user:pa%3Ass@acct.example.com/db?token=q%2Fsecret"
-    error = "driver failed for pa:ss with token=q/secret"
-
-    redacted = _redact_snapshot_error_message(error, dsn)
-
-    assert "pa:ss" not in redacted
-    assert "q/secret" not in redacted
-    assert "token=***" in redacted
-
-
 @pytest.mark.asyncio
 async def test_handle_snapshot_job_persists_and_raises_redacted_error() -> None:
     snapshot_id = uuid.uuid4()

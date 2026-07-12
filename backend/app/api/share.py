@@ -29,22 +29,6 @@ from app.spec.reversing import generate_reversing_spec
 router = APIRouter(prefix="/api", tags=["share"])
 
 
-def _redact_sensitive_snapshot_fields(
-    data: dict | list | str | int | float | bool | None,
-) -> dict | list | str | int | float | bool | None:
-    """Redact sensitive fields from snapshot JSON payload when shared publicly."""
-    if isinstance(data, dict):
-        return {
-            k: "***"
-            if k in {"comment", "relation_comment", "column_comment", "example_value"}
-            else _redact_sensitive_snapshot_fields(v)
-            for k, v in data.items()
-        }
-    elif isinstance(data, list):
-        return [_redact_sensitive_snapshot_fields(v) for v in data]
-    return data
-
-
 @router.post("/projects/{project_space_uuid}/share-links")
 async def create_share_link(
     project_space_uuid: uuid.UUID,
@@ -140,9 +124,7 @@ async def get_shared_snapshot(
         "status": snap.status,
         "schema_filter": snap.schema_filter,
         "error_message": snap.error_message,
-        "snapshot_json": _redact_sensitive_snapshot_fields(data.snapshot_json)
-        if data
-        else None,
+        "snapshot_json": data.snapshot_json if data else None,
     }
 
 

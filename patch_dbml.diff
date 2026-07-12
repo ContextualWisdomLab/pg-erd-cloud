@@ -1,0 +1,30 @@
+--- frontend/src/erd/dbml.ts
++++ frontend/src/erd/dbml.ts
+@@ -2,6 +2,10 @@
+ import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
+
++function escapeDbmlString(str: string): string {
++  return str.replace(/['\\]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
++}
++
+ export function exportDbml(
+   nodes: Node<TableNodeData>[],
+   edges: Edge[],
+@@ -26,7 +30,7 @@
+       if (col.is_pk) settings.push("pk");
+       if (col.is_not_null) settings.push("not null");
+       if (col.column_comment) {
+-        settings.push(`note: '${col.column_comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
++        settings.push(`note: '${escapeDbmlString(col.column_comment)}'`);
+       }
+
+       const settingsStr = settings.length > 0 ? ` [${settings.join(", ")}]` : "";
+@@ -34,7 +38,7 @@
+     }
+
+     if (node.data.comment) {
+-      output += `  Note: '${node.data.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'\n`;
++      output += `  Note: '${escapeDbmlString(node.data.comment)}'\n`;
+     }
+
+     output += "}\n\n";

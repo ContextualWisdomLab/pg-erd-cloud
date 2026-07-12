@@ -4,8 +4,6 @@ import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
 import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
-export * from './exportDataDictionary';
-
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>
   columns?: Array<{ relation_oid: number; column_name: string; data_type: string; is_not_null: boolean; example_value?: string | number | boolean | null }>
@@ -94,11 +92,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
-  // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
-  const nodesById = new Map<string, Node<TableNodeData>>();
-  for (const n of nodes) {
-    nodesById.set(n.id, n);
-  }
+  const nodesById = new Map(nodes.map(n => [n.id, n]));
 
   // Export tables
   for (const node of nodes) {
@@ -287,24 +281,19 @@ export function exportDiagramSvg(
   snapshot?: SnapshotJson | null,
 ): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
-  // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
-  const nodesById = new Map<string, Node<TableNodeData>>();
-  for (const n of nodes) {
-    nodesById.set(n.id, n);
-  }
+  const nodesById = new Map(nodes.map(n => [n.id, n]));
   const width = 280;
   const headerHeight = 34;
   const rowHeight = 22;
   const padding = 40;
   const indexes = indexesByRelation(snapshot);
-
-  // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
-  const heights = new Map<string, number>();
-  for (const node of nodes) {
-    // ponytail: cap rendered index rows; add full index export when the canvas carries index nodes.
-    const indexRows = Math.min((indexes.get(node.id)?.length || 0) + (node.data.indexes?.length || 0), 8);
-    heights.set(node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0)));
-  }
+  const heights = new Map(
+    nodes.map((node) => {
+      // ponytail: cap rendered index rows; add full index export when the canvas carries index nodes.
+      const indexRows = Math.min((indexes.get(node.id)?.length || 0) + (node.data.indexes?.length || 0), 8);
+      return [node.id, headerHeight + rowHeight * ((node.data.columns?.length || 0) + indexRows + (indexRows ? 1 : 0))];
+    }),
+  );
   let minX = 0;
   let minY = 0;
   let maxX = width;

@@ -43,6 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
-## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
-**Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
-**Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
+## 2026-07-01 - [Generic Action Button Accessibility]
+**Learning:** In custom modal dialogs, generic action buttons like '삭제' (Delete), '취소' (Cancel), and '저장' (Save) can lack sufficient context for screen reader users when read out of order or when multiple such buttons exist in the DOM. Relying solely on the surrounding dialog text is often insufficient for clarity.
+**Action:** Ensure generic action buttons, especially in modals or complex forms, include an explicit `aria-label` that provides the full context of the action (e.g., `aria-label="관계 설정 취소"` instead of just "취소").

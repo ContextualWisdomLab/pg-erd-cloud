@@ -1,0 +1,11 @@
+--- frontend/src/erd/dbml.ts
++++ frontend/src/erd/dbml.ts
+@@ -1,7 +1,7 @@
+ import type { Node, Edge } from "@xyflow/react";
+ import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
+
+ function escapeDbmlString(str: string): string {
+-  // ⚡ Bolt: Efficient single pass regex for escaping both backslash and quote to satisfy CodeQL
+-  // and converting newlines for DBML compatibility
+   return str.replace(/['\\]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+ }
