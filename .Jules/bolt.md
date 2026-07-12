@@ -1,3 +1,6 @@
 ## 2025-06-27 - [Map Initialization Overhead]
 **Learning:** Initializing Maps with `new Map(array.map(...))` creates unnecessary intermediate arrays, consuming memory and triggering garbage collection overhead, especially noticeable when dealing with many nodes.
 **Action:** Use a `for...of` loop to directly `map.set()` elements rather than creating an intermediate array of tuples, especially in frequently executed or rendering paths.
+## 2024-05-18 - Optimize string search logic for node properties
+**Learning:** Checking multiple fields for string match across a large React array by looping over elements and doing repeated `toLowerCase()` for each element creates significant garbage collection pressure and is a major bottleneck on large datasets.
+**Action:** When implementing high-frequency search or filtering operations across large collections of ERD nodes in the frontend, prefer direct string concatenation to consolidate all searchable fields into a single pre-lowercased string per node. Using substring matching on this single string prevents severe garbage collection pressure compared to array methods (`flatMap`, `join`) and avoids the overhead of iteratively lowercasing individual properties.
