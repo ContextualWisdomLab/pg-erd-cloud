@@ -15,10 +15,11 @@ def test_logout_route_uses_tighter_revocation_rate_limit() -> None:
     client = TestClient(main_app.app)
     headers = {CSRF_HEADER_NAME: generate_csrf_token(settings.app_secret)}
 
+    probe_path = "/api/auth/logout/rate-limit-probe"
     for _ in range(10):
-        assert client.post("/api/auth/logout", headers=headers).status_code != 429
+        assert client.post(probe_path, headers=headers).status_code != 429
 
-    response = client.post("/api/auth/logout", headers=headers)
+    response = client.post(probe_path, headers=headers)
 
     assert response.status_code == 429
     assert response.json() == {"detail": "rate limit exceeded"}
