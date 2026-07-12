@@ -123,15 +123,6 @@ class Settings(BaseSettings):
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
 
-    # Clearfolio reference-document viewer connector (buyer gateway).
-    clearfolio_gateway_url: str | None = None
-    clearfolio_tenant_claims_hmac_secret: str | None = None
-    clearfolio_tenant_id: str = "pg-erd-cloud"
-    clearfolio_permissions: str = (
-        "job:create,job:read,job:retry,viewer:read,artifact-link:create,analytics:read"
-    )
-    clearfolio_timeout_seconds: float = Field(30.0, gt=0.0, le=120.0)
-
     # Allowed JWT signing algorithms for OIDC verification.
     # Comma-separated string (env: OIDC_ALGORITHMS). Default is RS256.
     # NOTE: Do not trust the token header's alg; only accept algorithms from

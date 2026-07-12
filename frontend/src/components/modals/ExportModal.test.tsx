@@ -6,10 +6,9 @@ import { ExportModal } from './ExportModal';
 
 const baseProps = {
   isOpen: true,
+  exportDdlText: 'create table users (id integer primary key);',
   isCopied: false,
   hasDdlExport: true,
-  hasDictionaryExport: true,
-  hasDiagramExport: true,
   shareLinkUrl: '',
   isCreatingShareLink: false,
   isShareLinkCopied: false,
@@ -17,11 +16,6 @@ const baseProps = {
   canCreateShareLink: true,
   onCloseExport: vi.fn(),
   onCopyExportDdl: vi.fn(),
-  onDownloadSvg: vi.fn(),
-  onDownloadUml: vi.fn(),
-  onDownloadMermaid: vi.fn(),
-  onExportDictionaryCsv: vi.fn(),
-  onExportDictionaryMarkdown: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
 };
@@ -31,7 +25,7 @@ afterEach(() => {
 });
 
 describe('ExportModal', () => {
-  it('separates project share links from export artifacts', () => {
+  it('creates a project share link and exposes the current DDL', () => {
     const onCreateShareLink = vi.fn();
     render(
       <ExportModal
@@ -43,14 +37,7 @@ describe('ExportModal', () => {
     fireEvent.click(screen.getByRole('button', { name: '링크 만들기' }));
 
     expect(onCreateShareLink).toHaveBeenCalledOnce();
-    expect(screen.getByRole('heading', { name: '공유 링크' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '내보내기 산출물' })).toBeInTheDocument();
-    expect(screen.getByText('SQL DDL')).toBeInTheDocument();
-    expect(screen.getByText('SVG 이미지')).toBeInTheDocument();
-    expect(screen.getByText('PlantUML')).toBeInTheDocument();
-    expect(screen.getByText('Mermaid')).toBeInTheDocument();
-    expect(screen.getByText('Data Dictionary CSV')).toBeInTheDocument();
-    expect(screen.getByText('Data Dictionary MD')).toBeInTheDocument();
+    expect(screen.getByLabelText('DDL Export')).toHaveValue(baseProps.exportDdlText);
   });
 
   it('copies an already generated share link', () => {
@@ -71,41 +58,6 @@ describe('ExportModal', () => {
     expect(onCopyShareLink).toHaveBeenCalledOnce();
   });
 
-  it('runs each export artifact action from the modal', () => {
-    const onCopyExportDdl = vi.fn();
-    const onDownloadSvg = vi.fn();
-    const onDownloadUml = vi.fn();
-    const onDownloadMermaid = vi.fn();
-    const onExportDictionaryCsv = vi.fn();
-    const onExportDictionaryMarkdown = vi.fn();
-
-    render(
-      <ExportModal
-        {...baseProps}
-        onCopyExportDdl={onCopyExportDdl}
-        onDownloadSvg={onDownloadSvg}
-        onDownloadUml={onDownloadUml}
-        onDownloadMermaid={onDownloadMermaid}
-        onExportDictionaryCsv={onExportDictionaryCsv}
-        onExportDictionaryMarkdown={onExportDictionaryMarkdown}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'SQL DDL 복사' }));
-    fireEvent.click(screen.getByRole('button', { name: 'SVG 이미지 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: 'PlantUML 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Mermaid 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }));
-
-    expect(onCopyExportDdl).toHaveBeenCalledOnce();
-    expect(onDownloadSvg).toHaveBeenCalledOnce();
-    expect(onDownloadUml).toHaveBeenCalledOnce();
-    expect(onDownloadMermaid).toHaveBeenCalledOnce();
-    expect(onExportDictionaryCsv).toHaveBeenCalledOnce();
-    expect(onExportDictionaryMarkdown).toHaveBeenCalledOnce();
-  });
-
   it('shows share link copy or creation errors', () => {
     render(
       <ExportModal
@@ -117,32 +69,17 @@ describe('ExportModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('공유 링크 복사에 실패했습니다.');
   });
 
-  it('explains when exports cannot be generated yet', () => {
+  it('explains when DDL cannot be generated yet', () => {
     render(
       <ExportModal
         {...baseProps}
+        exportDdlText=""
         hasDdlExport={false}
-        hasDictionaryExport={false}
-        hasDiagramExport={false}
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(6);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
-  });
-
-  it('exposes access-control guidance for disabled button', () => {
-    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
-
-    expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
-    const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
-    expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
-    expect(accessManagementButton).not.toHaveAttribute('title');
+    expect(screen.queryByLabelText('DDL Export')).not.toBeInTheDocument();
+    expect(screen.getByText('DDL을 만들려면 먼저 스냅샷을 생성하거나 테이블을 추가하세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'DDL 복사' })).toBeDisabled();
   });
 });

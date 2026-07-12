@@ -702,25 +702,6 @@ def _introspect_snowflake_sync_with_config(
     )
 
 
-def _probe_snowflake_sync(config: SnowflakeDsnConfig) -> str:
-    conn = _connect(**config.connect_kwargs())
-    cursor = conn.cursor()
-    try:
-        rows = _fetch_dicts(cursor, "SELECT CURRENT_VERSION() AS version")
-        return str(rows[0].get("version") or "") if rows else ""
-    finally:
-        try:
-            cursor.close()
-        finally:
-            conn.close()
-
-
-async def probe_snowflake(dsn: str) -> str:
-    """SSRF-guarded connectivity check for Snowflake; returns the server version."""
-    config = await _parse_snowflake_dsn(dsn)
-    return await asyncio.to_thread(_probe_snowflake_sync, config)
-
-
 async def introspect_snowflake(dsn: str, schema_filter: str | None) -> dict:
     """Introspect Snowflake metadata into the common snapshot JSON shape."""
 

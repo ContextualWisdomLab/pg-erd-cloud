@@ -15,43 +15,20 @@ from app.models import (
     JobQueue,
     SchemaSnapshot,
     SchemaSnapshotData,
-    TableAnnotation,
 )
 from app.permissions import require_project_member
 from app.schemas import (
-    AuditColumnsOut,
-    ConstraintInventoryOut,
-    FkCyclesOut,
-    IndexRedundancyOut,
-    InferredRelationshipOut,
-    MigrationSafetyOut,
     NamingLintOut,
-    SchemaStatsOut,
-    SensitiveColumnsOut,
+    SchemaHealthOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
-    SnapshotDiffOut,
     SnapshotOut,
     WideTablesOut,
 )
 from app.ddl.export import snapshot_json_to_sql
-from app.ddl.migration import snapshot_diff_to_migration_sql
-from app.ddl.migration_safety import analyze_migration_safety
-from app.diff.schema_diff import diff_snapshots
-from app.spec.audit_columns import check_audit_columns
-from app.spec.constraint_inventory import build_constraint_inventory
-from app.spec.fk_cycles import detect_fk_cycles
-from app.spec.index_redundancy import detect_index_redundancy
-from app.spec.data_dictionary import snapshot_to_data_dictionary_md
+from app.spec.graphql_sdl import generate_graphql_sdl
 from app.spec.naming_lint import lint_naming
-from app.spec.orm_codegen import (
-    generate_prisma_schema,
-    generate_sqlalchemy_models,
-    generate_typeorm_entities,
-)
-from app.spec.relationship_inference import infer_relationships
-from app.spec.schema_stats import compute_schema_stats
-from app.spec.sensitive_columns import detect_sensitive_columns
+from app.spec.schema_health import analyze_schema_health
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -83,11 +60,7 @@ async def _get_authorized_snapshot(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser,
 ) -> SchemaSnapshot | None:
-    """Fetch a snapshot only after project membership has been checked.
-
-    A missing snapshot and a snapshot in another project both return ``None`` so
-    UUID-based read endpoints cannot be used to enumerate snapshot existence.
-    """
+    """Fetch a snapshot only after project membership has been checked."""
 
     project_space_uuid = await session.scalar(
         select(SchemaSnapshot.project_space_uuid).where(
@@ -168,12 +141,7 @@ async def get_snapshot(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> SnapshotDetailOut:
-    """Get a project-authorized snapshot status and captured JSON.
-
-    The snapshot payload is loaded only after ``_get_authorized_snapshot`` has
-    verified project membership. Missing and unauthorized snapshots share the
-    same not-found response.
-    """
+    """Get a snapshot's status and (if present) captured JSON."""
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
         return _snapshot_not_found(schema_snapshot_uuid)
@@ -184,151 +152,6 @@ async def get_snapshot(
         schema_filter=snap.schema_filter,
         error_message=snap.error_message,
         snapshot_json=data.snapshot_json if data else None,
-    )
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/inferred-relationships",
-    response_model=list[InferredRelationshipOut],
-)
-async def inferred_relationships(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> list[InferredRelationshipOut]:
-    """Suggest implicit (undeclared) foreign keys inferred from naming.
-
-    Useful for reverse-engineering databases that never declared their FKs.
-    Returns an empty list for missing/unauthorized snapshots (uniform response).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return []
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    if data is None:
-        return []
-    return [
-        InferredRelationshipOut(**rel)
-        for rel in infer_relationships(data.snapshot_json)
-    ]
-
-
-@router.get("/{schema_snapshot_uuid}/diff", response_model=SnapshotDiffOut)
-async def diff_snapshot(
-    schema_snapshot_uuid: uuid.UUID,
-    against: uuid.UUID = Query(
-        ..., description="Base snapshot UUID to compare this snapshot against"
-    ),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> SnapshotDiffOut:
-    """Diff this snapshot (target) against another (base).
-
-    Both snapshots are authorized independently via project membership, so a
-    caller can only diff snapshots they may already read. If either is missing
-    or unauthorized, a uniform ``not_found`` response is returned so existence
-    cannot be enumerated.
-    """
-    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    base_snap = await _get_authorized_snapshot(session, against, user)
-    if target_snap is None or base_snap is None:
-        return SnapshotDiffOut(
-            base_snapshot_uuid=against,
-            target_snapshot_uuid=schema_snapshot_uuid,
-            status="not_found",
-            diff=None,
-        )
-    base_data = await session.get(SchemaSnapshotData, against)
-    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    diff = diff_snapshots(
-        base_data.snapshot_json if base_data else None,
-        target_data.snapshot_json if target_data else None,
-    )
-    return SnapshotDiffOut(
-        base_snapshot_uuid=against,
-        target_snapshot_uuid=schema_snapshot_uuid,
-        status="ok",
-        diff=diff,
-    )
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/migration-safety", response_model=MigrationSafetyOut
-)
-async def migration_safety(
-    schema_snapshot_uuid: uuid.UUID,
-    against: uuid.UUID = Query(
-        ..., description="Base snapshot UUID to analyze migrating from"
-    ),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> MigrationSafetyOut:
-    """Risk-classify the migration from the base snapshot to this one.
-
-    Each change is labelled safe / warning / destructive with an explanation so
-    a reviewer can spot data loss and table-locking operations before applying.
-    Both snapshots are authorized independently (uniform not-found).
-    """
-    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    base_snap = await _get_authorized_snapshot(session, against, user)
-    if target_snap is None or base_snap is None:
-        return MigrationSafetyOut(
-            base_snapshot_uuid=against,
-            target_snapshot_uuid=schema_snapshot_uuid,
-            status="not_found",
-            analysis=None,
-        )
-    base_data = await session.get(SchemaSnapshotData, against)
-    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    analysis = analyze_migration_safety(
-        base_data.snapshot_json if base_data else None,
-        target_data.snapshot_json if target_data else None,
-    )
-    return MigrationSafetyOut(
-        base_snapshot_uuid=against,
-        target_snapshot_uuid=schema_snapshot_uuid,
-        status="ok",
-        analysis=analysis,
-    )
-
-
-@router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
-async def export_migration_sql(
-    schema_snapshot_uuid: uuid.UUID,
-    against: uuid.UUID = Query(
-        ..., description="Base snapshot UUID to migrate from"
-    ),
-    dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
-    direction: str = Query(
-        "up",
-        pattern="^(up|down)$",
-        description="up = base→target (apply), down = target→base (rollback)",
-    ),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> str:
-    """Generate migration SQL between the base and this (target) snapshot.
-
-    ``direction=up`` (default) moves base → target; ``direction=down`` emits the
-    rollback (target → base) — the same generator with the endpoints swapped, so
-    up and down are always exact mirrors. Both snapshots are authorized
-    independently via project membership; a uniform not-found marker is returned
-    if either is missing/unauthorized so existence cannot be enumerated.
-    """
-    target_snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    base_snap = await _get_authorized_snapshot(session, against, user)
-    if target_snap is None or base_snap is None:
-        return "-- snapshot not found\n"
-    base_data = await session.get(SchemaSnapshotData, against)
-    target_data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    base_json = base_data.snapshot_json if base_data else None
-    target_json = target_data.snapshot_json if target_data else None
-    if direction == "down":
-        base_json, target_json = target_json, base_json
-    return snapshot_diff_to_migration_sql(
-        base_json,
-        target_json,
-        target_dialect=dialect,
     )
 
 
@@ -377,208 +200,48 @@ async def wide_tables(
     )
 
 
-@router.get("/{schema_snapshot_uuid}/orm-models", response_class=PlainTextResponse)
-async def export_orm_models(
-    schema_snapshot_uuid: uuid.UUID,
-    flavor: str = Query("sqlalchemy", pattern="^(sqlalchemy|prisma|typeorm)$"),
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> str:
-    """Generate ORM model code from a snapshot (SQLAlchemy 2.0 or Prisma).
-
-    Forward engineering to application code: hand developers ready-to-edit
-    models instead of retyped tables. IDOR-safe (uniform not-found marker).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return "-- snapshot not found\n"
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    if data is None:
-        return "-- snapshot data not found\n"
-    if flavor == "prisma":
-        return generate_prisma_schema(data.snapshot_json)
-    if flavor == "typeorm":
-        return generate_typeorm_entities(data.snapshot_json)
-    return generate_sqlalchemy_models(data.snapshot_json)
-
-
-@router.get("/{schema_snapshot_uuid}/stats", response_model=SchemaStatsOut)
-async def schema_stats(
+@router.get("/{schema_snapshot_uuid}/schema-health", response_model=SchemaHealthOut)
+async def schema_health(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
-) -> SchemaStatsOut:
-    """Overview statistics for a snapshot (object counts, column & type
-    distribution, widest tables, PK/FK/index coverage).
+) -> SchemaHealthOut:
+    """Report schema smells for a snapshot (no-PK tables, unindexed FKs, orphans).
 
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    IDOR-safe: a uniform not-found status is returned for missing/unauthorized
+    snapshots so existence cannot be enumerated.
     """
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
-        return SchemaStatsOut(
-            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", stats=None
-        )
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    stats = compute_schema_stats(data.snapshot_json if data else None)
-    return SchemaStatsOut(
-        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", stats=stats
-    )
-
-
-@router.get("/{schema_snapshot_uuid}/fk-cycles", response_model=FkCyclesOut)
-async def fk_cycles(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> FkCyclesOut:
-    """Report circular foreign-key dependencies (migration-ordering hazards).
-
-    Multi-table cycles are warnings; self-references are informational.
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return FkCyclesOut(
+        return SchemaHealthOut(
             schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
         )
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    report = detect_fk_cycles(data.snapshot_json if data else None)
-    return FkCyclesOut(
+    report = analyze_schema_health(data.snapshot_json if data else None)
+    return SchemaHealthOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
 
 @router.get(
-    "/{schema_snapshot_uuid}/sensitive-columns", response_model=SensitiveColumnsOut
+    "/{schema_snapshot_uuid}/schema.graphql", response_class=PlainTextResponse
 )
-async def sensitive_columns(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> SensitiveColumnsOut:
-    """Compliance-scoping inventory: which columns likely hold PII / card /
-    credential data, mapped to the relevant framework (PCI DSS, GDPR/PIPA).
-
-    Detection only -- it does not encrypt, mask, or tokenize anything.
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return SensitiveColumnsOut(
-            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
-        )
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    report = detect_sensitive_columns(data.snapshot_json if data else None)
-    return SensitiveColumnsOut(
-        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
-    )
-
-
-@router.get("/{schema_snapshot_uuid}/audit-columns", response_model=AuditColumnsOut)
-async def audit_columns(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> AuditColumnsOut:
-    """Flag tables missing created_at/updated_at when the schema's own
-    majority follows that convention (no external style imposed).
-
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return AuditColumnsOut(
-            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
-        )
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    report = check_audit_columns(data.snapshot_json if data else None)
-    return AuditColumnsOut(
-        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
-    )
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/constraint-inventory",
-    response_model=ConstraintInventoryOut,
-)
-async def constraint_inventory(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> ConstraintInventoryOut:
-    """Inventory CHECK-constraint business rules and FK delete-action risks
-    (ON DELETE CASCADE = warning, SET NULL = info).
-
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return ConstraintInventoryOut(
-            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
-        )
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    report = build_constraint_inventory(data.snapshot_json if data else None)
-    return ConstraintInventoryOut(
-        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
-    )
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/index-redundancy", response_model=IndexRedundancyOut
-)
-async def index_redundancy(
-    schema_snapshot_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
-) -> IndexRedundancyOut:
-    """Report duplicate and prefix-shadowed indexes (safe drop candidates).
-
-    Unique indexes are never suggested for dropping (they enforce constraints);
-    expression/partial indexes are skipped rather than guessed.
-    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
-    """
-    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
-    if snap is None:
-        return IndexRedundancyOut(
-            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
-        )
-    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
-    report = detect_index_redundancy(data.snapshot_json if data else None)
-    return IndexRedundancyOut(
-        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
-    )
-
-
-@router.get(
-    "/{schema_snapshot_uuid}/data-dictionary.md", response_class=PlainTextResponse
-)
-async def export_data_dictionary(
+async def export_graphql_sdl(
     schema_snapshot_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
-    """Export a snapshot as a Markdown data dictionary, merged with the
-    project's table annotations (living documentation)."""
+    """Generate GraphQL SDL from a snapshot (types + FK-derived relations).
+
+    Forward engineering to the API layer. IDOR-safe (uniform not-found marker).
+    """
     snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
     if snap is None:
-        return "-- snapshot not found\n"
+        return "# snapshot not found\n"
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
-        return "-- snapshot data not found\n"
-    rows = await session.execute(
-        select(TableAnnotation).where(
-            TableAnnotation.project_space_uuid == snap.project_space_uuid
-        )
-    )
-    annotations = [
-        {
-            "schema_name": a.schema_name,
-            "relation_name": a.relation_name,
-            "body": a.body,
-        }
-        for a in rows.scalars().all()
-    ]
-    return snapshot_to_data_dictionary_md(data.snapshot_json, annotations)
+        return "# snapshot data not found\n"
+    return generate_graphql_sdl(data.snapshot_json)
 
 
 @router.get(

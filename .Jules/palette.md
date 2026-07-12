@@ -43,6 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
-## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
-**Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
-**Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
+## 2026-07-09 - Dialog Action Buttons Accessibility
+**Learning:** In complex modals like AddTable, EditTable, and EditEdge, generic action buttons (e.g., '취소', '저장', '삭제', '복제') must be provided with contextual `aria-label`s (like '테이블 추가 취소', '{table name} 테이블 복제'). Relying solely on the modal's `aria-labelledby` isn't always enough to provide immediate clarity to screen reader users navigating button-by-button.
+**Action:** Always append contextual information to generic modal actions (e.g., 'Cancel [Action]', 'Save [Entity]') to enhance keyboard and screen reader accessibility.

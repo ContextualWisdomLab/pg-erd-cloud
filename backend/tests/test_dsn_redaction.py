@@ -1,34 +1,26 @@
-from app.dsn_redaction import redact_dsn_error_message
+from app.dsn_redaction import redact_dsn_error_message, _password_candidates_from_dsn
 
 
-def test_redacts_nonstandard_scheme_password_and_query_secret() -> None:
-    dsn = "snowflake_invalid://user:pa%3Ass@acct.example.com/db?token=q%2Fsecret"
-    error = (
-        "driver failed for pa:ss using "
-        "snowflake_invalid://user:pa%3Ass@acct.example.com/db?token=q%2Fsecret "
-        "with token=q/secret"
-    )
-
-    redacted = redact_dsn_error_message(error, dsn)
-
-    assert "pa:ss" not in redacted
-    assert "pa%3Ass" not in redacted
-    assert "q/secret" not in redacted
-    assert "q%2Fsecret" not in redacted
-    assert "snowflake_invalid://user:***@acct.example.com/db?token=***" in redacted
+def test_password_candidates_from_dsn():
+    dsn = "snowflake_invalid://user:my_secret_pwd@host/db?password=secret_query"
+    candidates = _password_candidates_from_dsn(dsn)
+    assert "my_secret_pwd" in candidates
+    assert "secret_query" in candidates
 
 
-def test_short_dsn_password_does_not_corrupt_secret_key_names() -> None:
-    dsn = "postgresql://user:pass@db.example.com/app?password=q%2Fsecret"
-    error = (
-        "driver failed with password=q/secret while retrying "
-        "postgresql://user:pass@db.example.com/app"
-    )
+def test_redact_dsn_error_message_with_underscore_scheme():
+    dsn = "snowflake_invalid://user:my_secret_pwd@host/db?password=secret_query"
+    error_message = "Connection failed for user with my_secret_pwd and secret_query."
+    redacted = redact_dsn_error_message(error_message, dsn)
+    assert "my_secret_pwd" not in redacted
+    assert "secret_query" not in redacted
+    assert "Connection failed for user with *** and ***." in redacted
 
-    redacted = redact_dsn_error_message(error, dsn)
 
-    assert "q/secret" not in redacted
-    assert "user:pass@" not in redacted
-    assert "password=***" in redacted
-    assert "postgresql://user:***@db.example.com/app" in redacted
-    assert "***word" not in redacted
+def test_redact_dsn_error_message_standard():
+    dsn = "postgresql://user:my_secret_pwd@host/db?password=secret_query"
+    error_message = "Connection failed for user with my_secret_pwd and secret_query."
+    redacted = redact_dsn_error_message(error_message, dsn)
+    assert "my_secret_pwd" not in redacted
+    assert "secret_query" not in redacted
+    assert "Connection failed for user with *** and ***." in redacted

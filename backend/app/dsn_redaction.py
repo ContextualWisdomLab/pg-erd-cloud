@@ -18,10 +18,16 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
-    if "://" in dsn and not parsed.netloc:
-        # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
-        parsed = urlsplit("http://" + dsn.split("://", 1)[1])
+
+    # Python's urlsplit treats schemes with underscores as an empty scheme,
+    # moving the credentials into the path. Temporarily substitute the scheme
+    # so we can parse out the network location properly.
+    safe_dsn = dsn
+    scheme_match = re.match(r"^([^:/?#]+)://", dsn)
+    if scheme_match and "_" in scheme_match.group(1):
+        safe_dsn = "http://" + dsn[scheme_match.end() :]
+
+    parsed = urlsplit(safe_dsn)
 
     if parsed.password:
         candidates.add(parsed.password)
@@ -49,18 +55,10 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     return {candidate for candidate in candidates if candidate}
 
 
-def _redact_secret_occurrences(message: str, secret: str) -> str:
-    if len(secret) > 4:
-        return message.replace(secret, "***")
-
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(secret)}(?![A-Za-z0-9])")
-    return pattern.sub("***", message)
-
-
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
     """Redact DSN-derived secrets from a driver error message."""
 
     redacted = error_message
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
-        redacted = _redact_secret_occurrences(redacted, secret)
+        redacted = redacted.replace(secret, "***")
     return _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)

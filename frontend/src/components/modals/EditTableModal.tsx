@@ -223,18 +223,12 @@ export function EditTableModal({
             </button>
           </div>
           <div className="row">
-            <button
-              type="button"
-              onClick={onEditTableCancel}
-              aria-label={`${editingNode.data.title} 테이블 편집 취소`}
-            >
-              취소
-            </button>
+            <button type="button" onClick={onEditTableCancel} aria-label="테이블 편집 취소">취소</button>
             <button
               type="submit"
               form="editTableForm"
               style={{ background: "#034ea2", color: "#fff" }}
-              aria-label={`${editingNode.data.title} 테이블 편집 저장`}
+              aria-label="테이블 편집 저장"
             >
               저장
             </button>

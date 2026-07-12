@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import hashlib
 import uuid
 from dataclasses import dataclass
 from typing import Any, cast
@@ -14,7 +13,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import ApiKey, UserAccount
+from app.models import UserAccount
 from app.settings import settings
 
 
@@ -407,64 +406,11 @@ async def _ensure_user(
     return user
 
 
-API_KEY_PREFIX = "pgerd_"
-API_KEY_PBKDF2_ITERATIONS = 210_000
-
-
-def hash_api_key(token: str) -> str:
-    """Deterministic PBKDF2-HMAC digest of an API key (indexable lookup).
-
-    API keys are server-generated random bearer credentials, but CodeQL treats
-    bearer tokens as sensitive password-like inputs. PBKDF2-HMAC-SHA256 keeps
-    storage deterministic for the unique-indexed lookup while avoiding a fast
-    raw SHA-256/HMAC digest if the API-key table is disclosed. ``app_secret`` is
-    used as a deployment pepper, so database-only disclosure is not enough to
-    test guessed keys offline.
-    """
-
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        token.encode("utf-8"),
-        settings.app_secret.encode("utf-8"),
-        API_KEY_PBKDF2_ITERATIONS,
-    ).hex()
-
-
-async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
-    """Authenticate an ``Authorization: Bearer pgerd_...`` API key.
-
-    Looks up the PBKDF2 hash (constant-shape errors: any failure is the same
-    401 so keys cannot be probed) and rejects revoked keys.
-    """
-
-    row = await session.execute(
-        select(ApiKey, UserAccount)
-        .join(UserAccount, UserAccount.user_account_uuid == ApiKey.user_account_uuid)
-        .where(ApiKey.key_hash == hash_api_key(token))
-    )
-    pair = row.first()
-    if pair is None or pair[0].revoked_at is not None:
-        raise HTTPException(status_code=401, detail="invalid API key")
-    user = pair[1]
-    return CurrentUser(
-        user_account_uuid=user.user_account_uuid,
-        subject=user.oidc_subject,
-        display_name=user.display_name,
-    )
-
-
 async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> CurrentUser:
-    """FastAPI dependency that authenticates and returns the current user.
-
-    Accepts either the standard OIDC bearer token or a ``pgerd_``-prefixed
-    API key (programmatic access for CI/CD and SDKs).
-    """
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+    """FastAPI dependency that authenticates and returns the current user."""
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

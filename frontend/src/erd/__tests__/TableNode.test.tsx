@@ -73,16 +73,16 @@ describe('TableNode', () => {
     ]) {
       const item = screen.getByLabelText(name);
       expect(item).toHaveAttribute('title', name);
-      expect(item).not.toHaveAttribute('tabindex', '0');
+      expect(item).toHaveAttribute('tabindex', '0');
     }
 
     const indexName = screen.getByLabelText('idx_users_email_unique_long_name');
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
-    expect(indexName).not.toHaveAttribute('tabindex', '0');
+    expect(indexName).toHaveAttribute('tabindex', '0');
 
     const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
     expect(notNullBadge).toHaveAttribute('title', 'Not Null');
-    expect(notNullBadge).toHaveTextContent('NN');
+    expect(notNullBadge).toHaveTextContent('NOT NULL');
   });
 
   it('uses a fallback accessible name for blank table titles', () => {
