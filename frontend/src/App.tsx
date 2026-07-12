@@ -54,12 +54,15 @@ import {
   downloadText,
   exportDDL,
   exportDiagramSvg,
+  exportDictionaryCsv,
+  exportDictionaryMarkdown,
   exportPlantUml,
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
@@ -192,25 +195,7 @@ export default function App() {
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
-    if (!normalizedNodeSearch) return new Set<string>();
-    const matches = new Set<string>();
-    for (const node of nodes) {
-      const haystack = [
-        node.data.title,
-        node.data.comment ?? "",
-        ...node.data.columns.flatMap((column) => [
-          column.column_name,
-          column.data_type,
-          column.column_comment ?? "",
-        ]),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
-      if (haystack.includes(normalizedNodeSearch)) {
-        matches.add(node.id);
-      }
-    }
-    return matches;
+    return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
@@ -635,6 +620,22 @@ export default function App() {
 
   function onDownloadMermaid() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
+  }
+
+  function onExportDictionaryCsv() {
+    downloadText(
+      "data_dictionary.csv",
+      exportDictionaryCsv(nodes, edges),
+      "text/csv;charset=utf-8",
+    );
+  }
+
+  function onExportDictionaryMarkdown() {
+    downloadText(
+      "data_dictionary.md",
+      exportDictionaryMarkdown(nodes, edges),
+      "text/markdown;charset=utf-8",
+    );
   }
 
   function onDownloadDbml() {
@@ -1597,6 +1598,7 @@ export default function App() {
             isOpen={isExportModalOpen}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
+            hasDictionaryExport={nodes.length > 0}
             hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
@@ -1608,6 +1610,8 @@ export default function App() {
             onDownloadSvg={onDownloadSvg}
             onDownloadUml={onDownloadUml}
             onDownloadMermaid={onDownloadMermaid}
+            onExportDictionaryCsv={onExportDictionaryCsv}
+            onExportDictionaryMarkdown={onExportDictionaryMarkdown}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />

@@ -19,9 +19,15 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    AuditColumnsOut,
+    ConstraintInventoryOut,
+    FkCyclesOut,
+    IndexRedundancyOut,
     InferredRelationshipOut,
     MigrationSafetyOut,
     NamingLintOut,
+    SchemaStatsOut,
+    SensitiveColumnsOut,
     SnapshotCreateIn,
     SnapshotDetailOut,
     SnapshotDiffOut,
@@ -32,9 +38,20 @@ from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
 from app.ddl.migration_safety import analyze_migration_safety
 from app.diff.schema_diff import diff_snapshots
+from app.spec.audit_columns import check_audit_columns
+from app.spec.constraint_inventory import build_constraint_inventory
+from app.spec.fk_cycles import detect_fk_cycles
+from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.naming_lint import lint_naming
+from app.spec.orm_codegen import (
+    generate_prisma_schema,
+    generate_sqlalchemy_models,
+    generate_typeorm_entities,
+)
 from app.spec.relationship_inference import infer_relationships
+from app.spec.schema_stats import compute_schema_stats
+from app.spec.sensitive_columns import detect_sensitive_columns
 from app.spec.wide_tables import detect_wide_tables
 from app.jobs.valkey_queue import enqueue_job_signal
 from app.spec.llm import (
@@ -356,6 +373,178 @@ async def wide_tables(
         info_threshold=info_threshold,
     )
     return WideTablesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/orm-models", response_class=PlainTextResponse)
+async def export_orm_models(
+    schema_snapshot_uuid: uuid.UUID,
+    flavor: str = Query("sqlalchemy", pattern="^(sqlalchemy|prisma|typeorm)$"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> str:
+    """Generate ORM model code from a snapshot (SQLAlchemy 2.0 or Prisma).
+
+    Forward engineering to application code: hand developers ready-to-edit
+    models instead of retyped tables. IDOR-safe (uniform not-found marker).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return "-- snapshot not found\n"
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    if data is None:
+        return "-- snapshot data not found\n"
+    if flavor == "prisma":
+        return generate_prisma_schema(data.snapshot_json)
+    if flavor == "typeorm":
+        return generate_typeorm_entities(data.snapshot_json)
+    return generate_sqlalchemy_models(data.snapshot_json)
+
+
+@router.get("/{schema_snapshot_uuid}/stats", response_model=SchemaStatsOut)
+async def schema_stats(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SchemaStatsOut:
+    """Overview statistics for a snapshot (object counts, column & type
+    distribution, widest tables, PK/FK/index coverage).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SchemaStatsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", stats=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    stats = compute_schema_stats(data.snapshot_json if data else None)
+    return SchemaStatsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", stats=stats
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/fk-cycles", response_model=FkCyclesOut)
+async def fk_cycles(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> FkCyclesOut:
+    """Report circular foreign-key dependencies (migration-ordering hazards).
+
+    Multi-table cycles are warnings; self-references are informational.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return FkCyclesOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_fk_cycles(data.snapshot_json if data else None)
+    return FkCyclesOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/sensitive-columns", response_model=SensitiveColumnsOut
+)
+async def sensitive_columns(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> SensitiveColumnsOut:
+    """Compliance-scoping inventory: which columns likely hold PII / card /
+    credential data, mapped to the relevant framework (PCI DSS, GDPR/PIPA).
+
+    Detection only -- it does not encrypt, mask, or tokenize anything.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return SensitiveColumnsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_sensitive_columns(data.snapshot_json if data else None)
+    return SensitiveColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get("/{schema_snapshot_uuid}/audit-columns", response_model=AuditColumnsOut)
+async def audit_columns(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> AuditColumnsOut:
+    """Flag tables missing created_at/updated_at when the schema's own
+    majority follows that convention (no external style imposed).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return AuditColumnsOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = check_audit_columns(data.snapshot_json if data else None)
+    return AuditColumnsOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/constraint-inventory",
+    response_model=ConstraintInventoryOut,
+)
+async def constraint_inventory(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> ConstraintInventoryOut:
+    """Inventory CHECK-constraint business rules and FK delete-action risks
+    (ON DELETE CASCADE = warning, SET NULL = info).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return ConstraintInventoryOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_constraint_inventory(data.snapshot_json if data else None)
+    return ConstraintInventoryOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/index-redundancy", response_model=IndexRedundancyOut
+)
+async def index_redundancy(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> IndexRedundancyOut:
+    """Report duplicate and prefix-shadowed indexes (safe drop candidates).
+
+    Unique indexes are never suggested for dropping (they enforce constraints);
+    expression/partial indexes are skipped rather than guessed.
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return IndexRedundancyOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = detect_index_redundancy(data.snapshot_json if data else None)
+    return IndexRedundancyOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
