@@ -60,9 +60,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
 **Action:** Reuse existing collections while aggregating relational data, create `Map`/`Set` entries only on first use, and check for missing example fields before calling expensive inference helpers.
-## 2024-07-07 - Avoid new Map(array.map(...)) for Large Datasets
-**Learning:** Using `new Map(array.map(item => [key, val]))` creates a completely unnecessary intermediate O(N) array of tuple arrays. This forces the garbage collector to immediately clean up the mapped array and the individual tuples once the Map is constructed, leading to memory spikes and GC pauses in large ERD diagrams during export.
-**Action:** Replace `new Map(array.map(...))` with `const map = new Map();` and an iterative `for (const item of array) { map.set(key, item); }` loop to reduce intermediate garbage allocations to zero.
 
 ## 2024-05-18 - [Optimize Node Resolution in autoInfer.ts]
 **Learning:** Found an O(N^2) loop where `nodes.find` scanning via string splitting was running inside an `O(N)` loop to match foreign key relationships. Additionally, noticed two nested O(C) loops checking the same column array. Replaced the top-level loop with an O(1) `Map` lookup and the inner loop with a single O(C) scan using a standard `for...of` loop with early exits.

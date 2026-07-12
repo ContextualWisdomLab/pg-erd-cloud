@@ -10,9 +10,3 @@
 ## [Unreleased]
 ### 추가됨
 - ERD 캔버스 전체 노드 및 관계를 한 번에 초기화할 수 있는 **'전체 지우기' (Clear Canvas)** 버튼을 툴바에 추가했습니다.
-- `AddTableModal`, `EditTableModal`, `EditEdgeModal`, `GroupModal` 컴포넌트 및 `api.ts`에 대한 단위 테스트를 추가하여 프론트엔드 테스트 커버리지를 100%로 향상시켰습니다.
-
-### 변경됨
-- `GroupModal` 테스트 코드 구조를 개선하여 안정성을 높였습니다.
-
-- GroupModal.test.tsx에서 불필요한 import(`fireEvent`)를 제거하여 코드 유지보수성을 개선했습니다.

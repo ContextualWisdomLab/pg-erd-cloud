@@ -42,5 +42,4 @@ describe('GroupModal', () => {
     expect(tableLabel).toHaveAttribute('title', tableName);
     expect(tableLabel).not.toHaveAttribute('tabindex', '0');
   });
-
-  });
+});

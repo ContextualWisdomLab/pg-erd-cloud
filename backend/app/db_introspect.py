@@ -4,7 +4,6 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from app.dsn_redaction import redact_dsn_error_message
-from app.mysql_introspect import introspect_mysql, probe_mysql
 from app.pg_introspect.forward_ddl import validate_forward_ddl
 from app.pg_introspect.introspect import (
     apply_postgres_ddl,
@@ -14,7 +13,7 @@ from app.pg_introspect.introspect import (
 from app.snowflake_introspect import introspect_snowflake
 from app.snowflake_introspect.introspect import probe_snowflake
 
-DatabaseDialect = Literal["postgresql", "snowflake", "mysql"]
+DatabaseDialect = Literal["postgresql", "snowflake"]
 
 
 def detect_dsn_dialect(dsn: str) -> DatabaseDialect:
@@ -25,8 +24,6 @@ def detect_dsn_dialect(dsn: str) -> DatabaseDialect:
         return "postgresql"
     if scheme == "snowflake":
         return "snowflake"
-    if scheme in ("mysql", "mariadb"):
-        return "mysql"
     raise ValueError(f"unsupported database DSN scheme: {scheme or '<empty>'}")
 
 
@@ -37,8 +34,6 @@ async def introspect_database(dsn: str, schema_filter: str | None) -> dict:
         dialect = detect_dsn_dialect(dsn)
         if dialect == "snowflake":
             return await introspect_snowflake(dsn, schema_filter)
-        if dialect == "mysql":
-            return await introspect_mysql(dsn, schema_filter)
         return await introspect_postgres(dsn, schema_filter)
     except Exception as exc:
         message = str(exc) or type(exc).__name__
@@ -76,8 +71,6 @@ async def probe_database(dsn: str) -> str:
         dialect = detect_dsn_dialect(dsn)
         if dialect == "snowflake":
             return await probe_snowflake(dsn)
-        if dialect == "mysql":
-            return await probe_mysql(dsn)
         return await probe_postgres(dsn)
     except Exception as exc:
         message = str(exc) or type(exc).__name__
