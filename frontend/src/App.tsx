@@ -468,6 +468,46 @@ export default function App() {
     }));
   }
 
+  function onClearCanvas() {
+    if (nodes.length === 0) return;
+    if (!window.confirm("캔버스의 모든 테이블과 관계를 삭제하시겠습니까? (저장된 스냅샷에는 영향을 주지 않습니다)")) return;
+    setNodes([]);
+    setEdges([]);
+  }
+
+  function onAutoInferRelationships() {
+    if (nodes.length === 0) return;
+    const newEdges = inferRelationships(nodes);
+    if (newEdges.length === 0) {
+      alert("추론된 새로운 관계가 없습니다.");
+      return;
+    }
+
+    // add new edges only if not already present
+    setEdges((prev) => {
+      const existingSignatures = new Set(
+        prev.map((e) => {
+          const sourceCols = (e.data as any)?.sourceColumns?.join(",") || "";
+          const targetCols = (e.data as any)?.targetColumns?.join(",") || "";
+          return `${e.source}-${e.target}-${sourceCols}-${targetCols}`;
+        })
+      );
+      const edgesToAdd = newEdges.filter((e) => {
+        const sourceCols = (e.data as any)?.sourceColumns?.join(",") || "";
+        const targetCols = (e.data as any)?.targetColumns?.join(",") || "";
+        return !existingSignatures.has(`${e.source}-${e.target}-${sourceCols}-${targetCols}`);
+      });
+
+      if (edgesToAdd.length === 0) {
+        alert("모든 추론된 관계가 이미 존재합니다.");
+        return prev;
+      }
+
+      alert(`새롭게 ${edgesToAdd.length}개의 관계가 추가되었습니다.`);
+      return [...prev, ...edgesToAdd];
+    });
+  }
+
   async function onAutoLayout() {
     if (nodes.length === 0 || isLayouting) return;
     setIsLayouting(true);
@@ -747,20 +787,6 @@ export default function App() {
   function onOpenGroupManager() {
     if (nodes.length === 0) return;
     setIsGroupModalOpen(true);
-  }
-
-  function onAutoInferRelationships() {
-    const inferredEdges = inferRelationships(nodes);
-    if (inferredEdges.length > 0) {
-      setEdges((eds) => [...eds, ...inferredEdges]);
-    }
-  }
-
-  function onClearCanvas() {
-    if (window.confirm("캔버스의 모든 노드와 관계를 삭제하시겠습니까?")) {
-      setNodes([]);
-      setEdges([]);
-    }
   }
 
   function onCloseGroupManager() {
