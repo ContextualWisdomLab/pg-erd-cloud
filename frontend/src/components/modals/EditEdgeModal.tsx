@@ -67,6 +67,12 @@ export function EditEdgeModal({
             id="rel-label"
             value={relLabel}
             onChange={(e) => setRelLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onRelSubmit();
+              }
+            }}
             placeholder="fk_constraint_name"
             autoFocus
           />
@@ -77,8 +83,13 @@ export function EditEdgeModal({
         >
           <button
             type="button"
-            onClick={onRelDelete}
+            onClick={() => {
+              if (window.confirm("이 관계를 삭제하시겠습니까?")) {
+                onRelDelete();
+              }
+            }}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+            aria-label="관계 삭제"
           >
             삭제
           </button>
