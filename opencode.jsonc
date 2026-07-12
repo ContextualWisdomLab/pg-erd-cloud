@@ -7,18 +7,18 @@
     "codegraph": {
       "type": "local",
       "command": ["npx", "-y", "@colbymchenry/codegraph@0.9.9", "serve", "--mcp"],
-      "enabled": true
+      "enabled": false
     },
     "deepwiki": {
       "type": "remote",
       "url": "https://mcp.deepwiki.com/mcp",
-      "enabled": true,
+      "enabled": false,
       "timeout": 10000
     },
     "context7": {
       "type": "local",
       "command": ["npx", "-y", "@upstash/context7-mcp@3.1.0", "--transport", "stdio"],
-      "enabled": true,
+      "enabled": false,
       "timeout": 10000,
       "environment": {
         "NPM_CONFIG_IGNORE_SCRIPTS": "true",
@@ -28,7 +28,7 @@
     "web_search": {
       "type": "local",
       "command": ["npx", "-y", "@guhcostan/web-search-mcp@1.0.5"],
-      "enabled": true,
+      "enabled": false,
       "timeout": 10000,
       "environment": {
         "NPM_CONFIG_IGNORE_SCRIPTS": "true",
