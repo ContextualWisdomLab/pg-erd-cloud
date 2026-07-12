@@ -191,7 +191,8 @@ const XML_ESCAPES: Record<string, string> = {
 function escapeXml(value: unknown): string {
   return String(value ?? '').replace(
     XML_ESCAPE_RE,
-    (char) => XML_ESCAPES[char] ?? char,
+    // The regex and lookup table intentionally enumerate the same characters.
+    (char) => XML_ESCAPES[char]!,
   );
 }
 
@@ -314,7 +315,7 @@ export function exportDiagramSvg(
   for (const n of nodes) {
     const x = n.position.x;
     const y = n.position.y;
-    const h = heights.get(n.id) || headerHeight;
+    const h = heights.get(n.id)!;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
     if (x + width > maxX) maxX = x + width;
@@ -335,9 +336,9 @@ export function exportDiagramSvg(
     const target = nodesById.get(edge.target);
     if (!source || !target) continue;
     const sx = source.position.x + offsetX + width;
-    const sy = source.position.y + offsetY + (heights.get(source.id) || headerHeight) / 2;
+    const sy = source.position.y + offsetY + heights.get(source.id)! / 2;
     const tx = target.position.x + offsetX;
-    const ty = target.position.y + offsetY + (heights.get(target.id) || headerHeight) / 2;
+    const ty = target.position.y + offsetY + heights.get(target.id)! / 2;
     const mx = (sx + tx) / 2;
     parts.push(`<path d="M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>`);
     if (edge.label) {
@@ -348,7 +349,7 @@ export function exportDiagramSvg(
   for (const node of nodes) {
     const x = node.position.x + offsetX;
     const y = node.position.y + offsetY;
-    const height = heights.get(node.id) || headerHeight;
+    const height = heights.get(node.id)!;
     const groupColor = node.data.businessGroup
       ? normalizeBusinessGroupColor(node.data.businessGroup.color)
       : '#e0f2fe';
