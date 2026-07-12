@@ -46,3 +46,7 @@
 ## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
 **Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
 **Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
+
+## 2023-10-27 - Generic Dialog Buttons Need Full Context `aria-label`
+**Learning:** Generic action buttons in dialogs (e.g., "Delete", "Duplicate", "Cancel", "Save") can be confusing to screen reader users if they lack context. In `EditTableModal.tsx`, we encountered generic action labels that were improved by explicitly including the target resource name (e.g., table name) in the `aria-label`.
+**Action:** When adding generic action buttons like "Save" or "Delete" to modal dialogs, always inject contextual variables (like the item name) into their `aria-label` attribute (e.g., `aria-label={`${editingNode.data.title} 저장`}`) to ensure an unambiguous screen reader experience.
