@@ -43,3 +43,6 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
+## 2026-07-12 - Dialog Action Buttons Accessibility
+**Learning:** In complex modals like AddTable, EditTable, and EditEdge, generic action buttons (e.g., '취소', '저장', '삭제', '복제') must be provided with contextual `aria-label`s (like '테이블 추가 취소', '{table name} 테이블 복제'). Relying solely on the modal's `aria-labelledby` isn't always enough to provide immediate clarity to screen reader users navigating button-by-button.
+**Action:** Always append contextual information to generic modal actions (e.g., 'Cancel [Action]', 'Save [Entity]') to enhance keyboard and screen reader accessibility.
