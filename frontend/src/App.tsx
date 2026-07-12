@@ -646,7 +646,6 @@ export default function App() {
 
   function onRelDelete() {
     if (!editingEdge) return;
-    if (!window.confirm("정말로 이 관계를 삭제하시겠습니까?")) return;
     setEdges((eds) => eds.filter((e) => e.id !== editingEdge.id));
     setEditingEdge(null);
   }
