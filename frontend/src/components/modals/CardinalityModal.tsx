@@ -163,6 +163,7 @@ export function CardinalityModal({
                       <input
                         aria-label={`${column.column_name} distinct count`}
                         id={inputId}
+                        aria-label={`${column.column_name} distinct count`}
                         inputMode="numeric"
                         min="1"
                         type="number"
