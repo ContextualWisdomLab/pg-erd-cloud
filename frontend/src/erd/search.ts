@@ -19,13 +19,27 @@ function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
   return false;
 }
 
+export function getSearchTerms(search: string): string[] {
+  // ⚡ Bolt: Avoid Array.from(new Set(search.split().filter())) which does multiple intermediate allocations
+  const rawTerms = search.trim().toLocaleLowerCase().split(/\s+/);
+  const terms: string[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < rawTerms.length; i++) {
+    const term = rawTerms[i];
+    if (term && !seen.has(term)) {
+      seen.add(term);
+      terms.push(term);
+    }
+  }
+  return terms;
+}
+
 export function tableNodeMatchesSearch(
   node: Node<TableNodeData>,
   search: string,
 ): boolean {
-  const terms = Array.from(
-    new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
-  );
+  const terms = getSearchTerms(search);
   if (terms.length === 0) return false;
   return terms.every((term) => nodeIncludesTerm(node, term));
 }
@@ -35,8 +49,11 @@ export function findSearchMatchedNodeIds(
   search: string,
 ): Set<string> {
   const matches = new Set<string>();
+  const terms = getSearchTerms(search);
+  if (terms.length === 0) return matches;
+
   for (const node of nodes) {
-    if (tableNodeMatchesSearch(node, search)) {
+    if (terms.every((term) => nodeIncludesTerm(node, term))) {
       matches.add(node.id);
     }
   }
