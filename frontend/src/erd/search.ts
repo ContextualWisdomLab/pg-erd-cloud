@@ -21,11 +21,13 @@ function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
 
 export function tableNodeMatchesSearch(
   node: Node<TableNodeData>,
-  search: string,
+  search: string | string[],
 ): boolean {
-  const terms = Array.from(
-    new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
-  );
+  const terms = Array.isArray(search)
+    ? search
+    : Array.from(
+        new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
+      );
   if (terms.length === 0) return false;
   return terms.every((term) => nodeIncludesTerm(node, term));
 }
@@ -35,8 +37,15 @@ export function findSearchMatchedNodeIds(
   search: string,
 ): Set<string> {
   const matches = new Set<string>();
+  // ⚡ Bolt: Parse search terms ONCE outside the loop (O(1)) instead of inside tableNodeMatchesSearch for every node (O(N)),
+  // eliminating redundant string allocations, regex splits, and Sets per node.
+  const terms = Array.from(
+    new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
+  );
+  if (terms.length === 0) return matches;
+
   for (const node of nodes) {
-    if (tableNodeMatchesSearch(node, search)) {
+    if (tableNodeMatchesSearch(node, terms)) {
       matches.add(node.id);
     }
   }
