@@ -82,7 +82,7 @@ describe('TableNode', () => {
 
     const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
     expect(notNullBadge).toHaveAttribute('title', 'Not Null');
-    expect(notNullBadge).toHaveTextContent('NOT NULL');
+    expect(notNullBadge).toHaveTextContent('NN');
   });
 
   it('uses a fallback accessible name for blank table titles', () => {
