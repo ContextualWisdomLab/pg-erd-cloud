@@ -54,8 +54,6 @@ import {
   downloadText,
   exportDDL,
   exportDiagramSvg,
-  exportDictionaryCsv,
-  exportDictionaryMarkdown,
   exportPlantUml,
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
@@ -620,22 +618,6 @@ export default function App() {
 
   function onDownloadMermaid() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
-  }
-
-  function onExportDictionaryCsv() {
-    downloadText(
-      "data_dictionary.csv",
-      exportDictionaryCsv(nodes, edges),
-      "text/csv;charset=utf-8",
-    );
-  }
-
-  function onExportDictionaryMarkdown() {
-    downloadText(
-      "data_dictionary.md",
-      exportDictionaryMarkdown(nodes, edges),
-      "text/markdown;charset=utf-8",
-    );
   }
 
   function onDownloadDbml() {
@@ -1598,7 +1580,6 @@ export default function App() {
             isOpen={isExportModalOpen}
             isCopied={isCopied}
             hasDdlExport={nodes.length > 0}
-            hasDictionaryExport={nodes.length > 0}
             hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
             isCreatingShareLink={isCreatingShareLink}
@@ -1610,8 +1591,6 @@ export default function App() {
             onDownloadSvg={onDownloadSvg}
             onDownloadUml={onDownloadUml}
             onDownloadMermaid={onDownloadMermaid}
-            onExportDictionaryCsv={onExportDictionaryCsv}
-            onExportDictionaryMarkdown={onExportDictionaryMarkdown}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
