@@ -157,13 +157,9 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                 </abbr>
               ) : null}
               {c.is_not_null ? (
-                <abbr
-                  className="tableNode__badge"
-                  title="Not Null"
-                  aria-label="필수 입력 (Not Null)"
-                >
-                  NN
-                </abbr>
+                <span className="tableNode__badge" title="Not Null" aria-label="필수 입력 (Not Null)">
+                  NOT NULL
+                </span>
               ) : null}
               <Handle
                 type="source"

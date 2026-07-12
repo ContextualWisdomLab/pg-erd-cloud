@@ -5,7 +5,6 @@ interface ExportModalProps {
   isOpen: boolean;
   isCopied: boolean;
   hasDdlExport: boolean;
-  hasDictionaryExport: boolean;
   hasDiagramExport: boolean;
   shareLinkUrl: string;
   isCreatingShareLink: boolean;
@@ -17,8 +16,6 @@ interface ExportModalProps {
   onDownloadSvg: () => void;
   onDownloadUml: () => void;
   onDownloadMermaid: () => void;
-  onExportDictionaryCsv: () => void;
-  onExportDictionaryMarkdown: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -36,7 +33,6 @@ export function ExportModal({
   isOpen,
   isCopied,
   hasDdlExport,
-  hasDictionaryExport,
   hasDiagramExport,
   shareLinkUrl,
   isCreatingShareLink,
@@ -48,8 +44,6 @@ export function ExportModal({
   onDownloadSvg,
   onDownloadUml,
   onDownloadMermaid,
-  onExportDictionaryCsv,
-  onExportDictionaryMarkdown,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -98,22 +92,6 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadMermaid,
       ariaLabel: 'Mermaid 내보내기',
-    },
-    {
-      label: 'Data Dictionary CSV',
-      description: hasDictionaryExport ? '테이블/컬럼 목록' : '먼저 테이블을 추가하세요',
-      buttonLabel: '내보내기',
-      disabled: !hasDictionaryExport,
-      onExport: onExportDictionaryCsv,
-      ariaLabel: '데이터 사전 CSV 내보내기',
-    },
-    {
-      label: 'Data Dictionary MD',
-      description: hasDictionaryExport ? '마크다운 문서' : '먼저 테이블을 추가하세요',
-      buttonLabel: '내보내기',
-      disabled: !hasDictionaryExport,
-      onExport: onExportDictionaryMarkdown,
-      ariaLabel: '데이터 사전 Markdown 내보내기',
     },
   ];
 

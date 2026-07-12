@@ -8,7 +8,6 @@ const baseProps = {
   isOpen: true,
   isCopied: false,
   hasDdlExport: true,
-  hasDictionaryExport: true,
   hasDiagramExport: true,
   shareLinkUrl: '',
   isCreatingShareLink: false,
@@ -20,8 +19,6 @@ const baseProps = {
   onDownloadSvg: vi.fn(),
   onDownloadUml: vi.fn(),
   onDownloadMermaid: vi.fn(),
-  onExportDictionaryCsv: vi.fn(),
-  onExportDictionaryMarkdown: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
 };
@@ -49,8 +46,6 @@ describe('ExportModal', () => {
     expect(screen.getByText('SVG 이미지')).toBeInTheDocument();
     expect(screen.getByText('PlantUML')).toBeInTheDocument();
     expect(screen.getByText('Mermaid')).toBeInTheDocument();
-    expect(screen.getByText('Data Dictionary CSV')).toBeInTheDocument();
-    expect(screen.getByText('Data Dictionary MD')).toBeInTheDocument();
   });
 
   it('copies an already generated share link', () => {
@@ -76,8 +71,6 @@ describe('ExportModal', () => {
     const onDownloadSvg = vi.fn();
     const onDownloadUml = vi.fn();
     const onDownloadMermaid = vi.fn();
-    const onExportDictionaryCsv = vi.fn();
-    const onExportDictionaryMarkdown = vi.fn();
 
     render(
       <ExportModal
@@ -86,8 +79,6 @@ describe('ExportModal', () => {
         onDownloadSvg={onDownloadSvg}
         onDownloadUml={onDownloadUml}
         onDownloadMermaid={onDownloadMermaid}
-        onExportDictionaryCsv={onExportDictionaryCsv}
-        onExportDictionaryMarkdown={onExportDictionaryMarkdown}
       />,
     );
 
@@ -95,15 +86,11 @@ describe('ExportModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SVG 이미지 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: 'PlantUML 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mermaid 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }));
 
     expect(onCopyExportDdl).toHaveBeenCalledOnce();
     expect(onDownloadSvg).toHaveBeenCalledOnce();
     expect(onDownloadUml).toHaveBeenCalledOnce();
     expect(onDownloadMermaid).toHaveBeenCalledOnce();
-    expect(onExportDictionaryCsv).toHaveBeenCalledOnce();
-    expect(onExportDictionaryMarkdown).toHaveBeenCalledOnce();
   });
 
   it('shows share link copy or creation errors', () => {
@@ -122,18 +109,15 @@ describe('ExportModal', () => {
       <ExportModal
         {...baseProps}
         hasDdlExport={false}
-        hasDictionaryExport={false}
         hasDiagramExport={false}
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(6);
+    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(4);
     expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
   it('exposes access-control guidance for disabled button', () => {
