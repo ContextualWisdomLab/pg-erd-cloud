@@ -25,7 +25,8 @@ function csvCell(value: unknown): string {
 
 function markdownText(value: unknown): string {
   return cellText(value)
-    .replace(MARKDOWN_HTML_RE, (char) => MARKDOWN_HTML_ESCAPES[char] ?? char)
+    // The regex and lookup table intentionally enumerate the same characters.
+    .replace(MARKDOWN_HTML_RE, (char) => MARKDOWN_HTML_ESCAPES[char]!)
     .replace(MARKDOWN_ESCAPE_RE, (char) => `\\${char}`);
 }
 

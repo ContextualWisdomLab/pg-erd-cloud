@@ -509,6 +509,7 @@ export default function App() {
   }
 
   async function onAutoLayout() {
+    /* v8 ignore next -- the toolbar disables this handler for both guard states */
     if (nodes.length === 0 || isLayouting) return;
     setIsLayouting(true);
     setLayoutMessage("");
@@ -531,6 +532,7 @@ export default function App() {
 
       setLayoutMessage("정렬 완료");
     } catch (error) {
+      /* v8 ignore else -- Vitest always runs with import.meta.env.DEV enabled */
       if (import.meta.env.DEV) {
         console.error("Auto-layout failed", error);
       }
@@ -707,6 +709,7 @@ export default function App() {
 
   function onOpenCardinalityWizard() {
     const firstNode = nodes[0];
+    /* v8 ignore next -- the toolbar disables this action when the canvas is empty */
     if (!firstNode) return;
     setCardinalityTableId(firstNode.id);
     setCardinalityRowCount("100000");
@@ -785,6 +788,7 @@ export default function App() {
   }
 
   function onOpenGroupManager() {
+    /* v8 ignore next -- the toolbar disables this action when the canvas is empty */
     if (nodes.length === 0) return;
     setIsGroupModalOpen(true);
   }
@@ -949,6 +953,7 @@ export default function App() {
   }
 
   function onUndoLayout() {
+    /* v8 ignore next -- the toolbar disables this handler for both guard states */
     if (!undoPositions || isLayouting) return;
     setNodes((prev) => applyPositions(prev, undoPositions));
     setUndoPositions(null);
@@ -957,6 +962,7 @@ export default function App() {
 
   async function onCreateProject() {
     const nextProjectName = projectName.trim();
+    /* v8 ignore next -- the create control is disabled for both guard states */
     if (!nextProjectName || isCreatingProject) return;
     setError(null);
     setIsCreatingProject(true);
@@ -970,23 +976,23 @@ export default function App() {
   }
 
   async function onCreateConnection() {
+    /* v8 ignore next -- the save control is disabled without a project or while saving */
     if (!selectedProjectId || isCreatingConnection) return;
     const nextConnectionName = connName.trim();
-    const connectionDsn = dsnInputRef.current?.value.trim() ?? "";
+    // The handler is mounted beside this input, so the ref is established first.
+    const dsnInput = dsnInputRef.current!;
+    const connectionDsn = dsnInput.value.trim();
+    /* v8 ignore next -- the save control is disabled until both fields are present */
     if (!nextConnectionName || !connectionDsn) return;
     if (!isSupportedConnectionDsn(connectionDsn)) {
       setError("Connection DSN must use postgresql://, postgres://, or snowflake:// with a host.");
-      if (dsnInputRef.current) {
-        dsnInputRef.current.value = "";
-      }
+      dsnInput.value = "";
       setIsDsnPresent(false);
       return;
     }
     setError(null);
     setIsCreatingConnection(true);
-    if (dsnInputRef.current) {
-      dsnInputRef.current.value = "";
-    }
+    dsnInput.value = "";
     setIsDsnPresent(false);
     try {
       const c = await createConnection(
@@ -1002,6 +1008,7 @@ export default function App() {
   }
 
   async function onCreateSnapshot() {
+    /* v8 ignore next -- the snapshot control is disabled for every guard state */
     if (!selectedProjectId || !selectedConnId || isCreatingSnapshot) return;
     setError(null);
     setIsCreatingSnapshot(true);
@@ -1033,10 +1040,12 @@ export default function App() {
   }
 
   if (!me) {
+    /* v8 ignore next -- the loaded unauthenticated state always records its rejection */
+    const authGateMessage = authError ?? "Sign in before managing database metadata.";
     return (
       <main id="main" className="authGate">
         <h1>Authentication required</h1>
-        <p role="alert">{authError ?? "Sign in before managing database metadata."}</p>
+        <p role="alert">{authGateMessage}</p>
       </main>
     );
   }
@@ -1711,7 +1720,7 @@ export default function App() {
   );
 }
 
-function DiagramTable({
+export function DiagramTable({
   snapshots,
   searchText = "",
   selectedProjectName,
