@@ -49,3 +49,7 @@
 ## 2024-07-12 - [Accessibility] Unique aria-labels in dynamic lists
 **Learning:** Screen readers cannot differentiate generic labels (like '컬럼명' or 'PK') when they repeat in dynamic lists or tables. Providing a static aria-label inside a mapped array causes screen readers to announce identical generic labels across different rows.
 **Action:** Always prepend or append a uniquely identifiable name (e.g., prepending the row's specific item name) to the 'aria-label' attribute of interactive elements inside dynamic lists so screen readers can correctly distinguish between them.
+
+## 2024-05-18 - Native Keyboard Submission with Forms
+**Learning:** Interactive input groups intended for submission (like the new group creation input and button) lack native keyboard support (e.g., submitting via Enter key) when built with plain `<div>` elements.
+**Action:** Always wrap data submission input and button groups in a `<form>` element, set the primary action button to `type="submit"`, and handle `onSubmit` (preventing default). This automatically provides Enter-key submission capabilities and improves accessibility for keyboard users.
