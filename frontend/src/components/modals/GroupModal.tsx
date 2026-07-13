@@ -56,7 +56,7 @@ export function GroupModal({
           </button>
         </div>
 
-        <div className="groupManager__create">
+        <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
           <div className="field">
             <label htmlFor="business-group-name">그룹 이름</label>
             <input
@@ -85,13 +85,12 @@ export function GroupModal({
             ))}
           </div>
           <button
-            type="button"
-            onClick={onCreateBusinessGroup}
+            type="submit"
             disabled={!newGroupName.trim()}
           >
             추가
           </button>
-        </div>
+        </form>
 
         <div className="groupManager__section">
           <h4>그룹</h4>
