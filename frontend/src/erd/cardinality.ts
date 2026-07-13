@@ -118,7 +118,8 @@ export function buildIndexRecommendations({
     )
     .map((column) => ({
       ...column,
-      distinctCount: Math.min(column.distinctCount ?? 0, rowCount),
+      // The filter above establishes a positive, non-null distinct count.
+      distinctCount: Math.min(column.distinctCount!, rowCount),
     }));
 
   const recommendations = selected.map((column) =>
