@@ -31,7 +31,7 @@ export function EditTableModal({
       <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
-          <button type="button" className="exportModal__iconButton" aria-label="닫기" onClick={onEditTableCancel}>X</button>
+          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
         </div>
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
@@ -116,7 +116,7 @@ export function EditTableModal({
                       defaultValue={col.column_name}
                       placeholder="컬럼명"
                       style={{ flex: 2 }}
-                      aria-label="컬럼명"
+                      aria-label={`${col.column_name} 컬럼명`}
                     />
                     <input
                       type="text"
@@ -124,13 +124,14 @@ export function EditTableModal({
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
                       style={{ flex: 1.5 }}
-                      aria-label="데이터 타입"
+                      aria-label={`${col.column_name} 데이터 타입`}
                     />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
                         defaultChecked={col.is_pk}
+                        aria-label={`${col.column_name} PK 설정`}
                       />
                       PK
                     </label>
@@ -139,6 +140,7 @@ export function EditTableModal({
                         type="checkbox"
                         name={`col_nn_${idx}`}
                         defaultChecked={col.is_not_null}
+                        aria-label={`${col.column_name} NN 설정`}
                       />
                       NN
                     </label>

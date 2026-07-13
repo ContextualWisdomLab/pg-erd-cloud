@@ -49,11 +49,10 @@ export function GroupModal({
           <h3 id="group-manager-title">업무 그룹</h3>
           <button
             type="button"
-            className="exportModal__iconButton"
             onClick={onCloseGroupManager}
             aria-label="업무 그룹 닫기"
           >
-            X
+            닫기
           </button>
         </div>
 
