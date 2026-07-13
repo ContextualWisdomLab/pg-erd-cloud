@@ -100,7 +100,6 @@ export function CardinalityModal({
               value={cardinalityRowCount}
               onChange={(event) => {
                 const value = event.target.value;
-                /* v8 ignore else -- type=number normalizes invalid lexemes before change */
                 if (/^\d*$/.test(value)) {
                   setCardinalityRowCount(value);
                 }

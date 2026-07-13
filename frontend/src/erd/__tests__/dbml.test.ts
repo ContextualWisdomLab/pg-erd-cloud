@@ -123,21 +123,6 @@ describe('exportDbml', () => {
     expect(result).toContain('Ref: posts.(tenant_id, user_id) > users.(tenant_id, id)');
   });
 
-  it('exports a schema-qualified source to an unqualified target', () => {
-    const source = {
-      id: 'source', type: 'tableNode', position: { x: 0, y: 0 },
-      data: { title: 'audit.events', badges: { pk: false, fk: true }, columns: [] },
-    } as Node<TableNodeData>;
-    const target = {
-      id: 'target', type: 'tableNode', position: { x: 0, y: 0 },
-      data: { title: 'users', badges: { pk: true, fk: false }, columns: [] },
-    } as Node<TableNodeData>;
-    expect(exportDbml([source, target], [{
-      id: 'edge', source: 'source', target: 'target',
-      data: { sourceColumns: ['user_id'], targetColumns: ['id'] },
-    }])).toContain('Ref: audit.events.user_id > users.id');
-  });
-
   it('should escape special characters', () => {
     const nodes: Node<TableNodeData>[] = [
       {

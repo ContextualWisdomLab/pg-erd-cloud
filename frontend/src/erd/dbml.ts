@@ -2,6 +2,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
 
 function escapeString(str: string): string {
+  if (!str) return "";
   return str.replace(/'/g, "''");
 }
 

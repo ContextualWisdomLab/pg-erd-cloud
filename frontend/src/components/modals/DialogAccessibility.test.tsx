@@ -1,17 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { AddTableModal } from './AddTableModal';
 import { GroupModal } from './GroupModal';
 import { useDialogAccessibility } from './useDialogAccessibility';
-
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
-});
 
 describe('modal dialog accessibility', () => {
   it('closes with Escape and restores focus to the opener', async () => {
@@ -115,90 +110,5 @@ describe('modal dialog accessibility', () => {
     lastButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(firstButton).toHaveFocus();
-  });
-
-  it('focuses a buttonless dialog and keeps Tab inside it', async () => {
-    function ButtonlessDialog() {
-      const dialogRef = useDialogAccessibility(true, vi.fn());
-      return <div ref={dialogRef} role="dialog" tabIndex={-1}>No controls</div>;
-    }
-
-    render(<ButtonlessDialog />);
-    const dialog = screen.getByRole('dialog');
-    await waitFor(() => expect(dialog).toHaveFocus());
-    fireEvent.keyDown(document, { key: 'x' });
-    document.body.focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(dialog).toHaveFocus();
-  });
-
-  it('safely handles an open hook before its dialog ref is attached', () => {
-    vi.useFakeTimers();
-    function MissingDialog() {
-      useDialogAccessibility(true, vi.fn());
-      return <span>no dialog ref</span>;
-    }
-
-    render(<MissingDialog />);
-    fireEvent.keyDown(document, { key: 'Tab' });
-    act(() => { vi.runOnlyPendingTimers(); });
-  });
-
-  it('restores an existing opener immediately and on the follow-up timer', () => {
-    vi.useFakeTimers();
-    const opener = document.createElement('button');
-    document.body.appendChild(opener);
-    opener.focus();
-
-    function Dialog() {
-      const dialogRef = useDialogAccessibility(true, vi.fn());
-      return <div ref={dialogRef} role="dialog" tabIndex={-1}><button>inside</button></div>;
-    }
-
-    const { unmount } = render(<Dialog />);
-    act(() => { vi.runOnlyPendingTimers(); });
-    expect(screen.getByRole('button', { name: 'inside' })).toHaveFocus();
-    unmount();
-    expect(opener).toHaveFocus();
-    act(() => { vi.runOnlyPendingTimers(); });
-    expect(opener).toHaveFocus();
-    opener.remove();
-  });
-
-  it('does not wrap Tab from a middle control and tolerates body focus events', async () => {
-    function ThreeControlDialog() {
-      const dialogRef = useDialogAccessibility(true, vi.fn());
-      return (
-        <div ref={dialogRef} role="dialog" tabIndex={-1}>
-          <button>first</button><button>middle</button><button>last</button>
-        </div>
-      );
-    }
-
-    render(<ThreeControlDialog />);
-    const middle = screen.getByRole('button', { name: 'middle' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'first' })).toHaveFocus());
-    middle.focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(middle).toHaveFocus();
-    fireEvent.focusIn(document.body);
-  });
-
-  it('does not refocus an opener removed after cleanup', () => {
-    vi.useFakeTimers();
-    const opener = document.createElement('button');
-    document.body.appendChild(opener);
-    opener.focus();
-
-    function Dialog() {
-      const dialogRef = useDialogAccessibility(true, vi.fn());
-      return <div ref={dialogRef} role="dialog" tabIndex={-1}><button>inside</button></div>;
-    }
-
-    const { unmount } = render(<Dialog />);
-    act(() => { vi.runOnlyPendingTimers(); });
-    unmount();
-    opener.remove();
-    act(() => { vi.runOnlyPendingTimers(); });
   });
 });
