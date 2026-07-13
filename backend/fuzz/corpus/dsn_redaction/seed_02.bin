@@ -1,0 +1,1 @@
+postgresql://u:s3cr3t@db.example.com:5432/app?sslmode=require

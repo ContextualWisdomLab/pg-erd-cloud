@@ -16,25 +16,58 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 )
 
 
+def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
+    """Extract (netloc, query) from a DSN without ``urlsplit``.
+
+    ``urllib.parse.urlsplit`` raises ``ValueError`` (e.g. "Invalid IPv6 URL")
+    on malformed authorities such as an unbalanced ``[``. Redaction must never
+    crash on hostile input, otherwise the raw, un-redacted error message could
+    still reach a client. This fallback recovers the credential-bearing parts
+    with plain string slicing so embedded secrets are still stripped.
+    """
+
+    remainder = dsn
+    scheme_sep = remainder.find("://")
+    if scheme_sep != -1:
+        remainder = remainder[scheme_sep + 3 :]
+    remainder = remainder.split("#", 1)[0]
+    if "?" in remainder:
+        remainder, query = remainder.split("?", 1)
+    else:
+        query = ""
+    netloc = remainder.split("/", 1)[0]
+    return netloc, query
+
+
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
-    parsed = urlsplit(dsn)
-    if "://" in dsn and not parsed.netloc:
-        # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
-        parsed = urlsplit("http://" + dsn.split("://", 1)[1])
 
-    if parsed.password:
-        candidates.add(parsed.password)
-        candidates.add(quote(parsed.password, safe=""))
+    password: str | None = None
+    try:
+        parsed = urlsplit(dsn)
+        if "://" in dsn and not parsed.netloc:
+            # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+            parsed = urlsplit("http://" + dsn.split("://", 1)[1])
+        netloc = parsed.netloc
+        password = parsed.password
+        query = parsed.query
+    except ValueError:
+        # Malformed DSN (e.g. invalid IPv6 literal). Fall back to best-effort
+        # parsing so any embedded credentials are still redacted.
+        netloc, query = _split_dsn_best_effort(dsn)
 
-    if "@" in parsed.netloc:
-        userinfo = parsed.netloc.rsplit("@", 1)[0]
+    if password:
+        candidates.add(password)
+        candidates.add(quote(password, safe=""))
+
+    if "@" in netloc:
+        userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
             candidates.add(raw_password)
             candidates.add(unquote(raw_password))
 
-    for part in parsed.query.split("&"):
+    for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
         if not sep:
             continue

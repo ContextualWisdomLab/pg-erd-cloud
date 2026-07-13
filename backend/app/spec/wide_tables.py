@@ -18,6 +18,20 @@ WARNING = "warning"
 INFO = "info"
 
 
+def _rows(snapshot: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Return ``snapshot[key]`` as dict rows, tolerating malformed JSON.
+
+    Missing / non-list / non-dict-entry payloads degrade to "no rows" rather
+    than raising -- matching the defensive contract of the other snapshot
+    generators (``app.spec.reversing._rows`` etc.).
+    """
+
+    value = snapshot.get(key)
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, dict)]
+
+
 def detect_wide_tables(
     snapshot: dict[str, Any] | None,
     warn_threshold: int = 40,
@@ -25,8 +39,8 @@ def detect_wide_tables(
 ) -> dict[str, Any]:
     """Return tables exceeding the column-count thresholds, widest first."""
     snapshot = snapshot or {}
-    relations = snapshot.get("relations") or []
-    columns = snapshot.get("columns") or []
+    relations = _rows(snapshot, "relations")
+    columns = _rows(snapshot, "columns")
 
     # Only ordinary/partitioned tables count (views legitimately project many cols).
     table_oids = {
