@@ -59,16 +59,16 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, Set<string>> {
 
 function isForeignKeyColumn(
   edgeColumnsByNode: Map<string, Set<string>>,
+  fkHandles: Set<string>,
   node: Node<TableNodeData>,
   columnName: string,
-  edges: Edge[],
 ): boolean {
   if (edgeColumnsByNode.get(node.id)?.has(columnName)) {
     return true;
   }
 
   const handleId = sourceColumnHandleId(columnName);
-  return edges.some((edge) => edge.source === node.id && edge.sourceHandle === handleId);
+  return fkHandles.has(`${node.id}:${handleId}`);
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {
@@ -91,7 +91,15 @@ export function exportDictionaryCsv(
     'Example Value',
   ];
   const rows: unknown[][] = [header];
+  // ⚡ Bolt: Pre-compute foreign key handle sets to avoid O(E) array search per column,
+  // reducing complexity from O(N * C * E) to O(N * C + E).
   const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkHandles = new Set<string>();
+  for (const edge of edges) {
+    if (edge.sourceHandle) {
+      fkHandles.add(`${edge.source}:${edge.sourceHandle}`);
+    }
+  }
 
   for (const node of nodes) {
     const tableName = node.data.title || node.id;
@@ -110,7 +118,7 @@ export function exportDictionaryCsv(
         column.column_name,
         column.data_type,
         column.is_pk ? 'Y' : 'N',
-        isForeignKeyColumn(fkColumnsByNode, node, column.column_name, edges) ? 'Y' : 'N',
+        isForeignKeyColumn(fkColumnsByNode, fkHandles, node, column.column_name) ? 'Y' : 'N',
         column.is_not_null ? 'Y' : 'N',
         column.column_comment || '',
         exampleValue(column.example_value),
@@ -126,7 +134,15 @@ export function exportDictionaryMarkdown(
   edges: Edge[],
 ): string {
   const lines: string[] = ['# Data Dictionary', ''];
+  // ⚡ Bolt: Pre-compute foreign key handle sets to avoid O(E) array search per column,
+  // reducing complexity from O(N * C * E) to O(N * C + E).
   const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkHandles = new Set<string>();
+  for (const edge of edges) {
+    if (edge.sourceHandle) {
+      fkHandles.add(`${edge.source}:${edge.sourceHandle}`);
+    }
+  }
 
   if (nodes.length === 0) {
     lines.push('No tables found.');
@@ -149,7 +165,7 @@ export function exportDictionaryMarkdown(
 
     for (const column of columns) {
       const pk = column.is_pk ? 'Y' : 'N';
-      const fk = isForeignKeyColumn(fkColumnsByNode, node, column.column_name, edges) ? 'Y' : 'N';
+      const fk = isForeignKeyColumn(fkColumnsByNode, fkHandles, node, column.column_name) ? 'Y' : 'N';
       const notNull = column.is_not_null ? 'Y' : 'N';
       const comment = column.column_comment || '';
       lines.push(
