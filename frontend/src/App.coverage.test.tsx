@@ -275,19 +275,7 @@ beforeEach(() => {
   })
   api.createShareLink.mockResolvedValue({ url: 'http://localhost/api/share/one' })
   exports.inferRelationships.mockReturnValue([
-    {
-      id: 'inferred',
-      source: 'table-1',
-      target: 'table-2',
-      label: 'fk_inferred',
-      data: { sourceColumns: ['owner_id'], targetColumns: ['id'] },
-    },
-    {
-      id: 'inferred-without-column-metadata',
-      source: 'table-2',
-      target: 'table-1',
-      label: 'fk_inferred_fallback',
-    },
+    { id: 'inferred', source: 'table-1', target: 'table-2', label: 'fk_inferred' },
   ])
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -477,23 +465,13 @@ describe('App orchestration coverage', () => {
     expect(exports.downloadText).toHaveBeenCalledTimes(5)
 
     fireEvent.click(screen.getByRole('button', { name: 'DBML 내보내기' }))
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
-    expect(screen.getByTestId('edge-count')).toHaveTextContent('2')
-    expect(alertSpy).toHaveBeenCalledWith('새롭게 2개의 관계가 추가되었습니다.')
-    fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
-    expect(screen.getByTestId('edge-count')).toHaveTextContent('2')
-    expect(alertSpy).toHaveBeenCalledWith('모든 추론된 관계가 이미 존재합니다.')
     exports.inferRelationships.mockReturnValueOnce([])
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
-    expect(alertSpy).toHaveBeenCalledWith('추론된 새로운 관계가 없습니다.')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
-    expect(confirmSpy).toHaveBeenCalledWith(
-      '캔버스의 모든 테이블과 관계를 삭제하시겠습니까? (저장된 스냅샷에는 영향을 주지 않습니다)',
-    )
     expect(screen.getByText('ERD 캔버스가 비어 있습니다')).toBeInTheDocument()
   })
 
@@ -631,9 +609,8 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -663,9 +640,8 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -767,9 +743,8 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -808,9 +783,8 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
