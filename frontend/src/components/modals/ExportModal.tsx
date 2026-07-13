@@ -19,6 +19,7 @@ interface ExportModalProps {
   onDownloadMermaid: () => void;
   onExportDictionaryCsv: () => void;
   onExportDictionaryMarkdown: () => void;
+  onDownloadDbml: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -50,6 +51,7 @@ export function ExportModal({
   onDownloadMermaid,
   onExportDictionaryCsv,
   onExportDictionaryMarkdown,
+  onDownloadDbml,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -98,6 +100,14 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadMermaid,
       ariaLabel: 'Mermaid 내보내기',
+    },
+    {
+      label: 'DBML',
+      description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadDbml,
+      ariaLabel: 'DBML 내보내기',
     },
     {
       label: 'Data Dictionary CSV',
