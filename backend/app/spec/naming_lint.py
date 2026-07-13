@@ -47,6 +47,20 @@ DISCOURAGED_KEYWORDS = frozenset(
 _VALID_UNQUOTED = re.compile(r"^[a-z_][a-z0-9_$]*$")
 
 
+def _rows(snapshot: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Return ``snapshot[key]`` as dict rows, tolerating malformed JSON.
+
+    A key that is missing, not a list, or holds non-dict entries degrades to
+    "no rows" rather than raising -- the same defensive contract used by the
+    other snapshot generators (``app.spec.reversing._rows`` etc.).
+    """
+
+    value = snapshot.get(key)
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, dict)]
+
+
 def _case_style(name: str) -> str | None:
     """Classify identifier case style, or None if it can't be classified."""
     if re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", name):
@@ -65,8 +79,8 @@ def _item(category: str, severity: str, target: str, detail: str) -> dict[str, A
 def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Return naming-convention findings + a summary, breaking issues first."""
     snapshot = snapshot or {}
-    relations = snapshot.get("relations") or []
-    columns = snapshot.get("columns") or []
+    relations = _rows(snapshot, "relations")
+    columns = _rows(snapshot, "columns")
     rel_by_oid = {r.get("relation_oid"): r for r in relations}
 
     # (label, name) for every identifier: tables and columns.
