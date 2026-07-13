@@ -65,11 +65,10 @@ export function CardinalityModal({
           <h3 id="cardinality-title">인덱스 카디널리티</h3>
           <button
             type="button"
-            className="exportModal__iconButton"
             onClick={onCloseCardinalityWizard}
             aria-label="카디널리티 계산 닫기"
           >
-            X
+            닫기
           </button>
         </div>
 
