@@ -624,10 +624,6 @@ export default function App() {
     downloadText("pg-erd-diagram.mermaid", exportMermaid(nodes, edges), "text/plain");
   }
 
-  function onDownloadDbml() {
-    downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
-  }
-
   function onExportDictionaryCsv() {
     downloadText(
       "data_dictionary.csv",
@@ -642,6 +638,10 @@ export default function App() {
       exportDictionaryMarkdown(nodes, edges),
       "text/markdown;charset=utf-8",
     );
+  }
+
+  function onDownloadDbml() {
+    downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
   }
 
   function onRelDelete() {
@@ -1534,6 +1534,17 @@ export default function App() {
             >
               {"{}"}
             </button>
+            <button
+              type="button"
+              onClick={onDownloadDbml}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DBML 내보내기"
+              }
+              aria-label="DBML 내보내기"
+            >
+              DBML
+            </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
             </div>
@@ -1610,7 +1621,6 @@ export default function App() {
             onDownloadMermaid={onDownloadMermaid}
             onExportDictionaryCsv={onExportDictionaryCsv}
             onExportDictionaryMarkdown={onExportDictionaryMarkdown}
-            onDownloadDbml={onDownloadDbml}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />

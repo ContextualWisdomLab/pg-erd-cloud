@@ -22,7 +22,6 @@ const baseProps = {
   onDownloadMermaid: vi.fn(),
   onExportDictionaryCsv: vi.fn(),
   onExportDictionaryMarkdown: vi.fn(),
-  onDownloadDbml: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
 };
@@ -50,7 +49,6 @@ describe('ExportModal', () => {
     expect(screen.getByText('SVG 이미지')).toBeInTheDocument();
     expect(screen.getByText('PlantUML')).toBeInTheDocument();
     expect(screen.getByText('Mermaid')).toBeInTheDocument();
-    expect(screen.getByText('DBML')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary CSV')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary MD')).toBeInTheDocument();
   });
@@ -101,7 +99,6 @@ describe('ExportModal', () => {
     const onDownloadMermaid = vi.fn();
     const onExportDictionaryCsv = vi.fn();
     const onExportDictionaryMarkdown = vi.fn();
-    const onDownloadDbml = vi.fn();
 
     render(
       <ExportModal
@@ -112,7 +109,6 @@ describe('ExportModal', () => {
         onDownloadMermaid={onDownloadMermaid}
         onExportDictionaryCsv={onExportDictionaryCsv}
         onExportDictionaryMarkdown={onExportDictionaryMarkdown}
-        onDownloadDbml={onDownloadDbml}
       />,
     );
 
@@ -120,7 +116,6 @@ describe('ExportModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SVG 이미지 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: 'PlantUML 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mermaid 내보내기' }));
-    fireEvent.click(screen.getByRole('button', { name: 'DBML 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }));
 
@@ -128,7 +123,6 @@ describe('ExportModal', () => {
     expect(onDownloadSvg).toHaveBeenCalledOnce();
     expect(onDownloadUml).toHaveBeenCalledOnce();
     expect(onDownloadMermaid).toHaveBeenCalledOnce();
-    expect(onDownloadDbml).toHaveBeenCalledOnce();
     expect(onExportDictionaryCsv).toHaveBeenCalledOnce();
     expect(onExportDictionaryMarkdown).toHaveBeenCalledOnce();
   });
@@ -154,12 +148,11 @@ describe('ExportModal', () => {
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(7);
+    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(6);
     expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
