@@ -44,7 +44,8 @@ describe('snapshotToGraph', () => {
       ],
       constraints: [],
       pk_columns: [
-        { relation_oid: 1, column_name: 'id' }
+        { relation_oid: 1, column_name: 'id' },
+        { relation_oid: 1, column_name: 'name' }
       ]
     }
 
@@ -52,7 +53,7 @@ describe('snapshotToGraph', () => {
 
     expect(graph.nodes[0].data.badges.pk).toBe(true)
     expect(graph.nodes[0].data.columns[0].is_pk).toBe(true)
-    expect(graph.nodes[0].data.columns[1].is_pk).toBe(false)
+    expect(graph.nodes[0].data.columns[1].is_pk).toBe(true)
   })
 
   it('identifies foreign keys correctly via fk_edges', () => {

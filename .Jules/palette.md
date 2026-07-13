@@ -46,3 +46,6 @@
 ## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
 **Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
 **Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
+## 2024-07-12 - [Accessibility] Unique aria-labels in dynamic lists
+**Learning:** Screen readers cannot differentiate generic labels (like '컬럼명' or 'PK') when they repeat in dynamic lists or tables. Providing a static aria-label inside a mapped array causes screen readers to announce identical generic labels across different rows.
+**Action:** Always prepend or append a uniquely identifiable name (e.g., prepending the row's specific item name) to the 'aria-label' attribute of interactive elements inside dynamic lists so screen readers can correctly distinguish between them.
