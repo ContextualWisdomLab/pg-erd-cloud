@@ -115,10 +115,10 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
           {data.badges?.pk ? (
-            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">PK</abbr>
+            <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key"><span aria-hidden="true">PK</span></abbr>
           ) : null}
           {data.badges?.fk ? (
-            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key">FK</abbr>
+            <abbr className="tableNode__badge" title="Foreign Key" aria-label="Foreign Key"><span aria-hidden="true">FK</span></abbr>
           ) : null}
         </span>
       </div>
@@ -153,7 +153,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
               <span className="tableNode__colType">{c.data_type}</span>
               {c.is_pk ? (
                 <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
-                  PK
+                  <span aria-hidden="true">PK</span>
                 </abbr>
               ) : null}
               {c.is_not_null ? (
@@ -162,7 +162,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                   title="Not Null"
                   aria-label="필수 입력 (Not Null)"
                 >
-                  NN
+                  <span aria-hidden="true">NN</span>
                 </abbr>
               ) : null}
               <Handle

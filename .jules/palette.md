@@ -50,3 +50,7 @@
 ## 2024-05-18 - Table row input accessibility
 **Learning:** In table-based forms where inputs or `<select>` elements correspond to a specific row property (e.g., Distinct Count, Group Assignment), the visual context or `<label>` often only provides the row identity. Screen reader users can lose context when focusing directly on these inputs.
 **Action:** Always provide an explicit `aria-label` directly on the input/select to give screen readers full context (e.g., `${column.column_name} distinct count`, `${node.data.title} 그룹 배정`), even if it is linked to a label via `id` or placed next to it visually.
+
+## 2024-07-13 - [Table Node Accessibility]
+**Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
+**Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
