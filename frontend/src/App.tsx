@@ -49,7 +49,11 @@ import {
   type CardinalityStrength,
   type IndexRecommendation,
 } from "./erd/cardinality";
-import { snapshotToGraph, type TableNodeData } from "./erd/convert";
+import {
+  snapshotToGraph,
+  type ForeignKeyEdgeData,
+  type TableNodeData,
+} from "./erd/convert";
 import {
   downloadText,
   exportDDL,
@@ -755,13 +759,43 @@ export default function App() {
 
   function onAutoInferRelationships() {
     const inferredEdges = inferRelationships(nodes);
-    if (inferredEdges.length > 0) {
-      setEdges((eds) => [...eds, ...inferredEdges]);
+    if (inferredEdges.length === 0) {
+      window.alert("추론된 새로운 관계가 없습니다.");
+      return;
     }
+
+    setEdges((currentEdges) => {
+      const signature = (edge: Edge): string => {
+        const data = edge.data as ForeignKeyEdgeData | undefined;
+        return [
+          edge.source,
+          edge.target,
+          ...(data?.sourceColumns ?? []),
+          "=>",
+          ...(data?.targetColumns ?? []),
+        ].join("\u0000");
+      };
+      const existingSignatures = new Set(currentEdges.map(signature));
+      const edgesToAdd = inferredEdges.filter(
+        (edge) => !existingSignatures.has(signature(edge)),
+      );
+
+      if (edgesToAdd.length === 0) {
+        window.alert("모든 추론된 관계가 이미 존재합니다.");
+        return currentEdges;
+      }
+
+      window.alert(`새롭게 ${edgesToAdd.length}개의 관계가 추가되었습니다.`);
+      return [...currentEdges, ...edgesToAdd];
+    });
   }
 
   function onClearCanvas() {
-    if (window.confirm("캔버스의 모든 노드와 관계를 삭제하시겠습니까?")) {
+    if (
+      window.confirm(
+        "캔버스의 모든 테이블과 관계를 삭제하시겠습니까? (저장된 스냅샷에는 영향을 주지 않습니다)",
+      )
+    ) {
       setNodes([]);
       setEdges([]);
     }
