@@ -30,6 +30,12 @@ from app.spec.reversing import generate_reversing_spec
 router = APIRouter(prefix="/api", tags=["share"])
 
 
+import re
+from app.dsn_redaction import redact_dsn_error_message
+
+import re
+from app.dsn_redaction import redact_dsn_error_message
+
 def _redact_sensitive_snapshot_fields(
     data: dict | list | str | int | float | bool | None,
 ) -> dict | list | str | int | float | bool | None:
@@ -37,12 +43,26 @@ def _redact_sensitive_snapshot_fields(
     if isinstance(data, dict):
         return {
             k: "***"
-            if k in {"comment", "relation_comment", "column_comment", "example_value"}
+            if isinstance(k, str) and (
+                k.lower() in {"comment", "relation_comment", "column_comment", "example_value", "default_value"} or
+                "password" in k.lower() or
+                "secret" in k.lower() or
+                "credential" in k.lower() or
+                "token" in k.lower() or
+                "key" in k.lower()
+            )
             else _redact_sensitive_snapshot_fields(v)
             for k, v in data.items()
         }
     elif isinstance(data, list):
         return [_redact_sensitive_snapshot_fields(v) for v in data]
+    elif isinstance(data, str):
+        if "://" in data or "@" in data:
+            try:
+                from app.dsn_redaction import redact_dsn_error_message
+                return redact_dsn_error_message(data, "")
+            except Exception:
+                pass
     return data
 
 
