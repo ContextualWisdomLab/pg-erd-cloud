@@ -19,7 +19,7 @@ export function EditEdgeModal({
   onRelCancel,
   onRelSubmit,
 }: EditEdgeModalProps) {
-  const dialogRef = useDialogAccessibility(Boolean(editingEdge), onRelCancel);
+  const dialogRef = useDialogAccessibility<HTMLFormElement>(Boolean(editingEdge), onRelCancel);
 
   if (!editingEdge) return null;
 
