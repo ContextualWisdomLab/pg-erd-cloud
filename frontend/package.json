@@ -6,6 +6,7 @@
   "engines": {
     "node": ">=26 <27"
   },
+  "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
