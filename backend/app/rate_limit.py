@@ -136,7 +136,8 @@ def make_rate_limit_middleware(
         if not policy.enabled:
             return await call_next(request)
 
-        path = request.url.path
+        # ⚡ Bolt: Fast string prefix matching
+        path = request.scope.get("path", "")
         if not path.startswith(policy.route_prefix):
             return await call_next(request)
 
