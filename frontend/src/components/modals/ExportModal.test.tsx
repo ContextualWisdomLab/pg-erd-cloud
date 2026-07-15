@@ -155,7 +155,10 @@ describe('ExportModal', () => {
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(7);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
+    const sqlButton = screen.getByRole('button', { name: 'SQL DDL 복사' });
+    expect(sqlButton).toBeDisabled();
+    expect(sqlButton).toHaveAttribute('aria-describedby', 'export-artifact-desc-sql-ddl');
+
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
