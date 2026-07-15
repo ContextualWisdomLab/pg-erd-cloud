@@ -212,23 +212,27 @@ export function ExportModal({
             </p>
 
             <div className="exportModal__artifactList">
-              {artifacts.map((artifact) => (
-                <div className="exportModal__artifactRow" key={artifact.label}>
-                  <div>
-                    <strong>{artifact.label}</strong>
-                    <span>{artifact.description}</span>
+              {artifacts.map((artifact) => {
+                const descId = `export-artifact-desc-${artifact.label.replace(/\s+/g, '-').toLowerCase()}`;
+                return (
+                  <div className="exportModal__artifactRow" key={artifact.label}>
+                    <div>
+                      <strong>{artifact.label}</strong>
+                      <span id={descId}>{artifact.description}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={artifact.onExport}
+                      disabled={artifact.disabled}
+                      aria-label={artifact.ariaLabel}
+                      aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
+                      aria-describedby={descId}
+                    >
+                      {artifact.buttonLabel}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={artifact.onExport}
-                    disabled={artifact.disabled}
-                    aria-label={artifact.ariaLabel}
-                    aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
-                  >
-                    {artifact.buttonLabel}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </div>
