@@ -776,8 +776,8 @@ describe('App orchestration coverage', () => {
   it('falls back to node ids when auto-layout receives legacy nodes without titles', async () => {
     vi.mocked(snapshotToGraph).mockReturnValueOnce({
       nodes: [
-        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { columns: [], badges: { pk: false, fk: false } } },
-        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { columns: [], badges: { pk: false, fk: false } } },
+        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
+        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
       ] as any,
       edges: [],
     })
