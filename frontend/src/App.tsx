@@ -454,8 +454,8 @@ export default function App() {
     currentNodes: Array<Node<TableNodeData>>,
   ): Array<Node<TableNodeData>> {
     const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = a.data?.title ?? a.id;
-      const bTitle = b.data?.title ?? b.id;
+      const aTitle = a.data?.title || a.id;
+      const bTitle = b.data?.title || b.id;
       return aTitle.localeCompare(bTitle, "en");
     });
 

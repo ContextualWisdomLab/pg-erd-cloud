@@ -609,6 +609,7 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -776,13 +777,14 @@ describe('App orchestration coverage', () => {
   it('falls back to node ids when auto-layout receives legacy nodes without titles', async () => {
     vi.mocked(snapshotToGraph).mockReturnValueOnce({
       nodes: [
-        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { columns: [], badges: { pk: false, fk: false } } },
-        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { columns: [], badges: { pk: false, fk: false } } },
+        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
+        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
       ] as any,
       edges: [],
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {

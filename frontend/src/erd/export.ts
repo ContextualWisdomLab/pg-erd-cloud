@@ -67,12 +67,22 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  // ⚡ Bolt: Cache handle ids to avoid repetitive string manipulations during O(N) lookup.
+  let sourceHandleColumn: string | undefined;
+  for (const column of sourceNode.data.columns || []) {
+    if (sourceColumnHandleId(column.column_name) === edge.sourceHandle) {
+      sourceHandleColumn = column.column_name;
+      break;
+    }
+  }
+
+  let targetHandleColumn: string | undefined;
+  for (const column of targetNode.data.columns || []) {
+    if (targetColumnHandleId(column.column_name) === edge.targetHandle) {
+      targetHandleColumn = column.column_name;
+      break;
+    }
+  }
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -93,7 +103,7 @@ function fkColumnsForEdge(
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
-  // Bolt: Use map for O(1) node lookup instead of O(N) array find
+  // ⚡ Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
@@ -287,7 +297,7 @@ export function exportDiagramSvg(
   edges: Edge[],
   snapshot?: SnapshotJson | null,
 ): string {
-  // Bolt: Use map for O(1) node lookup instead of O(N) array find
+  // ⚡ Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
