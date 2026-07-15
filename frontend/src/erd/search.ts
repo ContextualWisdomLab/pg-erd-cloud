@@ -32,6 +32,11 @@ export function tableNodeMatchesSearch(
   return terms.every((term) => nodeIncludesTerm(node, term));
 }
 
+// ⚡ Bolt: WeakMap to cache search matches by node.data.
+// Since `node.data` remains stable during drags, this avoids re-evaluating the O(N*C) search function
+// across all nodes at 60fps when dragging while a search filter is active.
+const searchCache = new WeakMap<TableNodeData, Map<string, boolean>>();
+
 export function findSearchMatchedNodeIds(
   nodes: Array<Node<TableNodeData>>,
   search: string,
@@ -39,13 +44,29 @@ export function findSearchMatchedNodeIds(
   const matches = new Set<string>();
   // ⚡ Bolt: Parse search terms ONCE outside the loop (O(1)) instead of inside tableNodeMatchesSearch for every node (O(N)),
   // eliminating redundant string allocations, regex splits, and Sets per node.
+  const trimmedSearch = search.trim().toLocaleLowerCase();
   const terms = Array.from(
-    new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
+    new Set(trimmedSearch.split(/\s+/).filter(Boolean)),
   );
   if (terms.length === 0) return matches;
 
+  // Use a predictable cache key for this search.
+  const searchKey = terms.join(" ");
+
   for (const node of nodes) {
-    if (tableNodeMatchesSearch(node, terms)) {
+    let nodeCache = searchCache.get(node.data);
+    if (!nodeCache) {
+      nodeCache = new Map();
+      searchCache.set(node.data, nodeCache);
+    }
+
+    let isMatch = nodeCache.get(searchKey);
+    if (isMatch === undefined) {
+      isMatch = tableNodeMatchesSearch(node, terms);
+      nodeCache.set(searchKey, isMatch);
+    }
+
+    if (isMatch) {
       matches.add(node.id);
     }
   }

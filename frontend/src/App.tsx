@@ -197,17 +197,33 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  const visibleNodesDataCache = useRef(new WeakMap<TableNodeData, Map<boolean, TableNodeData>>());
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      let cacheMap = visibleNodesDataCache.current.get(node.data);
+      if (!cacheMap) {
+        cacheMap = new Map();
+        visibleNodesDataCache.current.set(node.data, cacheMap);
+      }
+
+      let decoratedData = cacheMap.get(isHighlighted);
+      if (!decoratedData) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        cacheMap.set(isHighlighted, decoratedData);
+      }
+
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
@@ -382,7 +398,7 @@ export default function App() {
   }, [
     cardinalityColumnSelections,
     cardinalityDistinctCounts,
-    cardinalityNode,
+    cardinalityNode?.data,
   ]);
   const cardinalityRecommendations = useMemo(
     () =>
