@@ -80,3 +80,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-25 - Avoid new Set(array.map(...)) for Set Initializations
 **Learning:** Using `new Set(array.map(item => item.id))` creates a completely unnecessary intermediate O(N) array of IDs. This forces the garbage collector to immediately clean up the mapped array once the Set is constructed, leading to memory spikes and GC pauses.
 **Action:** Replace `new Set(array.map(...))` with `const set = new Set();` and an iterative `for (const item of array) { set.add(item.id); }` loop to reduce intermediate garbage allocations to zero.
+## 2024-07-25 - Avoid O(N^2) Loop Scans with O(1) Dictionaries
+**Learning:** In loops processing hierarchical structures (like columns of a table), using list comprehensions or `sum()` over the entire collection to count items belonging to a parent (e.g. `sum(1 for c in columns if c["parent_id"] == oid)`) creates an O(N^2) bottleneck.
+**Action:** Replace `sum(...)` over accumulated collections with an O(1) dictionary counter (e.g. `col_pos = count_by_oid.get(oid, 0) + 1; count_by_oid[oid] = col_pos`) initialized outside the loop to reduce complexity to O(N).
