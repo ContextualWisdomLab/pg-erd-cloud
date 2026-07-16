@@ -43,3 +43,13 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+
+def test_redacts_nonstandard_dsn_lacking_slashes() -> None:
+    dsn = "postgres:user:s3cr3t456@host/db"
+    error = f"driver failed for s3cr3t456 with password=s3cr3t456 while using {dsn}"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "s3cr3t456" not in redacted
+    assert "password=***" in redacted
