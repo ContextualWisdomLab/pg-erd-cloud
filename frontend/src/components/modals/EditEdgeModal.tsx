@@ -82,16 +82,14 @@ export function EditEdgeModal({
           <button
             type="button"
             onClick={onRelDelete}
-            title="이 관계 삭제"
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
           >
             삭제
           </button>
           <div className="row">
-            <button type="button" onClick={onRelCancel} title="관계 설정 취소">취소</button>
+            <button type="button" onClick={onRelCancel}>취소</button>
             <button
               type="submit"
-              title="관계 설정 저장"
               style={{ background: "#034ea2", color: "#fff" }}
             >
               저장
