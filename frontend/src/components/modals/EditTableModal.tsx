@@ -22,7 +22,27 @@ export function EditTableModal({
   onEditTableSubmit,
   onDeleteTable,
 }: EditTableModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), onEditTableCancel);
+  // Snapshot the original node so we can restore it on cancel if needed
+  const [originalNodeSnapshot, setOriginalNodeSnapshot] = React.useState<Node<TableNodeData> | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen && editingNode && !originalNodeSnapshot) {
+      setOriginalNodeSnapshot(JSON.parse(JSON.stringify(editingNode)));
+    }
+    if (!isOpen) {
+      setOriginalNodeSnapshot(null);
+    }
+  }, [isOpen, editingNode, originalNodeSnapshot]);
+
+  const handleCancel = () => {
+    if (originalNodeSnapshot) {
+      setNodes((nds) => nds.map((n) => n.id === originalNodeSnapshot.id ? originalNodeSnapshot : n));
+      setEditingNode(originalNodeSnapshot);
+    }
+    onEditTableCancel();
+  };
+
+  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), handleCancel);
 
   if (!isOpen || !editingNode) return null;
 
@@ -31,7 +51,7 @@ export function EditTableModal({
       <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
-          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
+          <button type="button" aria-label="닫기" onClick={handleCancel}>X</button>
         </div>
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
@@ -61,6 +81,12 @@ export function EditTableModal({
                 <button
                   type="button"
                   onClick={() => {
+                    const newCol = {
+                      column_name: `new_col_${Date.now()}`,
+                      data_type: "text",
+                      is_not_null: false,
+                      is_pk: false,
+                    };
                     setNodes((nds: Node<TableNodeData>[]) =>
                       nds.map((n: Node<TableNodeData>) => {
                         if (n.id === editingNode.id) {
@@ -70,12 +96,7 @@ export function EditTableModal({
                               ...n.data,
                               columns: [
                                 ...n.data.columns,
-                                {
-                                  column_name: `new_col_${Date.now()}`,
-                                  data_type: "text",
-                                  is_not_null: false,
-                                  is_pk: false,
-                                }
+                                { ...newCol }
                               ]
                             }
                           };
@@ -91,12 +112,7 @@ export function EditTableModal({
                            ...prev.data,
                            columns: [
                              ...prev.data.columns,
-                             {
-                               column_name: `new_col_${Date.now()}`,
-                               data_type: "text",
-                               is_not_null: false,
-                               is_pk: false,
-                             }
+                             { ...newCol }
                            ]
                          }
                        }
@@ -215,7 +231,7 @@ export function EditTableModal({
                     },
                   },
                 ]);
-                onEditTableCancel();
+                handleCancel();
               }}
               style={{ color: "#034ea2", borderColor: "#93c5fd" }}
             >
@@ -223,11 +239,12 @@ export function EditTableModal({
             </button>
           </div>
           <div className="row">
-            <button type="button" onClick={onEditTableCancel}>취소</button>
+            <button type="button" onClick={handleCancel} aria-label="테이블 편집 취소">취소</button>
             <button
               type="submit"
               form="editTableForm"
               style={{ background: "#034ea2", color: "#fff" }}
+              aria-label="테이블 편집 저장"
             >
               저장
             </button>

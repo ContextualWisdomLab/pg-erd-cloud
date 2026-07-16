@@ -69,7 +69,7 @@ describe('modal behavior coverage', () => {
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
     expect(onSubmit).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 추가 취소' }))
     expect(onCancel).toHaveBeenCalledOnce()
 
     rerender(
@@ -83,7 +83,7 @@ describe('modal behavior coverage', () => {
     )
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '테이블 추가 저장' })).toBeEnabled()
   })
 
   it('covers EditEdgeModal visibility and actions', () => {
@@ -116,9 +116,9 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    fireEvent.click(screen.getByRole('button', { name: 'a에서 b 관계 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 설정 취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 설정 저장' }))
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
@@ -191,7 +191,7 @@ describe('modal behavior coverage', () => {
       data: { title: 'public.users_copy' },
     })
     expect(duplicated.data.columns).not.toBe(tableNode.data.columns)
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 편집 취소' }))
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(onDeleteTable).toHaveBeenCalledOnce()
