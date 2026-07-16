@@ -75,10 +75,11 @@ export function AddTableModal({
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
         >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
+          <button type="button" onClick={onAddTableCancel} title="테이블 추가 취소">취소</button>
           <button
             type="submit"
             disabled={!newTableName.trim()}
+            title={newTableName.trim() ? "테이블 추가" : "테이블 이름을 입력하세요"}
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }
