@@ -56,3 +56,9 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+
+
+
+## 2024-07-16 - Add ARIA Labels to Generic Modal Action Buttons
+**Learning:** In a canvas-based data modeling tool (like this ERD app) containing many separate modals for tasks like table editing, edge editing, and grouping, generic button text like "취소" (Cancel), "저장" (Save), and "삭제" (Delete) causes significant ambiguity for screen reader users when isolated from visual context. When navigating forms, screen reader users might not know *which* modal's action they are triggering.
+**Action:** Added explicit context to generic buttons in `EditTableModal`, `AddTableModal`, and `EditEdgeModal` using `aria-label`s (e.g., `aria-label="테이블 편집 취소"` or `aria-label="a에서 b 관계 삭제"`). Always remember to update the corresponding tests (e.g. `getByRole`) whenever `aria-label` is changed.

@@ -75,10 +75,11 @@ export function AddTableModal({
           className="row"
           style={{ justifyContent: "flex-end", marginTop: 8 }}
         >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
+          <button type="button" onClick={onAddTableCancel} aria-label="테이블 추가 취소">취소</button>
           <button
             type="submit"
             disabled={!newTableName.trim()}
+            aria-label="테이블 추가 저장"
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }
