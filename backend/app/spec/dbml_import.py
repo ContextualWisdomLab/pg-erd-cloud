@@ -135,6 +135,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
     current: tuple[str, str] | None = None
     in_ignored_block = 0
     in_indexes = False
+    column_position_by_oid: dict[int, int] = {}
 
     for raw_line in text.splitlines():
         # ReDoS guard: no legitimate DBML line approaches this length; capping
@@ -207,11 +208,14 @@ def parse_dbml(text: str) -> dict[str, Any]:
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
+        col_pos = column_position_by_oid.get(oid, 0) + 1
+        column_position_by_oid[oid] = col_pos
+
         columns.append(
             {
                 "relation_oid": oid,
                 "column_name": col_name,
-                "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
+                "column_position": col_pos,
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
                 "has_default": "default:" in settings,
