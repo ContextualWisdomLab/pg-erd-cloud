@@ -45,9 +45,12 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     password: str | None = None
     try:
         parsed = urlsplit(dsn)
-        if "://" in dsn and not parsed.netloc:
-            # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
-            parsed = urlsplit("http://" + dsn.split("://", 1)[1])
+        if not parsed.netloc:
+            if "://" in dsn:
+                # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+                parsed = urlsplit("http://" + dsn.split("://", 1)[1])
+            elif ":" in dsn and "@" in dsn:
+                parsed = urlsplit("http://" + dsn.split(":", 1)[1])
         netloc = parsed.netloc
         password = parsed.password
         query = parsed.query

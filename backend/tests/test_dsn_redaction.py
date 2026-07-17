@@ -43,3 +43,45 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+def test_password_candidates_from_nonstandard_dsn() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Standard format missing ://
+    candidates1 = _password_candidates_from_dsn("scheme:user:mypassword@acct.example.com/db?token=q%2Fsecret")
+    assert "mypassword" in candidates1
+    assert "q/secret" in candidates1
+
+    # Scheme with underscore missing ://
+    candidates2 = _password_candidates_from_dsn("snowflake_invalid://user:mypassword@acct.example.com/db?token=q%2Fsecret")
+    assert "mypassword" in candidates2
+
+def test_password_candidates_from_nonstandard_dsn_edge_case() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Test just scheme missing netloc and missing @ and :
+    candidates = _password_candidates_from_dsn("scheme_invalid_dsn")
+    assert candidates == set()
+
+def test_password_candidates_from_nonstandard_dsn_invalid_ipv6() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Test just scheme missing netloc and missing @ and :
+    candidates = _password_candidates_from_dsn("scheme://[invalid_ipv6")
+    assert candidates == set()
+
+def test_password_candidates_query_params() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Test query params decoding and quoting coverage
+    candidates = _password_candidates_from_dsn("scheme://user:pass@host/db?token=sec%2Bret")
+    assert "sec+ret" in candidates
+    assert "sec%2Bret" in candidates
+
+def test_password_candidates_query_params_no_sep() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Test query param loop continue condition `if not sep`
+    candidates = _password_candidates_from_dsn("scheme://host/db?justakey")
+    assert candidates == set()
+
+def test_password_candidates_query_params_non_secret() -> None:
+    from app.dsn_redaction import _password_candidates_from_dsn
+    # Test query param loop continue condition `not _SECRET_KEY_PATTERN.search`
+    candidates = _password_candidates_from_dsn("scheme://host/db?public_id=123")
+    assert candidates == set()
