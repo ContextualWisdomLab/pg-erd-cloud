@@ -135,6 +135,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
     current: tuple[str, str] | None = None
     in_ignored_block = 0
     in_indexes = False
+    col_count_by_oid: dict[int, int] = {}
 
     for raw_line in text.splitlines():
         # ReDoS guard: no legitimate DBML line approaches this length; capping
@@ -207,11 +208,17 @@ def parse_dbml(text: str) -> dict[str, Any]:
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
+
+        # ⚡ Bolt: Performance Optimization
+        # Use an O(1) dictionary counter instead of an O(N^2) sum(...) loop
+        # to calculate column positions efficiently for large DBML files.
+        pos = col_count_by_oid.get(oid, 0) + 1
+        col_count_by_oid[oid] = pos
         columns.append(
             {
                 "relation_oid": oid,
                 "column_name": col_name,
-                "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
+                "column_position": pos,
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
                 "has_default": "default:" in settings,
