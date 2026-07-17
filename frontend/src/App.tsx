@@ -197,20 +197,33 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+  // ⚡ Bolt: Cache decorated data objects using a WeakMap keyed by the stable node.data reference.
+  // This prevents breaking React.memo's fast-path (prev.data === next.data) in TableNode during 60fps
+  // dragging when a search filter is active, drastically reducing re-renders.
+  const searchDecoratedDataCache = useMemo(
+    () => new WeakMap<TableNodeData, TableNodeData>(),
+    [normalizedNodeSearch, searchMatchedNodeIds]
+  );
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let decoratedData = searchDecoratedDataCache.get(node.data);
+      if (!decoratedData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchDecoratedDataCache.set(node.data, decoratedData);
+      }
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchDecoratedDataCache, searchMatchedNodeIds]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
