@@ -189,6 +189,7 @@ export function EditTableModal({
           <div className="row" style={{ gap: 8 }}>
             <button
               type="button"
+              aria-label="테이블 삭제"
               onClick={onDeleteTable}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
             >
@@ -196,6 +197,7 @@ export function EditTableModal({
             </button>
             <button
               type="button"
+              aria-label="테이블 복제"
               onClick={() => {
                 const dupId = `${editingNode.id}_copy_${Date.now()}`;
                 setNodes((nds) => [
@@ -223,7 +225,7 @@ export function EditTableModal({
             </button>
           </div>
           <div className="row">
-            <button type="button" onClick={onEditTableCancel}>취소</button>
+            <button type="button" aria-label="테이블 편집 취소" onClick={onEditTableCancel}>취소</button>
             <button
               type="submit"
               form="editTableForm"

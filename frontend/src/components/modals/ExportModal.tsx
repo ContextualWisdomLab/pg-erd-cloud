@@ -242,7 +242,7 @@ export function ExportModal({
         </div>
 
         <div className="exportModal__footer">
-          <button type="button" onClick={onCloseExport}>취소</button>
+          <button type="button" aria-label="내보내기 취소" onClick={onCloseExport}>취소</button>
           <button type="button" className="exportModal__primaryAction" onClick={onCloseExport}>
             완료
           </button>
