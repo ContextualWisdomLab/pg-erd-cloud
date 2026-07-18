@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2024-07-18 - Native Keyboard Submission for Inline Forms
+**Learning:** Refactoring interactive input groups from `<div>` wrappers to `<form>` tags is a crucial accessibility fix that enables native keyboard submission (e.g., submitting a project name via Enter key). However, doing so requires updating associated React Testing Library queries to trigger `fireEvent.submit(form)` instead of just `fireEvent.click(button)` to properly verify the form submission lifecycle.
+**Action:** When migrating inline creation inputs to `<form>` elements, ensure `onSubmit` prevents default (`e.preventDefault()`) and that test suites are updated to fire submit events on the form node, capturing native keyboard workflows.
