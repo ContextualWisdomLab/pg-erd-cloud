@@ -344,11 +344,19 @@ describe('App orchestration coverage', () => {
 
   it('creates projects, validates and creates connections, and starts a snapshot', async () => {
     await renderReadyApp()
+
+    // Switch to projects view to test the new inlineCreate form submission
+    fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
+    fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: '  New  ' } })
+    fireEvent.submit(screen.getByLabelText('새 프로젝트 이름').closest('form')!)
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
+
+    // Switch back to editor to test the rest
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
-    fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  New  ' } })
+    fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  Another New  ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Another New'))
 
     const dsn = screen.getByLabelText('Connection DSN')
     fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
