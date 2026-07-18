@@ -54,3 +54,7 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+
+## 2024-07-18 - Tooltip interaction on functionally disabled buttons
+**Learning:** Native `disabled` attributes on `<button>` elements prevent all interaction events, including mouse enter events that trigger native browser tooltips (`title`). When a user needs to know *why* a button is disabled, standard `disabled` prevents them from finding out.
+**Action:** When providing a `title` explaining a disabled state, replace the native `disabled` attribute with `aria-disabled={true}`. Intercept the `onClick` handler (e.g. `e.preventDefault()`) and apply visual disabled styling manually to preserve accessibility and discoverability.
