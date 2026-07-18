@@ -116,6 +116,12 @@ function strengthLabel(strength: CardinalityStrength): string {
   return "보류";
 }
 
+
+const searchDataCache = new WeakMap<
+  TableNodeData,
+  { isHighlighted: boolean; data: TableNodeData }
+>();
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
@@ -201,13 +207,21 @@ export default function App() {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
+      let cached = searchDataCache.get(node.data);
+      if (!cached || cached.isHighlighted !== isHighlighted) {
+        cached = {
+          isHighlighted,
+          data: {
+            ...node.data,
+            isDimmed: !isHighlighted,
+            isHighlighted,
+          },
+        };
+        searchDataCache.set(node.data, cached);
+      }
       return {
         ...node,
-        data: {
-          ...node.data,
-          isDimmed: !isHighlighted,
-          isHighlighted,
-        },
+        data: cached.data,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
