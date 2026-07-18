@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2024-07-18 - 컨텍스트를 고려한 ARIA 레이블 추가
+**Learning:** 모달 내에 위치한 버튼 컴포넌트(예: "취소", "삭제", "복제")는 스크린 리더 환경에서 해당 버튼이 수행하는 구체적인 동작이나 대상을 명확히 전달하지 못합니다. 또한 모달 창 테스트 코드들(`ModalCoverage.test.tsx`, `EditTableModal.test.tsx`)이 `getByRole('button', { name: ... })`을 사용하여 요소를 쿼리하고 있었으므로, `aria-label`을 수정하면 테스트 코드가 실패하게 됩니다.
+**Action:** 접근성을 높이기 위해 '취소', '삭제'와 같은 버튼에 동작 대상이 포함된 명확한 `aria-label`(예: "테이블 추가 취소", "관계 삭제")을 추가하고, 이로 인해 깨지는 테스트 코드의 `getByRole` 쿼리 문자열도 반드시 함께 업데이트합니다.

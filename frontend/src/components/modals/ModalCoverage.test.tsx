@@ -69,7 +69,7 @@ describe('modal behavior coverage', () => {
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
     expect(onSubmit).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 추가 취소' }))
     expect(onCancel).toHaveBeenCalledOnce()
 
     rerender(
@@ -116,8 +116,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 설정 취소' }))
     fireEvent.click(screen.getByRole('button', { name: '저장' }))
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
     expect(onDelete).toHaveBeenCalledOnce()
@@ -182,7 +182,7 @@ describe('modal behavior coverage', () => {
 
     fireEvent.submit(document.getElementById('editTableForm')!)
     fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
-    fireEvent.click(screen.getByRole('button', { name: '복제' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
     expect(duplicated).toMatchObject({
@@ -191,7 +191,7 @@ describe('modal behavior coverage', () => {
       data: { title: 'public.users_copy' },
     })
     expect(duplicated.data.columns).not.toBe(tableNode.data.columns)
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 편집 취소' }))
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(onDeleteTable).toHaveBeenCalledOnce()
