@@ -173,6 +173,8 @@ async def export_shared_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     redacted_json = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_json, dict):
+        return "-- snapshot data is invalid\n"
     return snapshot_json_to_sql(redacted_json, target_dialect=dialect)
 
 
@@ -204,6 +206,8 @@ async def export_shared_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
 
     redacted_json = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_json, dict):
+        return "# DB Reversing Specification\n\nSnapshot data is invalid.\n"
 
     if mode == "llm-draft":
         try:
@@ -247,6 +251,8 @@ async def export_shared_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
 
     redacted_json = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_json, dict):
+        return "# ERD Index Design\n\nSnapshot data is invalid.\n"
 
     if mode == "llm-draft":
         try:
