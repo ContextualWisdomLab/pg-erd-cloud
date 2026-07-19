@@ -628,6 +628,35 @@ export default function App() {
     downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
   }
 
+  function onExportJson() {
+    const data = JSON.stringify({ nodes, edges }, null, 2);
+    downloadText("pg-erd-diagram.json", data, "application/json");
+  }
+
+  function onImportJson(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (parsed.nodes && Array.isArray(parsed.nodes)) {
+          setNodes(parsed.nodes);
+        }
+        if (parsed.edges && Array.isArray(parsed.edges)) {
+          setEdges(parsed.edges);
+        }
+      } catch (err) {
+        window.alert("잘못된 JSON 파일입니다.");
+      }
+      // Reset input value to allow importing the same file again
+      event.target.value = "";
+    };
+    reader.readAsText(file);
+  }
+
   function onExportDictionaryCsv() {
     downloadText(
       "data_dictionary.csv",
@@ -852,6 +881,8 @@ export default function App() {
       if (colName === null) continue; // Deleted column
 
       const colType = formData.get(`col_type_${i}`) as string;
+      const colComment = formData.get(`col_comment_${i}`) as string;
+      const colExample = formData.get(`col_example_${i}`) as string;
       const isPk = formData.get(`col_pk_${i}`) === "on";
       const isNotNull = formData.get(`col_nn_${i}`) === "on";
 
@@ -861,6 +892,8 @@ export default function App() {
         data_type: colType.trim() || "text",
         is_pk: isPk,
         is_not_null: isNotNull,
+        column_comment: colComment ? colComment.trim() : null,
+        example_value: colExample ? colExample.trim() : null,
       });
     }
 
@@ -1534,6 +1567,29 @@ export default function App() {
             >
               {"{}"}
             </button>
+            <button
+              type="button"
+              onClick={onExportJson}
+              disabled={nodes.length === 0}
+              title={
+                nodes.length === 0
+                  ? "내보낼 다이어그램이 없습니다"
+                  : "JSON 내보내기"
+              }
+              aria-label="JSON 내보내기"
+            >
+              📤
+            </button>
+            <label className="canvasToolbar__importBtn" title="JSON 불러오기">
+              <input
+                type="file"
+                accept=".json"
+                style={{ display: "none" }}
+                onChange={onImportJson}
+                aria-label="JSON 불러오기"
+              />
+              <span className="canvasToolbar__importBtnSpan" role="button" aria-label="JSON 불러오기 버튼">📥</span>
+            </label>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
             </div>
