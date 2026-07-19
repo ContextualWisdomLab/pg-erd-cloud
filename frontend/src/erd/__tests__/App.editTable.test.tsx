@@ -64,6 +64,8 @@ describe('App edit functionality', () => {
     expect(exportButtons[0]).toHaveTextContent('IMG');
     expect(exportButtons[1]).toHaveTextContent('UML');
     expect(exportButtons[2]).toHaveTextContent('{}');
+    expect(toolbarQueries.getByRole('button', { name: 'JSON 내보내기' })).toHaveTextContent('📤');
+    expect(toolbarQueries.getByRole('button', { name: 'JSON 불러오기 버튼' })).toHaveTextContent('📥');
   });
 
   it('filters the diagram list by search text', async () => {

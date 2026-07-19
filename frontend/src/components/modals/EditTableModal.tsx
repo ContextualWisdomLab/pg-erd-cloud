@@ -126,6 +126,22 @@ export function EditTableModal({
                       style={{ flex: 1.5 }}
                       aria-label={`${col.column_name} 데이터 타입`}
                     />
+                    <input
+                      type="text"
+                      name={`col_comment_${idx}`}
+                      defaultValue={col.column_comment || ""}
+                      placeholder="코멘트"
+                      style={{ flex: 1.5 }}
+                      aria-label={`${col.column_name} 코멘트`}
+                    />
+                    <input
+                      type="text"
+                      name={`col_example_${idx}`}
+                      defaultValue={col.example_value?.toString() || ""}
+                      placeholder="예시값"
+                      style={{ flex: 1.5 }}
+                      aria-label={`${col.column_name} 예시값`}
+                    />
                     <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
                       <input
                         type="checkbox"
@@ -144,6 +160,72 @@ export function EditTableModal({
                       />
                       NN
                     </label>
+                    <div className="col" style={{ gap: 2 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (idx === 0) return;
+                          setNodes((nds: Node<TableNodeData>[]) =>
+                            nds.map((n: Node<TableNodeData>) => {
+                              if (n.id === editingNode.id) {
+                                const newCols = [...n.data.columns];
+                                const temp = newCols[idx];
+                                newCols[idx] = newCols[idx - 1];
+                                newCols[idx - 1] = temp;
+                                return { ...n, data: { ...n.data, columns: newCols } };
+                              }
+                              return n;
+                            })
+                          );
+                          setEditingNode((prev: Node<TableNodeData> | null) => {
+                            if (!prev) return prev;
+                            const newCols = [...prev.data.columns];
+                            const temp = newCols[idx];
+                            newCols[idx] = newCols[idx - 1];
+                            newCols[idx - 1] = temp;
+                            return { ...prev, data: { ...prev.data, columns: newCols } };
+                          });
+                        }}
+                        disabled={idx === 0}
+                        style={{ padding: "0 4px", fontSize: "10px", lineHeight: "1", height: 16 }}
+                        aria-label={`${col.column_name} 위로 이동`}
+                        title="위로 이동"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (idx === editingNode.data.columns.length - 1) return;
+                          setNodes((nds: Node<TableNodeData>[]) =>
+                            nds.map((n: Node<TableNodeData>) => {
+                              if (n.id === editingNode.id) {
+                                const newCols = [...n.data.columns];
+                                const temp = newCols[idx];
+                                newCols[idx] = newCols[idx + 1];
+                                newCols[idx + 1] = temp;
+                                return { ...n, data: { ...n.data, columns: newCols } };
+                              }
+                              return n;
+                            })
+                          );
+                          setEditingNode((prev: Node<TableNodeData> | null) => {
+                            if (!prev) return prev;
+                            const newCols = [...prev.data.columns];
+                            const temp = newCols[idx];
+                            newCols[idx] = newCols[idx + 1];
+                            newCols[idx + 1] = temp;
+                            return { ...prev, data: { ...prev.data, columns: newCols } };
+                          });
+                        }}
+                        disabled={idx === editingNode.data.columns.length - 1}
+                        style={{ padding: "0 4px", fontSize: "10px", lineHeight: "1", height: 16 }}
+                        aria-label={`${col.column_name} 아래로 이동`}
+                        title="아래로 이동"
+                      >
+                        ↓
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
