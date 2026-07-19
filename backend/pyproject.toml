@@ -11,7 +11,7 @@ name = "pg-erd-cloud-backend"
 version = "0.1.0"
 requires-python = ">=3.10,<3.15"
 dependencies = [
-  "fastapi>=0.137.1",
+  "fastapi>=0.139.2",
   "hypercorn>=0.18.0",
   "prometheus-client>=0.25.0,<0.26.0",
   "pydantic>=2.13.4",
