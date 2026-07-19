@@ -197,20 +197,31 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: Cache decorated data keyed by stable node.data references.
+  // This preserves object identity across 60fps drag events when a search filter is active,
+  // preventing React Flow from forcing full deep-comparison re-renders of all TableNodes.
+  const decoratedDataCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [searchMatchedNodeIds]);
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let nextData = decoratedDataCache.get(node.data);
+      if (!nextData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        nextData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        decoratedDataCache.set(node.data, nextData);
+      }
+      return {
+        ...node,
+        data: nextData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, decoratedDataCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";

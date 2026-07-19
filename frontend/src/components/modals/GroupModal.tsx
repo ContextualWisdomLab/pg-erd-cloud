@@ -56,7 +56,7 @@ export function GroupModal({
           </button>
         </div>
 
-        <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
+        <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); /* v8 ignore next -- button is disabled when empty */ if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
           <div className="field">
             <label htmlFor="business-group-name">그룹 이름</label>
             <input
