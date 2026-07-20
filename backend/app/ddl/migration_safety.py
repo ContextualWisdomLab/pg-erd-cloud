@@ -24,13 +24,21 @@ DESTRUCTIVE = "destructive"
 _SEVERITY_RANK = {DESTRUCTIVE: 0, WARNING: 1, SAFE: 2}
 
 
-def _item(category: str, severity: str, target: str, detail: str) -> dict[str, Any]:
-    return {
+def _item(
+    category: str,
+    severity: str,
+    target: str,
+    detail: str,
+    **evidence: object,
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
         "category": category,
         "severity": severity,
         "target": target,
         "detail": detail,
     }
+    item.update(evidence)
+    return item
 
 
 def _fk_label(fk: dict[str, Any]) -> str:
@@ -66,10 +74,19 @@ def analyze_migration_safety(
             if name in b_cols:
                 continue
             if col.get("is_not_null"):
+                has_default = bool(col.get("has_default"))
                 items.append(
                     _item(
                         "add_column", WARNING, f"{key}.{name}",
-                        "New NOT NULL column — fails or locks if the table has rows and no default.",
+                        (
+                            "New NOT NULL column; a default is present, but its "
+                            "volatility, backfill, and table-lock behavior still "
+                            "need dialect-specific verification."
+                            if has_default
+                            else "New NOT NULL column without a default — fails "
+                            "or locks if the table has rows."
+                        ),
+                        has_default=has_default,
                     )
                 )
             else:
@@ -99,6 +116,39 @@ def analyze_migration_safety(
                 )
             if old.get("is_not_null") and not col.get("is_not_null"):
                 items.append(_item("drop_not_null", SAFE, f"{key}.{name}", "Relaxing NOT NULL is safe."))
+            old_has_default = bool(old.get("has_default"))
+            new_has_default = bool(col.get("has_default"))
+            if not old_has_default and new_has_default:
+                items.append(
+                    _item(
+                        "set_default",
+                        SAFE,
+                        f"{key}.{name}",
+                        "Adding a column default affects future rows and does not remove existing data.",
+                    )
+                )
+            elif old_has_default and not new_has_default:
+                items.append(
+                    _item(
+                        "drop_default",
+                        SAFE,
+                        f"{key}.{name}",
+                        "Dropping a column default affects future rows and does not remove existing data.",
+                    )
+                )
+            elif (
+                old_has_default
+                and new_has_default
+                and old.get("default_expr") != col.get("default_expr")
+            ):
+                items.append(
+                    _item(
+                        "alter_default",
+                        SAFE,
+                        f"{key}.{name}",
+                        "Changing a column default affects future rows and does not remove existing data.",
+                    )
+                )
 
         if btbl.get("pk", []) != ttbl.get("pk", []):
             items.append(

@@ -159,6 +159,67 @@ def test_primary_key_change_detected():
     assert member["primary_key"] == {"from": ["member_id"], "to": ["email"]}
 
 
+def test_column_default_change_is_detected():
+    base = _snap(
+        relations=[
+            {
+                "relation_oid": 1,
+                "schema_name": "public",
+                "relation_name": "email_records",
+            }
+        ],
+        columns=[
+            {
+                "relation_oid": 1,
+                "column_name": "source_lineage_json",
+                "data_type": "json",
+                "is_not_null": True,
+                "has_default": False,
+                "default_expr": None,
+            }
+        ],
+    )
+    target = _snap(
+        relations=[
+            {
+                "relation_oid": 99,
+                "schema_name": "public",
+                "relation_name": "email_records",
+            }
+        ],
+        columns=[
+            {
+                "relation_oid": 99,
+                "column_name": "source_lineage_json",
+                "data_type": "json",
+                "is_not_null": True,
+                "has_default": True,
+                "default_expr": "'{}'::json",
+            }
+        ],
+    )
+
+    diff = diff_snapshots(base, target)
+
+    change = diff["tables"]["changed"][0]["columns"]["changed"][0]
+    assert change == {
+        "column": "source_lineage_json",
+        "from": {
+            "data_type": "json",
+            "is_not_null": True,
+            "has_default": False,
+            "default_expr": None,
+        },
+        "to": {
+            "data_type": "json",
+            "is_not_null": True,
+            "has_default": True,
+            "default_expr": "'{}'::json",
+        },
+    }
+    assert diff["summary"]["columns_changed"] == 1
+
+
 def test_fk_added():
     base = _snap(
         relations=[
