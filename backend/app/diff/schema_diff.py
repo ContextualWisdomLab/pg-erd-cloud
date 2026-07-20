@@ -54,10 +54,18 @@ def _index_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         name = col.get("column_name")
         if name is None:
             continue
-        tables[table]["columns"][str(name)] = {
+        indexed_column = {
             "data_type": col.get("data_type"),
             "is_not_null": bool(col.get("is_not_null")),
         }
+        if "has_default" in col or "default_expr" in col:
+            indexed_column.update(
+                {
+                    "has_default": bool(col.get("has_default")),
+                    "default_expr": col.get("default_expr"),
+                }
+            )
+        tables[table]["columns"][str(name)] = indexed_column
 
     # Preserve primary-key column order via column_ordinal when present.
     pk_tmp: dict[str, list[tuple[int, str]]] = {}

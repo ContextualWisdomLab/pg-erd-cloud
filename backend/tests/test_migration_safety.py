@@ -78,6 +78,54 @@ def test_add_nullable_is_safe_add_not_null_is_warning():
     assert ("add_column", "warning") in _cats(analyze_migration_safety(base, add_nn))
 
 
+def test_add_not_null_with_default_reports_default_aware_warning():
+    base = _member()
+    target = _snap(
+        relations=[
+            {
+                "relation_oid": 4,
+                "schema_name": "public",
+                "relation_name": "member",
+            }
+        ],
+        columns=[
+            {
+                "relation_oid": 4,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 4,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
+            {
+                "relation_oid": 4,
+                "column_name": "source_lineage_json",
+                "data_type": "json",
+                "is_not_null": True,
+                "has_default": True,
+                "default_expr": "'{}'::json",
+            },
+        ],
+        pk_columns=[{"relation_oid": 4, "column_name": "member_id"}],
+    )
+
+    analysis = analyze_migration_safety(base, target)
+
+    item = next(
+        item
+        for item in analysis["items"]
+        if item["target"] == "public.member.source_lineage_json"
+    )
+    assert item["category"] == "add_column"
+    assert item["severity"] == "warning"
+    assert item["has_default"] is True
+    assert "default is present" in item["detail"]
+
+
 def test_type_change_and_set_not_null_are_warnings():
     base = _member(email_not_null=False)
     target = _snap(
@@ -92,6 +140,44 @@ def test_type_change_and_set_not_null_are_warnings():
     cats = _cats(analyze_migration_safety(base, target))
     assert ("alter_column_type", "warning") in cats
     assert ("set_not_null", "warning") in cats
+
+
+def test_default_changes_are_reported_as_safe():
+    def snapshot(*, has_default: bool, default_expr: str | None):
+        return _snap(
+            relations=[
+                {
+                    "relation_oid": 1,
+                    "schema_name": "public",
+                    "relation_name": "member",
+                }
+            ],
+            columns=[
+                {
+                    "relation_oid": 1,
+                    "column_name": "member_id",
+                    "data_type": "bigint",
+                    "is_not_null": True,
+                    "has_default": has_default,
+                    "default_expr": default_expr,
+                }
+            ],
+            pk_columns=[{"relation_oid": 1, "column_name": "member_id"}],
+        )
+
+    without_default = snapshot(has_default=False, default_expr=None)
+    default_one = snapshot(has_default=True, default_expr="1")
+    default_two = snapshot(has_default=True, default_expr="2")
+
+    assert ("set_default", "safe") in _cats(
+        analyze_migration_safety(without_default, default_one)
+    )
+    assert ("alter_default", "safe") in _cats(
+        analyze_migration_safety(default_one, default_two)
+    )
+    assert ("drop_default", "safe") in _cats(
+        analyze_migration_safety(default_one, without_default)
+    )
 
 
 def test_add_fk_is_warning_drop_fk_is_safe_and_report_is_sorted():
