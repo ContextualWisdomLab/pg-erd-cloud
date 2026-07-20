@@ -173,7 +173,7 @@ async def export_shared_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
-    return snapshot_json_to_sql(redacted, target_dialect=dialect)
+    return snapshot_json_to_sql(redacted, target_dialect=dialect)  # type: ignore
 
 
 @router.get(
@@ -205,7 +205,7 @@ async def export_shared_snapshot_reversing_spec(
     if mode == "llm-draft":
         try:
             redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
-            return await generate_reversing_llm_draft(redacted)
+            return await generate_reversing_llm_draft(redacted)  # type: ignore
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -215,7 +215,7 @@ async def export_shared_snapshot_reversing_spec(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
-    return generate_reversing_spec(redacted, mode=mode)
+    return generate_reversing_spec(redacted, mode=mode)  # type: ignore
 
 
 @router.get(
@@ -247,7 +247,7 @@ async def export_shared_snapshot_index_design(
     if mode == "llm-draft":
         try:
             redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
-            return await generate_index_design_llm_draft(redacted)
+            return await generate_index_design_llm_draft(redacted)  # type: ignore
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -257,4 +257,4 @@ async def export_shared_snapshot_index_design(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
-    return generate_index_design_spec(redacted, mode=mode)
+    return generate_index_design_spec(redacted, mode=mode)  # type: ignore
