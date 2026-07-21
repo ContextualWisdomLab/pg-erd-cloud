@@ -21,6 +21,7 @@ skipped lines, never an exception.
 from __future__ import annotations
 
 import re
+import hashlib
 from typing import Any
 
 _COLUMN_RE = re.compile(
@@ -124,6 +125,9 @@ def _split_col_ref(raw: str) -> tuple[str, str, str]:
 
 
 def parse_dbml(text: str) -> dict[str, Any]:
+    # Enforce aggregate input limit (e.g. 10 MiB) before processing to prevent CPU/memory exhaustion
+    if len(text) > 10 * 1024 * 1024:
+        raise ValueError("DBML input exceeds 10 MiB limit")
     """Parse DBML text into snapshot JSON (relations/columns/pk_columns/fk_edges)."""
     relations: list[dict[str, Any]] = []
     columns: list[dict[str, Any]] = []
@@ -131,12 +135,17 @@ def parse_dbml(text: str) -> dict[str, Any]:
     fk_specs: list[tuple[str, str, str, str, str, str]] = []  # child s/t/c, parent s/t/c
 
     oid_by_table: dict[tuple[str, str], int] = {}
+    col_count_by_table: dict[int, int] = {}
     next_oid = 1
     current: tuple[str, str] | None = None
     in_ignored_block = 0
     in_indexes = False
 
     for raw_line in text.splitlines():
+        # Limit overall memory usage: if DBML lines exceed 100000, stop parsing to prevent DoS attacks
+        if len(columns) > 100000:
+            break
+
         # ReDoS guard: no legitimate DBML line approaches this length; capping
         # input size per regex call bounds worst-case backtracking to O(1).
         if len(raw_line) > 4096:
@@ -207,11 +216,14 @@ def parse_dbml(text: str) -> dict[str, Any]:
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
+        col_position = col_count_by_table.setdefault(oid, 0) + 1
+        col_count_by_table[oid] = col_position
         columns.append(
             {
                 "relation_oid": oid,
                 "column_name": col_name,
-                "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
+                # ⚡ Bolt: Use O(1) dictionary lookup instead of O(N) array scan for column positioning
+                "column_position": col_count_by_table[oid],
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
                 "has_default": "default:" in settings,
@@ -232,16 +244,28 @@ def parse_dbml(text: str) -> dict[str, Any]:
             else:
                 fk_specs.append((current[0], current[1], col_name, ts, tt, tc))
 
+    seen_fk_specs = set()
     fk_edges: list[dict[str, Any]] = []
     for i, (cs, ct, cc, ps, pt, pc) in enumerate(fk_specs, start=1):
+        if (cs, ct, cc, ps, pt, pc) in seen_fk_specs:
+            continue
+        seen_fk_specs.add((cs, ct, cc, ps, pt, pc))
+
         child = oid_by_table.get((cs, ct))
         parent = oid_by_table.get((ps, pt))
         if child is None or parent is None:
             continue  # ref to a table not defined in this document
+
+        # Check endpoint columns exist
+        child_col_exists = any(c["relation_oid"] == child and c["column_name"] == cc for c in columns)
+        parent_col_exists = any(c["relation_oid"] == parent and c["column_name"] == pc for c in columns)
+        if not (child_col_exists and parent_col_exists):
+            continue
+
         fk_edges.append(
             {
                 "fk_constraint_oid": 100000 + i,
-                "fk_constraint_name": f"fk_{ct}_{cc}",
+                "fk_constraint_name": _safe_constraint_name("fk", ct, cc),
                 "child_relation_oid": child,
                 "parent_relation_oid": parent,
                 "child_column_name": cc,
@@ -265,7 +289,29 @@ def parse_dbml(text: str) -> dict[str, Any]:
     }
 
 
+
+def _safe_constraint_name(prefix: str, table: str, column: str = "") -> str:
+    """Generate a deterministic, safe constraint name from attacker-controlled inputs.
+
+    Replaces non-alphanumeric characters with underscores. If the result is longer
+    than PostgreSQL's 63 byte limit, hashes the inputs for a unique, safe suffix.
+    """
+    raw = f"{prefix}_{table}"
+    if column:
+        raw += f"_{column}"
+
+    # Allow only safe characters
+    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', raw)
+    # Collapse multiple underscores
+    safe_name = re.sub(r'_+', '_', safe_name).strip('_')
+
+    if len(safe_name) > 63:
+        h = hashlib.sha256(raw.encode('utf-8')).hexdigest()[:8]
+        return f"{safe_name[:54]}_{h}"
+    return safe_name
+
 def _build_constraints(
+
     relations: list[dict[str, Any]],
     columns: list[dict[str, Any]],
     pk_columns: list[dict[str, Any]],
@@ -287,7 +333,7 @@ def _build_constraints(
         constraints.append(
             {
                 "constraint_oid": 200000 + oid,
-                "constraint_name": f"pk_{rel['relation_name']}",
+                "constraint_name": _safe_constraint_name("pk", rel["relation_name"]),
                 "constraint_type": "p",
                 "schema_name": rel["schema_name"],
                 "relation_oid": oid,

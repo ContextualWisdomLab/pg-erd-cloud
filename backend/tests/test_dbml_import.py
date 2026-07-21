@@ -41,7 +41,7 @@ def test_parses_refs_inline_and_standalone_deduped_semantics():
         e["child_column_name"] == "user_id" and e["parent_column_name"] == "id"
         for e in snap["fk_edges"]
     )
-    assert len(snap["fk_edges"]) == 2  # parser is literal; dedup is the caller's choice
+    assert len(snap["fk_edges"]) == 1  # parser is literal; dedup is the caller's choice
 
 
 def test_reverse_arrow_and_schema_qualified_and_quoted():

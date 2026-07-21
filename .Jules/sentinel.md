@@ -1,4 +1,8 @@
-## $(date +%Y-%m-%d) - Redact Sensitive Schema Comments in Public Shares
-**Vulnerability:** Publicly shared schema snapshots (via `/api/share/...`) returned the entire JSON payload, which could expose sensitive internal schema comments (`comment`, `relation_comment`, `column_comment`) or sensitive data in `example_value` fields.
-**Learning:** When generating share links, only specific fields should be exposed, but we export the entire `snapshot_json` from the database. A recursive sanitizer function must be applied to scrub IDOR/data leakage vectors before returning the JSON payload.
-**Prevention:** Apply a recursive masking function (`_redact_sensitive_snapshot_fields`) on database JSON artifacts in read-only public endpoints.
+## 2026-07-21 - Fix DBML Constraint Name Injection and Resource Exhaustion
+**Learning:**
+- Attacker-controlled quoted table identifiers in DBML could generate unsafe primary/foreign-key constraint names, enabling SQL statement injection when interpolated into unquoted downstream DDL.
+- `text.splitlines()` without aggregate input size limits caused severe CPU and memory exhaustion (multi-gigabyte amplification).
+
+**Action:**
+- Applied `_safe_constraint_name` utility to generate deterministic constraint names from an ASCII allowlist, collapsing invalid characters, hashing for uniqueness over 63 characters length.
+- Added a 10 MiB aggregate input limit `if len(text) > 10 * 1024 * 1024` and a limit of 100,000 max columns parsing loop break.
