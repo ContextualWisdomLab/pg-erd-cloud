@@ -131,6 +131,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
     fk_specs: list[tuple[str, str, str, str, str, str]] = []  # child s/t/c, parent s/t/c
 
     oid_by_table: dict[tuple[str, str], int] = {}
+    col_count_by_table: dict[int, int] = {}
     next_oid = 1
     current: tuple[str, str] | None = None
     in_ignored_block = 0
@@ -207,11 +208,14 @@ def parse_dbml(text: str) -> dict[str, Any]:
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
+        col_position = col_count_by_table.setdefault(oid, 0) + 1
+        col_count_by_table[oid] = col_position
         columns.append(
             {
                 "relation_oid": oid,
                 "column_name": col_name,
-                "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
+                # ⚡ Bolt: Use O(1) dictionary lookup instead of O(N) array scan for column positioning
+                "column_position": col_count_by_table[oid],
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
                 "has_default": "default:" in settings,
