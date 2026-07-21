@@ -197,17 +197,33 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  const nodeSearchCacheRef = useRef<WeakMap<TableNodeData, TableNodeData>>(new WeakMap());
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
+
+    const cache = nodeSearchCacheRef.current;
+
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let decoratedData = cache.get(node.data);
+
+      // ⚡ Bolt: Cache decorated data in a WeakMap keyed by the stable node.data reference.
+      // This preserves object identity across 60fps drag events, preventing React.memo
+      // fast-path cache misses in TableNode and massive re-render latency.
+      if (!decoratedData || decoratedData.isHighlighted !== isHighlighted) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        cache.set(node.data, decoratedData);
+      }
+
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
