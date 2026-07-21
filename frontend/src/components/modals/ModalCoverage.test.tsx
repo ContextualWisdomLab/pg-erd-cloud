@@ -116,9 +116,9 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    fireEvent.click(screen.getByRole('button', { name: 'a에서 b으로의 관계 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 편집 취소' }))
+    fireEvent.click(screen.getByRole('button', { name: 'a에서 b으로의 관계 저장' }))
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
