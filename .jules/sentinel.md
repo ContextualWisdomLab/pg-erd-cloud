@@ -2,3 +2,7 @@
 **Vulnerability:** User-provided string fields (like project and connection names) lacked strict validation against control characters, only relying on length constraints.
 **Learning:** This could potentially lead to Log Injection (CRLF injection), Null Byte Injection, or terminal escape injection if these strings are subsequently logged or rendered directly.
 **Prevention:** Use explicit regex validation `pattern=r'^[^\x00-\x1F\x7F]+$'` on Pydantic string fields to strictly reject control characters.
+## 2025-02-27 - [Fix DSN Redaction Bypass with Malformed Schemes]
+**Vulnerability:** DSNs lacking standard scheme delimiters (like `snowflake_invalid:user:password@host/db`) caused `urllib.parse.urlsplit` to evaluate to an empty scheme without raising an error. This silently bypassed parsing logic that checked `parsed.netloc`, allowing credentials embedded in non-standard DSN query strings to be extracted incorrectly or skipped during error redaction. This leaked credentials in error messages.
+**Learning:** Python's `urlsplit` has quirky behavior with schemes containing underscores or missing `://` and defaults to parsing the entire URL into the `path` attribute. This requires fallback mechanisms, such as splitting on colons or injecting dummy schemes, to extract credentials effectively for redaction.
+**Prevention:** When dealing with connection string redaction, always ensure that fallbacks exist to inject dummy schemas (e.g. `http://`) before using `urlsplit` if `netloc` is falsy but `://` or `:` are present.
