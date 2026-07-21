@@ -41,7 +41,11 @@ export function uniqueBusinessGroupId(
   existingGroups: BusinessGroup[],
 ): string {
   const baseId = buildBusinessGroupId(name);
-  const existingIds = new Set(existingGroups.map((group) => group.id));
+  // ⚡ Bolt: Populate Set iteratively to avoid array allocation overhead (O(N)) from .map()
+  const existingIds = new Set<string>();
+  for (const group of existingGroups) {
+    existingIds.add(group.id);
+  }
   if (!existingIds.has(baseId)) return baseId;
   let suffix = 2;
   while (existingIds.has(`${baseId}_${suffix}`)) {

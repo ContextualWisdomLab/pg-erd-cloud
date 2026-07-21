@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-05-14 - Map/Set construction array allocation overhead
+**Learning:** Initializing Maps or Sets using `new Set(array.map(...))` creates unnecessary intermediate arrays and puts pressure on the garbage collector. In highly interactive applications (like this React ERD), frequent GC pauses cause jank.
+**Action:** Populate Maps and Sets iteratively using `for...of` loops, avoiding `.map()` when building lookup structures.
