@@ -640,6 +640,7 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -661,7 +662,10 @@ describe('App orchestration coverage', () => {
       .mockResolvedValueOnce(snapshots)
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    // Select a project to trigger listConnections and listSnapshots
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+
     await act(async () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
