@@ -244,12 +244,24 @@ def parse_dbml(text: str) -> dict[str, Any]:
             else:
                 fk_specs.append((current[0], current[1], col_name, ts, tt, tc))
 
+    seen_fk_specs = set()
     fk_edges: list[dict[str, Any]] = []
     for i, (cs, ct, cc, ps, pt, pc) in enumerate(fk_specs, start=1):
+        if (cs, ct, cc, ps, pt, pc) in seen_fk_specs:
+            continue
+        seen_fk_specs.add((cs, ct, cc, ps, pt, pc))
+
         child = oid_by_table.get((cs, ct))
         parent = oid_by_table.get((ps, pt))
         if child is None or parent is None:
             continue  # ref to a table not defined in this document
+
+        # Check endpoint columns exist
+        child_col_exists = any(c["relation_oid"] == child and c["column_name"] == cc for c in columns)
+        parent_col_exists = any(c["relation_oid"] == parent and c["column_name"] == pc for c in columns)
+        if not (child_col_exists and parent_col_exists):
+            continue
+
         fk_edges.append(
             {
                 "fk_constraint_oid": 100000 + i,
