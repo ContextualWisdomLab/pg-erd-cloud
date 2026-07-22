@@ -56,3 +56,7 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+
+## 2024-07-22 - Contextual aria-labels for generic actions
+**Learning:** Generic action buttons like "Delete" or "Cancel" in complex models lack context for screen reader users, especially when they refer to specific dynamic entities (e.g., specific tables or relationships). Adding dynamic text like `${title} 삭제` significantly improves clarity without breaking visual brevity. Furthermore, explicitly targeting the dynamic `aria-label` text inside tests with `getByRole('button', { name: '...' })` provides robust assertions that confirm both accessibility and functionality.
+**Action:** When creating modals or iterative dynamic UI with generic action buttons, verify if the action is targeted at a specific item and inject dynamic context into the `aria-label`. Ensure React Testing Library asserts check for the full descriptive `aria-label`.

@@ -116,7 +116,7 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: 'a에서 b으로의 관계 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
     fireEvent.click(screen.getByRole('button', { name: '저장' }))
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
@@ -181,7 +181,7 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
     fireEvent.submit(document.getElementById('editTableForm')!)
-    fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: 'public.users 테이블 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
