@@ -6,6 +6,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+# Rejects ASCII C0 controls (\x00–\x1F), DEL (\x7F), and C1 controls
+# (\x80–\x9F) to prevent log/terminal injection in user-supplied strings.
+NO_ASCII_CONTROL_CHARS_PATTERN = r"^[^\x00-\x1F\x7F-\x9F]+$"
+
 
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
@@ -13,7 +17,7 @@ class ProjectCreateIn(BaseModel):
     project_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
 
 
@@ -51,7 +55,7 @@ class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
     dsn: str = Field(
         min_length=1,
@@ -193,7 +197,7 @@ class DiagramViewCreateIn(BaseModel):
     name: str = Field(
         min_length=1,
         max_length=200,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
@@ -221,12 +225,12 @@ class TableAnnotationUpsertIn(BaseModel):
     schema_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
     relation_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
     body: str = Field(min_length=1, max_length=10_000)
 
@@ -317,7 +321,7 @@ class ApiKeyCreateIn(BaseModel):
     key_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=NO_ASCII_CONTROL_CHARS_PATTERN,
     )
 
 
