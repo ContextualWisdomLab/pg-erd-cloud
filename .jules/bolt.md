@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2026-07-22 - Avoid redundant Map instantiation in unrelated export paths
+**Learning:** When optimizing ERD export functions with pre-computed lookup Maps (like `columnByHandle`), instantiating them indiscriminately in unrelated functions (like `exportDiagramSvg`) that don't utilize the Map creates unnecessary CPU and memory allocation regressions (O(N*C)), even if the Map was beneficial for functions that actually parse edges like `exportDDL`. Test mocks also frequently contain undefined column objects, causing type errors during map generation.
+**Action:** When adding pre-computed Maps for O(1) lookups, only instantiate and populate them within the specific functions that actually require them. Additionally, explicitly guard against incomplete test mock data (`if (c && c.column_name)`) before passing values to handle generation functions.
