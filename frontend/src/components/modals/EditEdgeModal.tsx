@@ -19,7 +19,7 @@ export function EditEdgeModal({
   onRelCancel,
   onRelSubmit,
 }: EditEdgeModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(Boolean(editingEdge), onRelCancel);
+  const dialogRef = useDialogAccessibility(Boolean(editingEdge), onRelCancel);
 
   if (!editingEdge) return null;
 
@@ -39,17 +39,13 @@ export function EditEdgeModal({
         justifyContent: "center",
       }}
     >
-      <form
+      <div
         className="modalContent"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-rel-title"
         ref={dialogRef}
         tabIndex={-1}
-        onSubmit={(e) => {
-          e.preventDefault();
-          onRelSubmit();
-        }}
         style={{
           background: "#fff",
           padding: 20,
@@ -89,14 +85,15 @@ export function EditEdgeModal({
           <div className="row">
             <button type="button" onClick={onRelCancel}>취소</button>
             <button
-              type="submit"
+              type="button"
+              onClick={onRelSubmit}
               style={{ background: "#034ea2", color: "#fff" }}
             >
               저장
             </button>
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
