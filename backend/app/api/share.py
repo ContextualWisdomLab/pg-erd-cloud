@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -29,6 +30,12 @@ from app.spec.reversing import generate_reversing_spec
 router = APIRouter(prefix="/api", tags=["share"])
 
 
+import re
+from app.dsn_redaction import redact_dsn_error_message
+
+import re
+from app.dsn_redaction import redact_dsn_error_message
+
 def _redact_sensitive_snapshot_fields(
     data: dict | list | str | int | float | bool | None,
 ) -> dict | list | str | int | float | bool | None:
@@ -36,12 +43,26 @@ def _redact_sensitive_snapshot_fields(
     if isinstance(data, dict):
         return {
             k: "***"
-            if k in {"comment", "relation_comment", "column_comment", "example_value"}
+            if isinstance(k, str) and (
+                k.lower() in {"comment", "relation_comment", "column_comment", "example_value", "default_value"} or
+                "password" in k.lower() or
+                "secret" in k.lower() or
+                "credential" in k.lower() or
+                "token" in k.lower() or
+                "key" in k.lower()
+            )
             else _redact_sensitive_snapshot_fields(v)
             for k, v in data.items()
         }
     elif isinstance(data, list):
         return [_redact_sensitive_snapshot_fields(v) for v in data]
+    elif isinstance(data, str):
+        if "://" in data or "@" in data:
+            try:
+                from app.dsn_redaction import redact_dsn_error_message
+                return redact_dsn_error_message(data, "")
+            except Exception:
+                pass
     return data
 
 
@@ -140,7 +161,7 @@ async def get_shared_snapshot(
         "status": snap.status,
         "schema_filter": snap.schema_filter,
         "error_message": snap.error_message,
-        "snapshot_json": _redact_sensitive_snapshot_fields(data.snapshot_json)
+        "snapshot_json": cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
         if data
         else None,
     }
@@ -172,7 +193,7 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    return snapshot_json_to_sql(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)), target_dialect=dialect)
 
 
 @router.get(
@@ -203,7 +224,7 @@ async def export_shared_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
+            return await generate_reversing_llm_draft(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)))
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -212,7 +233,7 @@ async def export_shared_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_reversing_spec(data.snapshot_json, mode=mode)
+    return generate_reversing_spec(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)), mode=mode)
 
 
 @router.get(
@@ -243,7 +264,7 @@ async def export_shared_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
+            return await generate_index_design_llm_draft(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)))
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -252,4 +273,4 @@ async def export_shared_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_index_design_spec(data.snapshot_json, mode=mode)
+    return generate_index_design_spec(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)), mode=mode)

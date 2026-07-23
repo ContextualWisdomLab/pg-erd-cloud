@@ -292,14 +292,17 @@ export default function App() {
         if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
       .catch((e) => {
-        if (isCurrent) setError(String(e));
+        if (!isCurrent) return;
+        setError(String(e));
       });
     listSnapshots(selectedProjectId)
       .then((items) => {
-        if (isCurrent) setSnapshots(items);
+        if (!isCurrent) return;
+        setSnapshots(items);
       })
       .catch((e) => {
-        if (isCurrent) setError(String(e));
+        if (!isCurrent) return;
+        setError(String(e));
       });
     return () => {
       isCurrent = false;
