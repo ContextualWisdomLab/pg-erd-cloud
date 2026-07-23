@@ -53,6 +53,3 @@
 ## 2024-05-18 - Native Keyboard Submission with Forms
 **Learning:** Interactive input groups intended for submission (like the new group creation input and button) lack native keyboard support (e.g., submitting via Enter key) when built with plain `<div>` elements.
 **Action:** Always wrap data submission input and button groups in a `<form>` element, set the primary action button to `type="submit"`, and handle `onSubmit` (preventing default). This automatically provides Enter-key submission capabilities and improves accessibility for keyboard users.
-## 2024-07-14 - Native Keyboard Submission with Forms for Modals
-**Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
-**Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
