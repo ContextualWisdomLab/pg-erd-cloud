@@ -54,3 +54,7 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+
+## 2024-07-23 - Conditionally Disabled Export Buttons Accessibility
+**Learning:** Using the native `disabled` HTML attribute on export buttons when artifacts are unavailable (e.g. no tables added) removes them from the tab order. This makes them invisible to keyboard users and some screen readers, leaving them unaware of both the available export formats and the reasons why they are currently disabled.
+**Action:** Replace the native `disabled` attribute with `aria-disabled="true"`, apply visual disabled styling (e.g., `opacity: 0.5, cursor: "not-allowed"`), manually prevent submission via `onClick` if disabled, and use `aria-describedby` to link the button to the reason it is disabled, ensuring full discoverability and context for all users.
