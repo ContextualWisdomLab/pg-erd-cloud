@@ -65,6 +65,10 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
+// ⚡ Bolt: Use a WeakMap outside the component to cache decorated `node.data` objects.
+// This prevents breaking React.memo on 60fps drag updates when a search filter is active.
+const nodeDataDecorationCache = new WeakMap<TableNodeData, Map<boolean, TableNodeData>>();
+
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
   "failed",
@@ -201,13 +205,26 @@ export default function App() {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      let innerCache = nodeDataDecorationCache.get(node.data);
+      if (!innerCache) {
+        innerCache = new Map<boolean, TableNodeData>();
+        nodeDataDecorationCache.set(node.data, innerCache);
+      }
+
+      let decoratedData = innerCache.get(isHighlighted);
+      if (!decoratedData) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        innerCache.set(isHighlighted, decoratedData);
+      }
+
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
