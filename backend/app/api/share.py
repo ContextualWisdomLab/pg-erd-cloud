@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -172,7 +173,7 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    return snapshot_json_to_sql(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)), target_dialect=dialect)
 
 
 @router.get(
@@ -201,9 +202,10 @@ async def export_shared_snapshot_reversing_spec(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     if mode == "llm-draft":
         try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
+            return await generate_reversing_llm_draft(redacted)
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -212,7 +214,7 @@ async def export_shared_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_reversing_spec(data.snapshot_json, mode=mode)
+    return generate_reversing_spec(redacted, mode=mode)
 
 
 @router.get(
@@ -241,9 +243,10 @@ async def export_shared_snapshot_index_design(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# ERD Index Design\n\nSnapshot data not found.\n"
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     if mode == "llm-draft":
         try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
+            return await generate_index_design_llm_draft(redacted)
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -252,4 +255,4 @@ async def export_shared_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_index_design_spec(data.snapshot_json, mode=mode)
+    return generate_index_design_spec(redacted, mode=mode)
