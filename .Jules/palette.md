@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-07-20 - Disabled Button Accessibility with `aria-describedby`
+**Learning:** Disabled buttons often rely on `title` attributes for explanations. However, many browsers do not expose tooltips for disabled controls, leaving screen reader users without context. Furthermore, dynamically mapping artifact descriptions to `aria-describedby` requires careful ID generation (e.g., stripping spaces) to ensure proper resolution.
+**Action:** Always pair disabled buttons with visible helper text and link them using `aria-describedby` instead of relying on `title`. Ensure test suites (like `ExportModal.test.tsx`) are updated to explicitly verify the `aria-describedby` attribute and its target ID.

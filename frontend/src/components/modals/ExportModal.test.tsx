@@ -155,13 +155,21 @@ describe('ExportModal', () => {
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(7);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
+
+    const checkDisabledExportButton = (name: string, artifactLabel: string) => {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      const descId = `artifact-desc-${artifactLabel.replace(/\s+/g, '-')}`;
+      expect(button).toHaveAttribute('aria-describedby', descId);
+    };
+
+    checkDisabledExportButton('SQL DDL 복사', 'SQL DDL');
+    checkDisabledExportButton('SVG 이미지 내보내기', 'SVG 이미지');
+    checkDisabledExportButton('PlantUML 내보내기', 'PlantUML');
+    checkDisabledExportButton('Mermaid 내보내기', 'Mermaid');
+    checkDisabledExportButton('DBML 내보내기', 'DBML');
+    checkDisabledExportButton('데이터 사전 CSV 내보내기', 'Data Dictionary CSV');
+    checkDisabledExportButton('데이터 사전 Markdown 내보내기', 'Data Dictionary MD');
   });
 
   it('exposes access-control guidance for disabled button', () => {
