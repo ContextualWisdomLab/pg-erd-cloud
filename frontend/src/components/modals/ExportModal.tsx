@@ -212,23 +212,33 @@ export function ExportModal({
             </p>
 
             <div className="exportModal__artifactList">
-              {artifacts.map((artifact) => (
-                <div className="exportModal__artifactRow" key={artifact.label}>
-                  <div>
-                    <strong>{artifact.label}</strong>
-                    <span>{artifact.description}</span>
+              {artifacts.map((artifact) => {
+                const descId = `desc-${artifact.label.replace(/\s+/g, '-')}`;
+                return (
+                  <div className="exportModal__artifactRow" key={artifact.label}>
+                    <div>
+                      <strong>{artifact.label}</strong>
+                      <span id={descId}>{artifact.description}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (artifact.disabled) {
+                          e.preventDefault();
+                        } else {
+                          artifact.onExport();
+                        }
+                      }}
+                      aria-disabled={artifact.disabled}
+                      aria-label={artifact.ariaLabel}
+                      aria-describedby={descId}
+                      aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
+                    >
+                      {artifact.buttonLabel}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={artifact.onExport}
-                    disabled={artifact.disabled}
-                    aria-label={artifact.ariaLabel}
-                    aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
-                  >
-                    {artifact.buttonLabel}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </div>
