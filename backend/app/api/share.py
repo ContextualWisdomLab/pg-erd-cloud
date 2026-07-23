@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -172,7 +173,7 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(_redact_sensitive_snapshot_fields(data.snapshot_json), target_dialect=dialect)
+    return snapshot_json_to_sql(cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json)), target_dialect=dialect)
 
 
 @router.get(
@@ -201,7 +202,7 @@ async def export_shared_snapshot_reversing_spec(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
-    redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     if mode == "llm-draft":
         try:
             return await generate_reversing_llm_draft(redacted)
@@ -242,7 +243,7 @@ async def export_shared_snapshot_index_design(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# ERD Index Design\n\nSnapshot data not found.\n"
-    redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     if mode == "llm-draft":
         try:
             return await generate_index_design_llm_draft(redacted)
