@@ -43,16 +43,14 @@
 ## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
 **Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
 **Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
-## 2026-07-10 - Accessibility Anti-pattern: Excessive Tab Stops
-**Learning:** Adding `tabIndex={0}` to static, non-interactive text badges (like `abbr` or `span`) just to expose their `title` or `aria-label` attributes to keyboard users is an accessibility anti-pattern. It creates excessive tab stops and severely degrades keyboard navigation for users who rely on tab to move through actionable elements.
-**Action:** Never add `tabIndex={0}` to non-interactive elements unless they are specifically designed to be focusable for a functional reason. Use proper semantic HTML or let the screen reader read adjacent elements as part of natural navigation.
-## 2024-07-12 - [Accessibility] Unique aria-labels in dynamic lists
-**Learning:** Screen readers cannot differentiate generic labels (like '컬럼명' or 'PK') when they repeat in dynamic lists or tables. Providing a static aria-label inside a mapped array causes screen readers to announce identical generic labels across different rows.
-**Action:** Always prepend or append a uniquely identifiable name (e.g., prepending the row's specific item name) to the 'aria-label' attribute of interactive elements inside dynamic lists so screen readers can correctly distinguish between them.
+## 2026-07-05 - Accessible Disabled Buttons
+**Learning:** Adding `aria-describedby` to disabled buttons and explicitly linking them to visible helper text elements allows screen readers to announce the reason for being disabled, significantly improving accessibility for interactive elements that depend on prior state (like selecting a project).
+**Action:** Always pair disabled interactive elements with visible helper text and use `aria-describedby` to semantically link them, ensuring the context is available to assistive technologies.
 
-## 2024-05-18 - Native Keyboard Submission with Forms
-**Learning:** Interactive input groups intended for submission (like the new group creation input and button) lack native keyboard support (e.g., submitting via Enter key) when built with plain `<div>` elements.
-**Action:** Always wrap data submission input and button groups in a `<form>` element, set the primary action button to `type="submit"`, and handle `onSubmit` (preventing default). This automatically provides Enter-key submission capabilities and improves accessibility for keyboard users.
-## 2024-07-14 - Native Keyboard Submission with Forms for Modals
-**Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
-**Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2024-05-18 - Table row input accessibility
+**Learning:** In table-based forms where inputs or `<select>` elements correspond to a specific row property (e.g., Distinct Count, Group Assignment), the visual context or `<label>` often only provides the row identity. Screen reader users can lose context when focusing directly on these inputs.
+**Action:** Always provide an explicit `aria-label` directly on the input/select to give screen readers full context (e.g., `${column.column_name} distinct count`, `${node.data.title} 그룹 배정`), even if it is linked to a label via `id` or placed next to it visually.
+
+## 2024-07-13 - [Table Node Accessibility]
+**Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
+**Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
