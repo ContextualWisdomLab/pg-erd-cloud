@@ -28,16 +28,9 @@
 ## 2026-06-25 - Avoid Redundant map.set() on Mutable Map Values
 **Learning:** When updating mutable values stored in a `Map`, such as `Set` or `Array`, calling `map.set(key, value)` after every mutation repeats work once the entry already exists.
 **Action:** Create and store the mutable value only when `map.get(key)` misses. After that, mutate the retrieved collection directly with `.add()` or `.push()`.
-## Performance Issue: Inefficient Route Metric Priming
-The previous implementation of `prime_http_metrics` resulted in an O(M * R) Cartesian product loop creating metric series for every HTTP method across every single route.
-
-## Fix
-Optimized metric route processing to O(N) by creating a mapping of routes directly to their active methods and iterating solely over those active methods.
-
-## Benchmark Results
-100 unique routes, 1 unique method each (100 total combinations):
-- Before: ~820.62ms
-- After: ~1.17ms
+## 2024-06-24 - Route metric priming complexity reduction
+**Learning:** A Cartesian product loop in `prime_http_metrics` created O(M * R) work by initializing metric series for every method against every route. In a 100-route / 1-method sample, this measured about 820.62ms before optimization.
+**Action:** Build a route-to-active-method mapping first, then iterate only active pairs so priming scales linearly with real route-method combinations. In the same sample, this reduced runtime to about 1.17ms.
 ## 2026-06-25 - Avoid unbounded Math.min/Math.max spreads
 **Learning:** Spreading dynamically sized arrays into variadic functions like `Math.max(...values)` creates intermediate arrays and can exceed JS engine argument-count limits, often surfacing as `RangeError` variants such as "Too many arguments".
 **Action:** For unbounded frontend collections such as ERD nodes, calculate min/max bounds with an iterative loop instead of `Math.min(...array)` or `Math.max(...array)`.
