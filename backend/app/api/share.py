@@ -30,10 +30,6 @@ from app.spec.reversing import generate_reversing_spec
 router = APIRouter(prefix="/api", tags=["share"])
 
 
-import re
-from app.dsn_redaction import redact_dsn_error_message
-
-import re
 from app.dsn_redaction import redact_dsn_error_message
 
 def _redact_sensitive_snapshot_fields(
@@ -58,11 +54,7 @@ def _redact_sensitive_snapshot_fields(
         return [_redact_sensitive_snapshot_fields(v) for v in data]
     elif isinstance(data, str):
         if "://" in data or "@" in data:
-            try:
-                from app.dsn_redaction import redact_dsn_error_message
-                return redact_dsn_error_message(data, "")
-            except Exception:
-                pass
+            return redact_dsn_error_message(data, data)
     return data
 
 
