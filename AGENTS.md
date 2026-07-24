@@ -103,7 +103,7 @@ behind Traefik (`deploy/traefik/`).
 ## Agent journals (`.jules/`)
 
 - The canonical agent-journal directory is **`.jules/` (lowercase)** at the
-  repo root. Never create `.Jules/`, `Backend/.jules/`, or any other
+  repo root. Never create `.Jules/`, `backend/.jules/`, or any other
   case/location variant: case-insensitive filesystems (Windows, default macOS)
   collapse `.Jules` and `.jules` onto one physical directory while git tracks
   them as two, producing phantom `git add` failures and divergent content.
