@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId } from './handleUtils';
+import { decodeSourceHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -39,27 +39,25 @@ function sourceColumnsForEdge(edge: Edge): Set<string> {
   return columns;
 }
 
-type ForeignKeyNodeInfo = {
-  columns: Set<string>;
-  handles: Set<string>;
-};
-
-function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
-  const map = new Map<string, ForeignKeyNodeInfo>();
+function foreignKeyColumnsByNode(edges: Edge[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
 
   for (const edge of edges) {
-    let info = map.get(edge.source);
-    if (!info) {
-      info = { columns: new Set<string>(), handles: new Set<string>() };
-      map.set(edge.source, info);
+    let columns = map.get(edge.source);
+    if (!columns) {
+      columns = new Set<string>();
+      map.set(edge.source, columns);
     }
 
     for (const column of sourceColumnsForEdge(edge)) {
-      info.columns.add(column);
+      columns.add(column);
     }
 
-    if (edge.sourceHandle) {
-      info.handles.add(edge.sourceHandle);
+    // ⚡ Bolt: Decode source handle to its original column name once and add to the O(1) Set,
+    // avoiding O(N*C) string encoding and allocations in the export loops.
+    const decodedHandle = decodeSourceHandleId(edge.sourceHandle);
+    if (decodedHandle !== null) {
+      columns.add(decodedHandle);
     }
   }
 
@@ -67,19 +65,12 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
 }
 
 function isForeignKeyColumn(
-  edgeColumnsByNode: Map<string, ForeignKeyNodeInfo>,
+  edgeColumnsByNode: Map<string, Set<string>>,
   node: Node<TableNodeData>,
   columnName: string,
 ): boolean {
-  const info = edgeColumnsByNode.get(node.id);
-  if (!info) return false;
-
-  if (info.columns.has(columnName)) {
-    return true;
-  }
-
-  const handleId = sourceColumnHandleId(columnName);
-  return info.handles.has(handleId);
+  const columns = edgeColumnsByNode.get(node.id);
+  return columns ? columns.has(columnName) : false;
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {

@@ -2,7 +2,12 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import {
+  decodeSourceHandleId,
+  decodeTargetHandleId,
+  sourceColumnHandleId,
+  targetColumnHandleId,
+} from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,13 +72,23 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
-  if (sourceHandleColumn && targetHandleColumn) {
+  // ⚡ Bolt: Decode O(1) edge handle strings directly into column names and strictly match them,
+  // replacing expensive O(C) string conversions and matching loops with O(1) checks.
+  const decodedSourceHandle = decodeSourceHandleId(edge.sourceHandle);
+  const sourceHandleColumn =
+    decodedSourceHandle !== null &&
+    (sourceNode.data.columns || []).some((column) => column.column_name === decodedSourceHandle)
+      ? decodedSourceHandle
+      : undefined;
+
+  const decodedTargetHandle = decodeTargetHandleId(edge.targetHandle);
+  const targetHandleColumn =
+    decodedTargetHandle !== null &&
+    (targetNode.data.columns || []).some((column) => column.column_name === decodedTargetHandle)
+      ? decodedTargetHandle
+      : undefined;
+
+  if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
 

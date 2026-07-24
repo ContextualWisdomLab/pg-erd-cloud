@@ -14,3 +14,23 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function decodeHandleId(encoded: string): string {
+  if (encoded === 'c-empty') return ''
+  if (!encoded.startsWith('c-')) return ''
+  return encoded
+    .slice(2)
+    .split('-')
+    .map((hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .join('')
+}
+
+export function decodeSourceHandleId(handleId: string | null | undefined): string | null {
+  if (!handleId || !handleId.startsWith('src-')) return null
+  return decodeHandleId(handleId.slice(4))
+}
+
+export function decodeTargetHandleId(handleId: string | null | undefined): string | null {
+  if (!handleId || !handleId.startsWith('tgt-')) return null
+  return decodeHandleId(handleId.slice(4))
+}
