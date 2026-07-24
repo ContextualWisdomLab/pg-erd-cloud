@@ -1,56 +1,51 @@
-## 2025-02-24 - Accessibility and Disabled States for Forms
-**Learning:** In forms without `<form>` elements (where input and buttons are siblings), adding explicit `<label>` tags is difficult without changing the design layout. In such cases, explicitly adding an `aria-label` attribute directly to the inputs (`<input>`) is essential so screen readers can distinguish between inputs (like `dsn` and `conn-name` inputs without standard `<label>` groupings). Disabled buttons should not rely on `title` because many browsers do not expose disabled-control tooltips.
-**Action:** When working on standalone functional forms with multiple inputs, ensure secondary inputs that lack a traditional wrapping label tag include an `aria-label`. Pair disabled buttons with visible helper text and `aria-describedby` so the disabled reason remains available to mouse, keyboard, and screen-reader users.
-## 2024-05-24 - [Replaced blocking alert with inline copy feedback]
-**Learning:** Native browser alerts for micro-interactions (like copying text) are disruptive to the user flow. Replacing them with temporary inline button text updates (`aria-live="polite"`) significantly improves both the experience and accessibility for screen readers.
-**Action:** Always prefer non-blocking inline feedback or toast notifications over `alert()` or `confirm()` dialogs for non-destructive actions.
-## 2026-06-20 - Adding async operation loading states to critical UX paths
-**Learning:** This app requires manual yielding to the browser during compute-heavy or async events (like `onAutoLayout` with `requestAnimationFrame`). For typical network requests, standard state flags for disabling/progressing buttons with `aria-busy` provides sufficient UX feedback without freezing the UI.
-**Action:** When adding new network operations in this stack, consistently use dedicated loading state flags and apply `aria-busy` attributes paired with disabled logic to inform the user.
-## 2026-06-20 - [Canvas Empty States]
-**Learning:** In canvas-based applications (like React Flow ERDs), an empty canvas can look like a broken state or a loading delay if no guidance is provided. When no nodes are present, users need immediate visual feedback explaining *why* it's empty (e.g., waiting for reverse engineering) or *what* to do next (e.g., "Create a snapshot" or "Add a table").
-**Action:** Always implement an empty state for infinite canvas components that clearly distinguishes between 'loading/generating' and 'ready for interaction' to reduce user confusion.
-## 2026-06-21 - Disabled button visual feedback
-**Learning:** By default, buttons missing `:disabled` pseudo-class styling lack visual cues and keep a pointer cursor, leading to user confusion about interactivity.
-**Action:** Always ensure disabled buttons have reduced opacity, a not-allowed cursor, and optionally a different background/text color to clearly distinguish them from active buttons.
+## 2026-07-14 - Accessible Abbreviation Badges in ERD Nodes
+**Learning:** ERD nodes are dense with domain abbreviations ("PK", "FK", "NN", "NOT NULL") that visually capable DBAs parse instantly but that confuse screen-reader users and beginners. Three refinements emerged in sequence: a bare `title` tooltip only helps mouse users; `aria-label` on the wrapper provides the screen-reader name; and adding `aria-hidden="true"` on the inner visual text stops screen readers from announcing both the abbreviation and its expansion. Forcing focusability with `tabIndex` on non-interactive badges harms keyboard ergonomics.
+**Action:** For abbreviation badges, put a descriptive `aria-label` (e.g. "Primary Key") on the wrapper element, keep `title` only as a mouse-hover convenience, hide the raw abbreviation text with `aria-hidden="true"`, and do not add `tabIndex` to non-interactive elements.
+
+## 2026-07-11 - Explicit aria-labels on Row-Scoped and Standalone Inputs
+**Learning:** Inputs rendered per table row (e.g. Distinct Count, Group Assignment selects) or as siblings in label-less layouts (e.g. `dsn`, `conn-name`) lose their row/context identity for screen-reader users, who hear only a generic control name when focusing them.
+**Action:** Give each such input an explicit `aria-label` that carries the full context (e.g. `${column.column_name} distinct count`, `${node.data.title} group assignment`), even when a visual label sits next to it.
+
+## 2026-07-05 - Announcing Why a Control Is Disabled
+**Learning:** Fully disabled native buttons are unfocusable in many browsers, so neither `title` tooltips nor `aria-describedby` reliably convey the disabled reason; the "why" disappears for keyboard and screen-reader users.
+**Action:** Pair unavailable actions with visible helper text. When the reason must be announced on focus, use `aria-disabled="true"` plus a click/key guard and `aria-describedby`; reserve native `disabled` for cases where removing the control from the focus order is intentional.
+
+## 2026-06-30 - Text Truncation Accessibility
+**Learning:** Elements using `text-overflow: ellipsis` and "... N more" overflow summaries hide table, column, example, and group context from users who cannot hover; a `title` tooltip alone leaves keyboard and touch users without the full value.
+**Action:** Treat native `title` as a convenience hover fallback only. Pair truncated text with an accessible name or description carrying the full value, and make the truncated element focusable when the full text is otherwise unreachable.
+
+## 2026-06-30 - SPA Noscript Fallbacks
+**Learning:** A JavaScript-only SPA renders a blank screen when scripts are disabled, which is especially confusing for assistive-technology users and locked-down browser environments.
+**Action:** Add a localized `<noscript>` fallback near the top of `<body>` for SPA entry pages. Keep the message in the same language as the document `lang` value, or mark different-language text with its own `lang` attribute.
+
+## 2026-06-23 - Keyboard Navigation for Standalone Inputs and Modals
+**Learning:** Standalone inputs without a wrapping `<form>` element lack implicit Enter-to-submit behavior, forcing keyboard users onto the mouse, and custom modal dialogs trap keyboard users unless an explicit escape path exists.
+**Action:** When implementing inputs outside `<form>` contexts or inside custom modals, add `onKeyDown` handlers supporting `Enter` for submission and `Escape` for cancelation.
+
+## 2026-06-23 - Keep UX Changes Scoped; Fix Security Findings, Never Dodge Them
+**Learning:** In this repository, security scanners (STRIX) and strict reviewers analyze every file a PR touches. A "single micro-UX improvement" task that spreads across multiple files fails review for scope creep, and touching a component that handles sensitive inputs (e.g. DSN handling in `App.tsx`) can surface pre-existing vulnerabilities in CI.
+**Action:** Keep each micro-UX change isolated to one element and file. If a scanner flags a real vulnerability in a file you touched, fix it or report it explicitly — do not select files to avoid scanner attention, and never treat working around security review as an acceptable goal.
+
+## 2026-06-22 - Add Confirmation and Accessibility to Destructive Actions
+**Learning:** Destructive ERD canvas actions (deleting relations or business groups) executed immediately with no confirmation, and mapped lists rendered generic delete buttons without per-item context for screen readers.
+**Action:** Wrap destructive handlers in a confirmation step (e.g. `window.confirm`) and give mapped delete buttons a contextual `aria-label` naming the target item (e.g. ``aria-label={`Delete ${itemName}`}``).
+
 ## 2026-06-21 - Custom Modals and ARIA Context
-**Learning:** Custom generic `<div>` components mimicking native elements (like modals) frequently lack basic ARIA boundaries (`role="dialog"`, `aria-modal="true"`) and contextual naming, leading to screen reader confusion. Additionally, using `aria-label` on non-interactive generic elements (like an outer `div` wrapping list items) without a corresponding role (e.g. `role="group"`) is commonly ignored by assistive tech.
-**Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading. For non-interactive elements containing labeled groups, explicitly assign `role="group"` or a relevant semantic role when applying an `aria-label`.
-## 2025-02-23 - Add Confirmation and Accessibility to Destructive Actions
-**Learning:** In the ERD canvas, destructive actions like deleting relations or business groups were missing user confirmation, increasing the chance of accidental data loss. Furthermore, mapped lists of interactive elements like "Business Group" rendering generic "삭제" (delete) buttons lacked `aria-label` context, creating ambiguous screen reader experiences.
-**Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g., `aria-label={`${itemName} 삭제`}`).
-## 2026-06-21 - Form Input Keyboard Navigation
-**Learning:** Standalone inputs without wrapping `<form>` elements inherently lack keyboard submission support, forcing users to switch from keyboard to mouse just to complete simple forms. Furthermore, modal dialogues holding inputs trap keyboard users unless explicit cancelation escapes are implemented.
-**Action:** When implementing inputs outside of standard `<form>` contexts or within custom modals, explicitly add `onKeyDown` handlers to support `Enter` for submission and `Escape` for cancelation.
-## 2024-06-23 - [Safe Scope UX Tooltips]
-**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g., "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
-**Action:** Always verify the security posture of a file before making non-security changes to it. Prefer touching isolated display components (like `TableNode.tsx`) for UX enhancements rather than high-risk root components.
-## 2026-06-21 - Accessible Badges for Domain Abbreviations
-**Learning:** ERD diagrams heavily use domain abbreviations like "PK", "FK", and "NOT NULL". For visually capable users, these are quickly recognized. However, for screen reader users or beginners, abbreviations can be ambiguous. Wrapping them in generic `span`s without `aria-label` or `title` results in poor accessibility and misses an opportunity to provide helpful context.
-**Action:** When displaying technical or domain-specific abbreviations in badges (like PK/FK), consistently add a descriptive `title` (for mouse hover tooltips) and an `aria-label` (for screen readers) explaining the abbreviation's full meaning (e.g. "Primary Key").
-## 2026-06-28 - STRIX Security Intersections and Strict Scope Enforcement
-**Learning:** In projects with strict AI code review agents and security scanners (like STRIX), making multiple distinct micro-UX improvements (e.g. across different files or disparate components) in a single task intended for "ONE micro-UX improvement" will cause a CI failure. Furthermore, applying UX improvements to elements that handle potentially sensitive data (e.g. DSNs, or rendering unsanitized user input) can inadvertently trigger security scanners if those elements contain pre-existing vulnerabilities, blocking the PR entirely.
-**Action:** When tasked with a single micro-UX improvement, strictly isolate the change to one specific element and file. When choosing an element, actively avoid modifying components that handle credentials or render un-escaped user inputs to avoid intersecting with existing unpatched security flaws.
-## 2026-06-25 - Text Truncation Accessibility
-**Learning:** Elements using `text-overflow: ellipsis` can hide important table, column, example, and group context from users who need the full text.
-**Action:** Treat native `title` as a convenience hover fallback only. Pair truncated text with an accessible name or description, and make the truncated element focusable when the full value is otherwise hidden.
-## 2026-06-25 - SPA Noscript Fallbacks
-**Learning:** A JavaScript-only SPA can show a blank screen when scripts are disabled, which is especially confusing for assistive technology users and locked-down browser environments.
-**Action:** Add a localized `<noscript>` fallback near the top of `<body>` for SPA entry pages. Keep the message in the same language as the document `lang` value, or explicitly mark any different-language text with its own `lang` attribute.
-## 2026-06-30 - Custom Modals and ARIA Context
-**Learning:** Custom generic `<div>` components mimicking native elements (like modals) frequently lack basic ARIA boundaries (`role="dialog"`, `aria-modal="true"`) and contextual naming, leading to screen reader confusion. Additionally, using `aria-label` on non-interactive generic elements (like an outer `div` wrapping list items) without a corresponding role (e.g. `role="group"`) is commonly ignored by assistive tech.
-**Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading.
-## 2024-06-26 - [Abbreviation Comprehension in ERD Nodes]
-**Learning:** Users without deep database administration backgrounds may not immediately recognize domain-specific abbreviations like "PK" or "FK" rendered as minimalist badges inside dense ERD nodes.
-**Action:** Always provide `title` attributes on technical acronym badges (like Primary Key / Foreign Key) to ensure clarity and improve accessibility without cluttering the space-constrained node UI.
-## 2026-07-05 - Accessible Disabled Buttons
-**Learning:** Adding `aria-describedby` to disabled buttons and explicitly linking them to visible helper text elements allows screen readers to announce the reason for being disabled, significantly improving accessibility for interactive elements that depend on prior state (like selecting a project).
-**Action:** Always pair disabled interactive elements with visible helper text and use `aria-describedby` to semantically link them, ensuring the context is available to assistive technologies.
+**Learning:** Custom `<div>`-based modals frequently lack ARIA boundaries (`role="dialog"`, `aria-modal="true"`) and contextual naming, confusing screen readers. Separately, `aria-label` on a non-interactive generic element (like an outer `div` wrapping list items) is ignored by assistive tech unless the element also has a role.
+**Action:** Give custom modals `role="dialog"`, explicit `aria-modal="true"`, and `aria-labelledby` referencing their heading. When applying `aria-label` to a non-interactive container, also assign `role="group"` or another appropriate semantic role.
 
-## 2024-05-18 - Table row input accessibility
-**Learning:** In table-based forms where inputs or `<select>` elements correspond to a specific row property (e.g., Distinct Count, Group Assignment), the visual context or `<label>` often only provides the row identity. Screen reader users can lose context when focusing directly on these inputs.
-**Action:** Always provide an explicit `aria-label` directly on the input/select to give screen readers full context (e.g., `${column.column_name} distinct count`, `${node.data.title} 그룹 배정`), even if it is linked to a label via `id` or placed next to it visually.
+## 2026-06-21 - Disabled Button Visual Feedback
+**Learning:** Buttons without `:disabled` styling keep full opacity and a pointer cursor, so users cannot tell they are inactive.
+**Action:** Ensure disabled buttons have reduced opacity, a `not-allowed` cursor, and optionally a distinct background/text color to clearly distinguish them from active buttons.
 
-## 2024-07-13 - [Table Node Accessibility]
-**Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
-**Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2026-06-20 - Async Operation Loading States
+**Learning:** Compute-heavy handlers (like `onAutoLayout`) need manual yielding to the browser (`requestAnimationFrame`), while ordinary network requests only need state flags that disable the trigger and signal progress; `aria-busy` communicates the in-flight state to assistive tech without freezing the UI.
+**Action:** For new network operations, consistently add a dedicated loading-state flag, disable the triggering control while pending, and set `aria-busy` on the affected region.
+
+## 2026-06-20 - Canvas Empty States
+**Learning:** An empty infinite canvas (React Flow ERD) reads as broken or still loading when nothing explains why it is empty or what to do next (e.g. waiting for reverse engineering vs. "Create a snapshot").
+**Action:** Implement explicit empty states for canvas components that distinguish 'loading/generating' from 'ready for interaction' and point to the next action.
+
+## 2026-06-19 - Non-Blocking Inline Copy Feedback
+**Learning:** Native browser alerts for micro-interactions (like copying text) interrupt user flow; temporary inline button-text updates announced via `aria-live="polite"` improve both experience and screen-reader accessibility.
+**Action:** Prefer non-blocking inline feedback or toast notifications over `alert()`/`confirm()` for non-destructive actions.

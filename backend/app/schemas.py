@@ -13,7 +13,7 @@ class ProjectCreateIn(BaseModel):
     project_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
     )
 
 
@@ -30,7 +30,7 @@ class ProjectMemberAddIn(BaseModel):
     member_subject: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\s\x00-\x1F\x7F]+$",
+        pattern=r"^[^\s\x00-\x1F\x7F-\x9F]+$",
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
@@ -51,7 +51,7 @@ class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
     )
     dsn: str = Field(
         min_length=1,
