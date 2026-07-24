@@ -56,3 +56,7 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+
+## $(date +%Y-%m-%d) - Native Keyboard Submission Support
+**Learning:** React elements with input fields and an adjacent save/create button (often structured using `div`) prevent users from pressing "Enter" natively to submit.
+**Action:** Replaced semantic container `div` wrappers with `<form onSubmit={...}>` and updated `button type="button"` to `button type="submit"`. Always prefer form wrapping for groups containing inputs and an explicit action button to inherently support standard UX accessibility patterns like keyboard submission.
