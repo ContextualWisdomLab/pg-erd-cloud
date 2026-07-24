@@ -99,3 +99,17 @@ behind Traefik (`deploy/traefik/`).
   literature — e.g. data modeling, ER theory, schema normalization, or
   graph/layout algorithms for diagram rendering.
 <!-- END cwl-agent-guidance -->
+
+## Agent journals (`.jules/`)
+
+- The canonical agent-journal directory is **`.jules/` (lowercase)** at the
+  repo root. Never create `.Jules/`, `Backend/.jules/`, or any other
+  case/location variant: case-insensitive filesystems (Windows, default macOS)
+  collapse `.Jules` and `.jules` onto one physical directory while git tracks
+  them as two, producing phantom `git add` failures and divergent content.
+- Journal entry format: `## YYYY-MM-DD - Title` headings, newest first, with
+  `**Learning:**`/`**Action:**` fields (`**Vulnerability:**`/`**Learning:**`/
+  `**Prevention:**` for `sentinel.md`). Dates must be real: verify with
+  `git log` evidence, not memory.
+- Do not commit agent scratch files (e.g. `fix_plan*.txt`, planning notes) to
+  the repo; keep them in the session workspace.
