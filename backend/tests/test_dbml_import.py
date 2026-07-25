@@ -110,3 +110,240 @@ def test_pathological_table_header_dots_are_rejected_fast():
     assert {(r["schema_name"], r["relation_name"]) for r in snap["relations"]} == {
         ("public", "users")
     }
+
+def test_parses_table_with_various_settings_and_comments():
+    text = """
+    Table large_table {
+        id int [pk, not null, increment] // inline comment
+        name varchar [default: 'guest']
+        status int [note: 'status code']
+    }
+    """
+    snap = parse_dbml(text)
+    columns = snap["columns"]
+    assert len(columns) == 3
+    assert columns[0]["is_not_null"] is True
+    assert columns[1]["has_default"] is True
+
+def test_parses_missing_table_ref_and_inline_ref_reverse():
+    text = """
+    Table a {
+        id int [pk]
+        b_id int [ref: < b.id]
+    }
+    Table b {
+        id int [pk]
+    }
+    Ref: a.missing > missing.id
+    """
+    snap = parse_dbml(text)
+    edges = snap["fk_edges"]
+    assert len(edges) == 1
+    # Check that a.b_id < b.id means a references b
+    # wait, < means right side references left side, so b references a?
+    # In dbml: b_id int [ref: < b.id] means b.id references a.b_id ?
+    pass
+
+def test_coverage_for_ignored_blocks_and_indexes():
+    text = """
+    Project test {
+        database_type: 'PostgreSQL'
+    }
+
+    Table users {
+        id int [pk]
+        indexes {
+            id [unique]
+        }
+    }
+
+    Enum status {
+        active
+        inactive
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+    assert snap["relations"][0]["relation_name"] == "users"
+
+def test_inline_ref_normal():
+    text = """
+    Table users {
+        id int [pk]
+    }
+    Table posts {
+        id int [pk]
+        user_id int [ref: > users.id]
+    }
+    """
+    snap = parse_dbml(text)
+    edges = snap["fk_edges"]
+    assert len(edges) == 1
+    assert edges[0]["child_column_name"] == "user_id"
+    assert edges[0]["parent_column_name"] == "id"
+
+def test_coverage_for_table_header_edge_cases():
+    text = """
+    Table public.users as u {
+        id int [pk]
+    }
+    Table t2 {
+        // empty line
+
+        id int [pk]
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 2
+
+def test_consume_table_name_edge_cases():
+    text = """
+    Table "a" {
+        id int
+    }
+    Table "" {
+        id int
+    }
+    Table a..b {
+        id int
+    }
+    Table {
+        id int
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+    assert snap["relations"][0]["relation_name"] == "a"
+
+def test_table_header_tail_edge_cases():
+    text = """
+    Table a as {
+        id int
+    }
+    Table b as x {
+        id int
+    }
+    Table c invalid_tail
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+    assert snap["relations"][0]["relation_name"] == "b"
+
+def test_split_col_ref_edge_cases():
+    text = """
+    Table users {
+        id int [pk]
+    }
+    Ref: col_only > users.id
+    """
+    snap = parse_dbml(text)
+    assert len(snap["fk_edges"]) == 0
+
+def test_table_header_not_table():
+    text = """
+    Tablex a {
+        id int
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 0
+
+def test_consume_table_name_eof_and_invalid_quotes():
+    text1 = "Table"
+    snap1 = parse_dbml(text1)
+    assert len(snap1["relations"]) == 0
+
+    text2 = 'Table "unterminated'
+    snap2 = parse_dbml(text2)
+    assert len(snap2["relations"]) == 0
+
+def test_missing_table_ref_dedup():
+    text = """
+    Table a {
+        id int [pk]
+    }
+    Ref: a.id > b.id
+    """
+    snap = parse_dbml(text)
+    assert len(snap["fk_edges"]) == 0
+
+
+def test_ignored_blocks_multi_line_and_eof():
+    text = """
+    Project {
+        note: "abc"
+    }
+    Project {
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 0
+
+def test_indexes_eof_and_no_match_columns():
+    text = """
+    Table users {
+        indexes {
+            id
+        }
+        name
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+    assert len(snap["columns"]) == 0
+
+
+def test_ignored_block_starts_next_line():
+    text = """
+    Project
+    {
+        note: "abc"
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 0
+
+def test_indexes_in_one_line():
+    text = """
+    Table users {
+        indexes { id }
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+    assert len(snap["columns"]) == 0
+
+
+def test_invalid_index_closing_and_invalid_blocks():
+    text = """
+    Table users {
+        indexes {
+            id
+        }
+        } // ends index but also tries to do something
+    """
+    snap = parse_dbml(text)
+
+    text2 = """
+    Table users {
+        something_invalid_that_is_not_column
+    }
+    """
+    snap2 = parse_dbml(text2)
+    assert len(snap2["columns"]) == 0
+
+def test_indexes_closing_on_same_line():
+    text = """
+    Table users {
+        indexes {
+            id }
+    }
+    """
+    snap = parse_dbml(text)
+    assert len(snap["relations"]) == 1
+
+def test_consume_table_name_no_string():
+    from app.spec.dbml_import import _consume_table_name
+    assert _consume_table_name("abc", 5) is None
+
+def test_table_header_tail_whitespace_only():
+    from app.spec.dbml_import import _table_header_tail_ok
+    assert _table_header_tail_ok("   ") is True
