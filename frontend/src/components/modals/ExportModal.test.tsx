@@ -155,13 +155,34 @@ describe('ExportModal', () => {
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(7);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
+
+    const ddlButton = screen.getByRole('button', { name: 'SQL DDL 복사' });
+    expect(ddlButton).toBeDisabled();
+    expect(ddlButton).toHaveAttribute('aria-describedby', 'artifact-desc-SQL-DDL');
+
+    const svgButton = screen.getByRole('button', { name: 'SVG 이미지 내보내기' });
+    expect(svgButton).toBeDisabled();
+    expect(svgButton).toHaveAttribute('aria-describedby', 'artifact-desc-SVG-이미지');
+
+    const umlButton = screen.getByRole('button', { name: 'PlantUML 내보내기' });
+    expect(umlButton).toBeDisabled();
+    expect(umlButton).toHaveAttribute('aria-describedby', 'artifact-desc-PlantUML');
+
+    const mermaidButton = screen.getByRole('button', { name: 'Mermaid 내보내기' });
+    expect(mermaidButton).toBeDisabled();
+    expect(mermaidButton).toHaveAttribute('aria-describedby', 'artifact-desc-Mermaid');
+
+    const dbmlButton = screen.getByRole('button', { name: 'DBML 내보내기' });
+    expect(dbmlButton).toBeDisabled();
+    expect(dbmlButton).toHaveAttribute('aria-describedby', 'artifact-desc-DBML');
+
+    const csvButton = screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' });
+    expect(csvButton).toBeDisabled();
+    expect(csvButton).toHaveAttribute('aria-describedby', 'artifact-desc-Data-Dictionary-CSV');
+
+    const mdButton = screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' });
+    expect(mdButton).toBeDisabled();
+    expect(mdButton).toHaveAttribute('aria-describedby', 'artifact-desc-Data-Dictionary-MD');
   });
 
   it('exposes access-control guidance for disabled button', () => {

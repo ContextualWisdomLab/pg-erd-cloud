@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-07-20 - Adding aria-describedby to mapped list buttons
+**Learning:** When iterating over a list of items to generate disabled buttons that lack visual tooltips (since `title` is often ignored by browsers for disabled elements), dynamically generating a unique DOM `id` (e.g., using a slugified version of the item's label) is an effective way to link the button to its description `span` via `aria-describedby`. This ensures screen readers can announce the context of *why* the button is disabled or what it does.
+**Action:** When mapping over items to render interactive elements like buttons, assign a stable unique `id` to the adjacent descriptive text, and apply `aria-describedby={id}` to the button to connect the context.
