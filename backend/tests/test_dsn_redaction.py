@@ -43,3 +43,21 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+def test_url_encoded_passwords() -> None:
+    dsn = "postgresql://user:p%25w%2Bd@host/db"
+    error = "driver failed for p%w+d or p%25w%2Bd"
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "p%w+d" not in redacted
+    assert "p%25w%2Bd" not in redacted
+    assert "***" in redacted
+
+def test_url_encoded_passwords_space() -> None:
+    dsn = "postgresql://user:p%20w@host/db"
+    error = "driver failed for p w or p%20w"
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "p w" not in redacted
+    assert "p%20w" not in redacted
+    assert "***" in redacted

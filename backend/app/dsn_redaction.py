@@ -57,8 +57,12 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
         netloc, query = _split_dsn_best_effort(dsn)
 
     if password:
+        decoded_password = unquote_plus(password)
         candidates.add(password)
+        candidates.add(decoded_password)
         candidates.add(quote(password, safe=""))
+        candidates.add(quote(decoded_password, safe=""))
+        candidates.add(quote_plus(decoded_password, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
