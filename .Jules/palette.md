@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-07-25 - [Accessibility] Unique aria-labels in dynamic contexts
+**Learning:** Screen readers cannot differentiate generic labels (like '복제', duplicate) in dynamic contexts, especially inside table edit modals where a user might lose track of which table they are duplicating.
+**Action:** Always provide unique, descriptive 'aria-label' attributes that prepend or append specific contextual names (e.g. `${editingNode.data.title} 테이블 복제`) to interactive elements.

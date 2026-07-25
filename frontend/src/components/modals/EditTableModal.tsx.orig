@@ -217,7 +217,6 @@ export function EditTableModal({
                 ]);
                 onEditTableCancel();
               }}
-              aria-label={`${editingNode.data.title} 테이블 복제`}
               style={{ color: "#034ea2", borderColor: "#93c5fd" }}
             >
               복제

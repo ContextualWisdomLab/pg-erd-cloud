@@ -151,7 +151,7 @@ describe('EditTableModal', () => {
     expect(setNodesMock).not.toHaveBeenCalled();
   });
 
-  it('duplicates a table when 테이블 복제 is clicked', async () => {
+  it('duplicates a table when 복제 is clicked', async () => {
     const setNodesMock = vi.fn();
     const onEditTableCancelMock = vi.fn();
     const editingNode = {
@@ -170,7 +170,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
+    await user.click(screen.getByRole('button', { name: '복제' }));
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
