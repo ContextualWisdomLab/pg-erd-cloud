@@ -65,8 +65,8 @@ describe('exportDbml', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: 'src-c-0075-0073-0065-0072-005f-0069-0064',
+        targetHandle: 'tgt-c-0069-0064',
         label: 'rel',
       },
     ];

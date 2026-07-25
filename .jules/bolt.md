@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-25 - Avoid redundant handle generation and O(N*C) string searches during ERD export
+**Learning:** ERD export functions (Mermaid, Data Dictionary, DBML, etc.) frequently need to extract column names from edge `sourceHandle` strings. Iterating over all columns in all tables and continuously re-encoding column names with `sourceColumnHandleId` to match against the edge handle is extremely expensive (O(N*C)).
+**Action:** When extracting data from heavily encoded UI identifiers (like React Flow handles), implement an O(1) decoding utility (`parseColumnNameFromHandle`) to parse the string back into its original value directly, rather than encoding every possible value to search for a match.
