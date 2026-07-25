@@ -30,6 +30,11 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
     scheme_sep = remainder.find("://")
     if scheme_sep != -1:
         remainder = remainder[scheme_sep + 3 :]
+    else:
+        # Fallback for schemes missing slashes
+        scheme_match = re.match(r"^([a-zA-Z0-9+.\-_]+):", remainder)
+        if scheme_match:
+            remainder = remainder[len(scheme_match.group(1)) + 1 :]
     remainder = remainder.split("#", 1)[0]
     if "?" in remainder:
         remainder, query = remainder.split("?", 1)
@@ -44,10 +49,29 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
 
     password: str | None = None
     try:
-        parsed = urlsplit(dsn)
-        if "://" in dsn and not parsed.netloc:
-            # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
-            parsed = urlsplit("http://" + dsn.split("://", 1)[1])
+        # urlsplit fails to parse the scheme if it contains invalid characters
+        # like underscores, and then fails to parse netloc and password.
+        # We substitute the scheme with 'http' temporarily to ensure proper parsing.
+        temp_dsn = dsn
+        scheme_match = re.match(r"^([a-zA-Z0-9+.\-_]+):", dsn)
+        if scheme_match:
+            scheme = scheme_match.group(1)
+            if "_" in scheme:
+                temp_dsn = "http:" + dsn[len(scheme) + 1 :]
+
+        parsed = urlsplit(temp_dsn)
+
+        if not parsed.netloc:
+            if "://" in temp_dsn:
+                # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+                parsed = urlsplit("http://" + temp_dsn.split("://", 1)[1])
+            elif ":" in temp_dsn:
+                # Some DSNs use `scheme:user:password@host...` instead of `scheme://...`
+                # Only split on the first colon that represents the scheme separator
+                scheme_match2 = re.match(r"^([a-zA-Z0-9+.\-_]+):", temp_dsn)
+                if scheme_match2:
+                    parsed = urlsplit("http://" + temp_dsn[len(scheme_match2.group(1)) + 1 :])
+
         netloc = parsed.netloc
         password = parsed.password
         query = parsed.query
@@ -67,17 +91,18 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
             candidates.add(raw_password)
             candidates.add(unquote(raw_password))
 
-    for part in query.split("&"):
-        key, sep, raw_value = part.partition("=")
-        if not sep:
-            continue
-        if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
-            continue
-        decoded_value = unquote_plus(raw_value)
-        candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
+    if query:
+        for part in query.split("&"):
+            key, sep, raw_value = part.partition("=")
+            if not sep:
+                continue
+            if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
+                continue
+            decoded_value = unquote_plus(raw_value)
+            candidates.add(raw_value)
+            candidates.add(decoded_value)
+            candidates.add(quote(decoded_value, safe=""))
+            candidates.add(quote_plus(decoded_value, safe=""))
 
     return {candidate for candidate in candidates if candidate}
 
