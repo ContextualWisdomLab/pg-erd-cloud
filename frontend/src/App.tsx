@@ -192,6 +192,11 @@ export default function App() {
     { x: number; y: number }
   > | null>(null);
 
+  const searchDataCacheRef = useRef<{ search: string; cache: WeakMap<object, any> }>({
+    search: "",
+    cache: new WeakMap(),
+  });
+
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
@@ -199,15 +204,31 @@ export default function App() {
   }, [nodes, normalizedNodeSearch]);
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
+
+    if (searchDataCacheRef.current.search !== normalizedNodeSearch) {
+      searchDataCacheRef.current = {
+        search: normalizedNodeSearch,
+        cache: new WeakMap(),
+      };
+    }
+    const { cache } = searchDataCacheRef.current;
+
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      let decoratedData = cache.get(node.data);
+      if (!decoratedData || decoratedData.isHighlighted !== isHighlighted) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        cache.set(node.data, decoratedData);
+      }
+
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
