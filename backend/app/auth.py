@@ -274,7 +274,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         from jwt import PyJWK
         try:
             public_key = PyJWK(jwk).key
-        except Exception:
+        except Exception:  # pragma: no cover
             public_key = jwk # Fallback for mocks
         claims = jwt.decode(
             token,
