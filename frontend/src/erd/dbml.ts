@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
+import { parseColumnNameFromHandle } from "./handleUtils";
 
 function escapeString(str: string): string {
   return str.replace(/'/g, "''");
@@ -89,8 +90,23 @@ export function exportDbml(
         sourceCols = edgeData.sourceColumns.map(safeId);
         targetCols = edgeData.targetColumns.map(safeId);
       } else if (edge.sourceHandle && edge.targetHandle) {
-         sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
-         targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
+        let srcCol: string | null = null;
+        let tgtCol: string | null = null;
+        if (edge.sourceHandle.startsWith('src-c-')) {
+          srcCol = parseColumnNameFromHandle(edge.sourceHandle);
+        }
+        if (edge.targetHandle.startsWith('tgt-c-')) {
+          tgtCol = parseColumnNameFromHandle(edge.targetHandle);
+        }
+
+        if (srcCol !== null && tgtCol !== null) {
+          sourceCols = [safeId(srcCol)];
+          targetCols = [safeId(tgtCol)];
+        } else {
+           // Fallback logic, should not be reached with parsed handles
+           sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
+           targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
+        }
       }
 
       if (sourceCols.length > 0 && targetCols.length > 0) {
