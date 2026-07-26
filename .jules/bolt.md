@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-05-19 - React Flow 데이터 변이와 성능
+**Learning:** useMemo 내부에서 노드 데이터를 변이하여 파생된 속성(예: isHighlighted/isDimmed)을 계산하면, 검색 키 입력 시마다 데이터 객체의 식별자가 변경되어 React Flow가 모든 노드를 다시 렌더링하게 만듭니다. 이는 모든 노드 컴포넌트에서 React.memo를 깨뜨리고 큰 그래프에서 검색 시 심각한 프레임 저하를 일으킵니다.
+**Action:** 안정적인 node.data 객체를 키로 사용하는 WeakMap을 사용하여 장식된 데이터를 캐시합니다. 이렇게 하면 노드의 검색 일치 상태가 변경되지 않은 경우 렌더링 전반에 걸쳐 정확히 동일한 데이터 객체 참조를 유지하도록 보장하여 React.memo 성능을 유지하고 키 입력당 O(N) 객체 할당을 피할 수 있습니다.

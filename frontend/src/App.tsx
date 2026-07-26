@@ -116,6 +116,13 @@ function strengthLabel(strength: CardinalityStrength): string {
   return "보류";
 }
 
+// ⚡ Bolt: 객체 참조를 보존하여 불필요한 렌더링을 방지하기 위해 WeakMap을 사용해 검색 상태를 캐싱합니다.
+// 안정적인 `node.data` 참조를 키로 사용하여 검색 강조 상태가 변경되지 않은 경우
+// 매 검색 입력마다 새로운 `data` 객체를 할당하는 것을 방지합니다.
+// 이를 통해 React Flow가 수천 개의 노드를 불필요하게 다시 렌더링하는 것을 막습니다.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const searchDataCache = new WeakMap<object, any>();
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
@@ -201,13 +208,18 @@ export default function App() {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let nextData = searchDataCache.get(node.data);
+      if (!nextData || nextData.isHighlighted !== isHighlighted) {
+        nextData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchDataCache.set(node.data, nextData);
+      }
+      return {
+        ...node,
+        data: nextData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
