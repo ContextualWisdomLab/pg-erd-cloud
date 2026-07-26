@@ -57,15 +57,21 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
         netloc, query = _split_dsn_best_effort(dsn)
 
     if password:
+        decoded_password = unquote_plus(password)
         candidates.add(password)
-        candidates.add(quote(password, safe=""))
+        candidates.add(decoded_password)
+        candidates.add(quote(decoded_password, safe=""))
+        candidates.add(quote_plus(decoded_password, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
+            decoded_raw = unquote_plus(raw_password)
             candidates.add(raw_password)
-            candidates.add(unquote(raw_password))
+            candidates.add(decoded_raw)
+            candidates.add(quote(decoded_raw, safe=""))
+            candidates.add(quote_plus(decoded_raw, safe=""))
 
     for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -83,6 +89,8 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
 
 
 def _redact_secret_occurrences(message: str, secret: str) -> str:
+    # Always redact secrets regardless of length to prevent critical information exposure,
+    # but use word boundaries for short secrets to prevent corrupting unrelated text.
     if len(secret) > 4:
         return message.replace(secret, "***")
 
