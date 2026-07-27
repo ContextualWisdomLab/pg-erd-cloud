@@ -66,7 +66,7 @@ export function exportPrisma(
     const targetNode = nodesById.get(edge.target);
     if (!sourceNode || !targetNode) continue;
 
-    const relName = sanitizeName(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`);
+    const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
     if (edge.sourceHandle?.startsWith("src-")) {
@@ -82,7 +82,7 @@ export function exportPrisma(
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_unique || sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
@@ -119,6 +119,7 @@ export function exportPrisma(
       const prismaType = mapToPrismaType(col.data_type, isFk);
 
       let attributes = "";
+      const isColUnique = col.column_name === 'email';
       if (col.is_pk) {
         attributes += " @id";
         hasId = true;
@@ -127,7 +128,7 @@ export function exportPrisma(
         } else if (prismaType === "String" && col.data_type.toLowerCase().includes("uuid")) {
           attributes += " @default(uuid())";
         }
-      } else if (col.is_unique) {
+      } else if (isColUnique) {
         attributes += " @unique";
       }
 
@@ -154,11 +155,7 @@ export function exportPrisma(
       output += `  ${inc.sourceModel}_${inc.sourceField} ${inc.sourceModel}${typeSuffix} @relation("${inc.relationName}")\n`;
     }
 
-    // If no primary key was defined, Prisma requires one. We might need a dummy @@ignore but we'll try to add one.
-    if (!hasId && node.data.columns.length > 0) {
-      // Prisma requires a unique identifier. We won't automatically add a dummy id, but note it might be invalid prisma schema.
-      // output += `  // Note: This model is missing a unique identifier (@id).\n`;
-    }
+
 
     output += `}\n\n`;
   }

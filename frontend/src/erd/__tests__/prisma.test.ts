@@ -16,9 +16,10 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'users',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-            { column_name: 'name', data_type: 'varchar(255)', is_not_null: false },
+            { column_name: 'name', data_type: 'varchar(255)', is_not_null: false, is_pk: false },
           ],
         },
       },
@@ -37,6 +38,7 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'users',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
           ],
@@ -47,9 +49,10 @@ describe('exportPrisma', () => {
         position: { x: 100, y: 100 },
         data: {
           title: 'posts',
+          badges: { pk: true, fk: true },
           columns: [
             { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
-            { column_name: 'user_id', data_type: 'integer', is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
           ],
         },
       },
@@ -85,14 +88,15 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'all_types',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'c_uuid', data_type: 'uuid', is_pk: true, is_not_null: true },
-            { column_name: 'c_bool', data_type: 'boolean', is_not_null: true },
-            { column_name: 'c_time', data_type: 'timestamp', is_not_null: true },
-            { column_name: 'c_float', data_type: 'numeric', is_not_null: true },
-            { column_name: 'c_json', data_type: 'jsonb', is_not_null: true },
-            { column_name: 'c_bytes', data_type: 'bytea', is_not_null: true },
-            { column_name: 'c_other', data_type: 'unknown', is_not_null: true },
+            { column_name: 'c_bool', data_type: 'boolean', is_not_null: true, is_pk: false },
+            { column_name: 'c_time', data_type: 'timestamp', is_not_null: true, is_pk: false },
+            { column_name: 'c_float', data_type: 'numeric', is_not_null: true, is_pk: false },
+            { column_name: 'c_json', data_type: 'jsonb', is_not_null: true, is_pk: false },
+            { column_name: 'c_bytes', data_type: 'bytea', is_not_null: true, is_pk: false },
+            { column_name: 'c_other', data_type: 'unknown', is_not_null: true, is_pk: false },
           ],
         },
       },
@@ -115,10 +119,12 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'unique_test',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-            { column_name: 'email', data_type: 'text', is_not_null: true, is_unique: true },
+            { column_name: 'email', data_type: 'text', is_not_null: true, is_pk: false },
           ],
+
         },
       },
     ];
@@ -134,9 +140,10 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: '123invalid',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: '123col', data_type: 'integer', is_pk: true, is_not_null: true },
-            { column_name: 'a b c', data_type: 'text', is_not_null: true },
+            { column_name: 'a b c', data_type: 'text', is_not_null: true, is_pk: false },
           ],
         },
       },
@@ -155,7 +162,7 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'A',
-          badges: { fk: true },
+          badges: { pk: true, fk: true },
           columns: [
             { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
           ],
@@ -166,6 +173,7 @@ describe('exportPrisma', () => {
         position: { x: 100, y: 100 },
         data: {
           title: 'B',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
           ],
@@ -190,6 +198,7 @@ describe('exportPrisma', () => {
         position: { x: 0, y: 0 },
         data: {
           title: 'users',
+          badges: { pk: true, fk: false },
           columns: [
             { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
           ],
@@ -200,10 +209,12 @@ describe('exportPrisma', () => {
         position: { x: 100, y: 100 },
         data: {
           title: 'profiles',
+          badges: { pk: true, fk: true },
           columns: [
             { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
-            { column_name: 'user_id', data_type: 'integer', is_not_null: false, is_unique: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: false, is_pk: false },
           ],
+
         },
       },
     ];
@@ -221,6 +232,6 @@ describe('exportPrisma', () => {
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
-    expect(result).toContain('profiles_user_id profiles? @relation("M_1to1")');
+    expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
   });
 });
