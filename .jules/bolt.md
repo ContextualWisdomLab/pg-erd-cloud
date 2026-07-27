@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-28 - [ReactFlow Data Caching]
+**Learning:** ReactFlow forces full re-renders on nodes when dragging if `data` object identities change. When derived state like `visibleNodes` recreates the `node.data` on every update, it breaks `React.memo` inside custom nodes (like `TableNode`).
+**Action:** Use a `WeakMap` keyed by the stable `node.data` reference to cache the decorated state (e.g. `isDimmed`, `isHighlighted`). This ensures object identity is preserved for unmodified nodes across 60fps position updates, mitigating React Flow drag lag.

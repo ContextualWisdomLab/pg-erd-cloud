@@ -1,15 +1,4 @@
-💡 What
-- ExportModal에 DBML 다운로드 버튼 추가
-- 메인 화면에 있던 독립된 DBML 다운로드 버튼을 제거하고, ExportModal 안으로 통합하였습니다.
-- 관련된 통합테스트 및 유닛 테스트 업데이트 (`App.coverage.test.tsx`, `ExportModal.test.tsx`)
-
-🎯 Why
-- 기존에 분리되어 있던 DBML 내보내기 버튼을 모달 안으로 통합하여 사용자 인터페이스의 일관성을 높였습니다.
-- SVG, PlantUML 등 다른 파일 형식과 동일한 경험을 제공합니다.
-
-📸 Before/After
-- Before: 메인 도구 모음에 `DBML 내보내기` 버튼이 존재
-- After: `공유 및 내보내기` 모달 안 `산출물` 목록에 DBML 항목으로 이동됨
-
-♿ Accessibility
-- 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
+💡 **What**: React Flow 노드의 `data` 객체를 `WeakMap`을 사용하여 캐싱(caching)하도록 변경했습니다.
+🎯 **Why**: 검색어가 있을 때 `visibleNodes`에서 파생 상태(derived state)를 생성하며 매 렌더링마다 새로운 `node.data` 객체를 생성하고 있었습니다. 이로 인해 `TableNode`의 `React.memo`가 무력화되어 노드를 드래그할 때 모든 노드가 리렌더링(re-render)되면서 프레임 드롭(drag lag)이 발생하는 성능 문제가 있었습니다.
+📊 **Impact**: 노드 드래그 및 그래프 업데이트 등 60fps 마이크로 업데이트 환경에서 `React.memo`가 정상적으로 동작하도록 복원하여 불필요한 전체 리렌더링을 방지합니다.
+🔬 **Measurement**: `pnpm run test`, `pnpm run typecheck`, `pnpm run coverage` 통과 및 드래그 동작 시 성능 지표를 통해 확인할 수 있습니다.

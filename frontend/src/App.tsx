@@ -116,6 +116,8 @@ function strengthLabel(strength: CardinalityStrength): string {
   return "보류";
 }
 
+const searchDecoratedDataCache = new WeakMap<TableNodeData, TableNodeData>();
+
 export default function App() {
   const [activeView, setActiveView] = useState<WorkspaceView>("dashboard");
   const [me, setMe] = useState<CurrentUser | null>(null);
@@ -201,13 +203,25 @@ export default function App() {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      // ⚡ Bolt: Use WeakMap to cache decorated data based on stable node.data reference.
+      // This prevents creating new data objects on every drag frame, preserving React.memo
+      // and avoiding full React Flow re-renders during 60fps position updates.
+      let decoratedData = searchDecoratedDataCache.get(node.data);
+      if (!decoratedData || decoratedData.isHighlighted !== isHighlighted) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchDecoratedDataCache.set(node.data, decoratedData);
+      }
+
+      // Still need to return a new node object since ReactFlow mutates/relies on node identity,
+      // but data identity is preserved for TableNode React.memo.
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
