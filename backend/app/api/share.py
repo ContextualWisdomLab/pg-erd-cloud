@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import datetime as dt
 import uuid
 
@@ -172,7 +174,7 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     return snapshot_json_to_sql(redacted, target_dialect=dialect)
 
 
@@ -204,7 +206,7 @@ async def export_shared_snapshot_reversing_spec(
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            redacted_llm = _redact_sensitive_snapshot_fields(data.snapshot_json)
+            redacted_llm = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
             return await generate_reversing_llm_draft(redacted_llm)
         except LlmConfigurationError as exc:
             raise HTTPException(
@@ -214,7 +216,7 @@ async def export_shared_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     return generate_reversing_spec(redacted, mode=mode)
 
 
@@ -246,7 +248,7 @@ async def export_shared_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     if mode == "llm-draft":
         try:
-            redacted_llm = _redact_sensitive_snapshot_fields(data.snapshot_json)
+            redacted_llm = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
             return await generate_index_design_llm_draft(redacted_llm)
         except LlmConfigurationError as exc:
             raise HTTPException(
@@ -256,5 +258,5 @@ async def export_shared_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    redacted = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    redacted = cast(dict, _redact_sensitive_snapshot_fields(data.snapshot_json))
     return generate_index_design_spec(redacted, mode=mode)
