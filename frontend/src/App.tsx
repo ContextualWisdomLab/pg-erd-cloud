@@ -61,6 +61,7 @@ import {
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
+import { exportPrisma } from "./erd/prisma";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
@@ -626,6 +627,10 @@ export default function App() {
 
   function onDownloadDbml() {
     downloadText("pg-erd-diagram.dbml", exportDbml(nodes, edges), "text/plain");
+  }
+
+  function onDownloadPrisma() {
+    downloadText("pg-erd-diagram.prisma", exportPrisma(nodes, edges), "text/plain");
   }
 
   function onExportDictionaryCsv() {
@@ -1611,6 +1616,7 @@ export default function App() {
             onExportDictionaryCsv={onExportDictionaryCsv}
             onExportDictionaryMarkdown={onExportDictionaryMarkdown}
             onDownloadDbml={onDownloadDbml}
+            onDownloadPrisma={onDownloadPrisma}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
