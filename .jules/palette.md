@@ -54,3 +54,6 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2026-07-27 - [Descriptive ARIA labels for modal buttons]
+**Learning:** Adding dynamic, contextual `aria-label` attributes to generic buttons (like Save, Cancel, Delete) inside modals significantly improves screen reader navigation and clarity, ensuring users understand exactly what action they are taking.
+**Action:** Always provide contextual `aria-label`s for generic action buttons in dialogs using dynamic data like node or edge names.
