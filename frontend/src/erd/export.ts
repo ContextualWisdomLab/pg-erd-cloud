@@ -59,6 +59,8 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  sourceHandleMap?: Map<string, string>,
+  targetHandleMap?: Map<string, string>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -67,12 +69,12 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  const sourceHandleColumn = sourceHandleMap
+    ? sourceHandleMap.get(edge.sourceHandle || '')
+    : (sourceNode.data.columns || []).find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)?.column_name;
+  const targetHandleColumn = targetHandleMap
+    ? targetHandleMap.get(edge.targetHandle || '')
+    : (targetNode.data.columns || []).find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)?.column_name;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -128,12 +130,35 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   }
 
   // Export foreign keys
+  // ⚡ Bolt: Cache handle maps to optimize O(N^2) `.find()` lookup complexity for large graphs.
+  const handleMapCache = new Map<string, Map<string, string>>();
+
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+      let sourceMap = handleMapCache.get(sourceNode.id);
+      if (!sourceMap) {
+        sourceMap = new Map();
+        for (const c of sourceNode.data.columns || []) {
+          sourceMap.set(sourceColumnHandleId(c.column_name), c.column_name);
+          sourceMap.set(targetColumnHandleId(c.column_name), c.column_name);
+        }
+        handleMapCache.set(sourceNode.id, sourceMap);
+      }
+
+      let targetMap = handleMapCache.get(targetNode.id);
+      if (!targetMap) {
+        targetMap = new Map();
+        for (const c of targetNode.data.columns || []) {
+          targetMap.set(sourceColumnHandleId(c.column_name), c.column_name);
+          targetMap.set(targetColumnHandleId(c.column_name), c.column_name);
+        }
+        handleMapCache.set(targetNode.id, targetMap);
+      }
+
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, sourceMap, targetMap);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
