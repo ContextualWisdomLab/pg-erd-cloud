@@ -77,3 +77,9 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2026-07-28 - Optimize array find out of mapping edges loop
+**Learning:** During DDL export iteration on edges, the `fkColumnsForEdge` function attempts to locate source and target column matching the edge handles via `(sourceNode.data.columns || []).find(...)`. Because edge handles are encoded using the hex encoding, the `.find` callback invokes `sourceColumnHandleId` repeatedly to hex-encode every column over and over. This combination of an O(N) array scan coupled with repeated encoding causes substantial CPU waste.
+**Action:** Instead of iterating through columns and encoding their names, directly decode the edge handle ID strings using `decodeSourceHandleId` and `decodeTargetHandleId` into O(1) properties.
+## 2026-07-28 - Avoid explicit exact format assertion loss during decoding tests
+**Learning:** When writing tests for reversible encoding/decoding functions (e.g., `decodeHandleId`), only testing the round-trip `decode(encode(value)) === value` ensures consistency but fails to assert the actual strict expected output format of the encoded string. If the encoding algorithm is accidentally altered (e.g., switched from hex to base64), round-trip tests will still pass, silently breaking backward compatibility with serialized graph states.
+**Action:** Always retain explicit expected string comparisons (e.g., `expect(encode("id")).toBe("c-0069-0064")`) alongside round-trip assertions to maintain serialization contracts.

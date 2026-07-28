@@ -1,3 +1,4 @@
+import { decodeSourceHandleId, decodeTargetHandleId } from './handleUtils';
 import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
@@ -67,12 +68,15 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  const decodedSource = edge.sourceHandle ? decodeSourceHandleId(edge.sourceHandle) : undefined;
+  const sourceHandleColumn = decodedSource && sourceNode.data.columns?.some(c => c.column_name === decodedSource)
+    ? decodedSource
+    : undefined;
+
+  const decodedTarget = edge.targetHandle ? decodeTargetHandleId(edge.targetHandle) : undefined;
+  const targetHandleColumn = decodedTarget && targetNode.data.columns?.some(c => c.column_name === decodedTarget)
+    ? decodedTarget
+    : undefined;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
