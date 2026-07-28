@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-28 - Optimize String Iteration to prevent GC Pressure
+**Learning:** Using `Array.from(string, callback)` for high-frequency string operations (like creating ERD node/edge handle IDs from column names) forces intermediate array allocations and a callback execution per character, resulting in heavy garbage collection (GC) pressure and poor performance.
+**Action:** Replace `Array.from` with standard string iteration (`for...of` loop) which yields Unicode scalars natively without intermediate arrays or callback overhead.
