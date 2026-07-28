@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+# Ensure all URL encoding utilities are available for DSN redaction
 from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
 
 _SECRET_KEY_PATTERN = re.compile(
@@ -58,7 +59,10 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
 
     if password:
         candidates.add(password)
-        candidates.add(quote(password, safe=""))
+        decoded = unquote_plus(password)
+        candidates.add(decoded)
+        candidates.add(quote(decoded, safe=""))
+        candidates.add(quote_plus(decoded, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
@@ -86,7 +90,9 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(secret)}(?![A-Za-z0-9])")
+    left_bound = r"(?<![A-Za-z0-9])" if secret and secret[0].isalnum() else ""
+    right_bound = r"(?![A-Za-z0-9])" if secret and secret[-1].isalnum() else ""
+    pattern = re.compile(rf"{left_bound}{re.escape(secret)}{right_bound}")
     return pattern.sub("***", message)
 
 
