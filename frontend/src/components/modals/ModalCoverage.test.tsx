@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import type { Node } from '@xyflow/react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { TableNodeData } from '../../erd/convert'
 import { AddTableModal } from './AddTableModal'
@@ -41,6 +41,14 @@ afterEach(() => {
 })
 
 describe('modal behavior coverage', () => {
+  beforeEach(() => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('covers AddTableModal visibility, input, validation, cancel, and submit', () => {
     const setNewTableName = vi.fn()
     const onCancel = vi.fn()

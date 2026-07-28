@@ -81,7 +81,11 @@ export function EditEdgeModal({
         >
           <button
             type="button"
-            onClick={onRelDelete}
+            onClick={() => {
+              if (window.confirm("관계를 삭제하시겠습니까?")) {
+                onRelDelete();
+              }
+            }}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
           >
             삭제
