@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -36,3 +36,27 @@ describe('handleUtils', () => {
     });
   });
 });
+
+  describe('parseColumnNameFromHandle', () => {
+    it('should parse source handle correctly', () => {
+      expect(parseColumnNameFromHandle('src-c-0069-0064')).toBe('id');
+    });
+
+    it('should parse target handle correctly', () => {
+      expect(parseColumnNameFromHandle('tgt-c-0069-0064-005f-ac00')).toBe('id_가');
+    });
+
+    it('should parse base handle correctly', () => {
+      expect(parseColumnNameFromHandle('c-0069-0064-005f-1f680')).toBe('id_🚀');
+    });
+
+    it('should handle empty column name', () => {
+      expect(parseColumnNameFromHandle('src-c-empty')).toBe('');
+    });
+
+    it('should return undefined for invalid handles', () => {
+      expect(parseColumnNameFromHandle('invalid-handle')).toBeUndefined();
+      expect(parseColumnNameFromHandle(null)).toBeUndefined();
+      expect(parseColumnNameFromHandle(undefined)).toBeUndefined();
+    });
+  });
