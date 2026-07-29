@@ -732,6 +732,11 @@ button:disabled {
   opacity: 0.9;
 }
 
+.exportModal__disabledHintButton[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .exportModal__hint {
   margin: 4px 0 0;
   color: #64748b;

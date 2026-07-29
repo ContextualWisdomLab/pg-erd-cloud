@@ -54,3 +54,6 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2024-07-29 - Accessible Disabled Buttons
+**Learning:** The native `disabled` HTML attribute removes elements from the tab order and prevents interactive tooltip discovery (e.g., via screen readers). This caused the "접근 관리" button's associated `aria-describedby` hint to be undiscoverable by keyboard-only users.
+**Action:** Use `aria-disabled="true"` on the button, add visual disabled styles (`opacity: 0.5, cursor: "not-allowed"`), and manually prevent submission using an `onClick` handler (`e.preventDefault()`). This ensures the disabled reason is fully accessible and discoverable.
