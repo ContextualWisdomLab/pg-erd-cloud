@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { parseColumnNameFromHandle } from "./handleUtils";
 
 function sanitizeString(str: string): string {
   if (!str) return "";
@@ -29,14 +29,16 @@ export function exportMermaid(
   const fkNodesWithoutHandles = new Set<string>();
 
   for (const edge of edges) {
-    if (edge.sourceHandle?.startsWith("src-")) {
-      fkNodeColumnPairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
-    } else if (!edge.sourceHandle) {
+    if (edge.sourceHandle) {
+      const parsed = parseColumnNameFromHandle(edge.sourceHandle);
+      if (parsed) fkNodeColumnPairs.add(`${edge.source}:${parsed}`);
+    } else {
       fkNodesWithoutHandles.add(edge.source);
     }
 
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      fkNodeColumnPairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
+    if (edge.targetHandle) {
+      const parsed = parseColumnNameFromHandle(edge.targetHandle);
+      if (parsed) fkNodeColumnPairs.add(`${edge.target}:${parsed}`);
     }
   }
 
@@ -48,10 +50,9 @@ export function exportMermaid(
       let modifiers = "";
       if (col.is_pk) modifiers += " PK";
 
-      const safeId = sanitizeHandleId(col.column_name);
       // ⚡ Bolt: O(1) lookups instead of O(E) array search for every column
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${safeId}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       if (isFk && !col.is_pk) modifiers += " FK";
