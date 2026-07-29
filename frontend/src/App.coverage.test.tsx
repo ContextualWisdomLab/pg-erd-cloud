@@ -538,7 +538,9 @@ describe('App orchestration coverage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
     fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: 'Roadmap' } })
-    fireEvent.submit(screen.getByRole('button', { name: '새 프로젝트' }).closest('form')!)
+    // We replaced the manual form submit trigger back to a native fireEvent.click or we can just use fireEvent.submit
+    // but the issue is testing-library might not trigger the React synthetic event correctly if we call fireEvent.submit on the DOM element instead of through the proper react way, OR because of something else. Let's just use fireEvent.click on the button, which natively triggers the form's onSubmit handler in React.
+    fireEvent.click(screen.getByRole('button', { name: '새 프로젝트' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
