@@ -54,3 +54,6 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2024-07-29 - Native Form Submission for Inputs
+**Learning:** For inputs like "New project" or "New connection", wrapping the input and its submission button in a `<form>` element provides native Enter key submission, which drastically improves keyboard accessibility and speed without requiring synthetic `onKeyDown` listeners.
+**Action:** Always wrap interactive data submission input groups (input + primary button) in a `<form>` with an `onSubmit` handler (using `e.preventDefault()`), and set the primary button `type="submit"`.

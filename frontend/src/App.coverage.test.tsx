@@ -538,7 +538,7 @@ describe('App orchestration coverage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
     fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: 'Roadmap' } })
-    fireEvent.click(screen.getByRole('button', { name: '새 프로젝트' }))
+    fireEvent.submit(screen.getByRole('button', { name: '새 프로젝트' }).closest('form')!)
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
