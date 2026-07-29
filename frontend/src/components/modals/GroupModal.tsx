@@ -75,8 +75,9 @@ export function GroupModal({
             {BUSINESS_GROUP_COLORS.map((color) => (
               <button
                 type="button"
+                role="radio"
                 aria-label={`색상 ${color}`}
-                aria-pressed={newGroupColor === color}
+                aria-checked={newGroupColor === color}
                 className="groupManager__swatch"
                 key={color}
                 onClick={() => setNewGroupColor(color)}

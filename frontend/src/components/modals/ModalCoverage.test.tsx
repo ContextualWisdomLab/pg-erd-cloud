@@ -260,7 +260,7 @@ describe('modal behavior coverage', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
-    fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
+    fireEvent.click(screen.getAllByRole('radio', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
