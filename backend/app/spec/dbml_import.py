@@ -132,6 +132,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
 
     oid_by_table: dict[tuple[str, str], int] = {}
     next_oid = 1
+    col_counts_by_oid: dict[int, int] = {}
     current: tuple[str, str] | None = None
     in_ignored_block = 0
     in_indexes = False
@@ -207,11 +208,14 @@ def parse_dbml(text: str) -> dict[str, Any]:
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
+        col_position = col_counts_by_oid.get(oid, 0) + 1
+        col_counts_by_oid[oid] = col_position
+
         columns.append(
             {
                 "relation_oid": oid,
                 "column_name": col_name,
-                "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
+                "column_position": col_position,
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
                 "has_default": "default:" in settings,
