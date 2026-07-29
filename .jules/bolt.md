@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-29 - [React Flow 드래그 성능 향상을 위한 데이터 캐싱 (WeakMap)]
+**Learning:** React Flow에서 노드 드래그 시 `position` 정보만 업데이트되며, 매 프레임(60fps) 새로운 노드 객체가 생성되지만 `data` 객체의 참조는 유지됩니다. 이때 검색이나 필터링 등을 위해 파생된(decorated) `data` 객체를 렌더링 시마다 매번 새로 생성하면 `React.memo`의 얕은 비교(`prev.data === next.data`)가 실패하여 전체 컴포넌트 트리의 불필요한 재렌더링이 발생합니다.
+**Action:** 파생 상태를 계산할 때, 안정적인 `node.data` 참조를 키로 사용하는 외부 `WeakMap`을 사용하여 캐싱합니다. 이를 통해 원본 데이터가 변경되지 않는 한 동일한 파생 데이터 참조를 반환하여 렌더링을 최적화할 수 있습니다.

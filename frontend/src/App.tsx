@@ -65,6 +65,17 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
+// ⚡ Bolt: Cache decorated search state using the stable node.data reference.
+// React Flow recreates node objects on 60fps drag events (updating `position`),
+// but `node.data` remains referentially stable. By caching based on `node.data`,
+// we preserve object identity for `visibleNodes.data`, satisfying `React.memo`
+// fast-paths (e.g. `prev.data === next.data`) in TableNode and skipping expensive
+// re-renders during drag operations while search is active.
+const decoratedNodeDataCache = new WeakMap<
+  TableNodeData,
+  TableNodeData
+>();
+
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
   "failed",
@@ -201,13 +212,20 @@ export default function App() {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      let cachedData = decoratedNodeDataCache.get(node.data);
+      if (!cachedData || cachedData.isHighlighted !== isHighlighted) {
+        cachedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        decoratedNodeDataCache.set(node.data, cachedData);
+      }
+
+      return {
+        ...node,
+        data: cachedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
