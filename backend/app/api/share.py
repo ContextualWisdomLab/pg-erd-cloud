@@ -173,6 +173,8 @@ async def export_shared_snapshot_sql(
     if data is None:
         return "-- snapshot data not found\n"
     redacted_data = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_data, dict):
+        return "-- invalid snapshot data format\n"
     return snapshot_json_to_sql(redacted_data, target_dialect=dialect)
 
 
@@ -205,6 +207,8 @@ async def export_shared_snapshot_reversing_spec(
     if mode == "llm-draft":
         try:
             redacted_data = _redact_sensitive_snapshot_fields(data.snapshot_json)
+            if not isinstance(redacted_data, dict):
+                return "# Error\n\nInvalid snapshot data format."
             return await generate_reversing_llm_draft(redacted_data)
         except LlmConfigurationError as exc:
             raise HTTPException(
@@ -215,6 +219,8 @@ async def export_shared_snapshot_reversing_spec(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     redacted_data = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_data, dict):
+        return "# Error\n\nInvalid snapshot data format."
     return generate_reversing_spec(redacted_data, mode=mode)
 
 
@@ -247,6 +253,8 @@ async def export_shared_snapshot_index_design(
     if mode == "llm-draft":
         try:
             redacted_data = _redact_sensitive_snapshot_fields(data.snapshot_json)
+            if not isinstance(redacted_data, dict):
+                return "# Error\n\nInvalid snapshot data format."
             return await generate_index_design_llm_draft(redacted_data)
         except LlmConfigurationError as exc:
             raise HTTPException(
@@ -257,4 +265,6 @@ async def export_shared_snapshot_index_design(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
     redacted_data = _redact_sensitive_snapshot_fields(data.snapshot_json)
+    if not isinstance(redacted_data, dict):
+        return "# Error\n\nInvalid snapshot data format."
     return generate_index_design_spec(redacted_data, mode=mode)
