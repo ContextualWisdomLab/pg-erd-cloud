@@ -78,11 +78,13 @@ export function AddTableModal({
           <button type="button" onClick={onAddTableCancel}>취소</button>
           <button
             type="submit"
-            disabled={!newTableName.trim()}
+            aria-disabled={!newTableName.trim()}
+            title={!newTableName.trim() ? "테이블 이름을 입력하세요" : undefined}
+            onClick={(e) => { if (!newTableName.trim()) e.preventDefault(); }}
             style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
+              !newTableName.trim()
+                ? { opacity: 0.5, cursor: "not-allowed" }
+                : { background: "#034ea2", color: "#fff" }
             }
           >
             저장

@@ -54,3 +54,6 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2024-05-18 - [Add aria-disabled and tooltip to disabled buttons]
+**Learning:** In React, replacing the native `disabled` attribute with `aria-disabled="true"` correctly announces the disabled state to screen readers and keeps the element focusable to display tooltips on hover/focus. However, unlike native `disabled`, `aria-disabled` does not block click events or form submissions. For form submit buttons, when the native `disabled` attribute is removed, pressing "Enter" in an input field will trigger a form submission.
+**Action:** When converting a button to use `aria-disabled`, you must explicitly intercept the click/submit action by adding an `onClick` handler that calls `e.preventDefault()` when the button is logically disabled (e.g., `onClick={(e) => { if (!isValid) e.preventDefault(); }}`).

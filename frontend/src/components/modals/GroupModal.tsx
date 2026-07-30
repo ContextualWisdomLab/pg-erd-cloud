@@ -86,7 +86,10 @@ export function GroupModal({
           </div>
           <button
             type="submit"
-            disabled={!newGroupName.trim()}
+            aria-disabled={!newGroupName.trim()}
+            title={!newGroupName.trim() ? "그룹 이름을 입력하세요" : undefined}
+            onClick={(e) => { if (!newGroupName.trim()) e.preventDefault(); }}
+            style={!newGroupName.trim() ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             추가
           </button>
