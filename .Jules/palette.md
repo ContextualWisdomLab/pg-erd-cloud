@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-07-20 - Radiogroup Button Attributes Accessibility Anti-pattern
+**Learning:** When building custom radio groups (e.g., color swatches) with `role="radiogroup"`, ensuring the child elements correctly match the semantic structure is important. Using generic buttons with `aria-pressed` instead of `role="radio"` and `aria-checked` inside a `radiogroup` is a mismatched role structure that can confuse screen readers.
+**Action:** When creating a custom `radiogroup`, always ensure its child elements explicitly use `role="radio"` and `aria-checked` to reflect their correct selection state and semantic meaning.
