@@ -13,11 +13,33 @@ index is cheap to re-do, a wrong "drop this" suggestion is not).
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 WARNING = "warning"
 INFO = "info"
+
+
+def _first_paren_group(text: str) -> str | None:
+    """Return the contents of the first balanced-parenthesized group, or ``None``.
+
+    Unlike a flat ``(...)`` match, this spans nested parentheses so the whole
+    index column list is captured (for ``(lower(email))`` it returns the outer
+    group ``lower(email)``, not the inner ``email``). That lets the caller
+    recognise an expression index by the nested ``(`` it contains instead of
+    silently reading the inner argument as a column.
+    """
+    start = text.find("(")
+    if start == -1:
+        return None
+    depth = 0
+    for index, char in enumerate(text[start:], start):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1 : index]
+    return None  # unbalanced parentheses
 
 
 def _index_columns(index_def: object) -> list[str]:
@@ -25,11 +47,11 @@ def _index_columns(index_def: object) -> list[str]:
     text = str(index_def or "")
     if " where " in text.lower():
         return []  # partial index: not comparable
-    match = re.search(r"\(([^()]*)\)", text)
-    if not match:
+    group = _first_paren_group(text)
+    if group is None:
         return []
     cols: list[str] = []
-    for part in match.group(1).split(","):
+    for part in group.split(","):
         token = part.strip().strip('"').split()
         if not token or "(" in part:
             return []  # expression index: not comparable

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.spec.index_redundancy import detect_index_redundancy
+from app.spec.index_redundancy import _index_columns, detect_index_redundancy
 
 
 def _snap(index_defs, unique=None):
@@ -64,3 +64,40 @@ def test_different_columns_and_unparseable_defs_are_skipped():
                             "index_def": "CREATE INDEX ix_part ON public.orders (member_id) WHERE deleted_at IS NULL"})
     assert detect_index_redundancy(snap)["items"] == []
     assert detect_index_redundancy({})["summary"]["total"] == 0
+
+
+def test_functional_index_is_not_flagged_as_duplicate_of_a_plain_index():
+    # A plain (email) index and a functional (lower(email)) index are DIFFERENT
+    # indexes serving different queries. The parser must skip the expression
+    # index rather than mis-read its inner argument as a plain 'email' column and
+    # advise dropping a genuinely-needed index (the harmful false positive the
+    # module docstring promises to avoid).
+    snap = _snap({"ix_email": "email"})
+    snap["indexes"].append(
+        {
+            "relation_oid": 1,
+            "index_name": "ix_lower_email",
+            "index_def": (
+                "CREATE INDEX ix_lower_email ON public.orders "
+                "USING btree (lower(email))"
+            ),
+        }
+    )
+    assert detect_index_redundancy(snap)["items"] == []
+
+
+def test_index_columns_skips_expression_indexes_including_multi_column():
+    # Balanced-paren parse: a nested '(' anywhere in the column list marks an
+    # expression index, which is not comparable and must yield []. A multi-column
+    # list mixing a plain column with an expression must NOT silently drop the
+    # plain column and mis-report the expression as a column.
+    assert _index_columns("CREATE INDEX i ON t USING btree (lower(email))") == []
+    assert _index_columns("CREATE INDEX i ON t USING btree (a, lower(b))") == []
+    assert _index_columns("CREATE INDEX i ON t USING btree (lower((email)::text))") == []
+    # Plain / opclass / DESC lists still parse to their leading column tokens.
+    assert _index_columns("CREATE INDEX i ON t USING btree (email)") == ["email"]
+    assert _index_columns("CREATE INDEX i ON t (member_id, org_id)") == [
+        "member_id",
+        "org_id",
+    ]
+    assert _index_columns("CREATE INDEX i ON t USING gin (col gin_trgm_ops)") == ["col"]
