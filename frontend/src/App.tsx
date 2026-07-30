@@ -197,17 +197,33 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: Cache derived node data using the stable node.data reference.
+  // This prevents React Flow from destroying React.memo stability during 60fps drag events
+  // which otherwise triggers full re-renders of the entire graph on every micro-update.
+  const decoratedDataCache = useRef(new WeakMap<TableNodeData, { isHighlighted: boolean; data: TableNodeData }>());
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
+      let cached = decoratedDataCache.current.get(node.data);
+
+      if (!cached || cached.isHighlighted !== isHighlighted) {
+        cached = {
+          isHighlighted,
+          data: {
+            ...node.data,
+            isDimmed: !isHighlighted,
+            isHighlighted,
+          }
+        };
+        decoratedDataCache.current.set(node.data, cached);
+      }
+
       return {
         ...node,
-        data: {
-          ...node.data,
-          isDimmed: !isHighlighted,
-          isHighlighted,
-        },
+        data: cached.data,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
