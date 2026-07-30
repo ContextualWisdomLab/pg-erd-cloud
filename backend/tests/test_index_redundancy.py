@@ -101,3 +101,19 @@ def test_index_columns_skips_expression_indexes_including_multi_column():
         "org_id",
     ]
     assert _index_columns("CREATE INDEX i ON t USING gin (col gin_trgm_ops)") == ["col"]
+
+
+def test_index_columns_ignores_parens_inside_quoted_identifiers():
+    # A double-quoted identifier may legally contain parentheses. The scan must
+    # skip quoted names so it locks onto the real column-list '(...)', not a '('
+    # buried in the name — otherwise a genuinely-needed index gets mis-parsed and
+    # wrongly advised for dropping (the harmful false positive this module avoids).
+    assert _index_columns('CREATE INDEX "ix(foo)" ON t (email)') == ["email"]
+    # A doubled "" is SQL's escape for a literal quote inside the identifier.
+    assert _index_columns('CREATE INDEX "weird""(name)" ON t (a, b)') == ["a", "b"]
+    # A quoted schema/table with parens must likewise be skipped.
+    assert _index_columns('CREATE INDEX ix ON "my(schema)".orders (member_id)') == [
+        "member_id",
+    ]
+    # An unterminated quote yields no comparable column list rather than crashing.
+    assert _index_columns('CREATE INDEX "unterminated ON t (email)') == []

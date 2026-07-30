@@ -22,24 +22,47 @@ INFO = "info"
 def _first_paren_group(text: str) -> str | None:
     """Return the contents of the first balanced-parenthesized group, or ``None``.
 
+    Parentheses inside SQL double-quoted identifiers -- an index, schema, or
+    table named ``"ix(foo)"`` -- are skipped so the scan locks onto the real
+    column list rather than a ``(`` buried in a quoted name; a doubled ``""`` is
+    SQL's escape for a literal quote and stays inside the identifier.
+
     Unlike a flat ``(...)`` match, this spans nested parentheses so the whole
     index column list is captured (for ``(lower(email))`` it returns the outer
     group ``lower(email)``, not the inner ``email``). That lets the caller
     recognise an expression index by the nested ``(`` it contains instead of
     silently reading the inner argument as a column.
     """
-    start = text.find("(")
-    if start == -1:
-        return None
     depth = 0
-    for index, char in enumerate(text[start:], start):
+    start = -1
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char == '"':
+            # Consume a double-quoted identifier whole; a doubled "" is an
+            # escaped quote that stays inside it, so parens within a quoted
+            # name never open or close a column-list group.
+            index += 1
+            while index < length:
+                if text[index] == '"':
+                    if index + 1 < length and text[index + 1] == '"':
+                        index += 2
+                        continue
+                    break
+                index += 1
+            index += 1
+            continue
         if char == "(":
+            if depth == 0:
+                start = index
             depth += 1
-        elif char == ")":
+        elif char == ")" and depth > 0:
             depth -= 1
             if depth == 0:
                 return text[start + 1 : index]
-    return None  # unbalanced parentheses
+        index += 1
+    return None  # no balanced group (or unbalanced parentheses)
 
 
 def _index_columns(index_def: object) -> list[str]:
