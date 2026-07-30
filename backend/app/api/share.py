@@ -45,6 +45,18 @@ def _redact_sensitive_snapshot_fields(
     return data
 
 
+def _redacted_snapshot_dict(
+    snapshot_json: dict | list | str | int | float | bool | None,
+) -> dict:
+    """Return a snapshot dict with sensitive fields redacted for public export.
+
+    Spec/DDL generators require a ``dict``; a non-dict payload degrades to an
+    empty dict so a shared export can never leak raw comments/example values.
+    """
+    redacted = _redact_sensitive_snapshot_fields(snapshot_json)
+    return redacted if isinstance(redacted, dict) else {}
+
+
 @router.post("/projects/{project_space_uuid}/share-links")
 async def create_share_link(
     project_space_uuid: uuid.UUID,
@@ -201,9 +213,12 @@ async def export_shared_snapshot_reversing_spec(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# DB Reversing Specification\n\nSnapshot data not found.\n"
+    # Public share export: redact comments/example values (the reversing spec
+    # otherwise embeds relation/column comments and example values verbatim).
+    redacted_snapshot = _redacted_snapshot_dict(data.snapshot_json)
     if mode == "llm-draft":
         try:
-            return await generate_reversing_llm_draft(data.snapshot_json)
+            return await generate_reversing_llm_draft(redacted_snapshot)
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -212,7 +227,7 @@ async def export_shared_snapshot_reversing_spec(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_reversing_spec(data.snapshot_json, mode=mode)
+    return generate_reversing_spec(redacted_snapshot, mode=mode)
 
 
 @router.get(
