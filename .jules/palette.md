@@ -54,3 +54,7 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+
+## 2024-11-20 - Add context-specific ARIA labels to modal delete buttons
+**Learning:** Screen readers announce generic buttons like "삭제" (Delete) without context, leading to an ambiguous experience when multiple destructible entities are present or when the entity isn't implicitly clear in the focus order.
+**Action:** Always provide specific, context-rich `aria-label` attributes to destructive action buttons in modals (e.g., `aria-label="a에서 b으로의 관계 삭제"` or `aria-label="users 테이블 삭제"`).
