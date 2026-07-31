@@ -54,3 +54,6 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
+## 2024-07-31 - Add ARIA labels to delete/duplicate buttons in modals
+**Learning:** Generic action buttons in modals (like 'Delete' or 'Duplicate') lack sufficient context for screen reader users when multiple similar items might exist or when context is spread across the UI. Providing exact explicit context via `aria-label` (e.g., `aria-label="Delete relationship A to B"`) prevents ambiguous screen reader experiences and aligns with accessibility best practices.
+**Action:** Ensure generic action buttons (e.g., 'Delete', 'Cancel', 'Duplicate') provide full context via `aria-label` (e.g., `aria-label="Delete relationship"`) to prevent ambiguous screen reader experiences, rather than relying solely on surrounding text or modal titles.

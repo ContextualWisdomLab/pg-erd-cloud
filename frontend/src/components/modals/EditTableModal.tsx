@@ -190,12 +190,14 @@ export function EditTableModal({
             <button
               type="button"
               onClick={onDeleteTable}
+              aria-label="테이블 삭제"
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
             >
               테이블 삭제
             </button>
             <button
               type="button"
+              aria-label="테이블 복제"
               onClick={() => {
                 const dupId = `${editingNode.id}_copy_${Date.now()}`;
                 setNodes((nds) => [

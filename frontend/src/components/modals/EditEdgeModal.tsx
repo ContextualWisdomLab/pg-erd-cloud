@@ -82,6 +82,7 @@ export function EditEdgeModal({
           <button
             type="button"
             onClick={onRelDelete}
+            aria-label="관계 삭제"
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
           >
             삭제
