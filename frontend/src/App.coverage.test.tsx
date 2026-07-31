@@ -479,6 +479,7 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     for (const id of [
       'edge-guard-submit',
       'edge-guard-delete',
