@@ -54,6 +54,3 @@
 ## 2024-07-13 - [Table Node Accessibility]
 **Learning:** Adding `aria-hidden="true"` inside `abbr` elements with `aria-label` prevents screen readers from redundantly announcing short abbreviations like "PK" or "NN" along with their full label.
 **Action:** When creating short, domain-specific abbreviations with tooltips, use `aria-label` on the wrapper and hide the visual text from screen readers using `aria-hidden="true"` to create a cleaner auditory experience.
-## 2024-07-28 - [Accessible Generic Dialog Action Buttons]
-**Learning:** Generic action buttons (like "Save", "Cancel", or "Delete") in context-specific dialogs (such as the Edit Relation modal) can be ambiguous for screen reader users, who hear only the short, generic text without the visual context describing the entities involved (e.g. source and target tables).
-**Action:** Always provide full context via `aria-label` for generic action buttons in dialogs to clarify what is being acted upon (e.g., `aria-label="\${source}에서 \${target} 관계 저장"`), creating a more transparent auditory experience.
