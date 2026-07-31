@@ -1,22 +1,23 @@
-# pg-erd-cloud (MVP skeleton)
+# pg-erd-cloud
 
-PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어의 **실행 가능한 MVP 골격**입니다.
+PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB를 스냅샷으로 역설계하고,
+대화형 ERD로 탐색·편집하며, DDL/명세서/공유 링크로 내보낼 수 있습니다.
 
 ## 제공 기능(현재)
 
+- **Auth / workspace**: 인증 게이트, 프로젝트 스페이스, DB 연결(DSN 암호화 저장)
 - **Backend DB = PostgreSQL** (앱 메타데이터 저장)
 - **Reverse engineering(리버스)**: 대상 PostgreSQL에 연결해서
   - schema/table/column
   - PK/FK/UNIQUE/CHECK
   - index (access method 포함, 예: btree/hash/gist/gin/spgist/brin + extension AM)
-  를 pg_catalog 기반으로 수집하고 스냅샷으로 저장
+  를 pg_catalog 기반으로 수집하고 **백그라운드 잡**으로 스냅샷 저장
 - **Snowflake reverse engineering(선택)**: `snowflake://user:password@account/database/schema`
   형식의 DSN을 사용하면 Snowflake `INFORMATION_SCHEMA`에서 schema/table/column,
   PK/UNIQUE/FK 메타데이터를 수집하고 `source_dialect: "snowflake"` 스냅샷으로 저장합니다.
   실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
-- **ERD UI**: React Flow(MIT)로 PK/FK를 그래픽으로 렌더링
-- **Forward engineering(포워드)**: MVP 단계에서는 “스냅샷 기반 DDL(export)” 중심
-  (diff/변경 SQL 생성은 로드맵)
+- **ERD UI**: React Flow(MIT)로 PK/FK·그룹·검색·레이아웃을 그래픽으로 렌더링
+- **Forward engineering(포워드)**: 스냅샷 기반 DDL export + 스냅샷 간 diff/마이그레이션 SQL
 
   - SQL export: `GET /api/snapshots/{snapshot_uuid}/export.sql`
   - Target dialect: `?dialect=postgresql`(기본값) 또는 `?dialect=snowflake`
@@ -24,6 +25,7 @@ PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어의 **실행 �
       PostgreSQL 전용 index/tablespace/partition/check constraint는 주석으로 보존합니다.
     - Snowflake reverse snapshot JSON(`source_dialect: "snowflake"`)도 PostgreSQL
       DDL export에서 주요 type을 매핑합니다.
+  - DBML / Mermaid / Prisma 등 프론트엔드 export 경로 포함
 - **DB Reversing 명세서 생성**:
   - Markdown draft: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md`
   - LLM prompt: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md?mode=llm-prompt`
@@ -44,7 +46,8 @@ PostgreSQL 중심 클라우드 ERD(협업/공유) 소프트웨어의 **실행 �
 curl -X POST "http://localhost:8000/api/projects/<project_uuid>/share-links"
 ```
 
-반환된 `url_path`로 동료가 최신 스냅샷 목록/스냅샷 JSON/DDL export를 조회할 수 있습니다.
+반환된 `url_path`로 동료가 최신 스냅샷 목록/스냅샷 JSON/DDL·명세서 export를 조회할 수 있습니다.
+공개 share 응답·export에서는 **스키마 코멘트·`example_value` 등 민감 메타데이터를 제거(redact)** 합니다.
 `/api/share/*` 공개 조회/내보내기 경로는 전역 `/api/*` 제한보다 더 엄격한 별도
 IP 기반 rate limit을 적용합니다.
 

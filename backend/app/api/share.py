@@ -184,7 +184,11 @@ async def export_shared_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    # Public share export: redact comments/example values so COMMENT ON / embedded
+    # metadata never leave the share boundary.
+    return snapshot_json_to_sql(
+        _redacted_snapshot_dict(data.snapshot_json), target_dialect=dialect
+    )
 
 
 @router.get(
@@ -256,9 +260,11 @@ async def export_shared_snapshot_index_design(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "# ERD Index Design\n\nSnapshot data not found.\n"
+    # Public share export: same redaction contract as reversing-spec / JSON share.
+    redacted_snapshot = _redacted_snapshot_dict(data.snapshot_json)
     if mode == "llm-draft":
         try:
-            return await generate_index_design_llm_draft(data.snapshot_json)
+            return await generate_index_design_llm_draft(redacted_snapshot)
         except LlmConfigurationError as exc:
             raise HTTPException(
                 status_code=503, detail="LLM configuration error"
@@ -267,4 +273,4 @@ async def export_shared_snapshot_index_design(
             raise HTTPException(
                 status_code=502, detail="LLM provider request failed"
             ) from exc
-    return generate_index_design_spec(data.snapshot_json, mode=mode)
+    return generate_index_design_spec(redacted_snapshot, mode=mode)
