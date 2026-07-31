@@ -7,7 +7,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.api.share import (
+    export_shared_snapshot_index_design,
     export_shared_snapshot_reversing_spec,
+    export_shared_snapshot_sql,
     get_shared_snapshot,
 )
 
@@ -125,3 +127,37 @@ async def test_shared_reversing_spec_llm_prompt_redacts_sensitive_fields() -> No
     assert _SECRET_RELATION_COMMENT not in prompt
     assert _SECRET_COLUMN_COMMENT not in prompt
     assert _SECRET_EXAMPLE_VALUE not in prompt
+
+
+@pytest.mark.asyncio
+async def test_shared_index_design_markdown_redacts_sensitive_fields() -> None:
+    """Public index-design share export must not leak comments/example values."""
+
+    session = _share_session(_sensitive_snapshot())
+    share_uuid, snapshot_uuid = session._ids
+    markdown = await export_shared_snapshot_index_design(
+        share_link_uuid=share_uuid,
+        schema_snapshot_uuid=snapshot_uuid,
+        mode="markdown",
+        session=session,
+    )
+    assert _SECRET_RELATION_COMMENT not in markdown
+    assert _SECRET_COLUMN_COMMENT not in markdown
+    assert _SECRET_EXAMPLE_VALUE not in markdown
+
+
+@pytest.mark.asyncio
+async def test_shared_sql_export_redacts_sensitive_fields() -> None:
+    """Public SQL share export must not embed comments/example values."""
+
+    session = _share_session(_sensitive_snapshot())
+    share_uuid, snapshot_uuid = session._ids
+    sql = await export_shared_snapshot_sql(
+        share_link_uuid=share_uuid,
+        schema_snapshot_uuid=snapshot_uuid,
+        dialect="postgresql",
+        session=session,
+    )
+    assert _SECRET_RELATION_COMMENT not in sql
+    assert _SECRET_COLUMN_COMMENT not in sql
+    assert _SECRET_EXAMPLE_VALUE not in sql
