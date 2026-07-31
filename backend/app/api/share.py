@@ -30,10 +30,6 @@ from app.spec.reversing import generate_reversing_spec
 router = APIRouter(prefix="/api", tags=["share"])
 
 
-import re
-from app.dsn_redaction import redact_dsn_error_message
-
-import re
 from app.dsn_redaction import redact_dsn_error_message
 
 def _redact_sensitive_snapshot_fields(
