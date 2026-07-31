@@ -193,6 +193,10 @@ export default function App() {
     { x: number; y: number }
   > | null>(null);
 
+  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
+  const searchCacheRef = useRef<WeakMap<TableNodeData, TableNodeData>>(new WeakMap());
+  const lastSearchRef = useRef<string>("");
+
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
@@ -200,15 +204,26 @@ export default function App() {
   }, [nodes, normalizedNodeSearch]);
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
+
+    if (lastSearchRef.current !== normalizedNodeSearch) {
+      searchCacheRef.current = new WeakMap();
+      lastSearchRef.current = normalizedNodeSearch;
+    }
+
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let cachedData = searchCacheRef.current.get(node.data);
+      if (!cachedData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        cachedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchCacheRef.current.set(node.data, cachedData);
+      }
+      return {
+        ...node,
+        data: cachedData,
       };
     });
   }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
