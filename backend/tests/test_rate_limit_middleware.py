@@ -38,7 +38,7 @@ def test_rate_limit_applies_to_api_prefix_and_returns_429() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://testserver")
     assert client.get("/api/ping").status_code == 200
     assert client.get("/api/ping").status_code == 200
 
