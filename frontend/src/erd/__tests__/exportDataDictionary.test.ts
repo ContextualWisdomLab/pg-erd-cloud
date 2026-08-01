@@ -146,6 +146,24 @@ describe('exportDataDictionary', () => {
     expect(markdown).toContain('No columns.');
   });
 
+  it('should ignore invalid handles when computing foreign keys', () => {
+    const edge = {
+      id: 'edge1',
+      source: 'node1',
+      target: 'node2',
+      sourceHandle: 'invalid-handle',
+    } as Edge;
+
+    const md = exportDictionaryMarkdown(
+      [{ id: 'node1', data: { columns: [{ column_name: 'id', data_type: 'int', is_pk: true }] } }] as Node<TableNodeData>[],
+      [edge]
+    );
+
+    // invalid-handle shouldn't trigger an FK match
+    expect(md).toContain('| id | int | Y | N | N |  |  |');
+  });
+
+
   it('escapes Markdown table breakers and HTML-like content', () => {
     const markdown = exportDictionaryMarkdown(
       [
