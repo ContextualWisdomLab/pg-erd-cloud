@@ -161,14 +161,14 @@ describe('ExportModal', () => {
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Prisma Schema 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Prisma Schema 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('exposes access-control guidance for disabled button', () => {
@@ -176,7 +176,7 @@ describe('ExportModal', () => {
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
+    expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
   });

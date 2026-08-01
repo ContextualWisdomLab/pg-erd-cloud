@@ -202,7 +202,8 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
@@ -230,8 +231,15 @@ export function ExportModal({
                   </div>
                   <button
                     type="button"
-                    onClick={artifact.onExport}
-                    disabled={artifact.disabled}
+                    onClick={(e) => {
+                      if (artifact.disabled) {
+                        e.preventDefault();
+                      } else {
+                        artifact.onExport();
+                      }
+                    }}
+                    aria-disabled={artifact.disabled ? true : undefined}
+                    title={artifact.disabled ? artifact.description : undefined}
                     aria-label={artifact.ariaLabel}
                     aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
                   >
