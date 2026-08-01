@@ -2,3 +2,7 @@
 **Vulnerability:** User-provided string fields (like project and connection names) lacked strict validation against control characters, only relying on length constraints.
 **Learning:** This could potentially lead to Log Injection (CRLF injection), Null Byte Injection, or terminal escape injection if these strings are subsequently logged or rendered directly.
 **Prevention:** Use explicit regex validation `pattern=r'^[^\x00-\x1F\x7F]+$'` on Pydantic string fields to strictly reject control characters.
+## 2024-08-01 - Fix overly restrictive CORS configuration
+**Vulnerability:** The backend CORS configuration (`allow_methods`) explicitly restricted allowed methods to `["GET", "POST", "OPTIONS"]` by default. However, there are valid API endpoints defined with `@router.delete` and `@router.put` (e.g., in `backend/app/api/annotations.py`, `backend/app/api/diagram_views.py`, and `backend/app/api/api_keys.py`) that would be blocked by CORS due to this allowlist.
+**Learning:** Hardcoding HTTP methods in the global CORS middleware without considering the full set of API endpoints can inadvertently block valid requests, leading to functional bugs (like being unable to delete annotations or views) from the frontend due to CORS errors. This is a functional and availability issue as valid endpoints are unusable.
+**Prevention:** When configuring `allow_methods` in `CORSMiddleware`, ensure that it encompasses all HTTP methods used in the API routers, including `PUT`, `PATCH`, and `DELETE`.
