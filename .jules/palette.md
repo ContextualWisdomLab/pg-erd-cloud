@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-08-01 - Add form wrappers for native keyboard submission
+**Learning:** In React input elements combined with submit buttons, wrapping them in a `<form>` element handles 'Enter' key presses implicitly on interactive UI parts (like inline creators or search bars) and increases accessibility for keyboard users compared to standalone input/button pairs enclosed in `<div>`s.
+**Action:** Always wrap data submission input and button groups in a `<form>` element instead of a plain `<div>`. Set the primary action button to `type="submit"` and handle `onSubmit` (preventing default) rather than only utilizing `onClick` on the button.
