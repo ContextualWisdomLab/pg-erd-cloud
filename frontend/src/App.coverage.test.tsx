@@ -385,14 +385,12 @@ describe('App orchestration coverage', () => {
 
     fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
+    vi.useRealTimers()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
-    await act(async () => {
-      vi.runOnlyPendingTimers()
-      await Promise.resolve()
-    })
-    expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+    vi.useFakeTimers()
 
     fireEvent.click(screen.getByTestId('flow-connect'))
     fireEvent.click(screen.getByTestId('edge-label'))

@@ -451,24 +451,6 @@ export default function App() {
     });
   }
 
-  function computeSortedGridLayout(
-    currentNodes: Array<Node<TableNodeData>>,
-  ): Array<Node<TableNodeData>> {
-    const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = a.data?.title ?? a.id;
-      const bTitle = b.data?.title ?? b.id;
-      return aTitle.localeCompare(bTitle, "en");
-    });
-
-    return sorted.map((n, i) => ({
-      ...n,
-      position: {
-        x: (i % GRID_COLUMNS) * GRID_X_GAP,
-        y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP,
-      },
-    }));
-  }
-
   async function onAutoLayout() {
     /* v8 ignore next -- the toolbar disables this handler for both guard states */
     if (nodes.length === 0 || isLayouting) return;
@@ -480,11 +462,18 @@ export default function App() {
 
     try {
       // Yield to the browser so the UI can reflect the loading state.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
+      await new Promise<void>((resolve, reject) => {
+        try {
+          requestAnimationFrame(() => resolve());
+        } catch (e) {
+          reject(e);
+        }
+      });
 
-      const next = computeSortedGridLayout(nodes);
+      // ⚡ Dagre Layout dynamically computed instead of legacy sort grid.
+      // Import inline to keep App.tsx independent and avoid circular deps.
+      const { computeDagreLayout } = await import("./erd/dagreLayout");
+      const next = computeDagreLayout(nodes, edges);
       setNodes(next);
 
       requestAnimationFrame(() => {

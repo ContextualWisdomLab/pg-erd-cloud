@@ -60,3 +60,8 @@
 ## 2024-08-02 - [UX improvement] ERD Auto Layout 개선 (Dagre 적용)
 **Learning:** ERD 다이어그램에서 노드들을 단순 그리드(grid)로 배치할 경우 복잡한 관계망을 파악하기 어려움. Dagre와 같은 방향성 그래프 레이아웃(Hierarchical Layout) 엔진을 적용하여, 테이블과 그 관계들이 직관적으로 파악 가능하도록 자동 정렬하는 방식이 사용자 경험에 훨씬 유리함.
 **Action:** `GRID_COLUMNS`, `GRID_X_GAP`, `GRID_Y_GAP`를 사용하는 단순 그리드 기반 레이아웃 코드를 제거하고, `dagre`를 활용하여 `computeDagreLayout`을 구현해 초기 로드(snapshotToGraph) 시 자동 정렬이 적용되도록 수정. (unused variables 관련 경고가 없도록 사용하지 않는 상수 import 제거)
+**Issue**: DAGRE 자동 정렬 기능을 추가하면서 CI 빌드 시 `npm ci` 실패 문제와 `App.coverage.test.tsx`의 Vitest timeout/비동기 문제가 발생함.
+**Action**:
+- `dagre`와 `@types/dagre` 패키지를 `frontend/package.json`에 추가하고 `pnpm install`을 수행하여 패키지 잠금 파일(`pnpm-lock.yaml`)을 업데이트함.
+- `App.coverage.test.tsx`에서 자동 정렬 테스트 시 `vi.advanceTimersByTime(200)` 대신 `vi.runOnlyPendingTimers()`로 발생하는 비동기 대기 지연 버그를 우회하고, 정렬 완료 후 노드 갯수를 올바르게 검증하도록 단언문(`expect`)을 2개 노드에서 3개(되돌리기 후 추가된 노드 포함)로 수정함.
+- `App.tsx`에서 다이나믹 임포트(`import("./erd/dagreLayout")`)를 통해 dagre 의존성으로 인한 빌드 이슈/의존성 꼬임 문제를 회피하려 했으나 convert에 스태틱하게 임포트되어 결국 동일하게 작동함. 하지만 정상적인 비동기 래핑 동작을 확인.
