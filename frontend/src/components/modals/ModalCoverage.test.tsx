@@ -83,7 +83,7 @@ describe('modal behavior coverage', () => {
     )
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('covers EditEdgeModal visibility and actions', () => {
