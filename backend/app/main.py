@@ -132,7 +132,7 @@ app.add_middleware(
     # actually need cookie-based auth.
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS", "DELETE", "PUT", "PATCH"],
     allow_headers=CORS_ALLOW_HEADERS,
 )
 

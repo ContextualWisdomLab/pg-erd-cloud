@@ -2,3 +2,7 @@
 **Vulnerability:** User-provided string fields (like project and connection names) lacked strict validation against control characters, only relying on length constraints.
 **Learning:** This could potentially lead to Log Injection (CRLF injection), Null Byte Injection, or terminal escape injection if these strings are subsequently logged or rendered directly.
 **Prevention:** Use explicit regex validation `pattern=r'^[^\x00-\x1F\x7F]+$'` on Pydantic string fields to strictly reject control characters.
+## 2024-10-27 - Overly restrictive CORS configuration
+**Vulnerability:** The CORS configuration in `backend/app/main.py` restricted allowed HTTP methods to only `GET`, `POST`, and `OPTIONS`. This overly restrictive setting would block legitimate and expected API operations relying on other standard methods, such as `DELETE` (used for deleting views, annotations, API keys) or `PUT`/`PATCH` (for resource updates).
+**Learning:** Default-deny or strict-allowlist security mechanisms are important, but they must be correctly aligned with the application's actual operational requirements. When the configuration is too rigid, it breaks functionality without providing meaningful additional security against intended application features.
+**Prevention:** Always verify that security controls (like CORS `allow_methods`) encompass the full set of legitimate operations defined in the application's API endpoints. Include tests that exercise all required HTTP methods across different origins to ensure CORS headers do not interfere with expected functionality.
