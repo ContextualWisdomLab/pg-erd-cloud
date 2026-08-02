@@ -3,7 +3,7 @@ import type { Edge, Node } from '@xyflow/react'
 import type { BusinessGroup } from './businessGroups'
 import type { IndexRecommendation } from './cardinality'
 import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
-import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
+import { computeDagreLayout } from './dagreLayout'
 import type { SnapshotJson } from '../types'
 
 export type TableNodeData = {
@@ -126,12 +126,12 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     }
   }
 
-  const nodes: Array<Node<TableNodeData>> = tableRels.map((t, i) => {
+  const nodes: Array<Node<TableNodeData>> = tableRels.map((t) => {
     const cols = columnsByRel.get(t.relation_oid) || []
     return {
       id: String(t.relation_oid),
       type: 'tableNode',
-      position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
+      position: { x: 0, y: 0 }, // Position will be computed by dagreLayout
       data: {
         title: `${t.schema_name}.${t.relation_name}`,
         comment: t.relation_comment,
@@ -156,5 +156,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     type: 'smoothstep'
   }))
 
-  return { nodes, edges }
+  const layoutedNodes = computeDagreLayout(nodes, edges)
+
+  return { nodes: layoutedNodes, edges }
 }

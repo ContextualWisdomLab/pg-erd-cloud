@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-08-02 - [UX improvement] ERD Auto Layout 개선 (Dagre 적용)
+**Learning:** ERD 다이어그램에서 노드들을 단순 그리드(grid)로 배치할 경우 복잡한 관계망을 파악하기 어려움. Dagre와 같은 방향성 그래프 레이아웃(Hierarchical Layout) 엔진을 적용하여, 테이블과 그 관계들이 직관적으로 파악 가능하도록 자동 정렬하는 방식이 사용자 경험에 훨씬 유리함.
+**Action:** `GRID_COLUMNS`, `GRID_X_GAP`, `GRID_Y_GAP`를 사용하는 단순 그리드 기반 레이아웃 코드를 제거하고, `dagre`를 활용하여 `computeDagreLayout`을 구현해 초기 로드(snapshotToGraph) 시 자동 정렬이 적용되도록 수정. (unused variables 관련 경고가 없도록 사용하지 않는 상수 import 제거)
