@@ -1,8 +1,18 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  // ⚡ Bolt: Use a for...of loop instead of Array.from to avoid intermediate array allocations
+  // and reduce garbage collection (GC) overhead during high-frequency string operations.
+  let encoded = ''
+  let isFirst = true
+
+  for (const char of columnName) {
+    if (isFirst) {
+      isFirst = false
+    } else {
+      encoded += '-'
+    }
+    // for...of only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }
 
   return `c-${encoded || 'empty'}`
 }
