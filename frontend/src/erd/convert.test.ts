@@ -217,3 +217,43 @@ describe('snapshotToGraph', () => {
     expect(graph.edges).toHaveLength(1)
   })
 })
+
+  it('populates fully initialized arrays to prevent holes or undefined entries', () => {
+    const snapshot: SnapshotInput = {
+      relations: [
+        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' },
+        { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'posts' }
+      ],
+      columns: [],
+      constraints: [],
+      fk_edges: [
+        {
+          fk_constraint_oid: 100,
+          fk_constraint_name: 'fk_user',
+          child_relation_oid: 2,
+          parent_relation_oid: 1,
+          child_column_name: 'user_id',
+          parent_column_name: 'id',
+          column_ordinal: 1
+        }
+      ]
+    }
+
+    const graph = snapshotToGraph(snapshot)
+
+    expect(graph.nodes).toHaveLength(2)
+    for (const node of graph.nodes) {
+      expect(node).toBeDefined()
+      expect(node.id).toBeDefined()
+      expect(node.position).toBeDefined()
+      expect(node.data).toBeDefined()
+    }
+
+    expect(graph.edges).toHaveLength(1)
+    for (const edge of graph.edges) {
+      expect(edge).toBeDefined()
+      expect(edge.id).toBeDefined()
+      expect(edge.source).toBeDefined()
+      expect(edge.target).toBeDefined()
+    }
+  })
