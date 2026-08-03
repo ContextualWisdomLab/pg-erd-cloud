@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] 🧭 **관계 인지형 ERD 자동 배치**: 단순 그리드 대신 유지보수되는 Dagre 엔진으로 외래키 흐름을 반영한 결정론적 LR/TB 배치를 제공하고, 자동 배치 실패 시 기존 좌표를 보존합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
