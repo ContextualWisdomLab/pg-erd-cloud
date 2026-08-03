@@ -10,11 +10,11 @@ permissions:
 
 concurrency:
   group: repair-pr-700-search-race
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'chore: repair PR 700 search race'
+    if: github.event.head_commit.message == 'chore: repair PR 700 search race v2'
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -37,23 +37,25 @@ jobs:
 
           path = Path('frontend/src/App.coverage.test.tsx')
           text = path.read_text(encoding='utf-8')
-          old = """    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
-              expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
-              fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
-              expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
-          """
-          new = """    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
-              expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
-              await waitFor(() =>
-                expect(
-                  screen.queryByText(
-                    '아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.',
-                  ),
-                ).not.toBeInTheDocument(),
-              )
-              fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
-              expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
-          """
+          old = (
+              "    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)\n"
+              "    expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()\n"
+              "    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })\n"
+              "    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()\n"
+          )
+          new = (
+              "    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)\n"
+              "    expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()\n"
+              "    await waitFor(() =>\n"
+              "      expect(\n"
+              "        screen.queryByText(\n"
+              "          '아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.',\n"
+              "        ),\n"
+              "      ).not.toBeInTheDocument(),\n"
+              "    )\n"
+              "    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })\n"
+              "    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()\n"
+          )
           if text.count(old) != 1:
               raise SystemExit(f'expected one search-race block, found {text.count(old)}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
