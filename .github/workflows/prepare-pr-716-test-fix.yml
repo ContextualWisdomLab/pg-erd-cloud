@@ -34,20 +34,15 @@ jobs:
 
           path = Path('frontend/src/App.coverage.test.tsx')
           text = path.read_text()
-          before = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
-            await renderReadyApp()
-            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-            vi.useFakeTimers()
-          """
-          after = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
-            await renderReadyApp()
-            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-            await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-            vi.useFakeTimers()
-          """
-          if before not in text:
-              raise SystemExit('expected test block not found')
-          path.write_text(text.replace(before, after, 1))
+          test_title = "  it('logs auto-layout failures and preserves nodes added after the undo snapshot'"
+          test_start = text.index(test_title)
+          timer_marker = '    vi.useFakeTimers()'
+          timer_index = text.index(timer_marker, test_start)
+          insertion = "    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))\n"
+          test_prefix = text[test_start:timer_index]
+          if insertion not in test_prefix:
+              text = text[:timer_index] + insertion + text[timer_index:]
+          path.write_text(text)
 
       - name: Commit deterministic test and remove one-shot artifacts
         run: |
