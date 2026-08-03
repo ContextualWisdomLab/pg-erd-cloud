@@ -135,6 +135,22 @@ hypercorn --config python:app.hypercorn_config app.main:app \
   --access-logfile - --error-logfile -
 ```
 
+로컬 마이그레이션 DB를 웹 API의 SSRF 허용 목록에 넣지 않고 스냅샷하려면
+Unix-domain socket 전용 CLI를 사용합니다. 비밀번호가 포함된 DSN을 인자나 로그로
+전달하지 않으며 결과 JSON은 stdout으로만 출력합니다.
+
+```bash
+cd backend
+pg-erd-snapshot \
+  --host /tmp \
+  --database my_local_database \
+  --schema public \
+  --pretty > snapshot.json
+```
+
+원격 PostgreSQL은 기존 연결 API와 host allowlist를 계속 사용합니다. 이 CLI는 TCP
+호스트를 받지 않으므로 웹 API의 loopback/private-network 차단을 우회하지 않습니다.
+
 Snowflake 리버스 엔지니어링을 사용할 개발 환경에서는 백엔드 가상환경에서 선택 의존성을
 함께 설치합니다.
 

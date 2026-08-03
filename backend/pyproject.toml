@@ -32,6 +32,9 @@ dependencies = [
   "python-multipart>=0.0.32",
 ]
 
+[project.scripts]
+pg-erd-snapshot = "app.local_snapshot_cli:main"
+
 [project.optional-dependencies]
 snowflake = [
   "snowflake-connector-python>=4,<5",
