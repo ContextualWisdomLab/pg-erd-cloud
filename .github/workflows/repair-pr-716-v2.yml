@@ -1,4 +1,4 @@
-name: Repair PR 716 v2
+name: Repair PR 716 v3
 
 on:
   push:
@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: repair-pr-716-v2
+  group: repair-pr-716-v3
   cancel-in-progress: false
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'chore: run PR 716 verified repair v2'
+    if: github.event.head_commit.message == 'chore: run PR 716 verified repair v3'
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -45,6 +45,7 @@ jobs:
           import json
           import re
           from pathlib import Path
+          from textwrap import dedent
 
 
           app_path = Path("frontend/src/App.tsx")
@@ -66,23 +67,27 @@ jobs:
 
           coverage_path = Path("frontend/src/App.coverage.test.tsx")
           coverage = coverage_path.read_text(encoding="utf-8")
-          position_probe = '''        <span data-testid="node-positions">
+          position_probe = dedent("""\
+                  <span data-testid="node-positions">
                     {JSON.stringify(props.nodes.map((node: any) => ({ id: node.id, position: node.position })))}
                   </span>
-          '''
+          """)
           if 'data-testid="node-positions"' not in coverage:
               edge_count = '        <span data-testid="edge-count">{props.edges.length}</span>\n'
               if coverage.count(edge_count) != 1:
                   raise SystemExit("App.coverage.test.tsx: edge-count probe was not unique")
               coverage = coverage.replace(edge_count, edge_count + position_probe, 1)
 
-          old_undo = '''    vi.useRealTimers()
+          old_undo = dedent("""\
+              vi.useRealTimers()
               fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
               await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
               fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
               expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
-              vi.useFakeTimers()'''
-          exact_undo = '''    const positionsBeforeLayout = screen.getByTestId('node-positions').textContent
+              vi.useFakeTimers()
+          """).rstrip("\n")
+          exact_undo = dedent("""\
+              const positionsBeforeLayout = screen.getByTestId('node-positions').textContent
               vi.useRealTimers()
               fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
               await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
@@ -91,7 +96,8 @@ jobs:
               fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
               expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
               expect(screen.getByTestId('node-positions').textContent).toBe(positionsBeforeLayout)
-              vi.useFakeTimers()'''
+              vi.useFakeTimers()
+          """).rstrip("\n")
           if exact_undo not in coverage:
               if coverage.count(old_undo) != 1:
                   raise SystemExit("App.coverage.test.tsx: auto-layout undo block was not unique")
@@ -111,12 +117,12 @@ jobs:
                   palette,
                   flags=re.DOTALL,
               )
-          palette = palette.rstrip() + '''
+          palette += dedent("""\
 
-          ## 2026-08-03 - Relationship-aware ERD auto-layout
-          **Learning:** A fixed grid hides foreign-key direction and becomes difficult to scan as schemas grow. Deterministic hierarchical layout makes dependency paths visible while stable insertion order prevents visual jitter between identical snapshots.
-          **Action:** Use maintained typed `@dagrejs/dagre` with the canonical npm lockfile; size nodes from rendered column counts; ignore dangling edges; handle cycles; validate finite coordinates; and verify direction, determinism, non-overlap, immutability, and exact undo restoration.
-          '''
+              ## 2026-08-03 - Relationship-aware ERD auto-layout
+              **Learning:** A fixed grid hides foreign-key direction and becomes difficult to scan as schemas grow. Deterministic hierarchical layout makes dependency paths visible while stable insertion order prevents visual jitter between identical snapshots.
+              **Action:** Use maintained typed `@dagrejs/dagre` with the canonical npm lockfile; size nodes from rendered column counts; ignore dangling edges; handle cycles; validate finite coordinates; and verify direction, determinism, non-overlap, immutability, and exact undo restoration.
+          """)
           palette_path.write_text(palette, encoding="utf-8")
 
           package_path = Path("frontend/package.json")
