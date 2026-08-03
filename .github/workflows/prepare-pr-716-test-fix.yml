@@ -1,0 +1,54 @@
+name: Prepare PR 716 Test Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - frontend/src/App.coverage.test.tsx
+      - .github/workflows/prepare-pr-716-test-fix.yml
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Make the test wait for snapshot cards
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('frontend/src/App.coverage.test.tsx')
+          text = path.read_text()
+          before = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
+            await renderReadyApp()
+            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+            vi.useFakeTimers()
+          """
+          after = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
+            await renderReadyApp()
+            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+            await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+            vi.useFakeTimers()
+          """
+          if before not in text:
+              raise SystemExit('expected test block not found')
+          path.write_text(text.replace(before, after, 1))
+
+      - name: Upload patched test
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-716-patched-test
+          path: frontend/src/App.coverage.test.tsx
+          if-no-files-found: error
+          retention-days: 1
