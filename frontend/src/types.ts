@@ -8,6 +8,38 @@ export type Connection = {
   conn_name: string
 }
 
+export type DiagramViewPosition = {
+  x: number
+  y: number
+}
+
+export type DiagramViewViewport = DiagramViewPosition & {
+  zoom: number
+}
+
+/**
+ * Opaque, version-tolerant saved canvas state.
+ *
+ * Known position and viewport fields are typed for the current editor while the
+ * index signature preserves forward compatibility with future layout metadata.
+ */
+export type DiagramViewLayout = {
+  positions?: Record<string, DiagramViewPosition>
+  viewport?: DiagramViewViewport
+  [key: string]: unknown
+}
+
+export type DiagramView = {
+  diagram_view_uuid: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export type DiagramViewDetail = DiagramView & {
+  layout_json: DiagramViewLayout
+}
+
 export type ShareLink = {
   share_link_uuid: string
   permission_kind: string
