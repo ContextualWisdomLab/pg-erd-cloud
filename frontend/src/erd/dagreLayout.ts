@@ -1,7 +1,13 @@
 import * as dagre from '@dagrejs/dagre';
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type { TableNodeData } from './convert';
 
+/**
+ * Compute a deterministic relationship-aware layout without mutating the input graph.
+ *
+ * If Dagre cannot produce complete finite geometry, the affected node keeps its
+ * existing position so a layout failure never collapses the ERD onto the origin.
+ */
 export function computeDagreLayout(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -29,16 +35,43 @@ export function computeDagreLayout(
     dagreGraph.setEdge(edge.source, edge.target);
   });
 
-  dagre.layout(dagreGraph);
+  try {
+    dagre.layout(dagreGraph);
+  } catch {
+    return nodes.map((node) => ({
+      ...node,
+      position: { ...node.position },
+    }));
+  }
 
   return nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
+    const x = nodeWithPosition?.x;
+    const y = nodeWithPosition?.y;
+    const width = nodeWithPosition?.width;
+    const height = nodeWithPosition?.height;
+
+    if (
+      typeof x !== 'number' ||
+      typeof y !== 'number' ||
+      typeof width !== 'number' ||
+      typeof height !== 'number' ||
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      return {
+        ...node,
+        position: { ...node.position },
+      };
+    }
+
     return {
       ...node,
       position: {
-        // Fallback to 0 if dagre fails to compute coordinates (e.g., disconnected subgraph edge cases)
-        x: Number.isFinite(nodeWithPosition?.x) ? nodeWithPosition.x - nodeWithPosition.width / 2 : 0,
-        y: Number.isFinite(nodeWithPosition?.y) ? nodeWithPosition.y - nodeWithPosition.height / 2 : 0,
+        x: x - width / 2,
+        y: y - height / 2,
       },
     };
   });
