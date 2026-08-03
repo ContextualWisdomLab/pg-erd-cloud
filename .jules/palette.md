@@ -67,6 +67,12 @@
 - `App.tsx`에서 다이나믹 임포트(`import("./erd/dagreLayout")`)를 통해 dagre 의존성으로 인한 빌드 이슈/의존성 꼬임 문제를 회피하려 했으나 convert에 스태틱하게 임포트되어 결국 동일하게 작동함. 하지만 정상적인 비동기 래핑 동작을 확인.
 **Learning**: Vitest에서 fake timers와 real timers가 혼합된 테스트 케이스의 경우, DOM 이벤트가 트리거하는 비동기 작업(`requestAnimationFrame` 등)의 완료를 확실히 보장하려면, `vi.useFakeTimers()` 상태에서 `vi.advanceTimersByTime(ms)`만 호출하는 것보다 React Testing Library의 `waitFor()`를 통해 DOM 변화가 완료될 때까지 비동기적으로 대기(단, timeout을 넉넉히)하는 것이 가장 안정적인 우회법. (React 18/19 렌더링 배치 특성 및 act 래핑 때문)
 
-## 2026-08-03 - ERD relationship-aware auto layout
-**Learning:** The maintained `@dagrejs/dagre` package integrates cleanly through a static import when the frontend remains on npm and commits the synchronized `package-lock.json`. Layout regressions are more reliable when React Testing Library waits for visible completion with `waitFor`, then verifies geometry and exact undo restoration instead of relying on timer-draining implementation details.
-**Action:** Keep graph layout deterministic and defensive: preserve input coordinates when Dagre throws or emits incomplete geometry, assert node rectangles do not overlap, verify input immutability, and retain exact per-node positions across undo.
+## 2026-08-03 - Vitest Fake Timers와 Dagre Layout 테스트 전략 개선
+**Learning:**
+- Dagre 자동 레이아웃(`@dagrejs/dagre`) 알고리즘을 도입하면서 `try/catch` 블록과 `Number.isFinite` 기하 검증(geometry validation) 폴백(fallback) 로직을 테스트할 때, `require('@dagrejs/dagre')` 내부 모듈이나 Vitest spy(`vi.spyOn(dagre, 'layout')`)를 사용할 경우 ESM 모듈 참조 및 모듈 초기화 구조에 따라 `Cannot redefine property: layout`이나 `vi is not defined` 에러가 발생할 수 있음을 확인했습니다.
+- 복잡한 모듈 모킹 대신, 로직 내부에서 유효성을 검증하는 데 사용된 기본 객체(`Number.isFinite`)를 스파이하여(mock) 의도적으로 실패 상태를 트리거하는 것이 견고하고 안전한 폴백(fallback) 검증 테스트 방식입니다.
+- React Flow의 `requestAnimationFrame`과 React의 비동기 상태 렌더링에 Vitest fake timers를 함께 사용할 경우 타임아웃 3000ms 이상의 충분한 대기 시간과 `await waitFor` 블록을 조합해야 합니다.
+
+**Action:**
+- ESM 모듈 모킹 대신 `vi.spyOn(Number, 'isFinite')`를 사용하여 Dagre 좌표 실패 시의 fallback 위치(원래 좌표 유지) 반환 로직을 검증했습니다.
+- CI/CD 파이프라인에서 불필요한 lock 파일 충돌(`pnpm-lock.yaml`)을 방지하기 위해 `npm ci`와 호환되는 단일 `package-lock.json` 환경 유지를 확립했습니다.

@@ -385,11 +385,42 @@ describe('App orchestration coverage', () => {
 
     fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
+
+    // Capture positions before layout
+    const preLayoutPositions: Record<string, {x: number, y: number}> = {};
+    const nodes = document.querySelectorAll('.react-flow__node');
+    nodes.forEach(node => {
+      const id = node.getAttribute('data-id');
+      const transform = (node as HTMLElement).style.transform;
+      if (id && transform) {
+        const match = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+        if (match) {
+          preLayoutPositions[id] = { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+        }
+      }
+    });
+
     vi.useRealTimers()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
     await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument(), { timeout: 3000 })
+
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+
+    // Verify positions are restored
+    const postUndoNodes = document.querySelectorAll('.react-flow__node');
+    postUndoNodes.forEach(node => {
+      const id = node.getAttribute('data-id');
+      const transform = (node as HTMLElement).style.transform;
+      if (id && preLayoutPositions[id] && transform) {
+        const match = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+        if (match) {
+          expect(parseFloat(match[1])).toBeCloseTo(preLayoutPositions[id].x);
+          expect(parseFloat(match[2])).toBeCloseTo(preLayoutPositions[id].y);
+        }
+      }
+    });
+
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByTestId('flow-connect'))

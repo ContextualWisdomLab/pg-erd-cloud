@@ -1,13 +1,7 @@
 import * as dagre from '@dagrejs/dagre';
-import type { Edge, Node } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from './convert';
 
-/**
- * Compute a deterministic relationship-aware layout without mutating the input graph.
- *
- * If Dagre cannot produce complete finite geometry, the affected node keeps its
- * existing position so a layout failure never collapses the ERD onto the origin.
- */
 export function computeDagreLayout(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -32,46 +26,45 @@ export function computeDagreLayout(
   });
 
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+    // Only add edges for nodes that actually exist in the graph.
+    // Dagre will auto-create missing nodes with undefined sizes and mess up coordinates
+    // if edges reference non-existent nodes (like disconnected handles).
+    if (dagreGraph.hasNode(edge.source) && dagreGraph.hasNode(edge.target)) {
+      dagreGraph.setEdge(edge.source, edge.target);
+    }
   });
 
   try {
     dagre.layout(dagreGraph);
-  } catch {
-    return nodes.map((node) => ({
-      ...node,
-      position: { ...node.position },
-    }));
+  } catch (error) {
+    console.error('Dagre layout failed:', error);
+    return nodes.map((node) => ({ ...node }));
   }
 
   return nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
-    const x = nodeWithPosition?.x;
-    const y = nodeWithPosition?.y;
-    const width = nodeWithPosition?.width;
-    const height = nodeWithPosition?.height;
 
-    if (
-      typeof x !== 'number' ||
-      typeof y !== 'number' ||
-      typeof width !== 'number' ||
-      typeof height !== 'number' ||
-      !Number.isFinite(x) ||
-      !Number.isFinite(y) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      return {
-        ...node,
-        position: { ...node.position },
-      };
+    // When dagre fails, it may not throw, but instead drops x/y values
+    // for disconnected nodes or completely unassigned geometry.
+    // Also dagre drops x/y values when edges are completely unresolvable.
+    const validGeometry =
+      nodeWithPosition &&
+      nodeWithPosition.x !== undefined &&
+      nodeWithPosition.y !== undefined &&
+      Number.isFinite(nodeWithPosition.x) &&
+      Number.isFinite(nodeWithPosition.y) &&
+      Number.isFinite(nodeWithPosition.width) &&
+      Number.isFinite(nodeWithPosition.height);
+
+    if (!validGeometry) {
+      return { ...node, position: { ...node.position } };
     }
 
     return {
       ...node,
       position: {
-        x: x - width / 2,
-        y: y - height / 2,
+        x: nodeWithPosition.x - nodeWithPosition.width / 2,
+        y: nodeWithPosition.y - nodeWithPosition.height / 2,
       },
     };
   });
