@@ -1,15 +1,15 @@
-name: Repair PR 706 Backend Locks
+name: Repair Backend Dependency Locks
 
 on:
   push:
     branches:
-      - dependabot/pip/backend/fastapi-gte-0.141.1
+      - automation/synchronize-backend-locks
 
 permissions:
   contents: write
 
 concurrency:
-  group: repair-pr-706-backend-locks
+  group: repair-backend-dependency-locks
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout repair branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: dependabot/pip/backend/fastapi-gte-0.141.1
+          ref: automation/synchronize-backend-locks
           fetch-depth: 0
 
       - name: Setup Python
@@ -65,14 +65,16 @@ jobs:
           PYTHONPATH: .
         run: pytest -q
 
-      - name: Commit verified lockfiles and remove one-shot workflow
+      - name: Commit verified lockfiles and remove one-shot artifacts
         run: |
           set -euo pipefail
+          git rm .github/repair-pr-706.trigger
           git rm .github/workflows/repair-pr-706-locks.yml
+          git rm .github/workflows/autofix-pr-706-locks.yml
           git add backend/requirements.lock backend/requirements-dev.lock
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'chore(deps): synchronize FastAPI and Redis lockfiles'
-          git pull --rebase origin dependabot/pip/backend/fastapi-gte-0.141.1
-          git push origin 'HEAD:dependabot/pip/backend/fastapi-gte-0.141.1'
+          git pull --rebase origin automation/synchronize-backend-locks
+          git push origin 'HEAD:automation/synchronize-backend-locks'
