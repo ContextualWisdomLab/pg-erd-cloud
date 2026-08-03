@@ -216,8 +216,6 @@ describe('snapshotToGraph', () => {
     // Edges are still created based on the constraint even if badges aren't updated
     expect(graph.edges).toHaveLength(1)
   })
-})
-
   it('populates fully initialized arrays to prevent holes or undefined entries', () => {
     const snapshot: SnapshotInput = {
       relations: [
@@ -242,18 +240,32 @@ describe('snapshotToGraph', () => {
     const graph = snapshotToGraph(snapshot)
 
     expect(graph.nodes).toHaveLength(2)
+    expect(Object.keys(graph.nodes)).toHaveLength(2)
+    expect(graph.nodes.every(Boolean)).toBe(true)
     for (const node of graph.nodes) {
       expect(node).toBeDefined()
       expect(node.id).toBeDefined()
+      expect(node.type).toBe('tableNode')
       expect(node.position).toBeDefined()
       expect(node.data).toBeDefined()
+      expect(node.data.title).toBeDefined()
+      expect(node.data.columns).toBeDefined()
+      expect(node.data.badges).toBeDefined()
     }
 
     expect(graph.edges).toHaveLength(1)
+    expect(Object.keys(graph.edges)).toHaveLength(1)
+    expect(graph.edges.every(Boolean)).toBe(true)
     for (const edge of graph.edges) {
       expect(edge).toBeDefined()
       expect(edge.id).toBeDefined()
       expect(edge.source).toBeDefined()
       expect(edge.target).toBeDefined()
+      expect(edge.animated).toBe(false)
+      expect(edge.type).toBe('smoothstep')
+      expect(edge.data).toBeDefined()
+      expect(edge.label).toBeDefined()
     }
   })
+
+})

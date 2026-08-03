@@ -611,7 +611,7 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -642,7 +642,7 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -826,7 +826,7 @@ describe('App orchestration coverage', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     api.getSnapshot.mockRejectedValueOnce(new Error('poll down'))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
