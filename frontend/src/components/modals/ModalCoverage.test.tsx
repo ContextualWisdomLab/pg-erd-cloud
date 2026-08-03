@@ -59,6 +59,31 @@ describe('modal behavior coverage', () => {
     rerender(
       <AddTableModal
         isOpen
+        newTableName="   "
+        setNewTableName={setNewTableName}
+        onAddTableCancel={onCancel}
+        onAddTableSubmit={onSubmit}
+      />,
+    )
+
+    const saveBtn = screen.getByRole('button', { name: '저장' })
+    expect(saveBtn).toHaveAttribute('aria-disabled', 'true')
+    expect(saveBtn).toHaveStyle({ opacity: 0.5, cursor: 'not-allowed' })
+
+    // Test focusability
+    saveBtn.focus()
+    expect(saveBtn).toHaveFocus()
+
+    // Test interactions don't trigger submit when disabled
+    fireEvent.click(saveBtn)
+    fireEvent.keyDown(saveBtn, { key: 'Enter', code: 'Enter' })
+    fireEvent.keyDown(saveBtn, { key: ' ', code: 'Space' })
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    rerender(
+      <AddTableModal
+        isOpen
         newTableName=""
         setNewTableName={setNewTableName}
         onAddTableCancel={onCancel}
@@ -81,9 +106,16 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
+
+    expect(saveBtn).toHaveAttribute('aria-disabled', 'false')
+    expect(saveBtn).not.toHaveStyle({ opacity: 0.5, cursor: 'not-allowed' })
+
+    // Valid submissions
+    fireEvent.click(saveBtn)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+
     fireEvent.submit(screen.getByRole('dialog'))
-    expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
+    expect(onSubmit).toHaveBeenCalledTimes(2)
   })
 
   it('covers EditEdgeModal visibility and actions', () => {
