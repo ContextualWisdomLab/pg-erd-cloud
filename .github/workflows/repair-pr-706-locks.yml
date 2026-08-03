@@ -1,4 +1,4 @@
-name: Repair PR 706 FastAPI Locks
+name: Repair PR 706 Backend Locks
 
 on:
   push:
@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: repair-pr-706-fastapi-locks
+  group: repair-pr-706-backend-locks
   cancel-in-progress: false
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'chore: regenerate FastAPI lockfiles'
+    if: github.event.head_commit.message == 'chore: regenerate backend lockfiles'
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -46,6 +46,8 @@ jobs:
           uv pip compile backend/pyproject.toml --python-version 3.10 --generate-hashes --extra dev -o backend/requirements-dev.lock
           grep -Eq '^fastapi==0\.(14[1-9]|1[5-9][0-9]|[2-9][0-9]{2})\.' backend/requirements.lock
           grep -Eq '^fastapi==0\.(14[1-9]|1[5-9][0-9]|[2-9][0-9]{2})\.' backend/requirements-dev.lock
+          grep -Eq '^redis==([89]|[1-9][0-9]+)\.' backend/requirements.lock
+          grep -Eq '^redis==([89]|[1-9][0-9]+)\.' backend/requirements-dev.lock
 
       - name: Install locked backend dependencies
         working-directory: backend
@@ -71,6 +73,6 @@ jobs:
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore(deps): synchronize FastAPI lockfiles'
+          git commit -m 'chore(deps): synchronize FastAPI and Redis lockfiles'
           git pull --rebase origin dependabot/pip/backend/fastapi-gte-0.141.1
           git push origin 'HEAD:dependabot/pip/backend/fastapi-gte-0.141.1'
