@@ -26,6 +26,8 @@ MAX_LAYOUT_BYTES = 512 * 1024
 
 
 def _bound_layout_size(layout: dict) -> None:
+    """Reject saved-layout payloads that exceed the storage safety limit."""
+
     encoded = json.dumps(layout, separators=(",", ":")).encode("utf-8")
     if len(encoded) > MAX_LAYOUT_BYTES:
         raise HTTPException(status_code=413, detail="layout payload too large")
@@ -72,6 +74,7 @@ async def create_view(
     session: AsyncSession = Depends(get_session),
 ) -> DiagramViewOut:
     """Save a new ERD canvas view for a project."""
+
     await require_project_member(
         session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
@@ -102,7 +105,8 @@ async def list_views(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_read_session),
 ) -> list[DiagramViewOut]:
-    """List saved views for a project (newest first)."""
+    """List saved views for a project, newest first."""
+
     await require_project_member(session, project_space_uuid, user.user_account_uuid)
     rows = await session.execute(
         select(DiagramView)
@@ -111,12 +115,12 @@ async def list_views(
     )
     return [
         DiagramViewOut(
-            diagram_view_uuid=v.diagram_view_uuid,
-            name=v.name,
-            created_at=v.created_at,
-            updated_at=v.updated_at,
+            diagram_view_uuid=view.diagram_view_uuid,
+            name=view.name,
+            created_at=view.created_at,
+            updated_at=view.updated_at,
         )
-        for v in rows.scalars().all()
+        for view in rows.scalars().all()
     ]
 
 
@@ -127,6 +131,7 @@ async def get_view(
     session: AsyncSession = Depends(get_read_session),
 ) -> DiagramViewDetailOut:
     """Get one saved view including its layout payload."""
+
     view = await _get_authorized_view(session, diagram_view_uuid, user)
     if view is None:
         raise HTTPException(status_code=404, detail="diagram view not found")
@@ -139,13 +144,46 @@ async def get_view(
     )
 
 
+@router.put("/{diagram_view_uuid}", response_model=DiagramViewOut)
+async def update_view(
+    diagram_view_uuid: uuid.UUID,
+    body: DiagramViewCreateIn,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DiagramViewOut:
+    """Replace a saved ERD canvas view while preserving its stable identifier."""
+
+    view = await _get_authorized_view(
+        session, diagram_view_uuid, user, minimum_role="editor"
+    )
+    if view is None:
+        raise HTTPException(status_code=404, detail="diagram view not found")
+
+    # Validate the complete replacement before mutating the persistent object so
+    # a rejected payload cannot leave an in-memory session in a partially
+    # updated state.
+    _bound_layout_size(body.layout_json)
+    view.name = body.name
+    view.layout_json = body.layout_json
+    view.updated_at = dt.datetime.now(dt.timezone.utc)
+    await session.commit()
+
+    return DiagramViewOut(
+        diagram_view_uuid=view.diagram_view_uuid,
+        name=view.name,
+        created_at=view.created_at,
+        updated_at=view.updated_at,
+    )
+
+
 @router.delete("/{diagram_view_uuid}")
 async def delete_view(
     diagram_view_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, bool]:
-    """Delete a saved view (requires editor membership on its project)."""
+    """Delete a saved view after verifying editor membership on its project."""
+
     view = await _get_authorized_view(
         session, diagram_view_uuid, user, minimum_role="editor"
     )
