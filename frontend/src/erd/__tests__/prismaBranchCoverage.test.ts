@@ -60,4 +60,21 @@ describe('Prisma exporter branch completeness', () => {
 
     expect(() => exportPrisma(nodes, edges)).not.toThrow();
   });
+
+  it('ignores a non-empty source handle that does not use the src prefix', () => {
+    const edges: Edge[] = [
+      {
+        id: 'malformed-source-handle',
+        source: 'orders',
+        target: 'accounts',
+        sourceHandle: 'account_id',
+        targetHandle: 'tgt-id',
+      },
+    ];
+
+    const schema = exportPrisma(nodes, edges);
+
+    expect(schema).not.toContain('@relation("orders_accounts"');
+    expect(schema).toContain('model orders');
+  });
 });
