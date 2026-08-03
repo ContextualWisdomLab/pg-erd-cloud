@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -343,24 +344,38 @@ describe('App orchestration coverage', () => {
   })
 
   it('creates projects, validates and creates connections, and starts a snapshot', async () => {
+    const user = userEvent.setup()
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
-    fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  New  ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    // 1. Projects view inline-create via Enter
+    await user.click(screen.getByRole('button', { name: '프로젝트' }))
+    const inlineInput = screen.getByLabelText('새 프로젝트 이름')
+    await user.clear(inlineInput)
+    await user.type(inlineInput, 'InlineProject{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('InlineProject'))
+
+    // Navigate back to Editor view
+    await user.click(screen.getByRole('button', { name: '편집기' }))
+
+    // 2. Editor view New Project via Enter
+    const newProjectInput = screen.getByLabelText('New project')
+    await user.clear(newProjectInput)
+    await user.type(newProjectInput, 'New{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
 
     const dsn = screen.getByLabelText('Connection DSN')
     fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+
     fireEvent.change(dsn, { target: { value: 'http://bad.example/db' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     expect(dsn).toHaveValue('')
 
+    // 3. Editor view New Connection via Enter
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await user.type(dsn, '{Enter}')
     await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
