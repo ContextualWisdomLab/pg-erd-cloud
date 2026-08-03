@@ -1,0 +1,62 @@
+name: Generate Backend Locks Artifact
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - backend/pyproject.toml
+      - .github/workflows/generate-backend-locks-artifact.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.10'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.14'
+          enable-cache: false
+
+      - name: Generate hash-locked environments
+        run: |
+          set -euo pipefail
+          uv pip compile backend/pyproject.toml --python-version 3.10 --generate-hashes -o backend/requirements.lock
+          uv pip compile backend/pyproject.toml --python-version 3.10 --generate-hashes --extra dev -o backend/requirements-dev.lock
+          grep -Eq '^fastapi==0\.(14[1-9]|1[5-9][0-9]|[2-9][0-9]{2})\.' backend/requirements.lock
+          grep -Eq '^fastapi==0\.(14[1-9]|1[5-9][0-9]|[2-9][0-9]{2})\.' backend/requirements-dev.lock
+          grep -Eq '^redis==([89]|[1-9][0-9]+)\.' backend/requirements.lock
+          grep -Eq '^redis==([89]|[1-9][0-9]+)\.' backend/requirements-dev.lock
+
+      - name: Validate generated locks
+        working-directory: backend
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.lock
+          PYTHONPATH=. mypy app
+          PYTHONPATH=. pytest -q
+
+      - name: Upload generated locks
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: synchronized-backend-lockfiles
+          path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
+          if-no-files-found: error
+          retention-days: 1
