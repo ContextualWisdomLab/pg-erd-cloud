@@ -43,3 +43,8 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+
+def test_custom_scheme_no_slashes() -> None:
+    err = "Connection to snowflake_invalid:user:secretpass@host/db failed"
+    assert redact_dsn_error_message(err, "snowflake_invalid:user:secretpass@host/db") == "Connection to snowflake_invalid:user:***@host/db failed"
