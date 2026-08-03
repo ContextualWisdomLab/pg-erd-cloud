@@ -158,4 +158,24 @@ describe('snapshot polling cleanup branches', () => {
     expect(statusReads).toBeGreaterThan(0);
     expect(api.getSnapshot).toHaveBeenCalledTimes(1);
   });
+
+  it('does not publish a snapshot polling error after unmount', async () => {
+    api.listSnapshots.mockResolvedValue([snapshotSummary]);
+    let rejectSnapshot!: (reason: Error) => void;
+    api.getSnapshot.mockImplementationOnce(
+      () => new Promise((_, reject) => { rejectSnapshot = reject; }),
+    );
+
+    const view = render(<App />);
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledTimes(1));
+    await openSnapshot();
+    view.unmount();
+
+    await act(async () => {
+      rejectSnapshot(new Error('stale polling failure'));
+      await Promise.resolve();
+    });
+
+    expect(api.getSnapshot).toHaveBeenCalledTimes(1);
+  });
 });
