@@ -1,0 +1,80 @@
+name: Stabilize PR 693 CI
+
+on:
+  push:
+    branches:
+      - bolt-react-flow-cache-5569281215077212328
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stabilize-pr-693-ci
+  cancel-in-progress: false
+
+jobs:
+  stabilize:
+    if: github.event.head_commit.message == 'chore: stabilize PR 693 CI'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: bolt-react-flow-cache-5569281215077212328
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Stabilize asynchronous diagram fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('frontend/src/App.coverage.test.tsx')
+          text = path.read_text(encoding='utf-8')
+          old = """    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+              vi.useFakeTimers()
+              fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)"""
+          new = """    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+              await waitFor(() =>
+                expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0),
+              )
+              vi.useFakeTimers()
+              fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)"""
+          if old not in text:
+              raise SystemExit('Expected asynchronous diagram block was not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Install and validate frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run test
+          npm run build
+
+      - name: Commit stabilization and trigger focused repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/stabilize-pr-693-ci.yml
+          git add frontend/src/App.coverage.test.tsx
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: run PR 693 focused contract repair'
+          git pull --rebase origin bolt-react-flow-cache-5569281215077212328
+          git push origin 'HEAD:bolt-react-flow-cache-5569281215077212328'
