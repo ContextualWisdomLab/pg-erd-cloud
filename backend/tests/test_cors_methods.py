@@ -6,10 +6,10 @@ from app.main import app
 
 
 def test_cors_preflight_allows_configured_api_methods() -> None:
-    """The production CORS middleware must allow every API method used by the UI."""
+    """The production CORS middleware must allow every configured API method."""
     client = TestClient(app)
 
-    for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+    for method in ("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
         response = client.options(
             "/api/projects",
             headers={
