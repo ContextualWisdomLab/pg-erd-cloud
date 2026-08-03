@@ -7,7 +7,11 @@ from pathlib import Path
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-CHECKED_MODULES = (BACKEND_ROOT / "app" / "snowflake_introspect" / "introspect.py",)
+CHECKED_MODULES = (
+    BACKEND_ROOT / "app" / "local_snapshot_cli.py",
+    BACKEND_ROOT / "app" / "pg_introspect" / "snapshot_collect.py",
+    BACKEND_ROOT / "app" / "snowflake_introspect" / "introspect.py",
+)
 
 
 def _public_defs(
