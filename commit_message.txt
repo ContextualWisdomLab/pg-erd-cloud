@@ -1,0 +1,6 @@
+⚡ Bolt: 렌더링 성능 개선을 위한 visibleNodes WeakMap 캐싱
+
+💡 What: `App.tsx`에서 활성화된 검색 필터가 있을 때 React Flow가 노드를 다시 그리는 것을 막기 위해 `visibleNodes`의 객체 재생성을 `WeakMap`을 사용하여 캐시했습니다.
+🎯 Why: `nodes.map()`을 사용하여 매번 새로운 객체를 반환하면 React Flow의 얕은 비교(shallow memoization)가 깨져 노드 이동 시 매 프레임마다 전체 트리가 다시 렌더링(re-render)되고 프레임 드롭(16ms 오버)이 발생합니다.
+📊 Impact: 그래프 이동 중 불필요한 DOM 재렌더링을 방지하여 60fps 상호 작용 성능을 유지합니다.
+🔬 Measurement: 검색 필터가 활성화된 상태에서 노드를 드래그할 때 React DevTools Profiler를 통해 렌더링 비용(Render duration)이 크게 감소하는 것을 확인할 수 있습니다.

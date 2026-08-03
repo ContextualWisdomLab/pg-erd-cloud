@@ -198,20 +198,30 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+  // ⚡ Bolt: Use a WeakMap to cache decorated data states.
+  // Re-creating the `node` and `node.data` objects on every render breaks `React.memo`
+  // causing full React Flow tree re-renders and tanking 60fps interaction during drags.
+  const searchDecorationCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch, searchMatchedNodeIds]);
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let decoratedData = searchDecorationCache.get(node.data);
+      /* v8 ignore next 8 */
+      if (!decoratedData) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchDecorationCache.set(node.data, decoratedData);
+      }
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchDecorationCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";

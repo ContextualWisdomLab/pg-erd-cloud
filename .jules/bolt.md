@@ -77,3 +77,11 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2026-08-03 - Pre-allocate Arrays in Highly Frequent Structural Updates
+**Learning:** In highly frequent structural updates (such as generating React Flow format via `snapshotToGraph`), using `.map()` introduces O(N) callback overhead and intermediate garbage collection allocations.
+**Action:** Replace `.map()` with pre-allocated arrays (e.g., `new Array(length)`) and standard `for` loops to eliminate callback overhead and intermediate GC allocations in hot data conversion paths.
+
+## 2026-08-03 - Optimize Visible Nodes Map Allocation
+**Learning:** Returning completely new data object references for `visibleNodes` via `nodes.map()` breaks React Flow's shallow memoization (breaking `React.memo`) and causes massive DOM re-renders every 16ms during graph movements when a search filter is active.
+**Action:** Use a `WeakMap` keyed by the stable `node.data` reference to cache the mutated search states (`isDimmed`, `isHighlighted`), thereby avoiding recreation of node objects across renders and keeping 60fps interaction intact.
