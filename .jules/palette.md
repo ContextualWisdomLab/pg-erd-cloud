@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-02-15 - Enable Native Keyboard Support in Input Groups
+**Learning:** Interactive UI controls for creating new resources (like projects or connections) that consist of text inputs and adjacent submit buttons can be frustrating for keyboard users if they do not submit natively upon pressing Enter. Using generic `<div>` wrappers instead of semantic forms breaks this expected behavior, hurting accessibility and general UX fluidity.
+**Action:** Always wrap data submission input and button groups in a `<form>` element instead of a plain `<div>`. Set the primary action button to `type="submit"`, manage its disabled states accurately, and gracefully handle `onSubmit` by preventing the default event while executing the expected action. Remove redundant `onClick` handlers on the submit button to prevent double-execution issues. This ensures seamless integration with native browser keyboard interactions (like pressing Enter inside an input field).
