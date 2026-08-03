@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from typing import Any
 
@@ -109,6 +110,45 @@ async def test_capture_uses_local_connection_without_password_or_dsn(
     assert "dsn" not in captured
     assert "password" not in captured
     assert connection.closed is True
+
+
+@pytest.mark.parametrize("pretty", [False, True])
+def test_main_writes_snapshot_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    pretty: bool,
+) -> None:
+    expected = {"schema_filter": "public", "relations": []}
+
+    async def fake_capture(args: argparse.Namespace) -> dict:
+        assert args.database == "catalog"
+        assert args.host == str(tmp_path)
+        assert args.schema == "public"
+        return expected
+
+    monkeypatch.setattr(local_snapshot_cli, "capture_local_snapshot", fake_capture)
+    argv = [
+        "--database",
+        "catalog",
+        "--host",
+        str(tmp_path),
+        "--schema",
+        "public",
+    ]
+    if pretty:
+        argv.append("--pretty")
+
+    status = local_snapshot_cli.main(argv)
+
+    output = capsys.readouterr()
+    assert status == 0
+    assert output.err == ""
+    assert json.loads(output.out) == expected
+    if pretty:
+        assert output.out.startswith("{\n  ")
+    else:
+        assert output.out == '{"relations":[],"schema_filter":"public"}\n'
 
 
 @pytest.mark.parametrize(
