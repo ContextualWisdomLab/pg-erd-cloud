@@ -326,7 +326,17 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
+
+    const searchInput = screen.getByLabelText('다이어그램 검색')
+    // Wait for the snapshots to load before searching
+    await waitFor(() => expect(screen.queryByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).not.toBeInTheDocument())
+    fireEvent.change(searchInput, { target: { value: 'no-match' } })
+
+    const searchForm = searchInput.closest('form')
+    const searchSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+    if (searchForm) searchForm.dispatchEvent(searchSubmitEvent)
+    expect(searchSubmitEvent.defaultPrevented).toBe(true)
+
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
@@ -351,8 +361,15 @@ describe('App orchestration coverage', () => {
     await user.click(screen.getByRole('button', { name: '프로젝트' }))
     const inlineInput = screen.getByLabelText('새 프로젝트 이름')
     await user.clear(inlineInput)
+    // Assert invalid (whitespace only) does not submit
+    vi.mocked(api.createProject).mockClear()
+    await user.type(inlineInput, '   {Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
+    // Assert valid submits exactly once
+    await user.clear(inlineInput)
     await user.type(inlineInput, 'InlineProject{Enter}')
-    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('InlineProject'))
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+    expect(api.createProject).toHaveBeenCalledWith('InlineProject')
 
     // Navigate back to Editor view
     await user.click(screen.getByRole('button', { name: '편집기' }))
@@ -360,23 +377,29 @@ describe('App orchestration coverage', () => {
     // 2. Editor view New Project via Enter
     const newProjectInput = screen.getByLabelText('New project')
     await user.clear(newProjectInput)
+    vi.mocked(api.createProject).mockClear()
     await user.type(newProjectInput, 'New{Enter}')
-    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+    expect(api.createProject).toHaveBeenCalledWith('New')
 
     const dsn = screen.getByLabelText('Connection DSN')
     fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
+    vi.mocked(api.createConnection).mockClear()
     await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+    expect(api.createConnection).not.toHaveBeenCalled()
 
     fireEvent.change(dsn, { target: { value: 'http://bad.example/db' } })
     await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+    expect(api.createConnection).not.toHaveBeenCalled()
     expect(dsn).toHaveValue('')
 
     // 3. Editor view New Connection via Enter
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
     await user.type(dsn, '{Enter}')
-    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+    expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test')
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
@@ -398,7 +421,13 @@ describe('App orchestration coverage', () => {
     expect(api.getSnapshot).toHaveBeenCalledWith('s1')
     expect(screen.getByTestId('node-count')).toHaveTextContent('2')
 
-    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
+    const canvasSearchInput = screen.getByLabelText('테이블 또는 컬럼 검색')
+    fireEvent.change(canvasSearchInput, { target: { value: 'users' } })
+    const canvasSearchForm = canvasSearchInput.closest('form')
+    const canvasSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+    if (canvasSearchForm) canvasSearchForm.dispatchEvent(canvasSubmitEvent)
+    expect(canvasSubmitEvent.defaultPrevented).toBe(true)
+
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
     await act(async () => {
