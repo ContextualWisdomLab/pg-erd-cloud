@@ -1,4 +1,4 @@
-name: Prepare PR 716 Test Fix
+name: Apply PR 716 Test Fix
 
 on:
   pull_request:
@@ -9,10 +9,11 @@ on:
       - .github/workflows/prepare-pr-716-test-fix.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  prepare:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -20,8 +21,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout pull request
+      - name: Checkout maintained branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: jules-3578797244930525994-2c5c0eb4
+          fetch-depth: 0
 
       - name: Make the test wait for snapshot cards
         shell: python
@@ -45,10 +49,16 @@ jobs:
               raise SystemExit('expected test block not found')
           path.write_text(text.replace(before, after, 1))
 
-      - name: Upload patched test
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-716-patched-test
-          path: frontend/src/App.coverage.test.tsx
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit deterministic test and remove one-shot artifacts
+        run: |
+          set -euo pipefail
+          git rm .github/repair-pr-716-test.trigger
+          git rm .github/workflows/repair-pr-716-test-readiness.yml
+          git rm .github/workflows/prepare-pr-716-test-fix.yml
+          git add frontend/src/App.coverage.test.tsx
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test: stabilize auto-layout snapshot readiness'
+          git pull --rebase origin jules-3578797244930525994-2c5c0eb4
+          git push origin 'HEAD:jules-3578797244930525994-2c5c0eb4'
