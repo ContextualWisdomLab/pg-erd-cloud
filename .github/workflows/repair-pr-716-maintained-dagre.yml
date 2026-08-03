@@ -1,0 +1,101 @@
+name: Repair PR 716 Maintained Dagre
+
+on:
+  push:
+    branches:
+      - jules-3578797244930525994-2c5c0eb4
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-716-maintained-dagre
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'chore: run maintained Dagre repair'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: jules-3578797244930525994-2c5c0eb4
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Use maintained typed Dagre package and canonical npm lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          package_path = Path('frontend/package.json')
+          package = json.loads(package_path.read_text(encoding='utf-8'))
+          dependencies = package.setdefault('dependencies', {})
+          dependencies.pop('dagre', None)
+          dependencies['@dagrejs/dagre'] = '^3.0.0'
+          package['dependencies'] = dict(sorted(dependencies.items()))
+
+          dev_dependencies = package.setdefault('devDependencies', {})
+          dev_dependencies.pop('@types/dagre', None)
+          package['devDependencies'] = dict(sorted(dev_dependencies.items()))
+          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          layout_path = Path('frontend/src/erd/dagreLayout.ts')
+          layout = layout_path.read_text(encoding='utf-8')
+          if "from 'dagre'" not in layout and 'from "dagre"' not in layout:
+              if '@dagrejs/dagre' not in layout:
+                  raise SystemExit('Dagre import was not found')
+          layout = layout.replace("from 'dagre'", "from '@dagrejs/dagre'")
+          layout = layout.replace('from "dagre"', 'from "@dagrejs/dagre"')
+          layout_path.write_text(layout, encoding='utf-8')
+
+          Path('frontend/pnpm-lock.yaml').unlink(missing_ok=True)
+          PY
+
+      - name: Regenerate canonical npm lockfile
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Full coverage
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit verified repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-pr-716-maintained-dagre.yml
+          git add -A
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(layout): use maintained typed Dagre package'
+          git pull --rebase origin jules-3578797244930525994-2c5c0eb4
+          git push origin 'HEAD:jules-3578797244930525994-2c5c0eb4'
