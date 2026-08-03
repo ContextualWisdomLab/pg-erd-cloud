@@ -67,5 +67,20 @@ describe('handleUtils', () => {
       expect(decodeHandleId('invalid-format')).toBeNull();
       expect(decodeHandleId('src-c')).toBeNull(); // Missing hex parts
     });
+
+    it('should reject non-canonical hex and prefixes', () => {
+      // Uppercase hex
+      expect(decodeHandleId('c-0069-006A')).toBeNull();
+      // Junk in hex
+      expect(decodeHandleId('c-0069junk-0064')).toBeNull();
+      // Arbitrary prefix
+      expect(decodeHandleId('foo-c-0069')).toBeNull();
+      // Empty chunk mix
+      expect(decodeHandleId('c-empty-0069')).toBeNull();
+      // Out of bounds code point
+      expect(decodeHandleId('c-200000')).toBeNull();
+      // Missing hex chunk data between separators
+      expect(decodeHandleId('c-0069--0064')).toBeNull();
+    });
   });
 });

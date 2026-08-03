@@ -22,23 +22,45 @@ export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
 
+const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
+
 export function decodeHandleId(handleId: string | null | undefined): string | null {
   if (!handleId) return null;
-  const parts = handleId.split('-');
-  const cIndex = parts.indexOf('c');
-  if (cIndex === -1) return null;
 
-  if (parts.length === cIndex + 2 && parts[cIndex + 1] === 'empty') {
+  const parts = handleId.split('-');
+  let payloadIndex = -1;
+
+  if (parts[0] === 'c') {
+    payloadIndex = 1;
+  } else if ((parts[0] === 'src' || parts[0] === 'tgt') && parts[1] === 'c') {
+    payloadIndex = 2;
+  }
+
+  if (payloadIndex === -1) return null;
+
+  if (parts.length === payloadIndex + 1 && parts[payloadIndex] === 'empty') {
     return '';
   }
 
-  const hexParts = parts.slice(cIndex + 1);
+  const hexParts = parts.slice(payloadIndex);
   if (hexParts.length === 0) return null;
 
-  try {
-    return hexParts.map(hex => String.fromCodePoint(Number.parseInt(hex, 16))).join('');
-  } catch {
-    /* v8 ignore next */
-    return null;
+  let decoded = '';
+  for (const hex of hexParts) {
+    if (!HEX_CHUNK_RE.test(hex)) {
+      return null;
+    }
+    const codePoint = Number.parseInt(hex, 16);
+    if (codePoint > 0x10ffff) {
+      return null;
+    }
+    try {
+      decoded += String.fromCodePoint(codePoint);
+    } catch {
+      /* v8 ignore next */
+      return null;
+    }
   }
+
+  return decoded;
 }

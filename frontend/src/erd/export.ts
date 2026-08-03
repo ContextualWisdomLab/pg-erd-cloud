@@ -59,6 +59,8 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  sourceNodeColumnNames: Set<string>,
+  targetNodeColumnNames: Set<string>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -67,18 +69,17 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  // ⚡ Bolt: Optimize O(N) handle lookup to O(1) by decoding the handle string directly.
-  // This avoids encoding every column name during the iteration, reducing GC pressure
-  // and string manipulation overhead during iterative exports.
+  // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
+  // and using a precomputed O(1) Set to check for column existence.
   const decodedSource = decodeHandleId(edge.sourceHandle);
-  const sourceHandleColumn = decodedSource !== null ? (sourceNode.data.columns || [])
-    .find((column) => column.column_name === decodedSource)
-    ?.column_name : undefined;
+  const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
+    ? decodedSource
+    : undefined;
 
   const decodedTarget = decodeHandleId(edge.targetHandle);
-  const targetHandleColumn = decodedTarget !== null ? (targetNode.data.columns || [])
-    .find((column) => column.column_name === decodedTarget)
-    ?.column_name : undefined;
+  const targetHandleColumn = decodedTarget !== null && targetNodeColumnNames.has(decodedTarget)
+    ? decodedTarget
+    : undefined;
 
   if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
@@ -103,8 +104,16 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const nodeColumnSets = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    const colSet = new Set<string>();
+    if (n.data.columns) {
+      for (const c of n.data.columns) {
+        colSet.add(c.column_name);
+      }
+    }
+    nodeColumnSets.set(n.id, colSet);
   }
 
   // Export tables
@@ -140,7 +149,13 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+      const fkColumns = fkColumnsForEdge(
+        edge,
+        sourceNode,
+        targetNode,
+        nodeColumnSets.get(sourceNode.id)!,
+        nodeColumnSets.get(targetNode.id)!
+      );
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
