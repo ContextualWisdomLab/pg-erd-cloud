@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Edge, Node, XYPosition } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
 
 import type { TableNodeData } from './convert'
 import {
@@ -7,6 +7,8 @@ import {
   estimateDagreNodeSize,
   resolveDagrePosition,
 } from './dagreLayout'
+
+type FlowPosition = Node<TableNodeData>['position']
 
 function makeColumns(count: number): TableNodeData['columns'] {
   return Array.from({ length: count }, (_, index) => ({
@@ -19,7 +21,7 @@ function makeColumns(count: number): TableNodeData['columns'] {
 
 function makeNode(
   id: string,
-  position: XYPosition = { x: 0, y: 0 },
+  position: FlowPosition = { x: 0, y: 0 },
   columnCount = 0,
 ): Node<TableNodeData> {
   return {
@@ -34,7 +36,9 @@ function makeNode(
   }
 }
 
-function positionsById(nodes: readonly Node<TableNodeData>[]): Record<string, XYPosition> {
+function positionsById(
+  nodes: readonly Node<TableNodeData>[],
+): Record<string, FlowPosition> {
   return Object.fromEntries(nodes.map((node) => [node.id, node.position]))
 }
 
@@ -65,7 +69,9 @@ describe('estimateDagreNodeSize', () => {
       width: 280,
       height: 80,
     })
-    expect(estimateDagreNodeSize(makeNode('large', { x: 0, y: 0 }, 30).data)).toEqual({
+    expect(
+      estimateDagreNodeSize(makeNode('large', { x: 0, y: 0 }, 30).data),
+    ).toEqual({
       width: 280,
       height: 705,
     })
@@ -83,13 +89,21 @@ describe('resolveDagrePosition', () => {
   })
 
   it('falls back to the original finite position when layout data is unavailable', () => {
-    expect(resolveDagrePosition(undefined, { x: 9, y: 11 })).toEqual({ x: 9, y: 11 })
+    expect(resolveDagrePosition(undefined, { x: 9, y: 11 })).toEqual({
+      x: 9,
+      y: 11,
+    })
   })
 
   it('falls back to the origin when neither layout nor original coordinates are finite', () => {
     expect(
       resolveDagrePosition(
-        { x: Number.NaN, y: Number.POSITIVE_INFINITY, width: 80, height: 40 },
+        {
+          x: Number.NaN,
+          y: Number.POSITIVE_INFINITY,
+          width: 80,
+          height: 40,
+        },
         { x: Number.NaN, y: Number.NEGATIVE_INFINITY },
       ),
     ).toEqual({ x: 0, y: 0 })
@@ -101,7 +115,7 @@ describe('computeDagreLayout', () => {
     expect(computeDagreLayout([], [])).toEqual([])
   })
 
-  it('is deterministic, non-overlapping, immutable, and preserves node identity data', () => {
+  it('is deterministic, non-overlapping, immutable, and preserves node data', () => {
     const firstData = makeNode('a').data
     const nodes: Node<TableNodeData>[] = [
       { ...makeNode('c', { x: 30, y: 40 }), data: makeNode('c').data },
@@ -123,8 +137,14 @@ describe('computeDagreLayout', () => {
     expectFinitePositions(first)
 
     for (let leftIndex = 0; leftIndex < first.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < first.length; rightIndex += 1) {
-        expect(rectanglesOverlap(first[leftIndex]!, first[rightIndex]!)).toBe(false)
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < first.length;
+        rightIndex += 1
+      ) {
+        expect(rectanglesOverlap(first[leftIndex]!, first[rightIndex]!)).toBe(
+          false,
+        )
       }
     }
   })
@@ -169,6 +189,8 @@ describe('computeDagreLayout', () => {
 
     expectFinitePositions(result)
     expect(edges).toEqual(edgesBefore)
-    expect(result.map((node) => node.data)).toEqual(nodes.map((node) => node.data))
+    expect(result.map((node) => node.data)).toEqual(
+      nodes.map((node) => node.data),
+    )
   })
 })
