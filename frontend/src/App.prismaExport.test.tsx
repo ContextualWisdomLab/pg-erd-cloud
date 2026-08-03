@@ -87,8 +87,9 @@ describe('App Prisma export', () => {
   it('downloads the generated Prisma schema', async () => {
     render(<App />);
     await screen.findByRole('heading', { name: '대시보드' });
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Prisma 내보내기 테스트' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Prisma 내보내기 테스트' }));
 
     expect(exportMocks.exportPrisma).toHaveBeenCalledWith([], []);
     expect(exportMocks.downloadText).toHaveBeenCalledWith(
