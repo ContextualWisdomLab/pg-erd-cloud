@@ -227,7 +227,9 @@ export function ExportModal({
                 <div className="exportModal__artifactRow" key={artifact.label}>
                   <div>
                     <strong>{artifact.label}</strong>
-                    <span>{artifact.description}</span>
+                    <span id={`export-desc-${artifact.label.replace(/\s+/g, '-')}`}>
+                      {artifact.description}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -239,7 +241,7 @@ export function ExportModal({
                       }
                     }}
                     aria-disabled={artifact.disabled ? true : undefined}
-                    title={artifact.disabled ? artifact.description : undefined}
+                    aria-describedby={`export-desc-${artifact.label.replace(/\s+/g, '-')}`}
                     aria-label={artifact.ariaLabel}
                     aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
                   >
