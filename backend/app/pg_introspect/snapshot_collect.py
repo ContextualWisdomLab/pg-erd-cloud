@@ -24,6 +24,9 @@ async def collect_postgres_snapshot(
     schema_name = schema_filter
     include_system = False
 
+    # asyncpg rejects overlapping operations on one Connection. Keep these
+    # catalog reads sequential unless a future caller gives the collector a
+    # pool and an explicit multi-connection consistency policy.
     schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
     relations = await conn.fetch(queries.RELATIONS_SQL, schema_name, include_system)
     columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)

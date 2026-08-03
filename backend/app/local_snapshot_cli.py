@@ -25,6 +25,8 @@ _SCHEMA_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]{0,62}$")
 
 
 def _socket_directory(value: str) -> str:
+    """Accept an existing absolute directory suitable for a Unix socket."""
+
     path = Path(value)
     if not path.is_absolute():
         raise argparse.ArgumentTypeError(
@@ -36,12 +38,16 @@ def _socket_directory(value: str) -> str:
 
 
 def _schema_name(value: str) -> str:
+    """Accept one unquoted PostgreSQL schema identifier."""
+
     if not _SCHEMA_RE.fullmatch(value):
         raise argparse.ArgumentTypeError("--schema is not a valid PostgreSQL identifier")
     return value
 
 
 def _port(value: str) -> int:
+    """Parse a PostgreSQL port in the valid TCP and Unix-socket range."""
+
     try:
         port = int(value)
     except ValueError as exc:
@@ -52,6 +58,8 @@ def _port(value: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the trusted-local snapshot CLI."""
+
     parser = argparse.ArgumentParser(
         prog="pg-erd-snapshot",
         description=(
@@ -65,11 +73,13 @@ def build_parser() -> argparse.ArgumentParser:
         required=os.environ.get("PGDATABASE") is None,
         help="database name (defaults to PGDATABASE)",
     )
+    host_default = os.environ.get("PGHOST")
     parser.add_argument(
         "--host",
         type=_socket_directory,
-        default=os.environ.get("PGHOST", "/tmp"),
-        help="absolute Unix socket directory (defaults to PGHOST or /tmp)",
+        default=host_default,
+        required=host_default is None,
+        help="absolute Unix socket directory (defaults to PGHOST; no implicit fallback)",
     )
     parser.add_argument(
         "--port",
@@ -88,15 +98,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def capture_local_snapshot(args: argparse.Namespace) -> dict:
-    connect_args: dict[str, object] = {
-        "database": args.database,
-        "host": args.host,
-        "port": args.port,
-        "timeout": 10,
-    }
-    if args.user:
-        connect_args["user"] = args.user
-    conn = await asyncpg.connect(**connect_args)
+    """Connect over a validated Unix socket and collect one catalog snapshot."""
+
+    conn = await asyncpg.connect(
+        database=args.database,
+        host=args.host,
+        port=args.port,
+        user=args.user,
+        timeout=10,
+    )
     try:
         return await collect_postgres_snapshot(conn, args.schema)
     finally:
@@ -104,6 +114,8 @@ async def capture_local_snapshot(args: argparse.Namespace) -> dict:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Capture a trusted-local snapshot and write JSON to standard output."""
+
     args = build_parser().parse_args(argv)
     try:
         snapshot = asyncio.run(capture_local_snapshot(args))

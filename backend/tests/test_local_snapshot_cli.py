@@ -39,6 +39,20 @@ def test_environment_host_default_cannot_bypass_socket_boundary(
     assert "absolute PostgreSQL Unix socket directory" in capsys.readouterr().err
 
 
+def test_parser_requires_explicit_host_without_pghost(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PGDATABASE", "catalog")
+    monkeypatch.delenv("PGHOST", raising=False)
+
+    with pytest.raises(SystemExit) as exc_info:
+        local_snapshot_cli.build_parser().parse_args([])
+
+    assert exc_info.value.code == 2
+    assert "--host" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("value", ["not-a-port", "0", "65536"])
 def test_port_rejects_invalid_values(value: str) -> None:
     with pytest.raises(argparse.ArgumentTypeError):
@@ -95,3 +109,30 @@ async def test_capture_uses_local_connection_without_password_or_dsn(
     assert "dsn" not in captured
     assert "password" not in captured
     assert connection.closed is True
+
+
+@pytest.mark.parametrize(
+    ("error", "error_name"),
+    [
+        (OSError("socket denied"), "OSError"),
+        (local_snapshot_cli.asyncpg.PostgresError("database denied"), "PostgresError"),
+    ],
+)
+def test_main_redacts_connection_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    error: Exception,
+    error_name: str,
+) -> None:
+    async def fail_capture(_args: argparse.Namespace) -> dict:
+        raise error
+
+    monkeypatch.setattr(local_snapshot_cli, "capture_local_snapshot", fail_capture)
+
+    status = local_snapshot_cli.main(
+        ["--database", "catalog", "--host", str(tmp_path)]
+    )
+
+    assert status == 1
+    assert capsys.readouterr().err == f"pg-erd-snapshot failed: {error_name}\n"
