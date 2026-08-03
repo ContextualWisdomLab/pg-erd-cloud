@@ -1,0 +1,60 @@
+name: Bootstrap Current PR Queue
+
+on:
+  push:
+    branches:
+      - automation/hourly-commercial-readiness-loop
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: bootstrap-current-pr-queue
+  cancel-in-progress: false
+
+jobs:
+  remove-one-shot-workflow:
+    if: github.event.head_commit.message == 'ci: dispatch current PR queue'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout queue branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Remove one-shot workflow from the product diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/bootstrap-current-pr-queue.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(ci): remove one-shot queue bootstrap"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+  dispatch-current-queue:
+    needs: remove-one-shot-workflow
+    if: needs.remove-one-shot-workflow.result == 'success'
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@5983b41ace75040c1d81818171ca7d0f3653254e
+    with:
+      dry_run: false
+      max_prs: "100"
+      trigger_reviews: true
+      review_dispatch_limit: "-1"
+      branch_update_limit: "-1"
+      enable_auto_merge: true
+      merge_mode: direct_or_auto
+      update_branches: true
+      stale_opencode_minutes: "0"
+      project_flow: github-flow
+      base_branch: main
+    secrets: inherit
