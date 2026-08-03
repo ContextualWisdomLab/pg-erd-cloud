@@ -1,9 +1,11 @@
-import dagre, {
+import {
+  Graph,
+  layout,
   type EdgeLabel,
   type GraphLabel,
   type NodeLabel,
 } from '@dagrejs/dagre'
-import type { Edge, Node, XYPosition } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
 
 import type { TableNodeData } from './convert'
 
@@ -24,28 +26,40 @@ export type DagreNodeSize = {
   height: number
 }
 
-type PositionedDagreNode = Partial<Pick<NodeLabel, 'x' | 'y' | 'width' | 'height'>>
+type FlowPosition = Node<TableNodeData>['position']
+type PositionedDagreNode = Partial<
+  Pick<NodeLabel, 'x' | 'y' | 'width' | 'height'>
+>
 
 /**
  * Estimate the rendered table-card dimensions used by the layout engine.
- * The height mirrors the capped column rendering used by TableNode.
+ *
+ * The table component renders at most 25 column rows, so the layout estimate
+ * uses the same cap and does not create excessive whitespace for wide schemas.
  */
 export function estimateDagreNodeSize(data: TableNodeData): DagreNodeSize {
-  const visibleColumnCount = Math.min(data.columns.length, MAX_VISIBLE_COLUMNS)
+  const visibleColumnCount = Math.min(
+    data.columns?.length ?? 0,
+    MAX_VISIBLE_COLUMNS,
+  )
   return {
     width: NODE_WIDTH,
-    height: HEADER_HEIGHT + visibleColumnCount * COLUMN_ROW_HEIGHT + FOOTER_HEIGHT,
+    height:
+      HEADER_HEIGHT + visibleColumnCount * COLUMN_ROW_HEIGHT + FOOTER_HEIGHT,
   }
 }
 
 /**
  * Convert a Dagre centre coordinate to React Flow's top-left coordinate.
- * Invalid library output falls back to a finite original position, then origin.
+ *
+ * Invalid library output falls back to a finite original position and finally
+ * to the origin, preventing malformed or dangling graph data from introducing
+ * `NaN` or infinite coordinates into React Flow state.
  */
 export function resolveDagrePosition(
   layoutNode: PositionedDagreNode | undefined,
-  originalPosition: XYPosition,
-): XYPosition {
+  originalPosition: FlowPosition,
+): FlowPosition {
   const x = Number(layoutNode?.x)
   const y = Number(layoutNode?.y)
   const width = Number(layoutNode?.width)
@@ -68,8 +82,9 @@ export function resolveDagrePosition(
  * Lay out ERD table nodes according to their directed relationships.
  *
  * Nodes and edges are inserted in a stable order so identical inputs produce
- * identical coordinates. The function never mutates its inputs and preserves
- * node IDs, data objects, and every property other than `position`.
+ * identical coordinates. Dangling edges are ignored, cycles use Dagre's greedy
+ * acyclic transformation, and the input arrays and node objects are not
+ * mutated. Every node property other than `position` is preserved.
  */
 export function computeDagreLayout(
   nodes: readonly Node<TableNodeData>[],
@@ -78,9 +93,7 @@ export function computeDagreLayout(
 ): Node<TableNodeData>[] {
   if (nodes.length === 0) return []
 
-  const graph = new dagre.graphlib.Graph<GraphLabel, NodeLabel, EdgeLabel>({
-    multigraph: true,
-  })
+  const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true })
   graph.setDefaultEdgeLabel(() => ({}))
   graph.setGraph({
     rankdir: direction,
@@ -94,10 +107,12 @@ export function computeDagreLayout(
     ranker: 'network-simplex',
   })
 
-  const nodeIds = new Set(nodes.map((node) => node.id))
+  const nodeIds = new Set<string>()
+  for (const node of nodes) nodeIds.add(node.id)
+
   const stableNodes = [...nodes].sort((left, right) =>
-    `${left.data.title}\u0000${left.id}`.localeCompare(
-      `${right.data.title}\u0000${right.id}`,
+    `${left.data.title ?? ''}\u0000${left.id}`.localeCompare(
+      `${right.data.title ?? ''}\u0000${right.id}`,
       'en',
     ),
   )
@@ -118,7 +133,7 @@ export function computeDagreLayout(
     graph.setEdge(edge.source, edge.target, {}, `${edge.id}:${index}`)
   }
 
-  dagre.layout(graph)
+  layout(graph)
 
   return nodes.map((node) => ({
     ...node,
