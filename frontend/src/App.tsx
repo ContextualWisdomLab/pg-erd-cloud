@@ -193,25 +193,20 @@ export default function App() {
     { x: number; y: number }
   > | null>(null);
 
-  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
-  const searchCacheRef = useRef<WeakMap<TableNodeData, TableNodeData>>(new WeakMap());
-  const lastSearchRef = useRef<string>("");
-
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
+  const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
 
-    if (lastSearchRef.current !== normalizedNodeSearch) {
-      searchCacheRef.current = new WeakMap();
-      lastSearchRef.current = normalizedNodeSearch;
-    }
-
     return nodes.map((node) => {
-      let cachedData = searchCacheRef.current.get(node.data);
+      let cachedData = searchCache.get(node.data);
       if (!cachedData) {
         const isHighlighted = searchMatchedNodeIds.has(node.id);
         cachedData = {
@@ -219,14 +214,14 @@ export default function App() {
           isDimmed: !isHighlighted,
           isHighlighted,
         };
-        searchCacheRef.current.set(node.data, cachedData);
+        searchCache.set(node.data, cachedData);
       }
       return {
         ...node,
         data: cachedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
@@ -324,22 +319,33 @@ export default function App() {
 
   useEffect(() => {
     if (!snapshotId) return;
+    let isCurrent = true;
     const timer = setInterval(() => {
       getSnapshot(snapshotId)
         .then((s) => {
+          if (!isCurrent) return;
           setSnapshot(s);
           if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
             clearInterval(timer);
             if (selectedProjectId) {
               listSnapshots(selectedProjectId)
-                .then(setSnapshots)
-                .catch((e) => setError(String(e)));
+                .then((snaps) => {
+                  if (isCurrent) setSnapshots(snaps);
+                })
+                .catch((e) => {
+                  if (isCurrent) setError(String(e));
+                });
             }
           }
         })
-        .catch((e) => setError(String(e)));
+        .catch((e) => {
+          if (isCurrent) setError(String(e));
+        });
     }, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      isCurrent = false;
+      clearInterval(timer);
+    };
   }, [selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {
