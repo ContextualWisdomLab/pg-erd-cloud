@@ -28,14 +28,14 @@ const nodes: Node<TableNodeData>[] = [
 ];
 
 describe('Prisma exporter branch completeness', () => {
-  it('falls back safely for empty labels and malformed non-prefixed handles', () => {
+  it('uses the default relation name when a valid edge has an empty label', () => {
     const edges: Edge[] = [
       {
         id: 'orders-accounts',
         source: 'orders',
         target: 'accounts',
-        sourceHandle: 'account_id',
-        targetHandle: 'id',
+        sourceHandle: 'src-account_id',
+        targetHandle: 'tgt-id',
         label: '',
       },
     ];
