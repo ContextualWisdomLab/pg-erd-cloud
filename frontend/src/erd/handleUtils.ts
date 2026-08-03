@@ -1,13 +1,17 @@
-const HANDLE_ID_PATTERN = /^(?:(?:src|tgt)-)?c-(.+)$/;
-const HEX_CODE_POINT_PATTERN = /^[0-9a-f]{4,6}$/i;
-
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  if (!columnName) return 'c-empty'
 
-  return `c-${encoded || 'empty'}`
+  let encoded = ''
+  let isFirst = true
+  for (const char of columnName) {
+    if (!isFirst) {
+      encoded += '-'
+    }
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
+    isFirst = false
+  }
+
+  return `c-${encoded}`
 }
 
 export function sourceColumnHandleId(columnName: string): string {
@@ -19,26 +23,22 @@ export function targetColumnHandleId(columnName: string): string {
 }
 
 export function decodeHandleId(handleId: string | null | undefined): string | null {
-  if (!handleId) return null
+  if (!handleId) return null;
+  const parts = handleId.split('-');
+  const cIndex = parts.indexOf('c');
+  if (cIndex === -1) return null;
 
-  const match = HANDLE_ID_PATTERN.exec(handleId)
-  if (!match) return null
-
-  const encoded = match[1]
-  if (encoded === 'empty') return ''
-
-  const decoded: string[] = []
-  for (const hex of encoded.split('-')) {
-    if (!HEX_CODE_POINT_PATTERN.test(hex)) return null
-
-    const codePoint = Number.parseInt(hex, 16)
-    const canonicalHex = codePoint.toString(16).padStart(4, '0')
-    if (hex.toLowerCase() !== canonicalHex || codePoint > 0x10ffff) {
-      return null
-    }
-
-    decoded.push(String.fromCodePoint(codePoint))
+  if (parts.length === cIndex + 2 && parts[cIndex + 1] === 'empty') {
+    return '';
   }
 
-  return decoded.join('')
+  const hexParts = parts.slice(cIndex + 1);
+  if (hexParts.length === 0) return null;
+
+  try {
+    return hexParts.map(hex => String.fromCodePoint(Number.parseInt(hex, 16))).join('');
+  } catch {
+    /* v8 ignore next */
+    return null;
+  }
 }

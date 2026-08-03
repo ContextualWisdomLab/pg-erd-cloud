@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { decodeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { decodeHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
