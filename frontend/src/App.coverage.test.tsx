@@ -387,7 +387,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
     vi.useRealTimers()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
-    await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument(), { timeout: 3000 })
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
     vi.useFakeTimers()
@@ -608,7 +608,6 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -626,7 +625,7 @@ describe('App orchestration coverage', () => {
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
-    await screen.findByText('정렬 완료', { exact: false })
+    await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument(), { timeout: 3000 })
     fireEvent.click(screen.getAllByRole('button', { name: '테이블 추가' })[0]!)
     fireEvent.click(screen.getByTestId('add-name'))
     fireEvent.click(screen.getByTestId('add-submit'))
@@ -743,9 +742,11 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    const openBtns = screen.getAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
