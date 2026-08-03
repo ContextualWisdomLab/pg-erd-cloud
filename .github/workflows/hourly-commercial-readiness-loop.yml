@@ -18,7 +18,9 @@ permissions:
 
 concurrency:
   group: hourly-commercial-readiness-${{ github.repository }}
-  cancel-in-progress: false
+  # Only the newest queue sweep is relevant; prevent delayed hourly runs from
+  # accumulating behind a temporary GitHub Actions backlog.
+  cancel-in-progress: true
 
 jobs:
   review-check-merge-loop:
