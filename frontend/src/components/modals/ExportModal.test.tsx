@@ -105,6 +105,7 @@ describe('ExportModal', () => {
     const onExportDictionaryMarkdown = vi.fn();
     const onDownloadDbml = vi.fn();
     const onDownloadPrisma = vi.fn();
+    const onCopyShareLink = vi.fn();
 
     render(
       <ExportModal
@@ -117,6 +118,7 @@ describe('ExportModal', () => {
         onExportDictionaryMarkdown={onExportDictionaryMarkdown}
         onDownloadDbml={onDownloadDbml}
         onDownloadPrisma={onDownloadPrisma}
+        onCopyShareLink={onCopyShareLink}
       />,
     );
 
@@ -161,14 +163,22 @@ describe('ExportModal', () => {
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
-    expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'Prisma Schema 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toHaveAttribute('aria-disabled', 'true');
+
+    const disabledButtons = [
+      'SQL DDL 복사', 'SVG 이미지 내보내기', 'PlantUML 내보내기', 'Mermaid 내보내기',
+      'DBML 내보내기', 'Prisma Schema 내보내기', '데이터 사전 CSV 내보내기', '데이터 사전 Markdown 내보내기'
+    ];
+
+    for (const name of disabledButtons) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      fireEvent.click(button);
+    }
+
+    expect(baseProps.onCopyExportDdl).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadSvg).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadUml).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadMermaid).not.toHaveBeenCalled();
   });
 
   it('exposes access-control guidance for disabled button', () => {
@@ -179,5 +189,6 @@ describe('ExportModal', () => {
     expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
+    fireEvent.click(accessManagementButton);
   });
 });
