@@ -1,2 +1,2 @@
-Trigger the one-shot PR 693 focused contract repair.
-Run nonce: 2026-08-03T07:55:00Z
+Trigger the non-self-modifying focused search-decoration and sequential-polling repair workflow.
+Run nonce: 2026-08-03T08:30:00Z
