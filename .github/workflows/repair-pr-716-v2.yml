@@ -1,0 +1,164 @@
+name: Repair PR 716 v2
+
+on:
+  push:
+    branches:
+      - jules-3578797244930525994-2c5c0eb4
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-716-v2
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'chore: run PR 716 verified repair v2'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout latest repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: jules-3578797244930525994-2c5c0eb4
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Complete deterministic layout integration and exact undo coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          from pathlib import Path
+
+
+          app_path = Path("frontend/src/App.tsx")
+          app = app_path.read_text(encoding="utf-8")
+          grid_import = 'import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";\n'
+          dagre_import = 'import { computeDagreLayout } from "./erd/dagreLayout";\n'
+          if grid_import in app:
+              app = app.replace(grid_import, dagre_import, 1)
+          elif dagre_import not in app:
+              raise SystemExit("App.tsx: neither legacy grid import nor Dagre import found")
+
+          for obsolete in (
+              '      // ⚡ Dagre Layout dynamically computed instead of legacy sort grid.\n',
+              '      // Import inline to keep App.tsx independent and avoid circular deps.\n',
+              '      const { computeDagreLayout } = await import("./erd/dagreLayout");\n',
+          ):
+              app = app.replace(obsolete, "")
+          app_path.write_text(app, encoding="utf-8")
+
+          coverage_path = Path("frontend/src/App.coverage.test.tsx")
+          coverage = coverage_path.read_text(encoding="utf-8")
+          position_probe = '''        <span data-testid="node-positions">
+                    {JSON.stringify(props.nodes.map((node: any) => ({ id: node.id, position: node.position })))}
+                  </span>
+          '''
+          if 'data-testid="node-positions"' not in coverage:
+              edge_count = '        <span data-testid="edge-count">{props.edges.length}</span>\n'
+              if coverage.count(edge_count) != 1:
+                  raise SystemExit("App.coverage.test.tsx: edge-count probe was not unique")
+              coverage = coverage.replace(edge_count, edge_count + position_probe, 1)
+
+          old_undo = '''    vi.useRealTimers()
+              fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
+              await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
+              fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
+              expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+              vi.useFakeTimers()'''
+          exact_undo = '''    const positionsBeforeLayout = screen.getByTestId('node-positions').textContent
+              vi.useRealTimers()
+              fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
+              await waitFor(() => expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument())
+              const positionsAfterLayout = screen.getByTestId('node-positions').textContent
+              expect(positionsAfterLayout).not.toBe(positionsBeforeLayout)
+              fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
+              expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+              expect(screen.getByTestId('node-positions').textContent).toBe(positionsBeforeLayout)
+              vi.useFakeTimers()'''
+          if exact_undo not in coverage:
+              if coverage.count(old_undo) != 1:
+                  raise SystemExit("App.coverage.test.tsx: auto-layout undo block was not unique")
+              coverage = coverage.replace(old_undo, exact_undo, 1)
+          coverage_path.write_text(coverage, encoding="utf-8")
+
+          palette_path = Path(".jules/palette.md")
+          palette = palette_path.read_text(encoding="utf-8")
+          headings = (
+              r"## 2024-08-02 - \[UX improvement\] ERD Auto Layout 개선 \(Dagre 적용\)",
+              r"## 2026-08-03 - Relationship-aware ERD auto-layout",
+          )
+          for heading in headings:
+              palette = re.sub(
+                  rf"\n{heading}\n.*?(?=\n## |\Z)",
+                  "",
+                  palette,
+                  flags=re.DOTALL,
+              )
+          palette = palette.rstrip() + '''
+
+          ## 2026-08-03 - Relationship-aware ERD auto-layout
+          **Learning:** A fixed grid hides foreign-key direction and becomes difficult to scan as schemas grow. Deterministic hierarchical layout makes dependency paths visible while stable insertion order prevents visual jitter between identical snapshots.
+          **Action:** Use maintained typed `@dagrejs/dagre` with the canonical npm lockfile; size nodes from rendered column counts; ignore dangling edges; handle cycles; validate finite coordinates; and verify direction, determinism, non-overlap, immutability, and exact undo restoration.
+          '''
+          palette_path.write_text(palette, encoding="utf-8")
+
+          package_path = Path("frontend/package.json")
+          package = json.loads(package_path.read_text(encoding="utf-8"))
+          if package.get("dependencies", {}).get("@dagrejs/dagre") != "^3.0.0":
+              raise SystemExit("frontend/package.json: maintained @dagrejs/dagre dependency missing")
+          if "dagre" in package.get("dependencies", {}) or "@types/dagre" in package.get("devDependencies", {}):
+              raise SystemExit("frontend/package.json: obsolete Dagre dependency remains")
+          Path("frontend/pnpm-lock.yaml").unlink(missing_ok=True)
+          PY
+
+      - name: Regenerate canonical npm lockfile
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Full coverage
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit verified result and remove repair workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f --ignore-unmatch \
+            .github/workflows/repair-pr-716.yml \
+            .github/workflows/repair-pr-716-v2.yml
+          git add -A
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(layout): complete verified hierarchical layout integration"
+          git pull --rebase origin jules-3578797244930525994-2c5c0eb4
+          git push origin "HEAD:jules-3578797244930525994-2c5c0eb4"
