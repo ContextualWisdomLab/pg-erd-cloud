@@ -320,31 +320,44 @@ export default function App() {
   useEffect(() => {
     if (!snapshotId) return;
     let isCurrent = true;
-    const timer = setInterval(() => {
-      getSnapshot(snapshotId)
-        .then((s) => {
-          if (!isCurrent) return;
-          setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-            clearInterval(timer);
-            if (selectedProjectId) {
-              listSnapshots(selectedProjectId)
-                .then((snaps) => {
-                  if (isCurrent) setSnapshots(snaps);
-                })
-                .catch((e) => {
-                  if (isCurrent) setError(String(e));
-                });
+    let timer: number | null = null;
+
+    async function poll() {
+      try {
+        const s = await getSnapshot(snapshotId as string);
+        if (!isCurrent) return;
+        setSnapshot(s);
+
+        if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+          if (selectedProjectId) {
+            try {
+              const snaps = await listSnapshots(selectedProjectId);
+              if (isCurrent) setSnapshots(snaps);
+            } catch (e) {
+              if (isCurrent) setError(String(e));
             }
           }
-        })
-        .catch((e) => {
-          if (isCurrent) setError(String(e));
-        });
-    }, 1000);
+          return;
+        }
+
+        if (isCurrent) {
+          timer = window.setTimeout(poll, 1000);
+        }
+      } catch (e) {
+        if (isCurrent) {
+          setError(String(e));
+          timer = window.setTimeout(poll, 1000);
+        }
+      }
+    }
+
+    poll();
+
     return () => {
       isCurrent = false;
-      clearInterval(timer);
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
     };
   }, [selectedProjectId, snapshotId]);
 
