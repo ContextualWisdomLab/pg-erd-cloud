@@ -1,3 +1,4 @@
+/** Encode a column name as the canonical opaque React Flow handle payload. */
 export function sanitizeHandleId(columnName: string): string {
   if (!columnName) return 'c-empty'
 
@@ -14,16 +15,24 @@ export function sanitizeHandleId(columnName: string): string {
   return `c-${encoded}`
 }
 
+/** Build the canonical source-side handle identifier for a column name. */
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
+/** Build the canonical target-side handle identifier for a column name. */
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
+/**
+ * Decode a canonical column handle, returning null for malformed identifiers.
+ *
+ * Accepted forms are `c-*`, `src-c-*`, and `tgt-c-*`; each payload chunk must
+ * be four to six lowercase hexadecimal digits or the single `empty` sentinel.
+ */
 export function decodeHandleId(handleId: string | null | undefined): string | null {
   if (!handleId) return null;
 
