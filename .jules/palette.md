@@ -65,3 +65,4 @@
 - `dagre`와 `@types/dagre` 패키지를 `frontend/package.json`에 추가하고 `pnpm install`을 수행하여 패키지 잠금 파일(`pnpm-lock.yaml`)을 업데이트함.
 - `App.coverage.test.tsx`에서 자동 정렬 테스트 시 `vi.advanceTimersByTime(200)` 대신 `vi.runOnlyPendingTimers()`로 발생하는 비동기 대기 지연 버그를 우회하고, 정렬 완료 후 노드 갯수를 올바르게 검증하도록 단언문(`expect`)을 2개 노드에서 3개(되돌리기 후 추가된 노드 포함)로 수정함.
 - `App.tsx`에서 다이나믹 임포트(`import("./erd/dagreLayout")`)를 통해 dagre 의존성으로 인한 빌드 이슈/의존성 꼬임 문제를 회피하려 했으나 convert에 스태틱하게 임포트되어 결국 동일하게 작동함. 하지만 정상적인 비동기 래핑 동작을 확인.
+**Learning**: Vitest에서 fake timers와 real timers가 혼합된 테스트 케이스의 경우, DOM 이벤트가 트리거하는 비동기 작업(`requestAnimationFrame` 등)의 완료를 확실히 보장하려면, `vi.useFakeTimers()` 상태에서 `vi.advanceTimersByTime(ms)`만 호출하는 것보다 React Testing Library의 `waitFor()`를 통해 DOM 변화가 완료될 때까지 비동기적으로 대기(단, timeout을 넉넉히)하는 것이 가장 안정적인 우회법. (React 18/19 렌더링 배치 특성 및 act 래핑 때문)
