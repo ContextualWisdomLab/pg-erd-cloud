@@ -1,4 +1,4 @@
-import dagre from 'dagre';
+import * as dagre from '@dagrejs/dagre';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from './convert';
 
@@ -36,9 +36,9 @@ export function computeDagreLayout(
     return {
       ...node,
       position: {
-        // dagre가 계산한 x, y 좌표는 노드의 중심 좌표이므로 좌상단 좌표로 변환
-        x: nodeWithPosition.x - nodeWithPosition.width / 2,
-        y: nodeWithPosition.y - nodeWithPosition.height / 2,
+        // Fallback to 0 if dagre fails to compute coordinates (e.g., disconnected subgraph edge cases)
+        x: Number.isFinite(nodeWithPosition?.x) ? nodeWithPosition.x - nodeWithPosition.width / 2 : 0,
+        y: Number.isFinite(nodeWithPosition?.y) ? nodeWithPosition.y - nodeWithPosition.height / 2 : 0,
       },
     };
   });

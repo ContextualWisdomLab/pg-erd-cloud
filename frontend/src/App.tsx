@@ -49,6 +49,7 @@ import {
   type CardinalityStrength,
   type IndexRecommendation,
 } from "./erd/cardinality";
+import { computeDagreLayout } from "./erd/dagreLayout";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
 import {
   downloadText,
@@ -469,10 +470,7 @@ export default function App() {
           reject(e);
         }
       });
-
       // ⚡ Dagre Layout dynamically computed instead of legacy sort grid.
-      // Import inline to keep App.tsx independent and avoid circular deps.
-      const { computeDagreLayout } = await import("./erd/dagreLayout");
       const next = computeDagreLayout(nodes, edges);
       setNodes(next);
 
