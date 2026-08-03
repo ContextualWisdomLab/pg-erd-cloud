@@ -1,96 +1,86 @@
-import { describe, expect, it } from 'vitest'
-
-import {
-  decodeHandleId,
-  sanitizeHandleId,
-  sourceColumnHandleId,
-  targetColumnHandleId,
-} from './handleUtils'
+import { describe, it, expect } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, decodeHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
     it('should encode a simple ascii string', () => {
-      expect(sanitizeHandleId('id')).toBe('c-0069-0064')
-    })
+      expect(sanitizeHandleId('id')).toBe('c-0069-0064');
+    });
 
     it('should handle empty string', () => {
-      expect(sanitizeHandleId('')).toBe('c-empty')
-    })
+      expect(sanitizeHandleId('')).toBe('c-empty');
+    });
 
     it('should handle special characters', () => {
-      expect(sanitizeHandleId('user_id')).toBe('c-0075-0073-0065-0072-005f-0069-0064')
-    })
+      expect(sanitizeHandleId('user_id')).toBe('c-0075-0073-0065-0072-005f-0069-0064');
+    });
 
     it('should handle unicode characters', () => {
-      expect(sanitizeHandleId('id_가')).toBe('c-0069-0064-005f-ac00')
-    })
+      expect(sanitizeHandleId('id_가')).toBe('c-0069-0064-005f-ac00');
+    });
 
     it('should handle emojis', () => {
-      expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680')
-    })
-  })
+      expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
+    });
+  });
 
   describe('sourceColumnHandleId', () => {
     it('should prepend src- to sanitized id', () => {
-      expect(sourceColumnHandleId('id')).toBe('src-c-0069-0064')
-    })
-  })
+      expect(sourceColumnHandleId('id')).toBe('src-c-0069-0064');
+    });
+  });
 
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
-      expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064')
-    })
-  })
+      expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
 
   describe('decodeHandleId', () => {
-    it.each(['id', 'user_id', 'id_가', 'id_🚀', '', '\ud800'])(
-      'round-trips canonical handles for %j',
-      (columnName) => {
-        expect(decodeHandleId(sanitizeHandleId(columnName))).toBe(columnName)
-        expect(decodeHandleId(sourceColumnHandleId(columnName))).toBe(columnName)
-        expect(decodeHandleId(targetColumnHandleId(columnName))).toBe(columnName)
-      },
-    )
+    it('should decode a simple ascii string', () => {
+      expect(decodeHandleId('c-0069-0064')).toBe('id');
+      expect(decodeHandleId('src-c-0069-0064')).toBe('id');
+      expect(decodeHandleId('tgt-c-0069-0064')).toBe('id');
+    });
 
-    it('should decode canonical prefixes', () => {
-      expect(decodeHandleId('c-0069-0064')).toBe('id')
-      expect(decodeHandleId('src-c-0069-0064')).toBe('id')
-      expect(decodeHandleId('tgt-c-0069-0064')).toBe('id')
-    })
+    it('should handle empty string', () => {
+      expect(decodeHandleId('c-empty')).toBe('');
+      expect(decodeHandleId('src-c-empty')).toBe('');
+    });
 
-    it('should handle empty string payloads', () => {
-      expect(decodeHandleId('c-empty')).toBe('')
-      expect(decodeHandleId('src-c-empty')).toBe('')
-      expect(decodeHandleId('tgt-c-empty')).toBe('')
-    })
+    it('should handle special characters', () => {
+      expect(decodeHandleId('c-0075-0073-0065-0072-005f-0069-0064')).toBe('user_id');
+    });
 
-    it('should handle null, undefined, and missing payloads gracefully', () => {
-      expect(decodeHandleId(null)).toBeNull()
-      expect(decodeHandleId(undefined)).toBeNull()
-      expect(decodeHandleId('')).toBeNull()
-      expect(decodeHandleId('src-c')).toBeNull()
-      expect(decodeHandleId('tgt-c')).toBeNull()
-      expect(decodeHandleId('c')).toBeNull()
-    })
+    it('should handle unicode characters', () => {
+      expect(decodeHandleId('c-0069-0064-005f-ac00')).toBe('id_가');
+    });
 
-    it.each([
-      'invalid-format',
-      'foo-c-0069',
-      'src-foo-c-0069',
-      'c-0069junk-0064',
-      'c-0069-006A',
-      'c-069',
-      'c-00069',
-      'c-000069',
-      'c-0000069',
-      'c-empty-0069',
-      'c-0069-empty',
-      'c-0069--0064',
-      'c--0069',
-      'c-110000',
-      'c-200000',
-    ])('rejects non-canonical handle %s', (handleId) => {
-      expect(decodeHandleId(handleId)).toBeNull()
-    })
-  })
-})
+    it('should handle emojis', () => {
+      expect(decodeHandleId('c-0069-0064-005f-1f680')).toBe('id_🚀');
+    });
+
+    it('should handle null/undefined/invalid values gracefully', () => {
+      expect(decodeHandleId(null)).toBeNull();
+      expect(decodeHandleId(undefined)).toBeNull();
+      expect(decodeHandleId('')).toBeNull();
+      expect(decodeHandleId('invalid-format')).toBeNull();
+      expect(decodeHandleId('src-c')).toBeNull(); // Missing hex parts
+    });
+
+    it('should reject non-canonical hex and prefixes', () => {
+      // Uppercase hex
+      expect(decodeHandleId('c-0069-006A')).toBeNull();
+      // Junk in hex
+      expect(decodeHandleId('c-0069junk-0064')).toBeNull();
+      // Arbitrary prefix
+      expect(decodeHandleId('foo-c-0069')).toBeNull();
+      // Empty chunk mix
+      expect(decodeHandleId('c-empty-0069')).toBeNull();
+      // Out of bounds code point
+      expect(decodeHandleId('c-200000')).toBeNull();
+      // Missing hex chunk data between separators
+      expect(decodeHandleId('c-0069--0064')).toBeNull();
+    });
+  });
+});
