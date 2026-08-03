@@ -69,10 +69,7 @@ def test_hardened_pydantic_strings_accept_valid_input(valid_input: str) -> None:
     "control_char",
     [chr(i) for i in range(32)] + [chr(127)],
 )
-@pytest.mark.parametrize(
-    "position_fmt",
-    ["{}suffix", "pre{}post", "prefix{}"],
-)
+@pytest.mark.parametrize("position_fmt", ["{}suffix", "pre{}post", "prefix{}"])
 def test_hardened_pydantic_strings_reject_control_characters(
     control_char: str, position_fmt: str
 ) -> None:
