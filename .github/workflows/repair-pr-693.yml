@@ -1,0 +1,645 @@
+name: Repair PR 693 Review Findings
+
+on:
+  push:
+    branches:
+      - bolt-react-flow-cache-5569281215077212328
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-693-review-findings
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'chore: repair PR 693 review findings'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: bolt-react-flow-cache-5569281215077212328
+          fetch-depth: 0
+
+      - name: Restore canonical frontend dependency manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout origin/main -- frontend/package.json frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Write focused regression tests first
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > frontend/src/erd/searchDecoration.test.ts <<'EOF'
+          import type { Node } from '@xyflow/react'
+          import { describe, expect, it } from 'vitest'
+
+          import type { TableNodeData } from './convert'
+          import { decorateSearchNodes } from './searchDecoration'
+
+          function tableData(title: string): TableNodeData {
+            return {
+              title,
+              columns: [],
+              badges: { pk: false, fk: false },
+            }
+          }
+
+          function tableNode(id: string, data: TableNodeData): Node<TableNodeData> {
+            return {
+              id,
+              type: 'tableNode',
+              position: { x: 0, y: 0 },
+              data,
+            }
+          }
+
+          describe('decorateSearchNodes', () => {
+            it('reuses decorated data for stable source data and cache', () => {
+              const usersData = tableData('public.users')
+              const ordersData = tableData('public.orders')
+              const nodes = [tableNode('users', usersData), tableNode('orders', ordersData)]
+              const cache = new WeakMap<TableNodeData, TableNodeData>()
+              const matches = new Set(['users'])
+
+              const first = decorateSearchNodes(nodes, matches, cache)
+              const second = decorateSearchNodes(nodes, matches, cache)
+
+              expect(first[0]!.data).toBe(second[0]!.data)
+              expect(first[1]!.data).toBe(second[1]!.data)
+              expect(first[0]!.data).not.toBe(usersData)
+              expect(first[0]!.data).toMatchObject({ isHighlighted: true, isDimmed: false })
+              expect(first[1]!.data).toMatchObject({ isHighlighted: false, isDimmed: true })
+              expect(nodes[0]!.data).toBe(usersData)
+              expect(nodes[0]!.position).toEqual({ x: 0, y: 0 })
+            })
+
+            it('creates fresh decorated data when source data or query cache changes', () => {
+              const originalData = tableData('public.users')
+              const originalNode = tableNode('users', originalData)
+              const cache = new WeakMap<TableNodeData, TableNodeData>()
+              const first = decorateSearchNodes([originalNode], new Set(['users']), cache)
+
+              const replacementData = { ...originalData, comment: 'Updated' }
+              const replacement = decorateSearchNodes(
+                [{ ...originalNode, data: replacementData }],
+                new Set(['users']),
+                cache,
+              )
+              const changedQuery = decorateSearchNodes(
+                [originalNode],
+                new Set<string>(),
+                new WeakMap<TableNodeData, TableNodeData>(),
+              )
+
+              expect(replacement[0]!.data).not.toBe(first[0]!.data)
+              expect(replacement[0]!.data.comment).toBe('Updated')
+              expect(changedQuery[0]!.data).not.toBe(first[0]!.data)
+              expect(changedQuery[0]!.data).toMatchObject({
+                isHighlighted: false,
+                isDimmed: true,
+              })
+            })
+
+            it('returns an empty array for an empty graph', () => {
+              expect(
+                decorateSearchNodes(
+                  [],
+                  new Set<string>(),
+                  new WeakMap<TableNodeData, TableNodeData>(),
+                ),
+              ).toEqual([])
+            })
+          })
+          EOF
+
+          cat > frontend/src/snapshotPolling.test.ts <<'EOF'
+          import { afterEach, describe, expect, it, vi } from 'vitest'
+
+          import { startSnapshotPolling } from './snapshotPolling'
+          import type { Snapshot, SnapshotDetail } from './types'
+
+          function snapshotDetail(status: string): SnapshotDetail {
+            return {
+              schema_snapshot_uuid: `snapshot-${status}`,
+              status,
+              schema_filter: null,
+              error_message: null,
+              snapshot_json: null,
+            }
+          }
+
+          function deferred<T>() {
+            let resolve!: (value: T) => void
+            let reject!: (reason?: unknown) => void
+            const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+              resolve = resolvePromise
+              reject = rejectPromise
+            })
+            return { promise, resolve, reject }
+          }
+
+          async function flushPromises(): Promise<void> {
+            await Promise.resolve()
+            await Promise.resolve()
+            await Promise.resolve()
+          }
+
+          function manualScheduler() {
+            let nextId = 0
+            const callbacks = new Map<number, () => void>()
+            const schedule = vi.fn((callback: () => void, _delayMs: number) => {
+              nextId += 1
+              callbacks.set(nextId, callback)
+              return nextId
+            })
+            const cancel = vi.fn((handle: number) => {
+              callbacks.delete(handle)
+            })
+            function runNext(): void {
+              const entry = callbacks.entries().next().value as [number, () => void] | undefined
+              if (!entry) throw new Error('No scheduled poll')
+              callbacks.delete(entry[0])
+              entry[1]()
+            }
+            return { callbacks, schedule, cancel, runNext }
+          }
+
+          afterEach(() => {
+            vi.useRealTimers()
+          })
+
+          describe('startSnapshotPolling', () => {
+            it('runs one request at a time and stops after a terminal response', async () => {
+              const first = deferred<SnapshotDetail>()
+              const second = deferred<SnapshotDetail>()
+              const scheduler = manualScheduler()
+              const onSnapshot = vi.fn()
+              const onSnapshots = vi.fn()
+              const getSnapshot = vi
+                .fn()
+                .mockReturnValueOnce(first.promise)
+                .mockReturnValueOnce(second.promise)
+              const listSnapshots = vi.fn().mockResolvedValue([] as Snapshot[])
+
+              const stop = startSnapshotPolling({
+                snapshotId: 'snapshot-id',
+                projectId: 'project-id',
+                getSnapshot,
+                listSnapshots,
+                onSnapshot,
+                onSnapshots,
+                onError: vi.fn(),
+                schedule: scheduler.schedule,
+                cancel: scheduler.cancel,
+              })
+
+              expect(scheduler.schedule).toHaveBeenCalledTimes(1)
+              scheduler.runNext()
+              expect(getSnapshot).toHaveBeenCalledTimes(1)
+              expect(scheduler.schedule).toHaveBeenCalledTimes(1)
+
+              first.resolve(snapshotDetail('running'))
+              await flushPromises()
+              expect(onSnapshot).toHaveBeenCalledTimes(1)
+              expect(scheduler.schedule).toHaveBeenCalledTimes(2)
+
+              scheduler.runNext()
+              expect(getSnapshot).toHaveBeenCalledTimes(2)
+              second.resolve(snapshotDetail('succeeded'))
+              await flushPromises()
+
+              expect(onSnapshot).toHaveBeenCalledTimes(2)
+              expect(listSnapshots).toHaveBeenCalledWith('project-id')
+              expect(onSnapshots).toHaveBeenCalledWith([])
+              expect(scheduler.schedule).toHaveBeenCalledTimes(2)
+              expect(scheduler.callbacks.size).toBe(0)
+              stop()
+            })
+
+            it('ignores an obsolete response after cleanup and a replacement poll', async () => {
+              const obsolete = deferred<SnapshotDetail>()
+              const current = deferred<SnapshotDetail>()
+              const oldScheduler = manualScheduler()
+              const newScheduler = manualScheduler()
+              const oldSnapshot = vi.fn()
+              const newSnapshot = vi.fn()
+
+              const stopOld = startSnapshotPolling({
+                snapshotId: 'old-snapshot',
+                projectId: null,
+                getSnapshot: vi.fn().mockReturnValue(obsolete.promise),
+                listSnapshots: vi.fn(),
+                onSnapshot: oldSnapshot,
+                onSnapshots: vi.fn(),
+                onError: vi.fn(),
+                schedule: oldScheduler.schedule,
+                cancel: oldScheduler.cancel,
+              })
+              oldScheduler.runNext()
+              stopOld()
+
+              const stopCurrent = startSnapshotPolling({
+                snapshotId: 'new-snapshot',
+                projectId: null,
+                getSnapshot: vi.fn().mockReturnValue(current.promise),
+                listSnapshots: vi.fn(),
+                onSnapshot: newSnapshot,
+                onSnapshots: vi.fn(),
+                onError: vi.fn(),
+                schedule: newScheduler.schedule,
+                cancel: newScheduler.cancel,
+              })
+              newScheduler.runNext()
+
+              current.resolve(snapshotDetail('succeeded'))
+              await flushPromises()
+              obsolete.resolve(snapshotDetail('running'))
+              await flushPromises()
+
+              expect(newSnapshot).toHaveBeenCalledOnce()
+              expect(oldSnapshot).not.toHaveBeenCalled()
+              expect(oldScheduler.schedule).toHaveBeenCalledOnce()
+              stopCurrent()
+            })
+
+            it('ignores a project-list refresh that completes after cleanup', async () => {
+              const listResult = deferred<Snapshot[]>()
+              const scheduler = manualScheduler()
+              const onSnapshots = vi.fn()
+              const stop = startSnapshotPolling({
+                snapshotId: 'snapshot-id',
+                projectId: 'project-id',
+                getSnapshot: vi.fn().mockResolvedValue(snapshotDetail('failed')),
+                listSnapshots: vi.fn().mockReturnValue(listResult.promise),
+                onSnapshot: vi.fn(),
+                onSnapshots,
+                onError: vi.fn(),
+                schedule: scheduler.schedule,
+                cancel: scheduler.cancel,
+              })
+
+              scheduler.runNext()
+              await flushPromises()
+              stop()
+              listResult.resolve([])
+              await flushPromises()
+
+              expect(onSnapshots).not.toHaveBeenCalled()
+              expect(scheduler.schedule).toHaveBeenCalledOnce()
+            })
+
+            it('reports active failures, retries snapshot errors, and stops on refresh errors', async () => {
+              const retryScheduler = manualScheduler()
+              const retryError = vi.fn()
+              const stopRetry = startSnapshotPolling({
+                snapshotId: 'snapshot-id',
+                projectId: null,
+                getSnapshot: vi.fn().mockRejectedValue(new Error('snapshot failed')),
+                listSnapshots: vi.fn(),
+                onSnapshot: vi.fn(),
+                onSnapshots: vi.fn(),
+                onError: retryError,
+                schedule: retryScheduler.schedule,
+                cancel: retryScheduler.cancel,
+              })
+              retryScheduler.runNext()
+              await flushPromises()
+              expect(retryError).toHaveBeenCalledWith('Error: snapshot failed')
+              expect(retryScheduler.schedule).toHaveBeenCalledTimes(2)
+              stopRetry()
+              expect(retryScheduler.cancel).toHaveBeenCalledOnce()
+
+              const terminalScheduler = manualScheduler()
+              const terminalError = vi.fn()
+              startSnapshotPolling({
+                snapshotId: 'snapshot-id',
+                projectId: 'project-id',
+                getSnapshot: vi.fn().mockResolvedValue(snapshotDetail('not_found')),
+                listSnapshots: vi.fn().mockRejectedValue(new Error('refresh failed')),
+                onSnapshot: vi.fn(),
+                onSnapshots: vi.fn(),
+                onError: terminalError,
+                schedule: terminalScheduler.schedule,
+                cancel: terminalScheduler.cancel,
+              })
+              terminalScheduler.runNext()
+              await flushPromises()
+              expect(terminalError).toHaveBeenCalledWith('Error: refresh failed')
+              expect(terminalScheduler.schedule).toHaveBeenCalledOnce()
+            })
+
+            it('uses browser timers and cancels a pending initial poll', async () => {
+              vi.useFakeTimers()
+              const getSnapshot = vi.fn().mockResolvedValue(snapshotDetail('succeeded'))
+              const stopBeforeStart = startSnapshotPolling({
+                snapshotId: 'cancelled',
+                projectId: null,
+                getSnapshot,
+                listSnapshots: vi.fn(),
+                onSnapshot: vi.fn(),
+                onSnapshots: vi.fn(),
+                onError: vi.fn(),
+              })
+              stopBeforeStart()
+              await vi.advanceTimersByTimeAsync(1000)
+              expect(getSnapshot).not.toHaveBeenCalled()
+
+              const onSnapshot = vi.fn()
+              const stop = startSnapshotPolling({
+                snapshotId: 'active',
+                projectId: null,
+                getSnapshot,
+                listSnapshots: vi.fn(),
+                onSnapshot,
+                onSnapshots: vi.fn(),
+                onError: vi.fn(),
+              })
+              await vi.advanceTimersByTimeAsync(1000)
+              expect(onSnapshot).toHaveBeenCalledOnce()
+              stop()
+            })
+          })
+          EOF
+
+      - name: Prove focused tests fail before implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          npm run --prefix frontend test -- \
+            src/erd/searchDecoration.test.ts \
+            src/snapshotPolling.test.ts > /tmp/pr693-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/pr693-red.log
+          if [ "$status" -eq 0 ]; then
+            echo 'Focused tests unexpectedly passed before implementation.' >&2
+            exit 1
+          fi
+          grep -Eq 'Failed to resolve import|Cannot find module|Does the file exist' /tmp/pr693-red.log
+
+      - name: Implement tested search decoration and sequential polling
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > frontend/src/erd/searchDecoration.ts <<'EOF'
+          import type { Node } from '@xyflow/react'
+
+          import type { TableNodeData } from './convert'
+
+          /** Cache of search-decorated table data keyed by immutable source data. */
+          export type SearchDecorationCache = WeakMap<TableNodeData, TableNodeData>
+
+          /**
+           * Decorate nodes with search state while preserving data identity across
+           * position-only renders. A caller must create a new cache when the
+           * normalized search query changes.
+           */
+          export function decorateSearchNodes(
+            nodes: readonly Node<TableNodeData>[],
+            matchedNodeIds: ReadonlySet<string>,
+            cache: SearchDecorationCache,
+          ): Node<TableNodeData>[] {
+            return nodes.map((node) => {
+              let decoratedData = cache.get(node.data)
+              if (!decoratedData) {
+                const isHighlighted = matchedNodeIds.has(node.id)
+                decoratedData = {
+                  ...node.data,
+                  isDimmed: !isHighlighted,
+                  isHighlighted,
+                }
+                cache.set(node.data, decoratedData)
+              }
+              return { ...node, data: decoratedData }
+            })
+          }
+          EOF
+
+          cat > frontend/src/snapshotPolling.ts <<'EOF'
+          import type { Snapshot, SnapshotDetail } from './types'
+
+          const TERMINAL_SNAPSHOT_STATUSES = new Set([
+            'succeeded',
+            'failed',
+            'not_found',
+          ])
+
+          type TimerHandle = ReturnType<typeof window.setTimeout>
+          type ScheduleTimeout = (callback: () => void, delayMs: number) => TimerHandle
+          type CancelTimeout = (handle: TimerHandle) => void
+
+          /** Inputs and state sinks for one sequential snapshot-polling lifecycle. */
+          export type SnapshotPollingOptions = {
+            snapshotId: string
+            projectId: string | null
+            getSnapshot: (snapshotId: string) => Promise<SnapshotDetail>
+            listSnapshots: (projectId: string) => Promise<Snapshot[]>
+            onSnapshot: (snapshot: SnapshotDetail) => void
+            onSnapshots: (snapshots: Snapshot[]) => void
+            onError: (message: string) => void
+            intervalMs?: number
+            schedule?: ScheduleTimeout
+            cancel?: CancelTimeout
+          }
+
+          /**
+           * Start non-overlapping snapshot polling and return an idempotent cleanup.
+           * The next request is scheduled only after the current request settles,
+           * and every asynchronous continuation checks lifecycle currency.
+           */
+          export function startSnapshotPolling({
+            snapshotId,
+            projectId,
+            getSnapshot,
+            listSnapshots,
+            onSnapshot,
+            onSnapshots,
+            onError,
+            intervalMs = 1000,
+            schedule = (callback, delayMs) => window.setTimeout(callback, delayMs),
+            cancel = (handle) => window.clearTimeout(handle),
+          }: SnapshotPollingOptions): () => void {
+            let isCurrent = true
+            let timer: TimerHandle | undefined
+
+            function scheduleNext(): void {
+              if (!isCurrent) return
+              timer = schedule(() => {
+                timer = undefined
+                void poll()
+              }, intervalMs)
+            }
+
+            async function poll(): Promise<void> {
+              try {
+                const currentSnapshot = await getSnapshot(snapshotId)
+                if (!isCurrent) return
+                onSnapshot(currentSnapshot)
+
+                if (TERMINAL_SNAPSHOT_STATUSES.has(currentSnapshot.status)) {
+                  if (projectId) {
+                    try {
+                      const currentSnapshots = await listSnapshots(projectId)
+                      if (isCurrent) onSnapshots(currentSnapshots)
+                    } catch (error) {
+                      if (isCurrent) onError(String(error))
+                    }
+                  }
+                  return
+                }
+              } catch (error) {
+                if (!isCurrent) return
+                onError(String(error))
+              }
+
+              scheduleNext()
+            }
+
+            scheduleNext()
+
+            return () => {
+              if (!isCurrent) return
+              isCurrent = false
+              if (timer !== undefined) {
+                cancel(timer)
+                timer = undefined
+              }
+            }
+          }
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('frontend/src/App.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          import_anchor = 'import { findSearchMatchedNodeIds } from "./erd/search";\n'
+          imports = (
+              import_anchor
+              + 'import { decorateSearchNodes } from "./erd/searchDecoration";\n'
+              + 'import { startSnapshotPolling } from "./snapshotPolling";\n'
+          )
+          if text.count(import_anchor) != 1:
+              raise SystemExit('App.tsx search import anchor was not unique')
+          text = text.replace(import_anchor, imports, 1)
+
+          old_visible = '''  const visibleNodes = useMemo(() => {
+            if (!normalizedNodeSearch) return nodes;
+
+            return nodes.map((node) => {
+              let cachedData = searchCache.get(node.data);
+              if (!cachedData) {
+                const isHighlighted = searchMatchedNodeIds.has(node.id);
+                cachedData = {
+                  ...node.data,
+                  isDimmed: !isHighlighted,
+                  isHighlighted,
+                };
+                searchCache.set(node.data, cachedData);
+              }
+              return {
+                ...node,
+                data: cachedData,
+              };
+            });
+          }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);'''
+          new_visible = '''  const visibleNodes = useMemo(() => {
+            if (!normalizedNodeSearch) return nodes;
+            return decorateSearchNodes(nodes, searchMatchedNodeIds, searchCache);
+          }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);'''
+          if text.count(old_visible) != 1:
+              raise SystemExit('App.tsx visibleNodes block was not unique')
+          text = text.replace(old_visible, new_visible, 1)
+
+          old_polling = '''  useEffect(() => {
+            if (!snapshotId) return;
+            let isCurrent = true;
+            const timer = setInterval(() => {
+              getSnapshot(snapshotId)
+                .then((s) => {
+                  if (!isCurrent) return;
+                  setSnapshot(s);
+                  if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+                    clearInterval(timer);
+                    if (selectedProjectId) {
+                      listSnapshots(selectedProjectId)
+                        .then((snaps) => {
+                          if (isCurrent) setSnapshots(snaps);
+                        })
+                        .catch((e) => {
+                          if (isCurrent) setError(String(e));
+                        });
+                    }
+                  }
+                })
+                .catch((e) => {
+                  if (isCurrent) setError(String(e));
+                });
+            }, 1000);
+            return () => {
+              isCurrent = false;
+              clearInterval(timer);
+            };
+          }, [selectedProjectId, snapshotId]);'''
+          new_polling = '''  useEffect(() => {
+            if (!snapshotId) return;
+            return startSnapshotPolling({
+              snapshotId,
+              projectId: selectedProjectId,
+              getSnapshot,
+              listSnapshots,
+              onSnapshot: setSnapshot,
+              onSnapshots: setSnapshots,
+              onError: setError,
+            });
+          }, [selectedProjectId, snapshotId]);'''
+          if text.count(old_polling) != 1:
+              raise SystemExit('App.tsx polling block was not unique')
+          path.write_text(text.replace(old_polling, new_polling, 1), encoding='utf-8')
+          PY
+
+      - name: Verify focused tests
+        working-directory: frontend
+        run: npm run test -- src/erd/searchDecoration.test.ts src/snapshotPolling.test.ts
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Full frontend coverage
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit verified repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-pr-693.yml
+          git diff --exit-code origin/main -- frontend/package.json frontend/package-lock.json
+          git add -A
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(frontend): serialize snapshot polling and test cache identity'
+          git pull --rebase origin bolt-react-flow-cache-5569281215077212328
+          git push origin 'HEAD:bolt-react-flow-cache-5569281215077212328'
