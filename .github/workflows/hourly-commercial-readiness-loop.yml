@@ -1,0 +1,38 @@
+name: Hourly Commercial Readiness Loop
+
+on:
+  schedule:
+    # Run once per hour, offset from the top of the hour to reduce hosted-runner
+    # queue contention. GitHub schedules are evaluated in UTC.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+# The reusable scheduler needs these permissions to dispatch same-head reviews,
+# update approved branches, enable auto-merge, and merge policy-clean PRs.
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: hourly-commercial-readiness-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  review-check-merge-loop:
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@5983b41ace75040c1d81818171ca7d0f3653254e
+    with:
+      dry_run: false
+      max_prs: "100"
+      trigger_reviews: true
+      review_dispatch_limit: "-1"
+      branch_update_limit: "-1"
+      enable_auto_merge: true
+      merge_mode: direct_or_auto
+      update_branches: true
+      stale_opencode_minutes: "90"
+      project_flow: github-flow
+      base_branch: main
+    secrets: inherit
