@@ -38,11 +38,14 @@ jobs:
       - name: Enumerate target commits
         id: commits
         shell: bash
+        env:
+          COUNT: ${{ inputs.commit_count }}
+          BRANCH: ${{ inputs.branch }}
         run: |
           set -euo pipefail
 
-          count="${{ inputs.commit_count }}"
-          branch="${{ inputs.branch }}"
+          count="$COUNT"
+          branch="$BRANCH"
 
           if ! [[ "${count}" =~ ^[0-9]+$ ]]; then
             echo "commit_count must be a positive integer" >&2
