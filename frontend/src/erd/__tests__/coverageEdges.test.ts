@@ -50,7 +50,7 @@ describe('coverage edge contracts', () => {
       { id: 'missing', source: 'missing', target: 'parent' },
       { id: 'partial-data', source: 'child', target: 'parent', data: { sourceColumns: ['parent_id'] } },
       { id: 'empty-data', source: 'child', target: 'parent', data: { sourceColumns: [], targetColumns: [] } },
-      { id: 'handles', source: 'child', target: 'parent', sourceHandle: 'src-parent_id', targetHandle: 'tgt-' },
+      { id: 'handles', source: 'child', target: 'parent', sourceHandle: 'src-c-0070-0061-0072-0065-006e-0074-005f-0069-0064', targetHandle: 'tgt-c-empty' }, // 'parent_id' encoded and '' encoded
     ]
 
     const dbml = exportDbml([parent, child, node('empty', '', [])], edges)
