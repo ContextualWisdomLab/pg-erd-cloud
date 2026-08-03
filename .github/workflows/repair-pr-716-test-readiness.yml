@@ -1,0 +1,64 @@
+name: Repair PR 716 Test Readiness
+
+on:
+  push:
+    branches:
+      - jules-3578797244930525994-2c5c0eb4
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-716-test-readiness
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'test: wait for diagram snapshots before layout'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: jules-3578797244930525994-2c5c0eb4
+          fetch-depth: 0
+
+      - name: Make the auto-layout test wait for snapshot cards
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('frontend/src/App.coverage.test.tsx')
+          text = path.read_text()
+          before = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
+            await renderReadyApp()
+            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+            vi.useFakeTimers()
+          """
+          after = """  it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
+            await renderReadyApp()
+            fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+            await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+            vi.useFakeTimers()
+          """
+          if before not in text:
+              raise SystemExit('expected test block not found')
+          path.write_text(text.replace(before, after, 1))
+
+      - name: Remove one-shot artifacts and commit
+        run: |
+          set -euo pipefail
+          git rm .github/repair-pr-716-test.trigger
+          git rm .github/workflows/repair-pr-716-test-readiness.yml
+          git add frontend/src/App.coverage.test.tsx
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test: stabilize auto-layout snapshot readiness'
+          git pull --rebase origin jules-3578797244930525994-2c5c0eb4
+          git push origin 'HEAD:jules-3578797244930525994-2c5c0eb4'
