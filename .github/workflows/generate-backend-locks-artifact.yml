@@ -1,4 +1,4 @@
-name: Generate Backend Locks Artifact
+name: Generate and Commit Backend Locks
 
 on:
   pull_request:
@@ -9,10 +9,11 @@ on:
       - .github/workflows/generate-backend-locks-artifact.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
@@ -20,8 +21,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout pull request
+      - name: Checkout maintained branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: automation/synchronize-backend-locks
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -51,12 +55,17 @@ jobs:
           PYTHONPATH=. mypy app
           PYTHONPATH=. pytest -q
 
-      - name: Upload generated locks
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: synchronized-backend-lockfiles
-          path: |
-            backend/requirements.lock
-            backend/requirements-dev.lock
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit verified lockfiles and remove one-shot artifacts
+        run: |
+          set -euo pipefail
+          git rm .github/repair-pr-706.trigger
+          git rm .github/workflows/repair-pr-706-locks.yml
+          git rm .github/workflows/autofix-pr-706-locks.yml
+          git rm .github/workflows/generate-backend-locks-artifact.yml
+          git add backend/requirements.lock backend/requirements-dev.lock
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(deps): synchronize FastAPI and Redis lockfiles'
+          git pull --rebase origin automation/synchronize-backend-locks
+          git push origin 'HEAD:automation/synchronize-backend-locks'
