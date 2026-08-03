@@ -110,3 +110,23 @@ def test_pathological_table_header_dots_are_rejected_fast():
     assert {(r["schema_name"], r["relation_name"]) for r in snap["relations"]} == {
         ("public", "users")
     }
+
+
+def test_column_positions_are_contiguous_per_relation_for_large_import():
+    first_count = 1_000
+    second_count = 7
+    first_columns = "\n".join(f"  first_{index} integer" for index in range(first_count))
+    second_columns = "\n".join(f"  second_{index} text" for index in range(second_count))
+    text = f"Table first {{\n{first_columns}\n}}\nTable second {{\n{second_columns}\n}}\n"
+
+    snapshot = parse_dbml(text)
+    positions_by_oid: dict[int, list[int]] = {}
+    for column in snapshot["columns"]:
+        positions_by_oid.setdefault(column["relation_oid"], []).append(
+            column["column_position"]
+        )
+
+    assert positions_by_oid == {
+        1: list(range(1, first_count + 1)),
+        2: list(range(1, second_count + 1)),
+    }
