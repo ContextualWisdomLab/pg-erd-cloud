@@ -45,6 +45,16 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "password=***" in redacted
 
 
+def test_malformed_dsn_without_query_redacts_password() -> None:
+    dsn = "postgresql://user:s3cr3t@[bad/db"
+    error = f"driver failed for s3cr3t while using {dsn}"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "s3cr3t" not in redacted
+    assert "postgresql://user:***@[bad/db" in redacted
+
+
 def test_custom_scheme_no_slashes() -> None:
     dsn = "snowflake_invalid:user:secretpass@host/db"
     error = f"Connection to {dsn} failed"
@@ -63,6 +73,17 @@ def test_scheme_less_userinfo_password_is_redacted() -> None:
     assert redacted == "Connection to user:***@host/db failed after echoing ***"
 
 
+def test_malformed_scheme_less_authority_uses_best_effort_redaction() -> None:
+    dsn = "user:s3cr3t@[bad/db?token=q%2Fsecret"
+    error = f"Connection to {dsn} failed after echoing s3cr3t and q/secret"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "s3cr3t" not in redacted
+    assert "q/secret" not in redacted
+    assert "token=***" in redacted
+
+
 def test_scheme_less_query_secret_with_colon_is_redacted() -> None:
     dsn = "host/db?password=foo:bar"
     error = "Connection to host/db?password=foo:bar failed after echoing foo:bar"
@@ -70,3 +91,12 @@ def test_scheme_less_query_secret_with_colon_is_redacted() -> None:
     redacted = redact_dsn_error_message(error, dsn)
 
     assert redacted == "Connection to host/db?password=*** failed after echoing ***"
+
+
+def test_scheme_less_userinfo_without_password_or_secret_query_is_unchanged() -> None:
+    dsn = "user@host/db?mode=readonly"
+    error = f"Connection to {dsn} failed"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert redacted == error
