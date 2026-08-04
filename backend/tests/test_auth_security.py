@@ -200,6 +200,8 @@ async def test_oidc_rejects_header_selected_algorithm(
         raise AssertionError("jwt.decode must not run for unsupported algorithms")
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
+
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(
@@ -239,6 +241,8 @@ async def test_oidc_decode_rejects_kty_mismatch(
         raise AssertionError("jwt.decode must not run for mismatched key types")
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
+
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._decode_verified_oidc_token("ey...fake...")
@@ -275,6 +279,13 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    def dummy_pyjwk(jwk):
+        observed["jwk"] = jwk
+        return type("DummyKey", (), {"key": "dummy"})()
+    monkeypatch.setattr(auth.jwt, "PyJWK", dummy_pyjwk)
+
+
 
     async def mock_is_token_revoked(jti):
         return jti == "revoked-jwt"
@@ -370,6 +381,11 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+    def dummy_pyjwk(jwk):
+        observed["jwk"] = jwk
+        return type("DummyKey", (), {"key": "dummy"})()
+    monkeypatch.setattr(auth.jwt, "PyJWK", dummy_pyjwk)
+
 
     async def mock_is_token_revoked(jti):
         return jti == "revoked-jwt"
@@ -383,7 +399,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["jwk"] == {"kid": "new-key", "kty": "RSA"}
 
 
 @pytest.mark.asyncio
@@ -410,6 +426,7 @@ async def test_oidc_requires_jti_claim(
         "decode",
         lambda *_args, **_kwargs: {"sub": "user-1", "exp": exp_claim()},
     )
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(
@@ -451,6 +468,7 @@ async def test_oidc_rejects_revoked_jti(
             "exp": int(expires_at.timestamp()),
         },
     )
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
 
     async def mock_revoke(jti, ext):
         pass
@@ -552,7 +570,7 @@ async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def mock_get_unverified_header(token):
-        raise Exception("Invalid header")
+        raise auth.jwt.PyJWTError("Invalid header")
 
     monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
 
@@ -587,6 +605,8 @@ async def test_oidc_decode_rejects_jwt_decode_error(
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
+
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._decode_verified_oidc_token("Bearer token")
@@ -620,6 +640,8 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
         raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda _: type("DummyKey", (), {"key": "dummy"})())
+
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._decode_verified_oidc_token("ey...")
