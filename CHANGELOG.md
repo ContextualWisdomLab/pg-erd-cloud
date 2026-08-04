@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- [Security] 🔒 **자격 증명 전송 리디렉션 차단**: 데이터베이스 DSN을 전송하는 `fetch()` 요청에 `redirect: "error"`를 적용하여 3xx 응답이 POST 본문을 다른 위치로 전달하지 못하도록 fail-closed 처리했습니다.
+- [Deploy] 🔐 **프로덕션 TLS 종료 계약 추가**: Traefik HTTPS entry point, HTTP→HTTPS 영구 리디렉션, 외부 인증서·개인키 Compose secrets, TLS 1.2 이상, strict SNI, HSTS, 필수 `PUBLIC_ORIGIN`을 구성하고 회귀 테스트와 배포 문서를 추가했습니다.
+- [Docs] 📚 **Engineering evidence register**: Fetch Standard, Traefik, MITRE CWE, Snowflake Connector 문서를 APA 7th edition 형식으로 기록하고 Snowflake DNS pinning의 증거 경계를 명시했습니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
