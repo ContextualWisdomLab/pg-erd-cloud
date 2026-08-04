@@ -46,5 +46,27 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
 
 
 def test_custom_scheme_no_slashes() -> None:
-    err = "Connection to snowflake_invalid:user:secretpass@host/db failed"
-    assert redact_dsn_error_message(err, "snowflake_invalid:user:secretpass@host/db") == "Connection to snowflake_invalid:user:***@host/db failed"
+    dsn = "snowflake_invalid:user:secretpass@host/db"
+    error = f"Connection to {dsn} failed"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert redacted == "Connection to snowflake_invalid:user:***@host/db failed"
+
+
+def test_scheme_less_userinfo_password_is_redacted() -> None:
+    dsn = "user:secretpass@host/db"
+    error = "Connection to user:secretpass@host/db failed after echoing secretpass"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert redacted == "Connection to user:***@host/db failed after echoing ***"
+
+
+def test_scheme_less_query_secret_with_colon_is_redacted() -> None:
+    dsn = "host/db?password=foo:bar"
+    error = "Connection to host/db?password=foo:bar failed after echoing foo:bar"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert redacted == "Connection to host/db?password=*** failed after echoing ***"
