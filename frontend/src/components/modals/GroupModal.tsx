@@ -32,6 +32,34 @@ export function GroupModal({
   onAssignBusinessGroup,
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
+  const selectedColorIndex = BUSINESS_GROUP_COLORS.indexOf(
+    newGroupColor as (typeof BUSINESS_GROUP_COLORS)[number],
+  );
+
+  function onColorKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ): void {
+    const isNext = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const isPrevious = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    if (!isNext && !isPrevious) return;
+
+    event.preventDefault();
+    const direction = isNext ? 1 : -1;
+    const nextIndex =
+      (currentIndex + direction + BUSINESS_GROUP_COLORS.length) %
+      BUSINESS_GROUP_COLORS.length;
+    const nextColor = BUSINESS_GROUP_COLORS[nextIndex];
+    setNewGroupColor(nextColor);
+
+    const radioGroup = event.currentTarget.closest<HTMLElement>(
+      '[role="radiogroup"]',
+    );
+    const radioButtons = radioGroup?.querySelectorAll<HTMLButtonElement>(
+      '[role="radio"]',
+    );
+    radioButtons?.[nextIndex]?.focus();
+  }
 
   if (!isOpen) return null;
 
@@ -72,15 +100,22 @@ export function GroupModal({
             role="radiogroup"
             aria-label="그룹 색상"
           >
-            {BUSINESS_GROUP_COLORS.map((color) => (
+            {BUSINESS_GROUP_COLORS.map((color, index) => (
               <button
                 type="button"
                 role="radio"
                 aria-label={`색상 ${color}`}
                 aria-checked={newGroupColor === color}
+                tabIndex={
+                  newGroupColor === color ||
+                  (selectedColorIndex === -1 && index === 0)
+                    ? 0
+                    : -1
+                }
                 className="groupManager__swatch"
                 key={color}
                 onClick={() => setNewGroupColor(color)}
+                onKeyDown={(event) => onColorKeyDown(event, index)}
                 style={{ background: color }}
               />
             ))}
