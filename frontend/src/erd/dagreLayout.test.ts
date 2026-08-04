@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as dagre from '@dagrejs/dagre';
 import { computeDagreLayout } from './dagreLayout';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from './convert';
@@ -45,27 +46,40 @@ describe('dagreLayout', () => {
     expect(diffX >= 280 || diffY >= 80).toBe(true);
   });
 
-  it('should fallback to existing positions on layout exceptions/incomplete geometry', () => {
+  it('should fallback to existing positions on incomplete geometry', () => {
     const nodes: Node<TableNodeData>[] = [
       { id: '1', type: 'tableNode', position: { x: 100, y: 100 }, data: { title: 'users', columns: [], badges: { pk: false, fk: false } } }
     ];
 
-    // To reliably test the fallback mechanism without relying on complex module mocking,
-    // we can use a vitest spy on Number.isFinite, which is used to validate geometry.
-    // By forcing it to return false for the node's coordinates, we trigger the fallback.
-    const isFiniteSpy = vi.spyOn(Number, 'isFinite').mockImplementation((value) => {
-      // Force the validGeometry check to fail by returning false when validating
-      // the x or y coordinate (or just everything during this test).
-      return false;
-    });
+    const isFiniteSpy = vi.spyOn(Number, 'isFinite').mockReturnValue(false);
 
     try {
       const result = computeDagreLayout(nodes, []);
-      // The invalid geometry check fails, so it should return the original positions
       expect(result[0].position.x).toBe(100);
       expect(result[0].position.y).toBe(100);
     } finally {
       isFiniteSpy.mockRestore();
+    }
+  });
+
+  it('should fallback to existing positions when Dagre throws', () => {
+    const nodes: Node<TableNodeData>[] = [
+      { id: '1', type: 'tableNode', position: { x: 125, y: 225 }, data: { title: 'users', columns: [], badges: { pk: false, fk: false } } }
+    ];
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const layoutSpy = vi.spyOn(dagre, 'layout').mockImplementation(() => {
+      throw new Error('layout failure');
+    });
+
+    try {
+      const result = computeDagreLayout(nodes, []);
+      expect(result).not.toBe(nodes);
+      expect(result[0]).not.toBe(nodes[0]);
+      expect(result[0].position).toEqual({ x: 125, y: 225 });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Dagre layout failed:', expect.any(Error));
+    } finally {
+      layoutSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     }
   });
 
