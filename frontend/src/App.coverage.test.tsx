@@ -320,6 +320,7 @@ describe('App orchestration coverage', () => {
   })
 
   it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
+    const user = userEvent.setup()
     await renderReadyApp()
     expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
@@ -328,9 +329,19 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
 
     const searchInput = screen.getByLabelText('다이어그램 검색')
-    // Wait for the snapshots to load before searching
+    // Wait for the snapshots to load before searching.
     await waitFor(() => expect(screen.queryByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).not.toBeInTheDocument())
-    fireEvent.change(searchInput, { target: { value: 'no-match' } })
+
+    const diagramSearchCallCounts = {
+      listProjects: api.listProjects.mock.calls.length,
+      listConnections: api.listConnections.mock.calls.length,
+      listSnapshots: api.listSnapshots.mock.calls.length,
+      getSnapshot: api.getSnapshot.mock.calls.length,
+    }
+    const diagramSearchLocation = window.location.href
+
+    await user.clear(searchInput)
+    await user.type(searchInput, 'no-match{Enter}')
 
     const searchForm = searchInput.closest('form')
     const searchSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
@@ -338,8 +349,20 @@ describe('App orchestration coverage', () => {
     expect(searchSubmitEvent.defaultPrevented).toBe(true)
 
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
+    expect(api.listProjects).toHaveBeenCalledTimes(diagramSearchCallCounts.listProjects)
+    expect(api.listConnections).toHaveBeenCalledTimes(diagramSearchCallCounts.listConnections)
+    expect(api.listSnapshots).toHaveBeenCalledTimes(diagramSearchCallCounts.listSnapshots)
+    expect(api.getSnapshot).toHaveBeenCalledTimes(diagramSearchCallCounts.getSnapshot)
+    expect(window.location.href).toBe(diagramSearchLocation)
+
+    await user.clear(searchInput)
+    await user.type(searchInput, 'failed{Enter}')
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
+    expect(api.listProjects).toHaveBeenCalledTimes(diagramSearchCallCounts.listProjects)
+    expect(api.listConnections).toHaveBeenCalledTimes(diagramSearchCallCounts.listConnections)
+    expect(api.listSnapshots).toHaveBeenCalledTimes(diagramSearchCallCounts.listSnapshots)
+    expect(api.getSnapshot).toHaveBeenCalledTimes(diagramSearchCallCounts.getSnapshot)
+    expect(window.location.href).toBe(diagramSearchLocation)
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
 
@@ -653,10 +676,10 @@ describe('App orchestration coverage', () => {
 
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -794,7 +817,8 @@ describe('App orchestration coverage', () => {
       snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
     }))
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
