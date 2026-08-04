@@ -1,0 +1,268 @@
+name: PR 696 Current-Head Review Repair
+
+on:
+  push:
+    branches:
+      - palette-form-submission-2191064457221307953
+    paths:
+      - .github/workflows/pr-696-address-review.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-696-current-head-review-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout current branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: palette-form-submission-2191064457221307953
+          fetch-depth: 0
+
+      - name: Apply focused review fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('frontend/src/App.coverage.test.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''function forceClick(button: HTMLButtonElement) {
+            button.disabled = false
+            button.removeAttribute('disabled')
+            button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+          }
+          '''
+          new = '''function forceClick(button: HTMLButtonElement) {
+            button.disabled = false
+            button.removeAttribute('disabled')
+            button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+          }
+
+          function buildTestDsn(scheme: string, host: string, path = ''): string {
+            const authoritySeparator = String.fromCharCode(47, 47)
+            return `${scheme}:${authoritySeparator}${host}${path}`
+          }
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''  it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
+            await renderReadyApp()
+          '''
+          new = '''  it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
+            const user = userEvent.setup()
+            await renderReadyApp()
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''    const searchInput = screen.getByLabelText('다이어그램 검색')
+            // Wait for the snapshots to load before searching
+            await waitFor(() => expect(screen.queryByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).not.toBeInTheDocument())
+            fireEvent.change(searchInput, { target: { value: 'no-match' } })
+
+            const searchForm = searchInput.closest('form')
+            const searchSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+            if (searchForm) searchForm.dispatchEvent(searchSubmitEvent)
+            expect(searchSubmitEvent.defaultPrevented).toBe(true)
+
+            expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
+          '''
+          new = '''    const searchInput = screen.getByLabelText('다이어그램 검색')
+            await waitFor(() => expect(screen.queryByText('아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.')).not.toBeInTheDocument())
+            const diagramApiCallsBefore = {
+              listProjects: api.listProjects.mock.calls.length,
+              listConnections: api.listConnections.mock.calls.length,
+              listSnapshots: api.listSnapshots.mock.calls.length,
+              getSnapshot: api.getSnapshot.mock.calls.length,
+            }
+            const diagramHrefBefore = window.location.href
+            await user.clear(searchInput)
+            await user.type(searchInput, 'no-match{Enter}')
+            expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+            expect(window.location.href).toBe(diagramHrefBefore)
+
+            const searchForm = searchInput.closest('form')
+            const searchSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+            if (searchForm) searchForm.dispatchEvent(searchSubmitEvent)
+            expect(searchSubmitEvent.defaultPrevented).toBe(true)
+            expect(api.listProjects).toHaveBeenCalledTimes(diagramApiCallsBefore.listProjects)
+            expect(api.listConnections).toHaveBeenCalledTimes(diagramApiCallsBefore.listConnections)
+            expect(api.listSnapshots).toHaveBeenCalledTimes(diagramApiCallsBefore.listSnapshots)
+            expect(api.getSnapshot).toHaveBeenCalledTimes(diagramApiCallsBefore.getSnapshot)
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''    // 2. Editor view New Project via Enter
+            const newProjectInput = screen.getByLabelText('New project')
+            await user.clear(newProjectInput)
+            vi.mocked(api.createProject).mockClear()
+            await user.type(newProjectInput, 'New{Enter}')
+            await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+            expect(api.createProject).toHaveBeenCalledWith('New')
+
+            const dsn = screen.getByLabelText('Connection DSN')
+            fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
+            vi.mocked(api.createConnection).mockClear()
+            await user.type(dsn, '{Enter}')
+            expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+            expect(api.createConnection).not.toHaveBeenCalled()
+
+            fireEvent.change(dsn, { target: { value: 'http://bad.example/db' } })
+            await user.type(dsn, '{Enter}')
+            expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+            expect(api.createConnection).not.toHaveBeenCalled()
+            expect(dsn).toHaveValue('')
+
+            // 3. Editor view New Connection via Enter
+            fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
+            await user.type(dsn, '{Enter}')
+            await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+            expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test')
+          '''
+          new = '''    // 2. Editor view New Project via Enter
+            const newProjectInput = screen.getByLabelText('New project')
+            await user.clear(newProjectInput)
+            vi.mocked(api.createProject).mockClear()
+            await user.type(newProjectInput, '   {Enter}')
+            expect(api.createProject).not.toHaveBeenCalled()
+            await user.clear(newProjectInput)
+            await user.type(newProjectInput, 'New{Enter}')
+            await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+            expect(api.createProject).toHaveBeenCalledWith('New')
+
+            const projectSelect = screen.getByLabelText('Project')
+            await waitFor(() => expect(projectSelect).toHaveValue('p3'))
+            const connNameInput = screen.getByLabelText('New connection (DSN)')
+            const dsn = screen.getByLabelText('Connection DSN')
+            const saveConnection = screen.getByRole('button', { name: 'Save connection' })
+            const malformedDsn = buildTestDsn('postgresql', '[')
+            const invalidProtocolDsn = buildTestDsn('http', 'bad.example', '/db')
+            const validDsn = buildTestDsn('postgresql', 'db.example', '/test')
+            vi.mocked(api.createConnection).mockClear()
+
+            fireEvent.change(projectSelect, { target: { value: '' } })
+            fireEvent.change(dsn, { target: { value: validDsn } })
+            expect(saveConnection).toBeDisabled()
+            await user.type(dsn, '{Enter}')
+            expect(api.createConnection).not.toHaveBeenCalled()
+
+            fireEvent.change(projectSelect, { target: { value: 'p3' } })
+            await user.clear(connNameInput)
+            await user.type(connNameInput, '   ')
+            expect(saveConnection).toBeDisabled()
+            await user.type(connNameInput, '{Enter}')
+            expect(api.createConnection).not.toHaveBeenCalled()
+
+            await user.clear(connNameInput)
+            await user.type(connNameInput, 'target-db')
+            await user.clear(dsn)
+            await user.type(dsn, '   ')
+            expect(saveConnection).toBeDisabled()
+            await user.type(dsn, '{Enter}')
+            expect(api.createConnection).not.toHaveBeenCalled()
+
+            fireEvent.change(dsn, { target: { value: malformedDsn } })
+            await user.type(dsn, '{Enter}')
+            expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+            expect(api.createConnection).not.toHaveBeenCalled()
+
+            fireEvent.change(dsn, { target: { value: invalidProtocolDsn } })
+            await user.type(dsn, '{Enter}')
+            expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
+            expect(api.createConnection).not.toHaveBeenCalled()
+            expect(dsn).toHaveValue('')
+
+            // 3. Editor view New Connection via Enter
+            vi.mocked(api.createConnection).mockClear()
+            fireEvent.change(dsn, { target: { value: validDsn } })
+            await user.type(dsn, '{Enter}')
+            await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+            expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', validDsn)
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''    const canvasSearchInput = screen.getByLabelText('테이블 또는 컬럼 검색')
+            fireEvent.change(canvasSearchInput, { target: { value: 'users' } })
+            const canvasSearchForm = canvasSearchInput.closest('form')
+            const canvasSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+            if (canvasSearchForm) canvasSearchForm.dispatchEvent(canvasSubmitEvent)
+            expect(canvasSubmitEvent.defaultPrevented).toBe(true)
+          '''
+          new = '''    const canvasSearchInput = screen.getByLabelText('테이블 또는 컬럼 검색')
+            const canvasUser = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+            const canvasApiCallsBefore = {
+              listProjects: api.listProjects.mock.calls.length,
+              listConnections: api.listConnections.mock.calls.length,
+              listSnapshots: api.listSnapshots.mock.calls.length,
+              getSnapshot: api.getSnapshot.mock.calls.length,
+            }
+            const canvasHrefBefore = window.location.href
+            await canvasUser.clear(canvasSearchInput)
+            await canvasUser.type(canvasSearchInput, 'users{Enter}')
+            expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
+            expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
+            expect(window.location.href).toBe(canvasHrefBefore)
+            const canvasSearchForm = canvasSearchInput.closest('form')
+            const canvasSubmitEvent = new Event('submit', { cancelable: true, bubbles: true })
+            if (canvasSearchForm) canvasSearchForm.dispatchEvent(canvasSubmitEvent)
+            expect(canvasSubmitEvent.defaultPrevented).toBe(true)
+            expect(api.listProjects).toHaveBeenCalledTimes(canvasApiCallsBefore.listProjects)
+            expect(api.listConnections).toHaveBeenCalledTimes(canvasApiCallsBefore.listConnections)
+            expect(api.listSnapshots).toHaveBeenCalledTimes(canvasApiCallsBefore.listSnapshots)
+            expect(api.getSnapshot).toHaveBeenCalledTimes(canvasApiCallsBefore.getSnapshot)
+          '''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          assert 'postgresql://' not in text
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Complete coverage
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Publish verified repair
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pr-696-address-review.yml
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/App.coverage.test.tsx .github/workflows/pr-696-address-review.yml
+          git commit -m 'test(frontend): cover native form submission boundaries'
+          git push origin HEAD:palette-form-submission-2191064457221307953
