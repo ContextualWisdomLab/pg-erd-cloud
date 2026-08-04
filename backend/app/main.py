@@ -73,7 +73,15 @@ CORS_ALLOW_HEADERS = [
     CSRF_HEADER_NAME,
 ]
 
+
+from app.rate_limit import RateLimiter
+
+_rate_limiter: RateLimiter
+_share_link_rate_limiter: RateLimiter
+_revoke_rate_limiter: RateLimiter
+
 if valkey_queue_enabled():
+
     _rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:api:")
     _share_link_rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:share:")
     _revoke_rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:revoke:")
