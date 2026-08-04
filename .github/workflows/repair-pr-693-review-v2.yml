@@ -1,0 +1,205 @@
+name: Repair PR 693 Current Review
+
+on:
+  push:
+    branches:
+      - bolt-react-flow-cache-5569281215077212328
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-693-current-review
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'chore: repair PR 693 current review'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: bolt-react-flow-cache-5569281215077212328
+          fetch-depth: 0
+
+      - name: Merge current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Apply current review fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one replacement, found {count}')
+              file_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Extract polling into a callback-driven lifecycle so cleanup behavior is
+          # directly testable without observing React state after unmount.
+          Path('frontend/src/snapshotPolling.ts').write_text('''import type { Snapshot, SnapshotDetail } from './types'\n\nconst TERMINAL_SNAPSHOT_STATUSES = new Set([\n  'succeeded',\n  'failed',\n  'not_found',\n])\n\ntype TimerHandle = ReturnType<typeof window.setTimeout>\ntype ScheduleTimeout = (callback: () => void, delayMs: number) => TimerHandle\ntype CancelTimeout = (handle: TimerHandle) => void\n\n/** State sinks and dependencies for one snapshot-polling lifecycle. */\nexport type SnapshotPollingOptions = {\n  snapshotId: string\n  projectId: string | null\n  getSnapshot: (snapshotId: string) => Promise<SnapshotDetail>\n  listSnapshots: (projectId: string) => Promise<Snapshot[]>\n  onSnapshot: (snapshot: SnapshotDetail) => void\n  onSnapshots: (snapshots: Snapshot[]) => void\n  onError: (message: string) => void\n  intervalMs?: number\n  scheduleTimeout?: ScheduleTimeout\n  cancelTimeout?: CancelTimeout\n}\n\n/**\n * Start non-overlapping snapshot polling and return an idempotent cleanup.\n * Every asynchronous continuation checks lifecycle currency before publishing.\n */\nexport function startSnapshotPolling({\n  snapshotId,\n  projectId,\n  getSnapshot,\n  listSnapshots,\n  onSnapshot,\n  onSnapshots,\n  onError,\n  intervalMs = 1000,\n  scheduleTimeout = (callback, delayMs) => window.setTimeout(callback, delayMs),\n  cancelTimeout = (handle) => window.clearTimeout(handle),\n}: SnapshotPollingOptions): () => void {\n  let isCurrent = true\n  let timer: TimerHandle | null = null\n\n  const scheduleNext = () => {\n    timer = scheduleTimeout(() => {\n      timer = null\n      void poll()\n    }, intervalMs)\n  }\n\n  const poll = async (): Promise<void> => {\n    try {\n      const currentSnapshot = await getSnapshot(snapshotId)\n      if (!isCurrent) return\n      onSnapshot(currentSnapshot)\n\n      if (TERMINAL_SNAPSHOT_STATUSES.has(currentSnapshot.status)) {\n        if (projectId) {\n          try {\n            const currentSnapshots = await listSnapshots(projectId)\n            if (isCurrent) onSnapshots(currentSnapshots)\n          } catch (error) {\n            if (isCurrent) onError(String(error))\n          }\n        }\n        return\n      }\n    } catch (error) {\n      if (!isCurrent) return\n      onError(String(error))\n    }\n\n    scheduleNext()\n  }\n\n  void poll()\n\n  return () => {\n    if (!isCurrent) return\n    isCurrent = false\n    if (timer !== null) {\n      cancelTimeout(timer)\n      timer = null\n    }\n  }\n}\n''', encoding='utf-8')
+
+          replace_once(
+              'frontend/src/App.tsx',
+              'import { findSearchMatchedNodeIds } from "./erd/search";\nimport type { Connection, Project, Snapshot, SnapshotDetail } from "./types";\n',
+              'import { findSearchMatchedNodeIds } from "./erd/search";\nimport { startSnapshotPolling } from "./snapshotPolling";\nimport type { Connection, Project, Snapshot, SnapshotDetail } from "./types";\n',
+          )
+
+          old_polling = '''  useEffect(() => {\n    if (!snapshotId) return;\n    let isCurrent = true;\n    let timer: number | null = null;\n\n    async function poll() {\n      try {\n        const s = await getSnapshot(snapshotId as string);\n        if (!isCurrent) return;\n        setSnapshot(s);\n\n        if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {\n          if (selectedProjectId) {\n            try {\n              const snaps = await listSnapshots(selectedProjectId);\n              if (isCurrent) setSnapshots(snaps);\n            } catch (e) {\n              if (isCurrent) setError(String(e));\n            }\n          }\n          return;\n        }\n\n        if (isCurrent) {\n          timer = window.setTimeout(poll, 1000);\n        }\n      } catch (e) {\n        if (isCurrent) {\n          setError(String(e));\n          timer = window.setTimeout(poll, 1000);\n        }\n      }\n    }\n\n    poll();\n\n    return () => {\n      isCurrent = false;\n      if (timer !== null) {\n        clearTimeout(timer);\n      }\n    };\n  }, [selectedProjectId, snapshotId]);'''
+          new_polling = '''  useEffect(() => {\n    if (!snapshotId) return;\n    return startSnapshotPolling({\n      snapshotId,\n      projectId: selectedProjectId,\n      getSnapshot,\n      listSnapshots,\n      onSnapshot: setSnapshot,\n      onSnapshots: setSnapshots,\n      onError: setError,\n    });\n  }, [selectedProjectId, snapshotId]);'''
+          replace_once('frontend/src/App.tsx', old_polling, new_polling)
+
+          # Keep destructive confirmation in the application callback only. The
+          # modal components now delegate exactly one delete request.
+          replace_once(
+              'frontend/src/components/modals/EditEdgeModal.tsx',
+              '''            onClick={() => {\n              if (!window.confirm("이 관계를 삭제하시겠습니까?")) return;\n              onRelDelete();\n            }}''',
+              '            onClick={onRelDelete}',
+          )
+          replace_once(
+              'frontend/src/components/modals/GroupModal.tsx',
+              '''                    onClick={() => {\n                      if (!window.confirm(`'${group.name}' 그룹을 삭제하시겠습니까?`)) return;\n                      onDeleteBusinessGroup(group.id);\n                    }}''',
+              '                    onClick={() => onDeleteBusinessGroup(group.id)}',
+          )
+
+          # Capture the data references passed to ReactFlow and expose a
+          # position-only state update for the focused identity regression.
+          replace_once(
+              'frontend/src/App.coverage.test.tsx',
+              '''const exports = vi.hoisted(() => ({\n  downloadText: vi.fn(),\n  exportDDL: vi.fn(() => 'DDL'),\n  exportDiagramSvg: vi.fn(() => '<svg/>'),\n  exportDictionaryCsv: vi.fn(() => 'csv'),\n  exportDictionaryMarkdown: vi.fn(() => 'markdown'),\n  exportPlantUml: vi.fn(() => '@startuml'),\n  exportMermaid: vi.fn(() => 'graph TD'),\n  exportDbml: vi.fn(() => 'Table users {}'),\n  inferRelationships: vi.fn(),\n}))\n''',
+              '''const exports = vi.hoisted(() => ({\n  downloadText: vi.fn(),\n  exportDDL: vi.fn(() => 'DDL'),\n  exportDiagramSvg: vi.fn(() => '<svg/>'),\n  exportDictionaryCsv: vi.fn(() => 'csv'),\n  exportDictionaryMarkdown: vi.fn(() => 'markdown'),\n  exportPlantUml: vi.fn(() => '@startuml'),\n  exportMermaid: vi.fn(() => 'graph TD'),\n  exportDbml: vi.fn(() => 'Table users {}'),\n  inferRelationships: vi.fn(),\n}))\n\nconst flowCapture = vi.hoisted(() => ({\n  latestNodeData: [] as Array<Record<string, unknown>>,\n  positionOnlyUpdate: null as null | (() => void),\n}))\n''',
+          )
+          replace_once(
+              'frontend/src/App.coverage.test.tsx',
+              '''  function ReactFlowMock(props: Record<string, any>) {\n    React.useEffect(() => {\n      props.onInit?.({ fitView: vi.fn() })\n    }, [props.onInit])\n    return (''',
+              '''  function ReactFlowMock(props: Record<string, any>) {\n    React.useEffect(() => {\n      props.onInit?.({ fitView: vi.fn() })\n    }, [props.onInit])\n    flowCapture.latestNodeData = props.nodes.map((node: any) => node.data)\n    return (''',
+          )
+          replace_once(
+              'frontend/src/App.coverage.test.tsx',
+              '''    useNodesState: (initial: unknown[]) => {\n      const [value, setValue] = React.useState(initial)\n      return [value, setValue, vi.fn()]\n    },''',
+              '''    useNodesState: (initial: unknown[]) => {\n      const [value, setValue] = React.useState(initial)\n      flowCapture.positionOnlyUpdate = () => {\n        setValue((current: any[]) => current.map((node, index) => ({\n          ...node,\n          position: { ...node.position, x: node.position.x + index + 1 },\n        })))\n      }\n      return [value, setValue, vi.fn()]\n    },''',
+          )
+          replace_once(
+              'frontend/src/App.coverage.test.tsx',
+              '''beforeEach(() => {\n  vi.clearAllMocks()\n''',
+              '''beforeEach(() => {\n  vi.clearAllMocks()\n  flowCapture.latestNodeData = []\n  flowCapture.positionOnlyUpdate = null\n''',
+          )
+
+          old_identity = '''  it('preserves derived node data object identity when searching', async () => {\n    await renderReadyApp()\n    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))\n    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))\n    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)\n    await waitFor(() => expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument())\n\n    // Trigger a search that dims nodes\n    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'nomatch' } })\n    expect(screen.getByLabelText('테이블 또는 컬럼 검색')).toHaveValue('nomatch')\n\n    // Change back to match\n    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })\n    expect(screen.getByLabelText('테이블 또는 컬럼 검색')).toHaveValue('users')\n  })'''
+          new_identity = '''  it('preserves derived node data object identity when searching', async () => {\n    await renderReadyApp()\n    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))\n    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))\n    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)\n    await waitFor(() => expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument())\n\n    const search = screen.getByLabelText('테이블 또는 컬럼 검색')\n    fireEvent.change(search, { target: { value: 'users' } })\n    await waitFor(() => expect(flowCapture.latestNodeData[0]?.isHighlighted).toBe(true))\n    const firstDecoratedData = flowCapture.latestNodeData[0]\n\n    fireEvent.change(search, { target: { value: ' users ' } })\n    await waitFor(() => expect(search).toHaveValue(' users '))\n    expect(flowCapture.latestNodeData[0]).toBe(firstDecoratedData)\n\n    await act(async () => {\n      flowCapture.positionOnlyUpdate?.()\n    })\n    await waitFor(() => expect(flowCapture.latestNodeData[0]).toBe(firstDecoratedData))\n  })'''
+          replace_once('frontend/src/App.coverage.test.tsx', old_identity, new_identity)
+
+          # The Prisma test must traverse the real export-modal open action.
+          replace_once(
+              'frontend/src/App.prismaExport.test.tsx',
+              '''  ExportModal: (props: { onDownloadPrisma: () => void }) => (\n    <button type="button" onClick={props.onDownloadPrisma}>\n      Prisma 내보내기 테스트\n    </button>\n  ),''',
+              '''  ExportModal: (props: { isOpen: boolean; onDownloadPrisma: () => void }) =>\n    props.isOpen ? (\n      <button type="button" onClick={props.onDownloadPrisma}>\n        Prisma 내보내기 테스트\n      </button>\n    ) : null,''',
+          )
+          replace_once(
+              'frontend/src/App.prismaExport.test.tsx',
+              '''    fireEvent.click(screen.getByRole('button', { name: '편집기' }));\n\n    fireEvent.click(await screen.findByRole('button', { name: 'Prisma 내보내기 테스트' }));''',
+              '''    fireEvent.click(screen.getByRole('button', { name: '편집기' }));\n    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }));\n\n    fireEvent.click(await screen.findByRole('button', { name: 'Prisma 내보내기 테스트' }));''',
+          )
+
+          # Modal tests now verify delegation; App integration coverage owns the
+          # single confirmation dialog. Strengthen the absent-target assertion.
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''  it('keeps an edge when deletion is cancelled and deletes after confirmation', () => {\n    const onRelDelete = vi.fn();\n    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);''',
+              '''  it('delegates edge deletion to the application confirmation layer', () => {\n    const onRelDelete = vi.fn();''',
+          )
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''    fireEvent.click(screen.getByRole('button', { name: '삭제' }));\n    expect(onRelDelete).not.toHaveBeenCalled();\n    fireEvent.click(screen.getByRole('button', { name: '삭제' }));\n    expect(onRelDelete).toHaveBeenCalledTimes(1);\n    expect(confirm).toHaveBeenCalledTimes(2);''',
+              '''    fireEvent.click(screen.getByRole('button', { name: '삭제' }));\n    expect(onRelDelete).toHaveBeenCalledTimes(1);''',
+          )
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''    const onCreateBusinessGroup = vi.fn();\n    const onDeleteBusinessGroup = vi.fn();\n    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);''',
+              '''    const onCreateBusinessGroup = vi.fn();\n    const onDeleteBusinessGroup = vi.fn();''',
+          )
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }));\n    expect(onDeleteBusinessGroup).not.toHaveBeenCalled();\n    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }));\n    expect(onDeleteBusinessGroup).toHaveBeenCalledWith('billing-group');''',
+              '''    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }));\n    expect(onDeleteBusinessGroup).toHaveBeenCalledWith('billing-group');''',
+          )
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''    expect(onCreateBusinessGroup).toHaveBeenCalledTimes(1);\n    expect(confirm).toHaveBeenCalledTimes(2);''',
+              '''    expect(onCreateBusinessGroup).toHaveBeenCalledTimes(1);''',
+          )
+          replace_once(
+              'frontend/src/coverageGaps.test.tsx',
+              '''  it('ignores an edge whose target node is absent', () => {\n    const edges: Edge[] = [{ id: 'missing-target', source: 'profiles', target: 'absent' }];\n    expect(exportPrisma(nodes, edges)).toContain('model profiles');\n  });''',
+              '''  it('ignores an edge whose target node is absent', () => {\n    const edges: Edge[] = [{ id: 'missing-target', source: 'profiles', target: 'absent' }];\n    const schema = exportPrisma(nodes, edges);\n    expect(schema).toContain('model profiles');\n    expect(schema).not.toContain('absent');\n    expect(schema).not.toContain('@relation');\n  });''',
+          )
+
+          # Add direct callback-isolation evidence to the existing App polling
+          # branch suite while retaining its integration coverage.
+          replace_once(
+              'frontend/src/App.pollingBranches.test.tsx',
+              "import App from './App';\n",
+              "import App from './App';\nimport { startSnapshotPolling } from './snapshotPolling';\n",
+          )
+          polling_path = Path('frontend/src/App.pollingBranches.test.tsx')
+          polling_text = polling_path.read_text(encoding='utf-8')
+          marker = "describe('snapshot polling callback isolation'"
+          if marker not in polling_text:
+              polling_text += '''\n\ntype Deferred<T> = {\n  promise: Promise<T>;\n  resolve: (value: T) => void;\n  reject: (reason: Error) => void;\n};\n\nfunction deferred<T>(): Deferred<T> {\n  let resolve!: (value: T) => void;\n  let reject!: (reason: Error) => void;\n  const promise = new Promise<T>((resolvePromise, rejectPromise) => {\n    resolve = resolvePromise;\n    reject = rejectPromise;\n  });\n  return { promise, resolve, reject };\n}\n\nasync function flushPromises(): Promise<void> {\n  await Promise.resolve();\n  await Promise.resolve();\n  await Promise.resolve();\n}\n\nfunction manualScheduler() {\n  let callback: (() => void) | null = null;\n  const scheduleTimeout = vi.fn((next: () => void, _delayMs: number) => {\n    callback = next;\n    return 1;\n  });\n  const cancelTimeout = vi.fn(() => {\n    callback = null;\n  });\n  const run = () => {\n    const next = callback;\n    callback = null;\n    if (!next) throw new Error('No scheduled poll');\n    next();\n  };\n  return { scheduleTimeout, cancelTimeout, run, hasPending: () => callback !== null };\n}\n\ndescribe('snapshot polling callback isolation', () => {\n  it('publishes active terminal state and suppresses a refresh completed after cleanup', async () => {\n    const refresh = deferred<typeof snapshotSummary[]>();\n    const onSnapshot = vi.fn();\n    const onSnapshots = vi.fn();\n    const onError = vi.fn();\n    const stop = startSnapshotPolling({\n      snapshotId: 'snapshot-one',\n      projectId: 'project-one',\n      getSnapshot: vi.fn().mockResolvedValue(terminalSnapshot),\n      listSnapshots: vi.fn().mockReturnValue(refresh.promise),\n      onSnapshot,\n      onSnapshots,\n      onError,\n    });\n\n    await flushPromises();\n    expect(onSnapshot).toHaveBeenCalledWith(terminalSnapshot);\n    stop();\n    stop();\n    refresh.resolve([{ ...snapshotSummary, schema_snapshot_uuid: 'stale-snapshot' }]);\n    await flushPromises();\n\n    expect(onSnapshots).not.toHaveBeenCalled();\n    expect(onError).not.toHaveBeenCalled();\n  });\n\n  it('suppresses terminal refresh and snapshot errors completed after cleanup', async () => {\n    const refresh = deferred<typeof snapshotSummary[]>();\n    const refreshError = vi.fn();\n    const stopRefresh = startSnapshotPolling({\n      snapshotId: 'snapshot-one',\n      projectId: 'project-one',\n      getSnapshot: vi.fn().mockResolvedValue(terminalSnapshot),\n      listSnapshots: vi.fn().mockReturnValue(refresh.promise),\n      onSnapshot: vi.fn(),\n      onSnapshots: vi.fn(),\n      onError: refreshError,\n    });\n    await flushPromises();\n    stopRefresh();\n    refresh.reject(new Error('stale refresh failure'));\n    await flushPromises();\n    expect(refreshError).not.toHaveBeenCalled();\n\n    const pendingSnapshot = deferred<typeof terminalSnapshot>();\n    const onSnapshot = vi.fn();\n    const snapshotError = vi.fn();\n    const stopSnapshot = startSnapshotPolling({\n      snapshotId: 'snapshot-one',\n      projectId: null,\n      getSnapshot: vi.fn().mockReturnValue(pendingSnapshot.promise),\n      listSnapshots: vi.fn(),\n      onSnapshot,\n      onSnapshots: vi.fn(),\n      onError: snapshotError,\n    });\n    stopSnapshot();\n    pendingSnapshot.reject(new Error('stale snapshot failure'));\n    await flushPromises();\n    expect(onSnapshot).not.toHaveBeenCalled();\n    expect(snapshotError).not.toHaveBeenCalled();\n  });\n\n  it('serializes non-terminal polls, reports active errors, and cancels pending timers', async () => {\n    const first = deferred<typeof terminalSnapshot>();\n    const second = deferred<typeof terminalSnapshot>();\n    const scheduler = manualScheduler();\n    const getSnapshot = vi.fn()\n      .mockReturnValueOnce(first.promise)\n      .mockReturnValueOnce(second.promise);\n    const onSnapshot = vi.fn();\n    const onSnapshots = vi.fn();\n    const onError = vi.fn();\n    const stop = startSnapshotPolling({\n      snapshotId: 'snapshot-one',\n      projectId: 'project-one',\n      getSnapshot,\n      listSnapshots: vi.fn().mockResolvedValue([snapshotSummary]),\n      onSnapshot,\n      onSnapshots,\n      onError,\n      scheduleTimeout: scheduler.scheduleTimeout,\n      cancelTimeout: scheduler.cancelTimeout,\n    });\n\n    expect(getSnapshot).toHaveBeenCalledTimes(1);\n    first.resolve({ ...terminalSnapshot, status: 'running' });\n    await flushPromises();\n    expect(onSnapshot).toHaveBeenCalledTimes(1);\n    expect(scheduler.hasPending()).toBe(true);\n\n    scheduler.run();\n    expect(getSnapshot).toHaveBeenCalledTimes(2);\n    second.resolve(terminalSnapshot);\n    await flushPromises();\n    expect(onSnapshots).toHaveBeenCalledWith([snapshotSummary]);\n    expect(scheduler.hasPending()).toBe(false);\n    stop();\n\n    const errorScheduler = manualScheduler();\n    const stopError = startSnapshotPolling({\n      snapshotId: 'snapshot-one',\n      projectId: null,\n      getSnapshot: vi.fn().mockRejectedValue(new Error('active failure')),\n      listSnapshots: vi.fn(),\n      onSnapshot: vi.fn(),\n      onSnapshots: vi.fn(),\n      onError,\n      scheduleTimeout: errorScheduler.scheduleTimeout,\n      cancelTimeout: errorScheduler.cancelTimeout,\n    });\n    await flushPromises();\n    expect(onError).toHaveBeenCalledWith('Error: active failure');\n    expect(errorScheduler.hasPending()).toBe(true);\n    stopError();\n    expect(errorScheduler.cancelTimeout).toHaveBeenCalledWith(1);\n  });\n});\n'''
+              polling_path.write_text(polling_text, encoding='utf-8')
+          PY
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Focused review tests
+        working-directory: frontend
+        run: npm run test -- src/App.coverage.test.tsx src/App.pollingBranches.test.tsx src/App.prismaExport.test.tsx src/coverageGaps.test.tsx
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Full frontend coverage
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit verified repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-pr-693-review-v2.yml
+          git add -A
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(frontend): close polling and interaction review gaps'
+          git pull --rebase origin bolt-react-flow-cache-5569281215077212328
+          git push origin 'HEAD:bolt-react-flow-cache-5569281215077212328'
