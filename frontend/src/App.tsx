@@ -198,20 +198,38 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: React Flow의 노드 드래그 시 (60fps) 파생 데이터 객체가 재생성되어 React.memo 얕은 비교가 깨지는 현상을 방지하기 위해,
+  // 안정적인 node.data 참조를 키로 사용하는 WeakMap 캐시를 적용하여 객체 동일성을 보장하고 전체 리렌더링을 건너뜁니다.
+  const decoratedDataCache = useMemo(() => new WeakMap<TableNodeData, Map<boolean, TableNodeData>>(), []);
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
       const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+
+      let cache = decoratedDataCache.get(node.data);
+      if (!cache) {
+        cache = new Map<boolean, TableNodeData>();
+        decoratedDataCache.set(node.data, cache);
+      }
+
+      let decoratedData = cache.get(isHighlighted);
+      if (!decoratedData) {
+        decoratedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        cache.set(isHighlighted, decoratedData);
+      }
+
+      return {
+        ...node,
+        data: decoratedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, decoratedDataCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";

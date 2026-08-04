@@ -1,4 +1,0 @@
-So where does Strix run? Let's check `pr_body.txt` or `opencode.jsonc`.
-If I modified `.jules/bolt.md`, I modified a file at the root. Does the CI run STRIX if root files are modified?
-
-Let's read `opencode.jsonc`.

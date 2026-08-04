@@ -1,4 +1,0 @@
-It seems `mermaid.ts` was already optimized!
-And `export.ts` was already optimized (indexesByRelation).
-What about `frontend/src/erd/cardinality.ts`?
-Let's see what else I can optimize.
