@@ -60,6 +60,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "--cov --cov-branch --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 include = [
