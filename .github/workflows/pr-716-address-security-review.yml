@@ -1,0 +1,745 @@
+name: PR 716 Current-Head Review Repair
+
+on:
+  push:
+    branches:
+      - jules-3578797244930525994-2c5c0eb4
+    paths:
+      - .github/workflows/pr-716-address-security-review.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-716-current-head-review-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout current branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: jules-3578797244930525994-2c5c0eb4
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --require-hashes -r backend/requirements-dev.lock
+          npm --prefix frontend ci
+
+      - name: Add failing regression contracts first
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected one match in {path}, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "frontend/src/api.coverage.test.ts",
+              """    for (const [, init] of writes) {
+      expect(init?.headers).toMatchObject({ 'X-CSRF-Token': 'csrf' })
+      expect(init?.credentials).toBe('include')
+    }
+    expect(writes[2]?.[1]?.body).toBe(JSON.stringify({ db_connection_uuid: 'c', schema_filter: null }))
+""",
+              """    for (const [, init] of writes) {
+      expect(init?.headers).toMatchObject({ 'X-CSRF-Token': 'csrf' })
+      expect(init?.credentials).toBe('include')
+    }
+    expect(writes[1]?.[1]?.redirect).toBe('error')
+    expect(writes[2]?.[1]?.body).toBe(JSON.stringify({ db_connection_uuid: 'c', schema_filter: null }))
+""",
+          )
+
+          replace_once(
+              "frontend/src/erd/dagreLayout.test.ts",
+              """import { computeDagreLayout } from './dagreLayout';
+""",
+              """import * as dagre from '@dagrejs/dagre';
+import { computeDagreLayout } from './dagreLayout';
+""",
+          )
+          replace_once(
+              "frontend/src/erd/dagreLayout.test.ts",
+              """  it('should layout a directed chain in LR', () => {
+""",
+              """  it('should preserve independent position objects when dagre.layout throws', () => {
+    const nodes: Node<TableNodeData>[] = [
+      { id: '1', type: 'tableNode', position: { x: 100, y: 120 }, data: { title: 'users', columns: [], badges: { pk: false, fk: false } } },
+      { id: '2', type: 'tableNode', position: { x: 300, y: 320 }, data: { title: 'posts', columns: [], badges: { pk: false, fk: false } } }
+    ];
+    const layoutSpy = vi.spyOn(dagre, 'layout').mockImplementation(() => {
+      throw new Error('synthetic layout failure');
+    });
+
+    try {
+      const result = computeDagreLayout(nodes, []);
+      expect(result.map((node) => node.position)).toEqual(nodes.map((node) => node.position));
+      expect(result[0].position).not.toBe(nodes[0].position);
+      expect(result[1].position).not.toBe(nodes[1].position);
+    } finally {
+      layoutSpy.mockRestore();
+    }
+  });
+
+  it('should layout a directed chain in LR', () => {
+""",
+          )
+
+          replace_once(
+              "backend/tests/test_snowflake_introspect.py",
+              """    conf = await _parse_snowflake_dsn(
+        \"snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com\"
+    )
+    assert conf.authenticator == \"https://company.okta.com\"
+""",
+              """    conf = await _parse_snowflake_dsn(
+        \"snowflake://user:pass@acct/DB/PUBLIC?authenticator=https://company.okta.com\"
+    )
+    assert conf.authenticator == \"https://company.okta.com\"
+    assert conf.host == \"acct.snowflakecomputing.com\"
+""",
+          )
+          replace_once(
+              "backend/tests/test_snowflake_introspect.py",
+              """@pytest.mark.asyncio
+async def test_introspect_snowflake_builds_common_snapshot(
+""",
+              """@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (\"account\", \"expected_host\"),
+    [
+        (\"acct\", \"acct.snowflakecomputing.com\"),
+        (\"org-account\", \"org-account.snowflakecomputing.com\"),
+        (\"acct.eu-central-1\", \"acct.eu-central-1.snowflakecomputing.com\"),
+        (\"acct.cn-north-1\", \"acct.cn-north-1.snowflakecomputing.cn\"),
+        (
+            \"acct.us-east-1.privatelink\",
+            \"acct.us-east-1.privatelink.snowflakecomputing.com\",
+        ),
+    ],
+)
+async def test_parse_snowflake_dsn_validates_the_exact_connector_host(
+    monkeypatch: pytest.MonkeyPatch,
+    account: str,
+    expected_host: str,
+) -> None:
+    validated: list[tuple[str, bool, int | None]] = []
+
+    async def fake_validated_ip_hosts(host, is_hostaddr, port):
+        validated.append((host, is_hostaddr, port))
+        return (\"203.0.113.20\",)
+
+    monkeypatch.setattr(
+        \"app.snowflake_introspect.introspect._validated_ip_hosts\",
+        fake_validated_ip_hosts,
+    )
+
+    config = await _parse_snowflake_dsn(
+        f\"snowflake://user:pass@{account}/APP_DB/PUBLIC\"
+    )
+
+    assert config.account == account
+    assert config.host == expected_host
+    assert validated == [(expected_host, False, 443)]
+    assert config.connect_kwargs()[\"host\"] == expected_host
+    assert config.connect_kwargs()[\"port\"] == 443
+    assert config.connect_kwargs()[\"protocol\"] == \"https\"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    \"account\",
+    [
+        \"acct.snowflakecomputing.com\",
+        \"acct.snowflakecomputing.cn\",
+    ],
+)
+async def test_parse_snowflake_dsn_rejects_full_service_domains(
+    account: str,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=\"account identifier must not include the Snowflake service domain\",
+    ):
+        await _parse_snowflake_dsn(
+            f\"snowflake://user:pass@{account}/APP_DB/PUBLIC\"
+        )
+
+
+@pytest.mark.asyncio
+async def test_introspect_snowflake_builds_common_snapshot(
+""",
+          )
+          replace_once(
+              "backend/tests/test_snowflake_introspect.py",
+              """    assert captured_kwargs == {
+        \"account\": \"acct\",
+        \"user\": \"user\",
+""",
+              """    assert captured_kwargs == {
+        \"account\": \"acct\",
+        \"host\": \"acct.snowflakecomputing.com\",
+        \"port\": 443,
+        \"protocol\": \"https\",
+        \"user\": \"user\",
+""",
+          )
+
+          Path("backend/tests/test_production_tls_contract.py").write_text(
+              '''from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _read_repository_file(relative_path: str) -> str:
+    """Return one repository text file used by the production-edge contract."""
+
+    return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def test_production_compose_exposes_https_and_redirects_plain_http() -> None:
+    """Require TLS secrets, an HTTPS entrypoint, and permanent HTTP redirection."""
+
+    compose = _read_repository_file("compose.prod.yaml")
+    assert "--entryPoints.websecure.address=:8443" in compose
+    assert "--entryPoints.web.http.redirections.entryPoint.to=websecure" in compose
+    assert "--entryPoints.web.http.redirections.entryPoint.scheme=https" in compose
+    assert "--entryPoints.web.http.redirections.entryPoint.permanent=true" in compose
+    assert "TRAEFIK_HTTPS_PORT" in compose
+    assert "tls_certificate" in compose
+    assert "tls_private_key" in compose
+    assert "CORS_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}" in compose
+
+
+def test_dynamic_traefik_contract_terminates_tls_and_sets_hsts() -> None:
+    """Require every product router to use TLS and strict transport security."""
+
+    dynamic = _read_repository_file("deploy/traefik/dynamic.yaml")
+    assert dynamic.count("        - websecure") == 3
+    assert dynamic.count("      tls: {}") == 3
+    assert "forceSTSHeader: true" in dynamic
+    assert "stsSeconds: 31536000" in dynamic
+    assert "stsIncludeSubdomains: true" in dynamic
+    assert "certFile: /run/secrets/tls_certificate" in dynamic
+    assert "keyFile: /run/secrets/tls_private_key" in dynamic
+
+
+def test_example_environment_requires_public_origin_and_tls_files() -> None:
+    """Document the complete operator input needed by the production edge."""
+
+    example = _read_repository_file(".env.example")
+    assert "TRAEFIK_HTTPS_PORT=8443" in example
+    assert "TRAEFIK_TLS_CERT_FILE=./secrets/tls_cert.pem" in example
+    assert "TRAEFIK_TLS_KEY_FILE=./secrets/tls_key.pem" in example
+    assert "PUBLIC_ORIGIN=https://localhost:8443" in example
+''',
+              encoding="utf-8",
+          )
+          PY
+
+          set +e
+          (
+            cd backend
+            PYTHONPATH=. pytest -q \
+              tests/test_snowflake_introspect.py \
+              tests/test_snowflake_dsn_ssrf.py \
+              tests/test_production_tls_contract.py
+          )
+          backend_red=$?
+          (
+            cd frontend
+            npx vitest run src/api.coverage.test.ts src/erd/dagreLayout.test.ts
+          )
+          frontend_red=$?
+          set -e
+          if [ "$backend_red" -eq 0 ] || [ "$frontend_red" -eq 0 ]; then
+            echo "Expected both backend and frontend regression groups to fail before implementation." >&2
+            exit 1
+          fi
+          echo "Observed expected backend and frontend failures before production changes."
+
+      - name: Implement secure transport, canonical Snowflake targeting, and testable fallback
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected one match in {path}, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "frontend/src/api.ts",
+              """    method: 'POST',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ conn_name, dsn })
+""",
+              """    method: 'POST',
+    credentials: 'include',
+    redirect: 'error',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ conn_name, dsn })
+""",
+          )
+
+          replace_once(
+              "frontend/src/erd/dagreLayout.ts",
+              """    return nodes.map((node) => ({ ...node }));
+""",
+              """    return nodes.map((node) => ({
+      ...node,
+      position: { ...node.position },
+    }));
+""",
+          )
+
+          replace_once(
+              ".jules/sentinel.md",
+              "CVE-918",
+              "CWE-918",
+          )
+
+          snowflake_path = Path("backend/app/snowflake_introspect/introspect.py")
+          snowflake = snowflake_path.read_text(encoding="utf-8")
+          snowflake = snowflake.replace(
+              "import importlib\nimport re\n",
+              "import importlib\nimport ipaddress\nimport re\n",
+              1,
+          )
+          snowflake = snowflake.replace(
+              "from app.pg_introspect.dsn_guard import _validated_ip_hosts\n",
+              "from app.pg_introspect.dsn_guard import DsnTargetError, _validated_ip_hosts\n",
+              1,
+          )
+          marker = 'SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}\n\n\n'
+          helpers = '''SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
+SNOWFLAKE_ACCOUNT_RE = re.compile(r"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$")
+SNOWFLAKE_SERVICE_SUFFIXES = (
+    ".snowflakecomputing.com",
+    ".snowflakecomputing.cn",
+)
+
+
+def _snowflake_connection_host(account: str) -> str:
+    """Return the exact TLS hostname the connector derives for an account."""
+
+    normalized = account.lower().rstrip(".")
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        raise DsnTargetError("database host must not be localhost")
+
+    try:
+        literal_ip = ipaddress.ip_address(normalized)
+    except ValueError:
+        literal_ip = None
+    if literal_ip is not None:
+        if (
+            literal_ip.is_private
+            or literal_ip.is_loopback
+            or literal_ip.is_link_local
+            or literal_ip.is_multicast
+            or literal_ip.is_reserved
+            or literal_ip.is_unspecified
+        ):
+            raise DsnTargetError("database host resolves to a restricted IP range")
+        raise DsnTargetError("Snowflake account identifier must not be an IP address")
+
+    if normalized.endswith(SNOWFLAKE_SERVICE_SUFFIXES):
+        raise ValueError(
+            "Snowflake account identifier must not include the Snowflake service domain"
+        )
+    if not SNOWFLAKE_ACCOUNT_RE.fullmatch(normalized):
+        raise ValueError("invalid Snowflake account identifier")
+
+    labels = normalized.split(".")
+    top_level_domain = (
+        "cn" if len(labels) > 1 and labels[1].startswith("cn-") else "com"
+    )
+    return f"{normalized}.snowflakecomputing.{top_level_domain}"
+
+
+'''
+          if marker not in snowflake:
+              raise SystemExit("Snowflake query-parameter marker not found")
+          snowflake = snowflake.replace(marker, helpers, 1)
+          snowflake = snowflake.replace(
+              """    account: str
+    user: str
+""",
+              """    account: str
+    host: str
+    user: str
+""",
+              1,
+          )
+          old_kwargs = '''    def connect_kwargs(self) -> dict[str, str]:
+        """Return non-empty keyword arguments accepted by the Snowflake connector."""
+        kwargs = {
+            "account": self.account,
+            "user": self.user,
+            "database": self.database,
+        }
+        optional = {
+            "password": self.password,
+            "schema": self.schema,
+            "warehouse": self.warehouse,
+            "role": self.role,
+            "authenticator": self.authenticator,
+        }
+        for key, value in optional.items():
+            if value:
+                kwargs[key] = value
+        return kwargs
+'''
+          new_kwargs = '''    def connect_kwargs(self) -> dict[str, object]:
+        """Return connector arguments bound to the validated Snowflake hostname."""
+
+        kwargs: dict[str, object] = {
+            "account": self.account,
+            "host": self.host,
+            "port": 443,
+            "protocol": "https",
+            "user": self.user,
+            "database": self.database,
+        }
+        optional = {
+            "password": self.password,
+            "schema": self.schema,
+            "warehouse": self.warehouse,
+            "role": self.role,
+            "authenticator": self.authenticator,
+        }
+        for key, value in optional.items():
+            if value:
+                kwargs[key] = value
+        return kwargs
+'''
+          if old_kwargs not in snowflake:
+              raise SystemExit("Snowflake connect_kwargs block not found")
+          snowflake = snowflake.replace(old_kwargs, new_kwargs, 1)
+          snowflake = snowflake.replace(
+              '''    if not parsed.username:
+        raise ValueError("Snowflake DSN must include a user")
+
+    path_parts = [unquote(part) for part in parsed.path.split("/") if part]
+''',
+              '''    if not parsed.username:
+        raise ValueError("Snowflake DSN must include a user")
+    try:
+        explicit_port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Snowflake DSN port is invalid") from exc
+    if explicit_port is not None:
+        raise ValueError("Snowflake DSN must not override the connector port")
+
+    account = parsed.hostname.lower().rstrip(".")
+    connection_host = _snowflake_connection_host(account)
+
+    path_parts = [unquote(part) for part in parsed.path.split("/") if part]
+''',
+              1,
+          )
+          snowflake = snowflake.replace(
+              '''    await _validated_ip_hosts(parsed.hostname, is_hostaddr=False, port=443)
+
+    return SnowflakeDsnConfig(
+        account=parsed.hostname,
+''',
+              '''    await _validated_ip_hosts(connection_host, is_hostaddr=False, port=443)
+
+    return SnowflakeDsnConfig(
+        account=account,
+        host=connection_host,
+''',
+              1,
+          )
+          snowflake = snowflake.replace(
+              "def _connect(**kwargs: str) -> Any:\n",
+              "def _connect(**kwargs: object) -> Any:\n",
+              1,
+          )
+          snowflake_path.write_text(snowflake, encoding="utf-8")
+
+          compose = Path("compose.prod.yaml")
+          compose_text = compose.read_text(encoding="utf-8")
+          compose_text = compose_text.replace(
+              '''      - --entryPoints.web.address=:8080
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+''',
+              '''      - --entryPoints.web.address=:8080
+      - --entryPoints.websecure.address=:8443
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.web.http.redirections.entryPoint.permanent=true
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+''',
+              1,
+          )
+          compose_text = compose_text.replace(
+              '''    ports:
+      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    restart: unless-stopped
+''',
+              '''    ports:
+      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${TRAEFIK_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./deploy/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    secrets:
+      - tls_certificate
+      - tls_private_key
+    restart: unless-stopped
+''',
+              1,
+          )
+          compose_text = compose_text.replace(
+              "      CORS_ORIGINS: http://localhost:8080\n",
+              "      CORS_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}\n",
+              1,
+          )
+          compose_text = compose_text.replace(
+              '''secrets:
+  app_secret:
+    file: ./secrets/app_secret
+''',
+              '''secrets:
+  app_secret:
+    file: ./secrets/app_secret
+  tls_certificate:
+    file: ${TRAEFIK_TLS_CERT_FILE:?set TRAEFIK_TLS_CERT_FILE}
+  tls_private_key:
+    file: ${TRAEFIK_TLS_KEY_FILE:?set TRAEFIK_TLS_KEY_FILE}
+''',
+              1,
+          )
+          compose.write_text(compose_text, encoding="utf-8")
+
+          dynamic = Path("deploy/traefik/dynamic.yaml")
+          dynamic_text = dynamic.read_text(encoding="utf-8")
+          dynamic_text = dynamic_text.replace("        - web\n", "        - websecure\n")
+          dynamic_text = dynamic_text.replace(
+              """      service: backend
+      priority: 110
+""",
+              """      service: backend
+      tls: {}
+      priority: 110
+""",
+              1,
+          )
+          dynamic_text = dynamic_text.replace(
+              """      service: backend
+      priority: 100
+""",
+              """      service: backend
+      tls: {}
+      priority: 100
+""",
+              1,
+          )
+          dynamic_text = dynamic_text.replace(
+              """      service: frontend
+      priority: 1
+""",
+              """      service: frontend
+      tls: {}
+      priority: 1
+""",
+              1,
+          )
+          dynamic_text = dynamic_text.replace(
+              """        permissionsPolicy: geolocation=(), microphone=(), camera=()
+""",
+              """        permissionsPolicy: geolocation=(), microphone=(), camera=()
+        forceSTSHeader: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+""",
+              1,
+          )
+          dynamic_text += '''
+
+tls:
+  certificates:
+    - certFile: /run/secrets/tls_certificate
+      keyFile: /run/secrets/tls_private_key
+'''
+          dynamic.write_text(dynamic_text, encoding="utf-8")
+
+          replace_once(
+              ".env.example",
+              '''# Production edge port used by compose.prod.yaml (Traefik).
+TRAEFIK_HTTP_PORT=8080
+''',
+              '''# Production edge ports and TLS inputs used by compose.prod.yaml (Traefik).
+# Plain HTTP exists only to redirect to the HTTPS entrypoint.
+TRAEFIK_HTTP_PORT=8080
+TRAEFIK_HTTPS_PORT=8443
+TRAEFIK_TLS_CERT_FILE=./secrets/tls_cert.pem
+TRAEFIK_TLS_KEY_FILE=./secrets/tls_key.pem
+PUBLIC_ORIGIN=https://localhost:8443
+''',
+          )
+
+          replace_once(
+              "README.md",
+              '''# Restrict secret file permissions (owner read/write only)
+chmod 600 secrets/app_secret
+
+docker compose -f compose.prod.yaml up -d --build
+```
+
+- App entrypoint: <http://localhost:8080> (`TRAEFIK_HTTP_PORT`로 변경 가능)
+- Health: <http://localhost:8080/healthz>
+''',
+              '''# 로컬 검증용 인증서를 생성합니다. 인터넷 공개 운영에서는 조직이 발급한
+# 신뢰 가능한 인증서와 키를 TRAEFIK_TLS_CERT_FILE / TRAEFIK_TLS_KEY_FILE에 지정하세요.
+openssl req -x509 -newkey rsa:3072 -nodes -days 30 \\
+  -keyout secrets/tls_key.pem \\
+  -out secrets/tls_cert.pem \\
+  -subj "/CN=localhost" \\
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+# Restrict secret file permissions (owner read/write only)
+chmod 600 secrets/app_secret secrets/tls_key.pem
+chmod 644 secrets/tls_cert.pem
+
+docker compose -f compose.prod.yaml up -d --build
+```
+
+- HTTPS app entrypoint: <https://localhost:8443> (`TRAEFIK_HTTPS_PORT`로 변경 가능)
+- Plain HTTP: <http://localhost:8080>에서 HTTPS로 영구 리디렉션
+- Health: <https://localhost:8443/healthz>
+- `PUBLIC_ORIGIN`은 브라우저가 실제 사용하는 HTTPS origin과 정확히 같아야 합니다.
+''',
+          )
+
+          replace_once(
+              "README.md",
+              '''  실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
+''',
+              '''  실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
+  서버는 account identifier에서 Snowflake 공식 서비스 호스트를 산출한 뒤 그 정확한
+  호스트를 allowlist·DNS/IP 정책으로 검증하고, 검증된 호스트를 HTTPS connector에
+  명시적으로 전달합니다. `DB_INTROSPECTION_ALLOWED_HOSTS`에는 예를 들어
+  `*.snowflakecomputing.com,*.snowflakecomputing.cn`을 운영 정책에 맞게 설정하세요.
+''',
+          )
+
+          replace_once(
+              "CHANGELOG.md",
+              "## Unreleased\n",
+              """## Unreleased
+- [Security] 🔒 **DB credential transport 및 Snowflake 연결 대상 고정**: connection DSN POST의 HTTP redirect를 차단하고, production Traefik에 TLS 종료·HTTP→HTTPS redirect·HSTS를 구성했습니다. Snowflake account identifier에서 공식 서비스 호스트를 산출해 정확한 allowlist/DNS 검증 후 connector의 HTTPS host로 명시하여 사용자 지정 호스트와 실제 연결 대상의 불일치를 제거했습니다.
+""",
+          )
+          PY
+
+      - name: Verify focused regressions
+        run: |
+          set -euo pipefail
+          (
+            cd backend
+            PYTHONPATH=. pytest -q \
+              tests/test_snowflake_introspect.py \
+              tests/test_snowflake_dsn_ssrf.py \
+              tests/test_production_tls_contract.py
+          )
+          (
+            cd frontend
+            npx vitest run src/api.coverage.test.ts src/erd/dagreLayout.test.ts
+          )
+
+      - name: Verify complete backend and frontend contracts
+        run: |
+          set -euo pipefail
+          (
+            cd backend
+            PYTHONPATH=. mypy app
+            PYTHONPATH=. pytest -q
+          )
+          (
+            cd frontend
+            npm run typecheck
+            npm run coverage
+            npm run build
+          )
+
+      - name: Validate production Compose rendering
+        run: |
+          set -euo pipefail
+          mkdir -p secrets
+          printf 'test-secret\n' > secrets/app_secret
+          printf '%s\n' '-----BEGIN CERTIFICATE-----' 'test' '-----END CERTIFICATE-----' > secrets/tls_cert.pem
+          printf '%s\n' '-----BEGIN PRIVATE KEY-----' 'test' '-----END PRIVATE KEY-----' > secrets/tls_key.pem
+          PUBLIC_ORIGIN=https://localhost:8443 \
+            TRAEFIK_TLS_CERT_FILE=./secrets/tls_cert.pem \
+            TRAEFIK_TLS_KEY_FILE=./secrets/tls_key.pem \
+            POSTGRES_PASSWORD=test-password \
+            docker compose -f compose.prod.yaml config >/tmp/compose-prod-rendered.yaml
+          grep -F 'websecure' /tmp/compose-prod-rendered.yaml >/dev/null
+          rm -rf secrets
+
+      - name: Commit verified repair and remove one-shot workflow
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pr-716-address-security-review.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .env.example \
+            .jules/sentinel.md \
+            CHANGELOG.md \
+            README.md \
+            backend/app/snowflake_introspect/introspect.py \
+            backend/tests/test_production_tls_contract.py \
+            backend/tests/test_snowflake_introspect.py \
+            compose.prod.yaml \
+            deploy/traefik/dynamic.yaml \
+            frontend/src/api.coverage.test.ts \
+            frontend/src/api.ts \
+            frontend/src/erd/dagreLayout.test.ts \
+            frontend/src/erd/dagreLayout.ts \
+            .github/workflows/pr-716-address-security-review.yml
+          if git diff --cached --quiet; then
+            echo "No verified repair changes were produced." >&2
+            exit 1
+          fi
+          git commit -m "fix(security): harden ERD connection transport"
+          git push origin HEAD:jules-3578797244930525994-2c5c0eb4
