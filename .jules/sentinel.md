@@ -5,7 +5,7 @@
 
 ## 2026-08-04 - SSRF 방지 및 XSS 완화
 **Vulnerability:**
-1. **Critical - SSRF via Database Connection DSN (CVE-918):** `isSupportedConnectionDsn()` 함수에서 프로토콜과 호스트명 존재 여부만 확인하여, 악의적인 사용자가 클라우드 메타데이터 엔드포인트(169.254.169.254, metadata.google.internal)나 프라이빗 IP 범위(10.0.0.0/8 등), 로컬호스트를 입력해 백엔드가 내부망으로 요청을 보내도록 유도할 수 있었습니다.
+1. **Critical - SSRF via Database Connection DSN (CWE-918):** `isSupportedConnectionDsn()` 함수에서 프로토콜과 호스트명 존재 여부만 확인하여, 악의적인 사용자가 클라우드 메타데이터 엔드포인트(169.254.169.254, metadata.google.internal)나 프라이빗 IP 범위(10.0.0.0/8 등), 로컬호스트를 입력해 백엔드가 내부망으로 요청을 보내도록 유도할 수 있었습니다.
 2. **Medium - Inconsistent XSS Protection (CWE-79):** 사용자 제어 데이터인 `project_name`이 일부 UI(프로젝트 선택 드롭다운, 사이드바 요약, 다이어그램 헤더)에서 `sanitizeHtml()`을 거치지 않고 직접 렌더링되었습니다. (React의 기본 escaping이 적용되더라도, 프로젝트의 명시적인 일관성 유지 원칙에 어긋남).
 
 **Learning:**
@@ -25,3 +25,10 @@
 
 **Prevention:**
 - `undici` 버전을 7.29.0 이상으로 명시적으로 업데이트하여 취약점을 해결했습니다.
+
+## 2026-08-04 - Credential transport redirect and TLS hardening
+**Vulnerability:** The database-connection API accepted a DSN in a credential-bearing POST. Browser Fetch follows redirects by default, so a 307 or 308 response could forward the request body. The production Compose profile exposed only a cleartext HTTP entry point and did not define a user-provided TLS certificate.
+
+**Learning:** Initial-URL validation is not sufficient for a secret-bearing request. Redirect behavior and the deployment transport boundary must both fail closed. The WHATWG Fetch redirect mode `error` converts a redirect response into a network error, while Traefik requires TLS-enabled routers and certificates in dynamic configuration for explicit termination.
+
+**Prevention:** The connection POST now sets `redirect: 'error'`. Production Traefik redirects its loopback HTTP entry point to an externally exposed HTTPS entry point, loads certificate and private-key files through Compose secrets, requires TLS-enabled routers, enforces TLS 1.2 or newer, applies strict SNI handling, and emits HSTS headers. The public CORS origin is now an explicit required HTTPS deployment value.
