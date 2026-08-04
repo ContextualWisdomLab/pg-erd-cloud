@@ -132,8 +132,13 @@ def test_column_positions_are_contiguous_per_relation_for_large_import():
     }
 
 
+
 def test_parse_dbml_sql_injection():
-    text = 'Table "users; DROP TABLE users" {\n id integer [pk]\n}'
+    text = '''
+Table "users; DROP TABLE users" {
+  id integer [pk]
+}
+    '''
     try:
         parse_dbml(text)
         assert False, "Should have raised ValueError for SQL injection attempt"
