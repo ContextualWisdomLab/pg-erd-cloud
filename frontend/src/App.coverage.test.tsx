@@ -325,6 +325,13 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          '아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.',
+        ),
+      ).not.toBeInTheDocument(),
+    )
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
