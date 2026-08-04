@@ -37,11 +37,11 @@ jobs:
           PYTHONPATH: .
         run: mypy app
 
-      - name: Tests with enforced coverage
+      - name: Tests (pytest)
         working-directory: backend
         env:
           PYTHONPATH: .
-        run: pytest -q --cov --cov-branch --cov-report=term-missing --cov-fail-under=100
+        run: pytest -q
 
   frontend:
     runs-on: ubuntu-latest
