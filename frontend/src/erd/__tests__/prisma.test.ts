@@ -67,6 +67,12 @@ describe('exportPrisma', () => {
         targetHandle: 'tgt-id',
         label: 'users_posts',
       },
+      {
+        id: 'e_no_handle',
+        source: '2',
+        target: '1',
+        label: 'users_posts_no_handle',
+      },
     ];
 
     const result = exportPrisma(nodes, edges);
@@ -184,6 +190,7 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
+      { id: 'e3', source: '1', target: '2', sourceHandle: '' }
     ];
 
     const result = exportPrisma(nodes, edges);
@@ -233,5 +240,47 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
+  });
+
+  it('handles 1-to-1 unique relationships', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'profiles',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+
+        },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
+        label: '1to1_unique',
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('profiles_user_id profiles? @relation("M_1to1_unique")');
   });
 });

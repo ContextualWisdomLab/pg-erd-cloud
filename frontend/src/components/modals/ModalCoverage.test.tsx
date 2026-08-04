@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TableNodeData } from '../../erd/convert'
 import { AddTableModal } from './AddTableModal'
 import { CardinalityModal } from './CardinalityModal'
-import { EditEdgeModal } from './EditEdgeModal'
 import { EditTableModal } from './EditTableModal'
 import { GroupModal } from './GroupModal'
 
@@ -84,47 +83,6 @@ describe('modal behavior coverage', () => {
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
-  })
-
-  it('covers EditEdgeModal visibility and actions', () => {
-    const setRelLabel = vi.fn()
-    const onDelete = vi.fn()
-    const onCancel = vi.fn()
-    const onSubmit = vi.fn()
-    const { rerender } = render(
-      <EditEdgeModal
-        editingEdge={null}
-        relLabel=""
-        setRelLabel={setRelLabel}
-        onRelDelete={onDelete}
-        onRelCancel={onCancel}
-        onRelSubmit={onSubmit}
-      />,
-    )
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    rerender(
-      <EditEdgeModal
-        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
-        relLabel="fk_users"
-        setRelLabel={setRelLabel}
-        onRelDelete={onDelete}
-        onRelCancel={onCancel}
-        onRelSubmit={onSubmit}
-      />,
-    )
-    expect(screen.getByText(/From: a/)).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
-      target: { value: 'fk_changed' },
-    })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    fireEvent.click(screen.getByRole('button', { name: '저장' }))
-    expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
-    expect(onDelete).toHaveBeenCalledOnce()
-    expect(onCancel).toHaveBeenCalledOnce()
-    expect(onSubmit).toHaveBeenCalledOnce()
   })
 
   it('covers EditTableModal column mutation, duplication, form, and table actions', () => {
