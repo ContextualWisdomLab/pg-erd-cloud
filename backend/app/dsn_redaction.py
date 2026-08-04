@@ -41,19 +41,19 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
     return netloc, query
 
 
-def _authority_views_without_slashes(dsn: str) -> list[tuple[str, str | None, str]]:
-    """Return safe authority interpretations for DSNs that omit ``//``.
+def _authority_view_without_slashes(dsn: str) -> tuple[str, str | None, str]:
+    """Return the safest authority interpretation for a DSN omitting ``//``.
 
     A value such as ``user:password@host/db`` is parsed as one complete
     scheme-less authority. A custom no-slash scheme such as
-    ``scheme:user:password@host/db`` is additionally parsed after removing only
-    its validated leading scheme token. Keeping both interpretations avoids the
-    inherent ambiguity between a scheme and a username while ensuring that all
-    plausible password candidates are redacted. The placeholder scheme is used
-    only for local parsing and never causes network activity.
+    ``scheme:user:password@host/db`` is parsed only after removing its validated
+    leading scheme token. Choosing one format-aware interpretation prevents the
+    scheme token from being mistaken for a username while retaining the entire
+    query. The placeholder scheme is used solely for local parsing and never
+    causes network activity.
     """
 
-    authority_candidates = [dsn]
+    authority_candidate = dsn
     before_at = dsn.rsplit("@", 1)[0]
     scheme_prefix, separator, remainder = dsn.partition(":")
     if (
@@ -61,19 +61,19 @@ def _authority_views_without_slashes(dsn: str) -> list[tuple[str, str | None, st
         and before_at.count(":") >= 2
         and _DSN_SCHEME_PREFIX_PATTERN.fullmatch(scheme_prefix)
     ):
-        authority_candidates.append(remainder)
+        authority_candidate = remainder
 
-    views: list[tuple[str, str | None, str]] = []
-    for candidate in dict.fromkeys(authority_candidates):
-        normalized = candidate[2:] if candidate.startswith("//") else candidate
-        try:
-            parsed = urlsplit(_REDACTION_PARSE_PREFIX + normalized)
-        except ValueError:
-            netloc, query = _split_dsn_best_effort(normalized)
-            views.append((netloc, None, query))
-        else:
-            views.append((parsed.netloc, parsed.password, parsed.query))
-    return views
+    normalized = (
+        authority_candidate[2:]
+        if authority_candidate.startswith("//")
+        else authority_candidate
+    )
+    try:
+        parsed = urlsplit(_REDACTION_PARSE_PREFIX + normalized)
+    except ValueError:
+        netloc, query = _split_dsn_best_effort(normalized)
+        return netloc, None, query
+    return parsed.netloc, parsed.password, parsed.query
 
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
@@ -90,7 +90,7 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     else:
         views.append((parsed.netloc, parsed.password, parsed.query))
         if not parsed.netloc and "@" in dsn:
-            views.extend(_authority_views_without_slashes(dsn))
+            views.append(_authority_view_without_slashes(dsn))
 
     candidates: set[str] = set()
     for netloc, password, query in views:
