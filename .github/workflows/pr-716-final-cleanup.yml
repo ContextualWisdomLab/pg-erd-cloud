@@ -8,7 +8,7 @@ on:
       - .github/workflows/pr-716-final-cleanup.yml
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pr-716-final-cleanup
@@ -17,6 +17,8 @@ concurrency:
 jobs:
   cleanup-and-verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -71,7 +73,11 @@ jobs:
           printf '%s\n' 'test-only-app-secret-material' > secrets/app_secret
           printf '%s\n' 'test-only-certificate' > secrets/tls_cert
           printf '%s\n' 'test-only-private-key' > secrets/tls_key
-          POSTGRES_PASSWORD='test-only-database-password' PUBLIC_ORIGIN='https://erd.example.test' docker compose -f compose.prod.yaml config >/dev/null
+          POSTGRES_PASSWORD='test-only-database-password' \
+          PUBLIC_ORIGIN='https://erd.example.test' \
+          TLS_CERTIFICATE_FILE='./secrets/tls_cert' \
+          TLS_PRIVATE_KEY_FILE='./secrets/tls_key' \
+          docker compose -f compose.prod.yaml config >/dev/null
           rm -rf secrets
 
       - name: Publish verified cleanup
