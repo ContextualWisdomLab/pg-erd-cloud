@@ -83,7 +83,7 @@ behind Traefik (`deploy/traefik/`).
   - **codec-carver** — STT / omni-modal speech-video codec.
   - **fast-mlsirm** — LLM-as-a-Judge calibration + evaluation-item quality
     (uses aFIPC FIPC + kaefa item-fit).
-  - **feelanet-adfs** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
+  - **keyverse** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
     OAuth2.1; eliminate passwords).
   - **newsdom-api** — PDF→DOM sidecar.
   - **semantic-data-portal** — upper ontology / catalog / governance plane with
@@ -99,3 +99,11 @@ behind Traefik (`deploy/traefik/`).
   literature — e.g. data modeling, ER theory, schema normalization, or
   graph/layout algorithms for diagram rendering.
 <!-- END cwl-agent-guidance -->
+
+## Code-owner review gates — disabled (on hold)
+
+As of 2026-08-04, code-owner review requirements (`require_code_owner_reviews`
+in branch protection and `require_code_owner_review` in rulesets) are disabled
+across ContextualWisdomLab. A solo maintainer cannot independently satisfy a
+code-owner approval gate. Keep this policy on hold until the organization has
+multiple maintainers; do not re-enable CODEOWNERS-based merge gates before then.
