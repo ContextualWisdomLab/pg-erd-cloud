@@ -84,6 +84,11 @@ function sanitizeHtml(str: string | null | undefined): string {
     .replace(/'/g, "&#039;");
 }
 
+function sanitizeCssClass(str: unknown): string {
+  if (typeof str !== "string") return "";
+  return str.replace(/[^a-zA-Z0-9-_]/g, "");
+}
+
 type CurrentUser = {
   subject: string;
   display_name: string | null;
@@ -1739,7 +1744,7 @@ export function DiagramTable({
           <strong role="cell">{name}</strong>
           <span role="cell">{selectedProjectName || "현재 프로젝트"}</span>
           <span role="cell">
-            <span className={`statusPill statusPill--${sanitizeHtml(item.status)}`}>
+            <span className={`statusPill statusPill--${sanitizeCssClass(item.status)}`}>
               {sanitizeHtml(item.status)}
             </span>
           </span>
