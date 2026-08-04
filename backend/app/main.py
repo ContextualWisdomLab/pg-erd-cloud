@@ -26,9 +26,11 @@ from app.jobs.worker import run_worker_forever
 from app.observability import setup_observability
 from app.rate_limit import (
     InMemoryFixedWindowRateLimiter,
+    ValkeyFixedWindowRateLimiter,
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.jobs.valkey_queue import valkey_queue_enabled
 from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
@@ -71,9 +73,15 @@ CORS_ALLOW_HEADERS = [
     CSRF_HEADER_NAME,
 ]
 
-_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.api_rate_limit_max_keys
-)
+if valkey_queue_enabled():
+    _rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:api:")
+    _share_link_rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:share:")
+    _revoke_rate_limiter = ValkeyFixedWindowRateLimiter(key_prefix="rate_limit:revoke:")
+else:
+    _rate_limiter = InMemoryFixedWindowRateLimiter(max_keys=settings.api_rate_limit_max_keys)
+    _share_link_rate_limiter = InMemoryFixedWindowRateLimiter(max_keys=settings.share_link_rate_limit_max_keys)
+    _revoke_rate_limiter = InMemoryFixedWindowRateLimiter(max_keys=settings.api_rate_limit_max_keys)
+
 _rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=settings.api_rate_limit_requests,
@@ -81,9 +89,7 @@ _rate_limit_policy = RateLimitPolicy(
     route_prefix="/api",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
-_share_link_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.share_link_rate_limit_max_keys
-)
+
 _share_link_rate_limit_policy = RateLimitPolicy(
     enabled=settings.share_link_rate_limit_enabled,
     requests=settings.share_link_rate_limit_requests,
@@ -91,9 +97,7 @@ _share_link_rate_limit_policy = RateLimitPolicy(
     route_prefix="/api/share",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
 )
-_revoke_rate_limiter = InMemoryFixedWindowRateLimiter(
-    max_keys=settings.api_rate_limit_max_keys
-)
+
 _revoke_rate_limit_policy = RateLimitPolicy(
     enabled=settings.api_rate_limit_enabled,
     requests=10,
@@ -132,7 +136,7 @@ app.add_middleware(
     # actually need cookie-based auth.
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=CORS_ALLOW_HEADERS,
 )
 

@@ -6,9 +6,12 @@ import math
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from app.jobs.valkey_queue import _client, valkey_queue_enabled, _close_client
 
 SubjectGetter = Callable[[Request], Awaitable[str | None]]
 
@@ -20,38 +23,36 @@ _last_unknown_ip_log_at = 0.0
 
 @dataclass(frozen=True)
 class RateLimitPolicy:
-    """A small, dependency-free fixed-window rate limit policy.
-
-    Notes:
-    - This is intentionally in-memory (per-process).
-    - In multi-worker/multi-instance deployments, limits are enforced per worker
-      unless an external shared store (Redis/Valkey) is introduced.
-    """
+    """A small, dependency-free fixed-window rate limit policy."""
 
     enabled: bool
     requests: int
     window_seconds: float
     route_prefix: str = "/api"
     trust_x_forwarded_for: bool = False
+    trusted_proxies: list[str] | None = None
 
 
-def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
+def _get_client_ip(
+    request: Request,
+    *,
+    trust_x_forwarded_for: bool,
+    trusted_proxies: list[str] | None = None,
+) -> str:
     global _last_unknown_ip_log_at
+
+    client_host = "unknown" if request.client is None else (request.client.host or "unknown")
+    ip = client_host
 
     if trust_x_forwarded_for:
         xff = request.headers.get("X-Forwarded-For")
         if xff:
-            # Use the right-most value (nearest trusted proxy), trimming whitespace.
-            # This is safer than the left-most which can be spoofed by the client.
-            ip = xff.split(",")[-1].strip()
-            if ip:
-                return ip
-
-    client = request.client
-    if client is None:
-        ip = "unknown"
-    else:
-        ip = client.host or "unknown"
+            if trusted_proxies and client_host not in trusted_proxies:
+                pass  # Do not trust the proxy
+            else:
+                parsed_ip = xff.split(",")[-1].strip()
+                if parsed_ip:
+                    ip = parsed_ip
 
     # Avoid silently aggregating many callers under an "unknown" key.
     if ip == "unknown":
@@ -65,6 +66,51 @@ def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
                 bool(request.headers.get("X-Forwarded-For")),
             )
     return ip
+
+
+class RateLimiter(Protocol):
+    async def hit(self, *, key: str, policy: RateLimitPolicy) -> tuple[bool, int]:
+        ...
+
+
+class ValkeyFixedWindowRateLimiter:
+    """A Redis/Valkey backed fixed-window rate limiter."""
+
+    def __init__(self, key_prefix: str = "rate_limit:") -> None:
+        self.key_prefix = key_prefix
+
+    async def hit(self, *, key: str, policy: RateLimitPolicy) -> tuple[bool, int]:
+        if policy.window_seconds <= 0:
+            return True, 0
+        if policy.requests <= 0:
+            return False, math.ceil(policy.window_seconds)
+
+        now = time.monotonic()
+        window_id = int(now // policy.window_seconds)
+        retry_after = int(
+            max(0.0, math.ceil((window_id + 1) * policy.window_seconds - now))
+        )
+        redis_key = f"{self.key_prefix}{key}:{window_id}"
+
+        try:
+            client = await _client()
+        except Exception:
+            _logger.warning("Failed to connect to Valkey for rate limiting", exc_info=True)
+            return True, 0
+
+        try:
+            # We use an inline script or MULTI/EXEC or just INCR + EXPIRE
+            count = await client.incr(redis_key)
+            if count == 1:
+                await client.expire(redis_key, math.ceil(policy.window_seconds) * 2)
+
+            allowed = count <= policy.requests
+            return allowed, retry_after
+        except Exception:
+            _logger.warning("Valkey rate limit hit failed", exc_info=True)
+            return True, 0
+        finally:
+            await _close_client(client)
 
 
 class InMemoryFixedWindowRateLimiter:
@@ -122,7 +168,7 @@ class InMemoryFixedWindowRateLimiter:
 
 def make_rate_limit_middleware(
     *,
-    limiter: InMemoryFixedWindowRateLimiter,
+    limiter: RateLimiter,
     policy: RateLimitPolicy,
     get_subject: SubjectGetter | None = None,
 ) -> Callable[[Request, Callable[[Request], Awaitable[Response]]], Awaitable[Response]]:
@@ -148,7 +194,11 @@ def make_rate_limit_middleware(
                 # Never fail requests due to key derivation.
                 subject = None
 
-        ip = _get_client_ip(request, trust_x_forwarded_for=policy.trust_x_forwarded_for)
+        ip = _get_client_ip(
+            request,
+            trust_x_forwarded_for=policy.trust_x_forwarded_for,
+            trusted_proxies=policy.trusted_proxies,
+        )
         key = f"ip:{ip}"
         if subject:
             key = f"{key}|sub:{subject}"
