@@ -83,7 +83,7 @@ behind Traefik (`deploy/traefik/`).
   - **codec-carver** — STT / omni-modal speech-video codec.
   - **fast-mlsirm** — LLM-as-a-Judge calibration + evaluation-item quality
     (uses aFIPC FIPC + kaefa item-fit).
-  - **feelanet-adfs** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
+  - **keyverse** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
     OAuth2.1; eliminate passwords).
   - **newsdom-api** — PDF→DOM sidecar.
   - **semantic-data-portal** — upper ontology / catalog / governance plane with
