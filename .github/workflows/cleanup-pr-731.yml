@@ -1,0 +1,102 @@
+name: cleanup-pr-731
+
+on:
+  push:
+    branches:
+      - sentinel-fix-python-jose-16111687891435667816
+    paths:
+      - .github/cleanup-pr-731.trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-pr-731
+  cancel-in-progress: false
+
+jobs:
+  cleanup-and-verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout pull request branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: sentinel-fix-python-jose-16111687891435667816
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Remove unrelated frontend dependency drift
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git checkout origin/main -- frontend/package.json frontend/package-lock.json
+          git diff --check
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.10'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Backend typecheck
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: mypy app
+
+      - name: Focused DSN redaction branch coverage
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_dsn_redaction.py --cov=app.dsn_redaction --cov-branch --cov-report=term-missing --cov-fail-under=100
+
+      - name: Complete backend suite
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: pytest -q
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Complete frontend coverage suite
+        working-directory: frontend
+        run: npm run test
+
+      - name: Production frontend build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Publish validated cleanup
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/cleanup-pr-731.yml .github/cleanup-pr-731.trigger
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore(scope): remove unrelated frontend dependency drift'
+          git push origin HEAD:sentinel-fix-python-jose-16111687891435667816
