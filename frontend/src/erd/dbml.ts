@@ -1,6 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
-import { decodeHandleId } from "./handleUtils";
 
 function escapeString(str: string): string {
   return str.replace(/'/g, "''");
@@ -90,16 +89,8 @@ export function exportDbml(
         sourceCols = edgeData.sourceColumns.map(safeId);
         targetCols = edgeData.targetColumns.map(safeId);
       } else if (edge.sourceHandle && edge.targetHandle) {
-         // Handles are hex-encoded column names; decode and verify the column exists
-         // instead of emitting the raw encoded payload into the DBML output.
-         const decodedSource = decodeHandleId(edge.sourceHandle);
-         if (decodedSource !== null && (sourceNode.data.columns || []).some((c) => c && c.column_name === decodedSource)) {
-           sourceCols = [safeId(decodedSource)];
-         }
-         const decodedTarget = decodeHandleId(edge.targetHandle);
-         if (decodedTarget !== null && (targetNode.data.columns || []).some((c) => c && c.column_name === decodedTarget)) {
-           targetCols = [safeId(decodedTarget)];
-         }
+         sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
+         targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
       }
 
       if (sourceCols.length > 0 && targetCols.length > 0) {

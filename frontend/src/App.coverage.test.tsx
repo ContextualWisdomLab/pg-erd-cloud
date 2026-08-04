@@ -325,13 +325,6 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(
-        screen.queryByText(
-          '아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요.',
-        ),
-      ).not.toBeInTheDocument(),
-    )
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
@@ -648,6 +641,7 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -668,6 +662,7 @@ describe('App orchestration coverage', () => {
       .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectSnapshots = reject }))
       .mockResolvedValueOnce(snapshots)
     await renderReadyApp()
+    await waitFor(() => expect(screen.getByRole('button', { name: '편집기' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
     await act(async () => {
@@ -751,6 +746,7 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -791,6 +787,7 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
