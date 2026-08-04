@@ -130,3 +130,12 @@ def test_column_positions_are_contiguous_per_relation_for_large_import():
         1: list(range(1, first_count + 1)),
         2: list(range(1, second_count + 1)),
     }
+
+
+def test_parse_dbml_sql_injection():
+    text = 'Table "users; DROP TABLE users" {\n id integer [pk]\n}'
+    try:
+        parse_dbml(text)
+        assert False, "Should have raised ValueError for SQL injection attempt"
+    except ValueError as e:
+        assert "Invalid characters in identifier" in str(e)

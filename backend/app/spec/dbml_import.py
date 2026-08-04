@@ -106,8 +106,8 @@ def _split_table_name(raw: str) -> tuple[str, str]:
     raw = raw.strip().strip('"')
     if "." in raw:
         schema, _, name = raw.partition(".")
-        return schema.strip('"'), name.strip('"')
-    return "public", raw
+        return _validate_identifier(schema.strip('"')), _validate_identifier(name.strip('"'))
+    return "public", _validate_identifier(raw)
 
 
 def _split_col_ref(raw: str) -> tuple[str, str, str]:
@@ -115,7 +115,7 @@ def _split_col_ref(raw: str) -> tuple[str, str, str]:
 
     Splits on dots *outside* quotes so '"Order Items".account_id' works.
     """
-    parts = [p.strip('"') for p in _PATH_SEGMENT_RE.findall(raw.strip())]
+    parts = [_validate_identifier(p.strip('"')) for p in _PATH_SEGMENT_RE.findall(raw.strip())]
     if len(parts) >= 3:
         return parts[0], parts[1], parts[2]
     if len(parts) == 2:
@@ -123,7 +123,15 @@ def _split_col_ref(raw: str) -> tuple[str, str, str]:
     return "public", "", parts[0]
 
 
+
+def _validate_identifier(name: str) -> str:
+    """Validate an identifier to prevent SQL injection when generating constraints."""
+    if re.search(r'''['";]|--|/\\*''', name):
+        raise ValueError(f"Invalid characters in identifier: {name}")
+    return name
+
 def parse_dbml(text: str) -> dict[str, Any]:
+
     """Parse DBML text into snapshot JSON (relations/columns/pk_columns/fk_edges)."""
     relations: list[dict[str, Any]] = []
     columns: list[dict[str, Any]] = []
@@ -204,7 +212,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
         cm = _COLUMN_RE.match(line)
         if not cm:
             continue
-        col_name = (cm.group("qname") or cm.group("name")).strip('"')
+        col_name = _validate_identifier((cm.group("qname") or cm.group("name")).strip('"'))
         settings = (cm.group("settings") or "").lower()
         oid = oid_by_table[current]
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
