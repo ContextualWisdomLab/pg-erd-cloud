@@ -3,29 +3,35 @@ http:
     healthz:
       rule: Path(`/healthz`)
       entryPoints:
-        - web
+        - websecure
       service: backend
       priority: 110
       middlewares:
         - security-headers
+      tls:
+        options: hardened
 
     api:
       rule: PathPrefix(`/api`)
       entryPoints:
-        - web
+        - websecure
       service: backend
       priority: 100
       middlewares:
         - security-headers
+      tls:
+        options: hardened
 
     frontend:
       rule: PathPrefix(`/`)
       entryPoints:
-        - web
+        - websecure
       service: frontend
       priority: 1
       middlewares:
         - security-headers
+      tls:
+        options: hardened
 
   services:
     backend:
@@ -45,3 +51,16 @@ http:
         customFrameOptionsValue: DENY
         referrerPolicy: no-referrer
         permissionsPolicy: geolocation=(), microphone=(), camera=()
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+
+tls:
+  certificates:
+    - certFile: /run/secrets/tls_certificate
+      keyFile: /run/secrets/tls_private_key
+  options:
+    hardened:
+      minVersion: VersionTLS12
+      sniStrict: true
