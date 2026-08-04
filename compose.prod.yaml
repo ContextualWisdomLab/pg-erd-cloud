@@ -6,6 +6,10 @@ services:
       - --global.checknewversion=false
       - --global.sendanonymoususage=false
       - --entryPoints.web.address=:8080
+      - --entryPoints.websecure.address=:8443
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.web.http.redirections.entryPoint.permanent=true
       - --providers.file.filename=/etc/traefik/dynamic.yaml
       - --providers.file.watch=true
       - --accesslog=true
@@ -15,8 +19,12 @@ services:
       - frontend
     ports:
       - "127.0.0.1:${TRAEFIK_HTTP_PORT:-8080}:8080"
+      - "${TRAEFIK_HTTPS_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_HTTPS_PORT:-443}:8443"
     volumes:
       - ./deploy/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    secrets:
+      - tls_certificate
+      - tls_private_key
     restart: unless-stopped
 
   postgres:
@@ -25,7 +33,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-erd}
       POSTGRES_USER: ${POSTGRES_USER:-erd}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-54321}:5432"
     volumes:
@@ -45,7 +53,7 @@ services:
     env_file: ./.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
-      CORS_ORIGINS: http://localhost:8080
+      CORS_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN to the public HTTPS origin}
       APP_SECRET_FILE: /run/secrets/app_secret
     secrets:
       - app_secret
@@ -78,3 +86,7 @@ volumes:
 secrets:
   app_secret:
     file: ./secrets/app_secret
+  tls_certificate:
+    file: ${TLS_CERTIFICATE_FILE:?set TLS_CERTIFICATE_FILE to a PEM certificate}
+  tls_private_key:
+    file: ${TLS_PRIVATE_KEY_FILE:?set TLS_PRIVATE_KEY_FILE to a PEM private key}
