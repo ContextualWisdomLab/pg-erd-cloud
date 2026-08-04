@@ -14,22 +14,24 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
     r"(?P<value>[^&\s,;\"'<>]+)",
     re.IGNORECASE,
 )
+_DSN_SCHEME_PREFIX_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+._-]*$")
+_REDACTION_PARSE_PREFIX = "redaction://"
 
 
 def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
-    """Extract (netloc, query) from a DSN without ``urlsplit``.
+    """Extract ``(netloc, query)`` from a DSN without ``urlsplit``.
 
-    ``urllib.parse.urlsplit`` raises ``ValueError`` (e.g. "Invalid IPv6 URL")
-    on malformed authorities such as an unbalanced ``[``. Redaction must never
-    crash on hostile input, otherwise the raw, un-redacted error message could
-    still reach a client. This fallback recovers the credential-bearing parts
-    with plain string slicing so embedded secrets are still stripped.
+    ``urllib.parse.urlsplit`` raises ``ValueError`` on malformed authorities,
+    such as an unbalanced IPv6 bracket. Redaction must not propagate that
+    failure because the original exception can contain credentials. This
+    fallback uses bounded string operations to recover the authority and query
+    sections without performing network activity.
     """
 
     remainder = dsn
-    scheme_sep = remainder.find("://")
-    if scheme_sep != -1:
-        remainder = remainder[scheme_sep + 3 :]
+    scheme_separator = remainder.find("://")
+    if scheme_separator != -1:
+        remainder = remainder[scheme_separator + 3 :]
     remainder = remainder.split("#", 1)[0]
     if "?" in remainder:
         remainder, query = remainder.split("?", 1)
@@ -39,53 +41,88 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
     return netloc, query
 
 
-def _password_candidates_from_dsn(dsn: str) -> set[str]:
-    candidates: set[str] = set()
+def _authority_view_without_slashes(dsn: str) -> tuple[str, str | None, str]:
+    """Parse the safest authority view for a DSN that omits ``//``.
 
-    password: str | None = None
+    ``user:password@host/db`` must retain ``user`` as user information, while
+    ``scheme:user:password@host/db`` must remove only its validated scheme
+    token. The pre-``@`` colon count disambiguates those two forms. The
+    synthetic ``redaction`` scheme is used only by ``urlsplit`` and cannot
+    initiate a network request.
+    """
+
+    authority_candidate = dsn
+    before_at = dsn.rsplit("@", 1)[0]
+    scheme_prefix, separator, remainder = dsn.partition(":")
+    if (
+        separator
+        and before_at.count(":") >= 2
+        and _DSN_SCHEME_PREFIX_PATTERN.fullmatch(scheme_prefix)
+    ):
+        authority_candidate = remainder
+
+    normalized = (
+        authority_candidate[2:]
+        if authority_candidate.startswith("//")
+        else authority_candidate
+    )
+    try:
+        parsed = urlsplit(_REDACTION_PARSE_PREFIX + normalized)
+    except ValueError:
+        netloc, query = _split_dsn_best_effort(normalized)
+        return netloc, None, query
+    return parsed.netloc, parsed.password, parsed.query
+
+
+def _password_candidates_from_dsn(dsn: str) -> set[str]:
+    """Return encoded and decoded credential candidates extracted from ``dsn``."""
+
+    views: list[tuple[str, str | None, str]] = []
     try:
         parsed = urlsplit(dsn)
-        if not parsed.netloc:
-            if "://" in dsn:
-                # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
-                parsed = urlsplit("http://" + dsn.split("://", 1)[1])
-            elif ":" in dsn:
-                parsed = urlsplit("http://" + dsn.split(":", 1)[1])
-        netloc = parsed.netloc
-        password = parsed.password
-        query = parsed.query
     except ValueError:
-        # Malformed DSN (e.g. invalid IPv6 literal). Fall back to best-effort
-        # parsing so any embedded credentials are still redacted.
         netloc, query = _split_dsn_best_effort(dsn)
+        views.append((netloc, None, query))
+    else:
+        views.append((parsed.netloc, parsed.password, parsed.query))
+        if not parsed.netloc and "@" in dsn:
+            views.append(_authority_view_without_slashes(dsn))
 
-    if password:
-        candidates.add(password)
-        candidates.add(quote(password, safe=""))
+    candidates: set[str] = set()
+    for netloc, password, query in views:
+        if password:
+            decoded_password = unquote(password)
+            candidates.add(password)
+            candidates.add(decoded_password)
+            candidates.add(quote(decoded_password, safe=""))
 
-    if "@" in netloc:
-        userinfo = netloc.rsplit("@", 1)[0]
-        if ":" in userinfo:
-            raw_password = userinfo.split(":", 1)[1]
-            candidates.add(raw_password)
-            candidates.add(unquote(raw_password))
+        if "@" in netloc:
+            userinfo = netloc.rsplit("@", 1)[0]
+            if ":" in userinfo:
+                raw_password = userinfo.split(":", 1)[1]
+                decoded_password = unquote(raw_password)
+                candidates.add(raw_password)
+                candidates.add(decoded_password)
+                candidates.add(quote(decoded_password, safe=""))
 
-    for part in query.split("&"):
-        key, sep, raw_value = part.partition("=")
-        if not sep:
-            continue
-        if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
-            continue
-        decoded_value = unquote_plus(raw_value)
-        candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
+        for part in query.split("&"):
+            key, separator, raw_value = part.partition("=")
+            if not separator:
+                continue
+            if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
+                continue
+            decoded_value = unquote_plus(raw_value)
+            candidates.add(raw_value)
+            candidates.add(decoded_value)
+            candidates.add(quote(decoded_value, safe=""))
+            candidates.add(quote_plus(decoded_value, safe=""))
 
     return {candidate for candidate in candidates if candidate}
 
 
 def _redact_secret_occurrences(message: str, secret: str) -> str:
+    """Replace ``secret`` while avoiding substring damage for short values."""
+
     if len(secret) > 4:
         return message.replace(secret, "***")
 
@@ -94,7 +131,7 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
-    """Redact DSN-derived secrets from a driver error message."""
+    """Remove DSN-derived credentials from a database-driver error message."""
 
     redacted = error_message
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
