@@ -277,13 +277,13 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
+            leeway=OIDC_JWT_LEEWAY_SECONDS,
             options={
                 "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
+                "verify_iss": True,
+                "verify_exp": True,
+                "verify_jti": True,
+                "require": ["exp", "iss", "jti"] + (["aud"] if bool(settings.oidc_audience) else []),
             },
         )
     except jwt.PyJWTError as err:

@@ -302,13 +302,13 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
+        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
-            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+            "verify_iss": True,
+            "verify_exp": True,
+            "verify_jti": True,
+            "require": ["exp", "iss", "jti", "aud"],
         },
     }
 
