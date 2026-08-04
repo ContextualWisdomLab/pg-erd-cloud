@@ -686,8 +686,9 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -706,9 +707,14 @@ describe('App orchestration coverage', () => {
       .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectSnapshots = reject }))
       .mockResolvedValueOnce(snapshots)
     await renderReadyApp()
+
+    // Clear out initial errors before test acts
+    await waitFor(() => expect(screen.queryByText(/stale/)).not.toBeInTheDocument())
+
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
     await act(async () => {
+      // Catching these rejections inside the act stops the unhandled rejection in vitest
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
       await Promise.resolve()
