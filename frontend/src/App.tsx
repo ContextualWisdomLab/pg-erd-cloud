@@ -106,7 +106,42 @@ function formatPercent(value: number): string {
 function isSupportedConnectionDsn(value: string): boolean {
   try {
     const url = new URL(value);
-    return SUPPORTED_DSN_PROTOCOLS.has(url.protocol) && Boolean(url.hostname);
+    if (!SUPPORTED_DSN_PROTOCOLS.has(url.protocol) || !url.hostname) {
+      return false;
+    }
+
+    const host = url.hostname.toLowerCase();
+
+    // Block cloud metadata and known internal DNS
+    if (host === "metadata.google.internal" || host === "internal-db" || host === "localhost") {
+      return false;
+    }
+
+    // Basic IP parsing to block private/internal ranges
+    // This provides client-side defense-in-depth against SSRF.
+    const isIPv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    if (isIPv4) {
+      const p1 = parseInt(isIPv4[1], 10);
+      const p2 = parseInt(isIPv4[2], 10);
+
+      // 10.0.0.0/8 (RFC 1918)
+      if (p1 === 10) return false;
+      // 172.16.0.0/12 (RFC 1918)
+      if (p1 === 172 && p2 >= 16 && p2 <= 31) return false;
+      // 192.168.0.0/16 (RFC 1918)
+      if (p1 === 192 && p2 === 168) return false;
+      // 127.0.0.0/8 (Loopback)
+      if (p1 === 127) return false;
+      // 169.254.0.0/16 (Link-local / AWS IMDS)
+      if (p1 === 169 && p2 === 254) return false;
+    }
+
+    // Block IPv6 loopback
+    if (host === "::1" || host === "[::1]") {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -1058,7 +1093,7 @@ export default function App() {
               </option>
               {projects.map((p) => (
                 <option key={p.project_space_uuid} value={p.project_space_uuid}>
-                  {p.project_name}
+                  {sanitizeHtml(p.project_name)}
                 </option>
               ))}
             </select>
@@ -1204,7 +1239,7 @@ export default function App() {
             </div>
             <div>
               <span>선택 프로젝트</span>
-              <strong>{selectedProject?.project_name || "선택 안 됨"}</strong>
+              <strong>{sanitizeHtml(selectedProject?.project_name) || "선택 안 됨"}</strong>
             </div>
             <button type="button" onClick={() => setActiveView("editor")}>
               편집기로 이동
@@ -1344,7 +1379,7 @@ export default function App() {
             <div className="workspaceHeader">
               <div>
                 <h1 id="diagrams-title">다이어그램</h1>
-                <p>{selectedProject ? `${selectedProject.project_name} 프로젝트의 스냅샷` : "프로젝트를 선택하세요."}</p>
+                <p>{selectedProject ? `${sanitizeHtml(selectedProject.project_name)} 프로젝트의 스냅샷` : "프로젝트를 선택하세요."}</p>
               </div>
               <button type="button" onClick={() => setActiveView("editor")}>
                 편집기 열기
