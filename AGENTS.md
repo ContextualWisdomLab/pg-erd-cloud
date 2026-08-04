@@ -102,8 +102,12 @@ behind Traefik (`deploy/traefik/`).
 
 ## Code-owner review gates — disabled (on hold)
 
-As of 2026-08-04, code-owner review requirements (`require_code_owner_reviews`
-in branch protection and `require_code_owner_review` in rulesets) are disabled
-across ContextualWisdomLab. A solo maintainer cannot independently satisfy a
-code-owner approval gate. Keep this policy on hold until the organization has
-multiple maintainers; do not re-enable CODEOWNERS-based merge gates before then.
+The organization-level policy in `ContextualWisdomLab/.github` is authoritative.
+While the organization has only one maintainer, code-owner-specific requirements
+(`require_code_owner_reviews` in branch protection and
+`require_code_owner_review` in rulesets) remain on hold because they cannot be
+satisfied independently. Do not add or re-enable a CODEOWNERS-based merge gate
+until the central policy records multiple independent maintainers. This hold
+does not remove current-head independent approval, required status checks,
+security gates, latest-pusher restrictions, or unresolved-thread protection;
+when local text and central governance disagree, central governance wins.
