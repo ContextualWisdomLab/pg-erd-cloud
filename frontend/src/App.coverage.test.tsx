@@ -664,6 +664,9 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
     await act(async () => {
+      // allow react to flush the state update and run the cleanup effect
+      await Promise.resolve()
+      await Promise.resolve()
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
       await Promise.resolve()

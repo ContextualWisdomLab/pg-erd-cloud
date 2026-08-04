@@ -14,3 +14,7 @@
 **Vulnerability:** The frontend `package-lock.json` contained an outdated transitive dependency on `undici@7.28.0` via `jsdom`, which is vulnerable to multiple CVEs including CRLF injection, desynchronization, and cross-user information disclosure (CVE-2026-15157, CVE-2026-16728, CVE-2026-14643, CVE-2026-16729).
 **Learning:** Tools like `jsdom` bring in network-related dependencies like `undici`. When OSV scanner detects vulnerabilities in the frontend package lock, adding a direct override or explicit dependency ensures it is updated.
 **Prevention:** Always bump frontend dependencies by applying `"pnpm": { "overrides": ... }` or directly injecting it into package overrides, then recreating the lock file.
+## 2026-08-04 - [Test Coverage Async Flakiness]
+**Vulnerability:** Not a security vulnerability, but an issue affecting CI reliability. Tests utilizing `vi.useFakeTimers()` to interact with elements reliant on asynchronous DOM updates (like `App.tsx` snapshot polling lists) would fail sporadically.
+**Learning:** `vi.useFakeTimers()` intercepts promises and timer scheduling. If called before React has fully resolved and rendered initial effects, subsequent DOM queries (e.g., `screen.getAllByRole`) will fail. State updates triggered by event handlers must also be allowed to flush (via `await Promise.resolve()`) before fake timers are advanced.
+**Prevention:** Ensure explicit `await waitFor(...)` assertions are made to confirm expected UI state *prior* to enabling fake timers.
