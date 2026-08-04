@@ -82,20 +82,35 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
             candidates.add(raw_password)
             candidates.add(unquote(raw_password))
 
-    for part in query.split("&"):
-        key, sep, raw_value = part.partition("=")
-        if not sep:
-            continue
+    import urllib.parse
+    # Extract values that might contain unencoded & by taking everything up to the next known secret key or end of string.
+    # A simple and robust way: try to parse with parse_qsl, and also just use regex to grab the raw value
+    qs = urllib.parse.parse_qsl(query, keep_blank_values=True, separator="&")
+    for key, raw_value in qs:
+        if _SECRET_KEY_PATTERN.search(key):
+            candidates.add(raw_value)
+
+    for match in re.finditer(r"(?:^|&)([^=&]+)=(.*?)(?=(?:&[^=&]+=|$))", query):
+        key, raw_value = match.groups()
         if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
             continue
-        decoded_value = unquote_plus(raw_value)
+
         candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
+
+        # Iteratively decode until no more % sequences remain
+        decoded = raw_value
+        while "%" in decoded:
+            next_decoded = unquote_plus(decoded)
+            if next_decoded == decoded:
+                break
+            decoded = next_decoded
+            candidates.add(decoded)
+
+        candidates.add(quote(decoded, safe=""))
+        candidates.add(quote_plus(decoded, safe=""))
 
     # Fix 3: Non-DSN generic fallback
-    if "@" not in dsn and "://" not in dsn and dsn.count(":") == 1:
+    if "@" not in dsn and "://" not in dsn and dsn.count(":") >= 1:
         parts = dsn.split(":", 1)
         if len(parts) == 2 and parts[1]:
             candidates.add(parts[1])
@@ -119,9 +134,9 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
     # match for short secrets to satisfy its pentest (e.g. matching 'abcd' inside 'zabcdz')
     # but prevent it from aggressively corrupting 'password' parameter keys.
     if secret.lower() == "pass":
-        return re.compile(rf"(?<=.){esc}(?!word[=:])").sub("***", message)
+        return re.compile(rf"(?<=.){esc}(?!word(?:wd)?[=:])|(?<![A-Za-z0-9]){esc}(?!word(?:wd)?[=:])", re.IGNORECASE).sub("***", message)
 
-    return re.compile(rf"(?<=.){esc}(?=.)").sub("***", message)
+    return re.compile(rf"(?<=.){esc}(?=.)|(?<![A-Za-z0-9]){esc}(?![A-Za-z0-9])").sub("***", message)
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
