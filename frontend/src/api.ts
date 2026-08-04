@@ -182,6 +182,7 @@ export async function createConnection(projectId: string, conn_name: string, dsn
   const r = await fetch(`${API_BASE}/api/connections/by-project/${projectId}`, {
     method: 'POST',
     credentials: 'include',
+    redirect: 'error',
     headers: await jsonHeaders(),
     body: JSON.stringify({ conn_name, dsn })
   })
