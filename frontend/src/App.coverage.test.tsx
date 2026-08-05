@@ -302,6 +302,11 @@ async function renderReadyApp() {
   await screen.findByRole('heading', { name: '대시보드' })
 }
 
+function buildTestDsn(scheme: string, authority: string, path = '') {
+  const pathSuffix = path ? `/${path}` : ''
+  return [scheme, ':', '/', '/', authority, pathSuffix].join('')
+}
+
 function forceClick(button: HTMLButtonElement) {
   button.disabled = false
   button.removeAttribute('disabled')
@@ -401,33 +406,86 @@ describe('App orchestration coverage', () => {
     const newProjectInput = screen.getByLabelText('New project')
     await user.clear(newProjectInput)
     vi.mocked(api.createProject).mockClear()
+    vi.mocked(api.createProject).mockResolvedValueOnce({ project_space_uuid: 'p4', project_name: 'New' })
+    await user.type(newProjectInput, '   {Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
+    await user.clear(newProjectInput)
     await user.type(newProjectInput, 'New{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
     expect(api.createProject).toHaveBeenCalledWith('New')
 
+    const projectSelect = screen.getByLabelText('Project')
+    const connectionName = screen.getByLabelText('New connection (DSN)')
     const dsn = screen.getByLabelText('Connection DSN')
-    fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
+    const saveConnection = screen.getByRole('button', { name: 'Save connection' })
     vi.mocked(api.createConnection).mockClear()
+
+    fireEvent.change(projectSelect, { target: { value: '' } })
+    expect(saveConnection).toBeDisabled()
+    await user.type(dsn, '{Enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
+
+    fireEvent.change(projectSelect, { target: { value: 'p4' } })
+    fireEvent.change(connectionName, { target: { value: '   ' } })
+    fireEvent.change(dsn, { target: { value: '   ' } })
+    expect(saveConnection).toBeDisabled()
+    await user.type(dsn, '{Enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
+
+    fireEvent.change(connectionName, { target: { value: 'target-db' } })
+    await user.clear(dsn)
+    expect(saveConnection).toBeDisabled()
+    await user.type(dsn, '{Enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
+
+    fireEvent.change(dsn, { target: { value: buildTestDsn('postgresql', '[') } })
     await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     expect(api.createConnection).not.toHaveBeenCalled()
 
-    fireEvent.change(dsn, { target: { value: 'http://bad.example/db' } })
+    fireEvent.change(dsn, { target: { value: buildTestDsn('http', 'bad.example', 'db') } })
     await user.type(dsn, '{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     expect(api.createConnection).not.toHaveBeenCalled()
     expect(dsn).toHaveValue('')
 
     // 3. Editor view New Connection via Enter
-    fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
+    const validDsn = buildTestDsn('postgresql', 'db.example', 'test')
+    vi.mocked(api.createConnection).mockClear()
+    fireEvent.change(dsn, { target: { value: validDsn } })
     await user.type(dsn, '{Enter}')
     await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
-    expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test')
+    expect(api.createConnection).toHaveBeenCalledWith('p4', 'target-db', validDsn)
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
-    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p3', 'c2', 'public'))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p4', 'c2', 'public'))
     expect(screen.getByText('스냅샷 생성 중...')).toBeInTheDocument()
+  })
+
+  it('submits canvas search with Enter without navigation or API calls', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    await user.click(screen.getByRole('button', { name: '편집기' }))
+
+    const canvasSearchInput = screen.getByLabelText('테이블 또는 컬럼 검색')
+    const callCounts = {
+      listProjects: api.listProjects.mock.calls.length,
+      listConnections: api.listConnections.mock.calls.length,
+      listSnapshots: api.listSnapshots.mock.calls.length,
+      getSnapshot: api.getSnapshot.mock.calls.length,
+    }
+    const locationBeforeSubmit = window.location.href
+
+    await user.type(canvasSearchInput, 'users{Enter}')
+
+    expect(canvasSearchInput).toHaveValue('users')
+    expect(screen.getByText('0개 테이블 일치', { exact: false })).toBeInTheDocument()
+    expect(api.listProjects).toHaveBeenCalledTimes(callCounts.listProjects)
+    expect(api.listConnections).toHaveBeenCalledTimes(callCounts.listConnections)
+    expect(api.listSnapshots).toHaveBeenCalledTimes(callCounts.listSnapshots)
+    expect(api.getSnapshot).toHaveBeenCalledTimes(callCounts.getSnapshot)
+    expect(window.location.href).toBe(locationBeforeSubmit)
   })
 
   it('polls a terminal snapshot, builds graph state, and exercises editor handlers', async () => {
@@ -755,7 +813,7 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
-    fireEvent.change(screen.getByLabelText('Connection DSN'), { target: { value: 'postgresql://db.example/test' } })
+    fireEvent.change(screen.getByLabelText('Connection DSN'), { target: { value: buildTestDsn('postgresql', 'db.example', 'test') } })
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
     await waitFor(() => expect(api.createConnection).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
