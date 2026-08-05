@@ -19,6 +19,11 @@ async function loadApi(demo = false): Promise<ApiModule> {
   return import('./api')
 }
 
+function layoutWithSerializedSize(serializedBytes: number): DiagramViewLayout {
+  const fixedBytes = new TextEncoder().encode('{"blob":""}').byteLength
+  return { blob: 'a'.repeat(serializedBytes - fixedBytes) }
+}
+
 const initialLayout: DiagramViewLayout = {
   positions: {
     '1': { x: 12, y: 24 },
@@ -200,7 +205,7 @@ describe('saved diagram-view API client', () => {
       'Architecture review',
       initialLayout,
     )
-    expect(created.diagram_view_uuid).toBe('demo-view-42')
+    expect(created.diagram_view_uuid).toBe('demo-view-42-1')
     await expect(api.listDiagramViews('project-1')).resolves.toEqual([created])
     await expect(api.getDiagramView(created.diagram_view_uuid)).resolves.toEqual({
       ...created,
@@ -232,5 +237,102 @@ describe('saved diagram-view API client', () => {
     await expect(api.deleteDiagramView(created.diagram_view_uuid)).rejects.toThrow(
       'deleteDiagramView failed: 404',
     )
+  })
+
+  it('keeps same-millisecond demo IDs unique and mutations isolated', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(100)
+    const api = await loadApi(true)
+
+    const first = await api.createDiagramView('project-1', 'First', initialLayout)
+    const second = await api.createDiagramView('project-1', 'Second', updatedLayout)
+
+    expect(first.diagram_view_uuid).not.toBe(second.diagram_view_uuid)
+    expect(first.diagram_view_uuid).toBe('demo-view-100-1')
+    expect(second.diagram_view_uuid).toBe('demo-view-100-2')
+
+    await api.updateDiagramView(first.diagram_view_uuid, 'First updated', updatedLayout)
+    await api.deleteDiagramView(second.diagram_view_uuid)
+
+    await expect(api.getDiagramView(first.diagram_view_uuid)).resolves.toMatchObject({
+      name: 'First updated',
+      layout_json: updatedLayout,
+    })
+    await expect(api.getDiagramView(second.diagram_view_uuid)).rejects.toThrow(
+      'getDiagramView failed: 404',
+    )
+  })
+
+  it('moves an updated older demo view to the front', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(200)
+    const api = await loadApi(true)
+
+    const older = await api.createDiagramView('project-1', 'Older', initialLayout)
+    const newer = await api.createDiagramView('project-1', 'Newer', updatedLayout)
+    await expect(api.listDiagramViews('project-1')).resolves.toEqual([newer, older])
+
+    const updatedOlder = await api.updateDiagramView(
+      older.diagram_view_uuid,
+      'Older updated',
+      updatedLayout,
+    )
+    await expect(api.listDiagramViews('project-1')).resolves.toEqual([
+      updatedOlder,
+      newer,
+    ])
+  })
+
+  it('matches backend name and serialized-layout limits before demo mutation', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(300)
+    const api = await loadApi(true)
+    const exactLayout = layoutWithSerializedSize(512 * 1024)
+    const oversizedLayout = layoutWithSerializedSize(512 * 1024 + 1)
+
+    await expect(
+      api.createDiagramView('project-1', '', initialLayout),
+    ).rejects.toThrow('createDiagramView failed: invalid name')
+    await expect(
+      api.createDiagramView('project-1', 'x'.repeat(201), initialLayout),
+    ).rejects.toThrow('createDiagramView failed: invalid name')
+    await expect(
+      api.createDiagramView('project-1', 'Oversized', oversizedLayout),
+    ).rejects.toThrow('createDiagramView failed: layout payload too large')
+    await expect(api.listDiagramViews('project-1')).resolves.toEqual([])
+
+    const created = await api.createDiagramView('project-1', 'At limit', exactLayout)
+    const beforeRejectedUpdate = await api.getDiagramView(created.diagram_view_uuid)
+
+    await expect(
+      api.updateDiagramView(created.diagram_view_uuid, '', updatedLayout),
+    ).rejects.toThrow('updateDiagramView failed: invalid name')
+    await expect(
+      api.updateDiagramView(
+        created.diagram_view_uuid,
+        'x'.repeat(201),
+        updatedLayout,
+      ),
+    ).rejects.toThrow('updateDiagramView failed: invalid name')
+    await expect(
+      api.updateDiagramView(
+        created.diagram_view_uuid,
+        'Oversized update',
+        oversizedLayout,
+      ),
+    ).rejects.toThrow('updateDiagramView failed: layout payload too large')
+
+    await expect(api.getDiagramView(created.diagram_view_uuid)).resolves.toEqual(
+      beforeRejectedUpdate,
+    )
+    await expect(api.listDiagramViews('project-1')).resolves.toEqual([created])
+  })
+
+  it('rejects cyclic demo layouts without changing storage', async () => {
+    const api = await loadApi(true)
+    const cyclic: DiagramViewLayout = {}
+    cyclic.self = cyclic
+
+    await expect(
+      api.createDiagramView('project-1', 'Cyclic', cyclic),
+    ).rejects.toThrow('createDiagramView failed: invalid layout')
+    await expect(api.listDiagramViews('project-1')).resolves.toEqual([])
   })
 })
