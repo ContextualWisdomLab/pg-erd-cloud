@@ -10,9 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.annotations import router as annotations_router
 from app.api.api_keys import router as api_keys_router
+from app.api.auth_routes import router as auth_router
 from app.api.connections import router as connections_router
 from app.api.dbml import router as dbml_router
-from app.api.auth_routes import router as auth_router
 from app.api.diagram_views import router as diagram_views_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router
@@ -29,6 +29,7 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.request_body_limit import RequestBodyLimitMiddleware
 from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
@@ -64,6 +65,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
+
+# Buffer a bounded unsafe API body before routing. This is registered before the
+# other application middleware so rate limiting and CSRF may still reject a
+# request without body parsing, while accepted state-changing calls cannot reach
+# authentication dependencies or Pydantic deserialization with an unbounded body.
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=settings.api_request_body_max_bytes,
+    route_prefix="/api",
+)
 
 CORS_ALLOW_HEADERS = [
     "Authorization",
@@ -131,13 +142,13 @@ app.add_middleware(
     # Default to the strictest safe setting. Enable credentials only when you
     # actually need cookie-based auth.
     allow_credentials=False,
-    # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "OPTIONS"],
+    # Explicit allowlist synchronized with the production API surface.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=CORS_ALLOW_HEADERS,
 )
 
 # Observability should be registered after other middleware so it can capture
-# early returns (e.g. 429, CORS preflight).
+# early returns (e.g. 413, 429, CORS preflight).
 #
 # Note: security headers are registered last (outermost) so headers are attached
 # even when another middleware returns early.
@@ -149,8 +160,8 @@ setup_observability(app)
 # ones (i.e., it becomes the outermost).
 #
 # We register security headers last so headers are attached even when another
-# middleware returns early (e.g., CORS preflight, 429 rate-limit responses).
-# See: backend/tests/test_security_headers.py
+# middleware returns early (e.g., request-body rejection, CORS preflight, 429
+# rate-limit responses). See: backend/tests/test_security_headers.py
 app.middleware("http")(make_security_headers_middleware())
 
 
