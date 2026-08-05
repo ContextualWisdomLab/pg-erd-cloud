@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] ⚡ **ERD edge handle 직접 디코딩**: DDL·데이터 사전 export가 모든 후보 컬럼을 재인코딩해 검색하던 O(C × H) 경로를 canonical O(H) 디코더로 교체했습니다. `c-*`, `src-c-*`, `tgt-c-*`의 lowercase shortest-hex 형식만 허용하고 비정상 prefix·대문자·부분/빈 chunk·범위 초과·과잉 zero-padding을 거부합니다. ECMAScript·Unicode 근거와 검증 계약은 doctoring에 기록했습니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
