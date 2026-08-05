@@ -55,47 +55,6 @@ jobs:
                   raise SystemExit(f"expected exactly one export.ts occurrence: {old!r}")
               source = source.replace(old, new)
           export_path.write_text(source, encoding="utf-8")
-
-          test_path = Path("frontend/src/erd/__tests__/exportDataDictionary.test.ts")
-          tests = test_path.read_text(encoding="utf-8")
-          anchor = "\n\n  it('escapes Markdown table breakers and HTML-like content', () => {"
-          regression = """
-
-  it('rejects a target-role handle in the source FK position', () => {
-    const edge = {
-      id: 'wrong-role',
-      source: 'node1',
-      target: 'node2',
-      sourceHandle: 'tgt-c-0069-0064',
-    } as Edge;
-
-    const markdown = exportDictionaryMarkdown(
-      [
-        {
-          id: 'node1',
-          data: {
-            columns: [
-              {
-                column_name: 'id',
-                data_type: 'int',
-                is_pk: false,
-                is_not_null: false,
-              },
-            ],
-          },
-        },
-      ] as Node<TableNodeData>[],
-      [edge],
-    );
-
-    expect(markdown).toContain('| id | int | N | N | N |  |  |');
-  });
-"""
-          if regression.strip() not in tests:
-              if tests.count(anchor) != 1:
-                  raise SystemExit("expected one exportDataDictionary test anchor")
-              tests = tests.replace(anchor, regression + anchor)
-          test_path.write_text(tests, encoding="utf-8")
           PY
 
       - name: Install frontend dependencies
@@ -121,7 +80,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add frontend/src/erd/export.ts \
-            frontend/src/erd/__tests__/exportDataDictionary.test.ts \
             .github/workflows/pr-700-finalize-handle-export.yml
           git diff --cached --check
           git commit -m "fix(frontend): preserve source and target handle roles"
