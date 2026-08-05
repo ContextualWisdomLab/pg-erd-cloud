@@ -22,11 +22,15 @@ class FakeConnection:
         self.fetch_count = 0
 
     async def fetchval(self, query: str, *_args: object) -> object:
+        """Return a stable server version or Citus-extension flag."""
+
         if query == "SHOW server_version":
             return "17.10"
         return self.citus_mode != "absent"
 
     async def fetch(self, *_args: object) -> list[dict[str, object]]:
+        """Return empty catalogs and model optional Citus catalog behavior."""
+
         self.fetch_count += 1
         if self.fetch_count == 8:
             if self.citus_mode == "missing_catalog":
@@ -50,6 +54,8 @@ async def test_collect_postgres_snapshot_handles_each_citus_state(
     expected_citus: list[dict[str, object]],
     expected_fetch_count: int,
 ) -> None:
+    """Validate collection when Citus is absent, present, or lacks its catalog."""
+
     monkeypatch.setattr(
         snapshot_collect.asyncpg,
         "UndefinedTableError",
