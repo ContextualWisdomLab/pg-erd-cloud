@@ -81,11 +81,11 @@ def test_schema_name_rejects_sql_fragments() -> None:
 
 
 @pytest.mark.asyncio
-async def test_capture_uses_local_connection_without_password_or_dsn(
+async def test_capture_uses_local_connection_without_environment_password_or_dsn(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Connect only with bounded local arguments and always close afterward."""
+    """Block PGPASSWORD inheritance, bound connection inputs, and close afterward."""
 
     captured: dict[str, Any] = {}
     connection = FakeConnection()
@@ -98,6 +98,7 @@ async def test_capture_uses_local_connection_without_password_or_dsn(
         assert conn is connection
         return {"schema_filter": schema, "relations": []}
 
+    monkeypatch.setenv("PGPASSWORD", "must-not-be-inherited")
     monkeypatch.setattr(local_snapshot_cli.asyncpg, "connect", fake_connect)
     monkeypatch.setattr(
         local_snapshot_cli,
@@ -119,12 +120,13 @@ async def test_capture_uses_local_connection_without_password_or_dsn(
     assert captured == {
         "database": "catalog",
         "host": str(tmp_path),
+        "password": "",
         "port": 5432,
         "timeout": 10,
         "user": "operator",
     }
     assert "dsn" not in captured
-    assert "password" not in captured
+    assert captured["password"] != "must-not-be-inherited"
     assert connection.closed is True
 
 
