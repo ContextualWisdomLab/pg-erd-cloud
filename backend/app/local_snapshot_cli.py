@@ -100,15 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
 async def capture_local_snapshot(args: argparse.Namespace) -> dict:
     """Connect over a validated Unix socket and collect one catalog snapshot."""
 
-    connection_options: dict[str, object] = {
-        "database": args.database,
-        "host": args.host,
-        "port": args.port,
-        "user": args.user,
-        "timeout": 10,
-    }
-    connection_options["pass" + "word"] = ""
-    conn = await asyncpg.connect(**connection_options)
+    conn = await asyncpg.connect(
+        database=args.database,
+        host=args.host,
+        password="",
+        port=args.port,
+        user=args.user,
+        timeout=10,
+    )
     try:
         return await collect_postgres_snapshot(conn, args.schema)
     finally:
