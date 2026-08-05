@@ -96,6 +96,7 @@ def test_limited_request_selection_is_bounded_to_unsafe_api_calls() -> None:
 
     assert _is_limited_request(_scope(), "/api") is True
     assert _is_limited_request(_scope(path="/api"), "/api") is True
+    assert _is_limited_request(_scope(path="/anything"), "/") is True
     assert _is_limited_request(_scope(method="GET"), "/api") is False
     assert _is_limited_request(_scope(path="/apiary"), "/api") is False
     assert _is_limited_request(_scope(scope_type="websocket"), "/api") is False
