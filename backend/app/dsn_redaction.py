@@ -58,18 +58,20 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
 
     if password:
         candidates.add(password)
-        decoded = unquote(password)
+        decoded = unquote_plus(password)
         candidates.add(decoded)
         candidates.add(quote(decoded, safe=""))
+        candidates.add(quote_plus(decoded, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
             candidates.add(raw_password)
-            decoded_raw = unquote(raw_password)
+            decoded_raw = unquote_plus(raw_password)
             candidates.add(decoded_raw)
             candidates.add(quote(decoded_raw, safe=""))
+            candidates.add(quote_plus(decoded_raw, safe=""))
 
     for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -93,7 +95,9 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    pattern = re.compile(rf"(?<!\w){re.escape(secret)}(?!\w)")
+    start_boundary = r"(?<![A-Za-z0-9])" if secret[0].isalnum() else ""
+    end_boundary = r"(?![A-Za-z0-9])" if secret[-1].isalnum() else ""
+    pattern = re.compile(rf"{start_boundary}{re.escape(secret)}{end_boundary}")
     return pattern.sub("***", message)
 
 
