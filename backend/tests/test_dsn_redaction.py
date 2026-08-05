@@ -1,6 +1,5 @@
 from app.dsn_redaction import redact_dsn_error_message
 
-
 def test_redacts_nonstandard_scheme_password_and_query_secret() -> None:
     dsn = "snowflake_invalid://user:pa%3Ass@acct.example.com/db?token=q%2Fsecret"
     error = (
@@ -43,3 +42,10 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+def test_url_encoded_short_passwords_and_boundaries() -> None:
+    dsn = "postgresql://user:a%2Bb@db.example.com/app"
+    error = "driver failed for a+b (a%2Bb) with =a+ and b+="
+    redacted = redact_dsn_error_message(error, dsn)
+    assert "a+b" not in redacted
+    assert "a%2Bb" not in redacted
