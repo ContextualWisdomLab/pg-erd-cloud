@@ -29,7 +29,11 @@ def _is_limited_request(scope: Scope, route_prefix: str) -> bool:
     if str(scope.get("method", "")).upper() not in UNSAFE_METHODS:
         return False
     path = str(scope.get("path", ""))
-    return path == route_prefix or path.startswith(f"{route_prefix}/")
+    return (
+        route_prefix == "/"
+        or path == route_prefix
+        or path.startswith(f"{route_prefix}/")
+    )
 
 
 class RequestBodyLimitMiddleware:
