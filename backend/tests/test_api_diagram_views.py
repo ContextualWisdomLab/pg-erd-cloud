@@ -6,7 +6,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.api.diagram_views import create_view, delete_view, get_view, update_view
+from app.api.diagram_views import (
+    MAX_LAYOUT_BYTES,
+    create_view,
+    delete_view,
+    get_view,
+    update_view,
+)
 from app.auth import CurrentUser
 from app.schemas import DiagramViewCreateIn
 
@@ -17,6 +23,15 @@ def _user() -> CurrentUser:
     return CurrentUser(
         user_account_uuid=uuid.uuid4(), subject="test", display_name="Test"
     )
+
+
+def _layout_with_serialized_size(serialized_bytes: int) -> dict[str, str]:
+    """Build a compact JSON object whose UTF-8 encoding has the requested size."""
+
+    fixed_bytes = len(b'{"blob":""}')
+    if serialized_bytes < fixed_bytes:
+        raise ValueError("serialized size is too small for the fixture")
+    return {"blob": "a" * (serialized_bytes - fixed_bytes)}
 
 
 @pytest.mark.asyncio
@@ -68,8 +83,10 @@ async def test_create_view_rejects_oversized_layout() -> None:
     """Reject unbounded saved-layout payloads before persistence."""
 
     session = AsyncMock()
-    huge = {"blob": "a" * (600 * 1024)}  # > 512KB serialized
-    body = DiagramViewCreateIn(name="big", layout_json=huge)
+    body = DiagramViewCreateIn(
+        name="big",
+        layout_json=_layout_with_serialized_size(MAX_LAYOUT_BYTES + 1),
+    )
     with patch(
         "app.api.diagram_views.require_project_member", new_callable=AsyncMock
     ):
@@ -140,6 +157,39 @@ async def test_update_view_replaces_name_and_layout_for_editor() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_view_accepts_layout_at_exact_serialized_limit() -> None:
+    """Accept a replacement whose compact JSON encoding is exactly 512 KiB."""
+
+    session = AsyncMock()
+    view_id = uuid.uuid4()
+    created_at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+    view = SimpleNamespace(
+        diagram_view_uuid=view_id,
+        name="Original",
+        layout_json={},
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    exact_layout = _layout_with_serialized_size(MAX_LAYOUT_BYTES)
+
+    with patch(
+        "app.api.diagram_views._get_authorized_view",
+        new_callable=AsyncMock,
+        return_value=view,
+    ):
+        out = await update_view(
+            diagram_view_uuid=view_id,
+            body=DiagramViewCreateIn(name="At limit", layout_json=exact_layout),
+            user=_user(),
+            session=session,
+        )
+
+    assert view.layout_json == exact_layout
+    assert out.name == "At limit"
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_update_view_returns_404_without_editor_access() -> None:
     """Avoid revealing saved-view existence to unauthorized users."""
 
@@ -162,8 +212,8 @@ async def test_update_view_returns_404_without_editor_access() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_view_rejects_oversized_layout_before_mutation() -> None:
-    """Keep the previous layout intact when replacement payload is too large."""
+async def test_update_view_rejects_one_byte_over_limit_before_mutation() -> None:
+    """Keep the prior view unchanged when serialized layout is one byte too large."""
 
     session = AsyncMock()
     view_id = uuid.uuid4()
@@ -177,7 +227,8 @@ async def test_update_view_rejects_oversized_layout_before_mutation() -> None:
         updated_at=original_updated_at,
     )
     body = DiagramViewCreateIn(
-        name="Oversized", layout_json={"blob": "a" * (600 * 1024)}
+        name="Oversized",
+        layout_json=_layout_with_serialized_size(MAX_LAYOUT_BYTES + 1),
     )
 
     with patch(
