@@ -24,23 +24,35 @@ export function targetColumnHandleId(columnName: string): string {
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
+type HandleRole = 'column' | 'source' | 'target'
+
 function canonicalHexChunk(codePoint: number): string {
   return codePoint.toString(16).padStart(4, '0')
 }
 
-export function decodeHandleId(handleId: string | null | undefined): string | null {
+function decodeHandleForRole(
+  handleId: string | null | undefined,
+  expectedRole?: HandleRole,
+): string | null {
   if (!handleId) return null
 
   const parts = handleId.split('-')
   let payloadIndex = -1
+  let role: HandleRole | null = null
 
   if (parts[0] === 'c') {
     payloadIndex = 1
-  } else if ((parts[0] === 'src' || parts[0] === 'tgt') && parts[1] === 'c') {
+    role = 'column'
+  } else if (parts[0] === 'src' && parts[1] === 'c') {
     payloadIndex = 2
+    role = 'source'
+  } else if (parts[0] === 'tgt' && parts[1] === 'c') {
+    payloadIndex = 2
+    role = 'target'
   }
 
-  if (payloadIndex === -1) return null
+  if (payloadIndex === -1 || role === null) return null
+  if (expectedRole !== undefined && role !== expectedRole) return null
 
   if (parts.length === payloadIndex + 1 && parts[payloadIndex] === 'empty') {
     return ''
@@ -62,4 +74,20 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
   }
 
   return decoded
+}
+
+export function decodeHandleId(handleId: string | null | undefined): string | null {
+  return decodeHandleForRole(handleId)
+}
+
+export function decodeSourceColumnHandleId(
+  handleId: string | null | undefined,
+): string | null {
+  return decodeHandleForRole(handleId, 'source')
+}
+
+export function decodeTargetColumnHandleId(
+  handleId: string | null | undefined,
+): string | null {
+  return decodeHandleForRole(handleId, 'target')
 }
