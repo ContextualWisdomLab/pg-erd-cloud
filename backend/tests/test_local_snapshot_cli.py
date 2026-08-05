@@ -11,14 +11,20 @@ from app import local_snapshot_cli
 
 
 class FakeConnection:
+    """Track closure for a deterministic local snapshot connection."""
+
     def __init__(self) -> None:
         self.closed = False
 
     async def close(self) -> None:
+        """Record that the snapshot collector closed the connection."""
+
         self.closed = True
 
 
 def test_socket_directory_requires_existing_absolute_directory(tmp_path: Path) -> None:
+    """Reject relative or missing socket directories."""
+
     assert local_snapshot_cli._socket_directory(str(tmp_path)) == str(tmp_path)
     with pytest.raises(argparse.ArgumentTypeError):
         local_snapshot_cli._socket_directory("relative/socket")
@@ -30,6 +36,8 @@ def test_environment_host_default_cannot_bypass_socket_boundary(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Validate an explicit PGHOST default with the Unix-socket boundary."""
+
     monkeypatch.setenv("PGDATABASE", "catalog")
     monkeypatch.setenv("PGHOST", "db.example.com")
 
@@ -44,6 +52,8 @@ def test_parser_requires_explicit_host_without_pghost(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Require --host when PGHOST does not provide a socket directory."""
+
     monkeypatch.setenv("PGDATABASE", "catalog")
     monkeypatch.delenv("PGHOST", raising=False)
 
@@ -56,11 +66,15 @@ def test_parser_requires_explicit_host_without_pghost(
 
 @pytest.mark.parametrize("value", ["not-a-port", "0", "65536"])
 def test_port_rejects_invalid_values(value: str) -> None:
+    """Reject nonnumeric and out-of-range PostgreSQL ports."""
+
     with pytest.raises(argparse.ArgumentTypeError):
         local_snapshot_cli._port(value)
 
 
 def test_schema_name_rejects_sql_fragments() -> None:
+    """Accept one identifier and reject SQL-fragment schema values."""
+
     assert local_snapshot_cli._schema_name("catalog_v2") == "catalog_v2"
     with pytest.raises(argparse.ArgumentTypeError):
         local_snapshot_cli._schema_name("public; DROP SCHEMA public")
@@ -71,6 +85,8 @@ async def test_capture_uses_local_connection_without_password_or_dsn(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    """Connect only with bounded local arguments and always close afterward."""
+
     captured: dict[str, Any] = {}
     connection = FakeConnection()
 
@@ -119,6 +135,8 @@ def test_main_writes_snapshot_json(
     capsys: pytest.CaptureFixture[str],
     pretty: bool,
 ) -> None:
+    """Write equivalent compact and pretty snapshot JSON representations."""
+
     expected = {"schema_filter": "public", "relations": []}
 
     async def fake_capture(args: argparse.Namespace) -> dict:
@@ -165,6 +183,8 @@ def test_main_redacts_connection_errors(
     error: Exception,
     error_name: str,
 ) -> None:
+    """Return a stable error type without disclosing connection details."""
+
     async def fail_capture(_args: argparse.Namespace) -> dict:
         raise error
 
