@@ -325,6 +325,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
