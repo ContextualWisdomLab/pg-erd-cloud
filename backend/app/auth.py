@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -273,7 +273,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         claims = jwt.decode(
             token,
-            jwk,
+            jwt.PyJWK(jwk).key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,

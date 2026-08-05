@@ -383,7 +383,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["key"] == "dummy"
 
 
 @pytest.mark.asyncio
@@ -578,7 +578,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
-        raise auth.jwt.PyJWTError("mocked decoding error")
+        raise jwt.PyJWTError("mocked decoding error")
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
