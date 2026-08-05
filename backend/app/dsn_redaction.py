@@ -14,16 +14,16 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
     r"(?P<value>[^&\s,;\"'<>]+)",
     re.IGNORECASE,
 )
+_WORD_CHARACTER_PATTERN = re.compile(r"\w")
 
 
 def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
-    """Extract (netloc, query) from a DSN without ``urlsplit``.
+    """Extract ``(authority, query)`` from a malformed DSN without validation.
 
-    ``urllib.parse.urlsplit`` raises ``ValueError`` (e.g. "Invalid IPv6 URL")
-    on malformed authorities such as an unbalanced ``[``. Redaction must never
-    crash on hostile input, otherwise the raw, un-redacted error message could
-    still reach a client. This fallback recovers the credential-bearing parts
-    with plain string slicing so embedded secrets are still stripped.
+    ``urllib.parse.urlsplit`` raises ``ValueError`` for malformed authorities,
+    including an unbalanced IPv6 bracket. Redaction must not fail and expose the
+    original driver message, so this bounded fallback recovers only the two
+    credential-bearing regions with plain string slicing.
     """
 
     remainder = dsn
@@ -40,38 +40,44 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
 
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
+    """Return exact secret spellings that a database driver may disclose.
+
+    User-information and query strings have different decoding rules. A plus
+    sign in ``scheme://user:password@host`` is literal, so those values use
+    :func:`urllib.parse.unquote`. Query values follow form encoding, where a
+    plus sign represents a space, so only that domain uses
+    :func:`urllib.parse.unquote_plus`.
+    """
+
     candidates: set[str] = set()
 
     password: str | None = None
     try:
         parsed = urlsplit(dsn)
         if "://" in dsn and not parsed.netloc:
-            # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+            # Keep urlsplit's parsing contract while substituting only an
+            # unrecognised scheme so user-information remains discoverable.
             parsed = urlsplit("http://" + dsn.split("://", 1)[1])
         netloc = parsed.netloc
         password = parsed.password
         query = parsed.query
     except ValueError:
-        # Malformed DSN (e.g. invalid IPv6 literal). Fall back to best-effort
-        # parsing so any embedded credentials are still redacted.
         netloc, query = _split_dsn_best_effort(dsn)
 
     if password:
         candidates.add(password)
-        decoded = unquote_plus(password)
+        decoded = unquote(password)
         candidates.add(decoded)
         candidates.add(quote(decoded, safe=""))
-        candidates.add(quote_plus(decoded, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
             candidates.add(raw_password)
-            decoded_raw = unquote_plus(raw_password)
+            decoded_raw = unquote(raw_password)
             candidates.add(decoded_raw)
             candidates.add(quote(decoded_raw, safe=""))
-            candidates.add(quote_plus(decoded_raw, safe=""))
 
     for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -88,21 +94,44 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     return {candidate for candidate in candidates if candidate}
 
 
+def _is_unicode_word_character(character: str) -> bool:
+    """Return whether one character matches Python's Unicode-aware ``\w``."""
+
+    return _WORD_CHARACTER_PATTERN.fullmatch(character) is not None
+
+
 def _redact_secret_occurrences(message: str, secret: str) -> str:
+    """Replace one secret without corrupting larger Unicode identifiers.
+
+    Long candidates are unlikely to be ordinary words and are replaced exactly.
+    Short candidates use a boundary only when their corresponding edge is a
+    Unicode word character. Punctuation-edge secrets therefore remain
+    redactable next to text, while an ASCII or non-ASCII word fragment inside a
+    larger identifier is preserved.
+    """
+
     if not secret:
         return message
 
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    start_boundary = r"(?<![A-Za-z0-9])" if secret[0].isalnum() else ""
-    end_boundary = r"(?![A-Za-z0-9])" if secret[-1].isalnum() else ""
+    start_boundary = (
+        r"(?<!\w)" if _is_unicode_word_character(secret[0]) else ""
+    )
+    end_boundary = r"(?!\w)" if _is_unicode_word_character(secret[-1]) else ""
     pattern = re.compile(rf"{start_boundary}{re.escape(secret)}{end_boundary}")
     return pattern.sub("***", message)
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
-    """Redact DSN-derived secrets from a driver error message."""
+    """Redact DSN-derived credentials from a database-driver error message.
+
+    The function is best effort and deliberately returns a sanitized message
+    rather than raising when the DSN is malformed. Candidate replacement runs
+    longest first, then a final key-name sanitizer removes assignment-shaped
+    secrets that the DSN parser could not recover.
+    """
 
     redacted = error_message
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
