@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   decodeHandleId,
+  decodeSourceColumnHandleId,
+  decodeTargetColumnHandleId,
   sanitizeHandleId,
   sourceColumnHandleId,
   targetColumnHandleId,
@@ -104,5 +106,21 @@ describe('handleUtils', () => {
         expect(decodeHandleId(targetColumnHandleId(columnName))).toBe(columnName)
       },
     )
+  })
+
+  describe('role-specific decoders', () => {
+    it('accepts only a source handle in the source decoder', () => {
+      expect(decodeSourceColumnHandleId('src-c-0069-0064')).toBe('id')
+      expect(decodeSourceColumnHandleId('src-c-empty')).toBe('')
+      expect(decodeSourceColumnHandleId('tgt-c-0069-0064')).toBeNull()
+      expect(decodeSourceColumnHandleId('c-0069-0064')).toBeNull()
+    })
+
+    it('accepts only a target handle in the target decoder', () => {
+      expect(decodeTargetColumnHandleId('tgt-c-0069-0064')).toBe('id')
+      expect(decodeTargetColumnHandleId('tgt-c-empty')).toBe('')
+      expect(decodeTargetColumnHandleId('src-c-0069-0064')).toBeNull()
+      expect(decodeTargetColumnHandleId('c-0069-0064')).toBeNull()
+    })
   })
 })
