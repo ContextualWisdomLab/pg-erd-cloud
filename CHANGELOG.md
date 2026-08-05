@@ -1,7 +1,9 @@
 # Changelog
 
 ## Unreleased
-- [BE] 💾 **저장된 ERD View 갱신 API**: editor 권한 사용자가 기존 `diagram_view_uuid`를 유지한 채 이름과 레이아웃을 안전하게 교체할 수 있는 `PUT /api/diagram-views/{diagram_view_uuid}`를 추가했습니다. 512KB 상한, 존재 여부 비노출 404, 변경 전 전체 payload 검증을 유지합니다.
+- [BE] 💾 **저장된 ERD View 갱신 API**: editor 권한 사용자가 기존 `diagram_view_uuid`를 유지한 채 이름과 레이아웃을 안전하게 교체할 수 있는 `PUT /api/diagram-views/{diagram_view_uuid}`를 추가했습니다. 정확히 512 KiB인 compact JSON 레이아웃은 허용하고 1바이트 초과는 변경 전 거부하며, 존재 여부 비노출 404와 생성 시각·안정 ID 보존을 유지합니다.
+- [BE] 🛡️ **API 요청 본문 사전 제한**: unsafe `/api` 요청을 라우팅·인증·Pydantic 역직렬화 전에 최대 2 MiB(환경변수 `API_REQUEST_BODY_MAX_BYTES`)로 제한합니다. `Content-Length`와 chunked body를 모두 검사하고 OWASP API4:2023 및 ASGI 구현 근거를 doctoring에 기록했습니다.
+- [FE] 💾 **데모 저장 View 계약 정합화**: 같은 밀리초에도 고유한 View ID를 생성하고, 이름 1–200자·직렬화 레이아웃 512 KiB 제한을 저장 전 적용하며, 실패한 변경은 store를 보존하고 갱신된 View를 최신순 선두로 이동합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
