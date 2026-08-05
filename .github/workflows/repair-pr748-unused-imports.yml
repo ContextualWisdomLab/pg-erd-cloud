@@ -1,0 +1,91 @@
+name: Repair PR 748 unused imports
+run-name: Repair PR 748 imports at ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - perf/export-handle-parse-3370170627592123454
+    paths:
+      - .github/workflows/repair-pr748-unused-imports.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-pr748-unused-imports
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  repair:
+    if: >-
+      github.repository == 'ContextualWisdomLab/pg-erd-cloud' &&
+      github.ref == 'refs/heads/perf/export-handle-parse-3370170627592123454'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Check out exact trigger head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 10
+          persist-credentials: false
+
+      - name: Verify bounded repair lineage
+        env:
+          EXPECTED_PARENT: 8bccecbf11f82501f20a3313830716ba92c14e5d
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          mapfile -t changed_paths < <(git diff --name-only "$EXPECTED_PARENT" "$GITHUB_SHA")
+          test "${#changed_paths[@]}" -eq 1
+          test "${changed_paths[0]}" = ".github/workflows/repair-pr748-unused-imports.yml"
+
+      - name: Remove only the reviewed dead imports
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("frontend/src/erd/export.ts")
+          source = path.read_text(encoding="utf-8")
+          old = "import { sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';"
+          new = "import { parseColumnNameFromHandle } from './handleUtils';"
+          if source.count(old) != 1:
+              raise SystemExit("reviewed import anchor drifted")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+          rm -f .github/workflows/repair-pr748-unused-imports.yml
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "frontend/src/erd/export.ts "
+          git diff --check
+
+      - name: Publish workflow-free exact repair
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+          HEAD_BRANCH: ${{ github.ref_name }}
+          PUSH_TOKEN: ${{ github.token }}
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          remote_head="$(git ls-remote origin "refs/heads/${HEAD_BRANCH}" | cut -f1)"
+          test "$remote_head" = "$EXPECTED_HEAD"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No repair generated" >&2; exit 1; }
+          git commit -m "fix(frontend): remove obsolete handle imports"
+          auth_header="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$auth_header"
+          git -c http.extraheader="AUTHORIZATION: basic ${auth_header}" \
+            push --force-with-lease="refs/heads/${HEAD_BRANCH}:${EXPECTED_HEAD}" \
+            origin "HEAD:refs/heads/${HEAD_BRANCH}"
