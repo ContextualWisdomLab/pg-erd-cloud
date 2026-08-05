@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { decodeSourceColumnHandleId } from './handleUtils';
+import { decodeHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -57,9 +57,13 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
       info.columns.add(column);
     }
 
-    const decodedColumn = decodeSourceColumnHandleId(edge.sourceHandle);
-    if (decodedColumn !== null) {
-      info.columns.add(decodedColumn);
+    // ⚡ Bolt: Directly decode the handle and store the column name, avoiding
+    // repeatedly encoding every column during the export loop later.
+    if (edge.sourceHandle) {
+      const decodedColumn = decodeHandleId(edge.sourceHandle);
+      if (decodedColumn !== null) {
+        info.columns.add(decodedColumn);
+      }
     }
   }
 

@@ -24,70 +24,43 @@ export function targetColumnHandleId(columnName: string): string {
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
-type HandleRole = 'column' | 'source' | 'target'
+export function decodeHandleId(handleId: string | null | undefined): string | null {
+  if (!handleId) return null;
 
-function canonicalHexChunk(codePoint: number): string {
-  return codePoint.toString(16).padStart(4, '0')
-}
-
-function decodeHandleForRole(
-  handleId: string | null | undefined,
-  expectedRole?: HandleRole,
-): string | null {
-  if (!handleId) return null
-
-  const parts = handleId.split('-')
-  let payloadIndex = -1
-  let role: HandleRole | null = null
+  const parts = handleId.split('-');
+  let payloadIndex = -1;
 
   if (parts[0] === 'c') {
-    payloadIndex = 1
-    role = 'column'
-  } else if (parts[0] === 'src' && parts[1] === 'c') {
-    payloadIndex = 2
-    role = 'source'
-  } else if (parts[0] === 'tgt' && parts[1] === 'c') {
-    payloadIndex = 2
-    role = 'target'
+    payloadIndex = 1;
+  } else if ((parts[0] === 'src' || parts[0] === 'tgt') && parts[1] === 'c') {
+    payloadIndex = 2;
   }
 
-  if (payloadIndex === -1 || role === null) return null
-  if (expectedRole !== undefined && role !== expectedRole) return null
+  if (payloadIndex === -1) return null;
 
   if (parts.length === payloadIndex + 1 && parts[payloadIndex] === 'empty') {
-    return ''
+    return '';
   }
 
-  const hexParts = parts.slice(payloadIndex)
-  if (hexParts.length === 0) return null
+  const hexParts = parts.slice(payloadIndex);
+  if (hexParts.length === 0) return null;
 
-  let decoded = ''
+  let decoded = '';
   for (const hex of hexParts) {
     if (!HEX_CHUNK_RE.test(hex)) {
-      return null
+      return null;
     }
-    const codePoint = Number.parseInt(hex, 16)
-    if (codePoint > 0x10ffff || canonicalHexChunk(codePoint) !== hex) {
-      return null
+    const codePoint = Number.parseInt(hex, 16);
+    if (codePoint > 0x10ffff) {
+      return null;
     }
-    decoded += String.fromCodePoint(codePoint)
+    try {
+      decoded += String.fromCodePoint(codePoint);
+    } catch {
+      /* v8 ignore next */
+      return null;
+    }
   }
 
-  return decoded
-}
-
-export function decodeHandleId(handleId: string | null | undefined): string | null {
-  return decodeHandleForRole(handleId)
-}
-
-export function decodeSourceColumnHandleId(
-  handleId: string | null | undefined,
-): string | null {
-  return decodeHandleForRole(handleId, 'source')
-}
-
-export function decodeTargetColumnHandleId(
-  handleId: string | null | undefined,
-): string | null {
-  return decodeHandleForRole(handleId, 'target')
+  return decoded;
 }
