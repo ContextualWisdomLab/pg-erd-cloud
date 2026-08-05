@@ -69,6 +69,7 @@ include = [
   "app/permissions.py",
   "app/pg_introspect/queries.py",
   "app/pooler.py",
+  "app/request_body_limit.py",
   "app/schemas.py",
   "app/security.py",
   "app/security_headers.py",
