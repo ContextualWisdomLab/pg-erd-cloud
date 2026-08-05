@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2024-05-18 - Optimize DBML Import Column Positions
-**Learning:** In Python, calculating incremental positions or ordinal rankings inside a loop using inline generator expressions like `sum(1 for i in list if condition)` creates hidden $O(N^2)$ complexity. For operations over schemas with many columns, this causes exponential degradation and severe GC pressure.
-**Action:** Always maintain an auxiliary state counter (like a `dict[int, int]` mapping parent OID to current child count) to perform these tallies in $O(1)$ amortized time during sequential processing loops.
