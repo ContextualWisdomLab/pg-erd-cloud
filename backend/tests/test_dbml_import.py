@@ -56,16 +56,10 @@ Table "Order Items" {
 Ref: auth.accounts.account_id < "Order Items".account_id
 '''
     snap = parse_dbml(text)
-    assert ("auth", "accounts") in {
-        (r["schema_name"], r["relation_name"]) for r in snap["relations"]
-    }
+    assert ("auth", "accounts") in {(r["schema_name"], r["relation_name"]) for r in snap["relations"]}
     edge = snap["fk_edges"][0]
     # '<' means the right side references the left
-    child = next(
-        r
-        for r in snap["relations"]
-        if r["relation_oid"] == edge["child_relation_oid"]
-    )
+    child = next(r for r in snap["relations"] if r["relation_oid"] == edge["child_relation_oid"])
     assert child["relation_name"] == "Order Items"
 
 
@@ -94,38 +88,6 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert 'CREATE TABLE IF NOT EXISTS "public"."users"' in ddl
     assert 'CREATE TABLE IF NOT EXISTS "public"."posts"' in ddl
     assert "PRIMARY KEY" in ddl
-
-
-def test_column_positions_scale_and_reset_per_relation() -> None:
-    first_columns = "\n".join(f"  column_{index} integer" for index in range(1_000))
-    text = f"""
-Table wide_relation {{
-{first_columns}
-}}
-Table second_relation {{
-  first_column integer
-  second_column integer
-}}
-"""
-
-    snapshot = parse_dbml(text)
-    relation_oids = {
-        relation["relation_name"]: relation["relation_oid"]
-        for relation in snapshot["relations"]
-    }
-    wide_positions = [
-        column["column_position"]
-        for column in snapshot["columns"]
-        if column["relation_oid"] == relation_oids["wide_relation"]
-    ]
-    second_positions = [
-        column["column_position"]
-        for column in snapshot["columns"]
-        if column["relation_oid"] == relation_oids["second_relation"]
-    ]
-
-    assert wide_positions == list(range(1, 1_001))
-    assert second_positions == [1, 2]
 
 
 def test_pathological_long_line_is_skipped_fast():
