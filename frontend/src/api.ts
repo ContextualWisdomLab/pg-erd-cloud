@@ -15,7 +15,10 @@ import type {
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+const MAX_DIAGRAM_VIEW_NAME_LENGTH = 200
+const MAX_DIAGRAM_VIEW_LAYOUT_BYTES = 512 * 1024
 
+let demoDiagramViewSequence = 0
 let demoProjects: Project[] = [
   { project_space_uuid: 'demo-shopping', project_name: '쇼핑몰 시스템' },
   { project_space_uuid: 'demo-hr', project_name: '회사 인사관리' },
@@ -89,6 +92,8 @@ type CsrfTokenResponse = {
 
 type ShareLinkResponse = Omit<ShareLink, 'url'>
 
+type DiagramViewMutation = 'create' | 'update'
+
 function isLocalDevelopmentHost(hostname: string): boolean {
   return (
     hostname === 'localhost' ||
@@ -115,6 +120,32 @@ function diagramViewSummary(view: DiagramViewDetail): DiagramView {
     name: view.name,
     created_at: view.created_at,
     updated_at: view.updated_at,
+  }
+}
+
+function nextDemoDiagramViewId(): string {
+  demoDiagramViewSequence += 1
+  return `demo-view-${Date.now()}-${demoDiagramViewSequence}`
+}
+
+function validateDiagramViewInput(
+  mutation: DiagramViewMutation,
+  name: string,
+  layout: DiagramViewLayout,
+): void {
+  const operation = mutation === 'create' ? 'createDiagramView' : 'updateDiagramView'
+  if (name.length < 1 || name.length > MAX_DIAGRAM_VIEW_NAME_LENGTH) {
+    throw new Error(`${operation} failed: invalid name`)
+  }
+
+  let serialized: string
+  try {
+    serialized = JSON.stringify(layout)
+  } catch {
+    throw new Error(`${operation} failed: invalid layout`)
+  }
+  if (new TextEncoder().encode(serialized).byteLength > MAX_DIAGRAM_VIEW_LAYOUT_BYTES) {
+    throw new Error(`${operation} failed: layout payload too large`)
   }
 }
 
@@ -278,9 +309,10 @@ export async function createDiagramView(
   layout_json: DiagramViewLayout,
 ): Promise<DiagramView> {
   if (DEMO_MODE) {
+    validateDiagramViewInput('create', name, layout_json)
     const now = new Date(Date.now()).toISOString()
     const view: DiagramViewDetail = {
-      diagram_view_uuid: `demo-view-${Date.now()}`,
+      diagram_view_uuid: nextDemoDiagramViewId(),
       name,
       layout_json: cloneDiagramViewLayout(layout_json),
       created_at: now,
@@ -328,13 +360,18 @@ export async function updateDiagramView(
   if (DEMO_MODE) {
     const found = findDemoDiagramView(diagramViewId)
     if (!found) throw new Error('updateDiagramView failed: 404')
+    validateDiagramViewInput('update', name, layout_json)
     const updated: DiagramViewDetail = {
       ...found.view,
       name,
       layout_json: cloneDiagramViewLayout(layout_json),
       updated_at: new Date(Date.now()).toISOString(),
     }
-    demoDiagramViewsByProject[found.projectId]![found.index] = updated
+    const currentViews = demoDiagramViewsByProject[found.projectId]!
+    demoDiagramViewsByProject[found.projectId] = [
+      updated,
+      ...currentViews.filter((_, index) => index !== found.index),
+    ]
     return diagramViewSummary(updated)
   }
   const r = await fetch(`${API_BASE}/api/diagram-views/${diagramViewId}`, {
