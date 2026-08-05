@@ -110,3 +110,33 @@ def test_pathological_table_header_dots_are_rejected_fast():
     assert {(r["schema_name"], r["relation_name"]) for r in snap["relations"]} == {
         ("public", "users")
     }
+def test_column_positions_scale_and_reset_per_relation() -> None:
+    first_columns = "\n".join(f"  column_{index} integer" for index in range(1_000))
+    text = f"""
+Table wide_relation {{
+{first_columns}
+}}
+Table second_relation {{
+  first_column integer
+  second_column integer
+}}
+"""
+
+    snapshot = parse_dbml(text)
+    relation_oids = {
+        relation["relation_name"]: relation["relation_oid"]
+        for relation in snapshot["relations"]
+    }
+    wide_positions = [
+        column["column_position"]
+        for column in snapshot["columns"]
+        if column["relation_oid"] == relation_oids["wide_relation"]
+    ]
+    second_positions = [
+        column["column_position"]
+        for column in snapshot["columns"]
+        if column["relation_oid"] == relation_oids["second_relation"]
+    ]
+
+    assert wide_positions == list(range(1, 1_001))
+    assert second_positions == [1, 2]
