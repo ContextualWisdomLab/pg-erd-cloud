@@ -1,0 +1,91 @@
+name: Apply PR 696 review fixes v4
+
+on:
+  push:
+    branches:
+      - palette-form-submission-2191064457221307953
+    paths:
+      - .tmp/pr696-review-fix-ready-v4
+
+concurrency:
+  group: apply-pr-696-review-fixes-v4
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          ref: ${{ github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Validate staged scope and apply patch
+        env:
+          REVIEWED_HEAD: 9fe90618b13f828a63f5930d3705349bb1127c19
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$REVIEWED_HEAD" HEAD
+          staged_files="$(git diff --name-only "$REVIEWED_HEAD"...HEAD | sort)"
+          expected_files="$(printf '%s\n' \
+            .github/workflows/apply-pr-696-review-fixes-v3.yml \
+            .github/workflows/apply-pr-696-review-fixes-v4.yml \
+            .tmp/apply_pr696_review_fixes.py \
+            .tmp/pr696-review-fix-ready-v3 \
+            .tmp/pr696-review-fix-ready-v4 | sort)"
+          test "$staged_files" = "$expected_files"
+          python .tmp/apply_pr696_review_fixes.py
+          git diff --check
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify frontend
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run coverage
+          npm run build
+
+      - name: Publish verified patch and remove bootstrap files
+        env:
+          REVIEWED_HEAD: 9fe90618b13f828a63f5930d3705349bb1127c19
+          TARGET_BRANCH: palette-form-submission-2191064457221307953
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/apply-pr-696-review-fixes-v3.yml \
+            .github/workflows/apply-pr-696-review-fixes-v4.yml \
+            .tmp/apply_pr696_review_fixes.py \
+            .tmp/pr696-review-fix-ready-v3 \
+            .tmp/pr696-review-fix-ready-v4
+          rmdir .tmp 2>/dev/null || true
+          test "$(git diff --name-only "$REVIEWED_HEAD" -- | sort)" = "frontend/src/App.coverage.test.tsx"
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "test(frontend): cover complete keyboard form contracts"
+          test "$(git diff --name-only "$REVIEWED_HEAD"...HEAD | sort)" = "frontend/src/App.coverage.test.tsx"
+          git push origin "HEAD:${TARGET_BRANCH}"
