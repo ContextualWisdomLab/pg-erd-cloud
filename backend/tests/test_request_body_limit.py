@@ -4,7 +4,7 @@ import json
 from collections.abc import Sequence
 
 import pytest
-from starlette.types import Message, Scope
+from starlette.types import Message, Receive, Scope, Send
 
 from app.request_body_limit import (
     REQUEST_BODY_TOO_LARGE_DETAIL,
@@ -64,7 +64,7 @@ async def _run(
 def test_request_body_limit_configuration_is_fail_closed() -> None:
     """Reject non-positive limits and malformed route prefixes."""
 
-    async def app(scope: Scope, receive: object, send: object) -> None:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
         del scope, receive, send
 
     with pytest.raises(ValueError, match="positive"):
@@ -107,7 +107,7 @@ async def test_declared_oversize_is_rejected_before_downstream_execution() -> No
 
     downstream_called = False
 
-    async def app(scope: Scope, receive: object, send: object) -> None:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
         nonlocal downstream_called
         downstream_called = True
         del scope, receive, send
@@ -136,17 +136,13 @@ async def test_chunked_body_is_bounded_and_replayed_without_changes() -> None:
 
     observed: list[Message] = []
 
-    async def app(scope: Scope, receive: object, send: object) -> None:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
         del scope
-        receive_message = receive  # type: ignore[assignment]
-        send_message = send  # type: ignore[assignment]
-        observed.append(await receive_message())
-        observed.append(await receive_message())
-        observed.append(await receive_message())
-        await send_message(
-            {"type": "http.response.start", "status": 204, "headers": []}
-        )
-        await send_message({"type": "http.response.body", "body": b""})
+        observed.append(await receive())
+        observed.append(await receive())
+        observed.append(await receive())
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
 
     middleware = RequestBodyLimitMiddleware(app, 4)
     sent = await _run(
@@ -173,7 +169,7 @@ async def test_streamed_oversize_is_rejected_without_downstream_execution() -> N
 
     downstream_called = False
 
-    async def app(scope: Scope, receive: object, send: object) -> None:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
         nonlocal downstream_called
         downstream_called = True
         del scope, receive, send
@@ -198,16 +194,12 @@ async def test_disconnect_and_non_request_messages_are_replayed() -> None:
 
     observed: list[Message] = []
 
-    async def app(scope: Scope, receive: object, send: object) -> None:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
         del scope
-        receive_message = receive  # type: ignore[assignment]
-        send_message = send  # type: ignore[assignment]
-        observed.append(await receive_message())
-        observed.append(await receive_message())
-        await send_message(
-            {"type": "http.response.start", "status": 204, "headers": []}
-        )
-        await send_message({"type": "http.response.body", "body": b""})
+        observed.append(await receive())
+        observed.append(await receive())
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
 
     middleware = RequestBodyLimitMiddleware(app, 4)
     sent = await _run(
@@ -234,7 +226,9 @@ async def test_non_limited_scopes_bypass_body_buffering(scope: Scope) -> None:
 
     downstream_called = False
 
-    async def app(received_scope: Scope, receive: object, send: object) -> None:
+    async def app(
+        received_scope: Scope, receive: Receive, send: Send
+    ) -> None:
         nonlocal downstream_called
         downstream_called = True
         assert received_scope is scope
