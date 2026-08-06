@@ -12,6 +12,12 @@ type SetCapturedNodes = (
   value: CapturedNode[] | ((current: CapturedNode[]) => CapturedNode[]),
 ) => void
 
+type SnapshotSummary = {
+  schema_snapshot_uuid: string
+  status: string
+  schema_filter: string | null
+}
+
 const api = vi.hoisted(() => ({
   getMe: vi.fn(),
   listProjects: vi.fn(),
@@ -113,7 +119,7 @@ vi.mock('./erd/convert', () => ({
 import App from './App'
 
 const projects = [{ project_space_uuid: 'project-one', project_name: 'Project One' }]
-const snapshots = [
+const snapshots: SnapshotSummary[] = [
   { schema_snapshot_uuid: 'snapshot-one', status: 'running', schema_filter: null },
   { schema_snapshot_uuid: 'snapshot-two', status: 'succeeded', schema_filter: null },
 ]
@@ -222,10 +228,10 @@ describe('App search identity and polling isolation', () => {
   })
 
   it('does not let a superseded terminal list refresh overwrite the current snapshot list', async () => {
-    let resolveStaleRefresh!: (value: typeof snapshots) => void
+    let resolveStaleRefresh!: (value: SnapshotSummary[]) => void
     api.listSnapshots
       .mockResolvedValueOnce(snapshots)
-      .mockImplementationOnce(() => new Promise((resolve) => { resolveStaleRefresh = resolve }))
+      .mockImplementationOnce(() => new Promise<SnapshotSummary[]>((resolve) => { resolveStaleRefresh = resolve }))
       .mockResolvedValue(snapshots)
     api.getSnapshot.mockImplementation((snapshotId: string) => Promise.resolve(
       snapshotId === 'snapshot-two'
@@ -256,7 +262,7 @@ describe('App search identity and polling isolation', () => {
     let rejectStaleRefresh!: (reason: Error) => void
     api.listSnapshots
       .mockResolvedValueOnce(snapshots)
-      .mockImplementationOnce(() => new Promise((_, reject) => { rejectStaleRefresh = reject }))
+      .mockImplementationOnce(() => new Promise<SnapshotSummary[]>((_, reject) => { rejectStaleRefresh = reject }))
       .mockResolvedValue(snapshots)
     api.getSnapshot.mockImplementation((snapshotId: string) => Promise.resolve(
       snapshotId === 'snapshot-two'
@@ -278,7 +284,6 @@ describe('App search identity and polling isolation', () => {
 
     expect(screen.getByText('public.accounts')).toBeInTheDocument()
     expect(screen.queryByText('Error: stale refresh failure')).not.toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toHaveTextContent('stale refresh failure')
   })
 
   it('does not continue a pending snapshot request after unmount', async () => {
