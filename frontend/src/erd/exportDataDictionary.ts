@@ -4,7 +4,7 @@ import type { ForeignKeyEdgeData, TableNodeData } from './convert';
 import { decodeHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
-const CSV_FORMULA_RE = /^[=+\-@]/;
+const CSV_FORMULA_RE = /^[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
 const MARKDOWN_ESCAPE_RE = /[\\|`\[\]()]/g;
 const MARKDOWN_HTML_RE = /[&<>]/g;
 const MARKDOWN_HTML_ESCAPES: Record<string, string> = {
