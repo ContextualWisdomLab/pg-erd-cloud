@@ -98,3 +98,9 @@ def test_mixed_dsn_and_assignment_pattern() -> None:
 
     assert redact_dsn_error_message(error1, dsn) == "DSN: user:***@localhost and password = ***"
     assert redact_dsn_error_message(error2, dsn) == "password = *** and DSN: user:***@localhost"
+
+def test_schemeless_dsn_password_redaction() -> None:
+    dsn = "user:pass123@localhost/db"
+    error = "Connection failed for user:pass123@localhost"
+    result = redact_dsn_error_message(error, dsn)
+    assert result == "Connection failed for user:***@localhost"

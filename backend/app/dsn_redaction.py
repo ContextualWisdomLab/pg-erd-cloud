@@ -44,6 +44,18 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     except ValueError:
         netloc, query = _split_dsn_best_effort(dsn)
 
+    # Handle scheme-less DSNs like "user:pass@host/db"
+    if not password and not netloc and "@" in dsn:
+        # Try parsing with implicit scheme
+        try:
+            parsed_implicit = urlsplit("//" + dsn)
+            if parsed_implicit.netloc:
+                netloc = parsed_implicit.netloc
+                password = parsed_implicit.password
+                query = parsed_implicit.query
+        except ValueError:
+            pass
+
     if password:
         candidates.add(password)
         decoded = unquote(password)
