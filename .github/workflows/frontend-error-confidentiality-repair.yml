@@ -1,0 +1,175 @@
+name: Validate frontend error confidentiality
+
+on:
+  push:
+    branches: [bolt-react-flow-cache-5569281215077212328]
+    paths: [.github/workflows/frontend-error-confidentiality-repair.yml]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  repair-and-verify:
+    if: github.repository == 'ContextualWisdomLab/pg-erd-cloud'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js 26
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Add fail-first confidentiality regressions
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/App.searchPolling.test.tsx')
+          source = path.read_text(encoding='utf-8')
+          insertion = r'''
+
+  it('does not render sensitive authentication or snapshot error details', async () => {
+    const secret = 'postgresql://admin:super-secret@db.internal/customer'
+    api.getMe.mockRejectedValueOnce(new Error(`${secret}\nstack trace`))
+    const authView = render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Authentication failed. Sign in again or contact an administrator.',
+    )
+    expect(screen.queryByText(/super-secret|db\.internal|stack trace/)).not.toBeInTheDocument()
+    authView.unmount()
+
+    api.getMe.mockResolvedValue({ subject: 'user-one', display_name: 'User One' })
+    api.getSnapshot.mockResolvedValue({
+      ...detail('snapshot-one', 'first'),
+      status: 'failed',
+      error_message: `${secret}?password=another-secret`,
+    })
+    await renderReadyApp()
+    await openSnapshot(0)
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(await screen.findByText(
+      '스냅샷 처리에 실패했습니다. 연결 설정을 확인한 뒤 다시 시도해 주세요.',
+    )).toBeInTheDocument()
+    expect(screen.queryByText(/super-secret|another-secret|db\.internal/)).not.toBeInTheDocument()
+  })
+
+  it('does not render sensitive list-load exception details', async () => {
+    api.listConnections.mockRejectedValueOnce(
+      new Error('password=super-secret host=db.internal stack trace'),
+    )
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(await screen.findByText(
+      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    )).toBeInTheDocument()
+    expect(screen.queryByText(/super-secret|db\.internal|stack trace/)).not.toBeInTheDocument()
+  })
+'''
+          head, tail = source.rsplit('\n})', 1)
+          path.write_text(head + insertion + '\n})' + tail, encoding='utf-8')
+          PY
+          cd frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          set +e
+          npm test -- App.searchPolling.test.tsx
+          status=$?
+          set -e
+          test "$status" -ne 0
+      - name: Implement stable user-facing errors
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/App.tsx')
+          source = path.read_text(encoding='utf-8')
+          anchor = 'const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);\n'
+          replacement = '''const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);\n\nconst AUTHENTICATION_ERROR_MESSAGE =\n  "Authentication failed. Sign in again or contact an administrator.";\nconst DATA_LOAD_ERROR_MESSAGE =\n  "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";\nconst SNAPSHOT_FAILURE_MESSAGE =\n  "스냅샷 처리에 실패했습니다. 연결 설정을 확인한 뒤 다시 시도해 주세요.";\nconst SHARE_LINK_ERROR_MESSAGE =\n  "공유 링크를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";\n'''
+          if source.count(anchor) != 1:
+              raise SystemExit('DSN anchor drifted')
+          source = source.replace(anchor, replacement, 1)
+          rules = (
+              ('setAuthError(String(e));', 'setAuthError(AUTHENTICATION_ERROR_MESSAGE);', 1),
+              ('setError(String(e));', 'setError(DATA_LOAD_ERROR_MESSAGE);', 4),
+              ('setShareLinkError(String(error));', 'setShareLinkError(SHARE_LINK_ERROR_MESSAGE);', 1),
+              ('{String(snapshot.error_message)}', '{SNAPSHOT_FAILURE_MESSAGE}', 1),
+          )
+          for old, new, expected in rules:
+              if source.count(old) != expected:
+                  raise SystemExit(f'unexpected {old!r} count')
+              source = source.replace(old, new)
+          path.write_text(source, encoding='utf-8')
+          PY
+      - name: Record security decision
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          changelog_path = Path('CHANGELOG.md')
+          changelog = changelog_path.read_text(encoding='utf-8')
+          bullet = '- [FE] 🔒 **오류 기밀성 경계**: 인증·목록·스냅샷·공유 링크 오류를 고정된 사용자 메시지로 변환하고 서버 예외·DSN·비밀번호·스택·스냅샷 `error_message` 원문을 DOM에 렌더링하지 않습니다.\n'
+          if bullet not in changelog:
+              changelog_path.write_text(changelog.replace('## Unreleased\n', '## Unreleased\n' + bullet, 1), encoding='utf-8')
+          doc_path = Path('docs/doctoring/search-identity-and-sequential-polling.md')
+          doc = doc_path.read_text(encoding='utf-8')
+          section = '''
+
+## Frontend error-confidentiality boundary
+
+Exception text and snapshot `error_message` values are untrusted operational
+evidence that can contain connection strings, credentials, hostnames, queries,
+filesystem locations, or stack details. The browser maps each failure class to
+a stable, bounded user-facing message and never renders the raw value. Tests
+inject password-bearing PostgreSQL DSNs and stack-like text through authentication,
+list loading, and snapshot failure paths and prove those values are absent from
+the DOM.
+
+MITRE. (2026). *CWE-209: Generation of error message containing sensitive
+information* (Version 4.20). Common Weakness Enumeration. Retrieved August 6,
+2026, from https://cwe.mitre.org/data/definitions/209.html
+'''
+          if '## Frontend error-confidentiality boundary' not in doc:
+              doc_path.write_text(doc.rstrip() + section + '\n', encoding='utf-8')
+          PY
+      - name: Verify frontend acceptance
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          cd frontend
+          npm test -- App.searchPolling.test.tsx
+          npm run typecheck
+          npm run coverage
+          npm run build
+          cd ..
+          git diff --check
+      - name: Publish verified product repair
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+          SOURCE_BRANCH: bolt-react-flow-cache-5569281215077212328
+          GH_TOKEN: ${{ github.token }}
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git ls-remote origin refs/heads/${SOURCE_BRANCH} | cut -f1)" = "$EXPECTED_HEAD"
+          rm -f .github/workflows/frontend-error-confidentiality-repair.yml
+          git add -A
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'fix(security): keep sensitive errors out of the UI'
+          remote_url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force-with-lease="refs/heads/${SOURCE_BRANCH}:${EXPECTED_HEAD}" "$remote_url" "HEAD:refs/heads/${SOURCE_BRANCH}"
