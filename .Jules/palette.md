@@ -56,3 +56,7 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+
+## 2024-08-06 - [radiogroup 역할에 대한 올바른 자식 역할 부여]
+**Learning:** `role="radiogroup"`을 사용하여 커스텀 라디오 그룹(예: 색상 선택 스와치)을 만들 때, 자식 요소들은 `role="radio"`와 `aria-checked`를 명시적으로 사용해야 합니다. 기존처럼 제네릭 버튼에 `aria-pressed`를 사용하면 역할 구조가 일치하지 않아 접근성이 저하됩니다.
+**Action:** 관련된 React Testing Library 쿼리도 'button' 역할 대신 'radio' 역할을 검색하도록 업데이트해야 합니다.
