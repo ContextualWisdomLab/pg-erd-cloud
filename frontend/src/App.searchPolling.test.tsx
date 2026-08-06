@@ -2,6 +2,16 @@ import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+type CapturedNode = {
+  id: string
+  position: { x: number; y: number }
+  data: Record<string, unknown>
+}
+
+type SetCapturedNodes = (
+  value: CapturedNode[] | ((current: CapturedNode[]) => CapturedNode[]),
+) => void
+
 const api = vi.hoisted(() => ({
   getMe: vi.fn(),
   listProjects: vi.fn(),
@@ -15,7 +25,8 @@ const api = vi.hoisted(() => ({
 }))
 
 const flowCapture = vi.hoisted(() => ({
-  renders: [] as Array<Array<{ id: string; data: Record<string, unknown> }>>,
+  renders: [] as CapturedNode[][],
+  setNodes: null as SetCapturedNodes | null,
 }))
 
 vi.mock('./api', () => api)
@@ -47,7 +58,7 @@ vi.mock('@xyflow/react', async () => {
     Background: () => null,
     Controls: () => null,
     MiniMap: () => null,
-    ReactFlow: (props: { nodes: Array<{ id: string; data: Record<string, unknown> }>; children?: React.ReactNode }) => {
+    ReactFlow: (props: { nodes: CapturedNode[]; children?: React.ReactNode }) => {
       flowCapture.renders.push(props.nodes)
       return (
         <div data-testid="react-flow">
@@ -57,8 +68,9 @@ vi.mock('@xyflow/react', async () => {
       )
     },
     addEdge: (edge: unknown, edges: unknown[]) => [...edges, edge],
-    useNodesState: (initial: unknown[]) => {
+    useNodesState: (initial: CapturedNode[]) => {
       const [nodes, setNodes] = React.useState(initial)
+      flowCapture.setNodes = setNodes
       return [nodes, setNodes, vi.fn()]
     },
     useEdgesState: (initial: unknown[]) => {
@@ -114,6 +126,12 @@ const detail = (id: string, marker: string) => ({
   snapshot_json: { marker, relations: [], columns: [], pk_columns: [], fk_edges: [] },
 })
 
+function currentNodeData(nodeId: string): Record<string, unknown> {
+  const data = flowCapture.renders.at(-1)?.find((node) => node.id === nodeId)?.data
+  if (!data) throw new Error(`ReactFlow did not render node ${nodeId}`)
+  return data
+}
+
 async function renderReadyApp() {
   render(<App />)
   await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledWith('project-one'))
@@ -130,6 +148,7 @@ describe('App search identity and polling isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     flowCapture.renders.length = 0
+    flowCapture.setNodes = null
     api.getMe.mockResolvedValue({ subject: 'user-one', display_name: 'User One' })
     api.listProjects.mockResolvedValue(projects)
     api.listConnections.mockResolvedValue([])
@@ -139,7 +158,7 @@ describe('App search identity and polling isolation', () => {
 
   afterEach(() => cleanup())
 
-  it('reuses decorated node data for an unchanged normalized search and replaces it when the query changes', async () => {
+  it('reuses decoration for equivalent queries and position updates but replaces it for source or query changes', async () => {
     api.getSnapshot.mockResolvedValue(detail('snapshot-one', 'first'))
     await renderReadyApp()
     await openSnapshot(0)
@@ -147,18 +166,31 @@ describe('App search identity and polling isolation', () => {
 
     const search = screen.getByLabelText('테이블 또는 컬럼 검색')
     fireEvent.change(search, { target: { value: 'users' } })
-    await waitFor(() => expect(flowCapture.renders.at(-1)?.find((node) => node.id === 'users')?.data.isHighlighted).toBe(true))
-    const firstDecorated = flowCapture.renders.at(-1)!.find((node) => node.id === 'users')!.data
+    await waitFor(() => expect(currentNodeData('users').isHighlighted).toBe(true))
+    const firstDecorated = currentNodeData('users')
 
     fireEvent.change(search, { target: { value: ' users ' } })
     await waitFor(() => expect(search).toHaveValue(' users '))
-    const sameNormalizedQuery = flowCapture.renders.at(-1)!.find((node) => node.id === 'users')!.data
-    expect(sameNormalizedQuery).toBe(firstDecorated)
+    expect(currentNodeData('users')).toBe(firstDecorated)
+
+    await act(async () => {
+      flowCapture.setNodes?.((current) => current.map((node) => node.id === 'users'
+        ? { ...node, position: { x: node.position.x + 50, y: node.position.y + 25 } }
+        : node))
+    })
+    await waitFor(() => expect(currentNodeData('users')).toBe(firstDecorated))
+
+    await act(async () => {
+      flowCapture.setNodes?.((current) => current.map((node) => node.id === 'users'
+        ? { ...node, data: { ...node.data } }
+        : node))
+    })
+    await waitFor(() => expect(currentNodeData('users')).not.toBe(firstDecorated))
+    const replacedSourceDecoration = currentNodeData('users')
 
     fireEvent.change(search, { target: { value: 'orders' } })
-    await waitFor(() => expect(flowCapture.renders.at(-1)?.find((node) => node.id === 'orders')?.data.isHighlighted).toBe(true))
-    const changedQuery = flowCapture.renders.at(-1)!.find((node) => node.id === 'users')!.data
-    expect(changedQuery).not.toBe(firstDecorated)
+    await waitFor(() => expect(currentNodeData('orders').isHighlighted).toBe(true))
+    expect(currentNodeData('users')).not.toBe(replacedSourceDecoration)
     expect(graphData.firstUsers).not.toHaveProperty('isHighlighted')
   })
 
@@ -187,5 +219,82 @@ describe('App search identity and polling isolation', () => {
     expect(screen.getByText('public.accounts')).toBeInTheDocument()
     expect(screen.queryByText('public.users')).not.toBeInTheDocument()
     expect(api.listSnapshots).toHaveBeenCalledTimes(refreshCountAfterCurrentTerminal)
+  })
+
+  it('does not let a superseded terminal list refresh overwrite the current snapshot list', async () => {
+    let resolveStaleRefresh!: (value: typeof snapshots) => void
+    api.listSnapshots
+      .mockResolvedValueOnce(snapshots)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveStaleRefresh = resolve }))
+      .mockResolvedValue(snapshots)
+    api.getSnapshot.mockImplementation((snapshotId: string) => Promise.resolve(
+      snapshotId === 'snapshot-two'
+        ? detail('snapshot-two', 'second')
+        : detail('snapshot-one', 'first'),
+    ))
+
+    await renderReadyApp()
+    await openSnapshot(0)
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledTimes(2))
+    await openSnapshot(1)
+    await screen.findByText('public.accounts')
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledTimes(3))
+
+    await act(async () => {
+      resolveStaleRefresh([
+        { schema_snapshot_uuid: 'stale-only', status: 'failed', schema_filter: 'stale' },
+      ])
+      await Promise.resolve()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    expect(await screen.findAllByRole('button', { name: '열기' })).toHaveLength(2)
+    expect(screen.queryByText('ERD_stale_1')).not.toBeInTheDocument()
+  })
+
+  it('does not publish an error from a superseded terminal list refresh', async () => {
+    let rejectStaleRefresh!: (reason: Error) => void
+    api.listSnapshots
+      .mockResolvedValueOnce(snapshots)
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectStaleRefresh = reject }))
+      .mockResolvedValue(snapshots)
+    api.getSnapshot.mockImplementation((snapshotId: string) => Promise.resolve(
+      snapshotId === 'snapshot-two'
+        ? detail('snapshot-two', 'second')
+        : detail('snapshot-one', 'first'),
+    ))
+
+    await renderReadyApp()
+    await openSnapshot(0)
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledTimes(2))
+    await openSnapshot(1)
+    await screen.findByText('public.accounts')
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledTimes(3))
+
+    await act(async () => {
+      rejectStaleRefresh(new Error('stale refresh failure'))
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('public.accounts')).toBeInTheDocument()
+    expect(screen.queryByText('Error: stale refresh failure')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toHaveTextContent('stale refresh failure')
+  })
+
+  it('does not continue a pending snapshot request after unmount', async () => {
+    let resolveSnapshot!: (value: ReturnType<typeof detail>) => void
+    api.getSnapshot.mockReturnValue(new Promise((resolve) => { resolveSnapshot = resolve }))
+
+    const view = render(<App />)
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledWith('project-one'))
+    await openSnapshot(0)
+    view.unmount()
+
+    await act(async () => {
+      resolveSnapshot(detail('snapshot-one', 'first'))
+      await Promise.resolve()
+    })
+
+    expect(api.listSnapshots).toHaveBeenCalledTimes(1)
   })
 })
