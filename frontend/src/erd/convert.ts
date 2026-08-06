@@ -97,6 +97,13 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
         label = `${first.fk_constraint_name} (${orderedRows.length} cols)`
       }
 
+      const sourceColumns = new Array(orderedRows.length)
+      const targetColumns = new Array(orderedRows.length)
+      for (let i = 0; i < orderedRows.length; i++) {
+        sourceColumns[i] = orderedRows[i].child_column_name
+        targetColumns[i] = orderedRows[i].parent_column_name
+      }
+
       fkEdges.push({
         id: String(oid),
         source,
@@ -105,8 +112,8 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
         targetHandle,
         label,
         data: {
-          sourceColumns: orderedRows.map((row) => row.child_column_name),
-          targetColumns: orderedRows.map((row) => row.parent_column_name),
+          sourceColumns,
+          targetColumns,
         },
       })
     }
@@ -126,9 +133,11 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     }
   }
 
-  const nodes: Array<Node<TableNodeData>> = tableRels.map((t, i) => {
+  const nodes: Array<Node<TableNodeData>> = new Array(tableRels.length)
+  for (let i = 0; i < tableRels.length; i++) {
+    const t = tableRels[i]
     const cols = columnsByRel.get(t.relation_oid) || []
-    return {
+    nodes[i] = {
       id: String(t.relation_oid),
       type: 'tableNode',
       position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
@@ -142,19 +151,23 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
         }
       }
     }
-  })
+  }
 
-  const edges: Edge[] = fkEdges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourceHandle,
-    targetHandle: e.targetHandle,
-    label: e.label,
-    data: e.data,
-    animated: false,
-    type: 'smoothstep'
-  }))
+  const edges: Edge[] = new Array(fkEdges.length)
+  for (let i = 0; i < fkEdges.length; i++) {
+    const e = fkEdges[i]
+    edges[i] = {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
+      label: e.label,
+      data: e.data,
+      animated: false,
+      type: 'smoothstep'
+    }
+  }
 
   return { nodes, edges }
 }
