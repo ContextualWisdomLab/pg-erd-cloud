@@ -1529,7 +1529,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "types-python-jose" },
     { name = "types-requests" },
 ]
 snowflake = [
@@ -1574,7 +1573,6 @@ requires-dist = [
     { name = "snowflake-connector-python", marker = "extra == 'snowflake'", specifier = ">=4,<5" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51,<2.1" },
     { name = "starlette", specifier = ">=1.1.0" },
-    { name = "types-python-jose", marker = "extra == 'dev'", specifier = ">=3.5.0.20260408" },
     { name = "types-requests", marker = "extra == 'dev'" },
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
