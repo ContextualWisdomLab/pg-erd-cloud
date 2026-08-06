@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-08-06 - Optimized DBML parsing for tables with many columns
+**Learning:** In `backend/app/spec/dbml_import.py`, `sum(1 for c in columns if c["relation_oid"] == oid) + 1` was used to calculate the column position for each newly added column. Because it scanned the entire `columns` list linearly on every insertion, parsing a table with N columns took O(N^2) time for that table. This created a severe performance bottleneck when importing large DBML files with wide tables.
+**Action:** When calculating positions or occurrences within a loop, use an auxiliary O(1) dictionary counter (e.g., `col_count_by_oid.get(oid, 0) + 1`) to track state, avoiding nested O(N) operations inside loops.
