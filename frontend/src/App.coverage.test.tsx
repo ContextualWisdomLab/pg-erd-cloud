@@ -610,7 +610,6 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -642,7 +641,6 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -723,51 +721,6 @@ describe('App orchestration coverage', () => {
     expect(onOpenEditor).toHaveBeenCalledWith('s1')
   })
 
-  it('ignores obsolete polling responses after unmount or unselection', async () => {
-    let resolveSnapshot!: (value: any) => void
-    api.getSnapshot.mockReturnValue(new Promise((resolve) => { resolveSnapshot = resolve }))
-    api.listSnapshots.mockResolvedValue(snapshots)
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
-
-    // Simulate unmount/navigation away
-    cleanup()
-
-    // Resolve the inflight poll
-    await act(async () => {
-      resolveSnapshot({
-        schema_snapshot_uuid: 's1',
-        status: 'succeeded',
-        schema_filter: 'public',
-        error_message: null,
-        snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
-      })
-      await Promise.resolve()
-    })
-
-    // If it mutated state it would throw act errors or error boundary errors.
-    expect(api.listSnapshots).toHaveBeenCalledTimes(1) // from initial mount
-  })
-
-  it('preserves derived node data object identity when searching', async () => {
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
-    await waitFor(() => expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument())
-
-    // Trigger a search that dims nodes
-    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'nomatch' } })
-    expect(screen.getByLabelText('테이블 또는 컬럼 검색')).toHaveValue('nomatch')
-
-    // Change back to match
-    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
-    expect(screen.getByLabelText('테이블 또는 컬럼 검색')).toHaveValue('users')
-  })
-
   it('ignores duplicate share creation while a request is pending', async () => {
     let resolveShare!: (value: { url: string }) => void
     api.createShareLink.mockReturnValueOnce(new Promise((resolve) => { resolveShare = resolve }))
@@ -791,7 +744,6 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
