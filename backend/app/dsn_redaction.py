@@ -1,3 +1,5 @@
+"""Redact DSN-derived credentials from database driver error messages."""
+
 from __future__ import annotations
 
 import re
@@ -17,6 +19,8 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 
 def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
+    """Extract the authority and query from a malformed DSN without raising."""
+
     remainder = dsn
     scheme_sep = remainder.find("://")
     if scheme_sep != -1:
@@ -31,6 +35,8 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
 
 
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
+    """Return raw, decoded, and canonical secret representations from a DSN."""
+
     candidates: set[str] = set()
 
     password: str | None = None
@@ -52,6 +58,7 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
                 password = parsed_implicit.password
                 query = parsed_implicit.query
         except ValueError:
+            # Preserve fail-closed best-effort extraction for malformed authorities.
             pass
 
     if password:
@@ -59,7 +66,6 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
         decoded = unquote(password)
         candidates.add(decoded)
         candidates.add(quote(decoded, safe=""))
-        candidates.add(quote_plus(decoded, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
@@ -69,11 +75,10 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
             decoded_raw = unquote(raw_password)
             candidates.add(decoded_raw)
             candidates.add(quote(decoded_raw, safe=""))
-            candidates.add(quote_plus(decoded_raw, safe=""))
 
     for part in query.split("&"):
-        key, sep, raw_value = part.partition("=")
-        if not sep:
+        key, separator, raw_value = part.partition("=")
+        if not separator:
             continue
         if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
             continue
@@ -87,6 +92,8 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
 
 
 def _redact_secret_occurrences(message: str, secret: str) -> str:
+    """Replace exact secret occurrences while protecting larger Unicode words."""
+
     if not secret:
         return message
 
@@ -94,18 +101,28 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
         pattern = re.compile(re.escape(secret), re.IGNORECASE)
         return pattern.sub("***", message)
 
-    start_boundary = r"(?<!\w)"
-    end_boundary = r"(?!\w)"
-
-    pattern = re.compile(rf"{start_boundary}{re.escape(secret)}{end_boundary}", flags=re.UNICODE | re.IGNORECASE)
+    pattern = re.compile(
+        rf"(?<!\w){re.escape(secret)}(?!\w)",
+        flags=re.UNICODE | re.IGNORECASE,
+    )
     return pattern.sub("***", message)
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
-    redacted = error_message
-    if len(redacted) > 1000:
-        redacted = redacted[:1000]
-    redacted = _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)
+    """Redact DSN-derived secrets from a database driver error message.
+
+    Args:
+        error_message: Driver or connection text that may contain credential
+            assignments or representations derived from the DSN.
+        dsn: The database connection string used to derive raw, decoded, and
+            canonical encoded secret candidates.
+
+    Returns:
+        The complete error message with detected secrets replaced by ``***``.
+        Unrelated text and message length are otherwise preserved.
+    """
+
+    redacted = _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", error_message)
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
         redacted = _redact_secret_occurrences(redacted, secret)
     return redacted
