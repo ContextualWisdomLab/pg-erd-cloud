@@ -9,8 +9,8 @@ _SECRET_KEY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"(?P<prefix>\b[\w.-]*(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|"
-    r"api[_-]?key|access[_-]?key|auth(?:entication)?)[\w.-]*\s*[:=]\s*)"
+    r"(?P<prefix>\b[\w.-]*?(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|"
+    r"api[_-]?key|access[_-]?key|auth(?:entication)?)[\w.-]*?\s*[:=]\s*)"
     r"(?P<value>[^&\s,;\"'<>]+)",
     re.IGNORECASE,
 )
@@ -44,9 +44,7 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     except ValueError:
         netloc, query = _split_dsn_best_effort(dsn)
 
-    # Handle scheme-less DSNs like "user:pass@host/db"
     if not password and not netloc and "@" in dsn:
-        # Try parsing with implicit scheme
         try:
             parsed_implicit = urlsplit("//" + dsn)
             if parsed_implicit.netloc:
@@ -104,7 +102,10 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
-    redacted = _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", error_message)
+    redacted = error_message
+    if len(redacted) > 1000:
+        redacted = redacted[:1000]
+    redacted = _SECRET_ASSIGNMENT_PATTERN.sub(r"\g<prefix>***", redacted)
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
         redacted = _redact_secret_occurrences(redacted, secret)
     return redacted
