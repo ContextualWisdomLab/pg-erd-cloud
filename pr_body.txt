@@ -1,5 +1,15 @@
-🚨 Severity: MEDIUM
-💡 Vulnerability: User-provided string fields (such as diagram view names, table annotation schema/relation names, and API key names) lacked strict validation against control characters. They only relied on length constraints, allowing characters like null bytes, carriage returns, or terminal escape sequences to be injected.
-🎯 Impact: Allowing control characters in these fields could lead to Log Injection (CRLF injection), Null Byte Injection, or terminal escape sequence injection if these inputs are subsequently logged or rendered in a terminal interface.
-🔧 Fix: Enforced strict validation on Pydantic string fields (`DiagramViewCreateIn.name`, `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`, and `ApiKeyCreateIn.key_name`) using the regex pattern `^[^\x00-\x1F\x7F]+$`. This strictly rejects ASCII control characters and the DEL character while allowing legitimate unicode string inputs. Fields requiring multiline inputs (like `body` and `sql`) were explicitly left unchanged to prevent functionality regression.
-✅ Verification: Ran `uv run pytest` and verified all tests continue to pass. The regex implementation conforms to Pydantic V2 standards.
+💡 What
+- ExportModal에 DBML 다운로드 버튼 추가
+- 메인 화면에 있던 독립된 DBML 다운로드 버튼을 제거하고, ExportModal 안으로 통합하였습니다.
+- 관련된 통합테스트 및 유닛 테스트 업데이트 (`App.coverage.test.tsx`, `ExportModal.test.tsx`)
+
+🎯 Why
+- 기존에 분리되어 있던 DBML 내보내기 버튼을 모달 안으로 통합하여 사용자 인터페이스의 일관성을 높였습니다.
+- SVG, PlantUML 등 다른 파일 형식과 동일한 경험을 제공합니다.
+
+📸 Before/After
+- Before: 메인 도구 모음에 `DBML 내보내기` 버튼이 존재
+- After: `공유 및 내보내기` 모달 안 `산출물` 목록에 DBML 항목으로 이동됨
+
+♿ Accessibility
+- 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
