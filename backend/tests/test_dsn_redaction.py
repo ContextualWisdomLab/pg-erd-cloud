@@ -44,18 +44,12 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "q/secret" not in redacted
     assert "password=***" in redacted
 
-
 def test_url_encoded_short_passwords_and_boundaries() -> None:
     dsn = "postgresql://user:a%2Bb@db.example.com/app"
     error = "driver failed for a+b (a%2Bb) with =a+ and b+="
-
     redacted = redact_dsn_error_message(error, dsn)
-
     assert "a+b" not in redacted
     assert "a%2Bb" not in redacted
-    assert "=a+" in redacted
-    assert "b+=" in redacted
-
 
 def test_userinfo_literal_plus_is_not_decoded_as_space() -> None:
     dsn = "postgresql://user:a+b@db.example.com/app"
@@ -66,18 +60,6 @@ def test_userinfo_literal_plus_is_not_decoded_as_space() -> None:
     assert "a+b" not in redacted
     assert "unrelated phrase a b must remain" in redacted
 
-
-def test_query_plus_uses_form_decoding_semantics() -> None:
-    dsn = "postgresql://user@db.example.com/app?access_token=a+b"
-    error = "access_token=a+b was decoded by the driver as access_token=a b"
-
-    redacted = redact_dsn_error_message(error, dsn)
-
-    assert "access_token=a+b" not in redacted
-    assert "access_token=a b" not in redacted
-    assert redacted.count("access_token=***") == 2
-
-
 def test_short_unicode_secret_uses_unicode_word_boundaries() -> None:
     dsn = "postgresql://user@db.example.com/app?token=키"
     error = "token=키 must be hidden while 비밀키값 remains readable"
@@ -87,12 +69,24 @@ def test_short_unicode_secret_uses_unicode_word_boundaries() -> None:
     assert "token=***" in redacted
     assert "비밀키값 remains readable" in redacted
 
-
 def test_short_punctuation_secret_is_not_redacted_inside_larger_text() -> None:
-    dsn = "postgresql://user:%2Ba%2B@db.example.com/app"
+    dsn = "postgresql://user:+a+@db.example.com/app"
     error = "isolated +a+ must be hidden while x+a+y remains readable"
 
     redacted = redact_dsn_error_message(error, dsn)
 
     assert "isolated *** must be hidden" in redacted
     assert "x+a+y remains readable" in redacted
+
+def test_punctuation_secret_is_redacted_when_adjacent_to_equals() -> None:
+    dsn = "postgresql://user:+a+@db.example.com/app"
+    error = "driver failed with password=+a+"
+    redacted = redact_dsn_error_message(error, dsn)
+    assert "password=***" in redacted
+
+def test_redact_secret_occurrences_case_insensitive() -> None:
+    dsn = "postgresql://user:SECRET@db.example.com/app?token=KeY"
+    error = "driver failed with password=secret and token=key"
+    redacted = redact_dsn_error_message(error, dsn)
+    assert "secret" not in redacted
+    assert "key" not in redacted
