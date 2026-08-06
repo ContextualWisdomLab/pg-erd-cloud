@@ -4,7 +4,7 @@ import type { ForeignKeyEdgeData, TableNodeData } from './convert';
 import { decodeHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
-const CSV_FORMULA_RE = /^[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
+const CSV_FORMULA_RE = /^[\s]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
 const MARKDOWN_ESCAPE_RE = /[\\|`\[\]()]/g;
 const MARKDOWN_HTML_RE = /[&<>]/g;
 const MARKDOWN_HTML_ESCAPES: Record<string, string> = {
@@ -19,7 +19,7 @@ function cellText(value: unknown): string {
 
 function csvCell(value: unknown): string {
   const text = cellText(value);
-  const neutralized = CSV_FORMULA_RE.test(text.trimStart()) ? `'${text}` : text;
+  const neutralized = CSV_FORMULA_RE.test(text) ? `'${text}` : text;
   return `"${neutralized.replace(/"/g, '""')}"`;
 }
 
