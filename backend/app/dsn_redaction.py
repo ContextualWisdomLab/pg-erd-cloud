@@ -17,13 +17,12 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 
 
 def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
-    """Extract (netloc, query) from a DSN without ``urlsplit``.
+    """Extract ``(netloc, query)`` from a malformed DSN without ``urlsplit``.
 
-    ``urllib.parse.urlsplit`` raises ``ValueError`` (e.g. "Invalid IPv6 URL")
-    on malformed authorities such as an unbalanced ``[``. Redaction must never
-    crash on hostile input, otherwise the raw, un-redacted error message could
-    still reach a client. This fallback recovers the credential-bearing parts
-    with plain string slicing so embedded secrets are still stripped.
+    ``urllib.parse.urlsplit`` raises ``ValueError`` for malformed authorities,
+    including an unbalanced IPv6 bracket. Redaction must remain fail closed on
+    hostile input so the raw driver message is never returned merely because
+    the DSN could not be parsed normally.
     """
 
     remainder = dsn
@@ -39,39 +38,54 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
     return netloc, query
 
 
+def _add_userinfo_candidates(candidates: set[str], raw_value: str) -> None:
+    """Add raw, decoded, and canonical URL-userinfo secret candidates."""
+
+    if not raw_value:
+        return
+    decoded_value = unquote(raw_value)
+    candidates.add(raw_value)
+    candidates.add(decoded_value)
+    candidates.add(quote(decoded_value, safe=""))
+
+
+def _add_query_candidates(candidates: set[str], raw_value: str) -> None:
+    """Add raw, decoded, and canonical form-query secret candidates."""
+
+    if not raw_value:
+        return
+    decoded_value = unquote_plus(raw_value)
+    candidates.add(raw_value)
+    candidates.add(decoded_value)
+    candidates.add(quote(decoded_value, safe=""))
+    candidates.add(quote_plus(decoded_value, safe=""))
+
+
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
+    """Return credential representations that a database driver may expose."""
+
     candidates: set[str] = set()
 
     password: str | None = None
     try:
         parsed = urlsplit(dsn)
         if "://" in dsn and not parsed.netloc:
-            # ponytail: keep urlsplit; only swap the non-RFC scheme so userinfo parses.
+            # Keep ``urlsplit`` semantics while substituting only a parseable
+            # scheme so non-RFC database schemes still expose their userinfo.
             parsed = urlsplit("http://" + dsn.split("://", 1)[1])
         netloc = parsed.netloc
         password = parsed.password
         query = parsed.query
     except ValueError:
-        # Malformed DSN (e.g. invalid IPv6 literal). Fall back to best-effort
-        # parsing so any embedded credentials are still redacted.
         netloc, query = _split_dsn_best_effort(dsn)
 
     if password:
-        candidates.add(password)
-        decoded = unquote_plus(password)
-        candidates.add(decoded)
-        candidates.add(quote(decoded, safe=""))
-        candidates.add(quote_plus(decoded, safe=""))
+        _add_userinfo_candidates(candidates, password)
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
-            raw_password = userinfo.split(":", 1)[1]
-            candidates.add(raw_password)
-            decoded_raw = unquote_plus(raw_password)
-            candidates.add(decoded_raw)
-            candidates.add(quote(decoded_raw, safe=""))
-            candidates.add(quote_plus(decoded_raw, safe=""))
+            _add_userinfo_candidates(candidates, userinfo.split(":", 1)[1])
 
     for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -79,30 +93,29 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
             continue
         if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
             continue
-        decoded_value = unquote_plus(raw_value)
-        candidates.add(raw_value)
-        candidates.add(decoded_value)
-        candidates.add(quote(decoded_value, safe=""))
-        candidates.add(quote_plus(decoded_value, safe=""))
+        _add_query_candidates(candidates, raw_value)
 
     return {candidate for candidate in candidates if candidate}
 
 
 def _redact_secret_occurrences(message: str, secret: str) -> str:
+    """Redact one secret without replacing it inside a larger Unicode word."""
+
     if not secret:
         return message
 
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    start_boundary = r"(?<![A-Za-z0-9])" if secret[0].isalnum() else ""
-    end_boundary = r"(?![A-Za-z0-9])" if secret[-1].isalnum() else ""
-    pattern = re.compile(rf"{start_boundary}{re.escape(secret)}{end_boundary}")
+    # Short secrets are especially prone to corrupting unrelated identifiers.
+    # Unicode-aware ``\w`` boundaries protect both alphanumeric secrets and
+    # punctuation-bearing values such as ``+a+`` from substring over-redaction.
+    pattern = re.compile(rf"(?<!\w){re.escape(secret)}(?!\w)")
     return pattern.sub("***", message)
 
 
 def redact_dsn_error_message(error_message: str, dsn: str) -> str:
-    """Redact DSN-derived secrets from a driver error message."""
+    """Redact DSN-derived credentials from a database-driver error message."""
 
     redacted = error_message
     for secret in sorted(_password_candidates_from_dsn(dsn), key=len, reverse=True):
