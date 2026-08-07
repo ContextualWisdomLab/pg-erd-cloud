@@ -52,10 +52,7 @@ def _collect_internal_imports(
                 continue
             base = node.module
             if base == module_prefix or base.startswith(f"{module_prefix}."):
-                # Handle cases like:
-                #   from app import models
-                # where `node.module` is "app" but the imported module is
-                # "app.models".
+                # Handle cases where `node.module` is "app" but the imported module is "app.models".
                 for alias in node.names:
                     candidates: list[str]
                     if alias.name == "*":
