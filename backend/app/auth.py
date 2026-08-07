@@ -218,11 +218,11 @@ async def is_token_jti_revoked(jwt_id: str) -> bool:
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
-        stmt = select(RevokedToken).where(
+        stmt = select(RevokedToken.jwt_id).where(
             RevokedToken.jwt_id == jwt_id, RevokedToken.expires_at > current
-        )
+        ).limit(1)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return result.scalar() is not None
 
 
 def _bearer_token_from_request(request: Request) -> str:
