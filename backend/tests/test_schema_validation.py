@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.schemas import (
     ApiKeyCreateIn,
+    ApplySqlIn,
     ConnectionCreateIn,
     DiagramViewCreateIn,
     ProjectCreateIn,
@@ -69,3 +70,11 @@ def test_api_key_name_rejects_control_characters() -> None:
         ApiKeyCreateIn(key_name="my\x00key")
     with pytest.raises(ValidationError):
         ApiKeyCreateIn(key_name="my\nkey")
+
+
+def test_apply_sql_in_rejects_dangerous_characters() -> None:
+    # Control characters
+    with pytest.raises(ValidationError):
+        ApplySqlIn(sql="CREATE TABLE \x00users (id int);")
+    with pytest.raises(ValidationError):
+        ApplySqlIn(sql="CREATE TABLE \x1Busers (id int);")
