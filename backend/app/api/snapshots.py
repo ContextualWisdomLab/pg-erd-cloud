@@ -295,9 +295,7 @@ async def migration_safety(
 @router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
 async def export_migration_sql(
     schema_snapshot_uuid: uuid.UUID,
-    against: uuid.UUID = Query(
-        ..., description="Base snapshot UUID to migrate from"
-    ),
+    against: uuid.UUID = Query(..., description="Base snapshot UUID to migrate from"),
     dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
     direction: str = Query(
         "up",

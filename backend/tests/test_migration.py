@@ -18,10 +18,22 @@ def _member_table(oid=1):
             {"relation_oid": oid, "schema_name": "public", "relation_name": "member"}
         ],
         columns=[
-            {"relation_oid": oid, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": oid, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
+            {
+                "relation_oid": oid,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": oid,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
         ],
-        pk_columns=[{"relation_oid": oid, "column_name": "member_id", "column_ordinal": 1}],
+        pk_columns=[
+            {"relation_oid": oid, "column_name": "member_id", "column_ordinal": 1}
+        ],
     )
 
 
@@ -49,13 +61,27 @@ def test_dropped_table_emits_drop_table():
 def test_added_and_dropped_columns():
     base = _member_table()
     target = _snap(
-        relations=[{"relation_oid": 2, "schema_name": "public", "relation_name": "member"}],
-        columns=[
-            {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            # email dropped, nickname added
-            {"relation_oid": 2, "column_name": "nickname", "data_type": "text", "is_not_null": False},
+        relations=[
+            {"relation_oid": 2, "schema_name": "public", "relation_name": "member"}
         ],
-        pk_columns=[{"relation_oid": 2, "column_name": "member_id", "column_ordinal": 1}],
+        columns=[
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            # email dropped, nickname added
+            {
+                "relation_oid": 2,
+                "column_name": "nickname",
+                "data_type": "text",
+                "is_not_null": False,
+            },
+        ],
+        pk_columns=[
+            {"relation_oid": 2, "column_name": "member_id", "column_ordinal": 1}
+        ],
     )
     sql = snapshot_diff_to_migration_sql(base, target)
     assert 'ALTER TABLE "public"."member" ADD COLUMN "nickname" text;' in sql
@@ -65,13 +91,27 @@ def test_added_and_dropped_columns():
 def test_column_type_and_nullability_changes():
     base = _member_table()
     target = _snap(
-        relations=[{"relation_oid": 3, "schema_name": "public", "relation_name": "member"}],
-        columns=[
-            {"relation_oid": 3, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            # email: varchar(100) -> text, and now NOT NULL
-            {"relation_oid": 3, "column_name": "email", "data_type": "text", "is_not_null": True},
+        relations=[
+            {"relation_oid": 3, "schema_name": "public", "relation_name": "member"}
         ],
-        pk_columns=[{"relation_oid": 3, "column_name": "member_id", "column_ordinal": 1}],
+        columns=[
+            {
+                "relation_oid": 3,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            # email: varchar(100) -> text, and now NOT NULL
+            {
+                "relation_oid": 3,
+                "column_name": "email",
+                "data_type": "text",
+                "is_not_null": True,
+            },
+        ],
+        pk_columns=[
+            {"relation_oid": 3, "column_name": "member_id", "column_ordinal": 1}
+        ],
     )
     sql = snapshot_diff_to_migration_sql(base, target)
     assert 'ALTER TABLE "public"."member" ALTER COLUMN "email" TYPE text;' in sql
@@ -81,8 +121,18 @@ def test_column_type_and_nullability_changes():
 def test_foreign_key_add_and_drop():
     orders_rel = {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"}
     orders_cols = [
-        {"relation_oid": 2, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
-        {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+        {
+            "relation_oid": 2,
+            "column_name": "order_id",
+            "data_type": "bigint",
+            "is_not_null": True,
+        },
+        {
+            "relation_oid": 2,
+            "column_name": "member_id",
+            "data_type": "bigint",
+            "is_not_null": True,
+        },
     ]
     fk = {
         "fk_constraint_name": "fk_orders_member",
@@ -98,7 +148,12 @@ def test_foreign_key_add_and_drop():
             orders_rel,
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
             *orders_cols,
         ],
     )
@@ -114,7 +169,9 @@ def test_foreign_key_add_and_drop():
         in add_sql
     )
     drop_sql = snapshot_diff_to_migration_sql(target, base)
-    assert 'ALTER TABLE "public"."orders" DROP CONSTRAINT "fk_orders_member";' in drop_sql
+    assert (
+        'ALTER TABLE "public"."orders" DROP CONSTRAINT "fk_orders_member";' in drop_sql
+    )
 
 
 def test_foreign_key_is_dropped_before_referenced_table_is_dropped():
@@ -264,12 +321,26 @@ def test_added_table_in_new_schema_creates_schema_first():
 def test_snowflake_dialect_uses_set_data_type():
     base = _member_table()
     target = _snap(
-        relations=[{"relation_oid": 5, "schema_name": "public", "relation_name": "member"}],
-        columns=[
-            {"relation_oid": 5, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 5, "column_name": "email", "data_type": "text", "is_not_null": False},
+        relations=[
+            {"relation_oid": 5, "schema_name": "public", "relation_name": "member"}
         ],
-        pk_columns=[{"relation_oid": 5, "column_name": "member_id", "column_ordinal": 1}],
+        columns=[
+            {
+                "relation_oid": 5,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 5,
+                "column_name": "email",
+                "data_type": "text",
+                "is_not_null": False,
+            },
+        ],
+        pk_columns=[
+            {"relation_oid": 5, "column_name": "member_id", "column_ordinal": 1}
+        ],
     )
     sql = snapshot_diff_to_migration_sql(base, target, target_dialect="snowflake")
     assert "SET DATA TYPE" in sql

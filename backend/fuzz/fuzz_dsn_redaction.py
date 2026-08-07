@@ -41,9 +41,7 @@ def test_one_input(data: bytes) -> None:
     # Path B -- secret must not leak. Build a well-formed DSN with a known,
     # structurally-safe password and force it into the error text.
     pw_len = fdp.ConsumeIntInRange(1, 40)
-    pw = "".join(
-        _SAFE_PW[b % len(_SAFE_PW)] for b in fdp.ConsumeBytes(pw_len)
-    )
+    pw = "".join(_SAFE_PW[b % len(_SAFE_PW)] for b in fdp.ConsumeBytes(pw_len))
     if not pw:
         return
     host = "db.example.com"

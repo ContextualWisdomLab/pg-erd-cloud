@@ -64,7 +64,7 @@ def snapshot_to_data_dictionary_md(
     for col in columns:
         cols_by_oid.setdefault(col.get("relation_oid"), []).append(col)
     for cols in cols_by_oid.values():
-        cols.sort(key=lambda c: (c.get("column_position") or 0))
+        cols.sort(key=lambda c: c.get("column_position") or 0)
 
     pk_by_oid: dict[Any, set[str]] = {}
     for pk in pk_columns:
@@ -157,7 +157,11 @@ def snapshot_to_data_dictionary_md(
                 out.append(
                     f"- `{col_or_q(edge.get('child_column_name'))}` → "
                     f"`{parent_name}.{col_or_q(edge.get('parent_column_name'))}`"
-                    + (f" ({edge['fk_constraint_name']})" if edge.get("fk_constraint_name") else "")
+                    + (
+                        f" ({edge['fk_constraint_name']})"
+                        if edge.get("fk_constraint_name")
+                        else ""
+                    )
                 )
             out.append("")
 

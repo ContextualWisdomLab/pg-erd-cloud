@@ -3,6 +3,7 @@
 ## Unreleased
 - [FE] ⚡ **검색 렌더링 안정화**: 정규화된 검색어와 원본 테이블 데이터가 동일할 때 장식된 노드 데이터의 객체 정체성을 재사용하여 드래그·위치 갱신 중 불필요한 하위 트리 렌더링과 할당을 줄였습니다.
 - [FE] 🛡️ **스냅샷 폴링 격리**: 순차 폴링과 effect 세대 격리를 적용하여 화면 이동·스냅샷 전환·역순 응답 이후 오래된 결과, 목록 새로고침, 오류가 현재 상태를 덮어쓰지 못하도록 했습니다.
+- [CI] 🧪 **프런트엔드 커버리지 증거 상시 검증**: 필수 CI가 전체 Vitest V8 커버리지 실행과 프로덕션 빌드를 수행해 현재 head의 테스트 증거를 직접 게시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).

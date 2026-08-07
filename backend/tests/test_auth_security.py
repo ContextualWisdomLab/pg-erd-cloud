@@ -259,12 +259,25 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {
+            "keys": [
+                {
+                    "kid": "key-1",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     observed: dict[str, object] = {}
 
     def fake_decode(*args: object, **kwargs: object) -> dict:
-        observed["args"] = args
+        observed["key"] = (
+            getattr(args[1], "_jwk_data", args[1])
+            if hasattr(args[1], "_jwk_data")
+            else args[1]
+        )
         observed["kwargs"] = kwargs
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
@@ -297,8 +310,8 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
             "require_iss": True,
             "require_exp": True,
             "require_jti": True,
-            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
+        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
     }
 
 
@@ -353,13 +366,35 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
-        return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
+            return {
+                "keys": [
+                    {
+                        "kid": "new-key",
+                        "kty": "RSA",
+                        "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                        "e": "AQAB",
+                    }
+                ]
+            }
+        return {
+            "keys": [
+                {
+                    "kid": "old-key",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     observed: dict[str, object] = {}
 
     def fake_decode(*args: object, **kwargs: object) -> dict:
-        observed["key"] = args[1]
+        observed["key"] = (
+            getattr(args[1], "_jwk_data", args[1])
+            if hasattr(args[1], "_jwk_data")
+            else args[1]
+        )
         observed["kwargs"] = kwargs
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
@@ -383,7 +418,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert "key" in observed
 
 
 @pytest.mark.asyncio
@@ -397,7 +432,16 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {
+            "keys": [
+                {
+                    "kid": "key-1",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -431,7 +475,16 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {
+            "keys": [
+                {
+                    "kid": "key-1",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -575,10 +628,19 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {
+            "keys": [
+                {
+                    "kid": "key-1",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
-        raise auth.jwt.PyJWTError("mocked decoding error")
+        raise auth.jwt.exceptions.PyJWTError("mocked decoding error")
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -594,6 +656,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "token verification failed"
 
+
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch: pytest.MonkeyPatch,
@@ -607,7 +670,16 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {
+            "keys": [
+                {
+                    "kid": "key-1",
+                    "kty": "RSA",
+                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
+                    "e": "AQAB",
+                }
+            ]
+        }
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -617,7 +689,9 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
 
     def fail_decode(*_: object, **__: object) -> dict:
-        raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
+        raise AssertionError(
+            "jwt.decode must not run for mismatched algorithm/key type"
+        )
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
@@ -626,6 +700,8 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,

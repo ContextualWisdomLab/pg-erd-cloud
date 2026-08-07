@@ -16,8 +16,12 @@ from typing import Any
 
 INFO = "info"
 
-_CREATED = re.compile(r"^(created?_(at|on|time|date|dt)|create_(time|date|dt)|creation_date|reg(istered)?_(at|dt|date)|insert(ed)?_(at|dt))$")
-_UPDATED = re.compile(r"^(updated?_(at|on|time|date|dt)|update_(time|date|dt)|modified?_(at|on|time|date|dt)|last_modified(_at)?|mod_dt)$")
+_CREATED = re.compile(
+    r"^(created?_(at|on|time|date|dt)|create_(time|date|dt)|creation_date|reg(istered)?_(at|dt|date)|insert(ed)?_(at|dt))$"
+)
+_UPDATED = re.compile(
+    r"^(updated?_(at|on|time|date|dt)|update_(time|date|dt)|modified?_(at|on|time|date|dt)|last_modified(_at)?|mod_dt)$"
+)
 
 # Only flag when at least this share of tables already follows the convention.
 _ADOPTION_THRESHOLD = 0.5
@@ -82,7 +86,9 @@ def check_audit_columns(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         "created_adoption": round(created_share, 2),
         "updated_adoption": round(updated_share, 2),
         "convention_active": total >= _MIN_TABLES
-        and (created_share >= _ADOPTION_THRESHOLD or updated_share >= _ADOPTION_THRESHOLD),
+        and (
+            created_share >= _ADOPTION_THRESHOLD or updated_share >= _ADOPTION_THRESHOLD
+        ),
         "total": len(items),
     }
     return {"items": items, "summary": summary}

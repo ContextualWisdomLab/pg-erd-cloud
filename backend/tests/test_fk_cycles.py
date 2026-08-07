@@ -7,9 +7,17 @@ def _snap(edges, names=None):
     names = names or sorted({e[0] for e in edges} | {e[1] for e in edges})
     oid = {n: i + 1 for i, n in enumerate(names)}
     return {
-        "relations": [{"relation_oid": oid[n], "schema_name": "public", "relation_name": n} for n in names],
+        "relations": [
+            {"relation_oid": oid[n], "schema_name": "public", "relation_name": n}
+            for n in names
+        ],
         "fk_edges": [
-            {"child_relation_oid": oid[c], "parent_relation_oid": oid[p], "child_column_name": "x", "parent_column_name": "y"}
+            {
+                "child_relation_oid": oid[c],
+                "parent_relation_oid": oid[p],
+                "child_column_name": "x",
+                "parent_column_name": "y",
+            }
             for c, p in edges
         ],
     }
