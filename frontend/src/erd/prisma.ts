@@ -38,6 +38,8 @@ function mapToPrismaType(pgType: string, isFk: boolean): string {
   return "String"; // fallback
 }
 
+import { decodeHandleId } from './handleUtils';
+
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -61,6 +63,16 @@ export function exportPrisma(
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
 
+  // Cache pk lookup for O(1) checks
+  const pkColumnsByNode = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    const pks = new Set<string>();
+    for (const c of n.data.columns || []) {
+      if (c.is_pk) pks.add(c.column_name);
+    }
+    pkColumnsByNode.set(n.id, pks);
+  }
+
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
@@ -69,20 +81,33 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
+    if (edge.sourceHandle) {
+      const decodedSource = decodeHandleId(edge.sourceHandle);
+      if (decodedSource !== null) {
+        sourceField = decodedSource;
+      } else if (edge.sourceHandle.startsWith("src-")) {
+        // Fallback for tests/legacy handles that are not hex-encoded
+        sourceField = edge.sourceHandle.slice(4);
+      }
+      if (sourceField) {
+        fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+      }
+    } else {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+    if (edge.targetHandle) {
+      const decodedTarget = decodeHandleId(edge.targetHandle);
+      if (decodedTarget !== null) {
+        targetField = decodedTarget;
+      } else if (edge.targetHandle.startsWith("tgt-")) {
+        targetField = edge.targetHandle.slice(4);
+      }
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      const isUnique = pkColumnsByNode.get(edge.source)?.has(sourceField) || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({

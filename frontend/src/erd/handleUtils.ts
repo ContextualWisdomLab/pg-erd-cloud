@@ -24,6 +24,11 @@ export function targetColumnHandleId(columnName: string): string {
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
+/**
+ * Reverses the encoding applied by sanitizeHandleId to retrieve the native column string.
+ * This lookup strictly validates the structure and bounds lengths (max 10k items)
+ * to prevent ReDoS/OOM attacks from excessively sized hex strings.
+ */
 export function decodeHandleId(handleId: string | null | undefined): string | null {
   if (!handleId || handleId.length > 10000) return null;
 
@@ -52,7 +57,7 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
       return null;
     }
     const codePoint = Number.parseInt(hex, 16);
-    if (codePoint > 0x10ffff) {
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
       return null;
     }
     try {
