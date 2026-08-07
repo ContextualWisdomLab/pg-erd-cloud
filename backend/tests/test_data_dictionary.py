@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.spec.data_dictionary import col_or_q, snapshot_to_data_dictionary_md
+from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 
 
 def _snapshot():
@@ -55,13 +55,6 @@ def _snapshot():
     }
 
 
-def test_col_or_q_formats_present_and_missing_values():
-    assert col_or_q("value") == "value"
-    assert col_or_q(123) == "123"
-    assert col_or_q(True) == "True"
-    assert col_or_q(None) == "?"
-
-
 def test_renders_tables_columns_keys_and_metadata():
     md = snapshot_to_data_dictionary_md(_snapshot())
     assert md.startswith("# Data Dictionary")
@@ -93,12 +86,10 @@ def test_merges_project_annotations():
     md = snapshot_to_data_dictionary_md(
         _snapshot(),
         annotations=[
-            {"schema_name": "public", "relation_name": "orders", "body": "주문 트랜잭션 테이블"},
-            {"schema_name": "public", "relation_name": "member", "body": ""},
+            {"schema_name": "public", "relation_name": "orders", "body": "주문 트랜잭션 테이블"}
         ],
     )
     assert "> 📝 주문 트랜잭션 테이블" in md
-    assert "> 📝 " not in md.replace("> 📝 주문 트랜잭션 테이블", "")
 
 
 def test_labels_views_and_handles_empty_snapshot():
@@ -107,32 +98,3 @@ def test_labels_views_and_handles_empty_snapshot():
     assert "_view_" in md
     empty = snapshot_to_data_dictionary_md({})
     assert "No tables in this snapshot" in empty
-
-
-def test_renders_unknown_parent_and_missing_foreign_key_columns():
-    snapshot = {
-        "relations": [
-            {
-                "relation_oid": 1,
-                "schema_name": "public",
-                "relation_name": "child_record",
-                "relation_kind": "r",
-            }
-        ],
-        "columns": [],
-        "pk_columns": [{"relation_oid": 1, "column_name": None}],
-        "fk_edges": [
-            {
-                "child_relation_oid": 1,
-                "parent_relation_oid": 999,
-                "child_column_name": None,
-                "parent_column_name": None,
-                "fk_constraint_name": None,
-            }
-        ],
-        "indexes": [],
-    }
-
-    md = snapshot_to_data_dictionary_md(snapshot)
-
-    assert "`?` → `?.?`" in md

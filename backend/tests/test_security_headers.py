@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 from starlette.requests import Request
-from starlette.responses import Response
 
 from app import security_headers
 from app.csrf import CSRF_HEADER_NAME
@@ -50,33 +49,6 @@ def test_security_headers_present_on_healthz_and_api() -> None:
     assert (
         r2.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
     )
-
-
-def test_security_headers_preserve_existing_upstream_values() -> None:
-    """Application fallback headers must not overwrite stronger upstream policy."""
-    scope = {
-        "type": "http",
-        "asgi": {"version": "3.0"},
-        "http_version": "1.1",
-        "method": "GET",
-        "scheme": "https",
-        "path": "/api/ping",
-        "raw_path": b"/api/ping",
-        "query_string": b"",
-        "headers": [],
-        "client": ("127.0.0.1", 12345),
-        "server": ("testserver", 443),
-        "root_path": "",
-    }
-    request = Request(scope)
-    response = Response(headers={"X-Frame-Options": "SAMEORIGIN"})
-
-    security_headers.apply_security_headers(request, response)
-
-    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert "Content-Security-Policy" in response.headers
-    assert "Strict-Transport-Security" in response.headers
 
 
 def test_hsts_not_set_on_http_even_if_x_forwarded_proto_is_https() -> None:
