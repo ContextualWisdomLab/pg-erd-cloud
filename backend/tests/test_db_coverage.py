@@ -60,6 +60,21 @@ class _AsyncSessionContext:
         return None
 
 
+class _MonotonicClock:
+    """Module-like monotonic clock that never exhausts its final value."""
+
+    def __init__(self, *values: float) -> None:
+        if not values:
+            raise ValueError("at least one monotonic value is required")
+        self._values = list(values)
+
+    def monotonic(self) -> float:
+        """Return each configured value once, then repeat the final value."""
+        if len(self._values) > 1:
+            return self._values.pop(0)
+        return self._values[0]
+
+
 def _maker(marker: str):  # type: ignore[no-untyped-def]
     """Return a zero-argument async-session factory for generator tests."""
 
@@ -96,7 +111,11 @@ async def test_probe_pooler_admin_console_handles_disabled_empty_and_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Bound pooler probes and normalize missing or present SHOW VERSION rows."""
-    monkeypatch.setattr(db, "build_admin_console_dsn", lambda *_args: ("postgresql://u@db/p", "pw"))
+    monkeypatch.setattr(
+        db,
+        "build_admin_console_dsn",
+        lambda *_args: ("postgresql://u@db/p", "pw"),
+    )
     monkeypatch.setattr(settings, "db_pooler_probe_timeout_seconds", 0.0)
     assert await db._probe_pooler_admin_console("pgbouncer") is None
 
@@ -135,7 +154,11 @@ async def test_probe_pooler_admin_console_redacts_probe_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Treat transport/runtime failures as absence rather than leaking details."""
-    monkeypatch.setattr(db, "build_admin_console_dsn", lambda *_args: ("postgresql://u@db/p", None))
+    monkeypatch.setattr(
+        db,
+        "build_admin_console_dsn",
+        lambda *_args: ("postgresql://u@db/p", None),
+    )
     monkeypatch.setattr(settings, "db_pooler_probe_timeout_seconds", 1.1)
 
     def failing_connect(*_args: object, **_kwargs: object) -> _Connection:
@@ -162,12 +185,11 @@ async def test_get_pooler_detection_honors_explicit_and_cached_state(
     cached = PoolerDetectionResult(PoolerKind.PGCAT, True, "PgCat 1")
     monkeypatch.setattr(db, "_pooler_cache", cached)
     monkeypatch.setattr(db, "_pooler_cache_at", 50.0)
-    monkeypatch.setattr(db.time, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(db, "time", _MonotonicClock(100.0))
     assert await db.get_pooler_detection() is cached
 
-    times = iter((400.0, 100.0))
     monkeypatch.setattr(db, "_pooler_cache_at", 0.0)
-    monkeypatch.setattr(db.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(db, "time", _MonotonicClock(400.0, 100.0))
     assert await db.get_pooler_detection() is cached
 
 
@@ -179,7 +201,7 @@ async def test_get_pooler_detection_probes_in_order_and_caches_outcome(
     monkeypatch.setattr(settings, "db_pooler_kind", None)
     monkeypatch.setattr(db, "_pooler_cache", None)
     monkeypatch.setattr(db, "_pooler_cache_at", 0.0)
-    monkeypatch.setattr(db.time, "monotonic", lambda: 1000.0)
+    monkeypatch.setattr(db, "time", _MonotonicClock(1000.0))
     calls: list[str] = []
 
     async def probe(admin_db: str) -> str | None:
@@ -225,7 +247,11 @@ async def test_database_session_generators_choose_primary_and_read_only(
     await fallback_generator.aclose()
 
     monkeypatch.setattr(db, "ReadOnlySessionLocal", _maker("read-only"))
-    monkeypatch.setattr(settings, "database_read_only_url", "postgresql+asyncpg://ro/db")
+    monkeypatch.setattr(
+        settings,
+        "database_read_only_url",
+        "postgresql+asyncpg://ro/db",
+    )
     monkeypatch.setattr(settings, "db_read_routing", "auto")
 
     async def detected_pooler() -> PoolerDetectionResult:
