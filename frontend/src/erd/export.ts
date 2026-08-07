@@ -201,13 +201,14 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   return ddl;
 }
 
-const XML_ESCAPE_RE = /[&<>"']/g;
+const XML_ESCAPE_RE = /[&<>"'`]/g;
 const XML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
   '>': '&gt;',
   '"': '&quot;',
   "'": '&#39;',
+  '`': '&#x60;',
 };
 
 function escapeXml(value: unknown): string {
@@ -348,7 +349,7 @@ export function exportDiagramSvg(
   const svgWidth = maxX - minX + padding * 2;
   const svgHeight = maxY - minY + padding * 2;
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">`,
+    `<!-- xmlns --><svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">`,
     '<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker></defs>',
     '<rect width="100%" height="100%" fill="#f8fafc"/>',
   ];
