@@ -98,7 +98,7 @@ const workspaceNavItems: Array<{ id: WorkspaceView; label: string }> = [
   { id: "editor", label: "편집기" },
 ];
 
-function formatPercent(value: number): string {
+export function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
