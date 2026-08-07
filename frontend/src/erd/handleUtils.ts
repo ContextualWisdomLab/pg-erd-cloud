@@ -14,3 +14,31 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+export function parseColumnNameFromHandle(handleId: string | undefined | null): string | null {
+  if (!handleId) return null;
+
+  let prefixRemoved = handleId;
+  if (handleId.startsWith('src-')) {
+    prefixRemoved = handleId.slice(4);
+  } else if (handleId.startsWith('tgt-')) {
+    prefixRemoved = handleId.slice(4);
+  }
+
+  if (prefixRemoved.startsWith('c-')) {
+    const encoded = prefixRemoved.slice(2);
+    if (encoded === 'empty') {
+      return '';
+    }
+
+    try {
+      return encoded
+        .split('-')
+        .map((hex) => String.fromCodePoint(parseInt(hex, 16)))
+        .join('');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  return null;
+}
