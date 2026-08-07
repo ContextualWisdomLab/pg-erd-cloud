@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-08-07 - Add Keyboard Submission to Inline Forms
+**Learning:** For components that contain input fields combined with submission buttons, they often omit a wrapper form element causing Enter-to-submit to fail. Wrapping these generic groupings (like 'New Project' and 'New Connection' creation elements) in standard `<form>` elements handles native implicit submission smoothly without requiring manual key listeners.
+**Action:** When inspecting generic inline create elements containing an input and submit button, always ensure they are wrapped in a `<form>` and handle `onSubmit` (preventing default) instead of relying solely on the submit button's `onClick`.

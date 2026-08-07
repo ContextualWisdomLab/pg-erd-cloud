@@ -1078,7 +1078,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="field">
+        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
           <label htmlFor="project-name">New project</label>
           <div className="row">
             <input
@@ -1087,8 +1087,7 @@ export default function App() {
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
-              type="button"
-              onClick={onCreateProject}
+              type="submit"
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
               aria-describedby={
@@ -1103,7 +1102,7 @@ export default function App() {
               {createProjectHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
         <hr />
 
@@ -1126,7 +1125,7 @@ export default function App() {
           </select>
         </div>
 
-        <div className="field">
+        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1145,8 +1144,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
-            type="button"
-            onClick={onCreateConnection}
+            type="submit"
             disabled={
               !selectedProjectId ||
               !connName.trim() ||
@@ -1165,7 +1163,7 @@ export default function App() {
               {createConnectionHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
         <div className="field">
           <label htmlFor="schema-filter">Schema filter (optional)</label>
@@ -1309,20 +1307,22 @@ export default function App() {
                 <h1 id="projects-title">프로젝트</h1>
                 <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
               </div>
-              <div className="inlineCreate">
+              <form
+                className="inlineCreate"
+                onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}
+              >
                 <input
                   aria-label="새 프로젝트 이름"
                   value={projectName}
                   onChange={(event) => setProjectName(event.currentTarget.value)}
                 />
                 <button
-                  type="button"
-                  onClick={onCreateProject}
+                  type="submit"
                   disabled={!projectName.trim() || isCreatingProject}
                 >
                   {isCreatingProject ? "생성 중" : "새 프로젝트"}
                 </button>
-              </div>
+              </form>
             </div>
             <div className="dataTable" role="table" aria-label="프로젝트 목록">
               <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
