@@ -1,30 +1,36 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import { sanitizeTableName } from './securityUtils';
 
-describe('securityUtils', () => {
-  describe('sanitizeTableName', () => {
-    it('should allow alphanumeric characters and underscores', () => {
-      expect(sanitizeTableName('valid_Table_Name123')).toBe('valid_Table_Name123');
-    });
+describe('sanitizeTableName', () => {
+  it('preserves ASCII alphanumeric characters and underscores', () => {
+    expect(sanitizeTableName('valid_Table_Name123')).toBe('valid_Table_Name123');
+    expect(sanitizeTableName('Users')).toBe('Users');
+    expect(sanitizeTableName('table_1')).toBe('table_1');
+  });
 
-    it('should remove whitespace', () => {
-      expect(sanitizeTableName('invalid table name')).toBe('invalidtablename');
-    });
+  it('removes whitespace and punctuation', () => {
+    expect(sanitizeTableName('invalid table name')).toBe('invalidtablename');
+    expect(sanitizeTableName('  padded  ')).toBe('padded');
+    expect(sanitizeTableName('table-name')).toBe('tablename');
+    expect(sanitizeTableName('user@domain')).toBe('userdomain');
+    expect(sanitizeTableName('table!@#$%^&*()_+={}|[]\\:";\'<>?,./')).toBe('table_');
+  });
 
-    it('should remove special characters', () => {
-      expect(sanitizeTableName('table@#name!')).toBe('tablename');
-    });
+  it('reduces SQL-shaped text to the identifier allowlist', () => {
+    expect(sanitizeTableName('drop table;--')).toBe('droptable');
+    expect(sanitizeTableName('SELECT * FROM users')).toBe('SELECTFROMusers');
+    expect(sanitizeTableName('users; DROP TABLE audit_log;--')).toBe(
+      'usersDROPTABLEaudit_log',
+    );
+  });
 
-    it('should remove unicode/emoji characters', () => {
-      expect(sanitizeTableName('table_이름🚀')).toBe('table_');
-    });
+  it('removes non-ASCII Unicode and emoji characters', () => {
+    expect(sanitizeTableName('table_이름🚀')).toBe('table_');
+  });
 
-    it('should handle empty string', () => {
-      expect(sanitizeTableName('')).toBe('');
-    });
-
-    it('should return empty string if all characters are invalid', () => {
-      expect(sanitizeTableName('!!! @@@')).toBe('');
-    });
+  it('handles empty and entirely invalid input', () => {
+    expect(sanitizeTableName('')).toBe('');
+    expect(sanitizeTableName('!!! @@@')).toBe('');
   });
 });
