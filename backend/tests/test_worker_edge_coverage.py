@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from app.jobs import worker
@@ -89,13 +87,16 @@ async def test_worker_empty_queue_executes_sleep_continue_branch(
     async def sleep(delay: float) -> None:
         slept.append(delay)
 
+    async def never_called_handler(_factory: object, _job: object) -> None:
+        raise AssertionError("an empty queue must not dispatch a handler")
+
     monkeypatch.setattr(worker, "claim_one_job", claim)
     monkeypatch.setattr(worker.asyncio, "sleep", sleep)
 
     with pytest.raises(_StopWorker):
         await worker.run_worker_forever(
-            lambda: _Session(),  # type: ignore[arg-type]
-            {"snapshot": lambda *_args: SimpleNamespace()},  # type: ignore[dict-item]
+            _Session,  # type: ignore[arg-type]
+            {"snapshot": never_called_handler},  # type: ignore[dict-item]
             poll_interval_s=0.125,
         )
 
