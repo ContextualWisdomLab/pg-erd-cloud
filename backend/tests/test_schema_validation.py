@@ -3,7 +3,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ConnectionCreateIn, ProjectCreateIn, ProjectMemberAddIn
+from app.schemas import (
+    ApiKeyCreateIn,
+    ConnectionCreateIn,
+    DiagramViewCreateIn,
+    ProjectCreateIn,
+    ProjectMemberAddIn,
+    TableAnnotationUpsertIn,
+)
 
 
 def test_project_name_length_is_bounded() -> None:
@@ -37,3 +44,28 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+def test_diagram_name_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\x00diagram", layout_json={})
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\ndiagram", layout_json={})
+
+
+def test_table_annotation_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name="my\x00schema", relation_name="my_table", body="note"
+        )
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name="my_schema", relation_name="my\ntable", body="note"
+        )
+
+
+def test_api_key_name_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="my\x00key")
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="my\nkey")
