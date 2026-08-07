@@ -733,3 +733,72 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+@pytest.mark.asyncio
+async def test_oidc_rejects_crit_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fail_jwks():
+        raise AssertionError("JWKS must not load")
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["unsupported"]}
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer some-token"})
+        )
+    assert exc_info.value.status_code == 401
+    assert "critical headers are not supported" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_oidc_rejects_malformed_crit_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fail_jwks():
+        raise AssertionError("JWKS must not load")
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+
+    # crit is not a list
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": "unsupported"}
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer some-token"})
+        )
+    assert exc_info.value.status_code == 401
+    assert "invalid crit header" in exc_info.value.detail.lower()
+
+    # crit is a list of non-strings
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": [123]}
+    )
+    with pytest.raises(HTTPException) as exc_info2:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer some-token"})
+        )
+    assert exc_info2.value.status_code == 401
+    assert "invalid crit header" in exc_info2.value.detail.lower()
+
+@pytest.mark.asyncio
+async def test_oidc_rejects_empty_crit_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fail_jwks():
+        raise AssertionError("JWKS must not load")
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+
+    # crit is an empty list, which should be fine based on our logic,
+    # but the logic only raises an exception if len(crit) > 0, so it will proceed
+    # to the next step. Let's make the next step fail so we can cover the `len(crit) == 0` branch.
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": []}
+    )
+    with pytest.raises(AssertionError) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer some-token"})
+        )
+    assert "JWKS must not load" in str(exc_info.value)
