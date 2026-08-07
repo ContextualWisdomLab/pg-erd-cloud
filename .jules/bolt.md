@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2026-07-28 - Avoid O(N) Encoding Lookups in React Flow iterative exports
-**Learning:** In frontend ERD graph logic, edge handles (e.g., `src-c-0069...`) are hex-encoded column names. For iterative exports, using array find loops to re-encode all node columns to match an edge handle results in massive temporary object allocation and performance issues.
-**Action:** Directly decode the string edge handle into a column name first via `decodeHandleId`, allowing an O(1) string equality comparison against the pre-existing column names.
