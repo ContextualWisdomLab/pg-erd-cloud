@@ -939,7 +939,8 @@ export default function App() {
     setLayoutMessage("되돌렸습니다");
   }
 
-  async function onCreateProject() {
+  async function handleProjectSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     const nextProjectName = projectName.trim();
     /* v8 ignore next -- the create control is disabled for both guard states */
     if (!nextProjectName || isCreatingProject) return;
@@ -954,7 +955,8 @@ export default function App() {
     }
   }
 
-  async function onCreateConnection() {
+  async function handleConnectionSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     /* v8 ignore next -- the save control is disabled without a project or while saving */
     if (!selectedProjectId || isCreatingConnection) return;
     const nextConnectionName = connName.trim();
@@ -1078,7 +1080,7 @@ export default function App() {
           </div>
         </div>
 
-        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
+        <form className="field" onSubmit={handleProjectSubmit}>
           <label htmlFor="project-name">New project</label>
           <div className="row">
             <input
@@ -1125,7 +1127,7 @@ export default function App() {
           </select>
         </div>
 
-        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
+        <form className="field" onSubmit={handleConnectionSubmit}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1309,7 +1311,7 @@ export default function App() {
               </div>
               <form
                 className="inlineCreate"
-                onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}
+                onSubmit={handleProjectSubmit}
               >
                 <input
                   aria-label="새 프로젝트 이름"

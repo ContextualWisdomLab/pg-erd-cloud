@@ -347,20 +347,20 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
     fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  New  ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    fireEvent.submit(screen.getByLabelText('New project').closest('form')!)
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
 
     const dsn = screen.getByLabelText('Connection DSN')
     fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    fireEvent.submit(screen.getByLabelText('Connection DSN').closest('form')!)
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     fireEvent.change(dsn, { target: { value: 'http://bad.example/db' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    fireEvent.submit(screen.getByLabelText('Connection DSN').closest('form')!)
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     expect(dsn).toHaveValue('')
 
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    fireEvent.submit(screen.getByLabelText('Connection DSN').closest('form')!)
     await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
@@ -682,7 +682,7 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.change(screen.getByLabelText('Connection DSN'), { target: { value: 'postgresql://db.example/test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    fireEvent.submit(screen.getByLabelText('Connection DSN').closest('form')!)
     await waitFor(() => expect(api.createConnection).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
     await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p1', 'c2', undefined))
