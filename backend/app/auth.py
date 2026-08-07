@@ -287,6 +287,10 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             },
             leeway=OIDC_JWT_LEEWAY_SECONDS,
         )
+    except jwt.exceptions.MissingRequiredClaimError as err:
+        if err.claim == "jti":
+            raise HTTPException(status_code=401, detail="token missing jti") from err
+        raise HTTPException(status_code=401, detail="token verification failed") from err
     except Exception as err:
         raise HTTPException(
             status_code=401, detail="token verification failed"

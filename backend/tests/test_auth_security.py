@@ -259,16 +259,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {
-            "keys": [
-                {
-                    "kid": "key-1",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -366,26 +357,8 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {
-                "keys": [
-                    {
-                        "kid": "new-key",
-                        "kty": "RSA",
-                        "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                        "e": "AQAB",
-                    }
-                ]
-            }
-        return {
-            "keys": [
-                {
-                    "kid": "old-key",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+            return {"keys": [{"kid": "new-key", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
+        return {"keys": [{"kid": "old-key", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -432,16 +405,7 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {
-            "keys": [
-                {
-                    "kid": "key-1",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -449,10 +413,14 @@ async def test_oidc_requires_jti_claim(
         return jti == "revoked-jwt"
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+    def mock_decode(*args, **kwargs):
+        claims = {"sub": "user-1", "exp": exp_claim()}
+        # Do not include "jti" to trigger the ValueError from claims validator, NOT PyJWT
+        return claims
     monkeypatch.setattr(
         auth.jwt,
         "decode",
-        lambda *_args, **_kwargs: {"sub": "user-1", "exp": exp_claim()},
+        mock_decode,
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -475,16 +443,7 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {
-            "keys": [
-                {
-                    "kid": "key-1",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -628,16 +587,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {
-            "keys": [
-                {
-                    "kid": "key-1",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.exceptions.PyJWTError("mocked decoding error")
@@ -670,16 +620,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {
-            "keys": [
-                {
-                    "kid": "key-1",
-                    "kty": "RSA",
-                    "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N",
-                    "e": "AQAB",
-                }
-            ]
-        }
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "3bB3tqQeF80xM0y16wVb0-a2oM3uUo-Ff-0uW7qGfV3N", "e": "AQAB"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
