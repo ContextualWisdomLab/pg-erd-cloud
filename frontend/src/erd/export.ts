@@ -52,7 +52,31 @@ function sqlAccessMethod(value: unknown): string {
 
 function sqlDataType(value: unknown): string {
   const text = String(value ?? '').trim();
-  return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
+  if (!text) {
+    return 'text';
+  }
+
+  if (/[;/*-]/.test(text)) {
+    return 'text';
+  }
+
+  let open = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(') {
+      open++;
+    } else if (ch === ')') {
+      open--;
+      if (open < 0) {
+        return 'text';
+      }
+    }
+  }
+  if (open !== 0) {
+    return 'text';
+  }
+
+  return text;
 }
 
 const columnHandleCache = new WeakMap<Node<TableNodeData>, { sourceMap: Map<string, string>; targetMap: Map<string, string> }>();
