@@ -48,5 +48,8 @@ describe('handleUtils', () => {
       expect(parseColumnNameFromHandle(null as any)).toBe(null);
       expect(parseColumnNameFromHandle(undefined as any)).toBe(null);
     });
+    it('returns null for excessively long strings to prevent DoS', () => {
+      expect(parseColumnNameFromHandle('src-c-' + '0069-'.repeat(150))).toBe(null);
+    });
   });
 });

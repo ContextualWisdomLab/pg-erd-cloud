@@ -16,6 +16,7 @@ export function targetColumnHandleId(columnName: string): string {
 }
 export function parseColumnNameFromHandle(handleId: string | undefined | null): string | null {
   if (!handleId) return null;
+  if (handleId.length > 512) return null;
 
   let prefixRemoved = handleId;
   if (handleId.startsWith('src-')) {

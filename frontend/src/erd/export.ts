@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -70,17 +70,16 @@ function fkColumnsForEdge(
   // ⚡ Bolt: Optimize FK handle resolution
   // By parsing the handle ID directly into a column name instead of iterating through all columns
   // and string-encoding them via sourceColumnHandleId/targetColumnHandleId,
-  // we reduce lookup complexity from O(C) to O(1) per edge.
-  // This reduces CPU overhead and avoids unnecessary string allocation and GC pressure.
+  // we remove high garbage-collection overhead of string allocations on every iteration.
   const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
   let sourceHandleColumn: string | undefined = undefined;
-  if (parsedSource && (sourceNode.data.columns || []).some(c => c.column_name === parsedSource)) {
+  if (parsedSource !== null && (sourceNode.data.columns || []).some(c => c.column_name === parsedSource)) {
     sourceHandleColumn = parsedSource;
   }
 
   const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
   let targetHandleColumn: string | undefined = undefined;
-  if (parsedTarget && (targetNode.data.columns || []).some(c => c.column_name === parsedTarget)) {
+  if (parsedTarget !== null && (targetNode.data.columns || []).some(c => c.column_name === parsedTarget)) {
     targetHandleColumn = parsedTarget;
   }
 
