@@ -60,3 +60,16 @@ def test_valkey_queue_rejects_invalid_sentinel_hosts(
 
     with pytest.raises(ValueError, match="host:port"):
         valkey_queue.valkey_queue_config_summary()
+
+def test_valkey_queue_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "valkey_sentinel_hosts", "valkey.local:26379")
+    monkeypatch.setattr(settings, "valkey_url", None)
+    assert valkey_queue.valkey_queue_mode() == "sentinel"
+
+    monkeypatch.setattr(settings, "valkey_sentinel_hosts", None)
+    monkeypatch.setattr(settings, "valkey_url", "redis://localhost:6379/0")
+    assert valkey_queue.valkey_queue_mode() == "url"
+
+    monkeypatch.setattr(settings, "valkey_sentinel_hosts", None)
+    monkeypatch.setattr(settings, "valkey_url", None)
+    assert valkey_queue.valkey_queue_mode() == "disabled"
