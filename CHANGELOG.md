@@ -1,7 +1,6 @@
 # Changelog
 
 ## Unreleased
-- [BE] 🧼 **식별자 제어문자 차단**: 프로젝트·연결·다이어그램 뷰·테이블 주석 대상 이름과 API 키 이름에서 `U+0000`–`U+001F` 및 `U+007F`을 거부하여 로그 위조, 줄 기반 export 손상, 터미널 제어 시퀀스 주입 위험을 줄입니다. 다국어·이모지 이름과 의도적인 다중행 주석 본문은 유지합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
