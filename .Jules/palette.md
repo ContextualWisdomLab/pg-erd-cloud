@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-08-07 - [Accessible Custom Radio Groups]
+**Learning:** When building custom radio groups (e.g., color swatches) with `role="radiogroup"`, using generic buttons with `aria-pressed` creates mismatched role structures that confuse screen readers, since children of a radiogroup must be radios.
+**Action:** Ensure child elements of a `role="radiogroup"` explicitly use `role="radio"` and `aria-checked` (instead of `aria-pressed`) to properly communicate their state and semantics. Ensure corresponding React Testing Library tests use `role='radio'` queries.
