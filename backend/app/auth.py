@@ -112,17 +112,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    now = dt.datetime.now(dt.timezone.utc)
-
-    if _oidc_jwks is not None:
-        if not force_refresh and now < _oidc_jwks_expires_at:
-            return cast(dict, _oidc_jwks)
-        if (
-            force_refresh
-            and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
-        ):
-            return cast(dict, _oidc_jwks)
-
     async with _jwks_lock:
         now = dt.datetime.now(dt.timezone.utc)
         if _oidc_jwks is not None:

@@ -1,7 +1,6 @@
 # Changelog
 
 ## Unreleased
-- [BE] 🔐 **OIDC JWT 검증 경로를 PyJWT로 전환**: `python-jose`가 끌어오던 순수 Python `ecdsa` 의존 경로를 제거하고 `PyJWT[crypto]`와 `cryptography` 기반 검증으로 전환했습니다. 서버가 관리하는 비대칭 알고리즘 허용 목록, JWK 키 변환, 발급자·만료·JWT ID 및 조건부 audience 필수 검증, 제한된 leeway를 유지하며 두 hash lock을 함께 재생성했습니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
