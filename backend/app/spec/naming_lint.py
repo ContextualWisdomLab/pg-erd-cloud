@@ -32,7 +32,7 @@ RESERVED_WORDS = frozenset(
     do else end except false fetch for foreign from grant group having in
     initially intersect into lateral leading limit localtime localtimestamp not
     null offset on only or order placing primary references returning select
-    session_user some symmetric table then to trailing true union unique user
+    session_user some symmetric system_user table then to trailing true union unique user
     using variadic when where window with""".split()
 )
 

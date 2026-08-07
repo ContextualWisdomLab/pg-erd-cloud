@@ -25,6 +25,12 @@ def test_flags_reserved_word_table_and_column():
     assert report["summary"]["high"] >= 2
 
 
+def test_flags_system_user_is_reserved():
+    report = lint_naming(_snap({"system_user": ["id"]}))
+    assert ("reserved_word", "high") in _cats(report)
+    assert report["summary"]["high"] == 1
+
+
 def test_flags_identifier_requiring_quotes():
     report = lint_naming(_snap({"MyTable": ["id"], "member": ["first-name", "2fa_flag"]}))
     cats = _cats(report)
