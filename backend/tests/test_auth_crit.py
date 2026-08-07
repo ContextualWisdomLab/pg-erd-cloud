@@ -17,16 +17,13 @@ async def test_decode_verified_oidc_token_with_unsupported_crit(monkeypatch):
 async def test_decode_verified_oidc_token_with_supported_crit(monkeypatch):
     monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256", "crit": ["typ", "alg"]})
 
-    # We expect it to fail later (e.g. invalid signature), but not on the crit check
     with pytest.raises(HTTPException) as excinfo:
-        # Mock _validate_jwt_header to pass, so it goes to jwt.PyJWK
         monkeypatch.setattr("app.auth._validate_jwt_header", lambda x: "RS256")
 
         async def mock_get_jwks(force_refresh=False):
             return {"keys": []}
         monkeypatch.setattr("app.auth._get_jwks", mock_get_jwks)
 
-        # Then we expect it to fail on finding JWK
         await _decode_verified_oidc_token("dummy_token")
 
     assert excinfo.value.status_code == 401
@@ -36,17 +33,46 @@ async def test_decode_verified_oidc_token_with_supported_crit(monkeypatch):
 async def test_decode_verified_oidc_token_with_no_crit(monkeypatch):
     monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256"})
 
-    # We expect it to fail later (e.g. invalid signature), but not on the crit check
     with pytest.raises(HTTPException) as excinfo:
-        # Mock _validate_jwt_header to pass, so it goes to jwt.PyJWK
         monkeypatch.setattr("app.auth._validate_jwt_header", lambda x: "RS256")
 
         async def mock_get_jwks(force_refresh=False):
             return {"keys": []}
         monkeypatch.setattr("app.auth._get_jwks", mock_get_jwks)
 
-        # Then we expect it to fail on finding JWK
         await _decode_verified_oidc_token("dummy_token")
 
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == "unknown signing key"
+
+@pytest.mark.asyncio
+async def test_decode_verified_oidc_token_crit_not_list(monkeypatch):
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256", "crit": "typ"})
+    with pytest.raises(HTTPException) as excinfo:
+        await _decode_verified_oidc_token("dummy_token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "critical header must be a list"
+
+@pytest.mark.asyncio
+async def test_decode_verified_oidc_token_crit_too_many(monkeypatch):
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256", "crit": ["typ"] * 11})
+    with pytest.raises(HTTPException) as excinfo:
+        await _decode_verified_oidc_token("dummy_token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "too many critical headers"
+
+@pytest.mark.asyncio
+async def test_decode_verified_oidc_token_crit_not_string(monkeypatch):
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256", "crit": [123]})
+    with pytest.raises(HTTPException) as excinfo:
+        await _decode_verified_oidc_token("dummy_token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "critical header must be a string"
+
+@pytest.mark.asyncio
+async def test_decode_verified_oidc_token_crit_too_long(monkeypatch):
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256", "crit": ["a" * 51]})
+    with pytest.raises(HTTPException) as excinfo:
+        await _decode_verified_oidc_token("dummy_token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "critical header name too long"

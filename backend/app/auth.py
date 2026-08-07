@@ -233,8 +233,17 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
 
     crit = header.get('crit')
     if crit is not None:
-        understood = {'typ', 'alg', 'cty', 'kid'}
+        if not isinstance(crit, list):
+            raise HTTPException(status_code=401, detail="critical header must be a list")
+        if len(crit) > 10:
+            raise HTTPException(status_code=401, detail="too many critical headers")
+
+        understood = {'typ', 'alg', 'cty', 'kid', 'crit'}
         for crit_header in crit:
+            if not isinstance(crit_header, str):
+                raise HTTPException(status_code=401, detail="critical header must be a string")
+            if len(crit_header) > 50:
+                raise HTTPException(status_code=401, detail="critical header name too long")
             if crit_header not in understood:
                 raise HTTPException(status_code=401, detail="critical header not understood")
 
@@ -278,6 +287,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
                 "verify_aud": bool(settings.oidc_audience),
                 "verify_iss": True,
                 "verify_exp": True,
+                "verify_jti": True,
                 "require": ["exp", "iss", "jti"] + (["aud"] if bool(settings.oidc_audience) else []),
             },
         )

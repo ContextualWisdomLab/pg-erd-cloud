@@ -307,6 +307,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
             "verify_aud": True,
             "verify_iss": True,
             "verify_exp": True,
+            "verify_jti": True,
             "require": ["exp", "iss", "jti", "aud"],
         },
     }
