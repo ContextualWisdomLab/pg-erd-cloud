@@ -60,3 +60,24 @@ def test_valkey_queue_rejects_invalid_sentinel_hosts(
 
     with pytest.raises(ValueError, match="host:port"):
         valkey_queue.valkey_queue_config_summary()
+
+def test_format_sentinel_hosts_empty() -> None:
+    assert valkey_queue.format_sentinel_hosts([]) == ""
+
+
+def test_format_sentinel_hosts_single() -> None:
+    assert valkey_queue.format_sentinel_hosts([("localhost", 26379)]) == "localhost:26379"
+
+
+def test_format_sentinel_hosts_multiple() -> None:
+    assert (
+        valkey_queue.format_sentinel_hosts(
+            [("valkey-a.local", 26379), ("valkey-b.local", 26379)]
+        )
+        == "valkey-a.local:26379,valkey-b.local:26379"
+    )
+
+
+def test_format_sentinel_hosts_iterator() -> None:
+    hosts = (h for h in [("127.0.0.1", 6379)])
+    assert valkey_queue.format_sentinel_hosts(hosts) == "127.0.0.1:6379"
