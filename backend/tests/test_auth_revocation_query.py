@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import pytest
 
 from app import auth
@@ -54,7 +52,11 @@ async def test_is_token_jti_revoked_uses_scalar_existence_result(
     """Treat a returned JWT ID as revoked and a missing scalar as not revoked."""
     result = _ScalarResult(scalar_value)
     session = _RevocationSession(result)
-    session_factory: Callable[[], _RevocationSession] = lambda: session
+
+    def session_factory() -> _RevocationSession:
+        """Return the prepared fake session for the revocation lookup."""
+        return session
+
     monkeypatch.setattr(app_db, "SessionLocal", session_factory)
 
     assert await auth.is_token_jti_revoked("jwt-1") is expected
