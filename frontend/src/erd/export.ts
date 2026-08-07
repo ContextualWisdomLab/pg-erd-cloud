@@ -55,6 +55,23 @@ function sqlDataType(value: unknown): string {
   return SQL_DATA_TYPE_RE.test(text) ? text : 'text';
 }
 
+const columnHandleCache = new WeakMap<Node<TableNodeData>, { sourceMap: Map<string, string>; targetMap: Map<string, string> }>();
+
+function getColumnHandleMaps(node: Node<TableNodeData>) {
+  let maps = columnHandleCache.get(node);
+  if (!maps) {
+    const sourceMap = new Map<string, string>();
+    const targetMap = new Map<string, string>();
+    for (const column of node.data.columns || []) {
+      sourceMap.set(sourceColumnHandleId(column.column_name), column.column_name);
+      targetMap.set(targetColumnHandleId(column.column_name), column.column_name);
+    }
+    maps = { sourceMap, targetMap };
+    columnHandleCache.set(node, maps);
+  }
+  return maps;
+}
+
 function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
@@ -67,12 +84,8 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  const sourceHandleColumn = edge.sourceHandle ? getColumnHandleMaps(sourceNode).sourceMap.get(edge.sourceHandle) : undefined;
+  const targetHandleColumn = edge.targetHandle ? getColumnHandleMaps(targetNode).targetMap.get(edge.targetHandle) : undefined;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
