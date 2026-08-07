@@ -84,3 +84,7 @@ describe('handleUtils', () => {
     });
   });
 });
+
+  it('limits payload and hex chunks size against ReDoS', () => {
+    expect(decodeHandleId('c-' + '0041-'.repeat(20000) + '0041')).toBeNull();
+  });

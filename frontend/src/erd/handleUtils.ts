@@ -25,7 +25,7 @@ export function targetColumnHandleId(columnName: string): string {
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
 export function decodeHandleId(handleId: string | null | undefined): string | null {
-  if (!handleId) return null;
+  if (!handleId || handleId.length > 10000) return null;
 
   const parts = handleId.split('-');
   let payloadIndex = -1;
@@ -43,6 +43,7 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
   }
 
   const hexParts = parts.slice(payloadIndex);
+  if (hexParts.length > 10000) return null;
   if (hexParts.length === 0) return null;
 
   let decoded = '';
