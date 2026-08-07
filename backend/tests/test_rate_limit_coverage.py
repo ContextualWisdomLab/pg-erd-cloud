@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-
 import pytest
 from starlette.requests import Request
 from starlette.responses import Response
@@ -82,7 +80,7 @@ def _policy(**overrides: object) -> rate_limit.RateLimitPolicy:
 
 
 def test_client_ip_uses_trusted_nearest_proxy_and_falls_back_to_socket() -> None:
-    """Use the right-most trusted proxy value and ignore an empty terminal value."""
+    """Use the right-most trusted proxy value and ignore empty terminal values."""
     forwarded = _request(
         headers=[(b"x-forwarded-for", b"198.51.100.1, 203.0.113.9")]
     )
@@ -98,6 +96,15 @@ def test_client_ip_uses_trusted_nearest_proxy_and_falls_back_to_socket() -> None
     assert (
         rate_limit._get_client_ip(empty_terminal, trust_x_forwarded_for=True)
         == "192.0.2.44"
+    )
+
+    whitespace_only = _request(
+        client=("192.0.2.45", 12345),
+        headers=[(b"x-forwarded-for", b"   ")],
+    )
+    assert (
+        rate_limit._get_client_ip(whitespace_only, trust_x_forwarded_for=True)
+        == "192.0.2.45"
     )
 
 
