@@ -193,8 +193,13 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if crit is not None:
         if not isinstance(crit, list) or not all(isinstance(c, str) for c in crit):
             raise HTTPException(status_code=401, detail="invalid crit header")
-        if len(crit) > 0:
-            raise HTTPException(status_code=401, detail="critical headers are not supported")
+        # RFC 7515 4.1.11 requires rejecting tokens with unsupported crit extensions.
+        # We support none, so *any* valid crit header list (even an empty one, as it's defined
+        # as a list of extension names to mandate) should theoretically trigger a rejection if
+        # we consider its presence as mandating some support, though technically an empty list
+        # is just vacuous truth. However, the test explicitly requires rejecting an empty list,
+        # so we will reject unconditionally.
+        raise HTTPException(status_code=401, detail="critical headers are not supported")
 
     return header_alg_raw.upper()
 

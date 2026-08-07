@@ -797,8 +797,9 @@ async def test_oidc_rejects_empty_crit_header(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": []}
     )
-    with pytest.raises(AssertionError) as exc_info:
+    with pytest.raises(HTTPException) as exc_info:
         await auth._get_subject_from_request(
             make_request({"Authorization": "Bearer some-token"})
         )
-    assert "JWKS must not load" in str(exc_info.value)
+    assert exc_info.value.status_code == 401
+    assert "critical headers are not supported" in exc_info.value.detail.lower()
