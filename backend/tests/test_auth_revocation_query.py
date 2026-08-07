@@ -61,5 +61,5 @@ async def test_is_token_jti_revoked_uses_scalar_existence_result(
     assert result.scalar_calls == 1
     assert session.statement is not None
     statement_text = str(session.statement)
-    assert "revoked_tokens.jwt_id" in statement_text
+    assert "revoked_token.jwt_id" in statement_text
     assert "LIMIT" in statement_text.upper()
