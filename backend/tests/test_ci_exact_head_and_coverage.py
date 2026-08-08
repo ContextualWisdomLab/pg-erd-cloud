@@ -45,10 +45,12 @@ def test_backend_ci_enforces_full_statement_and_branch_coverage() -> None:
 
 
 def test_frontend_ci_enforces_full_coverage() -> None:
-    """Require frontend CI and Vitest to enforce all four coverage metrics at 100%."""
+    """Require frontend CI to measure every production source file at 100%."""
     workflow = _ci_workflow()
     vitest_config = VITEST_CONFIG_PATH.read_text(encoding="utf-8")
 
     assert "run: npm run coverage" in workflow
+    assert "include: ['src/**/*.{ts,tsx}']" in vitest_config
+    assert "exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**']" in vitest_config
     assert "thresholds:" in vitest_config
     assert "100: true" in vitest_config
