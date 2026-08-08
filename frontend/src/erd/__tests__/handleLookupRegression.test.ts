@@ -31,8 +31,9 @@ function tableNode(
 }
 
 describe('foreign-key handle lookup regressions', () => {
-  it('rejects partially parsed hexadecimal handle tokens', () => {
+  it('rejects malformed or invalid Unicode handle tokens', () => {
     expect(parseColumnNameFromHandle('src-c-0069junk-0064')).toBeNull();
+    expect(parseColumnNameFromHandle('src-c-110000')).toBeNull();
   });
 
   it('resolves edge handles without calling Array.some for every edge', () => {
