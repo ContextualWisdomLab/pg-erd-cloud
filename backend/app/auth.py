@@ -188,6 +188,17 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
         raise HTTPException(status_code=401, detail="token missing alg")
+
+    crit = header.get("crit")
+    if crit is not None:
+        if not isinstance(crit, list) or len(crit) == 0 or len(crit) > 10:
+            raise HTTPException(status_code=401, detail="invalid crit header")
+        for item in crit:
+            if not isinstance(item, str):
+                raise HTTPException(status_code=401, detail="invalid crit header")
+        # We don't support any critical extensions at the moment.
+        raise HTTPException(status_code=401, detail="unsupported critical extension")
+
     return header_alg_raw.upper()
 
 

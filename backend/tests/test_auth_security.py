@@ -733,3 +733,48 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+def test_validate_jwt_header_crit_valid() -> None:
+    # A valid header without crit should pass
+    alg = auth._validate_jwt_header({"alg": "RS256"})
+    assert alg == "RS256"
+
+
+def test_validate_jwt_header_crit_invalid_type() -> None:
+    # crit must be a list
+    with pytest.raises(HTTPException) as exc_info:
+        auth._validate_jwt_header({"alg": "RS256", "crit": "exp"})
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid crit header"
+
+
+def test_validate_jwt_header_crit_empty_list() -> None:
+    # crit must not be an empty list
+    with pytest.raises(HTTPException) as exc_info:
+        auth._validate_jwt_header({"alg": "RS256", "crit": []})
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid crit header"
+
+
+def test_validate_jwt_header_crit_too_many() -> None:
+    # crit list length should be bounded (e.g., >10)
+    with pytest.raises(HTTPException) as exc_info:
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["ext" + str(i) for i in range(15)]})
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid crit header"
+
+
+def test_validate_jwt_header_crit_non_string() -> None:
+    # crit items must be strings
+    with pytest.raises(HTTPException) as exc_info:
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["exp", 123]})
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid crit header"
+
+
+def test_validate_jwt_header_crit_unsupported() -> None:
+    # we don't support any critical extensions yet
+    with pytest.raises(HTTPException) as exc_info:
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["exp"]})
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "unsupported critical extension"
