@@ -14,6 +14,10 @@ function tableNode(
   title: string,
   columns: TableNodeData['columns'],
 ): Node<TableNodeData> {
+  const hasPrimaryKey = columns.reduce(
+    (hasPrimary, column) => hasPrimary || column.is_pk,
+    false,
+  );
   return {
     id,
     type: 'tableNode',
@@ -21,7 +25,7 @@ function tableNode(
     data: {
       title,
       columns,
-      badges: { pk: columns.some((column) => column.is_pk), fk: false },
+      badges: { pk: hasPrimaryKey, fk: false },
     },
   };
 }
