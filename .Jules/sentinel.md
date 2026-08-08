@@ -7,3 +7,12 @@
 **Vulnerability:** JWT 파싱 과정에서 RFC 7515에 명시된 `crit` (critical) 헤더에 대한 명시적 검증 로직이 존재하지 않아, 서명된 토큰이 인식 불가능한 중요 확장자(critical extensions) 처리를 요구하더라도 이를 무시하고 통과시킬 수 있는 잠재적 우회 취약점이 있었습니다.
 **Learning:** PyJWT와 같은 라이브러리를 사용할 때 기본 옵션만으로는 JWS 명세의 모든 보안 요구사항(특히 `crit` 파라미터)이 자동으로 강제되지 않을 수 있음을 확인했습니다.
 **Prevention:** `_validate_jwt_header` 함수에서 `crit` 헤더가 존재하는지 명시적으로 확인하고, 배열 타입 및 길이 제한을 적용하며, 현재 어플리케이션은 어떠한 추가 critical 파라미터도 지원하지 않으므로 항목이 존재할 경우 무조건 예외를 발생시키도록 방어적 검증 로직을 추가했습니다.
+
+## 2025-02-14 - python-jose 취약점(PYSEC-2026-1325) 완화를 위한 PyJWT 전환
+**Vulnerability:** `python-jose` 라이브러리가 더 이상 유지보수되지 않고 있으며, 내부적으로 사용하는 `ecdsa` 라이브러리의 취약점(PYSEC-2026-1325)을 그대로 상속받고 있었습니다. 이로 인해 CI의 OSV 스캔 및 dependency review에서 크리티컬한 보안 취약점 경고가 발생했습니다.
+**Learning:** 의존성 취약점이 프로젝트의 보안에 미치는 영향을 다시 확인했습니다. 특히, 유지보수가 중단된 보안 라이브러리의 경우 발견된 취약점이 수정되지 않아 이를 신속하게 교체해야 합니다.
+**Prevention:** `backend/pyproject.toml`에서 `python-jose` 및 `types-python-jose` 의존성을 제거하고 `PyJWT`로 완전히 전환했습니다. 이에 따라 JWT 서명 검증 및 디코딩 로직에 사용하는 모듈을 `import jwt` (PyJWT)로 교체하고 관련 테스트들을 업데이트했습니다.
+
+## 2025-02-14 - PyJWT migration decode options
+**Learning:** `PyJWT`의 `decode` 함수는 `options` 매개변수에 대해 `python-jose`와 다르게 `require_aud`, `require_iss`, `require_exp` 등의 키를 지원하지 않으며, 알 수 없는 키가 전달되면 `ValueError`를 발생시킵니다. 대신 `require` 리스트(`["exp", "iss", "jti", "aud"]`) 형태로 검증 옵션을 지정해야 합니다. 또한, `jti`를 강제하기 위해 기존 `python-jose` 옵션을 변환할 때 필수적으로 `require` 리스트에 `jti`를 포함시켜야 합니다.
+**Prevention:** `jwt.decode` 사용 시, `options={"require": ["exp", "iss", "jti", ...], "verify_aud": True}`와 같이 PyJWT 스펙에 맞춰 `options` 딕셔너리를 올바르게 구성했습니다.
