@@ -6,6 +6,7 @@ import re
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+VITEST_CONFIG_PATH = REPOSITORY_ROOT / "frontend" / "vitest.config.ts"
 
 
 def _ci_workflow() -> str:
@@ -41,3 +42,13 @@ def test_backend_ci_enforces_full_statement_and_branch_coverage() -> None:
     workflow = _ci_workflow()
 
     assert "pytest -q --cov=app --cov-branch --cov-fail-under=100" in workflow
+
+
+def test_frontend_ci_enforces_full_coverage() -> None:
+    """Require frontend CI and Vitest to enforce all four coverage metrics at 100%."""
+    workflow = _ci_workflow()
+    vitest_config = VITEST_CONFIG_PATH.read_text(encoding="utf-8")
+
+    assert "run: npm run coverage" in workflow
+    assert "thresholds:" in vitest_config
+    assert "100: true" in vitest_config
