@@ -78,5 +78,5 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
 ## 2026-08-07 - Optimize string-based node lookups using handle decoding
-**Learning:** We can reduce (N)$ string encoding loops in FK edge column lookups to (1)$ directly by decoding the parsed handle id to extract column names directly without generating garbage.
-**Action:** Always parse handles directly to resolve elements in edge loops if possible, rather than scanning the node lists to string encode.
+**Learning:** Precomputing each node's column names costs O(N * C) once. Each FK edge then decodes its bounded handle in O(H) and validates the decoded column with O(1) `Set.has`, eliminating the previous O(C) per-edge column scan and repeated handle re-encoding.
+**Action:** Build node-level column-name `Set` indexes before the edge loop, decode each source/target handle once, and use `Set.has` for membership. Describe the lookup as O(H) decoding plus O(1) membership rather than claiming that string decoding itself is O(1).
