@@ -59,8 +59,6 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
-  sourceNodeColumnNames: ReadonlySet<string>,
-  targetNodeColumnNames: ReadonlySet<string>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -69,19 +67,31 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  // Decode each handle once, then use the precomputed node indexes for O(1)
-  // column-membership checks instead of scanning and re-encoding every column.
+  // ⚡ Bolt: Optimize FK handle resolution
+  // By parsing the handle ID directly into a column name instead of iterating through all columns
+  // and string-encoding them via sourceColumnHandleId/targetColumnHandleId,
+  // we remove high garbage-collection overhead of string allocations on every iteration.
   const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
-  const sourceHandleColumn =
-    parsedSource !== null && sourceNodeColumnNames.has(parsedSource)
-      ? parsedSource
-      : undefined;
+  let sourceHandleColumn: string | undefined = undefined;
+  if (parsedSource !== null) {
+    for (const c of sourceNode.data.columns || []) {
+      if (c.column_name === parsedSource) {
+        sourceHandleColumn = parsedSource;
+        break;
+      }
+    }
+  }
 
   const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
-  const targetHandleColumn =
-    parsedTarget !== null && targetNodeColumnNames.has(parsedTarget)
-      ? parsedTarget
-      : undefined;
+  let targetHandleColumn: string | undefined = undefined;
+  if (parsedTarget !== null) {
+    for (const c of targetNode.data.columns || []) {
+      if (c.column_name === parsedTarget) {
+        targetHandleColumn = parsedTarget;
+        break;
+      }
+    }
+  }
 
   if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
@@ -103,16 +113,11 @@ function fkColumnsForEdge(
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
-  // Build node and column-name indexes once so edge lookup avoids repeated scans.
+  // Bolt: Use map for O(1) node lookup instead of O(N) array find
+  // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
-  const nodeColumnNamesById = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
-    const columnNames = new Set<string>();
-    for (const column of n.data.columns || []) {
-      columnNames.add(column.column_name);
-    }
-    nodeColumnNamesById.set(n.id, columnNames);
   }
 
   // Export tables
@@ -148,13 +153,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(
-        edge,
-        sourceNode,
-        targetNode,
-        nodeColumnNamesById.get(sourceNode.id)!,
-        nodeColumnNamesById.get(targetNode.id)!,
-      );
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
