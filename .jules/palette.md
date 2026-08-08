@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-01 - [Delete Table Confirmation]
+**Learning:** Destructive actions like deleting a table node previously occurred immediately without user confirmation via the edit modal.
+**Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests mock window.confirm appropriately.

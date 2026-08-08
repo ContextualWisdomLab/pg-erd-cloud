@@ -128,6 +128,7 @@ describe('modal behavior coverage', () => {
   })
 
   it('covers EditTableModal column mutation, duplication, form, and table actions', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.spyOn(Date, 'now').mockReturnValue(123)
     const setNodes = vi.fn()
     const setEditingNode = vi.fn()
