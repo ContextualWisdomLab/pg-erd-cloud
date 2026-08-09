@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 백그라운드 작업 실패 시 예외 문자열이나 알 수 없는 job type 값을 `job_queue.last_error`에 저장하지 않고 고정된 오류 코드만 기록하여 DSN·credential·SQL·샘플 데이터 누출을 차단합니다.
 - [BE] Forward Engineering durable-run 기반: `migration_run`·`migration_run_event` 영속화, project/plan/run-kind/plan-digest/actor를 묶는 versioned request digest, idempotency·상태·event type·before/after state·모든 SHA-256 evidence field·순서 DB 제약, dry-run/apply 상태 전이 계약, SQL·credential 필드와 PostgreSQL 연결 문자열 값을 거부하는 bounded evidence canonicalizer, exact state/version/prior-event-digest를 갱신하고 같은 transaction에 append-only event를 기록하는 optimistic CAS writer, run UUID·순서·상태·evidence·actor·UTC 시각·이전 digest를 묶는 versioned SHA-256 event chain과 run anchor, unexpired executable plan만 database conflict winner로 생성·재사용하는 내부 dry-run writer, stale worker 전이를 차단하는 versioned cancellation intent, IDOR-masked event count·canonical genesis·exact transition graph·cancellation flag/event 일치·chronology·evidence·digest chain을 검증하는 run polling API를 추가했습니다. 공개 create/cancel API·queue worker·실제 dry-run/apply는 아직 Planned입니다.
 - [BE] Forward Engineering 1단계: 브라우저 SQL 대신 버전형 `schema_model`·불변 `schema_model_revision`을 저장하고, 서버가 타깃 connection/snapshot에 결합된 구조화 `migration_plan`을 컴파일합니다. PostgreSQL 식별자 의미·위험·lock/rewrite/data-loss·권한·precondition을 보존하며 미지원 객체는 전량 fail-closed 처리합니다.
 - [BE] 프로젝트 멤버가 저장된 불변 `migration_plan`을 IDOR-masked `GET /api/migration-plans/{migration_plan_uuid}` 경로로 다시 열어 프로젝트·모델 revision·connection·snapshot·capability·actor·생성 시각까지 결합된 실행 정체성을 검토할 수 있습니다.

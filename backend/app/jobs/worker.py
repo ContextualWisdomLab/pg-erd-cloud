@@ -26,6 +26,20 @@ from app.settings import settings
 _logger = logging.getLogger(__name__)
 
 Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[None]]
+JOB_HANDLER_UNAVAILABLE = "job_handler_unavailable"
+JOB_HANDLER_FAILED = "job_handler_failed"
+
+
+def sanitize_job_error_message(_error: BaseException) -> str:
+    """Return fixed durable evidence without serializing an exception.
+
+    Handler exceptions may contain decrypted DSNs, SQL, credentials, or sampled
+    target values. The detailed exception therefore belongs in neither the
+    metadata database nor downstream API responses. Operators correlate the
+    fixed code with bounded metrics and handler-specific sanitized evidence.
+    """
+
+    return JOB_HANDLER_FAILED
 
 
 def _mark_job_running(job: JobQueue) -> JobQueue:
@@ -142,7 +156,7 @@ async def run_worker_forever(
             if handler is None:
                 async with session.begin():
                     job.status = "failed"
-                    job.last_error = f"Unknown job_type: {job.job_type}"
+                    job.last_error = JOB_HANDLER_UNAVAILABLE
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
                 continue
 
@@ -160,11 +174,11 @@ async def run_worker_forever(
                     outcome="succeeded",
                     duration_s=duration_s,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 duration_s = time.perf_counter() - started
                 async with session.begin():
                     job.status = "failed"
-                    job.last_error = str(e)
+                    job.last_error = sanitize_job_error_message(exc)
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
 
                 _publish_job_metrics(
