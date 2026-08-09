@@ -37,8 +37,9 @@ Current code implements only the first control-plane slice:
 - **Partially implemented:** durable run/event persistence, exact state
   validation, hashed idempotency keys, bounded evidence canonicalization, and
   atomic optimistic compare-and-swap transition/event persistence plus an
-  internal database-selected dry-run creation writer and cancellation intent;
-  no run API or worker execution authority exists yet.
+  internal database-selected dry-run creation writer, cancellation intent, and
+  authenticated integrity-checked run polling; no public creation API or worker
+  execution authority exists yet.
 - **Planned:** run creation/polling and workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
@@ -104,7 +105,7 @@ the effective request needed to reject same-key/different-request reuse.
 idempotency keys, deterministically binds project, plan, run kind, plan digest,
 and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
-evidence JSON. Public run creation and polling routes remain **Planned**, as do
+evidence JSON. Public run creation/cancellation routes remain **Planned**, as do
 queue/outbox integration,
 cancellation, sandbox/preflight workers, apply,
 reconciliation, and verification.
@@ -323,7 +324,7 @@ Plan SQL is read-only review output. The release executor consumes the
 structured stored plan and verifies `plan_digest`; it does not execute a new SQL
 string supplied in a run request.
 
-## 8. Migration-plan retrieval and planned run API
+## 8. Migration-plan retrieval and bounded run API
 
 Immutable plan retrieval is **Implemented**. Durable run/event persistence and
 the pure state/evidence contract are **Partially implemented**; remaining run routes
@@ -334,7 +335,7 @@ are **Planned** and do not exist in current code:
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
-| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | bounded state/evidence view, `200` | **Planned** |
+| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/state-chain/chronology/evidence returns sanitized `409` | **Implemented** |
 
 Dry-run states:
 
@@ -397,13 +398,13 @@ Current implemented endpoints use FastAPI's JSON shape
 |---:|---|
 | `401` | Missing or invalid authentication at the shared auth boundary. |
 | `403` | Authenticated project member lacks the required editor/deployer role. |
-| `404` | Missing, cross-project, or non-member resource identity on the current schema-model/plan paths. |
-| `409` | Stale model `If-Match`. |
+| `404` | Missing, cross-project, or non-member resource identity on current schema-model/plan/run paths. |
+| `409` | Stale model `If-Match` or corrupt durable run history. |
 | `413` | Model JSON exceeds 2 MiB, or a compiled plan exceeds 1,000 executable plus proposed statements or 4 MiB. |
 | `422` | Request validation, unusable/mismatched/outdated snapshot or connection, invalid model, or snapshot content unsupported by the current adapter. |
 
-Release-v1 errors remain sanitized and machine-classifiable. Before the run APIs
-ship, the implementation must choose and test one repository-wide structured
+Release-v1 errors remain sanitized and machine-classifiable. Before mutating run
+APIs ship, the implementation must choose and test one repository-wide structured
 shape containing at least a stable `code`, human-safe `detail`, optional bounded
 `findings`, and a correlation identifier. It must distinguish:
 
