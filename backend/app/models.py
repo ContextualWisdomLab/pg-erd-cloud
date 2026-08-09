@@ -309,6 +309,7 @@ class MigrationRun(Base):
     state_version: Mapped[int] = mapped_column(Integer(), default=1)
     idempotency_key_hash: Mapped[str] = mapped_column(Text())
     plan_digest: Mapped[str] = mapped_column(Text())
+    request_digest: Mapped[str] = mapped_column(Text())
     requested_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
     )
@@ -332,7 +333,6 @@ class MigrationRun(Base):
     __table_args__ = (
         UniqueConstraint(
             "project_space_uuid",
-            "migration_plan_uuid",
             "run_kind",
             "idempotency_key_hash",
             name="uq_migration_run__idempotent_action",
