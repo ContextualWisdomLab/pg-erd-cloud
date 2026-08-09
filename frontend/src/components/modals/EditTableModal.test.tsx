@@ -151,6 +151,54 @@ describe('EditTableModal', () => {
     expect(setNodesMock).not.toHaveBeenCalled();
   });
 
+  it('deletes a table when 테이블 삭제 is clicked and confirmed', async () => {
+    const onDeleteTableMock = vi.fn();
+    const editingNode = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'test_table',
+        comment: '',
+        columns: []
+      }
+    };
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<EditTableModal {...defaultProps} editingNode={editingNode as any} onDeleteTable={onDeleteTableMock} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '테이블 삭제' }));
+
+    expect(window.confirm).toHaveBeenCalledWith("'test_table' 테이블을 삭제하시겠습니까?");
+    expect(onDeleteTableMock).toHaveBeenCalled();
+  });
+
+  it('does not delete a table when 테이블 삭제 is clicked and canceled', async () => {
+    const onDeleteTableMock = vi.fn();
+    const editingNode = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'test_table',
+        comment: '',
+        columns: []
+      }
+    };
+
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(<EditTableModal {...defaultProps} editingNode={editingNode as any} onDeleteTable={onDeleteTableMock} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '테이블 삭제' }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(onDeleteTableMock).not.toHaveBeenCalled();
+  });
+
   it('duplicates a table when 복제 is clicked', async () => {
     const setNodesMock = vi.fn();
     const onEditTableCancelMock = vi.fn();
