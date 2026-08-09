@@ -36,8 +36,9 @@ Current code implements only the first control-plane slice:
   supported compiler subset. Known gaps are listed in section 6.
 - **Partially implemented:** durable run/event persistence, exact state
   validation, hashed idempotency keys, bounded evidence canonicalization, and
-  atomic optimistic compare-and-swap transition/event persistence; no run API
-  or worker execution authority exists yet.
+  atomic optimistic compare-and-swap transition/event persistence plus an
+  internal database-selected dry-run creation writer; no run API or worker
+  execution authority exists yet.
 - **Planned:** run creation/polling and workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
@@ -103,10 +104,18 @@ the effective request needed to reject same-key/different-request reuse.
 idempotency keys, deterministically binds project, plan, run kind, plan digest,
 and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
-evidence JSON. Run creation and
-polling routes remain **Planned**, as do queue/outbox integration,
+evidence JSON. Public run creation and polling routes remain **Planned**, as do
+queue/outbox integration,
 cancellation, sandbox/preflight workers, apply,
 reconciliation, and verification.
+
+`create_migration_run` is the implemented internal creation boundary. It
+verifies stored-plan integrity and expiry, rejects blocked plans and all apply
+requests, hashes the opaque idempotency key, and uses
+`uq_migration_run__idempotent_action` as the PostgreSQL concurrency winner.
+Only a new winner receives the sequence-one `run_queued` event; a duplicate is
+reused only when its versioned request digest is identical. The function does
+not commit, enqueue, or expose an HTTP success path.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic
