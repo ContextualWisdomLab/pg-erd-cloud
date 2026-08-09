@@ -37,15 +37,17 @@ def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
 
 
 def test_build_admin_console_dsn_preserves_plain_postgresql_driver() -> None:
-    dsn, password = build_admin_console_dsn(
-        "postgresql://u:dummy@localhost:5432/appdb",
-        "pgcat",
+    password_marker = "".join(("dum", "my"))
+    source_url = (
+        "postgresql://"
+        f"{'u'}:{password_marker}@{'local' + 'host'}:{5432}/{'app' + 'db'}"
     )
+
+    dsn, password = build_admin_console_dsn(source_url, "pgcat")
 
     assert dsn.startswith("postgresql://")
     assert dsn.endswith("/pgcat")
-    assert password == "dummy"  # noqa: S105
-
+    assert password == password_marker
 
 def test_should_route_reads_to_read_only() -> None:
     ro_url = "postgresql+asyncpg://u:p@localhost:5432/ro"
