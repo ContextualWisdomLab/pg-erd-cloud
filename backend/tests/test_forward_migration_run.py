@@ -9,16 +9,42 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy.dialects import postgresql
 
+from app.forward.migration_plan import compile_migration_plan
 from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
+    create_migration_run,
     digest_run_request,
     hash_idempotency_key,
     transition_migration_run,
     validate_run_transition,
 )
-from app.models import MigrationRun, MigrationRunEvent
+from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
+
+
+def _migration_plan(*, expires_at: datetime | None = None) -> MigrationPlan:
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    plan_json = compile_migration_plan(
+        {"format_version": 1, "postgresql_major": 18, "schemas": []},
+        {"format_version": 1, "postgresql_major": 18, "schemas": []},
+    )
+    return MigrationPlan(
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        schema_model_revision_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        base_schema_snapshot_uuid=uuid.uuid4(),
+        compiler_version=plan_json["compiler_version"],
+        base_digest=plan_json["base_digest"],
+        target_digest=plan_json["target_digest"],
+        statement_digest=plan_json["plan_digest"],
+        plan_json=plan_json,
+        created_by_user_uuid=uuid.uuid4(),
+        expires_at=expires_at or datetime(2026, 8, 11, tzinfo=timezone.utc),
+        created_at=now,
+    )
 
 
 def test_run_state_machine_separates_dry_run_and_apply_authority() -> None:
@@ -456,3 +482,157 @@ async def test_transition_masks_missing_stale_and_invalid_state_before_update() 
 
     session.execute.assert_not_awaited()
     session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_uses_database_conflict_winner_and_initial_event() -> None:
+    """Creation is one PostgreSQL idempotency insert plus sequence-one evidence."""
+
+    now = datetime(2026, 8, 10, 3, tzinfo=timezone.utc)
+    plan = _migration_plan()
+    actor_uuid = uuid.uuid4()
+    run_uuid = uuid.uuid4()
+    insert_result = SimpleNamespace(
+        scalar_one_or_none=Mock(return_value=run_uuid)
+    )
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=insert_result),
+        scalar=AsyncMock(),
+        add=Mock(),
+    )
+
+    created = await create_migration_run(
+        session,
+        plan=plan,
+        run_kind="dry_run",
+        idempotency_key="browser-request-한글-1",
+        requested_by_user_uuid=actor_uuid,
+        evidence={"request_source": "review_ui"},
+        now=now,
+    )
+
+    statement = session.execute.await_args.args[0]
+    compiled = str(statement.compile(dialect=postgresql.dialect()))
+    assert "ON CONFLICT ON CONSTRAINT uq_migration_run__idempotent_action DO NOTHING" in compiled
+    assert "RETURNING migration_run.migration_run_uuid" in compiled
+    event = session.add.call_args.args[0]
+    assert isinstance(event, MigrationRunEvent)
+    assert event.migration_run_uuid == run_uuid
+    assert event.sequence_number == 1
+    assert event.state_before is None
+    assert event.state_after == "queued"
+    assert event.evidence_json == {"request_source": "review_ui"}
+    assert created.migration_run_uuid == run_uuid
+    assert created.reused is False
+    session.scalar.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
+    """A duplicate key reuses the winner only when its request digest matches."""
+
+    now = datetime(2026, 8, 10, 3, tzinfo=timezone.utc)
+    plan = _migration_plan()
+    actor_uuid = uuid.uuid4()
+    existing = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="queued",
+        state_version=1,
+        idempotency_key_hash=hash_idempotency_key("same-key"),
+        plan_digest=plan.statement_digest,
+        request_digest=digest_run_request(
+            project_space_uuid=plan.project_space_uuid,
+            migration_plan_uuid=plan.migration_plan_uuid,
+            run_kind="dry_run",
+            plan_digest=plan.statement_digest,
+            requested_by_user_uuid=actor_uuid,
+        ),
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            return_value=SimpleNamespace(
+                scalar_one_or_none=Mock(return_value=None)
+            )
+        ),
+        scalar=AsyncMock(return_value=existing),
+        add=Mock(),
+    )
+
+    reused = await create_migration_run(
+        session,
+        plan=plan,
+        run_kind="dry_run",
+        idempotency_key="same-key",
+        requested_by_user_uuid=actor_uuid,
+        evidence={},
+        now=now,
+    )
+    assert reused.migration_run_uuid == existing.migration_run_uuid
+    assert reused.reused is True
+    session.add.assert_not_called()
+
+    existing.request_digest = "f" * 64
+    with pytest.raises(MigrationRunContractError, match="idempotency key conflict"):
+        await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="dry_run",
+            idempotency_key="same-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert() -> None:
+    """Run creation fails closed for apply, expiry, blockers, or plan tampering."""
+
+    now = datetime(2026, 8, 10, 3, tzinfo=timezone.utc)
+    actor_uuid = uuid.uuid4()
+    session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
+
+    apply_plan = _migration_plan()
+    with pytest.raises(MigrationRunContractError, match="apply run creation"):
+        await create_migration_run(
+            session,
+            plan=apply_plan,
+            run_kind="apply",
+            idempotency_key="apply-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+    expired = _migration_plan(expires_at=now)
+    with pytest.raises(MigrationRunContractError, match="expired"):
+        await create_migration_run(
+            session,
+            plan=expired,
+            run_kind="dry_run",
+            idempotency_key="expired-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+    blocked = _migration_plan()
+    blocked.plan_json = {**blocked.plan_json, "can_dry_run": False}
+    with pytest.raises(MigrationRunContractError, match="integrity"):
+        await create_migration_run(
+            session,
+            plan=blocked,
+            run_kind="dry_run",
+            idempotency_key="blocked-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+    session.execute.assert_not_awaited()
