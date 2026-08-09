@@ -148,6 +148,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
         "read-only repeatable-read transaction",
         "`object_ref` and `dependency_refs` are authoritative",
         "display-only",
+        "recomputes the canonical plan digest",
     ):
         assert required_term in contract
 
