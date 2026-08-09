@@ -36,10 +36,13 @@ secret-bearing request fields from being reflected by validation responses.
 
 Bray, T. (2017). *The JavaScript Object Notation (JSON) data interchange
 format* (RFC 8259). RFC Editor. https://www.rfc-editor.org/rfc/rfc8259.html
+This defines the JSON string transport rules whose rejected-input diagnostics must not reflect raw request values.
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation:
 Lexical structure*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
+This preserves PostgreSQL-owned lexical authority, including multiline formatting and quoted identifiers, after transport validation.
 
 Unicode Consortium. (2025). *The Unicode standard, version 17.0: Chapter 23—
 Special areas and format characters*.
 https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-23/
+This supports distinguishing transport-unsafe control characters from printable Unicode that must remain available to the SQL parser.
