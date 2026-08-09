@@ -91,18 +91,25 @@ def _schema_filter_clause(schema_filter: str | None) -> tuple[str, tuple[object,
     return f"TABLE_SCHEMA NOT IN ({placeholders})", _SYSTEM_SCHEMAS
 
 
+@dataclass(frozen=True)
+class MysqlIntrospectionRows:
+    """Rows fetched from information_schema."""
+
+    tables: list[dict]
+    columns: list[dict]
+    key_usage: list[dict]
+    indexes: list[dict]
+
+
 def rows_to_snapshot(
     version: str,
     schema_filter: str | None,
-    tables: list[dict],
-    columns: list[dict],
-    key_usage: list[dict],
-    indexes: list[dict],
+    rows: MysqlIntrospectionRows,
 ) -> dict[str, Any]:
     """Pure transformation: information_schema rows → common snapshot JSON."""
     oid_by_table: dict[tuple[str, str], int] = {}
     relations: list[dict[str, Any]] = []
-    for i, row in enumerate(tables, start=1):
+    for i, row in enumerate(rows.tables, start=1):
         key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]))
         oid_by_table[key] = i
         relations.append(
@@ -116,7 +123,7 @@ def rows_to_snapshot(
         )
 
     out_columns: list[dict[str, Any]] = []
-    for row in columns:
+    for row in rows.columns:
         oid = oid_by_table.get((str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"])))
         if oid is None:
             continue
@@ -142,7 +149,7 @@ def rows_to_snapshot(
     fk_edges: list[dict[str, Any]] = []
     constraints: list[dict[str, Any]] = []
     pk_cols_by_oid: dict[int, list[str]] = {}
-    for row in key_usage:
+    for row in rows.key_usage:
         oid = oid_by_table.get((str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"])))
         if oid is None:
             continue
@@ -218,7 +225,7 @@ def rows_to_snapshot(
 
     # group STATISTICS rows into per-index column lists
     grouped: dict[tuple[str, str, str], list[tuple[int, str, bool]]] = {}
-    for row in indexes:
+    for row in rows.indexes:
         ix_key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
         grouped.setdefault(ix_key, []).append(
             (
@@ -304,7 +311,10 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
             params,
         )
-        return rows_to_snapshot(version, schema_filter, tables, columns, key_usage, indexes)
+        rows = MysqlIntrospectionRows(
+            tables=tables, columns=columns, key_usage=key_usage, indexes=indexes
+        )
+        return rows_to_snapshot(version, schema_filter, rows)
     finally:
         conn.close()
 
