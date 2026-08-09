@@ -61,6 +61,13 @@ def upgrade() -> None:
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint(
+            "schema_model_revision_uuid",
+            "db_connection_uuid",
+            "base_schema_snapshot_uuid",
+            "statement_digest",
+            name="uq_migration_plan__immutable_identity",
+        ),
     )
     op.create_index(
         "ix_migration_plan__project_space_uuid",
@@ -72,9 +79,15 @@ def upgrade() -> None:
         "migration_plan",
         ["schema_model_revision_uuid"],
     )
+    op.create_index(
+        "ix_migration_plan__expires_at",
+        "migration_plan",
+        ["expires_at"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_migration_plan__expires_at", table_name="migration_plan")
     op.drop_index(
         "ix_migration_plan__schema_model_revision_uuid", table_name="migration_plan"
     )
