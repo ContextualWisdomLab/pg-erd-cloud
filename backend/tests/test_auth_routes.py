@@ -20,4 +20,4 @@ async def test_logout_revokes_token_and_returns_success(
     response = await logout(mock_request)
 
     mock_revoke.assert_awaited_once_with(mock_request)
-    assert response == {"success": True}
+    assert response == {"ok": True}
