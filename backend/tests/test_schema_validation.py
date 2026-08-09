@@ -58,6 +58,7 @@ def test_conn_name_rejects_control_characters() -> None:
     ],
 )
 def test_hardened_pydantic_strings_accept_valid_input(valid_input: str) -> None:
+    """Accept realistic printable names in every hardened request schema."""
     DiagramViewCreateIn(name=valid_input, layout_json={})
     TableAnnotationUpsertIn(
         schema_name=valid_input, relation_name=valid_input, body="body"
@@ -73,6 +74,7 @@ def test_hardened_pydantic_strings_accept_valid_input(valid_input: str) -> None:
 def test_hardened_pydantic_strings_reject_control_characters(
     control_char: str, position_fmt: str
 ) -> None:
+    """Reject ASCII controls and DEL at every position in hardened names."""
     test_str = position_fmt.format(control_char)
 
     with pytest.raises(ValidationError):
