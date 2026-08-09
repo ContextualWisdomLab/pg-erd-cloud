@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import re
+import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -98,6 +99,34 @@ def hash_idempotency_key(value: str) -> str:
         raise MigrationRunContractError("idempotency key length is invalid")
     if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
         raise MigrationRunContractError("idempotency key contains a control character")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def digest_run_request(
+    *,
+    project_space_uuid: uuid.UUID,
+    migration_plan_uuid: uuid.UUID,
+    run_kind: str,
+    plan_digest: str,
+    requested_by_user_uuid: uuid.UUID,
+) -> str:
+    """Bind one versioned run intent for idempotency conflict detection."""
+
+    if run_kind not in {"dry_run", "apply"}:
+        raise MigrationRunContractError("run kind is invalid")
+    if re.fullmatch(r"[0-9a-f]{64}", plan_digest) is None:
+        raise MigrationRunContractError("plan digest is invalid")
+    request = {
+        "contract_version": "migration-run-request/v1",
+        "migration_plan_uuid": str(migration_plan_uuid),
+        "plan_digest": plan_digest,
+        "project_space_uuid": str(project_space_uuid),
+        "requested_by_user_uuid": str(requested_by_user_uuid),
+        "run_kind": run_kind,
+    }
+    encoded = json.dumps(
+        request, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
