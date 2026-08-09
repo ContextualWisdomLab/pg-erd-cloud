@@ -39,6 +39,12 @@ def _relation_kind_name(kind: object) -> str:
     return kind_names.get(kind, "relation")
 
 
+def split_statements(sql: str) -> list[str]:
+    # Minimal manual testing gap example
+    statements = [part.strip() for part in sql.split(";")]
+    return [statement for statement in statements if statement]
+
+
 def _rows(snapshot: dict, key: str) -> list[dict]:
     value = snapshot.get(key)
     if not isinstance(value, list):

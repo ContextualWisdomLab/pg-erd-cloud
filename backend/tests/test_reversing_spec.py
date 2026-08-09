@@ -108,3 +108,14 @@ def test_generate_reversing_llm_prompt_contains_compact_json_summary() -> None:
     assert summary["objects"][0]["name"] == "public.users"
     assert summary["objects"][0]["columns"][1]["example"] == "user@example.com"
     assert summary["relationships"][0]["constraint"] == "orders_user_id_fkey"
+
+def test_split_statements() -> None:
+    from app.spec.reversing import split_statements
+
+    assert split_statements("SELECT 1") == ["SELECT 1"]
+    assert split_statements("SELECT 1; SELECT 2") == ["SELECT 1", "SELECT 2"]
+    assert split_statements("SELECT 1; SELECT 2;") == ["SELECT 1", "SELECT 2"]
+    assert split_statements("  SELECT 1  ;   SELECT 2  ;  ") == ["SELECT 1", "SELECT 2"]
+    assert split_statements("") == []
+    assert split_statements(";") == []
+    assert split_statements(";;") == []
