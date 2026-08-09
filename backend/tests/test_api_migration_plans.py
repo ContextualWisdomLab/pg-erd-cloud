@@ -44,11 +44,16 @@ def _stored_plan() -> SimpleNamespace:
     return SimpleNamespace(
         migration_plan_uuid=uuid.uuid4(),
         project_space_uuid=uuid.uuid4(),
+        schema_model_revision_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        base_schema_snapshot_uuid=uuid.uuid4(),
         statement_digest="c" * 64,
         base_digest="a" * 64,
         target_digest="b" * 64,
         compiler_version="pg-erd-forward/v1",
         plan_json={
+            "snapshot_contract_version": 1,
+            "postgresql_major": 18,
             "statements": [],
             "proposed_statements": [],
             "blockers": [],
@@ -56,6 +61,8 @@ def _stored_plan() -> SimpleNamespace:
             "can_dry_run": True,
             "requires_destructive_confirmation": False,
         },
+        created_by_user_uuid=uuid.uuid4(),
+        created_at=dt.datetime.now(dt.timezone.utc),
         expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
     )
 
@@ -77,6 +84,14 @@ async def test_get_migration_plan_returns_immutable_member_preview() -> None:
 
     assert out.migration_plan_uuid == plan.migration_plan_uuid
     assert out.plan_digest == plan.statement_digest
+    assert out.project_space_uuid == plan.project_space_uuid
+    assert out.schema_model_revision_uuid == plan.schema_model_revision_uuid
+    assert out.db_connection_uuid == plan.db_connection_uuid
+    assert out.base_schema_snapshot_uuid == plan.base_schema_snapshot_uuid
+    assert out.snapshot_contract_version == 1
+    assert out.postgresql_major == 18
+    assert out.created_by_user_uuid == plan.created_by_user_uuid
+    assert out.created_at == plan.created_at
     membership.assert_awaited_once()
 
 
@@ -221,6 +236,18 @@ def test_migration_plans_do_not_use_plan_digest_as_database_idempotency_key() ->
 def test_migration_plan_openapi_contract_uses_structured_models() -> None:
     schema = MigrationPlanOut.model_json_schema()
 
+    for binding in (
+        "project_space_uuid",
+        "schema_model_revision_uuid",
+        "db_connection_uuid",
+        "base_schema_snapshot_uuid",
+        "snapshot_contract_version",
+        "postgresql_major",
+        "created_by_user_uuid",
+        "created_at",
+    ):
+        assert binding in schema["required"]
+
     assert schema["properties"]["statements"]["items"] == {
         "$ref": "#/$defs/MigrationPlanStatement"
     }
@@ -250,11 +277,17 @@ async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> No
     _, revision, connection, snapshot, _ = inputs
     existing = SimpleNamespace(
         migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=inputs[0].project_space_uuid,
+        schema_model_revision_uuid=revision.schema_model_revision_uuid,
+        db_connection_uuid=connection.db_connection_uuid,
+        base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
         statement_digest="c" * 64,
         base_digest="a" * 64,
         target_digest="b" * 64,
         compiler_version="pg-erd-forward/v1",
         plan_json={
+            "snapshot_contract_version": 1,
+            "postgresql_major": 18,
             "statements": [],
             "proposed_statements": [],
             "blockers": [],
@@ -262,6 +295,8 @@ async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> No
             "can_dry_run": True,
             "requires_destructive_confirmation": False,
         },
+        created_by_user_uuid=uuid.uuid4(),
+        created_at=dt.datetime.now(dt.timezone.utc),
         expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
     )
     compiled = {
