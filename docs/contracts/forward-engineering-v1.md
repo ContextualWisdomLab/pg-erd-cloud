@@ -266,6 +266,10 @@ When `blockers` is non-empty, `statements` is empty and cannot be executed.
 Independent supported deltas are retained in `proposed_statements` solely for
 complete review; they are covered by the plan digest and the same risk summary.
 
+Every immutable-plan retrieval recomputes the canonical plan digest and
+compares it with both the JSON claim and separately persisted statement digest.
+A mismatch fails closed with sanitized `409` and returns no plan payload.
+
 Release-v1 requires the following; the plan count/size bound is implemented and
 the remaining items are planned:
 
