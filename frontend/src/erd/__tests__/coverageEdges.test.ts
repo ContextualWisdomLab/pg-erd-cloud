@@ -132,7 +132,7 @@ describe('coverage edge contracts', () => {
     ])
     const edges: Edge[] = [
       { id: 'blank', source: 'source', target: 'target', data: { sourceColumns: ['', 'first_id'] } },
-      { id: 'handle', source: 'source', target: 'target', sourceHandle: 'src-second_id' },
+      { id: 'handle', source: 'source', target: 'target', sourceHandle: 'src-c-0073-0065-0063-006f-006e-0064-005f-0069-0064' },
       { id: 'none', source: 'source', target: 'target' },
     ]
     const csv = exportDictionaryCsv([source], edges)
