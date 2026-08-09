@@ -148,6 +148,20 @@ def test_digest_changes_for_compiler_relevant_mutation() -> None:
     assert schema_model_digest(before) != schema_model_digest(after)
 
 
+def test_omitted_unsupported_collections_canonicalize_to_empty_lists() -> None:
+    model = _model()
+    table = model["schemas"][0]["tables"][0]
+    for field in ("unique_constraints", "foreign_keys", "indexes"):
+        table.pop(field)
+
+    canonical = canonicalize_schema_model(model)
+
+    canonical_table = canonical["schemas"][0]["tables"][0]
+    assert canonical_table["unique_constraints"] == []
+    assert canonical_table["foreign_keys"] == []
+    assert canonical_table["indexes"] == []
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
