@@ -324,7 +324,8 @@ so the frontend can gate controls without treating UI gating as authorization.
   requires `Idempotency-Key`, plan checksum, matching passed dry-run UUID,
   typed connection-name confirmation, and destructive acknowledgement when
   applicable; it returns `202` with its run UUID.
-- **Planned:** `GET /api/migration-runs/{run_uuid}`
+- **Implemented:** `GET /api/migration-runs/{run_uuid}` with membership masking
+  and bounded event-history integrity verification
   returns polling state and bounded evidence, including verification snapshot
   and residual diff when terminal.
 
