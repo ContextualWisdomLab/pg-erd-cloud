@@ -736,7 +736,7 @@ async def test_cancellation_intent_uses_cas_and_same_state_event_sequence() -> N
     compiled = statement.compile()
     assert compiled.params["state_version_1"] == 2
     assert compiled.params["state_1"] == "sandbox_running"
-    assert compiled.params["cancellation_requested_1"] is False
+    assert "migration_run.cancellation_requested IS false" in str(compiled)
     event = session.add.call_args.args[0]
     assert event.event_type == "cancellation_requested"
     assert event.sequence_number == 3
@@ -799,3 +799,61 @@ async def test_cancellation_is_idempotent_and_rejects_terminal_or_stale_run() ->
             actor_user_uuid=None,
             evidence={},
         )
+
+    run.state = "unknown"
+    with pytest.raises(MigrationRunContractError, match="state is invalid"):
+        await request_migration_run_cancellation(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            actor_user_uuid=None,
+            evidence={},
+        )
+
+    run.run_kind = "preview"
+    run.state = "queued"
+    with pytest.raises(MigrationRunContractError, match="state is invalid"):
+        await request_migration_run_cancellation(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            actor_user_uuid=None,
+            evidence={},
+        )
+
+    session.scalar.return_value = None
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await request_migration_run_cancellation(
+            session,
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=3,
+            actor_user_uuid=None,
+            evidence={},
+        )
+
+
+@pytest.mark.asyncio
+async def test_cancellation_validates_metadata_before_database_access() -> None:
+    """Invalid cancellation version, evidence, or time never reaches storage."""
+
+    session = SimpleNamespace(
+        scalar=AsyncMock(), execute=AsyncMock(), add=Mock()
+    )
+    for version, evidence, now in (
+        (0, {}, None),
+        (True, {}, None),
+        (1, {"databaseDsn": "postgresql://secret"}, None),
+        (1, {}, datetime(2026, 8, 10, 4)),
+    ):
+        with pytest.raises(MigrationRunContractError):
+            await request_migration_run_cancellation(
+                session,
+                migration_run_uuid=uuid.uuid4(),
+                expected_state_version=version,
+                actor_user_uuid=None,
+                evidence=evidence,
+                now=now,
+            )
+
+    session.scalar.assert_not_awaited()
+    session.execute.assert_not_awaited()
