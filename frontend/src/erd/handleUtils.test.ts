@@ -3,36 +3,32 @@ import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
-    it('should encode a simple ascii string', () => {
-      expect(sanitizeHandleId('id')).toBe('c-0069-0064');
-    });
-
-    it('should handle empty string', () => {
-      expect(sanitizeHandleId('')).toBe('c-empty');
-    });
-
-    it('should handle special characters', () => {
-      expect(sanitizeHandleId('user_id')).toBe('c-0075-0073-0065-0072-005f-0069-0064');
-    });
-
-    it('should handle unicode characters', () => {
-      expect(sanitizeHandleId('id_가')).toBe('c-0069-0064-005f-ac00');
-    });
-
-    it('should handle emojis', () => {
-      expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
+    it.each([
+      ['simple ascii string', 'id', 'id'],
+      ['empty string', '', ''],
+      ['special characters', 'user_id', 'user_id'],
+      ['unicode characters', 'id_가', 'id__'],
+      ['emojis', 'id_🚀', 'id___'],
+      ['alphanumeric', 'id123', 'id123'],
+      ['spaces', 'user id', 'user_id'],
+      ['special symbols', '!@#$%', '_____'],
+      ['control characters', '\n\t', '__'],
+      ['combining characters', 'e\u0301', 'e_'],
+      ['emoji with zwj', '👨‍👩‍👦', '________'],
+    ])('should handle %s', (_, input, expected) => {
+      expect(sanitizeHandleId(input)).toBe(expected);
     });
   });
 
   describe('sourceColumnHandleId', () => {
     it('should prepend src- to sanitized id', () => {
-      expect(sourceColumnHandleId('id')).toBe('src-c-0069-0064');
+      expect(sourceColumnHandleId('id')).toBe('src-id');
     });
   });
 
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
-      expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+      expect(targetColumnHandleId('id')).toBe('tgt-id');
     });
   });
 });

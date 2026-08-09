@@ -69,8 +69,8 @@ describe('exportMermaid', () => {
         id: 'e1',
         source: '2', // child has FK
         target: '1', // parent has PK
-        sourceHandle: 'src-c-0075-0073-0065-0072-005f-0069-0064', // user_id
-        targetHandle: 'tgt-c-0069-0064', // id
+        sourceHandle: 'src-user_id', // user_id
+        targetHandle: 'tgt-id', // id
         label: 'fk_user_id',
         type: 'smoothstep'
       }
