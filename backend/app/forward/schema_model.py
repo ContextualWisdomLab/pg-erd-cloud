@@ -257,7 +257,7 @@ def _canonical_table(value: object, path: str) -> dict[str, Any]:
     # These collections are retained in the v1 wire contract but must remain
     # empty until their lossless validators and structured compilers land.
     for field in ("unique_constraints", "foreign_keys", "indexes"):
-        entries = _list(table.get(field), f"{path}.{field}")
+        entries = _list(table.get(field, []), f"{path}.{field}")
         if entries:
             raise SchemaModelValidationError(
                 f"{path}.{field} contains unsupported feature {field!r}"
