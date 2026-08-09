@@ -9,7 +9,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/logout")
 async def logout(request: Request) -> dict[str, bool]:
-    """Invalidate the current bearer token for this app process."""
-
+    """Revoke the token currently presented by the user."""
     await revoke_current_request_token(request)
-    return {"ok": True}
+    return {"success": True}
