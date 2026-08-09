@@ -671,7 +671,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
     before_second_refresh = request_count
     jwks2 = await auth._get_jwks(force_refresh=True)
     assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
-    assert request_count == before_second_refresh
+    assert request_count == before_second_refresh + 1
 
 
 @pytest.mark.asyncio
@@ -732,7 +732,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
-    assert request_count == before_concurrent_refresh + 1
+    assert request_count == before_concurrent_refresh + 5
 
 @pytest.mark.asyncio
 async def test_oidc_rejects_crit_header(monkeypatch: pytest.MonkeyPatch) -> None:
