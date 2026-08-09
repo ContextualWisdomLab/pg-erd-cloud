@@ -183,7 +183,7 @@ def snapshot_to_schema_model(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     for index_row in indexes:
         if not isinstance(index_row, Mapping):
             raise SchemaModelValidationError("snapshot index must be an object")
-        relation_oid = index_row.get("relation_oid", index_row.get("table_oid"))
+        relation_oid = index_row.get("relation_oid") or index_row.get("table_oid")
         if index_row.get("is_primary") is not True or not pk_by_oid.get(relation_oid):
             raise SchemaModelValidationError(
                 "snapshot indexes other than primary-key backing indexes are not supported by compiler v1"
