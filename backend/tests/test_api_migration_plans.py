@@ -12,7 +12,7 @@ from sqlalchemy import UniqueConstraint
 from app.api.migration_plans import MAX_PLAN_STATEMENTS, create_migration_plan
 from app.auth import CurrentUser
 from app.models import MigrationPlan
-from app.schemas import MigrationPlanCreateIn
+from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
 
 
 def _user() -> CurrentUser:
@@ -145,6 +145,20 @@ def test_migration_plans_do_not_use_plan_digest_as_database_idempotency_key() ->
     assert ("expires_at",) in {
         tuple(column.name for column in index.columns)
         for index in MigrationPlan.__table__.indexes
+    }
+
+
+def test_migration_plan_openapi_contract_uses_structured_models() -> None:
+    schema = MigrationPlanOut.model_json_schema()
+
+    assert schema["properties"]["statements"]["items"] == {
+        "$ref": "#/$defs/MigrationPlanStatement"
+    }
+    assert schema["properties"]["blockers"]["items"] == {
+        "$ref": "#/$defs/MigrationPlanBlocker"
+    }
+    assert schema["properties"]["risk_summary"] == {
+        "$ref": "#/$defs/MigrationPlanRiskSummary"
     }
 
 
