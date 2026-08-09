@@ -43,3 +43,19 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+def test_malformed_dsn_without_query_string() -> None:
+    dsn = "postgresql://user:s3cr3t@[bad/db"
+    error = f"driver failed for s3cr3t while using {dsn}"
+    redacted = redact_dsn_error_message(error, dsn)
+    assert "s3cr3t" not in redacted
+    assert "postgresql://user:***@[bad/db" in redacted
+
+def test_dsn_query_parameters_without_secrets() -> None:
+    dsn = "postgresql://user:pass@db.example.com/app?password=q%2Fsecret&foo&bar=baz"
+    error = "driver failed with foo and bar=baz and password=q/secret"
+    redacted = redact_dsn_error_message(error, dsn)
+    assert "q/secret" not in redacted
+    assert "password=***" in redacted
+    assert "foo" in redacted
+    assert "bar=baz" in redacted
