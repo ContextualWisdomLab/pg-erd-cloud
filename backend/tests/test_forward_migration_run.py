@@ -54,6 +54,9 @@ def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> Non
         {"dsn": "postgresql://secret"},
         {"nested": {"raw_sql": "DROP TABLE customer_record"}},
         {"events": [{"access_token": "secret"}]},
+        {"nested": {"rawSql": "DROP TABLE customer_record"}},
+        {"databaseDsn": "postgresql://secret"},
+        {"events": [{"accessToken": "secret"}]},
     ):
         with pytest.raises(MigrationRunContractError, match="forbidden evidence field"):
             canonicalize_run_evidence(payload)
