@@ -12,7 +12,14 @@ import {
   addEdge,
   type Connection as FlowConnection,
 } from "@xyflow/react";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type FormEvent,
+} from "react";
 
 import {
   AddTableModal,
@@ -954,6 +961,11 @@ export default function App() {
     }
   }
 
+  function onCreateProjectSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void onCreateProject();
+  }
+
   async function onCreateConnection() {
     /* v8 ignore next -- the save control is disabled without a project or while saving */
     if (!selectedProjectId || isCreatingConnection) return;
@@ -984,6 +996,15 @@ export default function App() {
     } finally {
       setIsCreatingConnection(false);
     }
+  }
+
+  function onCreateConnectionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void onCreateConnection();
+  }
+
+  function onSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
   }
 
   async function onCreateSnapshot() {
@@ -1078,7 +1099,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="field">
+        <form className="field" onSubmit={onCreateProjectSubmit}>
           <label htmlFor="project-name">New project</label>
           <div className="row">
             <input
@@ -1087,8 +1108,7 @@ export default function App() {
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
-              type="button"
-              onClick={onCreateProject}
+              type="submit"
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
               aria-describedby={
@@ -1103,7 +1123,7 @@ export default function App() {
               {createProjectHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
         <hr />
 
@@ -1126,7 +1146,7 @@ export default function App() {
           </select>
         </div>
 
-        <div className="field">
+        <form className="field" onSubmit={onCreateConnectionSubmit}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1145,8 +1165,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
-            type="button"
-            onClick={onCreateConnection}
+            type="submit"
             disabled={
               !selectedProjectId ||
               !connName.trim() ||
@@ -1165,7 +1184,7 @@ export default function App() {
               {createConnectionHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
         <div className="field">
           <label htmlFor="schema-filter">Schema filter (optional)</label>
@@ -1309,20 +1328,19 @@ export default function App() {
                 <h1 id="projects-title">프로젝트</h1>
                 <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
               </div>
-              <div className="inlineCreate">
+              <form className="inlineCreate" onSubmit={onCreateProjectSubmit}>
                 <input
                   aria-label="새 프로젝트 이름"
                   value={projectName}
                   onChange={(event) => setProjectName(event.currentTarget.value)}
                 />
                 <button
-                  type="button"
-                  onClick={onCreateProject}
+                  type="submit"
                   disabled={!projectName.trim() || isCreatingProject}
                 >
                   {isCreatingProject ? "생성 중" : "새 프로젝트"}
                 </button>
-              </div>
+              </form>
             </div>
             <div className="dataTable" role="table" aria-label="프로젝트 목록">
               <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
@@ -1363,16 +1381,22 @@ export default function App() {
                 편집기 열기
               </button>
             </div>
-            <label className="workspaceSearch">
-              <span className="srOnly">다이어그램 검색</span>
-              <input
-                aria-label="다이어그램 검색"
-                placeholder="다이어그램 검색"
-                type="search"
-                value={diagramSearch}
-                onChange={(event) => setDiagramSearch(event.currentTarget.value)}
-              />
-            </label>
+            <form
+              className="workspaceSearch"
+              role="search"
+              onSubmit={onSearchSubmit}
+            >
+              <label>
+                <span className="srOnly">다이어그램 검색</span>
+                <input
+                  aria-label="다이어그램 검색"
+                  placeholder="다이어그램 검색"
+                  type="search"
+                  value={diagramSearch}
+                  onChange={(event) => setDiagramSearch(event.currentTarget.value)}
+                />
+              </label>
+            </form>
             <DiagramTable
               snapshots={snapshots}
               searchText={diagramSearch}
@@ -1391,16 +1415,22 @@ export default function App() {
             role="toolbar"
             aria-label="ERD 캔버스 도구"
           >
-            <label className="canvasToolbar__search">
-              <span className="srOnly">테이블 또는 컬럼 검색</span>
-              <input
-                aria-label="테이블 또는 컬럼 검색"
-                placeholder="테이블/컬럼 검색"
-                type="search"
-                value={nodeSearch}
-                onChange={(event) => setNodeSearch(event.currentTarget.value)}
-              />
-            </label>
+            <form
+              className="canvasToolbar__search"
+              role="search"
+              onSubmit={onSearchSubmit}
+            >
+              <label>
+                <span className="srOnly">테이블 또는 컬럼 검색</span>
+                <input
+                  aria-label="테이블 또는 컬럼 검색"
+                  placeholder="테이블/컬럼 검색"
+                  type="search"
+                  value={nodeSearch}
+                  onChange={(event) => setNodeSearch(event.currentTarget.value)}
+                />
+              </label>
+            </form>
             <button
               type="button"
               onClick={onAutoLayout}

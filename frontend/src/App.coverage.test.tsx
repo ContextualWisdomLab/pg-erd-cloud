@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -308,6 +309,75 @@ function forceClick(button: HTMLButtonElement) {
 }
 
 describe('App orchestration coverage', () => {
+  it('submits the editor project form exactly once with Enter', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const projectInput = screen.getByLabelText('New project')
+    await user.clear(projectInput)
+    await user.type(projectInput, '  Native Enter  {enter}')
+
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Native Enter'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the same guarded native form path for project-list creation', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
+    const projectInput = screen.getByLabelText('새 프로젝트 이름')
+
+    await user.clear(projectInput)
+    await user.type(projectInput, '   {enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
+
+    await user.clear(projectInput)
+    await user.type(projectInput, 'Roadmap{enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+  })
+
+  it('validates and submits a connection once with Enter while blocking re-entry', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    const dsnInput = screen.getByLabelText('Connection DSN')
+
+    await user.type(dsnInput, 'http://bad.example/db{enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
+    expect(dsnInput).toHaveValue('')
+
+    let resolveConnection!: (value: { db_connection_uuid: string; conn_name: string }) => void
+    api.createConnection.mockReturnValueOnce(new Promise((resolve) => {
+      resolveConnection = resolve
+    }))
+    await user.type(dsnInput, 'postgresql://db.example/test{enter}')
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+    expect(dsnInput).toHaveValue('')
+
+    await user.type(dsnInput, 'postgresql://db.example/second{enter}')
+    expect(api.createConnection).toHaveBeenCalledTimes(1)
+    await act(async () => resolveConnection({ db_connection_uuid: 'c3', conn_name: 'New DB' }))
+  })
+
+  it('keeps live diagram and canvas filtering inside non-navigating search forms', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const diagramSearch = screen.getByLabelText('다이어그램 검색')
+
+    await user.type(diagramSearch, 'failed{enter}')
+    expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
+    expect(diagramSearch.closest('form')).toHaveAttribute('role', 'search')
+
+    fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
+    const canvasSearch = screen.getByLabelText('테이블 또는 컬럼 검색')
+    await user.type(canvasSearch, 'users{enter}')
+    expect(canvasSearch).toHaveValue('users')
+    expect(canvasSearch.closest('form')).toHaveAttribute('role', 'search')
+  })
+
   it('shows loading and explicit authentication failure', async () => {
     let rejectMe!: (reason?: unknown) => void
     api.getMe.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectMe = reject }))
@@ -744,8 +814,9 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()

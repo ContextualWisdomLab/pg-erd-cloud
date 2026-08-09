@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] ♿ **네이티브 폼 키보드 제출**: 편집기·프로젝트 목록의 프로젝트 생성과 연결 생성은 한 개의 guarded `submit` 경로를 사용해 Enter와 클릭이 정확히 한 번 동작합니다. 다이어그램·캔버스 검색은 `role="search"` 폼에서 Enter 내비게이션만 막고 실시간 필터를 유지합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
