@@ -116,10 +116,14 @@ Rules:
 - `transition_migration_run` performs an optimistic update matching the exact
   UUID, kind, state, and state version, then appends the same-version sanitized
   event in the caller-owned transaction. A stale worker cannot publish evidence.
+- `create_migration_run` uses the database idempotency constraint to select one
+  dry-run winner, validates immutable plan integrity/expiry/executability, and
+  appends sequence-one evidence without committing or enqueueing. Apply creation
+  remains rejected until its approval and passed-dry-run bindings exist.
 
 ### Planned before production release
 
-- idempotent dry-run/apply creation and run polling routes;
+- authenticated dry-run creation and run polling routes, plus apply creation;
 - outbox/queue integration and cancellation semantics;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
