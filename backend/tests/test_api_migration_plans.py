@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -25,7 +26,10 @@ def _model() -> dict:
 class FakeSession:
     def __init__(self) -> None:
         self.added: list[object] = []
+        self.scalar = AsyncMock(return_value=None)
+        self.flush = AsyncMock()
         self.commit = AsyncMock()
+        self.rollback = AsyncMock()
 
     def add(self, value: object) -> None:
         self.added.append(value)
@@ -64,12 +68,15 @@ async def test_create_migration_plan_binds_revision_connection_snapshot_and_hash
     _, revision, connection, snapshot, _ = inputs
     session = FakeSession()
     user = _user()
+    run_sync = AsyncMock(side_effect=lambda function, *args: function(*args))
     with patch(
         "app.api.migration_plans._load_plan_inputs",
         new=AsyncMock(return_value=inputs),
     ), patch(
         "app.api.migration_plans.require_project_member", new_callable=AsyncMock
-    ) as membership:
+    ) as membership, patch(
+        "app.api.migration_plans.anyio.to_thread.run_sync", new=run_sync
+    ):
         out = await create_migration_plan(
             schema_model_revision_uuid=revision.schema_model_revision_uuid,
             body=MigrationPlanCreateIn(
@@ -89,6 +96,7 @@ async def test_create_migration_plan_binds_revision_connection_snapshot_and_hash
     assert out.can_dry_run is True
     assert out.proposed_statements == []
     membership.assert_awaited_once()
+    run_sync.assert_awaited_once()
     session.commit.assert_awaited_once()
 
 
@@ -128,6 +136,77 @@ def test_migration_plans_do_not_use_plan_digest_as_database_idempotency_key() ->
     }
 
     assert ("project_space_uuid", "statement_digest") not in unique_column_sets
+    assert (
+        "schema_model_revision_uuid",
+        "db_connection_uuid",
+        "base_schema_snapshot_uuid",
+        "statement_digest",
+    ) in unique_column_sets
+    assert ("expires_at",) in {
+        tuple(column.name for column in index.columns)
+        for index in MigrationPlan.__table__.indexes
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> None:
+    inputs = _inputs()
+    _, revision, connection, snapshot, _ = inputs
+    existing = SimpleNamespace(
+        migration_plan_uuid=uuid.uuid4(),
+        statement_digest="c" * 64,
+        base_digest="a" * 64,
+        target_digest="b" * 64,
+        compiler_version="pg-erd-forward/v1",
+        plan_json={
+            "statements": [],
+            "proposed_statements": [],
+            "blockers": [],
+            "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
+            "can_dry_run": True,
+            "requires_destructive_confirmation": False,
+        },
+        expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
+    )
+    compiled = {
+        "compiler_version": "pg-erd-forward/v1",
+        "base_digest": "a" * 64,
+        "target_digest": "b" * 64,
+        "plan_digest": "c" * 64,
+        "statements": [],
+        "proposed_statements": [],
+        "blockers": [],
+        "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
+        "can_dry_run": True,
+        "requires_destructive_confirmation": False,
+    }
+    session = FakeSession()
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans.compile_migration_plan", return_value=compiled
+    ), patch(
+        "app.api.migration_plans._existing_plan",
+        new=AsyncMock(return_value=existing),
+    ):
+        out = await create_migration_plan(
+            schema_model_revision_uuid=revision.schema_model_revision_uuid,
+            body=MigrationPlanCreateIn(
+                db_connection_uuid=connection.db_connection_uuid,
+                base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
+            ),
+            user=_user(),
+            session=session,
+        )
+
+    assert out.migration_plan_uuid == existing.migration_plan_uuid
+    assert session.added == []
+    session.flush.assert_not_awaited()
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
