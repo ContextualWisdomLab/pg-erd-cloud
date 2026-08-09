@@ -123,6 +123,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     assert {constraint.name for constraint in MigrationRun.__table__.constraints if isinstance(constraint, CheckConstraint)} == {
         "ck_migration_run__run_kind",
         "ck_migration_run__state",
+        "ck_migration_run__kind_state",
         "ck_migration_run__state_version",
     }
 
@@ -174,6 +175,7 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         '"request_digest"',
         '"uq_migration_run_event__run_sequence"',
         '"ck_migration_run__state_version"',
+        '"ck_migration_run__kind_state"',
         'ondelete="RESTRICT"',
         'ondelete="CASCADE"',
     ):
