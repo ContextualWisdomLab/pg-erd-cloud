@@ -110,6 +110,37 @@ async def test_get_migration_plan_rejects_tampered_persisted_payload() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("compiler_version", "pg-erd-forward/tampered"),
+        ("base_digest", "0" * 64),
+        ("target_digest", "0" * 64),
+    ],
+)
+async def test_get_migration_plan_rejects_denormalized_binding_mismatch(
+    field: str, value: str
+) -> None:
+    plan = _stored_plan()
+    setattr(plan, field, value)
+    session = FakeSession()
+    session.get.return_value = plan
+
+    with patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_migration_plan(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "migration plan integrity verification failed"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("missing", [True, False])
 async def test_get_migration_plan_masks_missing_and_non_member_identity(
     missing: bool,
