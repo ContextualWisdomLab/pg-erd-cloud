@@ -151,6 +151,13 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
     ):
         assert required_term in contract
 
+    normalized_contract = " ".join(contract.split())
+    assert (
+        "The immutable preview exposes project, model-revision, connection, "
+        "base-snapshot, snapshot-contract, PostgreSQL-major, creator, and creation-time "
+        "bindings" in normalized_contract
+    )
+
 
 def test_superseded_adr_is_not_restored() -> None:
     """Prevent a superseded ADR from reappearing beside canonical decisions."""
