@@ -370,6 +370,33 @@ def test_appended_column_ordinal_gap_is_blocked() -> None:
     assert plan["blockers"][0]["code"] == "column_order_change_unsupported"
 
 
+def test_appended_column_after_historical_attnum_gap_is_allowed() -> None:
+    base = _table_model()
+    base_columns = base["schemas"][0]["tables"][0]["columns"]
+    base_columns.append(
+        {
+            "column_name": "After Dropped Slot",
+            "data_type": "text",
+            "nullable": True,
+            "ordinal_position": 3,
+        }
+    )
+    target = copy.deepcopy(base)
+    target["schemas"][0]["tables"][0]["columns"].append(
+        {
+            "column_name": "Appended",
+            "data_type": "text",
+            "nullable": True,
+            "ordinal_position": 4,
+        }
+    )
+
+    plan = compile_migration_plan(base, target)
+
+    assert plan["blockers"] == []
+    assert plan["statements"][0]["target"].endswith(".Appended")
+
+
 def test_blocked_plan_retains_supported_deltas_as_review_only_proposals() -> None:
     base = _table_model(nullable=True, data_type="integer")
     base["schemas"][0]["tables"][0]["primary_key"] = None
