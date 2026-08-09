@@ -281,40 +281,43 @@ def _constraint_def(
     return f"FOREIGN KEY ({quoted_cols})"
 
 
-def _build_primary_key(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
-) -> tuple[dict, list[dict]]:
+@dataclass(frozen=True)
+class _ConstraintContext:
+    name: str
+    schema: str
+    table: str
+    relation_oid: int
+    columns: list[str]
+    constrained_attnums: list[int]
+    constraint_oid: int
+
+
+def _build_primary_key(ctx: _ConstraintContext) -> tuple[dict, list[dict]]:
     constraint = {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "p",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": None,
         "foreign_schema_name": None,
         "foreign_relation_name": None,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
-        "constraint_def": _constraint_def("p", columns, None, None, []),
+        "constraint_def": _constraint_def("p", ctx.columns, None, None, []),
         "check_expr": None,
     }
 
     pk_columns = []
-    for ordinal, column in enumerate(columns, start=1):
+    for ordinal, column in enumerate(ctx.columns, start=1):
         pk_columns.append(
             {
-                "constraint_oid": constraint_oid,
-                "constraint_name": name,
-                "schema_name": schema,
-                "relation_oid": relation_oid,
-                "relation_name": table,
+                "constraint_oid": ctx.constraint_oid,
+                "constraint_name": ctx.name,
+                "schema_name": ctx.schema,
+                "relation_oid": ctx.relation_oid,
+                "relation_name": ctx.table,
                 "column_ordinal": ordinal,
                 "column_name": column,
             }
@@ -322,40 +325,26 @@ def _build_primary_key(
     return constraint, pk_columns
 
 
-def _build_unique_constraint(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
-) -> dict:
+def _build_unique_constraint(ctx: _ConstraintContext) -> dict:
     return {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "u",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": None,
         "foreign_schema_name": None,
         "foreign_relation_name": None,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
-        "constraint_def": _constraint_def("u", columns, None, None, []),
+        "constraint_def": _constraint_def("u", ctx.columns, None, None, []),
         "check_expr": None,
     }
 
 
 def _build_foreign_key(
-    name: str,
-    schema: str,
-    table: str,
-    relation_oid: int,
-    columns: list[str],
-    constrained_attnums: list[int],
-    constraint_oid: int,
+    ctx: _ConstraintContext,
     referenced_schema: str | None,
     referenced_table: str | None,
     referenced_columns: list[str],
@@ -363,20 +352,20 @@ def _build_foreign_key(
     sorted_rows: list[dict],
 ) -> tuple[dict, list[dict]]:
     constraint = {
-        "constraint_oid": constraint_oid,
-        "constraint_name": name,
+        "constraint_oid": ctx.constraint_oid,
+        "constraint_name": ctx.name,
         "constraint_type": "f",
-        "schema_name": schema,
-        "relation_oid": relation_oid,
-        "relation_name": table,
+        "schema_name": ctx.schema,
+        "relation_oid": ctx.relation_oid,
+        "relation_name": ctx.table,
         "foreign_relation_oid": foreign_relation_oid,
         "foreign_schema_name": referenced_schema,
         "foreign_relation_name": referenced_table,
-        "constrained_attnums": constrained_attnums,
+        "constrained_attnums": ctx.constrained_attnums,
         "referenced_attnums": [],
         "constraint_def": _constraint_def(
             "f",
-            columns,
+            ctx.columns,
             referenced_schema,
             referenced_table,
             referenced_columns,
@@ -393,11 +382,11 @@ def _build_foreign_key(
                 continue
             fk_edges.append(
                 {
-                    "fk_constraint_oid": constraint_oid,
-                    "fk_constraint_name": name,
-                    "child_schema_name": schema,
-                    "child_relation_oid": relation_oid,
-                    "child_relation_name": table,
+                    "fk_constraint_oid": ctx.constraint_oid,
+                    "fk_constraint_name": ctx.name,
+                    "child_schema_name": ctx.schema,
+                    "child_relation_oid": ctx.relation_oid,
+                    "child_relation_name": ctx.table,
                     "parent_schema_name": referenced_schema,
                     "parent_relation_oid": foreign_relation_oid,
                     "parent_relation_name": referenced_table,
@@ -469,37 +458,25 @@ def _process_constraint_group(
         else None
     )
 
+    ctx = _ConstraintContext(
+        name=name,
+        schema=schema,
+        table=table,
+        relation_oid=relation_oid,
+        columns=columns,
+        constrained_attnums=constrained_attnums,
+        constraint_oid=constraint_oid,
+    )
+
     if ctype == "p":
-        constraint, new_pk_columns = _build_primary_key(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
-        )
+        constraint, new_pk_columns = _build_primary_key(ctx)
         return constraint, new_pk_columns, []
     elif ctype == "u":
-        constraint = _build_unique_constraint(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
-        )
+        constraint = _build_unique_constraint(ctx)
         return constraint, [], []
     elif ctype == "f":
         constraint, new_fk_edges = _build_foreign_key(
-            name,
-            schema,
-            table,
-            relation_oid,
-            columns,
-            constrained_attnums,
-            constraint_oid,
+            ctx,
             referenced_schema,
             referenced_table,
             referenced_columns,
