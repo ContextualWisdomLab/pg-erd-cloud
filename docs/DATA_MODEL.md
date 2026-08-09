@@ -97,6 +97,7 @@ erDiagram
     int state_version
     text idempotency_key_hash
     text plan_digest
+    text request_digest
     uuid requested_by_user_uuid FK
     boolean cancellation_requested
     text observed_base_digest
@@ -176,7 +177,7 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot execute. | Expiry is stored, but run creation/execution does not exist. | Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
-| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, migration_plan_uuid, run_kind, idempotency_key_hash)` plus bounded SHA-256 key digest contract. | Implemented foundation; concurrent API transaction Planned |
+| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; same-key/different-request comparison will return `409`. | Implemented storage foundation; concurrent API transaction Planned |
 | Run/event state tokens and sequence numbers are valid. | Database checks plus exact application transition graph; event sequence is unique per run. | Partially implemented; compare-and-swap transition writer Planned |
 
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
