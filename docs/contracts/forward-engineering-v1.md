@@ -37,8 +37,8 @@ Current code implements only the first control-plane slice:
 - **Partially implemented:** durable run/event persistence, exact state
   validation, hashed idempotency keys, bounded evidence canonicalization, and
   atomic optimistic compare-and-swap transition/event persistence plus an
-  internal database-selected dry-run creation writer; no run API or worker
-  execution authority exists yet.
+  internal database-selected dry-run creation writer and cancellation intent;
+  no run API or worker execution authority exists yet.
 - **Planned:** run creation/polling and workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
@@ -122,6 +122,12 @@ database access, reads the current run identity, and executes one optimistic
 update matching UUID, run kind, state, and expected state version. Only the CAS
 winner appends `migration_run_event` with the next sequence number. The caller
 owns the transaction, so an event insert failure rolls the state update back.
+
+`request_migration_run_cancellation` does not invent a synthetic state. It CAS
+updates `cancellation_requested` and `state_version` while matching the exact
+UUID, kind, state, prior version, and false cancellation flag, then appends a
+same-state event at the new sequence. Repeated intent is idempotent; terminal,
+missing, invalid, and stale runs fail closed.
 
 ## 4. Canonical model JSON
 
