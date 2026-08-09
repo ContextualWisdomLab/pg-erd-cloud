@@ -189,6 +189,11 @@ digests, compiler version, `can_dry_run`, destructive-confirmation flag,
 structured executable statements, review-only `proposed_statements`, blockers,
 risk summary, and expiry.
 
+The immutable preview exposes project, model-revision, connection,
+base-snapshot, snapshot-contract, PostgreSQL-major, creator, and creation-time
+bindings so a client can review the exact stored execution identity rather than
+infer authority from mutable UI state.
+
 Current route truth takes precedence over the older design-spec spelling
 `POST /api/projects/{project_uuid}/schema-models`. That project-nested alias is
 **Planned**, not implemented; the team must choose one canonical release path
