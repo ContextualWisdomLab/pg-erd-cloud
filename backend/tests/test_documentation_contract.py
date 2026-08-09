@@ -38,10 +38,10 @@ CURRENT_ROUTES = (
     "GET /api/schema-models/{schema_model_uuid}",
     "PUT /api/schema-models/{schema_model_uuid}",
     "POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans",
+    "GET /api/migration-plans/{migration_plan_uuid}",
 )
 
 PLANNED_ROUTES = (
-    "GET /api/migration-plans/{migration_plan_uuid}",
     "POST /api/migration-plans/{migration_plan_uuid}/dry-runs",
     "POST /api/migration-plans/{migration_plan_uuid}/apply-runs",
     "GET /api/migration-runs/{migration_run_uuid}",
@@ -93,8 +93,8 @@ def test_architecture_views_remain_renderable_mermaid_documents() -> None:
     assert without_mermaid == []
 
 
-def test_v1_contract_separates_current_routes_from_planned_run_routes() -> None:
-    """Prevent planned execution routes from being presented as implemented."""
+def test_v1_contract_separates_current_routes_from_remaining_run_routes() -> None:
+    """Keep retrieval implemented without presenting execution routes as live."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
 
@@ -104,8 +104,9 @@ def test_v1_contract_separates_current_routes_from_planned_run_routes() -> None:
     assert missing_current == []
     assert missing_planned == []
     assert "## 5. Current HTTP API contract" in contract
-    assert "## 8. Planned run API and status contract" in contract
-    assert "**Planned** and do not exist in current" in contract
+    assert "## 8. Migration-plan retrieval and planned run API" in contract
+    assert "Implemented" in contract
+    assert "remaining run routes" in contract
 
 
 def test_v1_contract_keeps_blocked_statements_as_review_only_proposals() -> None:
