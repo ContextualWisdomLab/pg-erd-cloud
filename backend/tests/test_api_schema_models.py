@@ -8,7 +8,11 @@ import pytest
 from fastapi import HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 
-from app.api.schema_models import create_schema_model, revise_schema_model
+from app.api.schema_models import (
+    _validate_base_snapshot,
+    create_schema_model,
+    revise_schema_model,
+)
 from app.auth import CurrentUser
 from app.models import SchemaModel, SchemaModelRevision
 from app.schemas import SchemaModelCreateIn, SchemaModelReviseIn
@@ -25,12 +29,49 @@ def _model() -> dict:
 class FakeWriteSession:
     def __init__(self) -> None:
         self.added: list[object] = []
+        self.get = AsyncMock()
         self.flush = AsyncMock()
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
 
     def add(self, value: object) -> None:
         self.added.append(value)
+
+
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        None,
+        SimpleNamespace(project_space_uuid=uuid.uuid4(), status="succeeded"),
+        SimpleNamespace(project_space_uuid=None, status="running"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_base_snapshot_must_exist_in_project_and_be_succeeded(
+    snapshot: object | None,
+) -> None:
+    project_uuid = uuid.uuid4()
+    if snapshot is not None and getattr(snapshot, "status") == "running":
+        snapshot.project_space_uuid = project_uuid
+    session = FakeWriteSession()
+    session.get.return_value = snapshot
+
+    with pytest.raises(HTTPException) as exc_info:
+        await _validate_base_snapshot(session, project_uuid, uuid.uuid4())
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail == "base snapshot is not usable"
+
+
+@pytest.mark.asyncio
+async def test_base_snapshot_accepts_succeeded_snapshot_in_same_project() -> None:
+    project_uuid = uuid.uuid4()
+    session = FakeWriteSession()
+    session.get.return_value = SimpleNamespace(
+        project_space_uuid=project_uuid, status="succeeded"
+    )
+
+    await _validate_base_snapshot(session, project_uuid, uuid.uuid4())
 
 
 @pytest.mark.asyncio
