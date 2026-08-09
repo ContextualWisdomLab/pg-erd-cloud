@@ -176,6 +176,7 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
         "genesis",
         "cancellation_graph",
         "missing_before",
+        "cancellation_flag",
     ],
 )
 async def test_get_migration_run_fails_closed_for_corrupt_history(
@@ -232,6 +233,8 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
         events[1].state_before = None
         events[1].event_digest = _event_digest(events[1])
         run.latest_event_digest = events[1].event_digest
+    elif mutation == "cancellation_flag":
+        run.cancellation_requested = True
     else:
         run.latest_event_digest = "f" * 64
     session = SimpleNamespace(

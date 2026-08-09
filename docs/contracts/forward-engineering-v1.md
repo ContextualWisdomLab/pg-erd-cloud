@@ -119,7 +119,9 @@ timestamp, and predecessor. Genesis has no predecessor; later events require a
 anchor. Retrieval recomputes every link and the terminal anchor, returning a
 sanitized `409` on mismatch; it also requires the exact genesis event and
 replays every ordinary or same-state cancellation transition through the v1
-state graph. This is tamper-evidence, not a signature or a
+state graph. The persisted `cancellation_requested` flag must exactly match one
+cancellation event; a missing, duplicate, or contradictory event fails closed.
+This is tamper-evidence, not a signature or a
 guarantee against an actor that can rewrite the entire metadata database.
 
 `create_migration_run` is the implemented internal creation boundary. It
@@ -348,7 +350,7 @@ are **Planned** and do not exist in current code:
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
-| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
+| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/cancellation-intent/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
 
 Dry-run states:
 

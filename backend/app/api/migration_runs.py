@@ -50,6 +50,7 @@ def _run_out(
     expected_state: str | None = None
     previous_created_at = None
     previous_event_digest = None
+    cancellation_event_seen = False
     event_output: list[MigrationRunEventOut] = []
     try:
         run_evidence = canonicalize_run_evidence(run.evidence_json)
@@ -63,8 +64,9 @@ def _run_out(
                 ):
                     raise _integrity_error()
             elif event.event_type == "cancellation_requested":
-                if event.state_before != event.state_after:
+                if cancellation_event_seen or event.state_before != event.state_after:
                     raise _integrity_error()
+                cancellation_event_seen = True
             else:
                 if event.state_before is None:
                     raise _integrity_error()
@@ -111,7 +113,11 @@ def _run_out(
             previous_event_digest = event.event_digest
     except MigrationRunContractError as exc:
         raise _integrity_error() from exc
-    if expected_state != run.state or previous_event_digest != run.latest_event_digest:
+    if (
+        expected_state != run.state
+        or previous_event_digest != run.latest_event_digest
+        or cancellation_event_seen != run.cancellation_requested
+    ):
         raise _integrity_error()
 
     return MigrationRunOut(

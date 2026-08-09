@@ -117,7 +117,7 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview with project/revision/connection/snapshot/capability/actor/time bindings, IDOR-masked | **Implemented** |
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest idempotent durable dry run | **Planned** |
 | `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
-| `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies count, canonical genesis, exact transition graph (including cancellation), chronology, event digests, run anchor, and secret-safe evidence before returning | **Implemented** |
+| `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies count, canonical genesis, exact transition graph, one-to-one cancellation flag/event consistency, chronology, event digests, run anchor, and secret-safe evidence before returning | **Implemented** |
 
 Implemented limits: model input is at most 2 MiB; a persisted plan is at most
 1,000 executable plus proposed statements and 4 MiB; plans expire 24 hours
