@@ -16,7 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_session
-from app.forward.migration_plan import compile_migration_plan
+from app.forward.migration_plan import (
+    compile_migration_plan,
+    verify_migration_plan_digest,
+)
 from app.forward.schema_model import SchemaModelValidationError
 from app.forward.snapshot_adapter import snapshot_to_schema_model
 from app.models import (
@@ -53,6 +56,11 @@ def _plan_out(plan: MigrationPlan) -> MigrationPlanOut:
     """Return the public representation of one persisted immutable plan."""
 
     plan_json = plan.plan_json
+    if not verify_migration_plan_digest(plan_json, plan.statement_digest):
+        raise HTTPException(
+            status_code=409,
+            detail="migration plan integrity verification failed",
+        )
     return MigrationPlanOut(
         migration_plan_uuid=plan.migration_plan_uuid,
         project_space_uuid=plan.project_space_uuid,
