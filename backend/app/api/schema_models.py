@@ -88,7 +88,7 @@ async def _get_model_for_update(
 
 
 def _revision_etag(revision: SchemaModelRevision) -> str:
-    """Return a strong entity tag that identifies the complete revision row."""
+    """Return a strong ETag containing the immutable revision UUID."""
 
     return f'"{revision.schema_model_revision_uuid}"'
 
@@ -153,7 +153,7 @@ async def revise_schema_model(
     user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SchemaModelDetailOut:
-    """Append a revision iff ``If-Match`` names the locked current digest."""
+    """Append a revision iff ``If-Match`` names the locked revision UUID."""
 
     found = await _get_model_for_update(session, schema_model_uuid)
     if found is None:
