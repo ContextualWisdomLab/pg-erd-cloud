@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 
+import pytest
+
 from app.forward.migration_plan import compile_migration_plan
 
 
@@ -51,6 +53,7 @@ def test_plan_is_structured_deterministic_and_preserves_quoted_identifiers() -> 
 
     assert first == second
     assert first["compiler_version"] == "pg-erd-forward/v1"
+    assert first["snapshot_contract_version"] == 1
     assert first["can_dry_run"] is True
     assert len(first["plan_digest"]) == 64
     assert [statement["kind"] for statement in first["statements"]] == [
@@ -172,6 +175,14 @@ def test_add_column_and_drop_table_paths_are_structured() -> None:
     drop_plan = compile_migration_plan(base, empty_schema)
     assert drop_plan["statements"][0]["kind"] == "drop_table"
     assert drop_plan["requires_destructive_confirmation"] is True
+
+
+def test_default_expressions_fail_closed_before_sql_rendering() -> None:
+    target = _table_model()
+    target["schemas"][0]["tables"][0]["columns"][0]["default"] = "now()"
+
+    with pytest.raises(ValueError, match="default expressions"):
+        compile_migration_plan(_empty_model(), target)
 
 
 def test_nullable_add_and_drop_not_null_are_safe_paths() -> None:
