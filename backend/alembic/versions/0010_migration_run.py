@@ -42,6 +42,7 @@ def upgrade() -> None:
         sa.Column("state_version", sa.Integer(), nullable=False),
         sa.Column("idempotency_key_hash", sa.Text(), nullable=False),
         sa.Column("plan_digest", sa.Text(), nullable=False),
+        sa.Column("request_digest", sa.Text(), nullable=False),
         sa.Column(
             "requested_by_user_uuid",
             postgresql.UUID(as_uuid=True),
@@ -58,7 +59,6 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint(
             "project_space_uuid",
-            "migration_plan_uuid",
             "run_kind",
             "idempotency_key_hash",
             name="uq_migration_run__idempotent_action",
