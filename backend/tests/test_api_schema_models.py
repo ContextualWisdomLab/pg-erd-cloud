@@ -129,7 +129,7 @@ async def test_revise_schema_model_rejects_stale_if_match() -> None:
 
 
 @pytest.mark.asyncio
-async def test_revise_schema_model_rejects_old_digest_when_base_only_revision_changed() -> None:
+async def test_revise_schema_model_uses_revision_uuid_when_base_only_revision_changes() -> None:
     from app.forward.schema_model import schema_model_digest
 
     model_json = _model()
@@ -149,25 +149,31 @@ async def test_revise_schema_model_rejects_old_digest_when_base_only_revision_ch
         base_schema_snapshot_uuid=uuid.uuid4(),
     )
 
+    session = FakeWriteSession()
+    response = Response()
     with patch(
         "app.api.schema_models._get_model_for_update",
         new=AsyncMock(return_value=(identity, current)),
     ), patch(
         "app.api.schema_models.require_project_member", new_callable=AsyncMock
     ):
-        with pytest.raises(HTTPException) as exc_info:
-            await revise_schema_model(
-                schema_model_uuid=identity.schema_model_uuid,
-                body=SchemaModelReviseIn(
-                    model_json=model_json, base_schema_snapshot_uuid=None
-                ),
-                response=Response(),
-                if_match=f'"{shared_model_digest}"',
-                user=_user(),
-                session=FakeWriteSession(),
-            )
+        out = await revise_schema_model(
+            schema_model_uuid=identity.schema_model_uuid,
+            body=SchemaModelReviseIn(
+                model_json=model_json, base_schema_snapshot_uuid=None
+            ),
+            response=response,
+            if_match=f'"{current.schema_model_revision_uuid}"',
+            user=_user(),
+            session=session,
+        )
 
-    assert exc_info.value.status_code == 409
+    assert out.revision_number == 4
+    revision = next(
+        item for item in session.added if isinstance(item, SchemaModelRevision)
+    )
+    assert revision.base_schema_snapshot_uuid is None
+    assert response.headers["etag"] == f'"{revision.schema_model_revision_uuid}"'
 
 
 @pytest.mark.asyncio
@@ -193,7 +199,7 @@ async def test_revise_schema_model_rejects_weak_if_match() -> None:
                 schema_model_uuid=identity.schema_model_uuid,
                 body=SchemaModelReviseIn(model_json=_model()),
                 response=Response(),
-                if_match='W/"' + "a" * 64 + '"',
+                if_match=f'W/"{current.schema_model_revision_uuid}"',
                 user=_user(),
                 session=FakeWriteSession(),
             )
