@@ -161,7 +161,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
             fk_edges = await conn.fetch(
                 queries.FK_EDGES_SQL, schema_name, include_system
             )
-            citus_distributed_tables = []
+            citus_distributed_tables: list[asyncpg.Record] = []
             has_citus = await conn.fetchval(
                 "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension "
                 "WHERE extname = 'citus')"
@@ -175,7 +175,12 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
                         schema_name,
                         include_system,
                     )
-                except asyncpg.UndefinedTableError:
+                except (
+                    asyncpg.InsufficientPrivilegeError,
+                    asyncpg.UndefinedColumnError,
+                    asyncpg.UndefinedFunctionError,
+                    asyncpg.UndefinedTableError,
+                ):
                     await savepoint.rollback()
                     citus_distributed_tables = []
                 else:
