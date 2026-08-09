@@ -5,7 +5,7 @@
 **Status:** Approved target architecture; Phase 1 control plane partially implemented
 **Date:** 2026-08-09
 
-### Implementation snapshot
+## Implementation snapshot
 
 Canonical product, technical, and runtime truth is maintained in
 [`docs/PRD.md`](../../PRD.md), [`docs/TRD.md`](../../TRD.md), the
