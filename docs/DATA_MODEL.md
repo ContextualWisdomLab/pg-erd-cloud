@@ -2,7 +2,7 @@
 
 - **Document status:** Current physical model plus accepted planned extension
 - **Runtime status:** Partially implemented; not production-ready
-- **Last reconciled with ORM and Alembic:** 2026-08-09
+- **Last reconciled with ORM and Alembic:** 2026-08-10
 
 Repository migrations, ORM definitions, and the Mermaid ERDs below are
 authoritative. The
@@ -88,6 +88,31 @@ erDiagram
     uuid created_by_user_uuid FK
     timestamptz expires_at
   }
+  MIGRATION_RUN {
+    uuid migration_run_uuid PK
+    uuid project_space_uuid FK
+    uuid migration_plan_uuid FK
+    text run_kind
+    text state
+    int state_version
+    text idempotency_key_hash
+    text plan_digest
+    uuid requested_by_user_uuid FK
+    boolean cancellation_requested
+    text observed_base_digest
+    jsonb evidence_json
+    text error_code
+  }
+  MIGRATION_RUN_EVENT {
+    uuid migration_run_event_uuid PK
+    uuid migration_run_uuid FK
+    int sequence_number
+    text event_type
+    text state_before
+    text state_after
+    jsonb evidence_json
+    uuid actor_user_uuid FK
+  }
 
   USER_ACCOUNT ||--o{ PROJECT_SPACE : creates
   USER_ACCOUNT ||--o{ PROJECT_MEMBER : holds
@@ -106,6 +131,11 @@ erDiagram
   DB_CONNECTION ||--o{ MIGRATION_PLAN : targets
   SCHEMA_SNAPSHOT ||--o{ MIGRATION_PLAN : starts_from
   USER_ACCOUNT ||--o{ MIGRATION_PLAN : creates
+  PROJECT_SPACE ||--o{ MIGRATION_RUN : scopes
+  MIGRATION_PLAN ||--o{ MIGRATION_RUN : attempts
+  USER_ACCOUNT ||--o{ MIGRATION_RUN : requests
+  MIGRATION_RUN ||--o{ MIGRATION_RUN_EVENT : records
+  USER_ACCOUNT o|--o{ MIGRATION_RUN_EVENT : acts
 ```
 
 ### Implemented key and deletion semantics
@@ -125,6 +155,11 @@ erDiagram
 | `migration_plan.schema_model_revision_uuid` | `schema_model_revision` | no | `RESTRICT` | Each plan compiles one revision; a revision can produce zero or more plans. |
 | `migration_plan.db_connection_uuid` | `db_connection` | no | `RESTRICT` | Each plan targets one connection; a connection can have zero or more plans. |
 | `migration_plan.base_schema_snapshot_uuid` | `schema_snapshot` | no | `RESTRICT` | Each plan binds one base snapshot; a snapshot can base zero or more plans. |
+| `migration_run.project_space_uuid` | `project_space` | no | `CASCADE` | Each durable run is scoped to one project; a project has zero or more runs. |
+| `migration_run.migration_plan_uuid` | `migration_plan` | no | `RESTRICT` | Each durable run attempts one immutable plan; plan deletion is blocked while evidence remains. |
+| `migration_run.requested_by_user_uuid` | `user_account` | no | `NO ACTION` | Each run records one requesting actor. |
+| `migration_run_event.migration_run_uuid` | `migration_run` | no | `CASCADE` | Each event belongs to one run; approved run deletion removes its event sequence atomically. |
+| `migration_run_event.actor_user_uuid` | `user_account` | yes | `NO ACTION` | Worker events may be system-authored; human actions retain an actor. |
 
 All `created_by_user_uuid` columns shown are non-null foreign keys to
 `user_account` with the database default delete behavior (`NO ACTION`).
@@ -140,7 +175,9 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan project, revision project, connection project, and snapshot project match; the snapshot came from that exact connection and succeeded. | `app.api.migration_plans.create_migration_plan` before insert. | Implemented in the API; not a database constraint |
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot execute. | Expiry is stored, but run creation/execution does not exist. | Planned |
-| Secrets never appear in plan or model JSON. | The plan schema does not take a DSN; connection secrets remain in `db_connection`. A future queue/event boundary still needs enforcement tests. | Partially implemented |
+| Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
+| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, migration_plan_uuid, run_kind, idempotency_key_hash)` plus bounded SHA-256 key digest contract. | Implemented foundation; concurrent API transaction Planned |
+| Run/event state tokens and sequence numbers are valid. | Database checks plus exact application transition graph; event sequence is unique per run. | Partially implemented; compare-and-swap transition writer Planned |
 
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
 It is provenance, not a database idempotency key: the same logical SQL may be
@@ -154,13 +191,13 @@ over all proposals, so a blocked plan can still disclose destructive risk. A
 future executor must reject blocked plans and must never promote proposals to
 execution input.
 
-## Planned run and event ERD
+## Physical run foundation — Implemented
 
-**Status: Planned.** `migration_run` and `migration_run_event` do not exist in
-the ORM or Alembic tree. The relationship cardinalities below are the accepted
-target contract. Exact non-key column types, names, indexes, retention fields,
-and uniqueness constraints must be frozen in an Alembic design review before
-implementation; this logical ERD must not be mistaken for an applied migration.
+`migration_run` and `migration_run_event` now exist in the ORM and Alembic
+revision `0010_migration_run` with the fields shown in the implemented ERD
+above. The logical diagram below retains accepted **Planned extensions** such
+as passed-dry-run and verification-snapshot references. Those extension fields
+do not exist physically and must not be inferred from the implemented tables.
 
 ```mermaid
 erDiagram
