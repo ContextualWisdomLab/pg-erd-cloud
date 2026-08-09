@@ -274,6 +274,17 @@ class MigrationPlan(Base):
         DateTime(timezone=True), default=utcnow
     )
 
+    __table_args__ = (
+        UniqueConstraint(
+            "schema_model_revision_uuid",
+            "db_connection_uuid",
+            "base_schema_snapshot_uuid",
+            "statement_digest",
+            name="uq_migration_plan__immutable_identity",
+        ),
+        Index("ix_migration_plan__expires_at", "expires_at"),
+    )
+
 
 
 class JobQueue(Base):
