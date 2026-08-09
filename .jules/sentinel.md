@@ -7,3 +7,8 @@
 **Vulnerability:** The application did not explicitly validate the `crit` (critical) header parameter during JWT verification, silently ignoring unsupported critical extensions in tokens.
 **Learning:** According to RFC 7515, if a token includes the `crit` header, it must be validated as a length-bounded list of strings, and the token must be rejected if the application does not support any of the included parameters. Failing to do so can lead to security bypasses or STRIX security scan alerts.
 **Prevention:** Always validate the `crit` header in JWT JOSE headers. It must be checked as a list of strings, and if the application doesn't support critical parameters, any non-empty `crit` list should cause verification failure.
+
+## 2025-02-18 - Fix Force Refresh Bypass Vulnerability in JWT JWKS Refresh
+**Vulnerability:** A logical error in `_get_jwks` overrode the `force_refresh` parameter. Redundant caching logic allowed cached keys to be returned even when `force_refresh=True` was explicitly requested.
+**Learning:** This flaw could potentially cause denial of service during key rotation or let attackers abuse timed windows to have illegitimate tokens accepted.
+**Prevention:** Ensure caching and short-circuit conditions clearly distinguish between default logic and explicit override flags (like `force_refresh`).
