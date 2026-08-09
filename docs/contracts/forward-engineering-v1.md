@@ -35,9 +35,10 @@ Current code implements only the first control-plane slice:
 - **Partially implemented:** fail-closed snapshot-to-model conversion and the
   supported compiler subset. Known gaps are listed in section 6.
 - **Partially implemented:** durable run/event persistence, exact state
-  validation, hashed idempotency keys, and bounded evidence canonicalization;
-  no run API or worker execution authority exists yet.
-- **Planned:** durable runs/events, isolated dry run, live preflight,
+  validation, hashed idempotency keys, bounded evidence canonicalization, and
+  atomic optimistic compare-and-swap transition/event persistence; no run API
+  or worker execution authority exists yet.
+- **Planned:** run creation/polling and workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
@@ -58,9 +59,9 @@ Current code implements only the first control-plane slice:
 | FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Planned |
 | FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Planned |
 | FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Planned |
-| FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Planned |
+| FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Partially implemented |
 | FE-INV-010 | Live apply requires `deployer`, exact-plan confirmation, a matching passed dry run, and separate destructive acknowledgement when applicable. | Partially implemented |
-| FE-INV-011 | Queue/event/browser payloads never contain a DSN, decrypted secret, or raw client SQL. | Planned |
+| FE-INV-011 | Queue/event/browser payloads never contain a DSN, decrypted secret, or raw client SQL. | Partially implemented |
 | FE-INV-012 | Only a persisted verification snapshot matching `target_digest` may produce `verified`. | Planned |
 | FE-INV-013 | Cross-project resource identities are uniformly masked as not found. | Partially implemented |
 | FE-INV-014 | Unknown fields, object kinds, operation kinds, and compiler versions fail closed. | Partially implemented |
@@ -95,7 +96,7 @@ mandatory when run creation is added.
 
 The ORM classes and Alembic revision `0010_migration_run` persist an idempotent
 run identity and append-only, per-run event sequence. Database checks bound run
-kind, state, run-kind/state compatibility, state version, and event sequence. A project/run-kind idempotency
+kind, state, state version, and event sequence. A project/run-kind idempotency
 key is unique independently of plan identity, while `request_digest` preserves
 the effective request needed to reject same-key/different-request reuse.
 `app.forward.migration_run` defines the exact state graph, hashes bounded
@@ -103,9 +104,15 @@ idempotency keys, deterministically binds project, plan, run kind, plan digest,
 and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. Run creation and
-polling routes remain **Planned**, as do queue/outbox integration, compare-and-
-swap transition persistence, cancellation, sandbox/preflight workers, apply,
+polling routes remain **Planned**, as do queue/outbox integration,
+cancellation, sandbox/preflight workers, apply,
 reconciliation, and verification.
+
+`transition_migration_run` validates event metadata and evidence before any
+database access, reads the current run identity, and executes one optimistic
+update matching UUID, run kind, state, and expected state version. Only the CAS
+winner appends `migration_run_event` with the next sequence number. The caller
+owns the transaction, so an event insert failure rolls the state update back.
 
 ## 4. Canonical model JSON
 
