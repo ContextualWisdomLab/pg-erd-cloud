@@ -16,6 +16,7 @@ from app.api.auth_routes import router as auth_router
 from app.api.diagram_views import router as diagram_views_router
 from app.api.me import router as me_router
 from app.api.migration_plans import router as migration_plans_router
+from app.api.migration_runs import router as migration_runs_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
 from app.api.schema_models import router as schema_models_router
@@ -183,3 +184,4 @@ app.include_router(share_router)
 app.include_router(auth_router)
 app.include_router(schema_models_router)
 app.include_router(migration_plans_router)
+app.include_router(migration_runs_router)
