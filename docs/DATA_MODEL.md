@@ -177,7 +177,7 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot execute. | Expiry is stored, but run creation/execution does not exist. | Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
-| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; same-key/different-request comparison will return `409`. | Implemented storage foundation; concurrent API transaction Planned |
+| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the internal PostgreSQL conflict-winner writer reuses only the same request and rejects different reuse. | Implemented internal dry-run writer; HTTP mapping Planned |
 | Run/event state tokens and sequence numbers are valid. | Database checks plus exact application transition graph; the CAS writer matches UUID, kind, state, and state version before appending the same-version event; event sequence is unique per run. | Implemented persistence boundary; APIs/workers Planned |
 
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
