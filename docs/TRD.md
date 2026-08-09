@@ -39,9 +39,17 @@ executable SQL, safety classification, approval truth, or recovery state.
 - Role order `viewer < editor < deployer < owner`; persistent legacy
   `apply-sql` requires deployer authority.
 
+### Partially implemented foundation
+
+- `MigrationRun` and `MigrationRunEvent` ORM/Alembic persistence with database
+  state/idempotency/sequence constraints;
+- a deterministic dry-run/apply transition contract, bounded hashed
+  idempotency keys, and recursive rejection of SQL/credential-bearing event
+  fields.
+
 ### Planned and release-blocking
 
-- plan retrieval, `MigrationRun`, and `MigrationRunEvent` APIs/tables;
+- migration-run creation/polling APIs and compare-and-swap transition service;
 - isolated disposable PostgreSQL execution and cleanup;
 - bounded target read-only preflight and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -66,7 +74,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Planned** |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** durable evidence boundary exists; queue integration Planned |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Planned** |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented; expiry is stored but run enforcement Planned** |
@@ -81,7 +89,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Planned; absent** |
+| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables/contracts exist; APIs/workers absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision` and `0009_migration_plan`. See
