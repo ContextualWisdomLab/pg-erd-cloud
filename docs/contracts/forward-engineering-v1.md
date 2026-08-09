@@ -98,9 +98,11 @@ run identity and append-only, per-run event sequence. Database checks bound run
 kind, state, state version, and event sequence. A project/run-kind idempotency
 key is unique independently of plan identity, while `request_digest` preserves
 the effective request needed to reject same-key/different-request reuse.
-`app.forward.migration_run`
-defines the exact state graph, hashes bounded idempotency keys, and rejects raw
-SQL or credential-bearing fields from bounded evidence JSON. Run creation and
+`app.forward.migration_run` defines the exact state graph, hashes bounded
+idempotency keys, deterministically binds project, plan, run kind, plan digest,
+and requesting actor in versioned `request_digest`, and rejects raw SQL,
+credential-bearing fields, or PostgreSQL connection-string values from bounded
+evidence JSON. Run creation and
 polling routes remain **Planned**, as do queue/outbox integration, compare-and-
 swap transition persistence, cancellation, sandbox/preflight workers, apply,
 reconciliation, and verification.
