@@ -235,6 +235,7 @@ async def test_oidc_decode_rejects_kty_mismatch(
     async def fake_jwks() -> dict:
         return {"keys": [jwk]}
 
+    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     def fail_decode(*_: object, **__: object) -> dict:
