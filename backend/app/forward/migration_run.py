@@ -109,6 +109,15 @@ class MigrationRunCreation:
     reused: bool
 
 
+@dataclass(frozen=True)
+class MigrationRunCancellation:
+    """The durable cancellation-intent identity selected by one CAS request."""
+
+    state: str
+    state_version: int
+    reused: bool
+
+
 def validate_run_transition(run_kind: str, current_state: str, next_state: str) -> None:
     """Reject a state transition outside the exact dry-run/apply graph."""
 
@@ -429,4 +438,95 @@ async def transition_migration_run(
         state_version=next_version,
         started_at=started_at,
         finished_at=finished_at,
+    )
+
+
+async def request_migration_run_cancellation(
+    session: AsyncSession,
+    *,
+    migration_run_uuid: uuid.UUID,
+    expected_state_version: int,
+    actor_user_uuid: uuid.UUID | None,
+    evidence: Mapping[str, object],
+    now: dt.datetime | None = None,
+) -> MigrationRunCancellation:
+    """Persist cancellation intent without inventing a synthetic run state.
+
+    Cancellation increments the same optimistic state version used by workers
+    and appends a same-state event. A worker must therefore observe the intent
+    before its next transition can win. The caller owns the transaction.
+    """
+
+    if (
+        isinstance(expected_state_version, bool)
+        or not isinstance(expected_state_version, int)
+        or expected_state_version < 1
+    ):
+        raise MigrationRunContractError("expected state version is invalid")
+    canonical_evidence = canonicalize_run_evidence(evidence)
+    request_time = now or dt.datetime.now(dt.timezone.utc)
+    if request_time.tzinfo is None or request_time.utcoffset() is None:
+        raise MigrationRunContractError("cancellation time must include a timezone")
+
+    run = await session.scalar(
+        select(MigrationRun)
+        .where(MigrationRun.migration_run_uuid == migration_run_uuid)
+        .execution_options(populate_existing=True)
+    )
+    if run is None or run.state_version != expected_state_version:
+        raise MigrationRunContractError("migration run state version conflict")
+    transitions = _TRANSITIONS.get(run.run_kind)
+    if transitions is None or run.state not in (
+        DRY_RUN_STATES if run.run_kind == "dry_run" else APPLY_RUN_STATES
+    ):
+        raise MigrationRunContractError("migration run state is invalid")
+    if not transitions.get(run.state):
+        raise MigrationRunContractError("terminal migration run cannot be cancelled")
+    if run.cancellation_requested:
+        return MigrationRunCancellation(
+            state=run.state,
+            state_version=run.state_version,
+            reused=True,
+        )
+
+    next_version = expected_state_version + 1
+    result = cast(
+        CursorResult[Any],
+        await session.execute(
+            update(MigrationRun)
+            .where(
+                MigrationRun.migration_run_uuid == migration_run_uuid,
+                MigrationRun.run_kind == run.run_kind,
+                MigrationRun.state == run.state,
+                MigrationRun.state_version == expected_state_version,
+                MigrationRun.cancellation_requested.is_(False),
+            )
+            .values(
+                cancellation_requested=True,
+                state_version=next_version,
+                updated_at=request_time,
+            )
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if result.rowcount != 1:
+        raise MigrationRunContractError("migration run state version conflict")
+
+    session.add(
+        MigrationRunEvent(
+            migration_run_event_uuid=uuid.uuid4(),
+            migration_run_uuid=migration_run_uuid,
+            sequence_number=next_version,
+            event_type="cancellation_requested",
+            state_before=run.state,
+            state_after=run.state,
+            evidence_json=canonical_evidence,
+            actor_user_uuid=actor_user_uuid,
+            created_at=request_time,
+        )
+    )
+    return MigrationRunCancellation(
+        state=run.state,
+        state_version=next_version,
+        reused=False,
     )
