@@ -9,7 +9,11 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import UniqueConstraint
 
-from app.api.migration_plans import MAX_PLAN_STATEMENTS, create_migration_plan
+from app.api.migration_plans import (
+    MAX_PLAN_STATEMENTS,
+    create_migration_plan,
+    get_migration_plan,
+)
 from app.auth import CurrentUser
 from app.models import MigrationPlan
 from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
@@ -30,9 +34,75 @@ class FakeSession:
         self.flush = AsyncMock()
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
+        self.get = AsyncMock(return_value=None)
 
     def add(self, value: object) -> None:
         self.added.append(value)
+
+
+def _stored_plan() -> SimpleNamespace:
+    return SimpleNamespace(
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        statement_digest="c" * 64,
+        base_digest="a" * 64,
+        target_digest="b" * 64,
+        compiler_version="pg-erd-forward/v1",
+        plan_json={
+            "statements": [],
+            "proposed_statements": [],
+            "blockers": [],
+            "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
+            "can_dry_run": True,
+            "requires_destructive_confirmation": False,
+        },
+        expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_migration_plan_returns_immutable_member_preview() -> None:
+    plan = _stored_plan()
+    session = FakeSession()
+    session.get.return_value = plan
+
+    with patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ) as membership:
+        out = await get_migration_plan(
+            migration_plan_uuid=plan.migration_plan_uuid,
+            user=_user(),
+            session=session,
+        )
+
+    assert out.migration_plan_uuid == plan.migration_plan_uuid
+    assert out.plan_digest == plan.statement_digest
+    membership.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", [True, False])
+async def test_get_migration_plan_masks_missing_and_non_member_identity(
+    missing: bool,
+) -> None:
+    plan = _stored_plan()
+    session = FakeSession()
+    session.get.return_value = None if missing else plan
+    denied = HTTPException(status_code=403, detail="project access denied")
+
+    with patch(
+        "app.api.migration_plans.require_project_member",
+        new=AsyncMock(side_effect=denied),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_migration_plan(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "migration plan not found"
 
 
 def _inputs() -> tuple:
@@ -159,6 +229,18 @@ def test_migration_plan_openapi_contract_uses_structured_models() -> None:
     }
     assert schema["properties"]["risk_summary"] == {
         "$ref": "#/$defs/MigrationPlanRiskSummary"
+    }
+
+
+def test_migration_plan_preview_route_is_published_in_openapi() -> None:
+    from app.main import app
+
+    operation = app.openapi()["paths"][
+        "/api/migration-plans/{migration_plan_uuid}"
+    ]["get"]
+
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/MigrationPlanOut"
     }
 
 
