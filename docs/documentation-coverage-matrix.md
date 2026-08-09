@@ -69,7 +69,7 @@ remain externally verifiable `downstream` facts.
 
 | Priority | Gap | Required next artifact/evidence | Lifecycle |
 | --- | --- | --- | --- |
-| P0 | The `nanoid` dev lock is fixed in the uncommitted candidate, but the remediation has no exact-head security evidence | Commit/push the `3.3.17` lock and rerun exact-head security gates | Candidate; becomes `active_pr` after push |
+| P0 | Every pushed head requires fresh security evidence for the `nanoid@3.3.17` remediation; this static document cannot certify a later head | Require all security gates on the exact PR head and remediate any new finding | `active_pr` gate |
 | P0 | No independent review; draft-skipped reviewers | Ready-for-review state and completed head-bound review | `active_pr` |
 | P0 | Browser/Figma comparison incomplete | Runtime screenshots and keyboard/responsive evidence | `active_pr` |
 | P1 | No persisted immutable editable schema model | FE-100 API/migration/contract PR | `planned` |
@@ -77,7 +77,7 @@ remain externally verifiable `downstream` facts.
 | P1 | Worker can strand running jobs | Lease/reclaim/idempotency/recovery design and tests | `planned` |
 | P1 | ORM/migration JSON/index drift | Forward-only reconciliation migration and schema comparison gate | `planned` |
 | P1 | SPA authentication is unwired outside demo assumptions | Versioned OIDC login/token flow and browser E2E | `planned` |
-| P1 | CORS omitted implemented PUT/DELETE methods | Explicit method constant and preflight regression test in the current candidate | Candidate; becomes `active_pr` after push |
+| P1 | Protected main omits CORS parity for implemented PUT/DELETE methods | Explicit method constant and preflight regression test are in PR #824; merge is still required | `active_pr` fix |
 | P2 | Retention/deletion/residency and audit ownership undefined | Data-governance policy and operational runbook | `planned` |
 | P2 | Drift script used unsupported cookie auth and implied it created snapshots | Bearer/API-key fix is `active_pr`; snapshot orchestration remains pipeline-owned | Mixed |
 
