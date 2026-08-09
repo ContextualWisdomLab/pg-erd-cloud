@@ -12,3 +12,8 @@
 **Vulnerability:** A logical error in `_get_jwks` overrode the `force_refresh` parameter. Redundant caching logic allowed cached keys to be returned even when `force_refresh=True` was explicitly requested.
 **Learning:** This flaw could potentially cause denial of service during key rotation or let attackers abuse timed windows to have illegitimate tokens accepted.
 **Prevention:** Ensure caching and short-circuit conditions clearly distinguish between default logic and explicit override flags (like `force_refresh`).
+
+## 2025-02-18 - Replacing Unmaintained `python-jose` with `PyJWT[crypto]`
+**Vulnerability:** The application was using the `python-jose` library, which is unmaintained and pins its dependencies to vulnerable versions of `ecdsa` (causing PYSEC-2026-1325). This vulnerability allows a Minerva timing attack on P-256 in python-ecdsa.
+**Learning:** Using unmaintained cryptography libraries exposes the application to supply-chain vulnerabilities, as they block security updates in their transitive dependencies.
+**Prevention:** Replace `python-jose` with the actively maintained `PyJWT[crypto]` library for JWT handling in the backend. Ensure tests and code are updated to use the new `jwt` module properly.
