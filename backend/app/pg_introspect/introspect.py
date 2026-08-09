@@ -26,7 +26,7 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
     def __init__(self, server_hostname: str) -> None:
         return None
 
-    def wrap_bio(
+    def wrap_bio(  # pylint: disable=too-many-arguments
         self,
         incoming: ssl.MemoryBIO,
         outgoing: ssl.MemoryBIO,
