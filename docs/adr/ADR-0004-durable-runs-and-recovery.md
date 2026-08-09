@@ -120,6 +120,9 @@ Rules:
   dry-run winner, validates immutable plan integrity/expiry/executability, and
   appends sequence-one evidence without committing or enqueueing. Apply creation
   remains rejected until its approval and passed-dry-run bindings exist.
+- Cancellation is a same-state, version-incrementing CAS event. A repeated
+  request is idempotent, a terminal run rejects it, and a worker holding the old
+  version must reload the intent before any further transition.
 
 ### Planned before production release
 
