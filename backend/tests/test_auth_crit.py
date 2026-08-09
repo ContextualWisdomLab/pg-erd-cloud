@@ -5,6 +5,10 @@ from fastapi import HTTPException
 from app.auth import _decode_verified_oidc_token
 
 
+async def _empty_jwks(force_refresh=False):
+    return {"keys": []}
+
+
 @pytest.mark.asyncio
 async def test_decode_verified_oidc_token_with_unsupported_crit(monkeypatch):
     monkeypatch.setattr(
@@ -29,6 +33,7 @@ async def test_decode_verified_oidc_token_rejects_registered_header_as_critical(
         "get_unverified_header",
         lambda x: {"alg": "RS256", "typ": "JWT", "crit": ["typ", "alg"]},
     )
+    monkeypatch.setattr("app.auth._get_jwks", _empty_jwks)
 
     with pytest.raises(HTTPException) as excinfo:
         await _decode_verified_oidc_token("dummy_token")
@@ -44,6 +49,7 @@ async def test_decode_verified_oidc_token_rejects_null_crit(monkeypatch):
         "get_unverified_header",
         lambda x: {"alg": "RS256", "crit": None},
     )
+    monkeypatch.setattr("app.auth._get_jwks", _empty_jwks)
 
     with pytest.raises(HTTPException) as excinfo:
         await _decode_verified_oidc_token("dummy_token")
@@ -59,6 +65,7 @@ async def test_decode_verified_oidc_token_rejects_empty_crit(monkeypatch):
         "get_unverified_header",
         lambda x: {"alg": "RS256", "crit": []},
     )
+    monkeypatch.setattr("app.auth._get_jwks", _empty_jwks)
 
     with pytest.raises(HTTPException) as excinfo:
         await _decode_verified_oidc_token("dummy_token")
@@ -70,15 +77,10 @@ async def test_decode_verified_oidc_token_rejects_empty_crit(monkeypatch):
 @pytest.mark.asyncio
 async def test_decode_verified_oidc_token_with_no_crit(monkeypatch):
     monkeypatch.setattr(jwt, "get_unverified_header", lambda x: {"alg": "RS256"})
+    monkeypatch.setattr("app.auth._validate_jwt_header", lambda x: "RS256")
+    monkeypatch.setattr("app.auth._get_jwks", _empty_jwks)
 
     with pytest.raises(HTTPException) as excinfo:
-        monkeypatch.setattr("app.auth._validate_jwt_header", lambda x: "RS256")
-
-        async def mock_get_jwks(force_refresh=False):
-            return {"keys": []}
-
-        monkeypatch.setattr("app.auth._get_jwks", mock_get_jwks)
-
         await _decode_verified_oidc_token("dummy_token")
 
     assert excinfo.value.status_code == 401
