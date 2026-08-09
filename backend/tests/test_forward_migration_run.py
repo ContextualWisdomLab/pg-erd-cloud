@@ -9,6 +9,7 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
+    digest_run_request,
     hash_idempotency_key,
     validate_run_transition,
 )
@@ -38,6 +39,39 @@ def test_idempotency_key_is_bounded_and_stored_only_as_a_digest() -> None:
     for value in ("", "contains\nnewline", "x" * 256):
         with pytest.raises(MigrationRunContractError):
             hash_idempotency_key(value)
+
+
+def test_run_request_digest_binds_exact_actor_plan_and_intent() -> None:
+    project_uuid = uuid.uuid4()
+    plan_uuid = uuid.uuid4()
+    actor_uuid = uuid.uuid4()
+    kwargs = {
+        "project_space_uuid": project_uuid,
+        "migration_plan_uuid": plan_uuid,
+        "run_kind": "dry_run",
+        "plan_digest": "a" * 64,
+        "requested_by_user_uuid": actor_uuid,
+    }
+
+    first = digest_run_request(**kwargs)
+    assert first == digest_run_request(**kwargs)
+    assert len(first) == 64
+
+    for field, value in (
+        ("project_space_uuid", uuid.uuid4()),
+        ("migration_plan_uuid", uuid.uuid4()),
+        ("run_kind", "apply"),
+        ("plan_digest", "b" * 64),
+        ("requested_by_user_uuid", uuid.uuid4()),
+    ):
+        changed = dict(kwargs)
+        changed[field] = value
+        assert digest_run_request(**changed) != first
+
+    with pytest.raises(MigrationRunContractError, match="run kind"):
+        digest_run_request(**{**kwargs, "run_kind": "preview"})
+    with pytest.raises(MigrationRunContractError, match="plan digest"):
+        digest_run_request(**{**kwargs, "plan_digest": "not-a-digest"})
 
 
 def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> None:
