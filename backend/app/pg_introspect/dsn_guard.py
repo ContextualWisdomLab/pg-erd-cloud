@@ -200,17 +200,14 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     query_host_values = _split_query_host_values(query.get("host", []), "host")
     if query_host_values:
         hostname = query_host_values[0].lower().rstrip(".")
-
-    query_host_coros = [_validated_ip_hosts(qh, False, port) for qh in query_host_values]
-
-    query_hostaddr_values = _split_query_host_values(query.get("hostaddr", []), "hostaddr")
-    query_hostaddr_coros = [_validated_ip_hosts(qha, True, port) for qha in query_hostaddr_values]
-
-    # Run all IP validations concurrently to optimize DNS resolution latency
-    results = await asyncio.gather(*query_host_coros, *query_hostaddr_coros)
-
-    query_hosts = list(results[:len(query_host_coros)])
-    query_hostaddrs = list(results[len(query_host_coros):])
+    query_hosts = []
+    for query_host in query_host_values:
+        query_hosts.append(await _validated_ip_hosts(query_host, False, port))
+    query_hostaddrs = []
+    for query_hostaddr in _split_query_host_values(
+        query.get("hostaddr", []), "hostaddr"
+    ):
+        query_hostaddrs.append(await _validated_ip_hosts(query_hostaddr, True, port))
 
     connection_host_groups = query_hosts + query_hostaddrs
     if not connection_host_groups:

@@ -78,6 +78,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
 
-## 2024-11-20 - [dsn_guard.py의 순차적 DNS 해석 최적화]
-**Learning:** `dsn_guard.py` 내에서 `query_host` 및 `query_hostaddr` 값을 순차적인 `for` 루프로 확인하고 있었으며, 이는 각 호스트마다 개별적인 DNS 조회를 대기하므로 불필요한 네트워크 지연(latency)을 발생시켰습니다.
-**Action:** `asyncio.gather`를 도입하여 모든 IP 및 호스트 검증 코루틴(`_validated_ip_hosts`)을 동시에(concurrently) 실행하도록 변경했습니다. 3개의 호스트 확인(각 0.1초 지연 설정) 벤치마크 기준 기존 약 0.40초에서 0.20초로 성능이 개선되었습니다.
+## 2024-11-20 - [dsn_guard.py의 순차적 DNS 해석 최적화 시도 및 롤백]
+**Learning:** `dsn_guard.py` 내에서 `query_host` 및 `query_hostaddr` 값을 순차적인 `for` 루프로 확인하는 코드를 `asyncio.gather`를 통해 동시(concurrent) 처리로 최적화하려 했으나, STRIX/보안 리뷰에서 거부되었습니다. (이유: SSRF 보안 경계가 무제한적인 병렬 처리로 인해 리소스 고갈(Resource Exhaustion) 취약점 등을 유발할 수 있음. 안전한 동시성 제한과 취약점 테스트 없이 지연(latency)을 줄이는 것은 안전하지 않음.)
+**Action:** 최적화 코드를 원복(Rollback)하고 보안 경계(Security Boundary)를 유지하기 위해 기존 순차 코드로 복원했습니다.
