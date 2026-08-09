@@ -34,6 +34,9 @@ Current code implements only the first control-plane slice:
   path.
 - **Partially implemented:** fail-closed snapshot-to-model conversion and the
   supported compiler subset. Known gaps are listed in section 6.
+- **Partially implemented:** durable run/event persistence, exact state
+  validation, hashed idempotency keys, and bounded evidence canonicalization;
+  no run API or worker execution authority exists yet.
 - **Planned:** durable runs/events, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
@@ -88,11 +91,16 @@ to the same project and exact connection. It stores `compiler_version`,
 24-hour `expires_at`. There is no update route. Expiry enforcement becomes
 mandatory when run creation is added.
 
-### `migration_run` and `migration_run_event` — Planned
+### `migration_run` and `migration_run_event` — Partially implemented
 
-These symbols and tables do not exist in the current working tree. Their target
-contract is defined in sections 8 and 9 and
-[ADR-0004](../adr/ADR-0004-durable-runs-and-recovery.md).
+The ORM classes and Alembic revision `0010_migration_run` persist an idempotent
+run identity and append-only, per-run event sequence. Database checks bound run
+kind, state, state version, and event sequence. `app.forward.migration_run`
+defines the exact state graph, hashes bounded idempotency keys, and rejects raw
+SQL or credential-bearing fields from bounded evidence JSON. Run creation and
+polling routes remain **Planned**, as do queue/outbox integration, compare-and-
+swap transition persistence, cancellation, sandbox/preflight workers, apply,
+reconciliation, and verification.
 
 ## 4. Canonical model JSON
 
@@ -290,8 +298,9 @@ string supplied in a run request.
 
 ## 8. Migration-plan retrieval and planned run API
 
-Immutable plan retrieval is **Implemented**. The remaining run routes and state
-symbols are **Planned** and do not exist in current code:
+Immutable plan retrieval is **Implemented**. Durable run/event persistence and
+the pure state/evidence contract are **Partially implemented**; remaining run routes
+are **Planned** and do not exist in current code:
 
 | Method and target route | Required request contract | Success | Status |
 |---|---|---|---|
