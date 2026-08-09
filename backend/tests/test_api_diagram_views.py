@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.api.diagram_views import create_view, delete_view, get_view
+from app.api.diagram_views import create_view, delete_view, get_view, list_views
 from app.auth import CurrentUser
 from app.schemas import DiagramViewCreateIn
 
@@ -93,3 +93,61 @@ async def test_delete_view_returns_404_when_unauthorized():
             )
     assert exc.value.status_code == 404
     session.delete.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_list_views_returns_list_when_authorized():
+    session = AsyncMock()
+    project_id = uuid.uuid4()
+    view_id1 = uuid.uuid4()
+    view_id2 = uuid.uuid4()
+    now = dt.datetime.now(dt.timezone.utc)
+
+    view1 = SimpleNamespace(
+        diagram_view_uuid=view_id1,
+        name="view 1",
+        created_at=now,
+        updated_at=now,
+    )
+    view2 = SimpleNamespace(
+        diagram_view_uuid=view_id2,
+        name="view 2",
+        created_at=now,
+        updated_at=now,
+    )
+
+    from unittest.mock import Mock
+    rows_mock = Mock()
+    rows_mock.scalars.return_value.all.return_value = [view1, view2]
+    session.execute.return_value = rows_mock
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as mock_require:
+        out = await list_views(
+            project_space_uuid=project_id, user=_user(), session=session
+        )
+
+        mock_require.assert_called_once()
+        assert len(out) == 2
+        assert out[0].diagram_view_uuid == view_id1
+        assert out[0].name == "view 1"
+        assert out[1].diagram_view_uuid == view_id2
+        assert out[1].name == "view 2"
+
+
+@pytest.mark.asyncio
+async def test_list_views_raises_when_unauthorized():
+    session = AsyncMock()
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as mock_require:
+        mock_require.side_effect = HTTPException(status_code=403, detail="Forbidden")
+
+        with pytest.raises(HTTPException) as exc:
+            await list_views(
+                project_space_uuid=uuid.uuid4(), user=_user(), session=session
+            )
+
+        assert exc.value.status_code == 403
