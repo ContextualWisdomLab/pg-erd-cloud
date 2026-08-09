@@ -51,7 +51,9 @@ executable SQL, safety classification, approval truth, or recovery state.
   caller-owned transaction;
 - an internal dry-run creation writer using the database idempotency constraint
   as the concurrency winner, rejecting same-key/different-request reuse,
-  expired/tampered/blocked plans, and every apply request.
+  expired/tampered/blocked plans, and every apply request;
+- idempotent cancellation intent that increments the shared state version and
+  appends a same-state event, preventing a stale worker transition from winning.
 
 ### Planned and release-blocking
 
@@ -81,7 +83,7 @@ by the graphical target architecture.
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** durable evidence boundary exists; queue integration Planned |
-| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run conflict-winner creation and CAS transition writers exist; HTTP/queue/recovery and apply creation Planned |
+| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation, transition, and cancellation CAS writers exist; HTTP/queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented; expiry is stored but run enforcement Planned** |
 
