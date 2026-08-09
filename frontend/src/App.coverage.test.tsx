@@ -259,7 +259,10 @@ const snapshots = [
 ]
 
 beforeEach(() => {
-  vi.resetAllMocks()
+  vi.clearAllMocks()
+  for (const method of Object.values(api)) {
+    method.mockReset()
+  }
   api.getMe.mockResolvedValue({ subject: 'user', display_name: 'User', user_account_uuid: 'u' })
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue(connections)
