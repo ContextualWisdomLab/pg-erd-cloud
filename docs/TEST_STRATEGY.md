@@ -208,11 +208,19 @@ npm run test
 npm run build
 ```
 
+Organization-required pull-request workflows additionally run `osv-scan`,
+`dependency-review`, `trivy-fs`, OpenSSF Scorecard, and SAST Semgrep. Those
+centrally operated workflows are authoritative dependencies: this leaf
+repository must require their exact-head results and must not duplicate their
+implementation. A queued, skipped, stale-head, or absent job is not passing
+evidence.
+
 The release workflow must add explicit statement and branch coverage commands
 covering every forward production module, migrated PostgreSQL integration,
-frontend forward-flow coverage, composed browser E2E, and security scans. Do
-not copy a historical pass count into documentation; attach machine output for
-the exact release head.
+frontend forward-flow coverage, and composed browser E2E. It must also retain
+the centrally operated security results for the exact release head. Do not copy
+a historical pass count into documentation; attach machine output for the exact
+release head.
 
 An acceptable evidence record contains:
 
