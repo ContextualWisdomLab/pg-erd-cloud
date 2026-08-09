@@ -83,6 +83,8 @@ _FORBIDDEN_EVIDENCE_TOKENS = frozenset(
 _POSTGRES_CONNECTION_STRING = re.compile(
     r"postgres(?:ql)?(?:\+[a-z0-9_.-]+)?://", re.IGNORECASE
 )
+_HEX_DIGEST = re.compile(r"[0-9a-f]{64}")
+_EVENT_TYPE = re.compile(r"[a-z][a-z0-9_]{0,63}")
 
 
 class MigrationRunContractError(ValueError):
@@ -165,6 +167,77 @@ def digest_run_request(
     }
     encoded = json.dumps(
         request, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def digest_run_event(
+    *,
+    migration_run_uuid: uuid.UUID,
+    sequence_number: int,
+    event_type: str,
+    state_before: str | None,
+    state_after: str,
+    evidence: Mapping[str, object],
+    actor_user_uuid: uuid.UUID | None,
+    created_at: dt.datetime,
+    previous_event_digest: str | None,
+) -> str:
+    """Return the versioned digest for one canonical event-chain link."""
+
+    if not isinstance(migration_run_uuid, uuid.UUID):
+        raise MigrationRunContractError("migration run UUID is invalid")
+    if (
+        isinstance(sequence_number, bool)
+        or not isinstance(sequence_number, int)
+        or sequence_number < 1
+    ):
+        raise MigrationRunContractError("event sequence is invalid")
+    if _EVENT_TYPE.fullmatch(event_type) is None:
+        raise MigrationRunContractError("event type is invalid")
+    if not isinstance(state_after, str) or not state_after:
+        raise MigrationRunContractError("event state is invalid")
+    if state_before is not None and (
+        not isinstance(state_before, str) or not state_before
+    ):
+        raise MigrationRunContractError("event state is invalid")
+    if actor_user_uuid is not None and not isinstance(actor_user_uuid, uuid.UUID):
+        raise MigrationRunContractError("event actor UUID is invalid")
+    if created_at.tzinfo is None or created_at.utcoffset() is None:
+        raise MigrationRunContractError("event time must include a timezone")
+    if sequence_number == 1:
+        if previous_event_digest is not None:
+            raise MigrationRunContractError(
+                "genesis event must not have a previous digest"
+            )
+    elif (
+        previous_event_digest is None
+        or _HEX_DIGEST.fullmatch(previous_event_digest) is None
+    ):
+        raise MigrationRunContractError("previous event digest is invalid")
+
+    event = {
+        "actor_user_uuid": (
+            str(actor_user_uuid) if actor_user_uuid is not None else None
+        ),
+        "contract_version": "migration-run-event/v1",
+        "created_at": created_at.astimezone(dt.timezone.utc)
+        .isoformat(timespec="microseconds")
+        .replace("+00:00", "Z"),
+        "event_type": event_type,
+        "evidence": canonicalize_run_evidence(evidence),
+        "migration_run_uuid": str(migration_run_uuid),
+        "previous_event_digest": previous_event_digest,
+        "sequence_number": sequence_number,
+        "state_after": state_after,
+        "state_before": state_before,
+    }
+    encoded = json.dumps(
+        event,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -280,6 +353,17 @@ async def create_migration_run(
         requested_by_user_uuid=requested_by_user_uuid,
     )
     run_uuid = uuid.uuid4()
+    event_digest = digest_run_event(
+        migration_run_uuid=run_uuid,
+        sequence_number=1,
+        event_type="run_queued",
+        state_before=None,
+        state_after="queued",
+        evidence=canonical_evidence,
+        actor_user_uuid=requested_by_user_uuid,
+        created_at=transition_time,
+        previous_event_digest=None,
+    )
     result = await session.execute(
         insert(MigrationRun)
         .values(
@@ -292,6 +376,7 @@ async def create_migration_run(
             idempotency_key_hash=key_hash,
             plan_digest=plan.statement_digest,
             request_digest=request_digest,
+            latest_event_digest=event_digest,
             requested_by_user_uuid=requested_by_user_uuid,
             cancellation_requested=False,
             observed_base_digest=None,
@@ -334,6 +419,8 @@ async def create_migration_run(
             state_before=None,
             state_after="queued",
             evidence_json=canonical_evidence,
+            previous_event_digest=None,
+            event_digest=event_digest,
             actor_user_uuid=requested_by_user_uuid,
             created_at=transition_time,
         )
@@ -371,7 +458,7 @@ async def transition_migration_run(
         or expected_state_version < 1
     ):
         raise MigrationRunContractError("expected state version is invalid")
-    if re.fullmatch(r"[a-z][a-z0-9_]{0,63}", event_type) is None:
+    if _EVENT_TYPE.fullmatch(event_type) is None:
         raise MigrationRunContractError("event type is invalid")
     canonical_evidence = canonicalize_run_evidence(evidence)
     transition_time = now or dt.datetime.now(dt.timezone.utc)
@@ -388,12 +475,25 @@ async def transition_migration_run(
 
     validate_run_transition(run.run_kind, run.state, next_state)
     next_version = expected_state_version + 1
+    previous_event_digest = run.latest_event_digest
+    event_digest = digest_run_event(
+        migration_run_uuid=migration_run_uuid,
+        sequence_number=next_version,
+        event_type=event_type,
+        state_before=run.state,
+        state_after=next_state,
+        evidence=canonical_evidence,
+        actor_user_uuid=actor_user_uuid,
+        created_at=transition_time,
+        previous_event_digest=previous_event_digest,
+    )
     started_at = run.started_at
     finished_at = run.finished_at
     values: dict[str, object] = {
         "state": next_state,
         "state_version": next_version,
         "evidence_json": canonical_evidence,
+        "latest_event_digest": event_digest,
         "updated_at": transition_time,
     }
     if run.state == "queued" and started_at is None:
@@ -412,6 +512,7 @@ async def transition_migration_run(
                 MigrationRun.run_kind == run.run_kind,
                 MigrationRun.state == run.state,
                 MigrationRun.state_version == expected_state_version,
+                MigrationRun.latest_event_digest == previous_event_digest,
             )
             .values(**values)
             .execution_options(synchronize_session=False)
@@ -429,6 +530,8 @@ async def transition_migration_run(
             state_before=run.state,
             state_after=next_state,
             evidence_json=canonical_evidence,
+            previous_event_digest=previous_event_digest,
+            event_digest=event_digest,
             actor_user_uuid=actor_user_uuid,
             created_at=transition_time,
         )
@@ -490,6 +593,18 @@ async def request_migration_run_cancellation(
         )
 
     next_version = expected_state_version + 1
+    previous_event_digest = run.latest_event_digest
+    event_digest = digest_run_event(
+        migration_run_uuid=migration_run_uuid,
+        sequence_number=next_version,
+        event_type="cancellation_requested",
+        state_before=run.state,
+        state_after=run.state,
+        evidence=canonical_evidence,
+        actor_user_uuid=actor_user_uuid,
+        created_at=request_time,
+        previous_event_digest=previous_event_digest,
+    )
     result = cast(
         CursorResult[Any],
         await session.execute(
@@ -500,11 +615,13 @@ async def request_migration_run_cancellation(
                 MigrationRun.state == run.state,
                 MigrationRun.state_version == expected_state_version,
                 MigrationRun.cancellation_requested.is_(False),
+                MigrationRun.latest_event_digest == previous_event_digest,
             )
             .values(
                 cancellation_requested=True,
                 state_version=next_version,
                 updated_at=request_time,
+                latest_event_digest=event_digest,
             )
             .execution_options(synchronize_session=False)
         ),
@@ -521,6 +638,8 @@ async def request_migration_run_cancellation(
             state_before=run.state,
             state_after=run.state,
             evidence_json=canonical_evidence,
+            previous_event_digest=previous_event_digest,
+            event_digest=event_digest,
             actor_user_uuid=actor_user_uuid,
             created_at=request_time,
         )

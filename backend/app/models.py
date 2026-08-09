@@ -310,6 +310,7 @@ class MigrationRun(Base):
     idempotency_key_hash: Mapped[str] = mapped_column(Text())
     plan_digest: Mapped[str] = mapped_column(Text())
     request_digest: Mapped[str] = mapped_column(Text())
+    latest_event_digest: Mapped[str] = mapped_column(Text())
     requested_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
     )
@@ -384,6 +385,10 @@ class MigrationRunEvent(Base):
     state_before: Mapped[str | None] = mapped_column(Text(), nullable=True)
     state_after: Mapped[str] = mapped_column(Text())
     evidence_json: Mapped[dict] = mapped_column(JSONB())
+    previous_event_digest: Mapped[str | None] = mapped_column(
+        Text(), nullable=True
+    )
+    event_digest: Mapped[str] = mapped_column(Text())
     actor_user_uuid: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user_account.user_account_uuid"),
@@ -402,6 +407,11 @@ class MigrationRunEvent(Base):
         CheckConstraint(
             "sequence_number >= 1",
             name="ck_migration_run_event__sequence_number",
+        ),
+        CheckConstraint(
+            "(sequence_number = 1 AND previous_event_digest IS NULL) OR "
+            "(sequence_number > 1 AND previous_event_digest IS NOT NULL)",
+            name="ck_migration_run_event__previous_digest",
         ),
         Index("ix_migration_run_event__migration_run_uuid", "migration_run_uuid"),
     )

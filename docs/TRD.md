@@ -54,6 +54,9 @@ executable SQL, safety classification, approval truth, or recovery state.
   expired/tampered/blocked plans, and every apply request;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning.
+- versioned canonical event digests covering run/sequence/type/state/evidence,
+  actor, UTC timestamp, and predecessor; the run stores the latest digest and
+  polling verifies the complete chain before returning evidence.
 
 ### Planned and release-blocking
 
@@ -97,7 +100,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables, contracts, and atomic CAS transition writer exist; APIs/workers absent |
+| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic CAS writer, cancellation intent, and polling exist; create/cancel APIs and workers absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision` and `0009_migration_plan`. See
@@ -114,7 +117,7 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview with project/revision/connection/snapshot/capability/actor/time bindings, IDOR-masked | **Implemented** |
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest idempotent durable dry run | **Planned** |
 | `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
-| `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies event count, sequence, state chain, chronology, and secret-safe evidence before returning | **Implemented** |
+| `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies count, sequence, state chain, chronology, canonical event digests, run anchor, and secret-safe evidence before returning | **Implemented** |
 
 Implemented limits: model input is at most 2 MiB; a persisted plan is at most
 1,000 executable plus proposed statements and 4 MiB; plans expire 24 hours

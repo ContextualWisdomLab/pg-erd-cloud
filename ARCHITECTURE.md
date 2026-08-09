@@ -65,6 +65,8 @@ Implemented in the initial safe vertical slice:
   exact, unexpired, executable dry-run intent and its sequence-one event;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
+- a versioned SHA-256 event chain anchored on each run row; polling recomputes
+  every link and fails closed on payload, ordering, predecessor, or anchor drift;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.
 

@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from app.api.migration_runs import get_migration_run
 from app.auth import CurrentUser
+from app.forward.migration_run import digest_run_event
 from app.models import MigrationRun, MigrationRunEvent
 
 
@@ -28,6 +29,7 @@ def _run() -> MigrationRun:
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         observed_base_digest=None,
@@ -41,7 +43,7 @@ def _run() -> MigrationRun:
 
 
 def _events(run: MigrationRun) -> list[MigrationRunEvent]:
-    return [
+    events = [
         MigrationRunEvent(
             migration_run_event_uuid=uuid.uuid4(),
             migration_run_uuid=run.migration_run_uuid,
@@ -50,6 +52,8 @@ def _events(run: MigrationRun) -> list[MigrationRunEvent]:
             state_before=None,
             state_after="queued",
             evidence_json={"request_source": "review_ui"},
+            previous_event_digest=None,
+            event_digest="",
             actor_user_uuid=run.requested_by_user_uuid,
             created_at=run.created_at,
         ),
@@ -61,10 +65,29 @@ def _events(run: MigrationRun) -> list[MigrationRunEvent]:
             state_before="queued",
             state_after="sandbox_running",
             evidence_json={"sandbox_version": "postgresql-18"},
+            previous_event_digest="",
+            event_digest="",
             actor_user_uuid=None,
             created_at=run.updated_at,
         ),
     ]
+    previous_digest = None
+    for event in events:
+        event.previous_event_digest = previous_digest
+        event.event_digest = digest_run_event(
+            migration_run_uuid=event.migration_run_uuid,
+            sequence_number=event.sequence_number,
+            event_type=event.event_type,
+            state_before=event.state_before,
+            state_after=event.state_after,
+            evidence=event.evidence_json,
+            actor_user_uuid=event.actor_user_uuid,
+            created_at=event.created_at,
+            previous_event_digest=previous_digest,
+        )
+        previous_digest = event.event_digest
+    run.latest_event_digest = events[-1].event_digest
+    return events
 
 
 @pytest.mark.asyncio
@@ -92,6 +115,8 @@ async def test_get_migration_run_returns_bounded_authorized_history() -> None:
     assert out.state_version == 2
     assert [event.sequence_number for event in out.events] == [1, 2]
     assert out.events[-1].evidence == {"sandbox_version": "postgresql-18"}
+    assert out.events[-1].previous_event_digest == out.events[0].event_digest
+    assert out.events[-1].event_digest == run.latest_event_digest
     membership.assert_awaited_once()
 
 
@@ -119,7 +144,19 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mutation", ["gap", "chain", "secret", "overflow", "state", "time", "final"]
+    "mutation",
+    [
+        "gap",
+        "chain",
+        "secret",
+        "overflow",
+        "state",
+        "time",
+        "final",
+        "digest",
+        "predecessor",
+        "anchor",
+    ],
 )
 async def test_get_migration_run_fails_closed_for_corrupt_history(
     mutation: str,
@@ -140,8 +177,14 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
         run.run_kind = "preview"
     elif mutation == "time":
         events[1].created_at = run.created_at - dt.timedelta(seconds=1)
-    else:
+    elif mutation == "final":
         events[1].state_after = "live_preflight_running"
+    elif mutation == "digest":
+        events[1].event_digest = "f" * 64
+    elif mutation == "predecessor":
+        events[1].previous_event_digest = "f" * 64
+    else:
+        run.latest_event_digest = "f" * 64
     session = SimpleNamespace(
         get=AsyncMock(return_value=run),
         scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),
@@ -170,6 +213,18 @@ async def test_get_migration_run_supports_valid_apply_history() -> None:
     events = _events(run)
     events[1].event_type = "apply_started"
     events[1].state_after = "applying"
+    events[1].event_digest = digest_run_event(
+        migration_run_uuid=events[1].migration_run_uuid,
+        sequence_number=events[1].sequence_number,
+        event_type=events[1].event_type,
+        state_before=events[1].state_before,
+        state_after=events[1].state_after,
+        evidence=events[1].evidence_json,
+        actor_user_uuid=events[1].actor_user_uuid,
+        created_at=events[1].created_at,
+        previous_event_digest=events[1].previous_event_digest,
+    )
+    run.latest_event_digest = events[1].event_digest
     session = SimpleNamespace(
         get=AsyncMock(return_value=run),
         scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),

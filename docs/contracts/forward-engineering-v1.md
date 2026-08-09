@@ -110,6 +110,15 @@ queue/outbox integration,
 cancellation, sandbox/preflight workers, apply,
 reconciliation, and verification.
 
+Each event stores `previous_event_digest` and `event_digest`; the run stores
+`latest_event_digest`. Contract `migration-run-event/v1` hashes the run UUID,
+sequence, type, before/after state, canonical evidence, actor, normalized UTC
+timestamp, and predecessor. Genesis has no predecessor; later events require a
+64-character lowercase SHA-256 predecessor. The run CAS also matches the prior
+anchor. Retrieval recomputes every link and the terminal anchor, returning a
+sanitized `409` on mismatch. This is tamper-evidence, not a signature or a
+guarantee against an actor that can rewrite the entire metadata database.
+
 `create_migration_run` is the implemented internal creation boundary. It
 verifies stored-plan integrity and expiry, rejects blocked plans and all apply
 requests, hashes the opaque idempotency key, and uses
@@ -120,7 +129,8 @@ not commit, enqueue, or expose an HTTP success path.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic
-update matching UUID, run kind, state, and expected state version. Only the CAS
+update matching UUID, run kind, state, expected state version, and prior event
+digest. Only the CAS
 winner appends `migration_run_event` with the next sequence number. The caller
 owns the transaction, so an event insert failure rolls the state update back.
 
@@ -335,7 +345,7 @@ are **Planned** and do not exist in current code:
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
-| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/state-chain/chronology/evidence returns sanitized `409` | **Implemented** |
+| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/state-chain/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
 
 Dry-run states:
 

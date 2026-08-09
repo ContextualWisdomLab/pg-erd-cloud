@@ -16,6 +16,7 @@ from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
     create_migration_run,
+    digest_run_event,
     digest_run_request,
     hash_idempotency_key,
     request_migration_run_cancellation,
@@ -112,6 +113,64 @@ def test_run_request_digest_binds_exact_actor_plan_and_intent() -> None:
         digest_run_request(**{**kwargs, "plan_digest": "not-a-digest"})
 
 
+def test_run_event_digest_binds_order_state_evidence_actor_and_time() -> None:
+    """Every durable event field and predecessor participates in its digest."""
+
+    run_uuid = uuid.uuid4()
+    actor_uuid = uuid.uuid4()
+    created_at = datetime(2026, 8, 10, 2, 3, 4, 5, tzinfo=timezone.utc)
+    kwargs = {
+        "migration_run_uuid": run_uuid,
+        "sequence_number": 2,
+        "event_type": "sandbox_started",
+        "state_before": "queued",
+        "state_after": "sandbox_running",
+        "evidence": {"attempt": 1, "sandbox_version": "postgresql-18"},
+        "actor_user_uuid": actor_uuid,
+        "created_at": created_at,
+        "previous_event_digest": "a" * 64,
+    }
+
+    first = digest_run_event(**kwargs)
+    assert first == digest_run_event(**kwargs)
+    assert len(first) == 64
+
+    for field, value in (
+        ("sequence_number", 3),
+        ("event_type", "sandbox_retried"),
+        ("state_before", "sandbox_running"),
+        ("state_after", "failed"),
+        ("evidence", {"attempt": 2}),
+        ("actor_user_uuid", uuid.uuid4()),
+        ("created_at", created_at.replace(microsecond=6)),
+        ("previous_event_digest", "b" * 64),
+    ):
+        changed = dict(kwargs)
+        changed[field] = value
+        assert digest_run_event(**changed) != first
+
+    genesis = {**kwargs, "sequence_number": 1, "previous_event_digest": None}
+    assert len(digest_run_event(**genesis)) == 64
+    for invalid in (
+        {**kwargs, "sequence_number": 1},
+        {**kwargs, "previous_event_digest": None},
+        {**kwargs, "previous_event_digest": "not-a-digest"},
+        {**kwargs, "created_at": created_at.replace(tzinfo=None)},
+        {**kwargs, "migration_run_uuid": "not-a-uuid"},
+        {**kwargs, "sequence_number": True},
+        {**kwargs, "sequence_number": "2"},
+        {**kwargs, "sequence_number": 0},
+        {**kwargs, "event_type": "invalid event"},
+        {**kwargs, "state_after": ""},
+        {**kwargs, "state_after": 1},
+        {**kwargs, "state_before": ""},
+        {**kwargs, "state_before": 1},
+        {**kwargs, "actor_user_uuid": "not-a-uuid"},
+    ):
+        with pytest.raises(MigrationRunContractError):
+            digest_run_event(**invalid)
+
+
 def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> None:
     evidence = canonicalize_run_evidence(
         {
@@ -201,6 +260,9 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         if isinstance(constraint, UniqueConstraint)
     }
     assert ("migration_run_uuid", "sequence_number") in unique_event_columns
+    assert "latest_event_digest" in MigrationRun.__table__.columns
+    assert "previous_event_digest" in MigrationRunEvent.__table__.columns
+    assert "event_digest" in MigrationRunEvent.__table__.columns
     assert {index.name for index in MigrationRun.__table__.indexes} == {
         "ix_migration_run__migration_plan_uuid",
         "ix_migration_run__project_space_uuid",
@@ -220,6 +282,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         evidence_json={},
@@ -241,6 +304,9 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         '"migration_run_event"',
         '"uq_migration_run__idempotent_action"',
         '"request_digest"',
+        '"latest_event_digest"',
+        '"previous_event_digest"',
+        '"event_digest"',
         '"uq_migration_run_event__run_sequence"',
         '"ck_migration_run__state_version"',
         '"ck_migration_run__kind_state"',
@@ -266,6 +332,7 @@ async def test_transition_uses_optimistic_cas_and_appends_sanitized_event() -> N
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=actor_uuid,
         cancellation_requested=False,
         evidence_json={},
@@ -307,6 +374,18 @@ async def test_transition_uses_optimistic_cas_and_appends_sanitized_event() -> N
         "attempt": 1,
         "sandbox_version": "postgresql-18",
     }
+    assert event.previous_event_digest == "d" * 64
+    assert event.event_digest == digest_run_event(
+        migration_run_uuid=run_uuid,
+        sequence_number=2,
+        event_type="sandbox_started",
+        state_before="queued",
+        state_after="sandbox_running",
+        evidence=event.evidence_json,
+        actor_user_uuid=actor_uuid,
+        created_at=now,
+        previous_event_digest="d" * 64,
+    )
     assert result.state == "sandbox_running"
     assert result.state_version == 2
     assert result.started_at == now
@@ -327,6 +406,7 @@ async def test_transition_fails_closed_when_compare_and_swap_loses_race() -> Non
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         evidence_json={},
@@ -367,6 +447,7 @@ async def test_transition_marks_terminal_state_without_restarting_run() -> None:
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         evidence_json={},
@@ -459,6 +540,7 @@ async def test_transition_masks_missing_stale_and_invalid_state_before_update() 
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         evidence_json={},
@@ -529,6 +611,8 @@ async def test_create_dry_run_uses_database_conflict_winner_and_initial_event() 
     assert event.state_before is None
     assert event.state_after == "queued"
     assert event.evidence_json == {"request_source": "review_ui"}
+    assert event.previous_event_digest is None
+    assert len(event.event_digest) == 64
     assert created.migration_run_uuid == run_uuid
     assert created.reused is False
     session.scalar.assert_not_awaited()
@@ -557,6 +641,7 @@ async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
             plan_digest=plan.statement_digest,
             requested_by_user_uuid=actor_uuid,
         ),
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=actor_uuid,
         cancellation_requested=False,
         evidence_json={},
@@ -713,6 +798,7 @@ async def test_cancellation_intent_uses_cas_and_same_state_event_sequence() -> N
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=actor_uuid,
         cancellation_requested=False,
         evidence_json={},
@@ -761,6 +847,7 @@ async def test_cancellation_is_idempotent_and_rejects_terminal_or_stale_run() ->
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
         request_digest="c" * 64,
+        latest_event_digest="d" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=True,
         evidence_json={},

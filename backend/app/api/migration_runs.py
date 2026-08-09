@@ -16,6 +16,7 @@ from app.forward.migration_run import (
     DRY_RUN_STATES,
     MigrationRunContractError,
     canonicalize_run_evidence,
+    digest_run_event,
 )
 from app.models import MigrationRun, MigrationRunEvent
 from app.permissions import require_project_member
@@ -47,13 +48,28 @@ def _run_out(
         raise _integrity_error()
     expected_state: str | None = None
     previous_created_at = None
+    previous_event_digest = None
     event_output: list[MigrationRunEventOut] = []
     try:
         run_evidence = canonicalize_run_evidence(run.evidence_json)
         for expected_sequence, event in enumerate(events, start=1):
+            canonical_evidence = canonicalize_run_evidence(event.evidence_json)
             if (
                 event.sequence_number != expected_sequence
                 or event.state_before != expected_state
+                or event.previous_event_digest != previous_event_digest
+                or event.event_digest
+                != digest_run_event(
+                    migration_run_uuid=event.migration_run_uuid,
+                    sequence_number=event.sequence_number,
+                    event_type=event.event_type,
+                    state_before=event.state_before,
+                    state_after=event.state_after,
+                    evidence=canonical_evidence,
+                    actor_user_uuid=event.actor_user_uuid,
+                    created_at=event.created_at,
+                    previous_event_digest=event.previous_event_digest,
+                )
                 or (
                     previous_created_at is not None
                     and event.created_at < previous_created_at
@@ -66,16 +82,19 @@ def _run_out(
                     event_type=event.event_type,
                     state_before=event.state_before,
                     state_after=event.state_after,
-                    evidence=canonicalize_run_evidence(event.evidence_json),
+                    evidence=canonical_evidence,
+                    previous_event_digest=event.previous_event_digest,
+                    event_digest=event.event_digest,
                     actor_user_uuid=event.actor_user_uuid,
                     created_at=event.created_at,
                 )
             )
             expected_state = event.state_after
             previous_created_at = event.created_at
+            previous_event_digest = event.event_digest
     except MigrationRunContractError as exc:
         raise _integrity_error() from exc
-    if expected_state != run.state:
+    if expected_state != run.state or previous_event_digest != run.latest_event_digest:
         raise _integrity_error()
 
     return MigrationRunOut(

@@ -43,6 +43,7 @@ def upgrade() -> None:
         sa.Column("idempotency_key_hash", sa.Text(), nullable=False),
         sa.Column("plan_digest", sa.Text(), nullable=False),
         sa.Column("request_digest", sa.Text(), nullable=False),
+        sa.Column("latest_event_digest", sa.Text(), nullable=False),
         sa.Column(
             "requested_by_user_uuid",
             postgresql.UUID(as_uuid=True),
@@ -122,6 +123,8 @@ def upgrade() -> None:
         sa.Column("state_before", sa.Text(), nullable=True),
         sa.Column("state_after", sa.Text(), nullable=False),
         sa.Column("evidence_json", postgresql.JSONB(), nullable=False),
+        sa.Column("previous_event_digest", sa.Text(), nullable=True),
+        sa.Column("event_digest", sa.Text(), nullable=False),
         sa.Column(
             "actor_user_uuid",
             postgresql.UUID(as_uuid=True),
@@ -137,6 +140,11 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "sequence_number >= 1",
             name="ck_migration_run_event__sequence_number",
+        ),
+        sa.CheckConstraint(
+            "(sequence_number = 1 AND previous_event_digest IS NULL) OR "
+            "(sequence_number > 1 AND previous_event_digest IS NOT NULL)",
+            name="ck_migration_run_event__previous_digest",
         ),
     )
     op.create_index(

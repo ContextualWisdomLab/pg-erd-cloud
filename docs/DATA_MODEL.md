@@ -98,6 +98,7 @@ erDiagram
     text idempotency_key_hash
     text plan_digest
     text request_digest
+    text latest_event_digest
     uuid requested_by_user_uuid FK
     boolean cancellation_requested
     text observed_base_digest
@@ -112,6 +113,8 @@ erDiagram
     text state_before
     text state_after
     jsonb evidence_json
+    text previous_event_digest
+    text event_digest
     uuid actor_user_uuid FK
   }
 
@@ -178,7 +181,7 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Expired plans cannot execute. | Expiry is stored, but run creation/execution does not exist. | Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
 | Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the internal PostgreSQL conflict-winner writer reuses only the same request and rejects different reuse. | Implemented internal dry-run writer; HTTP mapping Planned |
-| Run/event state tokens and sequence numbers are valid. | Database checks plus exact application transition graph; the CAS writer matches UUID, kind, state, and state version before appending the same-version event; event sequence is unique per run. | Implemented persistence boundary; APIs/workers Planned |
+| Run/event state tokens, sequence numbers, and digest links are valid. | Database checks plus exact application transition graph; the CAS writer matches UUID, kind, state, state version, and prior event anchor before appending the same-version event; event sequence is unique per run and polling recomputes every canonical digest. | Implemented persistence and polling boundary; workers Planned |
 
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
 It is provenance, not a database idempotency key: the same logical SQL may be

@@ -253,6 +253,8 @@ class MigrationRunEventOut(BaseModel):
     state_before: str | None
     state_after: str
     evidence: dict[str, object]
+    previous_event_digest: str | None
+    event_digest: str
     actor_user_uuid: uuid.UUID | None
     created_at: dt.datetime
 

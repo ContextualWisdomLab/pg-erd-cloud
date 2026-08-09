@@ -24,7 +24,8 @@ After this update, the repository has a coherent source-controlled set that:
 - describes the current model/revision/plan vertical slice without claiming
   sandbox, durable apply, convergence, or frontend support;
 - records the key architecture decisions and rejected unsafe alternatives;
-- separates the implemented metadata ERD from the planned run/event model;
+- separates implemented model/plan/run/event persistence from planned worker,
+  sandbox, preflight, apply, and convergence entities;
 - traces normative invariants to current code, tests, and documents; and
 - makes production blockers, security residuals, verification evidence, and
   no-replay recovery explicit.
@@ -185,9 +186,10 @@ as code or test evidence.
 - Create a frontend component/accessibility specification when implementation
   starts; the existing `docs/ui-ux/product-spec.md` remains useful for the
   current ERD editor but does not describe forward engineering.
-- Freeze planned run/event column types, same-tenant constraints, idempotency
-  uniqueness, indexes, outbox semantics, retention, and deletion policy before
-  Alembic implementation.
+- Define outbox semantics, same-tenant enforcement, retention, deletion policy,
+  and an independently anchored audit sink before enabling workers. Run/event
+  columns, idempotency, sequencing, indexes, and the in-database digest chain
+  are implemented in ORM/Alembic and remain subject to reviewed migrations.
 - Produce a release-scoped ASVS 5.0.0 applicability/evidence matrix; the
   standards document intentionally makes no certification claim.
 

@@ -41,6 +41,11 @@ Each run binds:
 `migration_run_event` is append-only and records state transitions,
 confirmation, drift, commit acknowledgement, reconciliation, and verification
 using identifiers, hashes, counts, and sanitized diagnostics.
+Each event carries a versioned canonical digest and its predecessor; the parent
+run anchors the latest digest. Writers update the anchor and append the new link
+in one caller-owned transaction. Readers recompute the chain. This detects
+accidental or partial row mutation but is not a signature and cannot defeat an
+attacker with authority to rewrite the complete metadata database.
 
 Dry-run states are:
 
@@ -123,6 +128,10 @@ Rules:
 - Cancellation is a same-state, version-incrementing CAS event. A repeated
   request is idempotent, a terminal run rejects it, and a worker holding the old
   version must reload the intent before any further transition.
+- Event digest contract `migration-run-event/v1` covers run UUID, sequence,
+  type, state, sanitized evidence, actor, normalized UTC time, and predecessor;
+  the run CAS matches and advances `latest_event_digest`, and polling verifies
+  every link plus the terminal anchor before exposing evidence.
 
 ### Planned before production release
 
