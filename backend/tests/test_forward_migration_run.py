@@ -24,11 +24,17 @@ from app.forward.migration_run import (
 from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
 
 
-def _migration_plan(*, expires_at: datetime | None = None) -> MigrationPlan:
+def _migration_plan(
+    *, expires_at: datetime | None = None, blocked: bool = False
+) -> MigrationPlan:
     now = datetime(2026, 8, 10, tzinfo=timezone.utc)
     plan_json = compile_migration_plan(
         {"format_version": 1, "postgresql_major": 18, "schemas": []},
-        {"format_version": 1, "postgresql_major": 18, "schemas": []},
+        {
+            "format_version": 1,
+            "postgresql_major": 17 if blocked else 18,
+            "schemas": [],
+        },
     )
     return MigrationPlan(
         migration_plan_uuid=uuid.uuid4(),
@@ -589,6 +595,25 @@ async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
             now=now,
         )
 
+    existing.request_digest = digest_run_request(
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        plan_digest=plan.statement_digest,
+        requested_by_user_uuid=actor_uuid,
+    )
+    session.scalar.return_value = None
+    with pytest.raises(MigrationRunContractError, match="winner is unavailable"):
+        await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="dry_run",
+            idempotency_key="same-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
 
 @pytest.mark.asyncio
 async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert() -> None:
@@ -608,6 +633,27 @@ async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert
             requested_by_user_uuid=actor_uuid,
             evidence={},
             now=now,
+        )
+
+    with pytest.raises(MigrationRunContractError, match="run kind"):
+        await create_migration_run(
+            session,
+            plan=apply_plan,
+            run_kind="preview",
+            idempotency_key="preview-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+    with pytest.raises(MigrationRunContractError, match="timezone"):
+        await create_migration_run(
+            session,
+            plan=apply_plan,
+            run_kind="dry_run",
+            idempotency_key="naive-time-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=datetime(2026, 8, 10, 3),
         )
 
     expired = _migration_plan(expires_at=now)
@@ -630,6 +676,18 @@ async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert
             plan=blocked,
             run_kind="dry_run",
             idempotency_key="blocked-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+    valid_blocked = _migration_plan(blocked=True)
+    with pytest.raises(MigrationRunContractError, match="cannot be dry-run"):
+        await create_migration_run(
+            session,
+            plan=valid_blocked,
+            run_kind="dry_run",
+            idempotency_key="valid-blocked-key",
             requested_by_user_uuid=actor_uuid,
             evidence={},
             now=now,
