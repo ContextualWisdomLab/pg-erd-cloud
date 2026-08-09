@@ -274,6 +274,12 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         return jti == "revoked-jwt"
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+    decoding_key = object()
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda _jwk, algorithm=None: decoding_key,
+    )
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
 
     async def mock_is_token_revoked(jti):
@@ -287,17 +293,18 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     assert subject == "user-1"
     assert display_name == "User One"
+    assert observed["args"][1] is decoding_key
     assert observed["kwargs"] == {
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
+        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
-            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+            "verify_iss": True,
+            "verify_exp": True,
+            "verify_jti": True,
+            "require": ["aud", "iss", "exp", "jti"],
         },
     }
 
@@ -369,6 +376,16 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
         return jti == "revoked-jwt"
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+    decoding_key = object()
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda jwk, algorithm=None: (
+            decoding_key
+            if jwk == {"kid": "new-key", "kty": "RSA"} and algorithm == "RS256"
+            else (_ for _ in ()).throw(AssertionError("unexpected JWK conversion"))
+        ),
+    )
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
 
     async def mock_is_token_revoked(jti):
@@ -383,7 +400,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["key"] is decoding_key
 
 
 @pytest.mark.asyncio
