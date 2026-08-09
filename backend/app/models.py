@@ -4,6 +4,8 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -283,6 +285,116 @@ class MigrationPlan(Base):
             name="uq_migration_plan__immutable_identity",
         ),
         Index("ix_migration_plan__expires_at", "expires_at"),
+    )
+
+
+class MigrationRun(Base):
+    """Durable dry-run or apply attempt bound to one immutable plan."""
+
+    __tablename__ = "migration_run"
+
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+    )
+    migration_plan_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_plan.migration_plan_uuid", ondelete="RESTRICT"),
+    )
+    run_kind: Mapped[str] = mapped_column(Text())
+    state: Mapped[str] = mapped_column(Text())
+    state_version: Mapped[int] = mapped_column(Integer(), default=1)
+    idempotency_key_hash: Mapped[str] = mapped_column(Text())
+    plan_digest: Mapped[str] = mapped_column(Text())
+    requested_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    cancellation_requested: Mapped[bool] = mapped_column(Boolean(), default=False)
+    observed_base_digest: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    evidence_json: Mapped[dict] = mapped_column(JSONB())
+    error_code: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    started_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid",
+            "migration_plan_uuid",
+            "run_kind",
+            "idempotency_key_hash",
+            name="uq_migration_run__idempotent_action",
+        ),
+        CheckConstraint(
+            "run_kind IN ('dry_run', 'apply')",
+            name="ck_migration_run__run_kind",
+        ),
+        CheckConstraint(
+            "state IN ('queued', 'sandbox_running', 'live_preflight_running', "
+            "'passed', 'drifted', 'failed', 'applying', 'reconciling', "
+            "'verifying', 'verified', 'drifted_no_apply', 'not_applied', "
+            "'verification_failed', 'failed_rolled_back', "
+            "'applied_with_drift', 'outcome_unknown')",
+            name="ck_migration_run__state",
+        ),
+        CheckConstraint(
+            "state_version >= 1", name="ck_migration_run__state_version"
+        ),
+        Index("ix_migration_run__project_space_uuid", "project_space_uuid"),
+        Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
+        Index("ix_migration_run__project_state", "project_space_uuid", "state"),
+    )
+
+
+class MigrationRunEvent(Base):
+    """Append-only, bounded evidence for one migration-run transition."""
+
+    __tablename__ = "migration_run_event"
+
+    migration_run_event_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer())
+    event_type: Mapped[str] = mapped_column(Text())
+    state_before: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    state_after: Mapped[str] = mapped_column(Text())
+    evidence_json: Mapped[dict] = mapped_column(JSONB())
+    actor_user_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid"),
+        nullable=True,
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            "sequence_number",
+            name="uq_migration_run_event__run_sequence",
+        ),
+        CheckConstraint(
+            "sequence_number >= 1",
+            name="ck_migration_run_event__sequence_number",
+        ),
+        Index("ix_migration_run_event__migration_run_uuid", "migration_run_uuid"),
     )
 
 
