@@ -362,6 +362,10 @@ class MigrationRun(Base):
         CheckConstraint(
             "state_version >= 1", name="ck_migration_run__state_version"
         ),
+        CheckConstraint(
+            "latest_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__latest_event_digest",
+        ),
         Index("ix_migration_run__project_space_uuid", "project_space_uuid"),
         Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
         Index("ix_migration_run__project_state", "project_space_uuid", "state"),
@@ -412,6 +416,15 @@ class MigrationRunEvent(Base):
             "(sequence_number = 1 AND previous_event_digest IS NULL) OR "
             "(sequence_number > 1 AND previous_event_digest IS NOT NULL)",
             name="ck_migration_run_event__previous_digest",
+        ),
+        CheckConstraint(
+            "previous_event_digest IS NULL OR "
+            "previous_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__previous_digest_format",
+        ),
+        CheckConstraint(
+            "event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__event_digest",
         ),
         Index("ix_migration_run_event__migration_run_uuid", "migration_run_uuid"),
     )

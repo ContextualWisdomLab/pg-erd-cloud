@@ -88,6 +88,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "state_version >= 1", name="ck_migration_run__state_version"
         ),
+        sa.CheckConstraint(
+            "latest_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__latest_event_digest",
+        ),
     )
     op.create_index(
         "ix_migration_run__project_space_uuid",
@@ -145,6 +149,15 @@ def upgrade() -> None:
             "(sequence_number = 1 AND previous_event_digest IS NULL) OR "
             "(sequence_number > 1 AND previous_event_digest IS NOT NULL)",
             name="ck_migration_run_event__previous_digest",
+        ),
+        sa.CheckConstraint(
+            "previous_event_digest IS NULL OR "
+            "previous_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__previous_digest_format",
+        ),
+        sa.CheckConstraint(
+            "event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__event_digest",
         ),
     )
     op.create_index(

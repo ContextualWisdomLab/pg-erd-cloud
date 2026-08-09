@@ -111,7 +111,8 @@ Rules:
 - `MigrationRun` and `MigrationRunEvent` ORM models plus Alembic revision 0010
   persist idempotent run identity and append-only ordered evidence.
 - Database checks constrain run kind, current state, positive state version,
-  and positive event sequence; uniqueness selects one run per hashed
+  positive event sequence, predecessor presence, and lowercase SHA-256 digest
+  shapes; uniqueness selects one run per hashed
   project/run-kind idempotency identity, `request_digest` distinguishes
   conflicting reuse, and one event exists per run sequence.
 - `app.forward.migration_run` owns the exact transition graph, bounded

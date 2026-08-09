@@ -252,6 +252,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         "ck_migration_run__state",
         "ck_migration_run__kind_state",
         "ck_migration_run__state_version",
+        "ck_migration_run__latest_event_digest",
     }
 
     unique_event_columns = {
@@ -260,6 +261,16 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         if isinstance(constraint, UniqueConstraint)
     }
     assert ("migration_run_uuid", "sequence_number") in unique_event_columns
+    assert {
+        constraint.name
+        for constraint in MigrationRunEvent.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    } == {
+        "ck_migration_run_event__sequence_number",
+        "ck_migration_run_event__previous_digest",
+        "ck_migration_run_event__previous_digest_format",
+        "ck_migration_run_event__event_digest",
+    }
     assert "latest_event_digest" in MigrationRun.__table__.columns
     assert "previous_event_digest" in MigrationRunEvent.__table__.columns
     assert "event_digest" in MigrationRunEvent.__table__.columns
@@ -309,6 +320,9 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         '"event_digest"',
         '"uq_migration_run_event__run_sequence"',
         '"ck_migration_run__state_version"',
+        '"ck_migration_run__latest_event_digest"',
+        '"ck_migration_run_event__previous_digest_format"',
+        '"ck_migration_run_event__event_digest"',
         '"ck_migration_run__kind_state"',
         'ondelete="RESTRICT"',
         'ondelete="CASCADE"',
