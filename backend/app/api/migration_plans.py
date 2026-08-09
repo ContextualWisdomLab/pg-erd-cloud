@@ -30,7 +30,7 @@ from app.models import (
 from app.permissions import require_project_member
 from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
 
-router = APIRouter(prefix="/api/schema-model-revisions", tags=["migration-plans"])
+router = APIRouter(prefix="/api", tags=["migration-plans"])
 PLAN_LIFETIME = dt.timedelta(hours=24)
 MAX_PLAN_STATEMENTS = 1_000
 MAX_PLAN_BYTES = 4 * 1024 * 1024
@@ -119,8 +119,37 @@ async def _load_plan_inputs(
     return model, revision, connection, snapshot, snapshot_data  # type: ignore[return-value]
 
 
+@router.get(
+    "/migration-plans/{migration_plan_uuid}",
+    response_model=MigrationPlanOut,
+)
+async def get_migration_plan(
+    migration_plan_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> MigrationPlanOut:
+    """Return one immutable plan preview to an authorized project member."""
+
+    plan = await session.get(MigrationPlan, migration_plan_uuid)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="migration plan not found")
+    try:
+        await require_project_member(
+            session,
+            plan.project_space_uuid,
+            user.user_account_uuid,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise HTTPException(
+                status_code=404, detail="migration plan not found"
+            ) from exc
+        raise
+    return _plan_out(plan)
+
+
 @router.post(
-    "/{schema_model_revision_uuid}/migration-plans",
+    "/schema-model-revisions/{schema_model_revision_uuid}/migration-plans",
     response_model=MigrationPlanOut,
 )
 async def create_migration_plan(
