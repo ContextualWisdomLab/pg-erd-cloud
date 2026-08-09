@@ -110,8 +110,9 @@ Rules:
   project/run-kind idempotency identity, `request_digest` distinguishes
   conflicting reuse, and one event exists per run sequence.
 - `app.forward.migration_run` owns the exact transition graph, bounded
-  idempotency-key hashing, and recursive rejection of SQL/credential-bearing
-  evidence fields.
+  idempotency-key hashing, versioned request digests binding project, plan,
+  run kind, plan digest, and actor, plus recursive rejection of SQL/credential
+  fields and PostgreSQL connection-string values in evidence.
 
 ### Planned before production release
 
