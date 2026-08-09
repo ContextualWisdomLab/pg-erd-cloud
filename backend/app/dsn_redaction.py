@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import re
 from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
 
@@ -39,6 +40,12 @@ def _split_dsn_best_effort(dsn: str) -> tuple[str, str]:
     return netloc, query
 
 
+@functools.lru_cache(maxsize=1024)
+def _is_secret_key(key: str) -> bool:
+    unquoted = unquote_plus(key) if ("%" in key or "+" in key) else key
+    return bool(_SECRET_KEY_PATTERN.search(unquoted))
+
+
 def _password_candidates_from_dsn(dsn: str) -> set[str]:
     candidates: set[str] = set()
 
@@ -71,7 +78,7 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
         key, sep, raw_value = part.partition("=")
         if not sep:
             continue
-        if not _SECRET_KEY_PATTERN.search(unquote_plus(key)):
+        if not _is_secret_key(key):
             continue
         decoded_value = unquote_plus(raw_value)
         candidates.add(raw_value)
