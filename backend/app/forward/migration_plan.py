@@ -10,6 +10,7 @@ unsupported semantic change into a blocking finding.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from collections.abc import Mapping
 from typing import Any
@@ -436,6 +437,22 @@ def _digest_plan(plan: Mapping[str, Any]) -> str:
         plan, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def verify_migration_plan_digest(
+    plan: Mapping[str, Any], expected_digest: str
+) -> bool:
+    """Verify persisted plan content against its immutable stored digest."""
+
+    claimed_digest = plan.get("plan_digest")
+    if not isinstance(claimed_digest, str):
+        return False
+    unsigned_plan = dict(plan)
+    unsigned_plan.pop("plan_digest", None)
+    calculated_digest = _digest_plan(unsigned_plan)
+    return hmac.compare_digest(claimed_digest, expected_digest) and hmac.compare_digest(
+        calculated_digest, expected_digest
+    )
 
 
 def compile_migration_plan(
