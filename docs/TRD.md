@@ -57,7 +57,7 @@ executable SQL, safety classification, approval truth, or recovery state.
 
 ### Planned and release-blocking
 
-- migration-run HTTP creation/polling APIs and queue/outbox integration;
+- migration-run HTTP creation/cancellation APIs and queue/outbox integration;
 - isolated disposable PostgreSQL execution and cleanup;
 - bounded target read-only preflight and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -114,7 +114,7 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview with project/revision/connection/snapshot/capability/actor/time bindings, IDOR-masked | **Implemented** |
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest idempotent durable dry run | **Planned** |
 | `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
-| `GET /api/migration-runs/{run_uuid}` | member | Poll bounded durable state/evidence | **Planned** |
+| `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies event count, sequence, state chain, chronology, and secret-safe evidence before returning | **Implemented** |
 
 Implemented limits: model input is at most 2 MiB; a persisted plan is at most
 1,000 executable plus proposed statements and 4 MiB; plans expire 24 hours
