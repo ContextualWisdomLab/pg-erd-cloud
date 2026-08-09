@@ -32,8 +32,9 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
   - Live LLM draft: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md?mode=llm-draft`
     - `LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`을 설정한 OpenAI-compatible
       chat-completions provider를 호출합니다.
-  - Share link에서도 동일한 `/api/share/{share_uuid}/snapshots/{snapshot_uuid}/...`
-    경로를 사용할 수 있습니다.
+  - Share link의 `/api/share/{share_uuid}/snapshots/{snapshot_uuid}/...` 경로는
+    결정적 Markdown과 `mode=llm-prompt`만 제공합니다. 외부 provider를 호출하는
+    `mode=llm-draft`는 인증된 `/api/snapshots/...` 경로에서만 사용할 수 있습니다.
 - **컬럼 예시값 힌트**: 리버스 스냅샷의 각 컬럼에 `example_value`를 추가합니다.
   실제 테이블 데이터를 샘플링하지 않고 컬럼명/타입 메타데이터로 만든 합성 예시라서
   ERD, PlantUML/SVG export, 명세서, LLM prompt에서 안전하게 참고할 수 있습니다.
@@ -46,8 +47,10 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
 curl -X POST "http://localhost:8000/api/projects/<project_uuid>/share-links"
 ```
 
-반환된 `url_path`로 동료가 최신 스냅샷 목록/스냅샷 JSON/DDL·명세서 export를 조회할 수 있습니다.
+반환된 `url_path`로 동료가 최근 성공 스냅샷 목록/스냅샷 JSON/DDL·명세서 export를 조회할 수 있습니다.
 공개 share 응답·export에서는 **스키마 코멘트·`example_value` 등 민감 메타데이터를 제거(redact)** 합니다.
+공개 명세서 export는 Markdown/LLM prompt만 지원하고 live LLM draft는 호출하지 않습니다.
+현재 공유 링크에는 만료·회수 기능이 없으므로 링크를 아는 누구나 해당 범위를 볼 수 있습니다.
 `/api/share/*` 공개 조회/내보내기 경로는 전역 `/api/*` 제한보다 더 엄격한 별도
 IP 기반 rate limit을 적용합니다.
 

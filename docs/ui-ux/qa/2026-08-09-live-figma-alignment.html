@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud ERD — Live Figma Alignment</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #111827;
+      background: #f3f4f6;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; }
+    main { max-width: 1180px; margin: 0 auto; }
+    header, section { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+    header { padding: 28px; }
+    section { margin-top: 16px; padding: 24px; }
+    h1, h2, p { margin-top: 0; }
+    h1 { margin-bottom: 8px; font-size: 28px; }
+    h2 { margin-bottom: 18px; font-size: 18px; }
+    p { color: #4b5563; line-height: 1.6; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge { padding: 6px 10px; border-radius: 999px; background: #eff6ff; color: #034ea2; font-size: 12px; font-weight: 700; }
+    .badge--blocked { background: #fff7ed; color: #9a3412; }
+    .frame { overflow: hidden; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; }
+    .editor { display: grid; grid-template-columns: 300fr 850fr 290fr; min-height: 250px; }
+    .editor > div { display: grid; place-items: center; padding: 16px; text-align: center; }
+    .editor strong { display: block; font-size: 20px; }
+    .editor small { color: #6b7280; }
+    .nav { background: #fff; border-right: 1px solid #e5e7eb; }
+    .canvas { position: relative; background: linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px); background-size: 20px 20px; }
+    .canvas::before { content: "↔  ↶  +  ◇  #  SQL  IMG  UML  {}  ↗"; position: absolute; top: 18px; right: 18px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: rgba(255,255,255,.92); font: 700 12px ui-monospace, monospace; }
+    .props { background: #fff; border-left: 1px solid #e5e7eb; }
+    .dashboard { display: grid; grid-template-columns: repeat(4, minmax(0, 240px)); gap: 16px; overflow-x: auto; padding-bottom: 4px; }
+    .metric { height: 96px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; }
+    .metric span { display: block; color: #6b7280; font-size: 12px; line-height: 16px; }
+    .metric strong { display: block; margin-top: 8px; font-size: 18px; line-height: 24px; }
+    .modals { display: flex; align-items: flex-end; gap: 14px; overflow-x: auto; min-height: 180px; padding-bottom: 6px; }
+    .modal { flex: 0 0 auto; display: grid; place-items: center; height: 120px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #4b5563; font-size: 12px; }
+    .w300 { width: 150px; } .w320 { width: 160px; } .w500 { width: 250px; } .w680 { width: 340px; } .w760 { width: 380px; } .w800 { width: 400px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+    th { color: #4b5563; font-size: 12px; }
+    .ok { color: #047857; font-weight: 700; }
+    .note { padding: 12px 14px; border-left: 3px solid #034ea2; background: #eff6ff; color: #374151; font-size: 13px; line-height: 1.6; }
+    .refs { margin: 0; padding-left: 22px; color: #4b5563; font-size: 13px; line-height: 1.7; }
+    @media (max-width: 767px) {
+      body { padding: 16px; }
+      .editor { grid-template-columns: 1fr; }
+      .nav, .props { border: 0; border-bottom: 1px solid #e5e7eb; }
+      .canvas { min-height: 320px; }
+      .dashboard { grid-template-columns: 1fr; }
+      .metric { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Cloud ERD · Live Figma alignment</h1>
+      <p>Authoritative file <code>csnpEEJfmqFWB0vNUoTkWA</code>의 Screen Templates와 구현 계약을 기준으로 한 2026-08-09 정합성 결과입니다.</p>
+      <div class="badges">
+        <span class="badge">31 test files</span>
+        <span class="badge">276 tests green</span>
+        <span class="badge">Typecheck green</span>
+        <span class="badge">Production build green</span>
+        <span class="badge">Frontend coverage 100%</span>
+        <span class="badge badge--blocked">Visual comparison blocked</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>ERD Editor · node 37:114 · 1440 × 900</h2>
+      <div class="frame editor" aria-label="300픽셀 내비게이션, 850픽셀 캔버스, 290픽셀 속성 패널">
+        <div class="nav"><span><strong>300</strong><small>navigation</small></span></div>
+        <div class="canvas"><span><strong>850</strong><small>canvas</small></span></div>
+        <div class="props"><span><strong>290</strong><small>properties</small></span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Dashboard · node 37:10</h2>
+      <div class="dashboard" aria-label="240픽셀 지표 카드 네 개와 16픽셀 간격">
+        <div class="metric"><span>Projects</span><strong>3</strong></div>
+        <div class="metric"><span>Connections</span><strong>5</strong></div>
+        <div class="metric"><span>Snapshots</span><strong>12</strong></div>
+        <div class="metric"><span>Diagrams</span><strong>8</strong></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>ModalShell width contract</h2>
+      <div class="modals">
+        <div class="modal w300">AddTable<br>300</div>
+        <div class="modal w320">Relationship<br>320</div>
+        <div class="modal w500">Export shell<br>500</div>
+        <div class="modal w680">Group<br>680</div>
+        <div class="modal w760">Cardinality<br>760</div>
+        <div class="modal w800">EditTable<br>800</div>
+      </div>
+      <p class="note">Concrete ShareExport screen <code>130:232</code> uses a 720px product modal; all modal widths are capped at viewport minus 32px and become scroll-safe on narrow screens.</p>
+    </section>
+
+    <section>
+      <h2>Alignment matrix</h2>
+      <table>
+        <thead><tr><th>Surface</th><th>Live target</th><th>Implemented contract</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>AuthGate <code>37:2</code></td><td>Cloud ERD card, wrapped description</td><td>Branded loading/auth-required states; raw errors removed</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Dashboard <code>37:10</code></td><td>300px sidebar; four 240×96 metrics</td><td>Exact geometry and metric semantics</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Editor <code>37:114</code></td><td>300 / 850 / 290; compact toolbar</td><td>Selection-driven Properties and exact toolbar order</td><td class="ok">Code aligned</td></tr>
+          <tr><td>AddTable <code>37:253</code></td><td>Korean name-only form</td><td>Shared ModalShell, guarded focusable Save</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Relationship <code>37:271</code></td><td>Endpoints, label, destructive footer</td><td>One confirmation owner; no duplicate prompt</td><td class="ok">Code aligned</td></tr>
+          <tr><td>ShareExport <code>130:232</code></td><td>Share link + DDL vertical hierarchy</td><td>User-facing <code>/share/{id}</code>, locked read-only ERD, extras collapsed</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Responsive shell</td><td>Breakpoint 767</td><td>Single-column reflow; canvas keeps isolated 2D behavior</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Modal behavior <code>30:200</code></td><td>Label, modal role, trap, Escape, return focus</td><td>Central ModalShell and regression coverage</td><td class="ok">Code aligned</td></tr>
+          <tr><td>Same-viewport visual comparison</td><td>Live Figma source beside rendered desktop/mobile states</td><td>Approved cloud browser could not reach the isolated local Vite server</td><td>Blocked</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>References · APA 7</h2>
+      <ol class="refs">
+        <li>World Wide Web Consortium. (n.d.). <em>Dialog (modal) pattern</em>. WAI-ARIA Authoring Practices Guide. https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/</li>
+        <li>World Wide Web Consortium. (2024). <em>Web Content Accessibility Guidelines (WCAG) 2.2</em>. https://www.w3.org/TR/WCAG22/</li>
+        <li>XYFlow. (n.d.). <em>Accessibility</em>. React Flow. https://reactflow.dev/learn/advanced-use/accessibility</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

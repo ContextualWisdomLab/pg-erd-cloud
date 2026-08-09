@@ -2,7 +2,7 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -31,30 +31,42 @@ export function GroupModal({
   onDeleteBusinessGroup,
   onAssignBusinessGroup,
 }: GroupModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
+  const selectedColorIndex = BUSINESS_GROUP_COLORS.indexOf(
+    newGroupColor as (typeof BUSINESS_GROUP_COLORS)[number],
+  );
+
+  function onColorKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ): void {
+    const isNext = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const isPrevious = event.key === "ArrowLeft" || event.key === "ArrowUp";
+
+    if (!isNext && !isPrevious) return;
+
+    event.preventDefault();
+    const direction = isNext ? 1 : -1;
+    const nextIndex =
+      (currentIndex + direction + BUSINESS_GROUP_COLORS.length) %
+      BUSINESS_GROUP_COLORS.length;
+
+    setNewGroupColor(BUSINESS_GROUP_COLORS[nextIndex]);
+    event.currentTarget
+      .closest<HTMLElement>('[role="radiogroup"]')
+      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [nextIndex]?.focus();
+  }
 
   if (!isOpen) return null;
 
   return (
-    <div className="modalOverlay">
-      <div
-        className="modalContent groupManager"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="group-manager-title"
-        ref={dialogRef}
-        tabIndex={-1}
-      >
-        <div className="modalHeader">
-          <h3 id="group-manager-title">업무 그룹</h3>
-          <button
-            type="button"
-            onClick={onCloseGroupManager}
-            aria-label="업무 그룹 닫기"
-          >
-            닫기
-          </button>
-        </div>
+    <ModalShell
+      title="업무 그룹"
+      titleId="group-manager-title"
+      onClose={onCloseGroupManager}
+      closeLabel="업무 그룹 닫기"
+      size="group"
+    >
 
         <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
           <div className="field">
@@ -72,15 +84,23 @@ export function GroupModal({
             role="radiogroup"
             aria-label="그룹 색상"
           >
-            {BUSINESS_GROUP_COLORS.map((color) => (
+            {BUSINESS_GROUP_COLORS.map((color, index) => (
               <button
                 type="button"
+                role="radio"
                 aria-label={`색상 ${color}`}
-                aria-pressed={newGroupColor === color}
+                aria-checked={newGroupColor === color}
                 className="groupManager__swatch"
                 key={color}
                 onClick={() => setNewGroupColor(color)}
+                onKeyDown={(event) => onColorKeyDown(event, index)}
                 style={{ background: color }}
+                tabIndex={
+                  newGroupColor === color ||
+                  (selectedColorIndex === -1 && index === 0)
+                    ? 0
+                    : -1
+                }
               />
             ))}
           </div>
@@ -108,10 +128,7 @@ export function GroupModal({
                   <button
                     type="button"
                     aria-label={`${group.name} 그룹 삭제`}
-                    onClick={() => {
-                      if (!window.confirm(`'${group.name}' 그룹을 삭제하시겠습니까?`)) return;
-                      onDeleteBusinessGroup(group.id);
-                    }}
+                    onClick={() => onDeleteBusinessGroup(group.id)}
                   >
                     삭제
                   </button>
@@ -150,7 +167,6 @@ export function GroupModal({
             ))}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

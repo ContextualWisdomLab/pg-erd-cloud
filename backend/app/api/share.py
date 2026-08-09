@@ -17,16 +17,19 @@ from app.models import (
     SchemaSnapshotData,
     ShareLink,
 )
-from app.spec.llm import (
-    LlmConfigurationError,
-    LlmProviderError,
-    generate_index_design_llm_draft,
-    generate_reversing_llm_draft,
-)
 from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
+
+
+def _validate_public_export_mode(mode: str) -> None:
+    """Keep paid live-LLM generation behind authenticated project routes."""
+    if mode not in {"markdown", "llm-prompt"}:
+        raise HTTPException(
+            status_code=400,
+            detail="unsupported public export mode",
+        )
 
 
 def _redact_sensitive_snapshot_fields(
@@ -107,7 +110,10 @@ async def get_share_link_info(
 
     rows = await session.execute(
         select(SchemaSnapshot)
-        .where(SchemaSnapshot.project_space_uuid == link.project_space_uuid)
+        .where(
+            SchemaSnapshot.project_space_uuid == link.project_space_uuid,
+            SchemaSnapshot.status == "succeeded",
+        )
         .order_by(SchemaSnapshot.created_at.desc())
         .limit(20)
     )
@@ -123,6 +129,7 @@ async def get_share_link_info(
                 "created_at": s.created_at.isoformat(),
             }
             for s in snaps
+            if s.status == "succeeded"
         ],
     }
 
@@ -143,7 +150,11 @@ async def get_shared_snapshot(
         raise HTTPException(status_code=410, detail="share link expired")
 
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
-    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+    if (
+        snap is None
+        or snap.project_space_uuid != link.project_space_uuid
+        or snap.status != "succeeded"
+    ):
         raise HTTPException(status_code=404, detail="snapshot not found")
 
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
@@ -151,7 +162,7 @@ async def get_shared_snapshot(
         "schema_snapshot_uuid": str(snap.schema_snapshot_uuid),
         "status": snap.status,
         "schema_filter": snap.schema_filter,
-        "error_message": snap.error_message,
+        "error_message": None,
         "snapshot_json": _redact_sensitive_snapshot_fields(data.snapshot_json)
         if data
         else None,
@@ -178,7 +189,11 @@ async def export_shared_snapshot_sql(
         raise HTTPException(status_code=410, detail="share link expired")
 
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
-    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+    if (
+        snap is None
+        or snap.project_space_uuid != link.project_space_uuid
+        or snap.status != "succeeded"
+    ):
         raise HTTPException(status_code=404, detail="snapshot not found")
 
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
@@ -198,10 +213,11 @@ async def export_shared_snapshot_sql(
 async def export_shared_snapshot_reversing_spec(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
+    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export a shared snapshot as a DB reversing spec or LLM prompt."""
+    _validate_public_export_mode(mode)
     link = await session.get(ShareLink, share_link_uuid)
     if link is None:
         raise HTTPException(status_code=404, detail="share link not found")
@@ -211,7 +227,11 @@ async def export_shared_snapshot_reversing_spec(
         raise HTTPException(status_code=410, detail="share link expired")
 
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
-    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+    if (
+        snap is None
+        or snap.project_space_uuid != link.project_space_uuid
+        or snap.status != "succeeded"
+    ):
         raise HTTPException(status_code=404, detail="snapshot not found")
 
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
@@ -220,17 +240,6 @@ async def export_shared_snapshot_reversing_spec(
     # Public share export: redact comments/example values (the reversing spec
     # otherwise embeds relation/column comments and example values verbatim).
     redacted_snapshot = _redacted_snapshot_dict(data.snapshot_json)
-    if mode == "llm-draft":
-        try:
-            return await generate_reversing_llm_draft(redacted_snapshot)
-        except LlmConfigurationError as exc:
-            raise HTTPException(
-                status_code=503, detail="LLM configuration error"
-            ) from exc
-        except LlmProviderError as exc:
-            raise HTTPException(
-                status_code=502, detail="LLM provider request failed"
-            ) from exc
     return generate_reversing_spec(redacted_snapshot, mode=mode)
 
 
@@ -241,10 +250,11 @@ async def export_shared_snapshot_reversing_spec(
 async def export_shared_snapshot_index_design(
     share_link_uuid: uuid.UUID,
     schema_snapshot_uuid: uuid.UUID,
-    mode: str = Query("markdown", pattern="^(markdown|llm-prompt|llm-draft)$"),
+    mode: str = Query("markdown", pattern="^(markdown|llm-prompt)$"),
     session: AsyncSession = Depends(get_read_session),
 ) -> str:
     """Export shared table/index design guidance or an LLM prompt."""
+    _validate_public_export_mode(mode)
     link = await session.get(ShareLink, share_link_uuid)
     if link is None:
         raise HTTPException(status_code=404, detail="share link not found")
@@ -254,7 +264,11 @@ async def export_shared_snapshot_index_design(
         raise HTTPException(status_code=410, detail="share link expired")
 
     snap = await session.get(SchemaSnapshot, schema_snapshot_uuid)
-    if snap is None or snap.project_space_uuid != link.project_space_uuid:
+    if (
+        snap is None
+        or snap.project_space_uuid != link.project_space_uuid
+        or snap.status != "succeeded"
+    ):
         raise HTTPException(status_code=404, detail="snapshot not found")
 
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
@@ -262,15 +276,4 @@ async def export_shared_snapshot_index_design(
         return "# ERD Index Design\n\nSnapshot data not found.\n"
     # Public share export: same redaction contract as reversing-spec / JSON share.
     redacted_snapshot = _redacted_snapshot_dict(data.snapshot_json)
-    if mode == "llm-draft":
-        try:
-            return await generate_index_design_llm_draft(redacted_snapshot)
-        except LlmConfigurationError as exc:
-            raise HTTPException(
-                status_code=503, detail="LLM configuration error"
-            ) from exc
-        except LlmProviderError as exc:
-            raise HTTPException(
-                status_code=502, detail="LLM provider request failed"
-            ) from exc
     return generate_index_design_spec(redacted_snapshot, mode=mode)

@@ -62,14 +62,14 @@ modals.
 ### Editor
 
 ```text
-+----------------------+---------------------------------------------+
-| Project selector     | [search] [layout] [undo] [+] [group] [SQL] |
-| New project          |                                             |
-| Connection selector  |                                             |
-| New connection       |                ERD canvas                    |
-| Schema filter        |                                             |
-| Reverse engineer     |     Empty state or table nodes/edges         |
-+----------------------+---------------------------------------------+
++----------------------+----------------------------------+------------+
+| Project selector     | [↔][↶][+][◇][#][SQL][IMG]…[↗]  | Properties |
+| New project          |                                  | Search     |
+| Connection selector  |                                  | Selection  |
+| New connection       |            ERD canvas            | Columns    |
+| Schema filter        |                                  | Share      |
+| Reverse engineer     | Empty state or table nodes/edges | Export     |
++----------------------+----------------------------------+------------+
 ```
 
 ### Share And Export Modal
@@ -110,3 +110,5 @@ modals.
   status text changes.
 - New visual work references the images in `docs/ui-ux` and the styles in
   `frontend/src/styles.css` before introducing new layout patterns.
+- Live implementation work follows `figma-contract.md` before historical PNG
+  or QA evidence.

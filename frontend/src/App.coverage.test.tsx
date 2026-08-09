@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
   getMe: vi.fn(),
+  publicShareIdFromPath: vi.fn<(pathname: string) => string | null>(() => null),
   listProjects: vi.fn(),
   listConnections: vi.fn(),
   listSnapshots: vi.fn(),
@@ -23,6 +24,7 @@ const exports = vi.hoisted(() => ({
   exportPlantUml: vi.fn(() => '@startuml'),
   exportMermaid: vi.fn(() => 'graph TD'),
   exportDbml: vi.fn(() => 'Table users {}'),
+  exportPrisma: vi.fn(() => 'model Users {}'),
   inferRelationships: vi.fn(),
 }))
 
@@ -37,7 +39,13 @@ vi.mock('./erd/export', () => ({
 }))
 vi.mock('./erd/mermaid', () => ({ exportMermaid: exports.exportMermaid }))
 vi.mock('./erd/dbml', () => ({ exportDbml: exports.exportDbml }))
+vi.mock('./erd/prisma', () => ({ exportPrisma: exports.exportPrisma }))
 vi.mock('./erd/autoInfer', () => ({ inferRelationships: exports.inferRelationships }))
+vi.mock('./components/SharedDiagramView', () => ({
+  SharedDiagramView: ({ shareLinkId, colorMode }: { shareLinkId: string; colorMode: string }) => (
+    <main aria-label="공유 ERD 테스트" data-color-mode={colorMode}>{shareLinkId}</main>
+  ),
+}))
 
 vi.mock('@xyflow/react', async () => {
   const React = await import('react')
@@ -67,13 +75,38 @@ vi.mock('@xyflow/react', async () => {
       props.onInit?.({ fitView: vi.fn() })
     }, [props.onInit])
     return (
-      <div data-testid="react-flow">
+      <div data-testid="react-flow" data-color-mode={String(props.colorMode)}>
         <span data-testid="node-count">{props.nodes.length}</span>
         <span data-testid="edge-count">{props.edges.length}</span>
         <button type="button" data-testid="flow-connect" onClick={() => props.onConnect?.({ source: 'table-1', target: 'table-2' })} />
         <button type="button" data-testid="flow-edge" onClick={(event) => props.onEdgeClick?.(event, props.edges[0] ?? edge)} />
+        <button
+          type="button"
+          data-testid="flow-edge-keyboard"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              props.onSelectionChange?.({
+                nodes: [],
+                edges: [props.edges[0] ?? edge],
+              })
+            }
+          }}
+        />
         <button type="button" data-testid="flow-edge-unlabeled" onClick={(event) => props.onEdgeClick?.(event, { ...edge, label: undefined })} />
-        <button type="button" data-testid="flow-node" onDoubleClick={(event) => props.onNodeDoubleClick?.(event, props.nodes[0] ?? initialNode)} />
+        <button
+          type="button"
+          data-testid="flow-node"
+          onClick={() => props.onSelectionChange?.({
+            nodes: [props.nodes[0] ?? initialNode],
+            edges: [],
+          })}
+          onDoubleClick={(event) => props.onNodeDoubleClick?.(event, props.nodes[0] ?? initialNode)}
+        />
+        <button
+          type="button"
+          data-testid="flow-clear-selection"
+          onClick={() => props.onSelectionChange?.({ nodes: [], edges: [] })}
+        />
         {props.children}
       </div>
     )
@@ -150,6 +183,7 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
+          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -259,7 +293,9 @@ const snapshots = [
 ]
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  Object.values(api).forEach((mock) => mock.mockReset())
+  Object.values(exports).forEach((mock) => mock.mockReset())
+  api.publicShareIdFromPath.mockReturnValue(null)
   api.getMe.mockResolvedValue({ subject: 'user', display_name: 'User', user_account_uuid: 'u' })
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue(connections)
@@ -275,6 +311,14 @@ beforeEach(() => {
     snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
   })
   api.createShareLink.mockResolvedValue({ url: 'http://localhost/api/share/one' })
+  exports.exportDDL.mockReturnValue('DDL')
+  exports.exportDiagramSvg.mockReturnValue('<svg/>')
+  exports.exportDictionaryCsv.mockReturnValue('csv')
+  exports.exportDictionaryMarkdown.mockReturnValue('markdown')
+  exports.exportPlantUml.mockReturnValue('@startuml')
+  exports.exportMermaid.mockReturnValue('graph TD')
+  exports.exportDbml.mockReturnValue('Table users {}')
+  exports.exportPrisma.mockReturnValue('model Users {}')
   exports.inferRelationships.mockReturnValue([
     { id: 'inferred', source: 'table-1', target: 'table-2', label: 'fk_inferred' },
   ])
@@ -312,25 +356,52 @@ describe('App orchestration coverage', () => {
     let rejectMe!: (reason?: unknown) => void
     api.getMe.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectMe = reject }))
     render(<App />)
-    expect(screen.getByText('Authenticating…')).toBeInTheDocument()
+    expect(screen.getByText('인증 정보를 확인하는 중입니다.')).toBeInTheDocument()
     await act(async () => rejectMe(new Error('denied')))
-    expect(await screen.findByRole('heading', { name: 'Authentication required' })).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('denied')
+    expect(await screen.findByRole('heading', { name: 'Cloud ERD' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('인증이 필요합니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('denied')
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+  })
+
+  it('renders the public share route instead of the authenticated shell', () => {
+    api.publicShareIdFromPath.mockReturnValueOnce('share-public')
+    render(<App />)
+    expect(screen.getByRole('main', { name: '공유 ERD 테스트' })).toHaveTextContent('share-public')
+    expect(screen.getByRole('main', { name: '공유 ERD 테스트' })).toHaveAttribute('data-color-mode', 'system')
+    expect(api.getMe).not.toHaveBeenCalled()
+  })
+
+  it('keeps the authenticated workspace when the project list fails', async () => {
+    api.listProjects.mockRejectedValueOnce(new Error('projects down'))
+    await renderReadyApp()
+    expect(screen.getByText('User')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('프로젝트 목록을 불러오지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('projects down')
+  })
+
+  it('keeps the connection selector empty when a project has no connections', async () => {
+    api.listConnections.mockResolvedValueOnce([])
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(screen.getByLabelText('Connection')).toHaveValue('')
   })
 
   it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
     await renderReadyApp()
-    expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('<Billing & Core>').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+    await screen.findByText('ERD_all_2')
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
+    expect(screen.getByTestId('react-flow')).toHaveAttribute('data-color-mode', 'system')
 
     cleanup()
     api.listProjects.mockResolvedValueOnce([])
@@ -347,7 +418,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
     fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  New  ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    fireEvent.submit(screen.getByRole('form', { name: '사이드바 프로젝트 생성' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
 
     const dsn = screen.getByLabelText('Connection DSN')
@@ -360,13 +431,39 @@ describe('App orchestration coverage', () => {
     expect(dsn).toHaveValue('')
 
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    fireEvent.submit(screen.getByRole('form', { name: '연결 생성' }))
     await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
     await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p3', 'c2', 'public'))
     expect(screen.getByText('스냅샷 생성 중...')).toBeInTheDocument()
+  })
+
+  it('keeps create failures recoverable without exposing API diagnostics', async () => {
+    api.createProject.mockRejectedValueOnce(new Error('project database secret'))
+    api.createConnection.mockRejectedValueOnce(new Error('connection database secret'))
+    api.createSnapshot.mockRejectedValueOnce(new Error('snapshot database secret'))
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    fireEvent.change(screen.getByLabelText('New project'), { target: { value: 'New' } })
+    fireEvent.submit(screen.getByRole('form', { name: '사이드바 프로젝트 생성' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('프로젝트를 만들지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('project database secret')
+
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/test' },
+    })
+    fireEvent.submit(screen.getByRole('form', { name: '연결 생성' }))
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalled())
+    expect(screen.getByRole('alert')).toHaveTextContent('데이터베이스 연결을 만들지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('connection database secret')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalled())
+    expect(screen.getByRole('alert')).toHaveTextContent('스냅샷을 만들지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('snapshot database secret')
   })
 
   it('polls a terminal snapshot, builds graph state, and exercises editor handlers', async () => {
@@ -382,6 +479,25 @@ describe('App orchestration coverage', () => {
     })
     expect(api.getSnapshot).toHaveBeenCalledWith('s1')
     expect(screen.getByTestId('node-count')).toHaveTextContent('2')
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('flow-node'))
+      await Promise.resolve()
+    })
+    const properties = screen.getByRole('complementary', { name: 'ERD 속성' })
+    expect(properties).toHaveTextContent('public.users')
+    expect(properties).toHaveTextContent('email')
+    expect(properties).toHaveTextContent('text')
+    fireEvent.click(screen.getByTestId('flow-clear-selection'))
+    expect(properties).toHaveTextContent('캔버스에서 테이블을 선택하면')
+    const edgeKeyboardTarget = screen.getByTestId('flow-edge-keyboard')
+    edgeKeyboardTarget.focus()
+    fireEvent.keyDown(edgeKeyboardTarget, { key: 'Enter' })
+    expect(properties).toHaveTextContent('fk_old')
+    fireEvent.click(screen.getByRole('button', { name: '관계 편집' }))
+    expect(screen.getByTestId('edge-modal')).toHaveAttribute('data-open', 'true')
+    fireEvent.click(screen.getByTestId('edge-cancel'))
+    fireEvent.click(screen.getByTestId('flow-node'))
 
     fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
@@ -402,9 +518,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('flow-edge-unlabeled'))
     fireEvent.click(screen.getByTestId('edge-cancel'))
     fireEvent.click(screen.getByTestId('flow-edge'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const relationshipConfirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('edge-delete'))
+    expect(screen.getByTestId('edge-count')).toHaveTextContent('2')
     fireEvent.click(screen.getByTestId('edge-delete'))
+    expect(relationshipConfirm).toHaveBeenCalledTimes(2)
+    expect(relationshipConfirm).toHaveBeenNthCalledWith(1, '정말로 이 관계를 삭제하시겠습니까?')
+    expect(relationshipConfirm).toHaveBeenNthCalledWith(2, '정말로 이 관계를 삭제하시겠습니까?')
+    expect(screen.getByTestId('edge-count')).toHaveTextContent('1')
 
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.submit(screen.getByTestId('table-empty-form'))
@@ -414,9 +535,147 @@ describe('App orchestration coverage', () => {
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.click(screen.getByTestId('table-cancel'))
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const tableConfirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    tableConfirm.mockClear()
     fireEvent.click(screen.getByTestId('table-delete'))
     fireEvent.click(screen.getByTestId('table-delete'))
+    expect(tableConfirm).toHaveBeenNthCalledWith(1, "'public.accounts' 테이블을 삭제하시겠습니까?")
+    expect(tableConfirm).toHaveBeenNthCalledWith(2, "'public.accounts' 테이블을 삭제하시겠습니까?")
+  })
+
+  it('renders and edits an unnamed relationship when endpoint tables are unavailable', async () => {
+    vi.mocked(snapshotToGraph).mockReturnValueOnce({
+      nodes: [],
+      edges: [
+        {
+          id: 'orphan-edge',
+          source: 'missing-source',
+          target: 'missing-target',
+          label: undefined,
+        },
+      ],
+    })
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(openButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const edgeKeyboardTarget = screen.getByTestId('flow-edge-keyboard')
+    edgeKeyboardTarget.focus()
+    fireEvent.keyDown(edgeKeyboardTarget, { key: 'Enter' })
+
+    const properties = screen.getByRole('complementary', { name: 'ERD 속성' })
+    expect(properties).toHaveTextContent('이름 없는 관계')
+    expect(properties).toHaveTextContent('missing-source → missing-target')
+    fireEvent.click(screen.getByRole('button', { name: '관계 편집' }))
+    expect(screen.getByTestId('edge-modal')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('clears the table selection when a different graph replaces the canvas', async () => {
+    const selectedNode = {
+      id: 'table-1',
+      type: 'tableNode',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'public.users',
+        columns: [{ column_name: 'id', data_type: 'bigint', is_not_null: true, is_pk: true }],
+        badges: { pk: true, fk: false },
+      },
+    }
+    const replacementNode = {
+      ...selectedNode,
+      data: { ...selectedNode.data, title: 'public.audit_log' },
+    }
+    vi.mocked(snapshotToGraph)
+      .mockReturnValueOnce({ nodes: [selectedNode], edges: [] })
+      .mockReturnValueOnce({ nodes: [replacementNode], edges: [] })
+    api.getSnapshot
+      .mockResolvedValueOnce({
+        schema_snapshot_uuid: 's1',
+        status: 'succeeded',
+        schema_filter: null,
+        error_message: null,
+        snapshot_json: { version: 1 },
+      })
+      .mockResolvedValueOnce({
+        schema_snapshot_uuid: 's2',
+        status: 'succeeded',
+        schema_filter: null,
+        error_message: null,
+        snapshot_json: { version: 2 },
+      })
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const firstDiagramButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(firstDiagramButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    fireEvent.click(screen.getByTestId('flow-node'))
+    expect(screen.getByRole('complementary', { name: 'ERD 속성' })).toHaveTextContent('public.users')
+
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const properties = screen.getByRole('complementary', { name: 'ERD 속성' })
+    expect(properties).toHaveTextContent('캔버스에서 테이블을 선택하면')
+    expect(properties).not.toHaveTextContent('public.audit_log')
+  })
+
+  it('shows selected table metadata, an empty-column state, and opens editing from Properties', async () => {
+    vi.mocked(snapshotToGraph).mockReturnValueOnce({
+      nodes: [
+        {
+          id: 'grouped-table',
+          type: 'tableNode',
+          position: { x: 0, y: 0 },
+          data: {
+            title: 'public.billing',
+            comment: '결제 원장',
+            columns: [],
+            badges: { pk: false, fk: false },
+            businessGroup: { id: 'billing', name: 'Billing', color: '#2563eb' },
+          },
+        },
+      ] as any,
+      edges: [],
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(openButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    vi.useRealTimers()
+
+    fireEvent.click(screen.getByTestId('flow-node'))
+    const properties = screen.getByRole('complementary', { name: 'ERD 속성' })
+    expect(properties).toHaveTextContent('결제 원장')
+    expect(properties).toHaveTextContent('등록된 컬럼이 없습니다.')
+    expect(screen.getByLabelText('Billing 그룹 색상')).toHaveStyle({ background: '#2563eb' })
+    fireEvent.click(screen.getByRole('button', { name: '테이블 편집' }))
+    expect(screen.getByTestId('table-modal')).toHaveAttribute('data-open', 'true')
   })
 
   it('adds nodes and exercises groups, cardinality, exports, inference, and clearing', async () => {
@@ -433,9 +692,18 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('group-create'))
     fireEvent.click(screen.getByTestId('group-assign-missing'))
     fireEvent.click(screen.getByTestId('group-assign'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const groupConfirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('group-delete'))
     fireEvent.click(screen.getByTestId('group-delete'))
+    expect(groupConfirm).toHaveBeenCalledTimes(2)
+    expect(groupConfirm).toHaveBeenNthCalledWith(
+      1,
+      '이 그룹을 삭제하면 포함된 모든 테이블에서 그룹 지정이 해제됩니다. 정말로 삭제하시겠습니까?',
+    )
+    expect(groupConfirm).toHaveBeenNthCalledWith(
+      2,
+      '이 그룹을 삭제하면 포함된 모든 테이블에서 그룹 지정이 해제됩니다. 정말로 삭제하시겠습니까?',
+    )
     fireEvent.click(screen.getByTestId('group-close'))
 
     fireEvent.click(screen.getByRole('button', { name: '인덱스 카디널리티 계산' }))
@@ -456,14 +724,17 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(6)
+    fireEvent.click(screen.getByRole('button', { name: 'SVG 이미지 내보내기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'PlantUML 내보내기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mermaid 내보내기' }))
+    expect(exports.downloadText).toHaveBeenCalledTimes(10)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -539,7 +810,7 @@ describe('App orchestration coverage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
     fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: 'Roadmap' } })
-    fireEvent.click(screen.getByRole('button', { name: '새 프로젝트' }))
+    fireEvent.submit(screen.getByRole('form', { name: '프로젝트 생성' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
@@ -610,8 +881,9 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -648,7 +920,8 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
+    expect(screen.getByRole('alert')).toHaveTextContent('스냅샷 목록을 새로고침하지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('terminal refresh down')
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {
@@ -694,7 +967,8 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(screen.getByRole('alert')).toHaveTextContent('database rejected snapshot')
+    expect(screen.getByRole('alert')).toHaveTextContent('스냅샷 생성에 실패했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('database rejected snapshot')
   })
 
   it('renders user identity fallbacks and a diagram list without a project label', async () => {
@@ -719,6 +993,17 @@ describe('App orchestration coverage', () => {
     expect(screen.getAllByText('현재 프로젝트')).toHaveLength(2)
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(onOpenEditor).toHaveBeenCalledWith('s1')
+
+    cleanup()
+    render(
+      <DiagramTable
+        snapshots={[{ schema_snapshot_uuid: 'queued', status: 'queued', schema_filter: 'public' }]}
+        selectedProjectName=""
+        onOpenEditor={onOpenEditor}
+      />,
+    )
+    expect(screen.getByText('queued')).toHaveClass('statusPill')
+    expect(screen.getByText('queued')).not.toHaveClass('statusPill--queued')
   })
 
   it('ignores duplicate share creation while a request is pending', async () => {
@@ -731,6 +1016,32 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('share-create'))
     expect(api.createShareLink).toHaveBeenCalledTimes(1)
     await act(async () => resolveShare({ url: 'http://localhost/api/share/done' }))
+  })
+
+  it('does not restore a stale share link after switching projects', async () => {
+    let resolveFirstShare!: (value: { url: string }) => void
+    api.createShareLink
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirstShare = resolve }))
+      .mockResolvedValueOnce({ url: 'http://localhost/api/share/project-b' })
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
+    fireEvent.click(screen.getByTestId('share-create'))
+    expect(api.createShareLink).toHaveBeenLastCalledWith('p1')
+
+    fireEvent.click(screen.getByTestId('export-close'))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
+    expect(screen.getByTestId('share-url')).toBeEmptyDOMElement()
+
+    fireEvent.click(screen.getByTestId('share-create'))
+    await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/project-b'))
+    expect(api.createShareLink).toHaveBeenLastCalledWith('p2')
+
+    await act(async () => resolveFirstShare({ url: 'http://localhost/api/share/project-a' }))
+    expect(screen.getByTestId('share-url')).toHaveTextContent('/project-b')
+    expect(screen.getByTestId('share-url')).not.toHaveTextContent('/project-a')
   })
 
   it('preserves positions across graph refresh and applies recommendations with sibling nodes', async () => {
@@ -784,8 +1095,9 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -801,14 +1113,16 @@ describe('App orchestration coverage', () => {
     api.listSnapshots.mockRejectedValueOnce(new Error('snapshots down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/down/)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/목록을 불러오지 못했습니다/)
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/down/)
     fireEvent.click(screen.getAllByRole('button', { name: '테이블 추가' })[0]!)
     fireEvent.click(screen.getByTestId('add-name'))
     fireEvent.click(screen.getByTestId('add-submit'))
     fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
     api.createShareLink.mockRejectedValueOnce(new Error('share down'))
     fireEvent.click(screen.getByTestId('share-create'))
-    await waitFor(() => expect(screen.getByTestId('share-error')).toHaveTextContent('share down'))
+    await waitFor(() => expect(screen.getByTestId('share-error')).toHaveTextContent('공유 링크를 만들지 못했습니다'))
+    expect(screen.getByTestId('share-error')).not.toHaveTextContent('share down')
 
     api.createShareLink.mockResolvedValueOnce({ url: 'http://localhost/api/share/fail-copy' })
     fireEvent.click(screen.getByTestId('share-create'))
@@ -831,6 +1145,7 @@ describe('App orchestration coverage', () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
     })
-    expect(screen.getByRole('alert')).toHaveTextContent('poll down')
+    expect(screen.getByRole('alert')).toHaveTextContent('스냅샷 상태를 확인하지 못했습니다')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('poll down')
   })
 })

@@ -63,6 +63,7 @@ asyncio_mode = "auto"
 
 [tool.coverage.run]
 include = [
+  "app/api/share.py",
   "app/csrf.py",
   "app/db_introspect.py",
   "app/metrics.py",

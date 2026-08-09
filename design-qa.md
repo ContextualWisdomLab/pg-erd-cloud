@@ -1,37 +1,45 @@
-**Findings**
-- No actionable P0/P1/P2 mismatches remain.
-  Location: `ExportModal` share/export component.
-  Evidence: Figma source node `29:143` and the rendered implementation both use a centered 640px modal, two-column desktop body, compact bordered sections, primary blue actions, neutral/success/error status strip treatment, and footer actions aligned to the right.
-  Impact: The implementation preserves the intended share/export hierarchy and does not block handoff.
-  Fix: None required.
+# Live Figma Design QA
 
-**Open Questions**
-- The Figma source has three export artifact rows: SQL DDL, SVG image, and Mermaid. The implementation adds PlantUML because the current product already exposes PlantUML export. This is treated as an intentional product-capability extension.
-- The implementation is localized in Korean while the Figma source is in English. The copy preserves the same intent and hierarchy.
-- The close button shows a visible focus ring in the automated screenshots. This is expected accessibility behavior from the capture path and should not be removed.
+Checked: 2026-08-09
 
-**Implementation Checklist**
-- Source visual truth path: `docs/ui-ux/qa/2026-07-02-figma-share-export-modal.png`.
-- Implementation screenshot path: `docs/ui-ux/qa/2026-07-02-implementation-share-export-modal.png`.
-- Success-state screenshot path: `docs/ui-ux/qa/2026-07-02-implementation-share-export-success-modal.png`.
-- Mobile screenshot path: `docs/ui-ux/qa/2026-07-02-implementation-share-export-mobile.png`.
-- Full-view comparison evidence: `docs/ui-ux/qa/2026-07-02-share-export-comparison.png`.
-- Viewport: desktop `1440x900`; mobile `390x844 @ 2x`.
-- State: default ready state and copied success state in demo mode.
-- Focused region comparison evidence: modal-only screenshots were captured because the component-level source and implementation are readable without additional crops.
-- Fonts and typography: system UI stack maps acceptably to the app; hierarchy, weight, wrapping, and line height remain readable in desktop and mobile captures.
-- Spacing and layout rhythm: modal width, two-column desktop layout, section grouping, status strip, and footer alignment match the source intent. Export row density was compacted during QA.
-- Colors and visual tokens: primary blue, slate text, light borders, neutral ready state, green success state, and disabled secondary action match the source intent and app palette.
-- Image quality and asset fidelity: no external images or replacement assets are part of this modal; all visible UI is native controls and text.
-- Copy and content: Korean implementation copy is coherent and maps to the same source states. PlantUML is the only added product row.
-- Responsiveness: mobile capture has no horizontal overflow; the modal collapses to one column and remains scrollable.
+## Result
 
-**Patches Made Since Previous QA Pass**
-- Reduced `exportModal` vertical gaps and padding.
-- Reduced share/export section padding and minimum height.
-- Tightened export artifact row gaps, padding, and button sizing.
+No actionable P0/P1 implementation defect remains in the code-level contract checks. Final visual sign-off is blocked because the approved cloud browser could not reach the sandbox-isolated local Vite server (`ERR_CONNECTION_REFUSED`), so a same-viewport source/implementation screenshot comparison could not be produced. Historical 2026-07-02 captures were not reused as current evidence.
 
-**Follow-up Polish**
-- Consider adding a dedicated Figma variant with PlantUML so the source design exactly reflects all current product export types.
+`final result: blocked`
 
-final result: passed
+## Authoritative Source
+
+- Figma file: `csnpEEJfmqFWB0vNUoTkWA`.
+- Screen templates: AuthGate `37:2`, Dashboard `37:10`, ProjectList `37:62`, DiagramList `37:88`, ERDEditor `37:114`, AddTable `37:253`, Relationship `37:271`, ShareExport `130:232`, Group `130:259`, Cardinality `130:285`, and EditTable `130:313`.
+- Developer Handoff: `39:3`; Implementation Contracts: `45:2`.
+- The deleted ShareExport node `29:143` and committed 2026-07-02 captures are historical evidence only.
+
+## Verified Contracts
+
+- The desktop ERDEditor follows the concrete 1440px frame split: 300px navigation, 850px canvas, and 290px properties inspector. At 767px the shell and inspector stack.
+- The compact toolbar follows the live order and keeps search in the properties inspector.
+- Shared Figma tokens cover colors, type, spacing, radius, effects, component sizes, modal sizes, responsive breakpoint, and disabled opacity. Inter 400/500/700 is bundled and placed first in the application font stack. Computed-style tests verify the concrete screen geometry and responsive rules.
+- React Flow controls, minimaps, backgrounds, and connection handles follow the system light/dark mode and the semantic handle tokens.
+- ShareExport keeps the live Korean share-link and DDL hierarchy, uses a fixed footer for DDL copy, and keeps existing extra export formats in a collapsed disclosure.
+- All editor dialogs use one labelled `aria-modal` shell with initial focus, Tab/Shift+Tab containment, Escape close, focus return, neutral structural wrappers, and an explicit backdrop policy, following the [WAI-ARIA modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+- Group colors use a keyboard-operable radio-group model with roving `tabindex`; destructive mutations prompt once at the application boundary.
+- React Flow selection uses the controlled selection callback, and stale selection is cleared when the graph changes, consistent with [React Flow accessibility guidance](https://reactflow.dev/learn/advanced-use/accessibility).
+- The public `/share/{id}` route renders successful API snapshots as a read-only ERD with no interaction unlock control, keeps server errors generic, and does not pre-escape React text. The export modal warns that bearer links currently have no expiry or revocation control.
+
+## Resolved Figma Conflicts
+
+- `layout/sidebar-width` is 360px, but the concrete ERDEditor screen is explicitly 300/850/290. Screen geometry wins for that screen; the general 360px variable remains in the token inventory.
+- ShareExport is drawn at 720px, but Developer Handoff explicitly says modal widths map to `modal/*` variables. The implementation therefore uses `modal/export-width` at 500px.
+- Figma dark inverse text and success-state color pairs fall below the [WCAG 2.2 normal-text contrast requirement](https://www.w3.org/TR/WCAG22/#contrast-minimum). The implementation uses audited inverse and success text overrides in light and dark modes.
+- Auth text, narrow modal footers, and the oversized ShareExport showcase are treated as documented Figma defects: implementation allows wrapping, keeps actions visible, and remains scroll-safe.
+
+## Verification Evidence
+
+- Frontend unit and interaction tests cover screen navigation, editor selection, modal actions, public sharing, API parsing, exports, accessibility behavior, Figma tokens, and responsive CSS contracts.
+- TypeScript typecheck, production build, diff whitespace check, and V8 coverage are required before handoff.
+- Visual source inspection used the live Figma nodes above. Implementation screenshot comparison remains the only blocked gate.
+
+## Required Follow-up
+
+Run the approved browser against a reachable preview at desktop `1440×900` and mobile `390×844`, capture the same states as the live source nodes, combine each source/implementation pair, and update this file only after visible spacing, typography, overflow, focus, and state differences have been reviewed.

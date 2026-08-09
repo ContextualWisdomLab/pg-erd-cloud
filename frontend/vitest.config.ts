@@ -1,8 +1,9 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
-import viteConfig from './vite.config'
+import viteConfig from './vite.config.ts'
 
 export default mergeConfig(viteConfig, defineConfig({
   test: {
+    css: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html'],

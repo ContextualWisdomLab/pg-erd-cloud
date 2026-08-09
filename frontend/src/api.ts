@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type { Connection, Project, SharedLinkInfo, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -93,12 +93,23 @@ function requireSecureCredentialTransport(): void {
 }
 
 export function shareLinkUrlFromPath(urlPath: unknown): string {
-  if (typeof urlPath !== 'string' || !urlPath.startsWith('/api/share/')) {
+  if (typeof urlPath !== 'string' || !/^\/api\/share\/[^/]+$/.test(urlPath)) {
     throw new Error('createShareLink failed: invalid share URL path')
   }
 
-  const apiBase = new URL(API_BASE || window.location.origin, window.location.origin)
-  return new URL(urlPath, apiBase).toString()
+  const shareLinkId = urlPath.slice('/api/share/'.length)
+  return new URL(`/share/${encodeURIComponent(shareLinkId)}`, window.location.origin).toString()
+}
+
+export function publicShareIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/share\/([^/]+)\/?$/)
+  if (!match?.[1]) return null
+
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return null
+  }
 }
 
 async function csrfToken(): Promise<string> {
@@ -222,11 +233,12 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
 
 export async function createShareLink(projectId: string): Promise<ShareLink> {
   if (DEMO_MODE) {
+    const shareLinkId = `demo-${projectId}`
     return {
-      share_link_uuid: `demo-share-${Date.now()}`,
+      share_link_uuid: shareLinkId,
       permission_kind: 'read',
-      url_path: `/api/share/demo-${projectId}`,
-      url: shareLinkUrlFromPath(`/api/share/demo-${projectId}`)
+      url_path: `/api/share/${shareLinkId}`,
+      url: shareLinkUrlFromPath(`/api/share/${shareLinkId}`)
     }
   }
 
@@ -242,6 +254,40 @@ export async function createShareLink(projectId: string): Promise<ShareLink> {
     ...response,
     url: shareLinkUrlFromPath(response.url_path)
   }
+}
+
+export async function getSharedLinkInfo(shareLinkId: string): Promise<SharedLinkInfo> {
+  if (DEMO_MODE) {
+    const projectId = shareLinkId.startsWith('demo-')
+      ? shareLinkId.slice('demo-'.length)
+      : shareLinkId
+    return {
+      project_space_uuid: projectId,
+      permission_kind: 'read',
+      snapshots: (demoSnapshotsByProject[projectId] ?? []).map((snapshot) => ({
+        ...snapshot,
+        created_at: new Date(0).toISOString(),
+      })),
+    }
+  }
+
+  const r = await fetch(`${API_BASE}/api/share/${encodeURIComponent(shareLinkId)}`)
+  if (!r.ok) throw new Error(`getSharedLinkInfo failed: ${r.status}`)
+  return r.json()
+}
+
+export async function getSharedSnapshot(
+  shareLinkId: string,
+  snapshotId: string,
+): Promise<SnapshotDetail> {
+  if (DEMO_MODE) return getSnapshot(snapshotId)
+
+  const r = await fetch(
+    `${API_BASE}/api/share/${encodeURIComponent(shareLinkId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+  )
+  if (!r.ok) throw new Error(`getSharedSnapshot failed: ${r.status}`)
+  const response = (await r.json()) as SnapshotDetailResponse
+  return snapshotDetailFromResponse(response)
 }
 
 export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {

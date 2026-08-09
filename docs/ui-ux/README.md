@@ -4,6 +4,10 @@ These reference screens define the intended product direction for Cloud ERD UI w
 See `product-spec.md` for the information architecture, screen definitions,
 key screens, wireframes, user stories, and implementation checklist.
 
+For implementation and review, start with `figma-contract.md`. It records the
+authoritative live Figma file, node inventory, precedence, and intentional
+extensions. The PNG files below are historical fallback evidence.
+
 - Use a quiet, work-focused application layout with a persistent left sidebar.
 - Keep the main palette light with blue as the primary action and active-state color.
 - Prefer thin borders, subtle shadows, compact tables, and dense editor controls.

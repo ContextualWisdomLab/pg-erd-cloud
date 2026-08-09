@@ -6,32 +6,55 @@ const FOCUSABLE_SELECTOR = [
   "textarea:not([disabled])",
   "input:not([disabled])",
   "select:not([disabled])",
+  "summary",
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
 const trackedDocuments = new WeakSet<Document>();
-let lastFocusedElement: HTMLElement | null = null;
-let lastInteractedElement: HTMLElement | null = null;
+type FocusableElement = HTMLElement | SVGElement;
 
-function isHTMLElement(ownerDocument: Document, value: EventTarget | Element | null): value is HTMLElement {
+let lastFocusedElement: FocusableElement | null = null;
+let lastInteractedElement: FocusableElement | null = null;
+
+function isFocusableElement(
+  ownerDocument: Document,
+  value: EventTarget | Element | null,
+): value is FocusableElement {
   /* v8 ignore next -- browser-owned documents always expose their matching window constructor */
   const HTMLElementCtor = ownerDocument.defaultView?.HTMLElement ?? HTMLElement;
-  return value instanceof HTMLElementCtor;
+  /* v8 ignore next -- browser-owned documents always expose their matching window constructor */
+  const SVGElementCtor = ownerDocument.defaultView?.SVGElement ?? SVGElement;
+  return value instanceof HTMLElementCtor || value instanceof SVGElementCtor;
+}
+
+function isElement(ownerDocument: Document, value: EventTarget | null): value is Element {
+  /* v8 ignore next -- browser-owned documents always expose their matching window constructor */
+  const ElementCtor = ownerDocument.defaultView?.Element ?? Element;
+  return value instanceof ElementCtor;
+}
+
+function closestFocusableAncestor(
+  ownerDocument: Document,
+  target: EventTarget | null,
+): FocusableElement | null {
+  if (!isElement(ownerDocument, target)) return null;
+  const candidate = target.closest(FOCUSABLE_SELECTOR);
+  return candidate && isFocusableElement(ownerDocument, candidate) && candidate !== ownerDocument.body
+    ? candidate
+    : null;
 }
 
 function ensureFocusTracking(ownerDocument: Document) {
   if (trackedDocuments.has(ownerDocument)) return;
 
   function rememberFocusedElement(event: Event) {
-    if (isHTMLElement(ownerDocument, event.target) && event.target !== ownerDocument.body) {
+    if (isFocusableElement(ownerDocument, event.target) && event.target !== ownerDocument.body) {
       lastFocusedElement = event.target;
     }
   }
 
   function rememberInteractedElement(event: Event) {
-    if (isHTMLElement(ownerDocument, event.target) && event.target !== ownerDocument.body) {
-      lastInteractedElement = event.target;
-    }
+    lastInteractedElement = closestFocusableAncestor(ownerDocument, event.target);
   }
 
   trackedDocuments.add(ownerDocument);
@@ -46,9 +69,17 @@ if (typeof document !== "undefined") {
   ensureFocusTracking(document);
 }
 
-function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
-  return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true");
+function getFocusableElements(dialog: HTMLElement): FocusableElement[] {
+  return Array.from(dialog.querySelectorAll(FOCUSABLE_SELECTOR))
+    .filter((element): element is FocusableElement => {
+      if (!isFocusableElement(dialog.ownerDocument, element)) return false;
+      if (element.tabIndex < 0 || element.closest('[hidden], [aria-hidden="true"]')) {
+        return false;
+      }
+
+      const closedDetails = element.closest<HTMLDetailsElement>("details:not([open])");
+      return !closedDetails || closedDetails.querySelector("summary") === element;
+    });
 }
 
 export function useDialogAccessibility(
@@ -77,7 +108,7 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
     if (!isOpen) return undefined;
 
     const activeElement =
-      isHTMLElement(ownerDocument, ownerDocument.activeElement) &&
+      isFocusableElement(ownerDocument, ownerDocument.activeElement) &&
       ownerDocument.activeElement !== ownerDocument.body &&
       (!dialog || !dialog.contains(ownerDocument.activeElement))
         ? ownerDocument.activeElement
@@ -133,7 +164,10 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
       const last = focusableElements[focusableElements.length - 1];
       const activeElement = ownerDocument.activeElement;
 
-      if (event.shiftKey && activeElement === first) {
+      if (!dialog.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && activeElement === last) {

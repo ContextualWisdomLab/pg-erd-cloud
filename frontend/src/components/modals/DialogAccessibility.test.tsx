@@ -1,11 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { AddTableModal } from './AddTableModal';
 import { GroupModal } from './GroupModal';
+import { ModalShell } from './ModalShell';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 afterEach(() => {
@@ -14,6 +15,49 @@ afterEach(() => {
 });
 
 describe('modal dialog accessibility', () => {
+  it('provides one labelled shell with an explicit backdrop policy', async () => {
+    const onClose = vi.fn();
+    const { container, rerender } = render(
+      <ModalShell
+        title="테이블 추가"
+        titleId="modal-shell-title"
+        onClose={onClose}
+        closeLabel="테이블 추가 닫기"
+        size="addTable"
+      >
+        <button type="button">본문 작업</button>
+      </ModalShell>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '테이블 추가' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveClass('modalShell--addTable');
+    expect(within(dialog).queryByRole('banner')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('contentinfo')).not.toBeInTheDocument();
+
+    fireEvent.click(container.querySelector('.modalOverlay')!);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: '테이블 추가 닫기' }));
+    expect(onClose).toHaveBeenCalledOnce();
+
+    onClose.mockClear();
+    rerender(
+      <ModalShell
+        title="테이블 추가"
+        titleId="modal-shell-title"
+        onClose={onClose}
+        closeLabel="테이블 추가 닫기"
+        size="addTable"
+        closeOnBackdrop
+      >
+        <button type="button">본문 작업</button>
+      </ModalShell>,
+    );
+    fireEvent.click(container.querySelector('.modalOverlay')!);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('closes with Escape and restores focus to the opener', async () => {
     const onCloseGroupManager = vi.fn();
 
@@ -66,6 +110,52 @@ describe('modal dialog accessibility', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('restores focus to the focusable ancestor of an SVG interaction target', async () => {
+    function Harness() {
+      const [isOpen, setIsOpen] = useState(false);
+      return (
+        <>
+          <button type="button">이전 포커스</button>
+          <svg>
+            <g
+              role="button"
+              tabIndex={0}
+              aria-label="관계 편집 열기"
+              onClick={() => setIsOpen(true)}
+            >
+              <path data-testid="svg-opener-target" />
+            </g>
+          </svg>
+          {isOpen ? (
+            <ModalShell
+              title="관계 편집"
+              titleId="focus-return-title"
+              onClose={() => setIsOpen(false)}
+              closeLabel="관계 편집 닫기"
+              size="relationship"
+            >
+              <button type="button">관계 저장</button>
+            </ModalShell>
+          ) : null}
+        </>
+      );
+    }
+
+    render(<Harness />);
+    const fallback = screen.getByRole('button', { name: '이전 포커스' });
+    const opener = screen.getByRole('button', { name: '관계 편집 열기' });
+    fallback.focus();
+    fallback.blur();
+
+    const svgTarget = screen.getByTestId('svg-opener-target');
+    fireEvent.mouseDown(svgTarget);
+    fireEvent.click(svgTarget);
+    await waitFor(() => expect(screen.getByRole('dialog', { name: '관계 편집' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '관계 편집 닫기' }));
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
   it('traps Tab navigation inside the dialog', async () => {
     render(
       <AddTableModal
@@ -84,11 +174,88 @@ describe('modal dialog accessibility', () => {
 
     saveButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
-    expect(tableNameInput).toHaveFocus();
+    expect(screen.getByRole('button', { name: '테이블 추가 닫기' })).toHaveFocus();
 
-    tableNameInput.focus();
+    screen.getByRole('button', { name: '테이블 추가 닫기' }).focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(saveButton).toHaveFocus();
+  });
+
+  it('recovers focus when Tab starts outside the open dialog', async () => {
+    render(
+      <>
+        <button type="button">외부 작업</button>
+        <AddTableModal
+          isOpen
+          newTableName="users"
+          setNewTableName={vi.fn()}
+          onAddTableCancel={vi.fn()}
+          onAddTableSubmit={vi.fn()}
+        />
+      </>,
+    );
+
+    const outsideButton = screen.getByRole('button', { name: '외부 작업' });
+    const firstDialogControl = screen.getByRole('button', { name: '테이블 추가 닫기' });
+    const lastDialogControl = screen.getByRole('button', { name: '저장' });
+
+    await waitFor(() => expect(screen.getByLabelText('테이블 이름')).toHaveFocus());
+
+    outsideButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(firstDialogControl).toHaveFocus();
+
+    outsideButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(lastDialogControl).toHaveFocus();
+  });
+
+  it('ignores non-HTML/SVG elements that expose a tabindex', async () => {
+    function ForeignNamespaceDialog() {
+      const dialogRef = useDialogAccessibility(true, vi.fn());
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}>
+          <button type="button">유효한 작업</button>
+        </div>
+      );
+    }
+
+    render(<ForeignNamespaceDialog />);
+    const dialog = screen.getByRole('dialog');
+    const mathElement = document.createElementNS(
+      'http://www.w3.org/1998/Math/MathML',
+      'math',
+    );
+    mathElement.setAttribute('tabindex', '0');
+    dialog.prepend(mathElement);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '유효한 작업' })).toHaveFocus(),
+    );
+  });
+
+  it('treats a closed details summary as the final visible Tab stop', async () => {
+    function DetailsDialog() {
+      const dialogRef = useDialogAccessibility(true, vi.fn());
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}>
+          <button type="button">첫 작업</button>
+          <details>
+            <summary>기타 산출물</summary>
+            <button type="button">숨겨진 산출물</button>
+          </details>
+        </div>
+      );
+    }
+
+    render(<DetailsDialog />);
+    const firstButton = screen.getByRole('button', { name: '첫 작업' });
+    const summary = screen.getByText('기타 산출물');
+
+    await waitFor(() => expect(firstButton).toHaveFocus());
+    summary.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(firstButton).toHaveFocus();
   });
 
   it('keeps aria-hidden=false controls in the focus trap', async () => {
@@ -115,6 +282,45 @@ describe('modal dialog accessibility', () => {
     lastButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(firstButton).toHaveFocus();
+  });
+
+  it('excludes controls hidden from assistive technology from the focus trap', async () => {
+    function TestDialog() {
+      const dialogRef = useDialogAccessibility(true, vi.fn());
+
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}>
+          <button type="button">First visible action</button>
+          <div aria-hidden="true">
+            <button type="button">Hidden action</button>
+          </div>
+          <button type="button">Last visible action</button>
+        </div>
+      );
+    }
+
+    render(<TestDialog />);
+
+    const firstButton = screen.getByRole('button', { name: 'First visible action' });
+    const lastButton = screen.getByRole('button', { name: 'Last visible action' });
+    await waitFor(() => expect(firstButton).toHaveFocus());
+
+    lastButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(firstButton).toHaveFocus();
+  });
+
+  it('does not install dialog behavior while the hook is closed', () => {
+    const onClose = vi.fn();
+
+    function ClosedDialog() {
+      const dialogRef = useDialogAccessibility(false, onClose);
+      return <div ref={dialogRef} role="dialog" tabIndex={-1}>Closed dialog</div>;
+    }
+
+    render(<ClosedDialog />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('focuses a buttonless dialog and keeps Tab inside it', async () => {
@@ -182,6 +388,7 @@ describe('modal dialog accessibility', () => {
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(middle).toHaveFocus();
     fireEvent.focusIn(document.body);
+    fireEvent.mouseDown(document.body);
   });
 
   it('does not refocus an opener removed after cleanup', () => {
