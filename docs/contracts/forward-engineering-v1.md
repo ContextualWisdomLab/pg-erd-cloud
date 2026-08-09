@@ -275,17 +275,17 @@ Plan SQL is read-only review output. The release executor consumes the
 structured stored plan and verifies `plan_digest`; it does not execute a new SQL
 string supplied in a run request.
 
-## 8. Planned run API and status contract
+## 8. Migration-plan retrieval and planned run API
 
-The following routes and symbols are **Planned** and do not exist in current
-code:
+Immutable plan retrieval is **Implemented**. The remaining run routes and state
+symbols are **Planned** and do not exist in current code:
 
-| Method and target route | Required request contract | Success |
-|---|---|---|
-| `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable plan preview, `200` |
-| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` |
-| `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` |
-| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | bounded state/evidence view, `200` |
+| Method and target route | Required request contract | Success | Status |
+|---|---|---|---|
+| `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
+| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
+| `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
+| `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | bounded state/evidence view, `200` | **Planned** |
 
 Dry-run states:
 
