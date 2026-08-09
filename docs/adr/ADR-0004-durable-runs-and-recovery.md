@@ -105,20 +105,22 @@ Rules:
   runs.
 - `MigrationRun` and `MigrationRunEvent` ORM models plus Alembic revision 0010
   persist idempotent run identity and append-only ordered evidence.
-- Database checks constrain run kind, current state, run-kind/state compatibility,
-  positive state version, and positive event sequence; uniqueness selects one run per hashed
+- Database checks constrain run kind, current state, positive state version,
+  and positive event sequence; uniqueness selects one run per hashed
   project/run-kind idempotency identity, `request_digest` distinguishes
   conflicting reuse, and one event exists per run sequence.
 - `app.forward.migration_run` owns the exact transition graph, bounded
   idempotency-key hashing, versioned request digests binding project, plan,
   run kind, plan digest, and actor, plus recursive rejection of SQL/credential
   fields and PostgreSQL connection-string values in evidence.
+- `transition_migration_run` performs an optimistic update matching the exact
+  UUID, kind, state, and state version, then appends the same-version sanitized
+  event in the caller-owned transaction. A stale worker cannot publish evidence.
 
 ### Planned before production release
 
 - idempotent dry-run/apply creation and run polling routes;
-- compare-and-swap state service, outbox/queue integration, and cancellation
-  semantics;
+- outbox/queue integration and cancellation semantics;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 
