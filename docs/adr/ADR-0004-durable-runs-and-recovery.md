@@ -126,7 +126,7 @@ Rules:
 
 ### Planned before production release
 
-- authenticated dry-run creation and run polling routes, plus apply creation;
+- authenticated dry-run/cancellation routes and apply creation;
 - outbox/queue integration and cancellation semantics;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
