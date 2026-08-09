@@ -1,7 +1,7 @@
 import datetime as dt
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -11,6 +11,7 @@ from app.api.diagram_views import (
     create_view,
     delete_view,
     get_view,
+    list_views,
     update_view,
 )
 from app.auth import CurrentUser
@@ -267,3 +268,70 @@ async def test_delete_view_returns_404_when_unauthorized() -> None:
             )
     assert exc.value.status_code == 404
     session.delete.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_delete_view_deletes_when_authorized() -> None:
+    """Delete and commit exactly the authorized saved-view resource."""
+
+    session = AsyncMock()
+    view = SimpleNamespace(diagram_view_uuid=uuid.uuid4())
+    with patch(
+        "app.api.diagram_views._get_authorized_view",
+        new_callable=AsyncMock,
+        return_value=view,
+    ):
+        result = await delete_view(
+            diagram_view_uuid=view.diagram_view_uuid, user=_user(), session=session
+        )
+
+    assert result == {"ok": True}
+    session.delete.assert_called_once_with(view)
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_list_views_returns_authorized_project_views() -> None:
+    """Return the exact authorized project's persisted view summaries."""
+
+    session = AsyncMock()
+    project_id = uuid.uuid4()
+    now = dt.datetime.now(dt.timezone.utc)
+    views = [
+        SimpleNamespace(
+            diagram_view_uuid=uuid.uuid4(), name=name, created_at=now, updated_at=now
+        )
+        for name in ("view 1", "view 2")
+    ]
+    rows = Mock()
+    rows.scalars.return_value.all.return_value = views
+    session.execute.return_value = rows
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as membership:
+        out = await list_views(
+            project_space_uuid=project_id, user=_user(), session=session
+        )
+
+    assert [item.name for item in out] == ["view 1", "view 2"]
+    membership.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_list_views_propagates_authorization_failure_before_query() -> None:
+    """Fail authorization before querying project-scoped view identities."""
+
+    session = AsyncMock()
+    denied = HTTPException(status_code=403, detail="Forbidden")
+    with patch(
+        "app.api.diagram_views.require_project_member",
+        new=AsyncMock(side_effect=denied),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await list_views(
+                project_space_uuid=uuid.uuid4(), user=_user(), session=session
+            )
+
+    assert exc.value.status_code == 403
+    session.execute.assert_not_awaited()
