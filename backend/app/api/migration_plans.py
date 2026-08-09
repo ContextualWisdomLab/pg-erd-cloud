@@ -55,10 +55,18 @@ def _plan_out(plan: MigrationPlan) -> MigrationPlanOut:
     plan_json = plan.plan_json
     return MigrationPlanOut(
         migration_plan_uuid=plan.migration_plan_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        schema_model_revision_uuid=plan.schema_model_revision_uuid,
+        db_connection_uuid=plan.db_connection_uuid,
+        base_schema_snapshot_uuid=plan.base_schema_snapshot_uuid,
         plan_digest=plan.statement_digest,
         base_digest=plan.base_digest,
         target_digest=plan.target_digest,
         compiler_version=plan.compiler_version,
+        snapshot_contract_version=plan_json["snapshot_contract_version"],
+        postgresql_major=plan_json["postgresql_major"],
+        created_by_user_uuid=plan.created_by_user_uuid,
+        created_at=plan.created_at,
         can_dry_run=bool(plan_json["can_dry_run"]),
         requires_destructive_confirmation=bool(
             plan_json["requires_destructive_confirmation"]
