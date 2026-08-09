@@ -69,6 +69,9 @@ _TRANSITIONS = {
 _FORBIDDEN_EVIDENCE_TOKENS = frozenset(
     {"credential", "dsn", "password", "secret", "sql", "token"}
 )
+_POSTGRES_CONNECTION_STRING = re.compile(
+    r"postgres(?:ql)?(?:\\+[a-z0-9_.-]+)?://", re.IGNORECASE
+)
 
 
 class MigrationRunContractError(ValueError):
@@ -102,8 +105,13 @@ def _validate_evidence(value: object, *, path: str, depth: int) -> Any:
     if depth > MAX_RUN_EVIDENCE_DEPTH:
         raise MigrationRunContractError("run evidence nesting is too deep")
     if value is None or isinstance(value, (bool, int, str)):
-        if isinstance(value, str) and len(value.encode("utf-8")) > MAX_RUN_EVIDENCE_STRING_BYTES:
-            raise MigrationRunContractError("run evidence string is too large")
+        if isinstance(value, str):
+            if len(value.encode("utf-8")) > MAX_RUN_EVIDENCE_STRING_BYTES:
+                raise MigrationRunContractError("run evidence string is too large")
+            if _POSTGRES_CONNECTION_STRING.search(value):
+                raise MigrationRunContractError(
+                    "run evidence must not contain a PostgreSQL connection string"
+                )
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
