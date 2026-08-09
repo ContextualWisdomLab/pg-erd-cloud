@@ -107,7 +107,8 @@ Rules:
   persist idempotent run identity and append-only ordered evidence.
 - Database checks constrain run kind, current state, positive state version,
   and positive event sequence; uniqueness selects one run per hashed
-  idempotency identity and one event per run sequence.
+  project/run-kind idempotency identity, `request_digest` distinguishes
+  conflicting reuse, and one event exists per run sequence.
 - `app.forward.migration_run` owns the exact transition graph, bounded
   idempotency-key hashing, and recursive rejection of SQL/credential-bearing
   evidence fields.
