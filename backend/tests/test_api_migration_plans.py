@@ -15,6 +15,7 @@ from app.api.migration_plans import (
     get_migration_plan,
 )
 from app.auth import CurrentUser
+from app.forward.migration_plan import compile_migration_plan
 from app.models import MigrationPlan
 from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
 
@@ -41,26 +42,18 @@ class FakeSession:
 
 
 def _stored_plan() -> SimpleNamespace:
+    plan_json = compile_migration_plan(_model(), _model())
     return SimpleNamespace(
         migration_plan_uuid=uuid.uuid4(),
         project_space_uuid=uuid.uuid4(),
         schema_model_revision_uuid=uuid.uuid4(),
         db_connection_uuid=uuid.uuid4(),
         base_schema_snapshot_uuid=uuid.uuid4(),
-        statement_digest="c" * 64,
-        base_digest="a" * 64,
-        target_digest="b" * 64,
-        compiler_version="pg-erd-forward/v1",
-        plan_json={
-            "snapshot_contract_version": 1,
-            "postgresql_major": 18,
-            "statements": [],
-            "proposed_statements": [],
-            "blockers": [],
-            "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
-            "can_dry_run": True,
-            "requires_destructive_confirmation": False,
-        },
+        statement_digest=plan_json["plan_digest"],
+        base_digest=plan_json["base_digest"],
+        target_digest=plan_json["target_digest"],
+        compiler_version=plan_json["compiler_version"],
+        plan_json=plan_json,
         created_by_user_uuid=uuid.uuid4(),
         created_at=dt.datetime.now(dt.timezone.utc),
         expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
@@ -93,6 +86,27 @@ async def test_get_migration_plan_returns_immutable_member_preview() -> None:
     assert out.created_by_user_uuid == plan.created_by_user_uuid
     assert out.created_at == plan.created_at
     membership.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_migration_plan_rejects_tampered_persisted_payload() -> None:
+    plan = _stored_plan()
+    plan.plan_json["can_dry_run"] = False
+    session = FakeSession()
+    session.get.return_value = plan
+
+    with patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_migration_plan(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "migration plan integrity verification failed"
 
 
 @pytest.mark.asyncio
@@ -275,42 +289,22 @@ def test_migration_plan_preview_route_is_published_in_openapi() -> None:
 async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> None:
     inputs = _inputs()
     _, revision, connection, snapshot, _ = inputs
+    compiled = compile_migration_plan(_model(), _model())
     existing = SimpleNamespace(
         migration_plan_uuid=uuid.uuid4(),
         project_space_uuid=inputs[0].project_space_uuid,
         schema_model_revision_uuid=revision.schema_model_revision_uuid,
         db_connection_uuid=connection.db_connection_uuid,
         base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
-        statement_digest="c" * 64,
-        base_digest="a" * 64,
-        target_digest="b" * 64,
-        compiler_version="pg-erd-forward/v1",
-        plan_json={
-            "snapshot_contract_version": 1,
-            "postgresql_major": 18,
-            "statements": [],
-            "proposed_statements": [],
-            "blockers": [],
-            "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
-            "can_dry_run": True,
-            "requires_destructive_confirmation": False,
-        },
+        statement_digest=compiled["plan_digest"],
+        base_digest=compiled["base_digest"],
+        target_digest=compiled["target_digest"],
+        compiler_version=compiled["compiler_version"],
+        plan_json=compiled,
         created_by_user_uuid=uuid.uuid4(),
         created_at=dt.datetime.now(dt.timezone.utc),
         expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
     )
-    compiled = {
-        "compiler_version": "pg-erd-forward/v1",
-        "base_digest": "a" * 64,
-        "target_digest": "b" * 64,
-        "plan_digest": "c" * 64,
-        "statements": [],
-        "proposed_statements": [],
-        "blockers": [],
-        "risk_summary": {"safe": 0, "warning": 0, "destructive": 0},
-        "can_dry_run": True,
-        "requires_destructive_confirmation": False,
-    }
     session = FakeSession()
 
     with patch(
