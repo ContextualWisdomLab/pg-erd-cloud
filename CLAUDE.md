@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-pg-erd-cloud is a PostgreSQL-focused cloud ERD (entity-relationship diagram) collaboration/sharing service — currently a runnable MVP skeleton. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders them as an interactive ERD (React Flow), and forward-engineers snapshots into DDL exports (PostgreSQL or Snowflake dialect), schema diffs/migration SQL, DBML/Mermaid exports, and "DB reversing spec" documents (markdown draft, LLM prompt, or live LLM draft via an OpenAI-compatible provider configured with `LLM_API_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`). Project owners can create share links for unauthenticated read/export access.
+pg-erd-cloud is a PostgreSQL-focused cloud ERD (entity-relationship diagram) collaboration/sharing service. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders them as an interactive ERD (React Flow), and forward-engineers snapshots into DDL exports (PostgreSQL or Snowflake dialect), schema diffs/migration SQL, DBML/Mermaid exports, and "DB reversing spec" documents. The safe live Forward Engineering workflow is partially implemented: versioned models and immutable server-compiled plans exist, while isolated dry run, durable apply, convergence verification, and the frontend journey remain release-blocking planned work. See `ARCHITECTURE.md`, `docs/PRD.md`, and `docs/TRD.md`.
 
 Repository docs are mixed-language: README.md and CHANGELOG.md are Korean; CONTRIBUTING.md, SECURITY.md, and most of docs/ are English.
 
@@ -89,6 +89,7 @@ Three deployable pieces in one repo:
 - `pg_introspect/` — pg_catalog-based introspection of the *target* PostgreSQL: schemas/tables/columns, PK/FK/UNIQUE/CHECK, indexes. Index access methods are discovered dynamically from `pg_am`/`pg_class.relam` and index DDL is preserved losslessly via `pg_get_indexdef()` — do not hardcode an index-type list (project principle, see README). Also synthesizes safe `example_value` column hints from name/type metadata only (never samples real table data).
 - `snowflake_introspect/` — optional Snowflake reverse engineering (INFORMATION_SCHEMA; requires the `snowflake` extra).
 - `ddl/` — forward engineering: snapshot → DDL export with dialect mapping, migration SQL, migration-safety checks.
+- `forward/` — server-authoritative canonical schema models, snapshot adapter, deterministic structured migration-plan compiler, risk/precondition metadata, and digests. Unsupported semantics fail closed.
 - `diff/` — snapshot-to-snapshot schema diff.
 - `spec/` — reversing-spec generation, naming lint, data dictionary, relationship inference, LLM integration.
 - Cross-cutting: `auth.py` (OIDC/Casdoor JWT verification when `OIDC_ISSUER` is set, plus API keys and token revocation), `csrf.py`, `rate_limit.py` (in-memory fixed-window; global `/api/*` limit plus a stricter separate limit for public `/api/share/*`), `security_headers.py`, `observability.py` (JSON request logs + Prometheus metrics — see docs/observability.md), `sanitize.py`/`dsn_redaction.py`, `settings.py` (pydantic-settings; env vars are documented in `.env.example`).
@@ -98,7 +99,8 @@ Three deployable pieces in one repo:
 1. A user registers a target-DB connection; the DSN is encrypted with `APP_SECRET` before being stored in the app DB.
 2. Requesting a snapshot enqueues a job; the background worker connects to the target DB, introspects it, and stores a JSON snapshot (`SchemaSnapshot` + `SchemaSnapshotData`).
 3. The frontend fetches snapshots via `/api/*` and renders the ERD; all exports (DDL, diff/migration SQL, reversing spec, DBML/Mermaid) are derived from the stored snapshot, not from live DB access.
-4. Share links expose read-only snapshot/export routes under `/api/share/{share_uuid}/...` with a tighter rate limit, and sensitive fields (schema comments, example values) are redacted from publicly shared payloads.
+4. The partial safe-live control plane stores canonical `SchemaModelRevision` rows and compiles an exact revision/connection/succeeded snapshot into an immutable `MigrationPlan`. It does not yet execute sandbox or durable apply runs.
+5. Share links expose read-only snapshot/export routes under `/api/share/{share_uuid}/...` with a tighter rate limit, and sensitive fields (schema comments, example values) are redacted from publicly shared payloads.
 
 ### Dev vs prod compose
 

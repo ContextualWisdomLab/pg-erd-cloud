@@ -2,8 +2,25 @@
 
 **Repository:** `ContextualWisdomLab/pg-erd-cloud`  
 **Base:** `main@72afe6db712b145baaba084f64a1ff4fb36d9fd0`  
-**Status:** Approved scope; written-spec review pending  
+**Status:** Approved target architecture; Phase 1 control plane partially implemented
 **Date:** 2026-08-09
+
+### Implementation snapshot
+
+Canonical product, technical, and runtime truth is maintained in
+[`docs/PRD.md`](../../PRD.md), [`docs/TRD.md`](../../TRD.md), the
+[`docs/adr/`](../../adr/README.md) decision set, and the
+[`forward-engineering-v1` contract](../../contracts/forward-engineering-v1.md).
+This document retains the approved end-state design and implementation order.
+
+Implemented now: canonical model/revision persistence, `If-Match` concurrency,
+strict snapshot adaptation for the proven subset, deterministic structured plan
+compilation/persistence, plan bounds, fail-closed blockers, and the deployer
+role on legacy persistent apply. Planned: plan retrieval, run/event persistence,
+isolated dry run, live preflight, executor/recovery/convergence, and the frontend
+workflow. The actual create route is
+`POST /api/schema-models/by-project/{project_space_uuid}`; the project-nested
+route below is a target compatibility shape, not current code.
 
 ## Problem
 
@@ -130,7 +147,12 @@ Replace the split frontend-generator/live-validator contract with a structured
 server compiler. Each statement has a kind, target objects, ordered SQL,
 transactional flag, and risk linkage. The same operation objects drive SQL
 rendering, executor dispatch, pre/postconditions, and the risk report so those
-surfaces cannot disagree. The compiler supports the model-editing subset:
+surfaces cannot disagree. The target compiler supports the model-editing subset
+below. Phase 1 currently implements schema/table/column/nullability/type
+operations and creation-time primary keys only; unique/FK/index/comment
+operations remain unsupported and fail closed or produce explicit blockers.
+When blocked, executable statements are empty while independent supported
+deltas remain reviewable as digest-bound proposals:
 
 - create missing schemas represented by the plan; never drop a schema
   automatically, and report desired schema removal as a blocker;
@@ -283,8 +305,9 @@ bypass the workflow's live-mutation boundary. Editors retain its default
 rollback-only behavior. Project responses expose the current user's capability
 so the frontend can gate controls without treating UI gating as authorization.
 
-- `POST /api/projects/{project_uuid}/schema-models`
-  creates a model from a succeeded snapshot or an explicit blank model.
+- **Current:** `POST /api/schema-models/by-project/{project_space_uuid}` creates
+  a model from a succeeded snapshot or an explicit blank model.
+- **Target compatibility shape:** `POST /api/projects/{project_uuid}/schema-models`.
 - `GET /api/schema-models/{model_uuid}`
   returns the model and current immutable revision.
 - `PUT /api/schema-models/{model_uuid}` with `If-Match`
@@ -292,16 +315,16 @@ so the frontend can gate controls without treating UI gating as authorization.
 - `POST /api/schema-model-revisions/{revision_uuid}/migration-plans`
   binds an exact connection/base snapshot and returns an immutable compiled
   preview/checksum.
-- `GET /api/migration-plans/{plan_uuid}`
+- **Planned:** `GET /api/migration-plans/{plan_uuid}`
   returns structured operations, SQL preview, risk, blockers, and hashes.
-- `POST /api/migration-plans/{plan_uuid}/dry-runs`
+- **Planned:** `POST /api/migration-plans/{plan_uuid}/dry-runs`
   requires `Idempotency-Key` and the plan checksum, creates a `dry_run`, and
   returns `202` with its run UUID.
-- `POST /api/migration-plans/{plan_uuid}/apply-runs`
+- **Planned:** `POST /api/migration-plans/{plan_uuid}/apply-runs`
   requires `Idempotency-Key`, plan checksum, matching passed dry-run UUID,
   typed connection-name confirmation, and destructive acknowledgement when
   applicable; it returns `202` with its run UUID.
-- `GET /api/migration-runs/{run_uuid}`
+- **Planned:** `GET /api/migration-runs/{run_uuid}`
   returns polling state and bounded evidence, including verification snapshot
   and residual diff when terminal.
 
