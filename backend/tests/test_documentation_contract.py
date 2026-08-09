@@ -160,6 +160,25 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
     )
 
 
+def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
+    """Keep run tables implemented while routes and execution remain planned."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    trd = _read(Path("docs/TRD.md"))
+    data_model = _read(Path("docs/DATA_MODEL.md"))
+    adr = _read(Path("docs/adr/ADR-0004-durable-runs-and-recovery.md"))
+
+    assert "These symbols and tables do not exist" not in contract
+    assert "**Partially implemented:** durable run/event persistence" in contract
+    assert "### Partially implemented foundation" in trd
+    assert "## Physical run foundation — Implemented" in data_model
+    assert "**Implementation status:** Partially implemented" in adr
+    assert (
+        "run creation and polling routes remain **planned**"
+        in " ".join(contract.lower().split())
+    )
+
+
 def test_superseded_adr_is_not_restored() -> None:
     """Prevent a superseded ADR from reappearing beside canonical decisions."""
 
