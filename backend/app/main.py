@@ -5,8 +5,11 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.annotations import router as annotations_router
 from app.api.api_keys import router as api_keys_router
@@ -64,6 +67,33 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def redact_request_validation_input(
+    _: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Return validation details without reflecting secret-bearing inputs.
+
+    Pydantic includes rejected values in its structured errors by default.
+    API payloads may contain SQL or credentials, so responses retain the
+    location, type, and safe validator message while removing the raw input.
+    """
+
+    errors = []
+    for error in exc.errors():
+        sanitized = {key: value for key, value in error.items() if key != "input"}
+        context = sanitized.get("ctx")
+        if isinstance(context, dict) and "error" in context:
+            sanitized["ctx"] = {
+                **context,
+                "error": str(context["error"]),
+            }
+        errors.append(sanitized)
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({"detail": errors}),
+    )
 
 CORS_ALLOW_HEADERS = [
     "Authorization",
