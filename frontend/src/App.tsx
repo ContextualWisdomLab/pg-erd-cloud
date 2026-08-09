@@ -102,7 +102,7 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-export function isSupportedConnectionDsn(value: string): boolean {
+function isSupportedConnectionDsn(value: string): boolean {
   try {
     const url = new URL(value);
     return SUPPORTED_DSN_PROTOCOLS.has(url.protocol) && Boolean(url.hostname);

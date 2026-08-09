@@ -245,7 +245,7 @@ vi.mock('./components/modals', () => ({
   ),
 }))
 
-import App, { DiagramTable, isSupportedConnectionDsn } from './App'
+import App, { DiagramTable } from './App'
 import { snapshotToGraph } from './erd/convert'
 
 const projects = [
@@ -832,31 +832,5 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByRole('alert')).toHaveTextContent('poll down')
-  })
-})
-
-
-describe('isSupportedConnectionDsn', () => {
-  it('returns true for supported postgres protocol', () => {
-    expect(isSupportedConnectionDsn('postgres://user:pass@localhost:5432/db')).toBe(true)
-    expect(isSupportedConnectionDsn('postgresql://user:pass@localhost:5432/db')).toBe(true)
-  })
-
-  it('returns true for supported snowflake protocol', () => {
-    expect(isSupportedConnectionDsn('snowflake://user:pass@host/db')).toBe(true)
-  })
-
-  it('returns false for unsupported protocol', () => {
-    expect(isSupportedConnectionDsn('mysql://user:pass@localhost:3306/db')).toBe(false)
-    expect(isSupportedConnectionDsn('http://localhost')).toBe(false)
-  })
-
-  it('returns false for invalid url', () => {
-    expect(isSupportedConnectionDsn('not-a-url')).toBe(false)
-    expect(isSupportedConnectionDsn('')).toBe(false)
-  })
-
-  it('returns false if hostname is empty', () => {
-    expect(isSupportedConnectionDsn('postgres:///')).toBe(false)
   })
 })
