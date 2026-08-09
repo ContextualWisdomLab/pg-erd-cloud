@@ -192,7 +192,7 @@ def test_validation_response_does_not_echo_secret_bearing_sql(
     redaction_marker = "-".join(("never", "log-me"))
     secret_sql = (
         "CREATE TABLE audit_record "
-        f"(credential text DEFAULT '{redaction_marker}')\\x00;"
+        f"(credential text DEFAULT '{redaction_marker}')\x00;"
     )
 
     response = client.post(
