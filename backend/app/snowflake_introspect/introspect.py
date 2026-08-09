@@ -91,6 +91,16 @@ SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 
 @dataclass(frozen=True)
+class SnowflakeRawData:
+    """Encapsulates raw rows fetched from Snowflake information_schema."""
+    version_rows: list[dict]
+    schema_rows: list[dict]
+    table_rows: list[dict]
+    column_rows: list[dict]
+    constraint_rows: list[dict]
+
+
+@dataclass(frozen=True)
 class SnowflakeDsnConfig:
     """Connection settings parsed from a Snowflake DSN."""
 
@@ -630,26 +640,22 @@ def _build_columns(
 def _build_snapshot(
     config: SnowflakeDsnConfig,
     effective_schema: str | None,
-    version_rows: list[dict],
-    schema_rows: list[dict],
-    table_rows: list[dict],
-    column_rows: list[dict],
-    constraint_rows: list[dict],
+    raw_data: SnowflakeRawData,
 ) -> dict:
-    relation_keys = sorted({_table_key(row) for row in table_rows})
+    relation_keys = sorted({_table_key(row) for row in raw_data.table_rows})
     relation_ids = {key: index for index, key in enumerate(relation_keys, start=1)}
     column_positions: dict[tuple[str, str], dict[str, int]] = defaultdict(dict)
 
-    schemas = _build_schemas(schema_rows)
-    relations = _build_relations(table_rows, relation_keys, relation_ids)
-    columns = _build_columns(column_rows, relation_ids, column_positions)
+    schemas = _build_schemas(raw_data.schema_rows)
+    relations = _build_relations(raw_data.table_rows, relation_keys, relation_ids)
+    columns = _build_columns(raw_data.column_rows, relation_ids, column_positions)
 
     constraints, pk_columns, fk_edges = _build_constraints(
-        constraint_rows, relation_ids, column_positions
+        raw_data.constraint_rows, relation_ids, column_positions
     )
     server_version = (
-        str(version_rows[0].get("server_version"))
-        if version_rows and version_rows[0].get("server_version") is not None
+        str(raw_data.version_rows[0].get("server_version"))
+        if raw_data.version_rows and raw_data.version_rows[0].get("server_version") is not None
         else "snowflake"
     )
     snapshot = {
@@ -691,14 +697,17 @@ def _introspect_snowflake_sync_with_config(
         finally:
             conn.close()
 
+    raw_data = SnowflakeRawData(
+        version_rows=version_rows,
+        schema_rows=schema_rows,
+        table_rows=table_rows,
+        column_rows=column_rows,
+        constraint_rows=constraint_rows,
+    )
     return _build_snapshot(
         config,
         effective_schema,
-        version_rows,
-        schema_rows,
-        table_rows,
-        column_rows,
-        constraint_rows,
+        raw_data,
     )
 
 
