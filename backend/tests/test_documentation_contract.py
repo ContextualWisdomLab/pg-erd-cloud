@@ -109,6 +109,20 @@ def test_v1_contract_separates_current_routes_from_remaining_run_routes() -> Non
     assert "remaining run routes" in contract
 
 
+def test_v1_contract_does_not_classify_plan_retrieval_as_planned() -> None:
+    """Keep the implemented immutable-plan read surface out of planned scope."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    normalized_contract = " ".join(contract.split())
+
+    assert "**Planned:** plan retrieval" not in normalized_contract
+    assert (
+        "| `GET /api/migration-plans/{migration_plan_uuid}` | none | "
+        "current `MigrationPlanOut`, `200` | member | Implemented |"
+        in normalized_contract
+    )
+
+
 def test_v1_contract_keeps_blocked_statements_as_review_only_proposals() -> None:
     """Keep blocked SQL visible for review but unavailable for execution."""
 
