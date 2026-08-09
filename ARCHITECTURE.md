@@ -63,6 +63,8 @@ Implemented in the initial safe vertical slice:
   transaction;
 - an internal PostgreSQL conflict-winner writer that creates or reuses one
   exact, unexpired, executable dry-run intent and its sequence-one event;
+- same-state, version-incrementing cancellation intent that forces a worker to
+  observe cancellation before its next CAS transition can win;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.
 
