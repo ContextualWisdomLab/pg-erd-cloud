@@ -76,6 +76,15 @@ def upgrade() -> None:
             name="ck_migration_run__state",
         ),
         sa.CheckConstraint(
+            "(run_kind = 'dry_run' AND state IN ('queued', 'sandbox_running', "
+            "'live_preflight_running', 'passed', 'drifted', 'failed')) OR "
+            "(run_kind = 'apply' AND state IN ('queued', 'applying', "
+            "'reconciling', 'verifying', 'verified', 'drifted_no_apply', "
+            "'not_applied', 'verification_failed', 'failed_rolled_back', "
+            "'applied_with_drift', 'outcome_unknown'))",
+            name="ck_migration_run__kind_state",
+        ),
+        sa.CheckConstraint(
             "state_version >= 1", name="ck_migration_run__state_version"
         ),
     )
