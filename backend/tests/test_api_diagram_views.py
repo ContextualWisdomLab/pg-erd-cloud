@@ -93,3 +93,19 @@ async def test_delete_view_returns_404_when_unauthorized():
             )
     assert exc.value.status_code == 404
     session.delete.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_delete_view_deletes_when_authorized():
+    session = AsyncMock()
+    view = SimpleNamespace(diagram_view_uuid=uuid.uuid4())
+    with patch(
+        "app.api.diagram_views._get_authorized_view",
+        new_callable=AsyncMock,
+        return_value=view,
+    ):
+        result = await delete_view(
+            diagram_view_uuid=view.diagram_view_uuid, user=_user(), session=session
+        )
+    assert result == {"ok": True}
+    session.delete.assert_called_once_with(view)
+    session.commit.assert_called_once()
