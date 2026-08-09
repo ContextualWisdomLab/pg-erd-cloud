@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import uuid
 
 import pytest
@@ -161,6 +162,27 @@ def test_identifier_parse_render_round_trip(identifier: str):
 
     assert snapshot["relations"][0]["relation_name"] == identifier
     assert f'"{encoded}"' in ddl
+
+
+def test_identifier_parse_render_property_fuzz_is_lossless():
+    rng = random.Random(747)
+    alphabet = (
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ "
+        ".,;:-/\\()[]{}!@#$%^&*+='\""
+        "注文☃é"
+    )
+
+    for _ in range(250):
+        identifier = "".join(rng.choice(alphabet) for _ in range(rng.randint(1, 20)))
+        if len(identifier.encode("utf-8")) > 63:
+            continue
+        encoded = identifier.replace('"', '""')
+
+        snapshot = parse_dbml(f'Table "{encoded}" {{\n  id int\n}}')
+        ddl = snapshot_json_to_sql(snapshot)
+
+        assert snapshot["relations"][0]["relation_name"] == identifier
+        assert f'"{encoded}"' in ddl
 
 
 def test_quoted_foreign_key_identifiers_use_the_same_renderer():
