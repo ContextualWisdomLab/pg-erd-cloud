@@ -39,12 +39,12 @@ CURRENT_ROUTES = (
     "PUT /api/schema-models/{schema_model_uuid}",
     "POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans",
     "GET /api/migration-plans/{migration_plan_uuid}",
+    "GET /api/migration-runs/{migration_run_uuid}",
 )
 
 PLANNED_ROUTES = (
     "POST /api/migration-plans/{migration_plan_uuid}/dry-runs",
     "POST /api/migration-plans/{migration_plan_uuid}/apply-runs",
-    "GET /api/migration-runs/{migration_run_uuid}",
 )
 
 README_CORE_LINKS = (
@@ -104,7 +104,7 @@ def test_v1_contract_separates_current_routes_from_remaining_run_routes() -> Non
     assert missing_current == []
     assert missing_planned == []
     assert "## 5. Current HTTP API contract" in contract
-    assert "## 8. Migration-plan retrieval and planned run API" in contract
+    assert "## 8. Migration-plan retrieval and bounded run API" in contract
     assert "Implemented" in contract
     assert "remaining run routes" in contract
 
@@ -161,7 +161,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep run tables implemented while routes and execution remain planned."""
+    """Keep run polling implemented while mutation and execution remain planned."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -174,7 +174,7 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "## Physical run foundation — Implemented" in data_model
     assert "**Implementation status:** Partially implemented" in adr
     assert (
-        "run creation and polling routes remain **planned**"
+        "public run creation/cancellation routes remain **planned**"
         in " ".join(contract.lower().split())
     )
 
