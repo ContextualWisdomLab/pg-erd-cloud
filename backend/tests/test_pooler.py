@@ -37,10 +37,14 @@ def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
 
 
 def test_build_admin_console_dsn_preserves_plain_postgresql_driver() -> None:
+    username = "u"
     password_marker = "".join(("dum", "my"))
+    hostname = "localhost"
+    port = 5432
+    database_name = "appdb"
     source_url = (
-        "postgresql://"
-        f"{'u'}:{password_marker}@{'local' + 'host'}:{5432}/{'app' + 'db'}"
+        f"postgresql://{username}:{password_marker}"
+        f"@{hostname}:{port}/{database_name}"
     )
 
     dsn, password = build_admin_console_dsn(source_url, "pgcat")
