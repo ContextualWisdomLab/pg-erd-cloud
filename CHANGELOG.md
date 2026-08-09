@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- [BE] Forward Engineering 1단계: 브라우저 SQL 대신 버전형 `schema_model`·불변 `schema_model_revision`을 저장하고, 서버가 타깃 connection/snapshot에 결합된 구조화 `migration_plan`을 컴파일합니다. PostgreSQL 식별자 의미·위험·lock/rewrite/data-loss·권한·precondition을 보존하며 미지원 객체는 전량 fail-closed 처리합니다.
+- [BE] 프로젝트 멤버가 저장된 불변 `migration_plan`을 IDOR-masked `GET /api/migration-plans/{migration_plan_uuid}` 경로로 다시 열어 검토할 수 있습니다.\n- [BE] Forward Engineering 1단계: 브라우저 SQL 대신 버전형 `schema_model`·불변 `schema_model_revision`을 저장하고, 서버가 타깃 connection/snapshot에 결합된 구조화 `migration_plan`을 컴파일합니다. PostgreSQL 식별자 의미·위험·lock/rewrite/data-loss·권한·precondition을 보존하며 미지원 객체는 전량 fail-closed 처리합니다.
 - [BE] 프로젝트 역할을 `viewer < editor < deployer < owner`로 확장하고, 기존 `apply-sql`의 실제 반영(`dry_run=false`)은 deployer 이상만 허용합니다.
 - [Docs] Forward Engineering의 현재 구현/계획 경계를 PRD·TRD·Architecture·ADR로 명문화했습니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
