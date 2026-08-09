@@ -430,14 +430,13 @@ def _group_constraint_rows(
 
 
 def _process_constraint_group(
+    group_key: tuple[str, str, str, str],
     group_rows: list[dict],
-    name: str,
-    schema: str,
-    table: str,
     relation_ids: dict[tuple[str, str], int],
     column_positions: dict[tuple[str, str], dict[str, int]],
     constraint_oid: int,
 ) -> tuple[dict | None, list[dict], list[dict]]:
+    _, name, schema, table = group_key
     sorted_rows = sorted(
         group_rows,
         key=lambda row: int(row.get("ordinal_position") or 0),
@@ -522,13 +521,11 @@ def _build_constraints(
     pk_columns: list[dict] = []
     fk_edges: list[dict] = []
 
-    for (_, name, schema, table), group_rows in grouped.items():
+    for group_key, group_rows in grouped.items():
         constraint_oid = len(constraints) + 1
         constraint, new_pk_columns, new_fk_edges = _process_constraint_group(
+            group_key,
             group_rows,
-            name,
-            schema,
-            table,
             relation_ids,
             column_positions,
             constraint_oid,
