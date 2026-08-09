@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 from typing import Literal
 
+from app.ddl.identifiers import quote_identifier
 from app.jobs.valkey_queue import valkey_queue_config_summary
 
 
@@ -24,7 +25,7 @@ def _rows(snapshot: dict, key: str) -> list[dict]:
 
 
 def _q(identifier: str) -> str:
-    return '"' + identifier.replace('"', '""') + '"'
+    return quote_identifier(identifier)
 
 
 def _qname(schema: str, name: str) -> str:

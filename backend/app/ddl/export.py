@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Literal
 
+from app.ddl.identifiers import quote_identifier
+
 DdlDialect = Literal["postgresql", "snowflake"]
 
 
@@ -42,10 +44,9 @@ def _snapshot_source_dialect(snapshot: dict) -> DdlDialect:
 
 
 def _q(ident: str) -> str:
-    """Quote a SQL identifier."""
+    """Validate and quote exactly one SQL identifier."""
 
-    # Quote identifier with double-quotes, escaping internal quotes.
-    return '"' + ident.replace('"', '""') + '"'
+    return quote_identifier(ident)
 
 
 def _qname(schema: str, name: str) -> str:

@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import uuid
+
+import pytest
+from fastapi import HTTPException
+
+from app.api.dbml import convert_dbml
+from app.auth import CurrentUser
 from app.ddl.export import snapshot_json_to_sql
-from app.spec.dbml_import import parse_dbml
+from app.pg_introspect.forward_ddl import _split_statements
+from app.schemas import DbmlConvertIn
+from app.spec.dbml_import import DbmlParseError, parse_dbml
 
 BASIC = """
 // a typical dbdiagram.io document
@@ -90,6 +99,99 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert "PRIMARY KEY" in ddl
 
 
+def test_quoted_identifiers_round_trip_through_postgresql_ddl_as_one_statement():
+    dbml = '''
+Table "Odd ""Table;--//""" {
+  "select" text [pk]
+  "Snow ☃" text
+}
+'''
+
+    snapshot = parse_dbml(dbml)
+    ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
+
+    relation = snapshot["relations"][0]
+    assert relation["relation_name"] == 'Odd "Table;--//"'
+    assert {column["column_name"] for column in snapshot["columns"]} == {
+        "select",
+        "Snow ☃",
+    }
+    assert '"public"."Odd ""Table;--//"""' in ddl
+    assert 'PRIMARY KEY ("select")' in ddl
+    assert ddl.count("CREATE TABLE") == 1
+    assert len(_split_statements(ddl)) == 2
+
+
+@pytest.mark.parametrize(
+    "dbml",
+    [
+        'Table "unterminated {\n  id int\n}',
+        'Table public..orders {\n  id int\n}',
+        'Table one.two.three {\n  id int\n}',
+        'Table "" {\n  id int\n}',
+        'Table "bad\x00name" {\n  id int\n}',
+        f'Table "{"é" * 32}" {{\n  id int\n}}',
+        'Table safe {\n  "unterminated int\n}',
+        'Table safe {\n  "bad\x00column" int\n}',
+    ],
+)
+def test_malformed_or_unrepresentable_identifiers_fail_closed(dbml: str):
+    with pytest.raises(DbmlParseError):
+        parse_dbml(dbml)
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        "ordinary_name",
+        "select",
+        "white space",
+        "semi;colon",
+        "comment--marker",
+        "slash//marker",
+        'embedded"quote',
+        "주문 내역",
+        "é" * 31 + "a",
+    ],
+)
+def test_identifier_parse_render_round_trip(identifier: str):
+    encoded = identifier.replace('"', '""')
+    snapshot = parse_dbml(f'Table "{encoded}" {{\n  id int\n}}')
+    ddl = snapshot_json_to_sql(snapshot)
+
+    assert snapshot["relations"][0]["relation_name"] == identifier
+    assert f'"{encoded}"' in ddl
+
+
+def test_quoted_foreign_key_identifiers_use_the_same_renderer():
+    dbml = '''
+Table "parent"";--" {
+  "id""value" bigint [pk]
+}
+Table "child" {
+  "parent""id" bigint
+}
+Ref: "child"."parent""id" > "parent"";--"."id""value"
+'''
+
+    ddl = snapshot_json_to_sql(parse_dbml(dbml))
+
+    assert 'REFERENCES "public"."parent"";--" ("id""value")' in ddl
+    assert len(_split_statements(ddl)) == 4  # schema, two tables, one FK
+
+
+@pytest.mark.asyncio
+async def test_convert_api_reports_malformed_identifier_without_partial_output():
+    with pytest.raises(HTTPException) as exc_info:
+        await convert_dbml(
+            DbmlConvertIn(dbml='Table "unterminated {\n id int\n}'),
+            CurrentUser(uuid.uuid4(), "subject", "Test user"),
+        )
+
+    assert exc_info.value.status_code == 422
+    assert "unterminated quoted identifier" in exc_info.value.detail
+
+
 def test_pathological_long_line_is_skipped_fast():
     import time
 
@@ -105,8 +207,6 @@ def test_pathological_table_header_dots_are_rejected_fast():
 
     hostile = "Table ." + "." * 4000 + "\nTable users {\n  id int [pk]\n}\n"
     start = time.monotonic()
-    snap = parse_dbml(hostile)
+    with pytest.raises(DbmlParseError):
+        parse_dbml(hostile)
     assert time.monotonic() - start < 1.0
-    assert {(r["schema_name"], r["relation_name"]) for r in snap["relations"]} == {
-        ("public", "users")
-    }
