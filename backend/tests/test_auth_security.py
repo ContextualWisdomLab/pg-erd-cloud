@@ -189,8 +189,6 @@ async def test_oidc_rejects_header_selected_algorithm(
     async def fake_jwks() -> dict:
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
-
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -235,7 +233,6 @@ async def test_oidc_decode_rejects_kty_mismatch(
     async def fake_jwks() -> dict:
         return {"keys": [jwk]}
 
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     def fail_decode(*_: object, **__: object) -> dict:
@@ -263,8 +260,6 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     async def fake_jwks() -> dict:
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
-
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
 
     observed: dict[str, object] = {}
 
@@ -298,9 +293,12 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "issuer": "https://issuer.example",
         "options": {
             "verify_aud": True,
-            "require": ["exp", "iss", "jti", "aud"],
+            "require_aud": True,
+            "require_iss": True,
+            "require_exp": True,
+            "require_jti": True,
+            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
-        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
     }
 
 
@@ -358,8 +356,6 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
             return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
         return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
 
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
-
     observed: dict[str, object] = {}
 
     def fake_decode(*args: object, **kwargs: object) -> dict:
@@ -387,7 +383,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == "dummy"
+    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
 
 
 @pytest.mark.asyncio
@@ -402,8 +398,6 @@ async def test_oidc_requires_jti_claim(
 
     async def fake_jwks() -> dict:
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
-
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -438,8 +432,6 @@ async def test_oidc_rejects_revoked_jti(
 
     async def fake_jwks() -> dict:
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
-
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -560,7 +552,7 @@ async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def mock_get_unverified_header(token):
-        raise auth.jwt.PyJWTError("Invalid header")
+        raise Exception("Invalid header")
 
     monkeypatch.setattr(auth.jwt, "get_unverified_header", mock_get_unverified_header)
 
@@ -584,8 +576,6 @@ async def test_oidc_decode_rejects_jwt_decode_error(
 
     async def fake_jwks() -> dict:
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
-
-    monkeypatch.setattr(auth.jwt, "PyJWK", lambda *args, **kwargs: type("DummyKey", (), {"key": "dummy"})())
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.PyJWTError("mocked decoding error")
