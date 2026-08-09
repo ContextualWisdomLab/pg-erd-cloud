@@ -112,8 +112,17 @@ async def test_live_apply_requires_deployer_role_while_dry_run_requires_editor()
             user=_user(),
             session=session,
         )
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(dry_run=True),
+            user=_user(),
+            session=session,
+        )
 
-    assert membership.await_args_list[1].kwargs["minimum_role"] == "deployer"
+    minimum_roles = [
+        call.kwargs.get("minimum_role") for call in membership.await_args_list
+    ]
+    assert minimum_roles == [None, "deployer", None, "editor"]
 
 
 @pytest.mark.asyncio
