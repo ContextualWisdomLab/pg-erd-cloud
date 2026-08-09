@@ -189,8 +189,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
         raise HTTPException(status_code=401, detail="token missing alg")
 
-    crit = header.get("crit")
-    if crit is not None:
+    if "crit" in header:
+        crit = header["crit"]
         if not isinstance(crit, list) or len(crit) == 0 or len(crit) > 10:
             raise HTTPException(status_code=401, detail="invalid crit header")
         for item in crit:
