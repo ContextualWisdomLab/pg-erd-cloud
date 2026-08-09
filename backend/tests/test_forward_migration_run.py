@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from math import nan
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -108,6 +109,36 @@ def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> Non
 
     with pytest.raises(MigrationRunContractError, match="too large"):
         canonicalize_run_evidence({"detail": "x" * 16_385})
+
+
+def test_run_evidence_enforces_every_json_shape_and_resource_bound() -> None:
+    """Evidence accepts finite JSON and rejects hostile shapes before storage."""
+
+    assert canonicalize_run_evidence(
+        {"finite": 1.25, "empty": None, "flags": [True, 1, "ok"]}
+    ) == {"empty": None, "finite": 1.25, "flags": [True, 1, "ok"]}
+
+    nested: dict[str, object] = {}
+    cursor = nested
+    for _ in range(10):
+        child: dict[str, object] = {}
+        cursor["child"] = child
+        cursor = child
+
+    invalid_cases = (
+        ({"value": nan}, "finite"),
+        ({str(index): index for index in range(257)}, "too many fields"),
+        ({"items": list(range(257))}, "too many items"),
+        ({"opaque": b"bytes"}, "unsupported"),
+        (nested, "too deep"),
+        ({str(index): "x" * 100 for index in range(200)}, "too large"),
+    )
+    for payload, message in invalid_cases:
+        with pytest.raises(MigrationRunContractError, match=message):
+            canonicalize_run_evidence(payload)
+
+    with pytest.raises(MigrationRunContractError, match="field name must be text"):
+        canonicalize_run_evidence({1: "value"})  # type: ignore[dict-item]
 
 
 def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> None:
@@ -288,6 +319,52 @@ async def test_transition_fails_closed_when_compare_and_swap_loses_race() -> Non
 
 
 @pytest.mark.asyncio
+async def test_transition_marks_terminal_state_without_restarting_run() -> None:
+    """A terminal transition preserves start time and records one finish time."""
+
+    started_at = datetime(2026, 8, 10, 1, tzinfo=timezone.utc)
+    finished_at = datetime(2026, 8, 10, 2, tzinfo=timezone.utc)
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+        started_at=started_at,
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    result = await transition_migration_run(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=3,
+        next_state="passed",
+        event_type="preflight_passed",
+        evidence={"finding_count": 0},
+        actor_user_uuid=None,
+        now=finished_at,
+    )
+
+    assert result.started_at == started_at
+    assert result.finished_at == finished_at
+    event = session.add.call_args.args[0]
+    assert event.sequence_number == 4
+    assert event.state_before == "live_preflight_running"
+    assert event.state_after == "passed"
+
+
+@pytest.mark.asyncio
 async def test_transition_validates_event_metadata_before_database_access() -> None:
     """Invalid event metadata cannot reach persistence or durable evidence."""
 
@@ -296,20 +373,86 @@ async def test_transition_validates_event_metadata_before_database_access() -> N
         execute=AsyncMock(),
         add=Mock(),
     )
-    for event_type, evidence in (
-        ("contains whitespace", {}),
-        ("sandbox_started", {"rawSql": "DROP TABLE customer_record"}),
+    for expected_version, event_type, evidence, now in (
+        (0, "sandbox_started", {}, None),
+        (True, "sandbox_started", {}, None),
+        (1, "contains whitespace", {}, None),
+        (1, "sandbox_started", {"rawSql": "DROP TABLE customer_record"}, None),
+        (1, "sandbox_started", {}, datetime(2026, 8, 10)),
     ):
         with pytest.raises(MigrationRunContractError):
             await transition_migration_run(
                 session,
                 migration_run_uuid=uuid.uuid4(),
-                expected_state_version=1,
+                expected_state_version=expected_version,
                 next_state="sandbox_running",
                 event_type=event_type,
                 evidence=evidence,
                 actor_user_uuid=None,
+                now=now,
             )
 
     session.scalar.assert_not_awaited()
     session.execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_transition_masks_missing_stale_and_invalid_state_before_update() -> None:
+    """Missing, stale, or graph-invalid runs never execute a durable update."""
+
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=None),
+        execute=AsyncMock(),
+        add=Mock(),
+    )
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=1,
+            next_state="sandbox_running",
+            event_type="sandbox_started",
+            evidence={},
+            actor_user_uuid=None,
+        )
+
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="queued",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session.scalar.return_value = run
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=1,
+            next_state="sandbox_running",
+            event_type="sandbox_started",
+            evidence={},
+            actor_user_uuid=None,
+        )
+
+    run.state_version = 1
+    with pytest.raises(MigrationRunContractError, match="invalid transition"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=1,
+            next_state="applying",
+            event_type="apply_started",
+            evidence={},
+            actor_user_uuid=None,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
