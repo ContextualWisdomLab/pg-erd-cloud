@@ -18,6 +18,7 @@ from app.forward.migration_run import (
     create_migration_run,
     digest_run_request,
     hash_idempotency_key,
+    request_migration_run_cancellation,
     transition_migration_run,
     validate_run_transition,
 )
@@ -694,3 +695,107 @@ async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert
         )
 
     session.execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_intent_uses_cas_and_same_state_event_sequence() -> None:
+    """Cancellation increments the durable version without inventing a state."""
+
+    now = datetime(2026, 8, 10, 4, tzinfo=timezone.utc)
+    actor_uuid = uuid.uuid4()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    result = await request_migration_run_cancellation(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=2,
+        actor_user_uuid=actor_uuid,
+        evidence={"request_source": "review_ui"},
+        now=now,
+    )
+
+    statement = session.execute.await_args.args[0]
+    compiled = statement.compile()
+    assert compiled.params["state_version_1"] == 2
+    assert compiled.params["state_1"] == "sandbox_running"
+    assert compiled.params["cancellation_requested_1"] is False
+    event = session.add.call_args.args[0]
+    assert event.event_type == "cancellation_requested"
+    assert event.sequence_number == 3
+    assert event.state_before == event.state_after == "sandbox_running"
+    assert event.evidence_json == {"request_source": "review_ui"}
+    assert result.state == "sandbox_running"
+    assert result.state_version == 3
+    assert result.reused is False
+
+
+@pytest.mark.asyncio
+async def test_cancellation_is_idempotent_and_rejects_terminal_or_stale_run() -> None:
+    """Repeated intent is harmless while terminal and lost-CAS writes fail closed."""
+
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=True,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=0)),
+        add=Mock(),
+    )
+    repeated = await request_migration_run_cancellation(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=3,
+        actor_user_uuid=None,
+        evidence={},
+    )
+    assert repeated.reused is True
+    session.execute.assert_not_awaited()
+
+    run.cancellation_requested = False
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await request_migration_run_cancellation(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            actor_user_uuid=None,
+            evidence={},
+        )
+
+    run.state = "passed"
+    with pytest.raises(MigrationRunContractError, match="terminal"):
+        await request_migration_run_cancellation(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            actor_user_uuid=None,
+            evidence={},
+        )
