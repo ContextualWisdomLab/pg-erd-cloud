@@ -18,10 +18,12 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MigrationRun, MigrationRunEvent
+from app.forward.migration_plan import verify_migration_plan_digest
+from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
 
 MAX_IDEMPOTENCY_KEY_BYTES = 255
 MAX_RUN_EVIDENCE_BYTES = 16_384
@@ -95,6 +97,16 @@ class MigrationRunTransition:
     state_version: int
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
+
+
+@dataclass(frozen=True)
+class MigrationRunCreation:
+    """The durable identity selected by one idempotent creation request."""
+
+    migration_run_uuid: uuid.UUID
+    state: str
+    state_version: int
+    reused: bool
 
 
 def validate_run_transition(run_kind: str, current_state: str, next_state: str) -> None:
@@ -209,6 +221,120 @@ def canonicalize_run_evidence(value: Mapping[str, object]) -> dict[str, Any]:
     if len(encoded) > MAX_RUN_EVIDENCE_BYTES:
         raise MigrationRunContractError("run evidence is too large")
     return cast(dict[str, Any], json.loads(encoded))
+
+
+async def create_migration_run(
+    session: AsyncSession,
+    *,
+    plan: MigrationPlan,
+    run_kind: str,
+    idempotency_key: str,
+    requested_by_user_uuid: uuid.UUID,
+    evidence: Mapping[str, object],
+    now: dt.datetime | None = None,
+) -> MigrationRunCreation:
+    """Select one durable dry-run identity without exposing execution authority.
+
+    The PostgreSQL uniqueness constraint is the concurrency winner. The caller
+    owns the transaction and queue publication; this function never commits or
+    signals a worker. Apply creation remains fail-closed until approval and
+    passed-dry-run bindings are persisted.
+    """
+
+    if run_kind == "apply":
+        raise MigrationRunContractError("apply run creation is not implemented")
+    if run_kind != "dry_run":
+        raise MigrationRunContractError("run kind is invalid")
+    transition_time = now or dt.datetime.now(dt.timezone.utc)
+    if transition_time.tzinfo is None or transition_time.utcoffset() is None:
+        raise MigrationRunContractError("creation time must include a timezone")
+    key_hash = hash_idempotency_key(idempotency_key)
+    canonical_evidence = canonicalize_run_evidence(evidence)
+    plan_json = plan.plan_json
+    if (
+        not verify_migration_plan_digest(plan_json, plan.statement_digest)
+        or plan_json.get("compiler_version") != plan.compiler_version
+        or plan_json.get("base_digest") != plan.base_digest
+        or plan_json.get("target_digest") != plan.target_digest
+    ):
+        raise MigrationRunContractError("migration plan integrity verification failed")
+    if plan.expires_at <= transition_time:
+        raise MigrationRunContractError("migration plan expired")
+    if plan_json.get("can_dry_run") is not True or plan_json.get("blockers"):
+        raise MigrationRunContractError("migration plan cannot be dry-run")
+
+    request_digest = digest_run_request(
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind=run_kind,
+        plan_digest=plan.statement_digest,
+        requested_by_user_uuid=requested_by_user_uuid,
+    )
+    run_uuid = uuid.uuid4()
+    result = await session.execute(
+        insert(MigrationRun)
+        .values(
+            migration_run_uuid=run_uuid,
+            project_space_uuid=plan.project_space_uuid,
+            migration_plan_uuid=plan.migration_plan_uuid,
+            run_kind=run_kind,
+            state="queued",
+            state_version=1,
+            idempotency_key_hash=key_hash,
+            plan_digest=plan.statement_digest,
+            request_digest=request_digest,
+            requested_by_user_uuid=requested_by_user_uuid,
+            cancellation_requested=False,
+            observed_base_digest=None,
+            evidence_json=canonical_evidence,
+            error_code=None,
+            created_at=transition_time,
+            updated_at=transition_time,
+            started_at=None,
+            finished_at=None,
+        )
+        .on_conflict_do_nothing(constraint="uq_migration_run__idempotent_action")
+        .returning(MigrationRun.migration_run_uuid)
+    )
+    inserted_uuid = result.scalar_one_or_none()
+    if inserted_uuid is None:
+        existing = await session.scalar(
+            select(MigrationRun).where(
+                MigrationRun.project_space_uuid == plan.project_space_uuid,
+                MigrationRun.run_kind == run_kind,
+                MigrationRun.idempotency_key_hash == key_hash,
+            )
+        )
+        if existing is None:
+            raise MigrationRunContractError("idempotency winner is unavailable")
+        if existing.request_digest != request_digest:
+            raise MigrationRunContractError("idempotency key conflict")
+        return MigrationRunCreation(
+            migration_run_uuid=existing.migration_run_uuid,
+            state=existing.state,
+            state_version=existing.state_version,
+            reused=True,
+        )
+
+    session.add(
+        MigrationRunEvent(
+            migration_run_event_uuid=uuid.uuid4(),
+            migration_run_uuid=inserted_uuid,
+            sequence_number=1,
+            event_type="run_queued",
+            state_before=None,
+            state_after="queued",
+            evidence_json=canonical_evidence,
+            actor_user_uuid=requested_by_user_uuid,
+            created_at=transition_time,
+        )
+    )
+    return MigrationRunCreation(
+        migration_run_uuid=inserted_uuid,
+        state="queued",
+        state_version=1,
+        reused=False,
+    )
 
 
 async def transition_migration_run(
