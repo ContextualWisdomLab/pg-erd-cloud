@@ -10,6 +10,43 @@ from app.pooler import (
 _DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
 
 
+import asyncio
+import time
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+from app.db import get_pooler_detection
+import app.db
+
+@pytest.mark.asyncio
+async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
+    # Set config to auto-detect
+    monkeypatch.setattr(app.db.settings, "db_pooler_kind", None)
+    # Clear cache
+    app.db._pooler_cache = None
+    app.db._pooler_cache_at = 0.0
+
+    async def mock_probe(admin_db):
+        if admin_db == "pgbouncer":
+            await asyncio.sleep(0.5)
+            return None
+        elif admin_db == "pgcat":
+            await asyncio.sleep(0.01)
+            return "PgCat 0.10.0"
+        return None
+
+    monkeypatch.setattr(app.db, "_probe_pooler_admin_console", mock_probe)
+
+    start = time.monotonic()
+    result = await get_pooler_detection()
+    elapsed = time.monotonic() - start
+
+    assert result.detected is True
+    assert result.kind == PoolerKind.PGCAT
+    assert elapsed < 0.25, f"Took {elapsed:.2f}s, expected < 0.25s (did not run concurrently)"
+
+
 def test_classify_pooler_version_text() -> None:
     assert classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
     assert classify_pooler_version_text("PgCat 0.10.0") == PoolerKind.PGCAT
