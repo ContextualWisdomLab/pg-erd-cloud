@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-08-09 - [Async PBKDF2 Hashing]
+**Learning:** PBKDF2 해싱과 같이 CPU 집약적인 작업은 asyncio의 이벤트 루프를 차단할 수 있습니다. FastAPI와 같은 비동기 프레임워크에서는 이러한 작업이 다른 요청의 처리를 지연시킵니다.
+**Action:** `hash_api_key` 함수에서 발생하는 동기적 해싱 처리를 `asyncio.to_thread`를 사용하여 별도의 스레드 풀로 오프로드했습니다. 이를 통해 200ms 가까이 걸리던 해싱 작업 동안에도 다른 코루틴이 정상적으로 실행될 수 있도록 하여 전체 시스템 처리량을 향상시켰습니다.

@@ -10,7 +10,7 @@ from typing import Any, cast
 import httpx
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -194,8 +194,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     if not jwt_id:
         return
@@ -213,8 +213,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
@@ -411,7 +411,7 @@ API_KEY_PREFIX = "pgerd_"
 API_KEY_PBKDF2_ITERATIONS = 210_000
 
 
-def hash_api_key(token: str) -> str:
+async def hash_api_key(token: str) -> str:
     """Deterministic PBKDF2-HMAC digest of an API key (indexable lookup).
 
     API keys are server-generated random bearer credentials, but CodeQL treats
@@ -422,12 +422,15 @@ def hash_api_key(token: str) -> str:
     test guessed keys offline.
     """
 
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        token.encode("utf-8"),
-        settings.app_secret.encode("utf-8"),
-        API_KEY_PBKDF2_ITERATIONS,
-    ).hex()
+    def _hash() -> str:
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            token.encode("utf-8"),
+            settings.app_secret.encode("utf-8"),
+            API_KEY_PBKDF2_ITERATIONS,
+        ).hex()
+
+    return await asyncio.to_thread(_hash)
 
 
 async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
@@ -440,7 +443,7 @@ async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     row = await session.execute(
         select(ApiKey, UserAccount)
         .join(UserAccount, UserAccount.user_account_uuid == ApiKey.user_account_uuid)
-        .where(ApiKey.key_hash == hash_api_key(token))
+        .where(ApiKey.key_hash == await hash_api_key(token))
     )
     pair = row.first()
     if pair is None or pair[0].revoked_at is not None:
@@ -464,7 +467,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

@@ -12,6 +12,7 @@ from app.csrf import (
     verify_csrf_token,
 )
 from app.main import app
+from app.settings import settings
 
 
 def make_request(
@@ -105,4 +106,4 @@ def test_csrf_token_endpoint_returns_signed_token() -> None:
 
     assert response.status_code == 200
     token = response.json()["csrf_token"]
-    assert verify_csrf_token(token, "test-secret")
+    assert verify_csrf_token(token, settings.app_secret)
