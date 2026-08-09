@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sqlalchemy import CheckConstraint, UniqueConstraint
@@ -11,6 +14,7 @@ from app.forward.migration_run import (
     canonicalize_run_evidence,
     digest_run_request,
     hash_idempotency_key,
+    transition_migration_run,
     validate_run_transition,
 )
 from app.models import MigrationRun, MigrationRunEvent
@@ -180,3 +184,132 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         'ondelete="CASCADE"',
     ):
         assert required in migration
+
+
+@pytest.mark.asyncio
+async def test_transition_uses_optimistic_cas_and_appends_sanitized_event() -> None:
+    """A successful transition updates one exact version and appends its event."""
+
+    run_uuid = uuid.uuid4()
+    actor_uuid = uuid.uuid4()
+    run = MigrationRun(
+        migration_run_uuid=run_uuid,
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="queued",
+        state_version=1,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+
+    result = await transition_migration_run(
+        session,
+        migration_run_uuid=run_uuid,
+        expected_state_version=1,
+        next_state="sandbox_running",
+        event_type="sandbox_started",
+        evidence={"sandbox_version": "postgresql-18", "attempt": 1},
+        actor_user_uuid=actor_uuid,
+        now=now,
+    )
+
+    statement = session.execute.await_args.args[0]
+    compiled = statement.compile()
+    assert {
+        "migration_run_uuid_1",
+        "state_version_1",
+        "state_1",
+    }.issubset(compiled.params)
+    assert compiled.params["migration_run_uuid_1"] == run_uuid
+    assert compiled.params["state_version_1"] == 1
+    assert compiled.params["state_1"] == "queued"
+    event = session.add.call_args.args[0]
+    assert isinstance(event, MigrationRunEvent)
+    assert event.sequence_number == 2
+    assert event.state_before == "queued"
+    assert event.state_after == "sandbox_running"
+    assert event.evidence_json == {
+        "attempt": 1,
+        "sandbox_version": "postgresql-18",
+    }
+    assert result.state == "sandbox_running"
+    assert result.state_version == 2
+    assert result.started_at == now
+    assert result.finished_at is None
+
+
+@pytest.mark.asyncio
+async def test_transition_fails_closed_when_compare_and_swap_loses_race() -> None:
+    """A stale worker cannot append evidence after losing the state-version CAS."""
+
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="queued",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=0)),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=2,
+            next_state="sandbox_running",
+            event_type="sandbox_started",
+            evidence={},
+            actor_user_uuid=None,
+        )
+
+    session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_transition_validates_event_metadata_before_database_access() -> None:
+    """Invalid event metadata cannot reach persistence or durable evidence."""
+
+    session = SimpleNamespace(
+        scalar=AsyncMock(),
+        execute=AsyncMock(),
+        add=Mock(),
+    )
+    for event_type, evidence in (
+        ("contains whitespace", {}),
+        ("sandbox_started", {"rawSql": "DROP TABLE customer_record"}),
+    ):
+        with pytest.raises(MigrationRunContractError):
+            await transition_migration_run(
+                session,
+                migration_run_uuid=uuid.uuid4(),
+                expected_state_version=1,
+                next_state="sandbox_running",
+                event_type=event_type,
+                evidence=evidence,
+                actor_user_uuid=None,
+            )
+
+    session.scalar.assert_not_awaited()
+    session.execute.assert_not_awaited()
