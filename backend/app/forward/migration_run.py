@@ -116,9 +116,10 @@ def _validate_evidence(value: object, *, path: str, depth: int) -> Any:
         for key, nested in value.items():
             if not isinstance(key, str):
                 raise MigrationRunContractError("run evidence field name must be text")
+            separated_key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
             tokens = {
                 token
-                for token in re.split(r"[^a-z0-9]+", key.casefold())
+                for token in re.split(r"[^a-z0-9]+", separated_key.casefold())
                 if token
             }
             if tokens & _FORBIDDEN_EVIDENCE_TOKENS:
