@@ -14,33 +14,24 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
 export function parseColumnNameFromHandle(handleId: string | undefined | null): string | null {
-  if (!handleId) return null;
-  if (handleId.length > 512) return null;
+  if (!handleId || handleId.length > 512) return null;
 
-  let prefixRemoved = handleId;
-  if (handleId.startsWith('src-')) {
-    prefixRemoved = handleId.slice(4);
-  } else if (handleId.startsWith('tgt-')) {
-    prefixRemoved = handleId.slice(4);
+  const encoded = handleId.startsWith('src-') || handleId.startsWith('tgt-')
+    ? handleId.slice(4)
+    : handleId;
+  if (!encoded.startsWith('c-')) return null;
+
+  const codePoints = encoded.slice(2);
+  if (codePoints === 'empty') return '';
+
+  const parts = codePoints.split('-');
+  if (!parts.every((part) => /^[0-9a-f]{4,6}$/i.test(part))) return null;
+
+  try {
+    return parts.map((part) => String.fromCodePoint(Number.parseInt(part, 16))).join('');
+  } catch {
+    return null;
   }
-
-  if (prefixRemoved.startsWith('c-')) {
-    const encoded = prefixRemoved.slice(2);
-    if (encoded === 'empty') {
-      return '';
-    }
-
-    try {
-      const parts = encoded.split('-');
-      for (const hex of parts) {
-        if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
-      }
-      return parts.map((hex) => String.fromCodePoint(parseInt(hex, 16))).join('');
-    } catch (e) {
-      return null;
-    }
-  }
-
-  return null;
 }
