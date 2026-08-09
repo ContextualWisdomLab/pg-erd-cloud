@@ -61,6 +61,8 @@ Implemented in the initial safe vertical slice:
 - optimistic compare-and-swap run transitions that update one exact state
   version and append the matching sanitized evidence event in the caller's
   transaction;
+- an internal PostgreSQL conflict-winner writer that creates or reuses one
+  exact, unexpired, executable dry-run intent and its sequence-one event;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.
 
