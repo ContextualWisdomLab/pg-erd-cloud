@@ -167,6 +167,59 @@ class MigrationPlanCreateIn(BaseModel):
     base_schema_snapshot_uuid: uuid.UUID
 
 
+class MigrationPlanObjectRef(BaseModel):
+    """Structured PostgreSQL object identity carried beside rendered SQL."""
+
+    database: str | None = None
+    schema_name: str | None = None
+    table_name: str | None = None
+    column_name: str | None = None
+
+
+class MigrationPlanRisk(BaseModel):
+    """Conservative operational and data-integrity risk for one statement."""
+
+    severity: Literal["safe", "warning", "destructive"]
+    lock_mode: str
+    possible_rewrite: bool
+    table_scan: bool
+    data_loss: bool
+    detail: str
+
+
+class MigrationPlanStatement(BaseModel):
+    """One server-compiled statement and its execution authority metadata."""
+
+    kind: str
+    target: str
+    object_ref: MigrationPlanObjectRef
+    sql: str
+    transactional: bool
+    dependencies: list[str]
+    dependency_refs: list[MigrationPlanObjectRef]
+    reversible: bool
+    risk: MigrationPlanRisk
+    required_privileges: list[str]
+    preconditions: list[dict[str, object]]
+
+
+class MigrationPlanBlocker(BaseModel):
+    """Unsupported semantic change that suppresses executable statements."""
+
+    code: str
+    object: str
+    object_ref: MigrationPlanObjectRef
+    detail: str
+
+
+class MigrationPlanRiskSummary(BaseModel):
+    """Statement counts grouped by conservative risk severity."""
+
+    safe: int
+    warning: int
+    destructive: int
+
+
 class MigrationPlanOut(BaseModel):
     """Immutable structured plan preview returned for review and dry run."""
 
@@ -177,10 +230,10 @@ class MigrationPlanOut(BaseModel):
     compiler_version: str
     can_dry_run: bool
     requires_destructive_confirmation: bool
-    statements: list[dict]
-    proposed_statements: list[dict]
-    blockers: list[dict]
-    risk_summary: dict
+    statements: list[MigrationPlanStatement]
+    proposed_statements: list[MigrationPlanStatement]
+    blockers: list[MigrationPlanBlocker]
+    risk_summary: MigrationPlanRiskSummary
     expires_at: dt.datetime
 
 
