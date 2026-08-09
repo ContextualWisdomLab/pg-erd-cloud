@@ -15,6 +15,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.forward.schema_model import canonicalize_schema_model, schema_model_digest
+from app.pg_introspect.snapshot_contract import (
+    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+)
 
 COMPILER_VERSION = "pg-erd-forward/v1"
 
@@ -268,7 +271,10 @@ def _compile_table_changes(
         preconditions: list[dict[str, Any]] = []
         severity = "safe"
         detail = "Adds a nullable column without rewriting existing rows."
-        if not column["nullable"] and column.get("default") is None:
+        # Compiler v1 rejects every default expression at model validation, so
+        # every required added column needs target-side proof that the table is
+        # empty. Do not let an uncompiled default suppress this precondition.
+        if not column["nullable"]:
             severity = "warning"
             detail = "A required column without a default needs proof the table is empty."
             preconditions.append(
@@ -562,6 +568,7 @@ def compile_migration_plan(
     }
     plan: dict[str, Any] = {
         "compiler_version": COMPILER_VERSION,
+        "snapshot_contract_version": CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
         "postgresql_major": target["postgresql_major"],
         "base_digest": schema_model_digest(base),
         "target_digest": schema_model_digest(target),
