@@ -123,7 +123,7 @@ def generate_sqlalchemy_models(snapshot: dict[str, Any] | None) -> str:
         oid = rel.get("relation_oid")
         table = str(rel.get("relation_name"))
         schema = str(rel.get("schema_name"))
-        lines += ["", "", f"class {_class_name(table)}(Base):"]
+        lines.extend(("", "", f"class {_class_name(table)}(Base):"))
         if rel.get("relation_comment"):
             lines.append(f"    {str(rel['relation_comment'])!r}")
             lines.append("")
@@ -178,7 +178,7 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
         oid = rel.get("relation_oid")
         table = str(rel.get("relation_name"))
         model = _class_name(table)
-        lines += ["", f"model {model} {{"]
+        lines.extend(("", f"model {model} {{"))
         cols = ix["cols_by_oid"].get(oid, [])
         col_names = _column_names(cols)
         pk_cols = ix["pk_by_oid"].get(oid, set())
@@ -258,7 +258,7 @@ def generate_typeorm_entities(snapshot: dict[str, Any] | None) -> str:
         schema = str(rel.get("schema_name"))
         cls = _class_name(table)
         entity_args = json.dumps(table) if schema == "public" else f"{{ name: {json.dumps(table)}, schema: {json.dumps(schema)} }}"
-        lines += ["", f"@Entity({entity_args})", f"export class {cls} {{"]
+        lines.extend(("", f"@Entity({entity_args})", f"export class {cls} {{"))
         cols = ix["cols_by_oid"].get(oid, [])
         col_names = _column_names(cols)
         for col in cols:
