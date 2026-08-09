@@ -750,7 +750,7 @@ async def test_oidc_rejects_crit_header(monkeypatch: pytest.MonkeyPatch) -> None
             make_request({"Authorization": "Bearer some-token"})
         )
     assert exc_info.value.status_code == 401
-    assert "critical headers are not supported" in exc_info.value.detail.lower()
+    assert exc_info.value.detail == "invalid crit header"
 
 
 @pytest.mark.asyncio
@@ -791,9 +791,7 @@ async def test_oidc_rejects_empty_crit_header(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
 
-    # crit is an empty list, which should be fine based on our logic,
-    # but the logic only raises an exception if len(crit) > 0, so it will proceed
-    # to the next step. Let's make the next step fail so we can cover the `len(crit) == 0` branch.
+    # RFC 7515 forbids an empty crit list, so reject it before JWKS access.
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": []}
     )
