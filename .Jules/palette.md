@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-07-15 - Contextual aria-labels for generic modal actions
+**Learning:** Generic action buttons (like "Delete" or "Duplicate") placed globally at the bottom of modals can lose context for screen reader users, especially when the modal's primary title doesn't clearly articulate the active entity in real-time.
+**Action:** When adding global modal actions, always ensure the buttons have contextual `aria-label` attributes incorporating the specific entity's name (e.g., `aria-label={\`\${entity.title} 삭제\`}`) to provide unambiguous feedback.
