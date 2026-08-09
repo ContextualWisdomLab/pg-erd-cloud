@@ -92,6 +92,8 @@ SUPPORTED_QUERY_PARAMS = {"warehouse", "role", "authenticator"}
 
 @dataclass(frozen=True)
 class ConstraintContext:
+    """Context holding all the arguments for constraint generation."""
+
     name: str
     schema: str
     table: str
