@@ -76,7 +76,6 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     }
     assert (
         "project_space_uuid",
-        "migration_plan_uuid",
         "run_kind",
         "idempotency_key_hash",
     ) in unique_run_columns
@@ -110,6 +109,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         state_version=1,
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
+        request_digest="c" * 64,
         requested_by_user_uuid=uuid.uuid4(),
         cancellation_requested=False,
         evidence_json={},
@@ -130,6 +130,7 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         '"migration_run"',
         '"migration_run_event"',
         '"uq_migration_run__idempotent_action"',
+        '"request_digest"',
         '"uq_migration_run_event__run_sequence"',
         '"ck_migration_run__state_version"',
         'ondelete="RESTRICT"',
