@@ -33,7 +33,7 @@ support.
 | React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; desired-model adapters and live workflow **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
-| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities and run/event storage **Implemented**; run APIs/workers **Planned** |
+| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, and verified run polling **Implemented**; creation APIs/workers **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | **Planned** |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
