@@ -417,6 +417,11 @@ async def test_oidc_requires_jti_claim(
         return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda _jwk, algorithm=None: object(),
+    )
 
     async def mock_is_token_revoked2(jti):
         return jti == "revoked-jwt"
@@ -454,6 +459,11 @@ async def test_oidc_rejects_revoked_jti(
         minutes=5
     )
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda _jwk, algorithm=None: object(),
+    )
 
     async def mock_is_token_revoked2(jti):
         return jti == "revoked-jwt"
