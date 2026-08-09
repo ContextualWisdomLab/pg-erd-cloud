@@ -26,6 +26,7 @@ from app.metrics import (
     prime_http_metrics,
     render_metrics,
 )
+from app.rate_limit import resolve_client_ip
 from app.settings import settings
 
 _logger = logging.getLogger("app.observability")
@@ -47,17 +48,11 @@ def _get_route_template(request: Request) -> str:
 
 
 def _get_client_ip(request: Request) -> str:
-    if settings.api_rate_limit_trust_x_forwarded_for:
-        xff = request.headers.get("X-Forwarded-For")
-        if xff:
-            ip = xff.split(",")[-1].strip()
-            if ip:
-                return ip
-
-    client = request.client
-    if client is None:
-        return "unknown"
-    return client.host or "unknown"
+    return resolve_client_ip(
+        request,
+        trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+        trusted_proxy_hops=settings.api_rate_limit_trusted_proxy_hops,
+    )
 
 
 def _log_json(event: str, fields: dict[str, object], *, level: int) -> None:

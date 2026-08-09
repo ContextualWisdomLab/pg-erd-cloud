@@ -391,10 +391,13 @@ describe('modal dialog accessibility', () => {
     fireEvent.mouseDown(document.body);
   });
 
-  it('does not refocus an opener removed after cleanup', () => {
+  it('moves focus to a stable fallback when the opener is removed after cleanup', () => {
     vi.useFakeTimers();
     const opener = document.createElement('button');
-    document.body.appendChild(opener);
+    const fallback = document.createElement('main');
+    fallback.tabIndex = -1;
+    fallback.dataset.dialogFocusFallback = '';
+    document.body.append(opener, fallback);
     opener.focus();
 
     function Dialog() {
@@ -407,5 +410,59 @@ describe('modal dialog accessibility', () => {
     unmount();
     opener.remove();
     act(() => { vi.runOnlyPendingTimers(); });
+    expect(fallback).toHaveFocus();
+    fallback.remove();
+  });
+
+  it('focuses the stable region when a destructive close removes its opener', async () => {
+    function Harness() {
+      const [hasSelection, setHasSelection] = useState(true);
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <aside data-dialog-focus-fallback tabIndex={-1} aria-label="속성 패널">
+            {hasSelection ? (
+              <button type="button" onClick={() => setIsOpen(true)}>
+                선택 항목 편집
+              </button>
+            ) : (
+              <span>선택 없음</span>
+            )}
+          </aside>
+          {isOpen ? (
+            <ModalShell
+              title="선택 항목 편집"
+              titleId="destructive-focus-title"
+              onClose={() => setIsOpen(false)}
+              closeLabel="편집 닫기"
+              size="relationship"
+              footer={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasSelection(false);
+                    setIsOpen(false);
+                  }}
+                >
+                  삭제
+                </button>
+              }
+            >
+              <span>편집 내용</span>
+            </ModalShell>
+          ) : null}
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: '선택 항목 편집' }));
+    await user.click(screen.getByRole('button', { name: '삭제' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('complementary', { name: '속성 패널' })).toHaveFocus(),
+    );
   });
 });

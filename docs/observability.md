@@ -1,8 +1,14 @@
-# Observability (MVP)
+# Observability Baseline
+
+Status date: 2026-08-09
+Lifecycle: telemetry emission `implemented_on_main`; collection, retention,
+dashboards, and paging `downstream`
+Owner: application maintainers for emission; deployment operator for collection
 
 This document defines the **minimum observability baseline** for `pg-erd-cloud`:
 
-- Central **structured logs** (JSON)
+- **Structured log emission** to process stdout (JSON); central collection is
+  deployment-owned
 - Basic **metrics** (Prometheus exposition)
 - Suggested **alert thresholds**
 
@@ -25,7 +31,9 @@ Fields:
 - `status` (number): HTTP status code
 - `duration_ms` (number): request duration in milliseconds
 - `client_ip` (string): client IP (uses `X-Forwarded-For` only when
-  `API_RATE_LIMIT_TRUST_X_FORWARDED_FOR=true`)
+  `API_RATE_LIMIT_TRUST_X_FORWARDED_FOR=true`, selecting the hop configured by
+  `API_RATE_LIMIT_TRUSTED_PROXY_HOPS`; this is the same resolver used by rate
+  limiting)
 
 Notes:
 

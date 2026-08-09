@@ -40,7 +40,7 @@ textarea {
   --color-surface-floating: var(--pg-color-surface-toolbar);
   --color-surface-empty: var(--pg-color-surface-empty);
   --color-overlay: var(--pg-color-surface-modal-overlay);
-  --color-border: var(--pg-color-border-default);
+  --color-border: var(--pg-color-border-control);
   --color-border-soft: var(--pg-color-border-subtle);
   --color-border-subtle: var(--pg-color-border-subtle);
   --color-border-active: var(--pg-color-border-active);
@@ -297,7 +297,7 @@ textarea:focus-visible {
 
 .metricCard span,
 .projectCard span,
-.dataTable span {
+.dataTable__row > span {
   color: var(--color-muted);
 }
 
@@ -392,7 +392,7 @@ textarea:focus-visible {
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
-  border: 1px solid var(--pg-color-border-default);
+  border: 1px solid var(--pg-color-border-control);
   border-radius: var(--pg-radius-md);
   background: var(--pg-color-surface-default);
   color: var(--pg-color-text-primary);
@@ -435,8 +435,14 @@ textarea:focus-visible {
 }
 
 .react-flow {
+  --xy-background-color: var(--pg-color-bg-canvas);
+  --xy-minimap-background-color: var(--pg-color-surface-default);
   --xy-handle-background-color: transparent;
-  --xy-handle-border-color: var(--pg-color-border-default);
+  --xy-handle-border-color: var(--pg-color-border-control);
+  --xy-controls-button-border-color: var(--pg-color-border-control);
+  --xy-edge-stroke: var(--pg-color-border-control);
+  --xy-connectionline-stroke: var(--pg-color-border-control);
+  --xy-edge-stroke-selected: var(--pg-color-border-focus);
 }
 
 .editorWorkspace {
@@ -483,7 +489,7 @@ textarea:focus-visible {
   box-sizing: border-box;
   width: 100%;
   padding: var(--pg-spacing-8) var(--pg-spacing-10);
-  border: 1px solid var(--pg-color-border-default);
+  border: 1px solid var(--pg-color-border-control);
   border-radius: var(--pg-radius-sm);
   background: var(--pg-color-surface-default);
   color: var(--pg-color-text-primary);
@@ -614,6 +620,15 @@ textarea:focus-visible {
 
 .editorProperties__actions button {
   min-width: 0;
+}
+
+.editorProperties__actionHints {
+  display: grid;
+  gap: var(--pg-spacing-4);
+}
+
+.editorProperties__actionHints p {
+  margin: 0;
 }
 
 .editorProperties__primaryAction {
@@ -1043,6 +1058,19 @@ button[aria-disabled="true"] {
   gap: var(--pg-spacing-12);
 }
 
+.editTableForm input:not([type]),
+.editTableForm input[type="text"],
+.editTableForm textarea {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: var(--pg-spacing-8) var(--pg-spacing-10);
+  border: 1px solid var(--pg-color-border-control);
+  border-radius: var(--pg-radius-sm);
+  background: var(--pg-color-surface-default);
+  color: var(--pg-color-text-primary);
+}
+
 .editTableForm__columns {
   margin-top: var(--pg-spacing-16);
 }
@@ -1103,7 +1131,7 @@ button[aria-disabled="true"] {
   font-size: var(--pg-type-font-size-14);
 }
 
-.exportModal__section p {
+.exportModal__section > p:not(.exportModal__hint) {
   margin: var(--pg-spacing-4) 0 0;
   color: var(--color-muted-strong);
   font-size: var(--pg-type-font-size-13);
@@ -1115,7 +1143,7 @@ button[aria-disabled="true"] {
   box-sizing: border-box;
   width: 100%;
   padding: var(--pg-spacing-10);
-  border: 1px solid var(--pg-color-border-subtle);
+  border: 1px solid var(--pg-color-border-control);
   border-radius: var(--pg-radius-sm);
   background: var(--pg-color-bg-canvas);
   color: var(--pg-color-text-primary);
@@ -1145,7 +1173,7 @@ button[aria-disabled="true"] {
   min-height: 100px;
   resize: vertical;
   padding: var(--pg-spacing-10);
-  border: 1px solid var(--pg-color-border-default);
+  border: 1px solid var(--pg-color-border-control);
   border-radius: var(--pg-radius-sm);
   background: var(--pg-color-bg-canvas);
   color: var(--pg-color-text-primary);

@@ -1,8 +1,9 @@
 # Cloud ERD UI/UX Reference
 
 These reference screens define the intended product direction for Cloud ERD UI work.
-See `product-spec.md` for the information architecture, screen definitions,
-key screens, wireframes, user stories, and implementation checklist.
+The canonical product authority is [`docs/PRD.md`](../PRD.md). See
+`product-spec.md` for the UI appendix: information architecture, screen
+definitions, wireframes, screen-level stories, and implementation checklist.
 
 For implementation and review, start with `figma-contract.md`. It records the
 authoritative live Figma file, node inventory, precedence, and intentional

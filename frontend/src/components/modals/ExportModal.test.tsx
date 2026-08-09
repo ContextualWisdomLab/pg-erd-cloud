@@ -12,6 +12,7 @@ const baseProps = {
   hasDictionaryExport: true,
   hasDiagramExport: true,
   shareLinkUrl: '',
+  shareLinkExpiresAt: '',
   isCreatingShareLink: false,
   isShareLinkCopied: false,
   shareLinkError: null,
@@ -211,12 +212,25 @@ describe('ExportModal', () => {
     expect(onExportDictionaryMarkdown).not.toHaveBeenCalled();
   });
 
-  it('warns that bearer share links currently cannot be expired or revoked', () => {
+  it('explains bearer-link expiry and owner revocation', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(
-      screen.getByText('이 링크를 아는 누구나 공유된 성공 스냅샷을 볼 수 있으며, 현재 링크 만료·회수 기능은 제공되지 않습니다.'),
+      screen.getByText(/새 링크는 서버가 설정한 시점에 자동 만료되며/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '접근 관리' })).not.toBeInTheDocument();
+  });
+
+  it('shows the exact server-returned share expiry', () => {
+    const expiresAt = '2026-08-16T12:34:00.000Z';
+    const { container } = render(
+      <ExportModal
+        {...baseProps}
+        shareLinkUrl="https://example.test/share/link-id"
+        shareLinkExpiresAt={expiresAt}
+      />,
+    );
+
+    expect(container.querySelector('time')).toHaveAttribute('datetime', expiresAt);
   });
 });

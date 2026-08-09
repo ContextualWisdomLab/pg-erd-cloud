@@ -238,6 +238,7 @@ export async function createShareLink(projectId: string): Promise<ShareLink> {
       share_link_uuid: shareLinkId,
       permission_kind: 'read',
       url_path: `/api/share/${shareLinkId}`,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       url: shareLinkUrlFromPath(`/api/share/${shareLinkId}`)
     }
   }

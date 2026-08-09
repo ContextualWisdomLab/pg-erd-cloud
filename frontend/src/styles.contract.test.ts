@@ -163,13 +163,101 @@ describe('live Figma layout contract', () => {
     )
   })
 
-  it('pins React Flow handles to the semantic handle tokens', () => {
+  it('pins React Flow handles, controls, and relationship lines to semantic tokens', () => {
+    expect(declaration('.react-flow', '--xy-background-color')).toBe(
+      'var(--pg-color-bg-canvas)',
+    )
+    expect(declaration('.react-flow', '--xy-minimap-background-color')).toBe(
+      'var(--pg-color-surface-default)',
+    )
     expect(declaration('.react-flow', '--xy-handle-background-color')).toBe(
       'transparent',
     )
     expect(declaration('.react-flow', '--xy-handle-border-color')).toBe(
-      'var(--pg-color-border-default)',
+      'var(--pg-color-border-control)',
     )
+    expect(declaration('.react-flow', '--xy-controls-button-border-color')).toBe(
+      'var(--pg-color-border-control)',
+    )
+    expect(declaration('.react-flow', '--xy-edge-stroke')).toBe(
+      'var(--pg-color-border-control)',
+    )
+    expect(declaration('.react-flow', '--xy-connectionline-stroke')).toBe(
+      'var(--pg-color-border-control)',
+    )
+    expect(declaration('.react-flow', '--xy-edge-stroke-selected')).toBe(
+      'var(--pg-color-border-focus)',
+    )
+  })
+
+  it('uses the high-contrast semantic border for form controls', () => {
+    expect(declaration(':root', '--color-border')).toBe(
+      'var(--pg-color-border-control)',
+    )
+    expect(declaration('.workspaceSearch input', 'border')).toBe(
+      '1px solid var(--pg-color-border-control)',
+    )
+    expect(declaration('.editorProperties__search input', 'border')).toBe(
+      '1px solid var(--pg-color-border-control)',
+    )
+    expect(declaration('.exportModal__linkInput', 'border')).toBe(
+      '1px solid var(--pg-color-border-control)',
+    )
+  })
+
+  it('keeps nested diagram status pills on their semantic state colors', () => {
+    expect(declaration('.dataTable span', 'color')).toBe('')
+    expect(declaration('.dataTable__row > span', 'color')).toBe(
+      'var(--color-muted)',
+    )
+    expect(declaration('.statusPill--succeeded', 'color')).toBe(
+      'var(--color-success-strong)',
+    )
+    expect(declaration('.statusPill--failed', 'color')).toBe(
+      'var(--color-danger-strong)',
+    )
+  })
+
+  it('keeps export hints distinct from section description copy', () => {
+    expect(declaration('.exportModal__section p', 'font-size')).toBe('')
+    expect(
+      declaration(
+        '.exportModal__section > p:not(.exportModal__hint)',
+        'font-size',
+      ),
+    ).toBe('var(--pg-type-font-size-13)')
+    expect(declaration('.exportModal__hint', 'color')).toBe(
+      'var(--pg-color-text-muted)',
+    )
+    expect(declaration('.exportModal__hint', 'font-size')).toBe(
+      'var(--pg-type-font-size-11)',
+    )
+  })
+
+  it('styles EditTable text controls with semantic modal tokens', () => {
+    const selectors = [
+      '.editTableForm input:not([type])',
+      '.editTableForm input[type="text"]',
+      '.editTableForm textarea',
+    ]
+
+    for (const selector of selectors) {
+      expect(declaration(selector, 'padding')).toBe(
+        'var(--pg-spacing-8) var(--pg-spacing-10)',
+      )
+      expect(declaration(selector, 'border')).toBe(
+        '1px solid var(--pg-color-border-control)',
+      )
+      expect(declaration(selector, 'border-radius')).toBe(
+        'var(--pg-radius-sm)',
+      )
+      expect(declaration(selector, 'background')).toBe(
+        'var(--pg-color-surface-default)',
+      )
+      expect(declaration(selector, 'color')).toBe(
+        'var(--pg-color-text-primary)',
+      )
+    }
   })
 
   it('keeps desktop columns above 767px and stacks the shell and dialogs at 767px', () => {

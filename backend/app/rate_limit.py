@@ -33,25 +33,47 @@ class RateLimitPolicy:
     window_seconds: float
     route_prefix: str = "/api"
     trust_x_forwarded_for: bool = False
+    trusted_proxy_hops: int = 1
 
 
-def _get_client_ip(request: Request, *, trust_x_forwarded_for: bool) -> str:
-    global _last_unknown_ip_log_at
+def resolve_client_ip(
+    request: Request,
+    *,
+    trust_x_forwarded_for: bool,
+    trusted_proxy_hops: int = 1,
+) -> str:
+    """Resolve the client address from a fixed, trusted proxy-chain depth.
 
+    ``trusted_proxy_hops`` counts from the right side of ``X-Forwarded-For``.
+    The header is used only when it contains the complete configured chain;
+    otherwise the direct peer is the safe fallback.
+    """
     if trust_x_forwarded_for:
         xff = request.headers.get("X-Forwarded-For")
         if xff:
-            # Use the right-most value (nearest trusted proxy), trimming whitespace.
-            # This is safer than the left-most which can be spoofed by the client.
-            ip = xff.split(",")[-1].strip()
-            if ip:
-                return ip
+            forwarded_hops = [part.strip() for part in xff.split(",") if part.strip()]
+            if trusted_proxy_hops >= 1 and len(forwarded_hops) >= trusted_proxy_hops:
+                return forwarded_hops[-trusted_proxy_hops]
 
     client = request.client
     if client is None:
-        ip = "unknown"
-    else:
-        ip = client.host or "unknown"
+        return "unknown"
+    return client.host or "unknown"
+
+
+def _get_client_ip(
+    request: Request,
+    *,
+    trust_x_forwarded_for: bool,
+    trusted_proxy_hops: int = 1,
+) -> str:
+    global _last_unknown_ip_log_at
+
+    ip = resolve_client_ip(
+        request,
+        trust_x_forwarded_for=trust_x_forwarded_for,
+        trusted_proxy_hops=trusted_proxy_hops,
+    )
 
     # Avoid silently aggregating many callers under an "unknown" key.
     if ip == "unknown":
@@ -148,7 +170,11 @@ def make_rate_limit_middleware(
                 # Never fail requests due to key derivation.
                 subject = None
 
-        ip = _get_client_ip(request, trust_x_forwarded_for=policy.trust_x_forwarded_for)
+        ip = _get_client_ip(
+            request,
+            trust_x_forwarded_for=policy.trust_x_forwarded_for,
+            trusted_proxy_hops=policy.trusted_proxy_hops,
+        )
         key = f"ip:{ip}"
         if subject:
             key = f"{key}|sub:{subject}"

@@ -48,6 +48,7 @@
   --pg-color-text-brand: var(--pg-primitive-primary-700);
   --pg-color-border-default: var(--pg-primitive-gray-300);
   --pg-color-border-subtle: var(--pg-primitive-gray-200);
+  --pg-color-border-control: var(--pg-primitive-gray-500);
   --pg-color-border-focus: var(--pg-primitive-primary-700);
   --pg-color-border-danger: var(--pg-primitive-danger-300);
   --pg-color-border-active: var(--pg-primitive-blue-100);
@@ -143,7 +144,7 @@
   --pg-type-font-weight-medium: 500;
   --pg-type-font-weight-bold: 700;
   --pg-type-font-family-figma-sans: Inter;
-  --pg-type-font-family-css-stack: var(--pg-type-font-family-figma-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pg-type-font-family-css-stack: var(--pg-type-font-family-figma-sans), "Noto Sans KR Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --pg-type-font-family-mono: "Roboto Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --pg-effect-focus-ring: 0 0 0 3px rgb(3 78 162 / 18%);
@@ -169,6 +170,7 @@
   --pg-color-text-brand: #bfdbfe;
   --pg-color-border-default: #4b5563;
   --pg-color-border-subtle: #4b5563;
+  --pg-color-border-control: #9ca3af;
   --pg-color-border-focus: #bfdbfe;
   --pg-color-border-danger: #b91c1c;
   --pg-color-border-active: #6e95eb;

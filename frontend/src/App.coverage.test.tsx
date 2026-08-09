@@ -174,6 +174,7 @@ vi.mock('./components/modals', () => ({
     <div data-testid="export-modal" data-open={props.isOpen}>
       <span data-testid="share-url">{props.shareLinkUrl}</span>
       <span data-testid="share-error">{props.shareLinkError}</span>
+      <span data-testid="share-copied">{String(props.isShareLinkCopied)}</span>
       <button type="button" data-testid="share-copy-guard" onClick={props.onCopyShareLink} />
       {props.isOpen ? (
         <>
@@ -281,6 +282,7 @@ vi.mock('./components/modals', () => ({
 
 import App, { DiagramTable } from './App'
 import { snapshotToGraph } from './erd/convert'
+import type { SnapshotDetail } from './types'
 
 const projects = [
   { project_space_uuid: 'p1', project_name: '<Billing & Core>' },
@@ -351,6 +353,16 @@ function forceClick(button: HTMLButtonElement) {
   button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 describe('App orchestration coverage', () => {
   it('shows loading and explicit authentication failure', async () => {
     let rejectMe!: (reason?: unknown) => void
@@ -411,6 +423,20 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('프로젝트가 없습니다. 이름을 입력해 새 프로젝트를 만드세요.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     expect(screen.getByText('프로젝트를 선택하세요.')).toBeInTheDocument()
+  })
+
+  it('describes why inspector share and export actions are unavailable', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    expect(screen.getByRole('button', { name: '내보내기 열기' })).toHaveAccessibleDescription(
+      '내보내려면 캔버스에 테이블을 추가하세요.',
+    )
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: '' } })
+    expect(screen.getByRole('button', { name: '공유 열기' })).toHaveAccessibleDescription(
+      '공유 링크를 만들려면 프로젝트를 선택하세요.',
+    )
   })
 
   it('creates projects, validates and creates connections, and starts a snapshot', async () => {
@@ -878,6 +904,42 @@ describe('App orchestration coverage', () => {
     await act(async () => rejectMe(new Error('late failure')))
   })
 
+  it('ignores connection and snapshot creation completions after unmount', async () => {
+    const connectionRequest = deferred<{ db_connection_uuid: string; conn_name: string }>()
+    api.createConnection.mockReturnValueOnce(connectionRequest.promise)
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/unmount' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    cleanup()
+    await act(async () =>
+      connectionRequest.resolve({ db_connection_uuid: 'late-c', conn_name: 'Late connection' }),
+    )
+
+    const snapshotRequest = deferred<{
+      schema_snapshot_uuid: string
+      status: string
+      schema_filter: string | null
+    }>()
+    api.createSnapshot.mockReturnValueOnce(snapshotRequest.promise)
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    cleanup()
+    await act(async () =>
+      snapshotRequest.resolve({
+        schema_snapshot_uuid: 'late-s',
+        status: 'queued',
+        schema_filter: null,
+      }),
+    )
+
+    expect(api.getSnapshot).not.toHaveBeenCalledWith('late-s')
+  })
+
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
@@ -944,7 +1006,251 @@ describe('App orchestration coverage', () => {
     expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
   })
 
-  it('renders snapshot failures and polls without a selected project', async () => {
+  it('clears project-scoped connections and diagrams before replacement metadata arrives', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    expect(await screen.findByText('ERD_billing_1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(screen.getByLabelText('Connection')).toHaveValue('c1')
+
+    let rejectConnections!: (reason: unknown) => void
+    let rejectSnapshots!: (reason: unknown) => void
+    api.listConnections.mockReturnValueOnce(
+      new Promise((_resolve, reject) => { rejectConnections = reject }),
+    )
+    api.listSnapshots.mockReturnValueOnce(
+      new Promise((_resolve, reject) => { rejectSnapshots = reject }),
+    )
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    expect(screen.getByLabelText('Connection')).toHaveValue('')
+    expect(screen.getByLabelText('Connection')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByLabelText('Connection')).toHaveTextContent('Loading…')
+    fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
+    expect(screen.getByText('불러오는 중')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('스냅샷 목록을 불러오는 중입니다.')
+    expect(screen.queryByText('아직 다이어그램 스냅샷이 없습니다.', { exact: false })).not.toBeInTheDocument()
+
+    await act(async () => {
+      rejectConnections(new Error('project-b connections unavailable'))
+      rejectSnapshots(new Error('project-b snapshots unavailable'))
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument()
+    expect(screen.getByText('아직 다이어그램 스냅샷이 없습니다.', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(screen.getByLabelText('Connection')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.getByLabelText('Connection')).toHaveTextContent('Select…')
+  })
+
+  it('clears a previous project metadata error when another project is selected', async () => {
+    api.listConnections
+      .mockRejectedValueOnce(new Error('project-a metadata failed'))
+      .mockResolvedValueOnce(connections)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '데이터베이스 연결 목록을 불러오지 못했습니다',
+    )
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(api.listConnections).toHaveBeenLastCalledWith('p2'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not commit a connection created for a project that is no longer selected', async () => {
+    const projectAConnection = deferred<{ db_connection_uuid: string; conn_name: string }>()
+    api.createConnection
+      .mockReturnValueOnce(projectAConnection.promise)
+      .mockResolvedValueOnce({ db_connection_uuid: 'c-b', conn_name: 'Project B DB' })
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/project-a' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    expect(api.createConnection).toHaveBeenLastCalledWith(
+      'p1',
+      'target-db',
+      'postgresql://db.example/project-a',
+    )
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/project-b' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c-b'))
+
+    await act(async () =>
+      projectAConnection.resolve({ db_connection_uuid: 'c-a', conn_name: 'Project A DB' }),
+    )
+    expect(screen.getByLabelText('Connection')).toHaveValue('c-b')
+    expect(screen.queryByRole('option', { name: 'Project A DB' })).not.toBeInTheDocument()
+  })
+
+  it('commits a connection when its project is selected again after another project request', async () => {
+    const projectAConnection = deferred<{ db_connection_uuid: string; conn_name: string }>()
+    api.createConnection.mockReturnValueOnce(projectAConnection.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/project-a' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    expect(api.createConnection).toHaveBeenLastCalledWith(
+      'p1',
+      'target-db',
+      'postgresql://db.example/project-a',
+    )
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/project-b' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c2'))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p1' } })
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+
+    await act(async () =>
+      projectAConnection.resolve({ db_connection_uuid: 'c-a', conn_name: 'Project A DB' }),
+    )
+    expect(screen.getByLabelText('Connection')).toHaveValue('c-a')
+    expect(screen.getByRole('option', { name: 'Project A DB' })).toBeInTheDocument()
+  })
+
+  it('does not poll a snapshot created for a project that is no longer selected', async () => {
+    const projectASnapshot = deferred<{
+      schema_snapshot_uuid: string
+      status: string
+      schema_filter: string | null
+    }>()
+    api.createSnapshot.mockReturnValueOnce(projectASnapshot.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    expect(api.createSnapshot).toHaveBeenLastCalledWith('p1', 'c1', undefined)
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    vi.useFakeTimers()
+    await act(async () =>
+      projectASnapshot.resolve({
+        schema_snapshot_uuid: 'snapshot-project-a',
+        status: 'queued',
+        schema_filter: null,
+      }),
+    )
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+    })
+
+    expect(api.getSnapshot).not.toHaveBeenCalledWith('snapshot-project-a')
+  })
+
+  it('polls a snapshot when its project is selected again before completion', async () => {
+    const projectASnapshot = deferred<{
+      schema_snapshot_uuid: string
+      status: string
+      schema_filter: string | null
+    }>()
+    api.createSnapshot.mockReturnValueOnce(projectASnapshot.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenLastCalledWith('p2', 'c1', undefined))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p1' } })
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled()
+
+    vi.useFakeTimers()
+    await act(async () =>
+      projectASnapshot.resolve({
+        schema_snapshot_uuid: 'snapshot-project-a',
+        status: 'queued',
+        schema_filter: null,
+      }),
+    )
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(api.getSnapshot).toHaveBeenCalledWith('snapshot-project-a')
+  })
+
+  it('keeps a newly created connection when an older metadata request finishes last', async () => {
+    const initialConnections = deferred<typeof connections>()
+    api.listConnections.mockReturnValueOnce(initialConnections.promise)
+    api.createConnection.mockResolvedValueOnce({
+      db_connection_uuid: 'c-new',
+      conn_name: 'Newer DB',
+    })
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.change(screen.getByLabelText('Connection DSN'), {
+      target: { value: 'postgresql://db.example/newer' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c-new'))
+
+    await act(async () => initialConnections.resolve(connections))
+    expect(screen.getByLabelText('Connection')).toHaveValue('c-new')
+    expect(screen.getByLabelText('Connection')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.getByRole('option', { name: 'Newer DB' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Warehouse' })).toBeInTheDocument()
+  })
+
+  it('keeps a terminal snapshot refresh when the initial list finishes last', async () => {
+    const initialSnapshots = deferred<typeof snapshots>()
+    const refreshedSnapshots = [
+      { schema_snapshot_uuid: 's-new', status: 'succeeded', schema_filter: 'newer' },
+    ]
+    api.listSnapshots
+      .mockReturnValueOnce(initialSnapshots.promise)
+      .mockResolvedValueOnce(refreshedSnapshots)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    await waitFor(() => expect(screen.getByLabelText('Connection')).toHaveValue('c1'))
+    vi.useFakeTimers()
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    vi.useRealTimers()
+
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    expect(await screen.findByText('ERD_newer_1')).toBeInTheDocument()
+    await act(async () => initialSnapshots.resolve(snapshots))
+    expect(screen.getByText('ERD_newer_1')).toBeInTheDocument()
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument()
+  })
+
+  it('renders sanitized snapshot failures while the project remains selected', async () => {
     api.getSnapshot.mockResolvedValue({
       schema_snapshot_uuid: 's3',
       status: 'failed',
@@ -957,11 +1263,14 @@ describe('App orchestration coverage', () => {
     fireEvent.change(screen.getByLabelText('Connection DSN'), { target: { value: 'postgresql://db.example/test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
     await waitFor(() => expect(api.createConnection).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
-    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p1', 'c2', undefined))
-
     vi.useFakeTimers()
-    fireEvent.change(screen.getByLabelText('Project'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(api.createSnapshot).toHaveBeenCalledWith('p1', 'c2', undefined)
+
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -1044,6 +1353,89 @@ describe('App orchestration coverage', () => {
     expect(screen.getByTestId('share-url')).not.toHaveTextContent('/project-a')
   })
 
+  it('ignores a clipboard completion after the share context is invalidated', async () => {
+    const clipboardWrite = deferred<void>()
+    vi.mocked(navigator.clipboard.writeText).mockReturnValueOnce(clipboardWrite.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
+    fireEvent.click(screen.getByTestId('share-create'))
+    await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
+    fireEvent.click(screen.getByTestId('share-copy'))
+
+    fireEvent.click(screen.getByTestId('export-close'))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await act(async () => clipboardWrite.resolve())
+
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
+    expect(screen.getByTestId('share-copied')).toHaveTextContent('false')
+    expect(screen.getByTestId('share-error')).toBeEmptyDOMElement()
+  })
+
+  it('clears active share copy feedback when changing projects', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
+    fireEvent.click(screen.getByTestId('share-create'))
+    await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
+    fireEvent.click(screen.getByTestId('share-copy'))
+    await waitFor(() => expect(screen.getByTestId('share-copied')).toHaveTextContent('true'))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    expect(screen.getByTestId('share-copied')).toHaveTextContent('false')
+  })
+
+  it('serializes snapshot polling and ignores a late response after project change', async () => {
+    const firstPoll = deferred<SnapshotDetail>()
+    api.getSnapshot.mockReturnValueOnce(firstPoll.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(openButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+    expect(api.getSnapshot).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await act(async () =>
+      firstPoll.resolve({
+        schema_snapshot_uuid: 's1',
+        status: 'succeeded',
+        schema_filter: 'project-a',
+        error_message: null,
+        snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
+      }),
+    )
+
+    expect(api.listSnapshots.mock.calls.filter(([projectId]) => projectId === 'p1')).toHaveLength(1)
+    expect(screen.getByTestId('node-count')).toHaveTextContent('0')
+  })
+
+  it('ignores a late polling failure after changing projects', async () => {
+    const firstPoll = deferred<SnapshotDetail>()
+    api.getSnapshot.mockReturnValueOnce(firstPoll.promise)
+
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(openButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+    })
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await act(async () => firstPoll.reject(new Error('late project-a polling failure')))
+
+    expect(screen.queryByText('스냅샷 상태를 확인하지 못했습니다.', { exact: false })).not.toBeInTheDocument()
+  })
+
   it('preserves positions across graph refresh and applies recommendations with sibling nodes', async () => {
     let pollCount = 0
     api.getSnapshot.mockImplementation(async () => ({
@@ -1055,8 +1447,9 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(openButtons[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()

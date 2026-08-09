@@ -14,7 +14,7 @@ FROM node:26.5.0-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be
 WORKDIR /app
 
 COPY --from=build --chown=node:node /app/dist /app/dist
-COPY --chown=node:node serve-static.mjs /app/serve-static.mjs
+COPY --chown=node:node serve-static.mjs static-headers.mjs /app/
 
 USER node
 

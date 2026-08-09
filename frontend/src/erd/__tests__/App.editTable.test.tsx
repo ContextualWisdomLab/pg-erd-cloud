@@ -70,6 +70,8 @@ describe('App edit functionality', () => {
     const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
     const properties = screen.getByRole('complementary', { name: 'ERD 속성' });
 
+    expect(properties).toHaveAttribute('data-dialog-focus-fallback', 'true');
+    expect(properties).toHaveAttribute('tabindex', '-1');
     expect(within(properties).getByRole('heading', { name: '속성' })).toBeInTheDocument();
     expect(within(properties).getByLabelText('테이블 또는 컬럼 검색')).toBeInTheDocument();
     expect(within(properties).getByRole('button', { name: '공유 열기' })).toBeInTheDocument();

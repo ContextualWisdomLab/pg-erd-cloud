@@ -182,14 +182,27 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
     return () => {
       window.clearTimeout(focusTimer);
       ownerDocument.removeEventListener("keydown", handleKeyDown);
-      if (previousFocus && ownerDocument.contains(previousFocus)) {
-        previousFocus.focus();
-        window.setTimeout(() => {
-          if (ownerDocument.contains(previousFocus)) {
-            previousFocus.focus();
-          }
-        }, 0);
-      }
+      const restoreFocus = () => {
+        const fallbackCandidate = ownerDocument.querySelector(
+          "[data-dialog-focus-fallback]",
+        );
+        const fallbackFocus = isFocusableElement(
+          ownerDocument,
+          fallbackCandidate,
+        )
+          ? fallbackCandidate
+          : null;
+        const focusTarget =
+          previousFocus && ownerDocument.contains(previousFocus)
+            ? previousFocus
+            : fallbackFocus;
+        if (focusTarget && ownerDocument.contains(focusTarget)) {
+          focusTarget.focus();
+        }
+      };
+
+      restoreFocus();
+      window.setTimeout(restoreFocus, 0);
     };
   }, [isOpen]);
 

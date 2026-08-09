@@ -126,12 +126,24 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("demo");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(
     null,
   );
+  const selectedProjectIdRef = useRef<string | null>(null);
+  const projectEpochRef = useRef(0);
+  const selectProject = useCallback((projectId: string | null) => {
+    if (selectedProjectIdRef.current === projectId) return;
+    selectedProjectIdRef.current = projectId;
+    projectEpochRef.current += 1;
+    setSelectedProjectIdState(projectId);
+  }, []);
 
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [isLoadingProjectConnections, setIsLoadingProjectConnections] =
+    useState(false);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [isLoadingProjectSnapshots, setIsLoadingProjectSnapshots] =
+    useState(false);
   const [connName, setConnName] = useState("target-db");
   const [isDsnPresent, setIsDsnPresent] = useState(false);
   const [selectedConnId, setSelectedConnId] = useState<string | null>(null);
@@ -164,6 +176,11 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareLinkRequestIdRef = useRef(0);
+  const shareCopyRequestIdRef = useRef(0);
+  const connectionListRequestIdRef = useRef(0);
+  const snapshotListRequestIdRef = useRef(0);
+  const connectionCreateTokenByProjectRef = useRef(new Map<string, symbol>());
+  const snapshotCreateTokenByProjectRef = useRef(new Map<string, symbol>());
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -172,6 +189,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   const [exportDdlText, setExportDdlText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
   const [shareLinkUrl, setShareLinkUrl] = useState("");
+  const [shareLinkExpiresAt, setShareLinkExpiresAt] = useState("");
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
@@ -233,9 +251,84 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
     [edges, selectedEditorEdgeId],
   );
 
+  const loadProjectConnections = useCallback(
+    async (projectId: string, projectEpoch: number) => {
+      const requestId = connectionListRequestIdRef.current + 1;
+      connectionListRequestIdRef.current = requestId;
+      const isCurrent = () =>
+        projectEpochRef.current === projectEpoch &&
+        connectionListRequestIdRef.current === requestId;
+      const commitIfCurrent = (commit: () => void) => {
+        if (isCurrent()) commit();
+      };
+
+      try {
+        const items = await listConnections(projectId);
+        commitIfCurrent(() => {
+          setConnections((current) => {
+            const fetchedIds = new Set(
+              items.map((item) => item.db_connection_uuid),
+            );
+            const localOnly = current.filter(
+              (item) => !fetchedIds.has(item.db_connection_uuid),
+            );
+            return [...localOnly, ...items];
+          });
+          setSelectedConnId(
+            (current) => current ?? items[0]?.db_connection_uuid ?? null,
+          );
+          setIsLoadingProjectConnections(false);
+        });
+      } catch {
+        commitIfCurrent(() => {
+          setIsLoadingProjectConnections(false);
+          setError(
+            "데이터베이스 연결 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          );
+        });
+      }
+    },
+    [],
+  );
+
+  const loadProjectSnapshots = useCallback(
+    async (
+      projectId: string,
+      projectEpoch: number,
+      failureMessage = "스냅샷 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ) => {
+      const requestId = snapshotListRequestIdRef.current + 1;
+      snapshotListRequestIdRef.current = requestId;
+      const isCurrent = () =>
+        projectEpochRef.current === projectEpoch &&
+        snapshotListRequestIdRef.current === requestId;
+      const commitIfCurrent = (commit: () => void) => {
+        if (isCurrent()) commit();
+      };
+
+      try {
+        const items = await listSnapshots(projectId);
+        commitIfCurrent(() => {
+          setSnapshots(items);
+          setIsLoadingProjectSnapshots(false);
+        });
+      } catch {
+        commitIfCurrent(() => {
+          setIsLoadingProjectSnapshots(false);
+          setError(failureMessage);
+        });
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     return () => {
+      projectEpochRef.current += 1;
       shareLinkRequestIdRef.current += 1;
+      shareCopyRequestIdRef.current += 1;
+      connectionCreateTokenByProjectRef.current.clear();
+      snapshotCreateTokenByProjectRef.current.clear();
       if (copyFeedbackTimeoutRef.current !== null) {
         window.clearTimeout(copyFeedbackTimeoutRef.current);
       }
@@ -247,7 +340,13 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
 
   useEffect(() => {
     shareLinkRequestIdRef.current += 1;
+    shareCopyRequestIdRef.current += 1;
+    if (shareCopyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      shareCopyFeedbackTimeoutRef.current = null;
+    }
     setShareLinkUrl("");
+    setShareLinkExpiresAt("");
     setIsCreatingShareLink(false);
     setIsShareLinkCopied(false);
     setShareLinkError(null);
@@ -281,7 +380,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
         if (meResult.status === "rejected") {
           setMe(null);
           setProjects([]);
-          setSelectedProjectId(null);
+          selectProject(null);
           setConnections([]);
           setSelectedConnId(null);
           setAuthError(
@@ -298,14 +397,14 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
 
         if (projectsResult.status === "rejected") {
           setProjects([]);
-          setSelectedProjectId(null);
+          selectProject(null);
           setError("프로젝트 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
           return;
         }
 
         const projectItems = projectsResult.value;
         setProjects(projectItems);
-        setSelectedProjectId(projectItems[0]?.project_space_uuid || null);
+        selectProject(projectItems[0]?.project_space_uuid || null);
       })
       .finally(() => {
         if (isCurrent) setIsAuthLoading(false);
@@ -314,64 +413,90 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [selectProject]);
 
   useEffect(() => {
+    const projectEpoch = projectEpochRef.current;
+    setError(null);
+    setConnections([]);
+    setIsLoadingProjectConnections(Boolean(selectedProjectId));
+    setSelectedConnId(null);
+    setSnapshots([]);
+    setIsLoadingProjectSnapshots(Boolean(selectedProjectId));
+    setSnapshotId(null);
+    setSnapshot(null);
+    setNodes([]);
+    setEdges([]);
+    setSelectedEditorNodeId(null);
+    setSelectedEditorEdgeId(null);
+    setUndoPositions(null);
+    setBusinessGroups([]);
+    setIsCreatingConnection(
+      Boolean(
+        selectedProjectId &&
+          connectionCreateTokenByProjectRef.current.has(selectedProjectId),
+      ),
+    );
+    setIsCreatingSnapshot(
+      Boolean(
+        selectedProjectId &&
+          snapshotCreateTokenByProjectRef.current.has(selectedProjectId),
+      ),
+    );
+
     if (!selectedProjectId) {
-      setConnections([]);
-      setSelectedConnId(null);
-      setSnapshots([]);
       return;
     }
-    let isCurrent = true;
-    listConnections(selectedProjectId)
-      .then((c) => {
-        if (!isCurrent) return;
-        setConnections(c);
-        if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setError("데이터베이스 연결 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-        }
-      });
-    listSnapshots(selectedProjectId)
-      .then((items) => {
-        if (isCurrent) setSnapshots(items);
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setError("스냅샷 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-        }
-      });
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedProjectId]);
+    void loadProjectConnections(selectedProjectId, projectEpoch);
+    void loadProjectSnapshots(selectedProjectId, projectEpoch);
+  }, [
+    loadProjectConnections,
+    loadProjectSnapshots,
+    selectedProjectId,
+    setEdges,
+    setNodes,
+  ]);
 
   useEffect(() => {
     if (!snapshotId) return;
-    const timer = setInterval(() => {
-      getSnapshot(snapshotId)
-        .then((s) => {
-          setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-            clearInterval(timer);
-            if (selectedProjectId) {
-              listSnapshots(selectedProjectId)
-                .then(setSnapshots)
-                .catch(() =>
-                  setError("스냅샷 목록을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요."),
-                );
-            }
-          }
-        })
-        .catch(() =>
-          setError("스냅샷 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+    const projectEpoch = projectEpochRef.current;
+    let isCurrent = true;
+    let timer: number;
+
+    const pollSnapshot = async () => {
+      try {
+        const nextSnapshot = await getSnapshot(snapshotId);
+        if (!isCurrent || projectEpochRef.current !== projectEpoch) return;
+        setSnapshot(nextSnapshot);
+        if (TERMINAL_SNAPSHOT_STATUSES.has(nextSnapshot.status)) {
+          void loadProjectSnapshots(
+            selectedProjectId!,
+            projectEpoch,
+            "스냅샷 목록을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          );
+          return;
+        }
+      } catch {
+        if (!isCurrent || projectEpochRef.current !== projectEpoch) return;
+        setError(
+          "스냅샷 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
         );
+      }
+
+      timer = window.setTimeout(() => {
+        void pollSnapshot();
+      }, 1000);
+    };
+
+    timer = window.setTimeout(() => {
+      void pollSnapshot();
     }, 1000);
-    return () => clearInterval(timer);
-  }, [selectedProjectId, snapshotId]);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [loadProjectSnapshots, selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {
     return snapshot?.snapshot_json
@@ -385,7 +510,24 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
       ? "Enter connection name and DSN"
       : "";
   const createSnapshotHint =
-    selectedProjectId && selectedConnId ? "" : "Select project and connection";
+    isLoadingProjectConnections
+      ? "Loading project connections"
+      : selectedProjectId && selectedConnId
+        ? ""
+        : "Select project and connection";
+  const editorActionHints: Array<{ id: string; text: string }> = [];
+  if (!selectedProjectId) {
+    editorActionHints.push({
+      id: "editor-share-disabled-reason",
+      text: "공유 링크를 만들려면 프로젝트를 선택하세요.",
+    });
+  }
+  if (nodes.length === 0) {
+    editorActionHints.push({
+      id: "editor-export-disabled-reason",
+      text: "내보내려면 캔버스에 테이블을 추가하세요.",
+    });
+  }
   const isSnapshotPending =
     isCreatingSnapshot ||
     Boolean(snapshotId && !snapshot) ||
@@ -604,6 +746,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   function onCloseExport() {
     setIsExportModalOpen(false);
     setIsCopied(false);
+    shareCopyRequestIdRef.current += 1;
     if (copyFeedbackTimeoutRef.current !== null) {
       window.clearTimeout(copyFeedbackTimeoutRef.current);
       copyFeedbackTimeoutRef.current = null;
@@ -645,7 +788,10 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
 
     try {
       const link = await createShareLink(selectedProjectId);
-      commitIfCurrent(() => setShareLinkUrl(link.url));
+      commitIfCurrent(() => {
+        setShareLinkUrl(link.url);
+        setShareLinkExpiresAt(link.expires_at);
+      });
     } catch {
       commitIfCurrent(() =>
         setShareLinkError(
@@ -659,22 +805,35 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
 
   const onCopyShareLink = useCallback(async () => {
     if (!shareLinkUrl) return;
+    const requestId = shareCopyRequestIdRef.current + 1;
+    shareCopyRequestIdRef.current = requestId;
+    const commitIfCurrent = (commit: () => void) => {
+      if (shareCopyRequestIdRef.current === requestId) commit();
+    };
+
+    if (shareCopyFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
+      shareCopyFeedbackTimeoutRef.current = null;
+    }
+    setIsShareLinkCopied(false);
+
     try {
       await navigator.clipboard.writeText(shareLinkUrl);
-      setShareLinkError(null);
-      setIsShareLinkCopied(true);
-
-      if (shareCopyFeedbackTimeoutRef.current !== null) {
-        window.clearTimeout(shareCopyFeedbackTimeoutRef.current);
-      }
-
-      shareCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
-        setIsShareLinkCopied(false);
-        shareCopyFeedbackTimeoutRef.current = null;
-      }, 2000);
+      commitIfCurrent(() => {
+        setShareLinkError(null);
+        setIsShareLinkCopied(true);
+        shareCopyFeedbackTimeoutRef.current = window.setTimeout(() => {
+          commitIfCurrent(() => {
+            setIsShareLinkCopied(false);
+            shareCopyFeedbackTimeoutRef.current = null;
+          });
+        }, 2000);
+      });
     } catch {
-      setIsShareLinkCopied(false);
-      setShareLinkError("공유 링크 복사에 실패했습니다.");
+      commitIfCurrent(() => {
+        setIsShareLinkCopied(false);
+        setShareLinkError("공유 링크 복사에 실패했습니다.");
+      });
     }
   }, [shareLinkUrl]);
 
@@ -1021,7 +1180,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
     try {
       const p = await createProject(nextProjectName);
       setProjects((prev) => [p, ...prev]);
-      setSelectedProjectId(p.project_space_uuid);
+      selectProject(p.project_space_uuid);
     } catch {
       setError("프로젝트를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -1032,6 +1191,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   async function onCreateConnection() {
     /* v8 ignore next -- the save control is disabled without a project or while saving */
     if (!selectedProjectId || isCreatingConnection) return;
+    const projectId = selectedProjectId;
     const nextConnectionName = connName.trim();
     // The handler is mounted beside this input, so the ref is established first.
     const dsnInput = dsnInputRef.current!;
@@ -1044,44 +1204,85 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
       setIsDsnPresent(false);
       return;
     }
+    const requestToken = Symbol();
+    connectionCreateTokenByProjectRef.current.set(projectId, requestToken);
+    const isCurrent = () =>
+      selectedProjectIdRef.current === projectId &&
+      connectionCreateTokenByProjectRef.current.get(projectId) === requestToken;
+    const commitIfCurrent = (commit: () => void) => {
+      if (isCurrent()) commit();
+    };
     setError(null);
     setIsCreatingConnection(true);
     dsnInput.value = "";
     setIsDsnPresent(false);
     try {
       const c = await createConnection(
-        selectedProjectId,
+        projectId,
         nextConnectionName,
         connectionDsn,
       );
-      setConnections((prev) => [c, ...prev]);
-      setSelectedConnId(c.db_connection_uuid);
+      commitIfCurrent(() => {
+        setConnections((prev) => [
+          c,
+          ...prev.filter(
+            (item) => item.db_connection_uuid !== c.db_connection_uuid,
+          ),
+        ]);
+        setSelectedConnId(c.db_connection_uuid);
+      });
     } catch {
-      setError(
-        "데이터베이스 연결을 만들지 못했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
-      );
+      commitIfCurrent(() => {
+        setError(
+          "데이터베이스 연결을 만들지 못했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
+        );
+      });
     } finally {
-      setIsCreatingConnection(false);
+      commitIfCurrent(() => setIsCreatingConnection(false));
+      if (
+        connectionCreateTokenByProjectRef.current.get(projectId) ===
+        requestToken
+      ) {
+        connectionCreateTokenByProjectRef.current.delete(projectId);
+      }
     }
   }
 
   async function onCreateSnapshot() {
     /* v8 ignore next -- the snapshot control is disabled for every guard state */
     if (!selectedProjectId || !selectedConnId || isCreatingSnapshot) return;
+    const projectId = selectedProjectId;
+    const requestToken = Symbol();
+    snapshotCreateTokenByProjectRef.current.set(projectId, requestToken);
+    const isCurrent = () =>
+      selectedProjectIdRef.current === projectId &&
+      snapshotCreateTokenByProjectRef.current.get(projectId) === requestToken;
+    const commitIfCurrent = (commit: () => void) => {
+      if (isCurrent()) commit();
+    };
     setError(null);
     setIsCreatingSnapshot(true);
     try {
       const s = await createSnapshot(
-        selectedProjectId,
+        projectId,
         selectedConnId,
         schemaFilter.trim() || undefined,
       );
-      setSnapshotId(s.schema_snapshot_uuid);
-      setSnapshot(null);
+      commitIfCurrent(() => {
+        setSnapshotId(s.schema_snapshot_uuid);
+        setSnapshot(null);
+      });
     } catch {
-      setError("스냅샷을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      commitIfCurrent(() => {
+        setError("스냅샷을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      });
     } finally {
-      setIsCreatingSnapshot(false);
+      commitIfCurrent(() => setIsCreatingSnapshot(false));
+      if (
+        snapshotCreateTokenByProjectRef.current.get(projectId) === requestToken
+      ) {
+        snapshotCreateTokenByProjectRef.current.delete(projectId);
+      }
     }
   }
 
@@ -1167,7 +1368,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
             <select
               id="project-select"
               value={selectedProjectId || ""}
-              onChange={(e) => setSelectedProjectId(e.target.value || null)}
+              onChange={(e) => selectProject(e.target.value || null)}
               className="sidebarSelect"
             >
               <option value="" disabled>
@@ -1225,9 +1426,11 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
             value={selectedConnId || ""}
             onChange={(e) => setSelectedConnId(e.target.value || null)}
             className="sidebarSelect"
+            aria-busy={isLoadingProjectConnections}
+            disabled={isLoadingProjectConnections}
           >
             <option value="" disabled>
-              Select…
+              {isLoadingProjectConnections ? "Loading…" : "Select…"}
             </option>
             {connections.map((c) => (
               <option key={c.db_connection_uuid} value={c.db_connection_uuid}>
@@ -1370,7 +1573,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
               </div>
               <div className="metricCard">
                 <span>연결</span>
-                <strong>{connections.length}</strong>
+                <strong>{isLoadingProjectConnections ? "…" : connections.length}</strong>
               </div>
               <div className="metricCard">
                 <span>스냅샷</span>
@@ -1399,7 +1602,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
                       type="button"
                       className="projectCard"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >
@@ -1423,6 +1626,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
               </div>
               <DiagramTable
                 snapshots={recentSnapshots}
+                isLoading={isLoadingProjectSnapshots}
                 selectedProjectName={selectedProject?.project_name ?? ""}
                 onOpenEditor={(id) => {
                   setSnapshotId(id);
@@ -1470,12 +1674,18 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
               {projects.map((project) => (
                 <div className="dataTable__row dataTable__row--projects" role="row" key={project.project_space_uuid}>
                   <strong role="cell">{project.project_name}</strong>
-                  <span role="cell">{project.project_space_uuid === selectedProjectId ? connections.length : "선택 후 표시"}</span>
+                  <span role="cell">
+                    {project.project_space_uuid === selectedProjectId
+                      ? isLoadingProjectConnections
+                        ? "불러오는 중"
+                        : connections.length
+                      : "선택 후 표시"}
+                  </span>
                   <span role="cell">
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >
@@ -1512,6 +1722,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
             </label>
             <DiagramTable
               snapshots={snapshots}
+              isLoading={isLoadingProjectSnapshots}
               searchText={diagramSearch}
               selectedProjectName={selectedProject?.project_name ?? ""}
               onOpenEditor={(id) => {
@@ -1713,6 +1924,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
             hasDictionaryExport={nodes.length > 0}
             hasDiagramExport={nodes.length > 0}
             shareLinkUrl={shareLinkUrl}
+            shareLinkExpiresAt={shareLinkExpiresAt}
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
             shareLinkError={shareLinkError}
@@ -1793,7 +2005,12 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
             onAddTableSubmit={onAddTableSubmit}
           />
         </div>
-          <aside className="editorProperties" aria-label="ERD 속성">
+          <aside
+            className="editorProperties"
+            aria-label="ERD 속성"
+            data-dialog-focus-fallback
+            tabIndex={-1}
+          >
             <div>
               <h2>속성</h2>
               <p>
@@ -1923,6 +2140,9 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
               <button
                 type="button"
                 aria-label="공유 열기"
+                aria-describedby={
+                  selectedProjectId ? undefined : "editor-share-disabled-reason"
+                }
                 onClick={onOpenExport}
                 disabled={!selectedProjectId}
               >
@@ -1932,6 +2152,9 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
                 type="button"
                 className="editorProperties__primaryAction"
                 aria-label="내보내기 열기"
+                aria-describedby={
+                  nodes.length === 0 ? "editor-export-disabled-reason" : undefined
+                }
                 onClick={onOpenExport}
                 disabled={nodes.length === 0}
               >
@@ -1960,6 +2183,15 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
                 캔버스 비우기
               </button>
             </div>
+            {editorActionHints.length ? (
+              <div className="editorProperties__actionHints">
+                {editorActionHints.map((hint) => (
+                  <p id={hint.id} key={hint.id}>
+                    {hint.text}
+                  </p>
+                ))}
+              </div>
+            ) : null}
           </aside>
           </div>
         )}
@@ -1979,11 +2211,13 @@ export default function App({ colorMode = "system" }: { colorMode?: ColorMode })
 
 export function DiagramTable({
   snapshots,
+  isLoading = false,
   searchText = "",
   selectedProjectName,
   onOpenEditor,
 }: {
   snapshots: Snapshot[];
+  isLoading?: boolean;
   searchText?: string;
   selectedProjectName?: string;
   onOpenEditor: (snapshotId: string) => void;
@@ -2001,6 +2235,14 @@ export function DiagramTable({
         item.status.toLocaleLowerCase().includes(normalizedSearchText)
       );
     });
+
+  if (isLoading) {
+    return (
+      <div className="panelEmpty" role="status">
+        스냅샷 목록을 불러오는 중입니다.
+      </div>
+    );
+  }
 
   if (!rows.length) {
     return (

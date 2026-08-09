@@ -9,6 +9,7 @@ interface ExportModalProps {
   hasDictionaryExport: boolean;
   hasDiagramExport: boolean;
   shareLinkUrl: string;
+  shareLinkExpiresAt: string;
   isCreatingShareLink: boolean;
   isShareLinkCopied: boolean;
   shareLinkError: string | null;
@@ -43,6 +44,7 @@ export function ExportModal({
   hasDictionaryExport,
   hasDiagramExport,
   shareLinkUrl,
+  shareLinkExpiresAt,
   isCreatingShareLink,
   isShareLinkCopied,
   shareLinkError,
@@ -60,6 +62,14 @@ export function ExportModal({
   onCopyShareLink,
 }: ExportModalProps) {
   if (!isOpen) return null;
+
+  const expiryDate = shareLinkExpiresAt ? new Date(shareLinkExpiresAt) : null;
+  const expiryLabel = expiryDate && !Number.isNaN(expiryDate.getTime())
+    ? new Intl.DateTimeFormat('ko-KR', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(expiryDate)
+    : null;
 
   const shareStatusKind = shareLinkError ? 'error' : isShareLinkCopied ? 'success' : 'neutral';
   const shareStatusRole = shareLinkError ? 'alert' : 'status';
@@ -193,8 +203,12 @@ export function ExportModal({
               </button>
             )}
             <p id="share-export-access-hint" className="exportModal__hint">
-              이 링크를 아는 누구나 공유된 성공 스냅샷을 볼 수 있으며, 현재 링크
-              만료·회수 기능은 제공되지 않습니다.
+              이 링크를 아는 누구나 공유된 성공 스냅샷을 볼 수 있습니다. 새 링크는
+              서버가 설정한 시점에 자동 만료되며, 소유자는 프로젝트 공유 API로 즉시
+              폐기할 수 있습니다. 현재 이 화면에는 회수 버튼이 없습니다.
+              {expiryLabel ? (
+                <> 만료 예정: <time dateTime={shareLinkExpiresAt}>{expiryLabel}</time>.</>
+              ) : null}
             </p>
           </div>
 

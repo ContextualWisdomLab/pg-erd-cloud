@@ -7,20 +7,26 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
+from fastapi.routing import APIRoute
 
 from app.api.share import (
+    _redact_sensitive_snapshot_fields,
     create_share_link,
     export_shared_snapshot_index_design,
     export_shared_snapshot_reversing_spec,
     export_shared_snapshot_sql,
     get_share_link_info,
     get_shared_snapshot,
+    revoke_share_link,
+    router,
 )
+from app.db import get_session
 
 _SECRET_RELATION_COMMENT = "SECRET_RELATION_COMMENT internal only"
 _SECRET_COLUMN_COMMENT = "SECRET_COLUMN_COMMENT contains PII notes"
 _SECRET_EXAMPLE_VALUE = "secret-example-value@internal.example"
 _SECRET_ERROR_MESSAGE = "host=db.internal user=admin TLS path=/secret"
+_SECRET_WRONG_PATH = "secret-from-wrong-path"
 
 _PUBLIC_SHARE_ENDPOINTS = [
     (get_share_link_info, {}),
@@ -45,8 +51,18 @@ def _sensitive_snapshot() -> dict:
 
     return {
         "source_dialect": "postgresql",
+        "database_name": "public-demo-database",
         "server_version": "16.4",
         "captured_at": "2026-06-20T00:00:00+00:00",
+        "future_private_metadata": "must not cross the public schema boundary",
+        "schemas": [
+            {
+                "schema_oid": 10,
+                "schema_name": "public",
+                "database_name": _SECRET_WRONG_PATH,
+            },
+            "legacy_schema",
+        ],
         "relations": [
             {
                 "schema_name": "public",
@@ -54,7 +70,11 @@ def _sensitive_snapshot() -> dict:
                 "relation_oid": 1,
                 "relation_kind": "r",
                 "relation_comment": _SECRET_RELATION_COMMENT,
+                "future_owner_email": "owner@internal.example",
+                "database_name": _SECRET_WRONG_PATH,
+                "columns": [{"database_name": _SECRET_WRONG_PATH}],
             },
+            _SECRET_WRONG_PATH,
         ],
         "columns": [
             {
@@ -146,12 +166,151 @@ async def test_owner_can_create_share_link() -> None:
     added_link = session.add.call_args.args[0]
     assert added_link.project_space_uuid == project_space_uuid
     assert added_link.created_by_user_uuid == user.user_account_uuid
+    assert added_link.expires_at is not None
+    assert dt.timedelta(days=6, hours=23) < (
+        added_link.expires_at - added_link.created_at
+    ) <= dt.timedelta(days=7)
     assert out == {
         "share_link_uuid": str(added_link.share_link_uuid),
         "permission_kind": "viewer",
         "url_path": f"/api/share/{added_link.share_link_uuid}",
+        "expires_at": added_link.expires_at.isoformat(),
     }
     session.commit.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_revoke_share_link() -> None:
+    """An owner can invalidate a bearer link before its expiry."""
+
+    project_space_uuid = uuid.uuid4()
+    share_link_uuid = uuid.uuid4()
+    row = MagicMock()
+    row.scalar_one_or_none.return_value = "owner"
+    link = SimpleNamespace(
+        share_link_uuid=share_link_uuid,
+        project_space_uuid=project_space_uuid,
+    )
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=row),
+        get=AsyncMock(return_value=link),
+        delete=AsyncMock(),
+        commit=AsyncMock(),
+    )
+    user = SimpleNamespace(user_account_uuid=uuid.uuid4())
+
+    response = await revoke_share_link(
+        project_space_uuid=project_space_uuid,
+        share_link_uuid=share_link_uuid,
+        user=user,
+        session=session,
+    )
+
+    assert response.status_code == 204
+    session.delete.assert_awaited_once_with(link)
+    session.commit.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_revoke_share_link_requires_owner_role() -> None:
+    """An editor cannot revoke a project's bearer link."""
+
+    row = MagicMock()
+    row.scalar_one_or_none.return_value = "editor"
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=row),
+        get=AsyncMock(),
+        delete=AsyncMock(),
+        commit=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await revoke_share_link(
+            project_space_uuid=uuid.uuid4(),
+            share_link_uuid=uuid.uuid4(),
+            user=SimpleNamespace(user_account_uuid=uuid.uuid4()),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "owner role required"
+    session.get.assert_not_awaited()
+    session.delete.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_revoke_share_link_rejects_cross_project_link() -> None:
+    """An owner cannot revoke a link belonging to a different project."""
+
+    row = MagicMock()
+    row.scalar_one_or_none.return_value = "owner"
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=row),
+        get=AsyncMock(
+            return_value=SimpleNamespace(project_space_uuid=uuid.uuid4())
+        ),
+        delete=AsyncMock(),
+        commit=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await revoke_share_link(
+            project_space_uuid=uuid.uuid4(),
+            share_link_uuid=uuid.uuid4(),
+            user=SimpleNamespace(user_account_uuid=uuid.uuid4()),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 404
+    session.delete.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+def test_public_share_routes_validate_links_on_the_primary_session() -> None:
+    """Replica lag must not keep a revoked bearer link readable."""
+
+    public_routes = [
+        route
+        for route in router.routes
+        if isinstance(route, APIRoute) and route.path.startswith("/api/share/")
+    ]
+
+    assert public_routes
+    for route in public_routes:
+        session_dependencies = [
+            dependency
+            for dependency in route.dependant.dependencies
+            if dependency.name == "session"
+        ]
+        assert len(session_dependencies) == 1
+        assert session_dependencies[0].call is get_session
+
+
+def test_public_snapshot_projection_is_path_and_type_scoped() -> None:
+    """Allowed names at the wrong level or with object values fail closed."""
+
+    projected = _redact_sensitive_snapshot_fields(
+        {
+            "source": {"database_name": _SECRET_WRONG_PATH},
+            "constraints": [
+                {
+                    123: _SECRET_WRONG_PATH,
+                    "constraint_oid": 1,
+                    "constrained_attnums": [
+                        1,
+                        {"database_name": _SECRET_WRONG_PATH},
+                    ],
+                    "check_expr": {"relation_name": _SECRET_WRONG_PATH},
+                }
+            ],
+        }
+    )
+
+    assert projected == {
+        "constraints": [{"constraint_oid": 1, "constrained_attnums": [1]}]
+    }
+    assert _redact_sensitive_snapshot_fields([_SECRET_WRONG_PATH]) == {}
 
 
 @pytest.mark.asyncio
@@ -379,6 +538,14 @@ async def test_shared_snapshot_json_redacts_sensitive_fields() -> None:
     assert _SECRET_RELATION_COMMENT not in payload
     assert _SECRET_COLUMN_COMMENT not in payload
     assert _SECRET_EXAMPLE_VALUE not in payload
+    assert _SECRET_WRONG_PATH not in payload
+    assert "future_private_metadata" not in payload
+    assert "future_owner_email" not in payload
+    assert out["snapshot_json"]["database_name"] == "public-demo-database"
+    assert out["snapshot_json"]["schemas"] == [
+        {"schema_oid": 10, "schema_name": "public"},
+        "legacy_schema",
+    ]
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,17 @@
 
 Last checked: 2026-08-09
 
+Audit binding:
+
+- Live Plugin API identity: file `csnpEEJfmqFWB0vNUoTkWA`, document `0:0`,
+  verified on 2026-08-09 (Asia/Seoul).
+- Code baseline inspected: `main@72afe6db712b145baaba084f64a1ff4fb36d9fd0`
+  and PR #824 head `385af92424a6dba338ad9255bc1c920a7dd9f996`.
+- Figma's Plugin API does not expose `version` or `lastModified` on a DOCUMENT
+  node; a direct version-property query was rejected. Therefore the file key,
+  live page/node inventory, check date, and code SHA are the reproducible
+  binding. Any later candidate SHA requires fresh visual QA.
+
 This file records the live source of truth for Cloud ERD implementation work.
 Use it before the historical PNGs or QA captures in this directory.
 
@@ -26,15 +37,24 @@ The former share/export node `29:143` no longer exists. Do not use it as a live 
 - TableNode: `32:2`
 - Editor Controls: `35:2`
 - Product Organisms: `36:2`
-- Developer Handoff: `39:3`
+- Developer Handoff: `39:2`
 - Implementation Contracts: `45:2`
 
-The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` currently contains an empty page and conflicting variables. It is not authoritative.
+The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` contains only its `Page 2`
+canvas rather than the product screen inventory, plus conflicting variable
+collections. It is a token reference, not the screen authority.
+
+The authoritative file currently has 18 pages. Its variable collections contain
+Primitives (27), Color (51 across Light/Dark), Spacing (17), Radius (4), Sizing
+(18), and Typography (16) variables. Counts are evidence for the check date,
+not stable API identifiers. The supplemental kit has a smaller conflicting
+Primitives/Color/Spacing/Radius inventory with Light/High Contrast modes.
 
 ## Screen nodes
 
 | Screen | Node | Target frame |
 | --- | --- | --- |
+| Screen inventory | `16:2` | 1440×800 |
 | AuthGate | `37:2` | 390×720 |
 | Dashboard | `37:10` | 1440×900 |
 | ProjectList | `37:62` | 390×720 |
@@ -46,6 +66,9 @@ The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` currently contains an empty page 
 | GroupModal | `130:259` | 900×640 |
 | CardinalityModal | `130:285` | 900×640 |
 | EditTableModal | `130:313` | 900×640 |
+
+Supporting contract nodes: screen supplement `45:275`, contract matrix
+`130:229`, and the Implementation Contracts audit frame `127:2`.
 
 ## Implementation rules
 
@@ -62,7 +85,7 @@ The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` currently contains an empty page 
 ## Intentional extensions
 
 - DBML, Prisma, and data-dictionary exports remain available under the collapsed “기타 산출물” disclosure. The default share/export view follows the live Figma share-link and DDL sections.
-- The public share URL uses `/share/{id}` and renders successful public API snapshots as a read-only ERD. The backend `/api/share/{id}` route remains the data endpoint, and the product copy must disclose that anyone with the bearer link can view it while expiry/revocation is unavailable.
+- The public share URL uses `/share/{id}` and renders successful public API snapshots as a read-only ERD. The backend `/api/share/{id}` route remains the data endpoint, and product copy must disclose bearer access, server-controlled expiry, owner API revocation, and the current absence of a UI revoke button.
 - Auth loading and authentication-required states reuse the AuthGate card tokens because the live file defines only the idle login state and the repository does not yet provide an OIDC login redirect UI.
 
 ## Known Figma defects not to reproduce
@@ -74,3 +97,4 @@ The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` currently contains an empty page 
 - The ShareExport frame is 720px wide, while the Developer Handoff explicitly requires modal widths to map to `modal/*`; the implementation therefore uses `modal/export-width` at 500px.
 - Dark-mode `color/text/inverse` resolves to dark text over the blue primary action and does not meet the normal-text contrast requirement. The implementation uses white action text as an audited accessibility override.
 - The supplied success text/surface pair is below 4.5:1 in light mode and substantially lower in dark mode. The implementation uses darker light-theme and lighter dark-theme success text as audited accessibility overrides.
+- The supplied default/subtle borders and React Flow edge defaults fall below the 3:1 non-text contrast requirement when they are the only visible boundary for controls, handles, or relationship edges. The implementation retains the Figma border tokens for structural dividers and uses a dedicated higher-contrast `color/border/control` semantic override for interactive boundaries and relationship lines in both themes.

@@ -74,7 +74,7 @@ describe('live Figma design token contract', () => {
 
   it('uses the bundled Figma sans family first in the application stack', () => {
     expect(token('--pg-type-font-family-css-stack')).toBe(
-      'var(--pg-type-font-family-figma-sans),system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+      'var(--pg-type-font-family-figma-sans),"Noto Sans KR Variable",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
     )
   })
 
@@ -131,6 +131,25 @@ describe('live Figma design token contract', () => {
           resolvedToken('--pg-color-surface-active'),
         ),
       ).toBeGreaterThanOrEqual(4.5)
+
+      delete document.documentElement.dataset.theme
+    },
+  )
+
+  it.each(['light', 'dark'] as const)(
+    'keeps control and handle boundaries distinguishable in %s mode',
+    (theme) => {
+      if (theme === 'dark') document.documentElement.dataset.theme = 'dark'
+      else delete document.documentElement.dataset.theme
+
+      const controlBorder = resolvedToken('--pg-color-border-control')
+      expect(controlBorder).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(
+        contrastRatio(controlBorder, resolvedToken('--pg-color-surface-default')),
+      ).toBeGreaterThanOrEqual(3)
+      expect(
+        contrastRatio(controlBorder, resolvedToken('--pg-color-bg-canvas')),
+      ).toBeGreaterThanOrEqual(3)
 
       delete document.documentElement.dataset.theme
     },

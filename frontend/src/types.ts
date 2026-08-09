@@ -12,6 +12,7 @@ export type ShareLink = {
   share_link_uuid: string
   permission_kind: string
   url_path: string
+  expires_at: string
   url: string
 }
 
