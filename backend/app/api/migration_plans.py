@@ -56,7 +56,12 @@ def _plan_out(plan: MigrationPlan) -> MigrationPlanOut:
     """Return the public representation of one persisted immutable plan."""
 
     plan_json = plan.plan_json
-    if not verify_migration_plan_digest(plan_json, plan.statement_digest):
+    if (
+        not verify_migration_plan_digest(plan_json, plan.statement_digest)
+        or plan_json.get("compiler_version") != plan.compiler_version
+        or plan_json.get("base_digest") != plan.base_digest
+        or plan_json.get("target_digest") != plan.target_digest
+    ):
         raise HTTPException(
             status_code=409,
             detail="migration plan integrity verification failed",
