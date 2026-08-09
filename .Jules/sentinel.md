@@ -16,3 +16,13 @@
 ## 2025-02-14 - PyJWT migration decode options
 **Learning:** `PyJWT`의 `decode` 함수는 `options` 매개변수에 대해 `python-jose`와 다르게 `require_aud`, `require_iss`, `require_exp` 등의 키를 지원하지 않으며, 알 수 없는 키가 전달되면 `ValueError`를 발생시킵니다. 대신 `require` 리스트(`["exp", "iss", "jti", "aud"]`) 형태로 검증 옵션을 지정해야 합니다. 또한, `jti`를 강제하기 위해 기존 `python-jose` 옵션을 변환할 때 필수적으로 `require` 리스트에 `jti`를 포함시켜야 합니다.
 **Prevention:** `jwt.decode` 사용 시, `options={"require": ["exp", "iss", "jti", ...], "verify_aud": True}`와 같이 PyJWT 스펙에 맞춰 `options` 딕셔너리를 올바르게 구성했습니다.
+
+## 2025-02-14 - PyJWT crit parameter null 우회 버그 수정
+**Vulnerability:** JWT 헤더를 검사하는 `_validate_jwt_header`에서 파이썬 dict의 `get` 메서드를 사용하여 `crit = header.get("crit")`로 값을 가져올 때, 페이로드에 실제로 `{"crit": null}` 이 포함되어 있으면 `crit is not None` 조건에 걸리지 않아 (null이 파이썬 None으로 매핑됨) 검증을 그대로 우회할 수 있습니다.
+**Learning:** JSON 검증에서 키의 존재 여부와 키의 값이 None인지를 구분해야 합니다. `dict.get()`을 사용하여 검증을 우회할 수 있는 edge case(Null Injection)가 생길 수 있음을 확인했습니다.
+**Prevention:** `if "crit" in header:` 와 같이 키가 헤더에 명시적으로 존재하는지 확인한 뒤에 처리하도록 코드를 방어적으로 작성했습니다. 이로 인해 어떤 형태로든 `crit` 필드를 포함한 모든 JWT가 차단됩니다.
+
+## 2025-02-14 - PyJWT crit parameter null 우회 버그 수정
+**Vulnerability:** JWT 헤더를 검사하는 `_validate_jwt_header`에서 파이썬 dict의 `get` 메서드를 사용하여 `crit = header.get("crit")`로 값을 가져올 때, 페이로드에 실제로 `{"crit": null}` 이 포함되어 있으면 `crit is not None` 조건에 걸리지 않아 (null이 파이썬 None으로 매핑됨) 검증을 그대로 우회할 수 있습니다.
+**Learning:** JSON 검증에서 키의 존재 여부와 키의 값이 None인지를 구분해야 합니다. `dict.get()`을 사용하여 검증을 우회할 수 있는 edge case(Null Injection)가 생길 수 있음을 확인했습니다.
+**Prevention:** `if "crit" in header:` 와 같이 키가 헤더에 명시적으로 존재하는지 확인한 뒤에 처리하도록 코드를 방어적으로 작성했습니다. 이로 인해 어떤 형태로든 `crit` 필드를 포함한 모든 JWT가 차단됩니다.

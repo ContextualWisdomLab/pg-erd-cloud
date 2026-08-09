@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-import jwt
+from jose import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -250,7 +250,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
 
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
-    except jwt.PyJWTError:
+    except Exception:  # noqa: BLE001
         raise HTTPException(status_code=401, detail="invalid token header")
 
     header_alg = _validate_jwt_header(header)
@@ -282,19 +282,20 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
-        # Create a key object using PyJWT's PyJWK class.
-        key = jwt.PyJWK(jwk).key
         claims = jwt.decode(
             token,
-            key,
+            jwk,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
             options={
                 "verify_aud": bool(settings.oidc_audience),
-                "require": ["exp", "iss", "jti"] + (["aud"] if settings.oidc_audience else []),
+                "require_aud": bool(settings.oidc_audience),
+                "require_iss": True,
+                "require_exp": True,
+                "require_jti": True,
+                "leeway": OIDC_JWT_LEEWAY_SECONDS,
             },
-            leeway=OIDC_JWT_LEEWAY_SECONDS,
         )
     except Exception as err:
         raise HTTPException(
