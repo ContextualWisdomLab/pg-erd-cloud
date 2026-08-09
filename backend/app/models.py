@@ -164,6 +164,118 @@ class SchemaSnapshotData(Base):
     )
 
 
+class SchemaModel(Base):
+    """Project-scoped editable schema identity with immutable revisions."""
+
+    __tablename__ = "schema_model"
+
+    schema_model_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    model_name: Mapped[str] = mapped_column(Text())
+    current_revision_number: Mapped[int] = mapped_column(Integer())
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid", "model_name", name="uq_schema_model__project_name"
+        ),
+    )
+
+
+class SchemaModelRevision(Base):
+    """Immutable canonical JSON revision used as migration-plan input."""
+
+    __tablename__ = "schema_model_revision"
+
+    schema_model_revision_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    schema_model_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_model.schema_model_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    revision_number: Mapped[int] = mapped_column(Integer())
+    revision_digest: Mapped[str] = mapped_column(Text())
+    model_json: Mapped[dict] = mapped_column(JSONB())
+    base_schema_snapshot_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "schema_model_uuid",
+            "revision_number",
+            name="uq_schema_model_revision__model_number",
+        ),
+    )
+
+
+class MigrationPlan(Base):
+    """Immutable server-compiled plan bound to one target and base snapshot."""
+
+    __tablename__ = "migration_plan"
+
+    migration_plan_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    schema_model_revision_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "schema_model_revision.schema_model_revision_uuid", ondelete="RESTRICT"
+        ),
+        index=True,
+    )
+    db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("db_connection.db_connection_uuid", ondelete="RESTRICT"),
+    )
+    base_schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="RESTRICT"),
+    )
+    compiler_version: Mapped[str] = mapped_column(Text())
+    base_digest: Mapped[str] = mapped_column(Text())
+    target_digest: Mapped[str] = mapped_column(Text())
+    statement_digest: Mapped[str] = mapped_column(Text())
+    plan_json: Mapped[dict] = mapped_column(JSONB())
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
+
 class JobQueue(Base):
     """Lightweight DB-backed job queue (MVP)."""
 

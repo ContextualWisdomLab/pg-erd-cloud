@@ -15,8 +15,10 @@ from app.api.dbml import router as dbml_router
 from app.api.auth_routes import router as auth_router
 from app.api.diagram_views import router as diagram_views_router
 from app.api.me import router as me_router
+from app.api.migration_plans import router as migration_plans_router
 from app.api.projects import router as projects_router
 from app.api.share import router as share_router
+from app.api.schema_models import router as schema_models_router
 from app.api.snapshots import router as snapshots_router
 from app.auth import try_get_subject_for_rate_limit
 from app.csrf import CSRF_HEADER_NAME, generate_csrf_token, make_csrf_middleware
@@ -68,8 +70,10 @@ app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
 CORS_ALLOW_HEADERS = [
     "Authorization",
     "Content-Type",
+    "If-Match",
     CSRF_HEADER_NAME,
 ]
+CORS_EXPOSE_HEADERS = ["ETag"]
 
 _rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
@@ -132,8 +136,9 @@ app.add_middleware(
     # actually need cookie-based auth.
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=CORS_ALLOW_HEADERS,
+    expose_headers=CORS_EXPOSE_HEADERS,
 )
 
 # Observability should be registered after other middleware so it can capture
@@ -176,3 +181,5 @@ app.include_router(api_keys_router)
 app.include_router(me_router)
 app.include_router(share_router)
 app.include_router(auth_router)
+app.include_router(schema_models_router)
+app.include_router(migration_plans_router)

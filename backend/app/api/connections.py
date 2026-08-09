@@ -76,12 +76,15 @@ async def apply_sql(
     db_connection_uuid: uuid.UUID,
     body: ApplySqlIn,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    session: AsyncSession = Depends(get_session),
 ) -> ApplySqlOut:
     """Forward engineering: apply allow-listed DDL to a stored connection.
 
     SECURITY-SENSITIVE (writes to a live database):
-    * Requires the **editor** role on the connection's project.
+    * Requires **editor** for rollback-only compatibility validation and the
+      stronger **deployer** role for a persistent live apply.
+    * Authorization and connection lookup use the primary session so replica
+      lag cannot revive a revoked deployer role.
     * IDOR-safe: non-members get a uniform 404 (no enumeration); members
       lacking editor get 403.
     * Rejects arbitrary SQL and requires unquoted snake_case database object
@@ -109,8 +112,9 @@ async def apply_sql(
         if exc.status_code == 403:
             raise HTTPException(status_code=404, detail="connection not found")
         raise
+    required_role = "editor" if body.dry_run else "deployer"
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+        session, project_space_uuid, user.user_account_uuid, minimum_role=required_role
     )
 
     conn = await session.get(DbConnection, db_connection_uuid)

@@ -51,3 +51,16 @@ async def test_require_project_member_rejects_non_member() -> None:
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "project access denied"
+
+
+@pytest.mark.asyncio
+async def test_deployer_role_sits_between_editor_and_owner() -> None:
+    role = await require_project_member(
+        FakeSession("deployer"), uuid.uuid4(), uuid.uuid4(), minimum_role="deployer"
+    )
+    assert role == "deployer"
+
+    with pytest.raises(HTTPException):
+        await require_project_member(
+            FakeSession("editor"), uuid.uuid4(), uuid.uuid4(), minimum_role="deployer"
+        )

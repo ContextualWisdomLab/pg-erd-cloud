@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from app import security_headers
 from app.csrf import CSRF_HEADER_NAME
-from app.main import CORS_ALLOW_HEADERS
+from app.main import CORS_ALLOW_HEADERS, CORS_EXPOSE_HEADERS
 from app.security_headers import make_security_headers_middleware
 
 
@@ -128,6 +128,61 @@ def test_cors_preflight_allows_csrf_token_header() -> None:
 
     assert r.status_code in (200, 204)
     assert CSRF_HEADER_NAME.lower() in r.headers["Access-Control-Allow-Headers"].lower()
+
+
+def test_cors_preflight_allows_if_match_for_schema_revisions() -> None:
+    """Cross-origin optimistic-concurrency updates must pass preflight."""
+    app = FastAPI()
+
+    @app.put("/api/schema-models/example")
+    def revise_schema_model() -> dict[str, bool]:
+        return {"ok": True}
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://example.com"],
+        allow_credentials=False,
+        allow_methods=["PUT", "OPTIONS"],
+        allow_headers=CORS_ALLOW_HEADERS,
+    )
+
+    response = TestClient(app).options(
+        "/api/schema-models/example",
+        headers={
+            "Origin": "http://example.com",
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "If-Match, Content-Type",
+        },
+    )
+
+    assert response.status_code in (200, 204)
+    assert "if-match" in response.headers["Access-Control-Allow-Headers"].lower()
+
+
+def test_cors_exposes_strong_revision_etag_to_browser_clients() -> None:
+    """Cross-origin clients must be able to read the token used by If-Match."""
+    app = FastAPI()
+
+    @app.get("/api/schema-models/example")
+    def get_schema_model(response: Response) -> dict[str, bool]:
+        response.headers["ETag"] = '"revision-uuid"'
+        return {"ok": True}
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://example.com"],
+        allow_credentials=False,
+        allow_methods=["GET"],
+        allow_headers=CORS_ALLOW_HEADERS,
+        expose_headers=CORS_EXPOSE_HEADERS,
+    )
+
+    response = TestClient(app).get(
+        "/api/schema-models/example", headers={"Origin": "http://example.com"}
+    )
+
+    assert response.headers["ETag"] == '"revision-uuid"'
+    assert "etag" in response.headers["Access-Control-Expose-Headers"].lower()
 
 
 def test_csp_not_applied_to_fastapi_docs_endpoints() -> None:

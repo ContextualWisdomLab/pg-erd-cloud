@@ -25,6 +25,13 @@ def test_member_subject_rejects_control_or_whitespace() -> None:
         ProjectMemberAddIn(member_subject="dev:bad\x00user", project_role="viewer")
 
 
+def test_deployer_is_an_assignable_non_owner_role() -> None:
+    payload = ProjectMemberAddIn(
+        member_subject="dev:release-engineer", project_role="deployer"
+    )
+    assert payload.project_role == "deployer"
+
+
 def test_connection_payload_lengths_are_bounded() -> None:
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="x" * 129, dsn="postgresql://localhost/db")

@@ -34,7 +34,7 @@ class ProjectMemberAddIn(BaseModel):
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
-    project_role: Literal["viewer", "editor"] = Field(default="viewer")
+    project_role: Literal["viewer", "editor", "deployer"] = Field(default="viewer")
 
 
 class ProjectMemberOut(BaseModel):
@@ -129,6 +129,59 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class SchemaModelCreateIn(BaseModel):
+    """Create a named editable model and its first immutable revision."""
+
+    model_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+    )
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None = None
+
+
+class SchemaModelReviseIn(BaseModel):
+    """Save a successor revision under optimistic concurrency control."""
+
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None = None
+
+
+class SchemaModelDetailOut(BaseModel):
+    """Editable model identity together with one immutable revision."""
+
+    schema_model_uuid: uuid.UUID
+    model_name: str
+    schema_model_revision_uuid: uuid.UUID
+    revision_number: int
+    revision_digest: str
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None
+
+
+class MigrationPlanCreateIn(BaseModel):
+    """Bind one model revision to an exact target connection and snapshot."""
+
+    db_connection_uuid: uuid.UUID
+    base_schema_snapshot_uuid: uuid.UUID
+
+
+class MigrationPlanOut(BaseModel):
+    """Immutable structured plan preview returned for review and dry run."""
+
+    migration_plan_uuid: uuid.UUID
+    plan_digest: str
+    base_digest: str
+    target_digest: str
+    compiler_version: str
+    can_dry_run: bool
+    requires_destructive_confirmation: bool
+    statements: list[dict]
+    proposed_statements: list[dict]
+    blockers: list[dict]
+    risk_summary: dict
+    expires_at: dt.datetime
 
 
 class WideTablesOut(BaseModel):
