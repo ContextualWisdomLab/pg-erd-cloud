@@ -245,6 +245,40 @@ class MigrationPlanOut(BaseModel):
     expires_at: dt.datetime
 
 
+class MigrationRunEventOut(BaseModel):
+    """One ordered, sanitized event in a durable migration-run history."""
+
+    sequence_number: int = Field(ge=1)
+    event_type: str
+    state_before: str | None
+    state_after: str
+    evidence: dict[str, object]
+    actor_user_uuid: uuid.UUID | None
+    created_at: dt.datetime
+
+
+class MigrationRunOut(BaseModel):
+    """Authorized immutable view of one durable run and its event history."""
+
+    migration_run_uuid: uuid.UUID
+    project_space_uuid: uuid.UUID
+    migration_plan_uuid: uuid.UUID
+    run_kind: Literal["dry_run", "apply"]
+    state: str
+    state_version: int = Field(ge=1)
+    plan_digest: str
+    requested_by_user_uuid: uuid.UUID
+    cancellation_requested: bool
+    observed_base_digest: str | None
+    evidence: dict[str, object]
+    error_code: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    started_at: dt.datetime | None
+    finished_at: dt.datetime | None
+    events: list[MigrationRunEventOut]
+
+
 class WideTablesOut(BaseModel):
     """Wide / denormalized table findings for a snapshot."""
 
@@ -324,112 +358,3 @@ class DiagramViewDetailOut(DiagramViewOut):
 
     layout_json: dict
 
-
-class TableAnnotationUpsertIn(BaseModel):
-    """Request body for creating/updating a table annotation."""
-
-    schema_name: str = Field(min_length=1, max_length=255)
-    relation_name: str = Field(min_length=1, max_length=255)
-    body: str = Field(min_length=1, max_length=10_000)
-
-
-class TableAnnotationOut(BaseModel):
-    """A table annotation."""
-
-    table_annotation_uuid: uuid.UUID
-    schema_name: str
-    relation_name: str
-    body: str
-    created_at: dt.datetime
-    updated_at: dt.datetime
-
-
-class InferredRelationshipOut(BaseModel):
-    """An implicit (undeclared) foreign-key relationship inferred from names."""
-
-    child_schema: str
-    child_table: str
-    child_column: str
-    parent_schema: str
-    parent_table: str
-    parent_column: str
-    confidence: str
-    reason: str
-
-
-class SnapshotDiffOut(BaseModel):
-    """Structured diff between two schema snapshots.
-
-    ``status`` is ``"not_found"`` when either snapshot is missing or the caller
-    is not authorized for it (uniform response avoids existence enumeration);
-    ``"ok"`` with a populated ``diff`` otherwise.
-    """
-
-    base_snapshot_uuid: uuid.UUID
-    target_snapshot_uuid: uuid.UUID
-    status: str
-    diff: dict | None
-
-
-class MigrationSafetyOut(BaseModel):
-    """Risk-classified analysis of migrating one snapshot to another."""
-
-    base_snapshot_uuid: uuid.UUID
-    target_snapshot_uuid: uuid.UUID
-    status: str
-    analysis: dict | None
-
-
-class MeOut(BaseModel):
-    """Current user payload returned by /me."""
-
-    user_account_uuid: uuid.UUID
-    subject: str
-    display_name: str | None
-
-
-class NamingLintOut(BaseModel):
-    """Naming-convention findings for a snapshot's identifiers."""
-
-    schema_snapshot_uuid: uuid.UUID
-    status: str
-    report: dict | None
-
-
-class DbmlConvertIn(BaseModel):
-    """Request body for converting DBML text into a snapshot."""
-
-    dbml: str = Field(min_length=1, max_length=524_288)
-    include_ddl: bool = True
-    dialect: Literal["postgresql", "snowflake"] = "postgresql"
-
-
-class DbmlConvertOut(BaseModel):
-    """DBML conversion result: snapshot JSON plus optional DDL."""
-
-    snapshot_json: dict
-    ddl: str | None = None
-    tables: int
-    foreign_keys: int
-
-
-class ApiKeyCreateIn(BaseModel):
-    """Request body for creating an API key."""
-
-    key_name: str = Field(min_length=1, max_length=128)
-
-
-class ApiKeyOut(BaseModel):
-    """API key metadata (never contains the secret)."""
-
-    api_key_uuid: uuid.UUID
-    key_name: str
-    key_prefix: str
-    created_at: dt.datetime
-    revoked_at: dt.datetime | None
-
-
-class ApiKeyCreatedOut(ApiKeyOut):
-    """Creation response: includes the secret exactly once."""
-
-    secret: str
