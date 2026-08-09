@@ -224,10 +224,18 @@ class MigrationPlanOut(BaseModel):
     """Immutable structured plan preview returned for review and dry run."""
 
     migration_plan_uuid: uuid.UUID
+    project_space_uuid: uuid.UUID
+    schema_model_revision_uuid: uuid.UUID
+    db_connection_uuid: uuid.UUID
+    base_schema_snapshot_uuid: uuid.UUID
     plan_digest: str
     base_digest: str
     target_digest: str
     compiler_version: str
+    snapshot_contract_version: int = Field(ge=1)
+    postgresql_major: int = Field(ge=14, le=18)
+    created_by_user_uuid: uuid.UUID
+    created_at: dt.datetime
     can_dry_run: bool
     requires_destructive_confirmation: bool
     statements: list[MigrationPlanStatement]
