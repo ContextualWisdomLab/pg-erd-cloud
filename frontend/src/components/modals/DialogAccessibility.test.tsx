@@ -201,4 +201,28 @@ describe('modal dialog accessibility', () => {
     opener.remove();
     act(() => { vi.runOnlyPendingTimers(); });
   });
+
+  it('sets focus on the element with autofocus attribute', async () => {
+    vi.useFakeTimers();
+
+    function DialogWithAutofocus() {
+      const dialogRef = useDialogAccessibility(true, vi.fn());
+      return (
+        <div ref={dialogRef} role="dialog" tabIndex={-1}>
+          <button type="button">First Button</button>
+          <input type="text" autoFocus aria-label="Autofocus Input" />
+          <button type="button">Last Button</button>
+        </div>
+      );
+    }
+
+    render(<DialogWithAutofocus />);
+
+    act(() => {
+        vi.runOnlyPendingTimers();
+    });
+
+    const input = screen.getByLabelText('Autofocus Input');
+    expect(input).toHaveFocus();
+  });
 });
