@@ -118,7 +118,9 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mutation", ["gap", "chain", "secret", "overflow"])
+@pytest.mark.parametrize(
+    "mutation", ["gap", "chain", "secret", "overflow", "state", "time", "final"]
+)
 async def test_get_migration_run_fails_closed_for_corrupt_history(
     mutation: str,
 ) -> None:
@@ -132,8 +134,14 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
         events[1].state_before = "live_preflight_running"
     elif mutation == "secret":
         events[1].evidence_json = {"databaseDsn": "postgresql://secret"}
-    else:
+    elif mutation == "overflow":
         events = events * 501
+    elif mutation == "state":
+        run.run_kind = "preview"
+    elif mutation == "time":
+        events[1].created_at = run.created_at - dt.timedelta(seconds=1)
+    else:
+        events[1].state_after = "live_preflight_running"
     session = SimpleNamespace(
         get=AsyncMock(return_value=run),
         scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),
@@ -150,3 +158,57 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "migration run integrity verification failed"
+
+
+@pytest.mark.asyncio
+async def test_get_migration_run_supports_valid_apply_history() -> None:
+    """The same bounded polling contract represents an apply state graph."""
+
+    run = _run()
+    run.run_kind = "apply"
+    run.state = "applying"
+    events = _events(run)
+    events[1].event_type = "apply_started"
+    events[1].state_after = "applying"
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),
+    )
+    with patch(
+        "app.api.migration_runs.require_project_member", new_callable=AsyncMock
+    ):
+        out = await get_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            user=_user(),
+            session=session,
+        )
+
+    assert out.run_kind == "apply"
+    assert out.state == "applying"
+
+
+@pytest.mark.asyncio
+async def test_get_migration_run_handles_missing_and_non_membership_http_errors() -> None:
+    """Missing rows are masked while non-membership HTTP failures propagate."""
+
+    session = SimpleNamespace(get=AsyncMock(return_value=None), scalars=AsyncMock())
+    with pytest.raises(HTTPException) as missing:
+        await get_migration_run(
+            migration_run_uuid=uuid.uuid4(), user=_user(), session=session
+        )
+    assert missing.value.status_code == 404
+
+    run = _run()
+    session.get.return_value = run
+    with patch(
+        "app.api.migration_runs.require_project_member",
+        new=AsyncMock(side_effect=HTTPException(status_code=503, detail="unavailable")),
+    ):
+        with pytest.raises(HTTPException) as unavailable:
+            await get_migration_run(
+                migration_run_uuid=run.migration_run_uuid,
+                user=_user(),
+                session=session,
+            )
+    assert unavailable.value.status_code == 503
+    session.scalars.assert_not_awaited()
