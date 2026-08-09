@@ -66,6 +66,8 @@ def _read(relative_path: Path) -> str:
 
 
 def test_canonical_forward_engineering_documents_exist_and_are_nonempty() -> None:
+    """Require every canonical forward-engineering document to contain text."""
+
     missing = [
         path.as_posix()
         for path in CANONICAL_DOCUMENTS
@@ -82,6 +84,8 @@ def test_canonical_forward_engineering_documents_exist_and_are_nonempty() -> Non
 
 
 def test_architecture_views_remain_renderable_mermaid_documents() -> None:
+    """Keep every required architecture view renderable as Mermaid source."""
+
     without_mermaid = [
         path.as_posix() for path in MERMAID_DOCUMENTS if "```mermaid" not in _read(path)
     ]
@@ -90,6 +94,8 @@ def test_architecture_views_remain_renderable_mermaid_documents() -> None:
 
 
 def test_v1_contract_separates_current_routes_from_planned_run_routes() -> None:
+    """Prevent planned execution routes from being presented as implemented."""
+
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
 
     missing_current = [route for route in CURRENT_ROUTES if route not in contract]
@@ -103,6 +109,8 @@ def test_v1_contract_separates_current_routes_from_planned_run_routes() -> None:
 
 
 def test_v1_contract_keeps_blocked_statements_as_review_only_proposals() -> None:
+    """Keep blocked SQL visible for review but unavailable for execution."""
+
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     normalized_contract = " ".join(contract.split())
 
@@ -114,6 +122,8 @@ def test_v1_contract_keeps_blocked_statements_as_review_only_proposals() -> None
 
 
 def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit() -> None:
+    """Retain concurrency, snapshot, and identifier authority in the contract."""
+
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
 
     for required_term in (
@@ -128,12 +138,16 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_superseded_adr_is_not_restored() -> None:
+    """Prevent a superseded ADR from reappearing beside canonical decisions."""
+
     superseded = REPOSITORY_ROOT / "docs/adr/0001-server-authoritative-migration-plans.md"
 
     assert not superseded.exists()
 
 
 def test_readme_links_the_core_forward_engineering_documents() -> None:
+    """Keep the repository entry point linked to canonical product memory."""
+
     readme = _read(Path("README.md"))
     missing_links = [target for target in README_CORE_LINKS if target not in readme]
 
