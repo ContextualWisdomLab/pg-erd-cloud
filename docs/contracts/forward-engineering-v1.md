@@ -98,8 +98,10 @@ mandatory when run creation is added.
 
 The ORM classes and Alembic revision `0010_migration_run` persist an idempotent
 run identity and append-only, per-run event sequence. Database checks bound run
-kind, state, state version, event sequence, predecessor presence, and lowercase
-SHA-256 digest shapes. A project/run-kind idempotency
+kind, state, state version, event type, before/after state tokens, event
+sequence, predecessor presence, and every persisted lowercase SHA-256 digest
+shape (idempotency, plan, request, observed base, chain link, and run anchor). A
+project/run-kind idempotency
 key is unique independently of plan identity, while `request_digest` preserves
 the effective request needed to reject same-key/different-request reuse.
 `app.forward.migration_run` defines the exact state graph, hashes bounded

@@ -253,6 +253,10 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         "ck_migration_run__kind_state",
         "ck_migration_run__state_version",
         "ck_migration_run__latest_event_digest",
+        "ck_migration_run__idempotency_key_hash",
+        "ck_migration_run__plan_digest",
+        "ck_migration_run__request_digest",
+        "ck_migration_run__observed_base_digest",
     }
 
     unique_event_columns = {
@@ -270,6 +274,9 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         "ck_migration_run_event__previous_digest",
         "ck_migration_run_event__previous_digest_format",
         "ck_migration_run_event__event_digest",
+        "ck_migration_run_event__event_type",
+        "ck_migration_run_event__state_before",
+        "ck_migration_run_event__state_after",
     }
     assert "latest_event_digest" in MigrationRun.__table__.columns
     assert "previous_event_digest" in MigrationRunEvent.__table__.columns
@@ -321,8 +328,15 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         '"uq_migration_run_event__run_sequence"',
         '"ck_migration_run__state_version"',
         '"ck_migration_run__latest_event_digest"',
+        '"ck_migration_run__idempotency_key_hash"',
+        '"ck_migration_run__plan_digest"',
+        '"ck_migration_run__request_digest"',
+        '"ck_migration_run__observed_base_digest"',
         '"ck_migration_run_event__previous_digest_format"',
         '"ck_migration_run_event__event_digest"',
+        '"ck_migration_run_event__event_type"',
+        '"ck_migration_run_event__state_before"',
+        '"ck_migration_run_event__state_after"',
         '"ck_migration_run__kind_state"',
         'ondelete="RESTRICT"',
         'ondelete="CASCADE"',

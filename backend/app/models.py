@@ -366,6 +366,23 @@ class MigrationRun(Base):
             "latest_event_digest ~ '^[0-9a-f]{64}$'",
             name="ck_migration_run__latest_event_digest",
         ),
+        CheckConstraint(
+            "idempotency_key_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__idempotency_key_hash",
+        ),
+        CheckConstraint(
+            "plan_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__plan_digest",
+        ),
+        CheckConstraint(
+            "request_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__request_digest",
+        ),
+        CheckConstraint(
+            "observed_base_digest IS NULL OR "
+            "observed_base_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__observed_base_digest",
+        ),
         Index("ix_migration_run__project_space_uuid", "project_space_uuid"),
         Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
         Index("ix_migration_run__project_state", "project_space_uuid", "state"),
@@ -425,6 +442,18 @@ class MigrationRunEvent(Base):
         CheckConstraint(
             "event_digest ~ '^[0-9a-f]{64}$'",
             name="ck_migration_run_event__event_digest",
+        ),
+        CheckConstraint(
+            "event_type ~ '^[a-z][a-z0-9_]{0,63}$'",
+            name="ck_migration_run_event__event_type",
+        ),
+        CheckConstraint(
+            "state_before IS NULL OR state_before IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown')",
+            name="ck_migration_run_event__state_before",
+        ),
+        CheckConstraint(
+            "state_after IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown')",
+            name="ck_migration_run_event__state_after",
         ),
         Index("ix_migration_run_event__migration_run_uuid", "migration_run_uuid"),
     )
