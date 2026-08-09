@@ -350,6 +350,15 @@ class MigrationRun(Base):
             name="ck_migration_run__state",
         ),
         CheckConstraint(
+            "(run_kind = 'dry_run' AND state IN ('queued', 'sandbox_running', "
+            "'live_preflight_running', 'passed', 'drifted', 'failed')) OR "
+            "(run_kind = 'apply' AND state IN ('queued', 'applying', "
+            "'reconciling', 'verifying', 'verified', 'drifted_no_apply', "
+            "'not_applied', 'verification_failed', 'failed_rolled_back', "
+            "'applied_with_drift', 'outcome_unknown'))",
+            name="ck_migration_run__kind_state",
+        ),
+        CheckConstraint(
             "state_version >= 1", name="ck_migration_run__state_version"
         ),
         Index("ix_migration_run__project_space_uuid", "project_space_uuid"),
