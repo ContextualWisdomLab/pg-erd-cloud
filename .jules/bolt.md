@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2024-05-23 - Optimize dict lookup inside generator loop
-**Learning:** Dictionary `.get()` calls inside tight loops (like comprehensions over thousands of items) can introduce significant overhead due to method lookup. Redundant iterations like multiple `sum()` calls over a large list should be combined into a single pass.
-**Action:** Replaced `.get("...")` with a cached `d_get = dict.get` reference in `detect_sensitive_columns` and merged severity summation loops, showing an improvement in benchmark tests.

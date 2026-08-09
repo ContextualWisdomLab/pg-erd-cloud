@@ -41,28 +41,24 @@ _RULES: list[tuple[str, str, str, re.Pattern[str]]] = [
 def detect_sensitive_columns(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Return a classified inventory of likely-sensitive columns."""
     snapshot = snapshot or {}
-    d_get = dict.get
-    relations = d_get(snapshot, "relations") or []
-    columns = d_get(snapshot, "columns") or []
+    relations = snapshot.get("relations") or []
+    columns = snapshot.get("columns") or []
 
-    rel_by_oid = {d_get(r, "relation_oid"): r for r in relations}
+    rel_by_oid = {r.get("relation_oid"): r for r in relations}
     items: list[dict[str, Any]] = []
 
     for col in columns:
-        name = d_get(col, "column_name")
+        name = str(col.get("column_name") or "")
         if not name:
             continue
-        name = str(name)
         lname = name.lower()
         for category, severity, framework, pattern in _RULES:
             if pattern.search(lname):
-                rel = rel_by_oid.get(d_get(col, "relation_oid"))
-                if not rel:
-                    rel = {}
+                rel = rel_by_oid.get(col.get("relation_oid")) or {}
                 items.append(
                     {
-                        "schema": d_get(rel, "schema_name"),
-                        "table": d_get(rel, "relation_name"),
+                        "schema": rel.get("schema_name"),
+                        "table": rel.get("relation_name"),
                         "column": name,
                         "category": category,
                         "severity": severity,
@@ -81,22 +77,13 @@ def detect_sensitive_columns(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     )
 
     by_framework: dict[str, int] = {}
-    high = medium = low = 0
     for i in items:
-        fw = str(i["framework"])
-        by_framework[fw] = by_framework.get(fw, 0) + 1
-        sev = i["severity"]
-        if sev == HIGH:
-            high += 1
-        elif sev == MEDIUM:
-            medium += 1
-        elif sev == LOW:
-            low += 1
+        by_framework[i["framework"]] = by_framework.get(i["framework"], 0) + 1
 
     summary = {
-        "high": high,
-        "medium": medium,
-        "low": low,
+        "high": sum(1 for i in items if i["severity"] == HIGH),
+        "medium": sum(1 for i in items if i["severity"] == MEDIUM),
+        "low": sum(1 for i in items if i["severity"] == LOW),
         "total": len(items),
         "by_framework": by_framework,
     }
