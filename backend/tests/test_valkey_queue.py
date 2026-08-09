@@ -60,3 +60,10 @@ def test_valkey_queue_rejects_invalid_sentinel_hosts(
 
     with pytest.raises(ValueError, match="host:port"):
         valkey_queue.valkey_queue_config_summary()
+
+def test_format_sentinel_hosts() -> None:
+    hosts = [("localhost", 26379), ("redis.local", 26380)]
+    result = valkey_queue.format_sentinel_hosts(hosts)
+    assert result == "localhost:26379,redis.local:26380"
+
+    assert valkey_queue.format_sentinel_hosts([]) == ""
