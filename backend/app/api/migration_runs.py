@@ -17,6 +17,7 @@ from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
     digest_run_event,
+    validate_run_transition,
 )
 from app.models import MigrationRun, MigrationRunEvent
 from app.permissions import require_project_member
@@ -54,6 +55,22 @@ def _run_out(
         run_evidence = canonicalize_run_evidence(run.evidence_json)
         for expected_sequence, event in enumerate(events, start=1):
             canonical_evidence = canonicalize_run_evidence(event.evidence_json)
+            if expected_sequence == 1:
+                if (
+                    event.event_type != "run_queued"
+                    or event.state_before is not None
+                    or event.state_after != "queued"
+                ):
+                    raise _integrity_error()
+            elif event.event_type == "cancellation_requested":
+                if event.state_before != event.state_after:
+                    raise _integrity_error()
+            else:
+                if event.state_before is None:
+                    raise _integrity_error()
+                validate_run_transition(
+                    run.run_kind, event.state_before, event.state_after
+                )
             if (
                 event.sequence_number != expected_sequence
                 or event.state_before != expected_state

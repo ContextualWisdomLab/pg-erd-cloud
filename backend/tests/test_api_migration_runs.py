@@ -90,6 +90,22 @@ def _events(run: MigrationRun) -> list[MigrationRunEvent]:
     return events
 
 
+def _event_digest(event: MigrationRunEvent) -> str:
+    """Recompute one fixture event after an intentional test mutation."""
+
+    return digest_run_event(
+        migration_run_uuid=event.migration_run_uuid,
+        sequence_number=event.sequence_number,
+        event_type=event.event_type,
+        state_before=event.state_before,
+        state_after=event.state_after,
+        evidence=event.evidence_json,
+        actor_user_uuid=event.actor_user_uuid,
+        created_at=event.created_at,
+        previous_event_digest=event.previous_event_digest,
+    )
+
+
 @pytest.mark.asyncio
 async def test_get_migration_run_returns_bounded_authorized_history() -> None:
     """A member can poll exact state identity and sanitized ordered evidence."""
@@ -156,6 +172,10 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
         "digest",
         "predecessor",
         "anchor",
+        "graph",
+        "genesis",
+        "cancellation_graph",
+        "missing_before",
     ],
 )
 async def test_get_migration_run_fails_closed_for_corrupt_history(
@@ -183,6 +203,35 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
         events[1].event_digest = "f" * 64
     elif mutation == "predecessor":
         events[1].previous_event_digest = "f" * 64
+    elif mutation == "graph":
+        events[1].state_after = "passed"
+        events[1].event_digest = digest_run_event(
+            migration_run_uuid=events[1].migration_run_uuid,
+            sequence_number=events[1].sequence_number,
+            event_type=events[1].event_type,
+            state_before=events[1].state_before,
+            state_after=events[1].state_after,
+            evidence=events[1].evidence_json,
+            actor_user_uuid=events[1].actor_user_uuid,
+            created_at=events[1].created_at,
+            previous_event_digest=events[1].previous_event_digest,
+        )
+        run.state = "passed"
+        run.latest_event_digest = events[1].event_digest
+    elif mutation == "genesis":
+        events[0].event_type = "unexpected_genesis"
+        events[0].event_digest = _event_digest(events[0])
+        events[1].previous_event_digest = events[0].event_digest
+        events[1].event_digest = _event_digest(events[1])
+        run.latest_event_digest = events[1].event_digest
+    elif mutation == "cancellation_graph":
+        events[1].event_type = "cancellation_requested"
+        events[1].event_digest = _event_digest(events[1])
+        run.latest_event_digest = events[1].event_digest
+    elif mutation == "missing_before":
+        events[1].state_before = None
+        events[1].event_digest = _event_digest(events[1])
+        run.latest_event_digest = events[1].event_digest
     else:
         run.latest_event_digest = "f" * 64
     session = SimpleNamespace(
@@ -240,6 +289,59 @@ async def test_get_migration_run_supports_valid_apply_history() -> None:
 
     assert out.run_kind == "apply"
     assert out.state == "applying"
+
+
+@pytest.mark.asyncio
+async def test_get_migration_run_supports_valid_same_state_cancellation() -> None:
+    """Cancellation evidence advances the version without inventing a state."""
+
+    run = _run()
+    events = _events(run)
+    event = MigrationRunEvent(
+        migration_run_event_uuid=uuid.uuid4(),
+        migration_run_uuid=run.migration_run_uuid,
+        sequence_number=3,
+        event_type="cancellation_requested",
+        state_before="sandbox_running",
+        state_after="sandbox_running",
+        evidence_json={"request_source": "review_ui"},
+        previous_event_digest=events[-1].event_digest,
+        event_digest="",
+        actor_user_uuid=run.requested_by_user_uuid,
+        created_at=run.updated_at + dt.timedelta(seconds=1),
+    )
+    event.event_digest = digest_run_event(
+        migration_run_uuid=event.migration_run_uuid,
+        sequence_number=event.sequence_number,
+        event_type=event.event_type,
+        state_before=event.state_before,
+        state_after=event.state_after,
+        evidence=event.evidence_json,
+        actor_user_uuid=event.actor_user_uuid,
+        created_at=event.created_at,
+        previous_event_digest=event.previous_event_digest,
+    )
+    events.append(event)
+    run.state_version = 3
+    run.latest_event_digest = event.event_digest
+    run.cancellation_requested = True
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),
+    )
+    with patch(
+        "app.api.migration_runs.require_project_member", new_callable=AsyncMock
+    ):
+        out = await get_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            user=_user(),
+            session=session,
+        )
+
+    assert out.state == "sandbox_running"
+    assert out.state_version == 3
+    assert out.cancellation_requested is True
+    assert out.events[-1].event_type == "cancellation_requested"
 
 
 @pytest.mark.asyncio
