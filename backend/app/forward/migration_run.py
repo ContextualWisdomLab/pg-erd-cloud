@@ -208,10 +208,7 @@ def canonicalize_run_evidence(value: Mapping[str, object]) -> dict[str, Any]:
     ).encode("utf-8")
     if len(encoded) > MAX_RUN_EVIDENCE_BYTES:
         raise MigrationRunContractError("run evidence is too large")
-    loaded = json.loads(encoded)
-    if not isinstance(loaded, dict):
-        raise MigrationRunContractError("run evidence must be an object")
-    return loaded
+    return cast(dict[str, Any], json.loads(encoded))
 
 
 async def transition_migration_run(
