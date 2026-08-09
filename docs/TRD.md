@@ -95,7 +95,7 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `GET /api/schema-models/{schema_model_uuid}` | member | Current immutable revision, IDOR-masked | **Implemented** |
 | `PUT /api/schema-models/{schema_model_uuid}` + strong revision-UUID `If-Match` | editor+ | Idempotent no-op for identical content/base or append successor; stale/weak token `409`; responses expose `ETag` through CORS | **Implemented** |
 | `POST /api/schema-model-revisions/{revision_uuid}/migration-plans` | editor+ | Validate exact tenant/connection/snapshot binding, compile, bound, persist | **Implemented** |
-| `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview | **Planned** |
+| `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview, IDOR-masked | **Implemented** |
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest idempotent durable dry run | **Planned** |
 | `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
 | `GET /api/migration-runs/{run_uuid}` | member | Poll bounded durable state/evidence | **Planned** |
