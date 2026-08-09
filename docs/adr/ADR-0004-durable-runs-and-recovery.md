@@ -1,7 +1,7 @@
 # ADR-0004: Durable runs, idempotency, cancellation, and recovery
 
 - **Decision status:** Accepted
-- **Implementation status:** Planned
+- **Implementation status:** Partially implemented
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -103,10 +103,17 @@ Rules:
   work.
 - Persisted migration plans provide the immutable input identity for future
   runs.
+- `MigrationRun` and `MigrationRunEvent` ORM models plus Alembic revision 0010
+  persist idempotent run identity and append-only ordered evidence.
+- Database checks constrain run kind, current state, positive state version,
+  and positive event sequence; uniqueness selects one run per hashed
+  idempotency identity and one event per run sequence.
+- `app.forward.migration_run` owns the exact transition graph, bounded
+  idempotency-key hashing, and recursive rejection of SQL/credential-bearing
+  evidence fields.
 
 ### Planned before production release
 
-- `MigrationRun` and `MigrationRunEvent` models and migrations;
 - idempotent dry-run/apply creation and run polling routes;
 - compare-and-swap state service, outbox/queue integration, and cancellation
   semantics;
