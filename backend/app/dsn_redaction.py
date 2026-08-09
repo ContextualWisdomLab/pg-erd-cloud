@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
 
 _SECRET_KEY_PATTERN = re.compile(
@@ -82,11 +83,16 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
     return {candidate for candidate in candidates if candidate}
 
 
+@lru_cache(maxsize=128)
+def _get_short_secret_pattern(secret: str) -> re.Pattern:
+    return re.compile(rf"(?<![A-Za-z0-9]){re.escape(secret)}(?![A-Za-z0-9])")
+
+
 def _redact_secret_occurrences(message: str, secret: str) -> str:
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(secret)}(?![A-Za-z0-9])")
+    pattern = _get_short_secret_pattern(secret)
     return pattern.sub("***", message)
 
 
