@@ -61,6 +61,13 @@ def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> Non
         with pytest.raises(MigrationRunContractError, match="forbidden evidence field"):
             canonicalize_run_evidence(payload)
 
+    for payload in (
+        {"detail": "postgresql://worker:password@db.example/app"},
+        {"events": [{"endpoint": "POSTGRES://worker@db.example/app"}]},
+    ):
+        with pytest.raises(MigrationRunContractError, match="connection string"):
+            canonicalize_run_evidence(payload)
+
     with pytest.raises(MigrationRunContractError, match="too large"):
         canonicalize_run_evidence({"detail": "x" * 16_385})
 
