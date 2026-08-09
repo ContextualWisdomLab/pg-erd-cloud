@@ -56,17 +56,13 @@ def snapshot_to_data_dictionary_md(
     indexes = snapshot.get("indexes") or []
     ann_by_table = _annotation_map(annotations)
 
-    oid_to_rel: dict[Any, dict[str, Any]] = {}
-    for rel in relations:
-        oid_to_rel[rel.get("relation_oid")] = rel
+    oid_to_rel: dict[Any, dict[str, Any]] = {
+        rel.get("relation_oid"): rel for rel in relations
+    }
 
     cols_by_oid: dict[Any, list[dict[str, Any]]] = {}
     for col in columns:
-        oid = col.get("relation_oid")
-        if oid in cols_by_oid:
-            cols_by_oid[oid].append(col)
-        else:
-            cols_by_oid[oid] = [col]
+        cols_by_oid.setdefault(col.get("relation_oid"), []).append(col)
     for cols in cols_by_oid.values():
         cols.sort(key=lambda c: (c.get("column_position") or 0))
 
@@ -74,36 +70,20 @@ def snapshot_to_data_dictionary_md(
     for pk in pk_columns:
         name = pk.get("column_name")
         if name is not None:
-            oid = pk.get("relation_oid")
-            s_name = str(name)
-            if oid in pk_by_oid:
-                pk_by_oid[oid].add(s_name)
-            else:
-                pk_by_oid[oid] = {s_name}
+            pk_by_oid.setdefault(pk.get("relation_oid"), set()).add(str(name))
 
     fk_child_cols: dict[Any, set[str]] = {}
     fk_by_oid: dict[Any, list[dict[str, Any]]] = {}
     for edge in fk_edges:
         oid = edge.get("child_relation_oid")
-        if oid in fk_by_oid:
-            fk_by_oid[oid].append(edge)
-        else:
-            fk_by_oid[oid] = [edge]
+        fk_by_oid.setdefault(oid, []).append(edge)
         child_col = edge.get("child_column_name")
         if child_col is not None:
-            s_col = str(child_col)
-            if oid in fk_child_cols:
-                fk_child_cols[oid].add(s_col)
-            else:
-                fk_child_cols[oid] = {s_col}
+            fk_child_cols.setdefault(oid, set()).add(str(child_col))
 
     idx_by_oid: dict[Any, list[dict[str, Any]]] = {}
     for idx in indexes:
-        oid = idx.get("relation_oid")
-        if oid in idx_by_oid:
-            idx_by_oid[oid].append(idx)
-        else:
-            idx_by_oid[oid] = [idx]
+        idx_by_oid.setdefault(idx.get("relation_oid"), []).append(idx)
 
     out: list[str] = ["# Data Dictionary", ""]
     meta = []
