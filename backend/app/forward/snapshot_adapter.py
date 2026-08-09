@@ -200,7 +200,7 @@ def snapshot_to_schema_model(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             if schema_name in declared_schema_names:
                 raise SchemaModelValidationError("snapshot contains a duplicate schema")
             declared_schema_names.add(schema_name)
-            schemas[schema_name]
+            schemas.setdefault(schema_name, [])
     for oid, relation in oid_to_relation.items():
         key_parts = sorted(
             pk_by_oid.get(oid, []), key=lambda item: int(item.get("column_ordinal") or 0)
