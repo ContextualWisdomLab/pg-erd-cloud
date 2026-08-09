@@ -29,12 +29,13 @@ Current code implements only the first control-plane slice:
 
 - **Implemented:** canonical model validation/digest; persisted model identities
   and immutable revisions; optimistic revision API; deterministic structured
-  plan compilation/persistence; project `deployer` role; deployer gating on the
-  legacy persistent `apply-sql` path.
+  plan compilation/persistence and authenticated immutable-plan retrieval;
+  project `deployer` role; deployer gating on the legacy persistent `apply-sql`
+  path.
 - **Partially implemented:** fail-closed snapshot-to-model conversion and the
   supported compiler subset. Known gaps are listed in section 6.
-- **Planned:** plan retrieval, durable runs/events, isolated dry run, live
-  preflight, target-fingerprint revalidation, structured execution,
+- **Planned:** durable runs/events, isolated dry run, live preflight,
+  target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
 - **Rejected for v1:** browser-authored SQL in the graphical workflow,
@@ -172,6 +173,7 @@ mutations currently return `200`, not `201`.
 | `GET /api/schema-models/{schema_model_uuid}` | none | current `SchemaModelDetailOut`, `200` | member | Implemented |
 | `PUT /api/schema-models/{schema_model_uuid}` | `SchemaModelReviseIn`; required `If-Match` | successor `SchemaModelDetailOut`, `200` | editor+ | Implemented |
 | `POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans` | `MigrationPlanCreateIn` | `MigrationPlanOut`, `200` | editor+ | Implemented |
+| `GET /api/migration-plans/{migration_plan_uuid}` | none | current `MigrationPlanOut`, `200` | member | Implemented |
 | `POST /api/connections/{db_connection_uuid}/apply-sql` | legacy `ApplySqlIn` | `ApplySqlOut`, `200` | editor for rollback-only; deployer for persistent apply | Implemented legacy compatibility only |
 
 `SchemaModelCreateIn` contains `model_name`, `model_json`, and optional
