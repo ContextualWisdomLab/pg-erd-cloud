@@ -57,7 +57,7 @@ def test_snapshot_adapter_requires_current_capability_contract() -> None:
     snapshot = _snapshot()
     snapshot.pop("snapshot_contract_version")
 
-    with pytest.raises(SchemaModelValidationError, match="recapture|required"):
+    with pytest.raises(SchemaModelValidationError, match=r"recapture|required"):
         snapshot_to_schema_model(snapshot)
 
 
@@ -126,7 +126,7 @@ def test_snapshot_adapter_rejects_identity_and_generated_catalog_metadata(
     snapshot = _snapshot()
     snapshot["columns"][0].update(generated_metadata)
 
-    with pytest.raises(SchemaModelValidationError, match="identity|generated"):
+    with pytest.raises(SchemaModelValidationError, match=r"identity|generated"):
         snapshot_to_schema_model(snapshot)
 
 
@@ -156,7 +156,8 @@ def test_snapshot_adapter_allows_realistic_primary_constraint_and_backing_index(
         {
             "index_oid": 701,
             "index_name": 'Order "Item" pkey',
-            "relation_oid": 42,
+            "relation_oid": None,
+            "table_oid": 42,
             "is_primary": True,
         }
     ]
@@ -222,7 +223,7 @@ def test_snapshot_adapter_rejects_partition_and_tablespace_metadata(
     snapshot["relations"][0].update(relation_metadata)
 
     with pytest.raises(
-        SchemaModelValidationError, match="partition|tablespace|relation kind"
+        SchemaModelValidationError, match=r"partition|tablespace|relation kind"
     ):
         snapshot_to_schema_model(snapshot)
 
