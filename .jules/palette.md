@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-10 - [모달 닫기 버튼 접근성 개선]
+**Learning:** 모달 닫기 버튼 내부 텍스트로 단순 'X'를 사용하는 경우, `aria-label="닫기"`가 설정되어 있더라도 스크린 리더에 따라 "닫기 X"와 같이 불필요한 시각적 텍스트가 함께 읽혀 사용자에게 혼란을 줄 수 있습니다.
+**Action:** 단순히 텍스트 'X'를 사용하는 대신 해당 텍스트를 `<span aria-hidden="true">X</span>`로 감싸 시각적으로만 보이게 하고 스크린 리더에서는 무시되도록 처리해야 합니다.
