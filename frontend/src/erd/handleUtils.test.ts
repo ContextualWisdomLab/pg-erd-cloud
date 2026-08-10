@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -33,6 +33,41 @@ describe('handleUtils', () => {
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('parseColumnNameFromHandle', () => {
+    it('should decode a simple ascii string', () => {
+      expect(parseColumnNameFromHandle('c-0069-0064')).toBe('id');
+      expect(parseColumnNameFromHandle('src-c-0069-0064')).toBe('id');
+      expect(parseColumnNameFromHandle('tgt-c-0069-0064')).toBe('id');
+    });
+
+    it('should handle empty string', () => {
+      expect(parseColumnNameFromHandle('c-empty')).toBe('');
+      expect(parseColumnNameFromHandle('src-c-empty')).toBe('');
+    });
+
+    it('should handle special characters', () => {
+      expect(parseColumnNameFromHandle('src-c-0075-0073-0065-0072-005f-0069-0064')).toBe('user_id');
+    });
+
+    it('should handle unicode characters', () => {
+      expect(parseColumnNameFromHandle('tgt-c-0069-0064-005f-ac00')).toBe('id_가');
+    });
+
+    it('should handle emojis', () => {
+      expect(parseColumnNameFromHandle('c-0069-0064-005f-1f680')).toBe('id_🚀');
+    });
+
+    it('should handle fallback unencoded handles', () => {
+      expect(parseColumnNameFromHandle('src-user_id')).toBe('user_id');
+      expect(parseColumnNameFromHandle('id')).toBe('id');
+    });
+
+    it('should handle null/undefined', () => {
+      expect(parseColumnNameFromHandle(null)).toBe(null);
+      expect(parseColumnNameFromHandle(undefined)).toBe(null);
     });
   });
 });

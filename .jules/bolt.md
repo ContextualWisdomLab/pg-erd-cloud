@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-28 - Avoid O(E*C) complexity and regression in edge resolution during export
+**Learning:** During ERD export to DBML/Mermaid/Dictionary, looking up original column names by parsing every edge handle and validating against all target node columns introduces safety/regression risks if column arrays are missing/incomplete, and causes unnecessary overhead. A strict validation broke DBML exports for edge case connections.
+**Action:** Use an O(1) string decoder directly on edge handle strings. When using decoded handle IDs directly, remove strict validation against node data in DBML if nodes might be missing full column state in tests/edge cases, ensuring the export falls back to the decoded ID robustly.
