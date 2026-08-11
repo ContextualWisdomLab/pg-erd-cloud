@@ -234,7 +234,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
         # ReDoS guard: no legitimate DBML line approaches this length; capping
         # input size per regex call bounds worst-case backtracking to O(1).
         if len(raw_line) > 4096:
-            continue
+            raise DbmlParseError("DBML line exceeds 4096 characters")
         line = _strip_line_comment(raw_line).strip()
         if not line:
             continue

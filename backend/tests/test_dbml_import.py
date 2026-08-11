@@ -246,14 +246,24 @@ async def test_convert_api_reports_malformed_identifier_without_partial_output()
     assert "unterminated quoted identifier" in exc_info.value.detail
 
 
-def test_pathological_long_line_is_skipped_fast():
+@pytest.mark.asyncio
+async def test_pathological_long_line_fails_closed_fast():
     import time
 
     hostile = 'Table t {\n  id int [pk]\n}\nRef: ' + '"a' * 100_000 + "\n"
     start = time.monotonic()
-    snap = parse_dbml(hostile)
+    with pytest.raises(DbmlParseError, match="DBML line exceeds 4096 characters"):
+        parse_dbml(hostile)
     assert time.monotonic() - start < 1.0  # no catastrophic backtracking
-    assert len(snap["relations"]) == 1
+
+    with pytest.raises(HTTPException) as exc_info:
+        await convert_dbml(
+            DbmlConvertIn(dbml=hostile),
+            CurrentUser(uuid.uuid4(), "subject", "Test user"),
+        )
+
+    assert exc_info.value.status_code == 422
+    assert "DBML line exceeds 4096 characters" in exc_info.value.detail
 
 
 def test_pathological_table_header_dots_are_rejected_fast():
