@@ -755,3 +755,346 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+
+@pytest.mark.asyncio
+async def test_oidc_config_rejects_disabled_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fail before network access when OIDC is disabled."""
+    monkeypatch.setattr(settings, "oidc_issuer", None)
+
+    with pytest.raises(RuntimeError, match="OIDC is disabled"):
+        await auth._get_oidc_config()
+
+
+@pytest.mark.asyncio
+async def test_jwks_rejects_missing_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reject discovery documents without a string JWKS URI."""
+
+    async def config_without_jwks_uri() -> dict[str, object]:
+        return {"jwks_uri": None}
+
+    monkeypatch.setattr(auth, "_get_oidc_config", config_without_jwks_uri)
+
+    with pytest.raises(RuntimeError, match="OIDC jwks_uri missing"):
+        await auth._get_jwks()
+
+
+@pytest.mark.asyncio
+async def test_jwks_uses_fresh_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Return a fresh cached key set without opening an HTTP client."""
+
+    async def config() -> dict[str, str]:
+        return {"jwks_uri": "https://issuer.example/jwks"}
+
+    monkeypatch.setattr(auth, "_get_oidc_config", config)
+    monkeypatch.setattr(auth, "_oidc_jwks", {"keys": [{"kid": "cached"}]})
+    monkeypatch.setattr(
+        auth,
+        "_oidc_jwks_expires_at",
+        auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(minutes=1),
+    )
+
+    assert await auth._get_jwks() == {"keys": [{"kid": "cached"}]}
+
+
+@pytest.mark.asyncio
+async def test_jwks_rejects_redirect_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not follow redirects when retrieving signing keys."""
+
+    async def config() -> dict[str, str]:
+        return {"jwks_uri": "https://issuer.example/jwks"}
+
+    class RedirectingClient:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "RedirectingClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, _url: str) -> _FakeHttpResponse:
+            return _FakeHttpResponse({}, is_redirect=True)
+
+    monkeypatch.setattr(auth, "_get_oidc_config", config)
+    monkeypatch.setattr(auth, "_oidc_jwks", None)
+    monkeypatch.setattr(auth.httpx, "AsyncClient", RedirectingClient)
+
+    with pytest.raises(RuntimeError, match="OIDC JWKS endpoint must not redirect"):
+        await auth._get_jwks()
+
+
+def test_jwk_selection_and_claim_validation_edge_cases() -> None:
+    """Cover malformed key sets and required JWT fields."""
+    assert auth._pick_jwk({"keys": "not-a-list"}, "key-1") is None
+    assert auth._pick_jwk({"keys": [None, {"kid": "key-1"}]}, "key-1") == {
+        "kid": "key-1"
+    }
+    assert auth._pick_jwk({"keys": [{"kid": "first"}]}, None) == {"kid": "first"}
+
+    with pytest.raises(HTTPException, match="token missing exp"):
+        auth._jwt_expiry({})
+    with pytest.raises(HTTPException, match="token missing alg"):
+        auth._validate_jwt_header({"typ": "jwt"})
+    assert auth._validate_jwt_header({"typ": "at+jwt", "alg": "rs256"}) == "RS256"
+    with pytest.raises(HTTPException, match="missing bearer token"):
+        auth._bearer_token_from_request(make_request())
+
+
+class _RevocationResult:
+    def __init__(self, value: object | None) -> None:
+        self._value = value
+
+    def scalar(self) -> object | None:
+        return self._value
+
+
+class _RevocationSession:
+    def __init__(self, scalar_value: object | None = None) -> None:
+        self.scalar_value = scalar_value
+        self.statements: list[object] = []
+        self.added: list[object] = []
+        self.commits = 0
+
+    async def __aenter__(self) -> "_RevocationSession":
+        return self
+
+    async def __aexit__(self, *_args: object) -> None:
+        return None
+
+    async def execute(self, statement: object) -> _RevocationResult:
+        self.statements.append(statement)
+        return _RevocationResult(self.scalar_value)
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
+@pytest.mark.asyncio
+async def test_revocation_store_writes_and_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exercise the durable revocation write and bounded lookup paths."""
+    import app.db as db
+
+    write_session = _RevocationSession()
+    monkeypatch.setattr(db, "SessionLocal", lambda: write_session)
+    expiry = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(minutes=5)
+
+    await auth.revoke_token_jti("jwt-1", expiry)
+
+    assert len(write_session.statements) == 1
+    assert len(write_session.added) == 1
+    assert write_session.added[0].jwt_id == "jwt-1"
+    assert write_session.commits == 1
+
+    revoked_session = _RevocationSession("jwt-1")
+    monkeypatch.setattr(db, "SessionLocal", lambda: revoked_session)
+    assert await auth.is_token_jti_revoked("jwt-1") is True
+    assert len(revoked_session.statements) == 1
+
+    active_session = _RevocationSession()
+    monkeypatch.setattr(db, "SessionLocal", lambda: active_session)
+    assert await auth.is_token_jti_revoked("jwt-2") is False
+
+
+@pytest.mark.asyncio
+async def test_empty_jwt_id_does_not_open_revocation_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ignore an empty identifier without creating a database session."""
+    import app.db as db
+
+    def fail_session() -> None:
+        raise AssertionError("SessionLocal must not be called")
+
+    monkeypatch.setattr(db, "SessionLocal", fail_session)
+    await auth.revoke_token_jti("", auth.dt.datetime.now(auth.dt.timezone.utc))
+
+
+@pytest.mark.parametrize(
+    ("jwk", "algorithm", "expected_detail"),
+    [
+        ({"kid": "key-1", "kty": "EC"}, "RS256", "algorithm/key type mismatch"),
+        ({"kid": "key-1", "kty": "OKP"}, "RS256", "algorithm/key type mismatch"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_oidc_rejects_additional_key_type_mismatches(
+    monkeypatch: pytest.MonkeyPatch,
+    jwk: dict[str, str],
+    algorithm: str,
+    expected_detail: str,
+) -> None:
+    """Fail closed for EC/algorithm mismatch and unsupported key types."""
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", (algorithm,))
+    monkeypatch.setattr(
+        auth.jwt,
+        "get_unverified_header",
+        lambda _token: {"kid": "key-1", "alg": algorithm},
+    )
+
+    async def fake_jwks() -> dict[str, list[dict[str, str]]]:
+        return {"keys": [jwk]}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._decode_verified_oidc_token("token")
+
+    assert exc_info.value.detail == expected_detail
+
+
+@pytest.mark.asyncio
+async def test_oidc_accepts_ec_key_for_es_algorithm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Allow an EC key only with an explicitly allowed ES algorithm."""
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("ES256",))
+    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(
+        auth.jwt,
+        "get_unverified_header",
+        lambda _token: {"kid": "key-1", "alg": "ES256"},
+    )
+
+    async def fake_jwks() -> dict[str, list[dict[str, str]]]:
+        return {"keys": [{"kid": "key-1", "kty": "EC"}]}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(
+        auth.jwt, "PyJWK", lambda _jwk: type("DummyKey", (), {"key": "dummy"})()
+    )
+    monkeypatch.setattr(
+        auth.jwt,
+        "decode",
+        lambda *_args, **_kwargs: {
+            "sub": "user-1",
+            "jti": "jwt-1",
+            "exp": exp_claim(),
+        },
+    )
+
+    claims = await auth._decode_verified_oidc_token("token")
+
+    assert claims["sub"] == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_verified_claims_require_subject_and_rate_limit_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Require a subject and return it on the best-effort rate-limit path."""
+    with pytest.raises(HTTPException, match="token missing sub"):
+        await auth._verified_token_from_claims({"jti": "jwt-1", "exp": exp_claim()})
+
+    async def verified_subject(
+        _request: Request, verify_revocation: bool = True
+    ) -> tuple[str, str | None]:
+        assert verify_revocation is False
+        return "subject-1", None
+
+    monkeypatch.setattr(auth, "_get_subject_from_request", verified_subject)
+    assert await auth.try_get_subject_for_rate_limit(make_request()) == "subject-1"
+
+
+@pytest.mark.asyncio
+async def test_ensure_user_replaces_expired_cache_and_creates_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Evict stale cache data, create a user, and bound cache growth."""
+    auth._user_cache.clear()
+    subject = "subject-new"
+    expired_user = auth.CurrentUser(uuid.uuid4(), subject, None)
+    auth._user_cache[subject] = (
+        expired_user,
+        auth.dt.datetime.now(auth.dt.timezone.utc) - auth.dt.timedelta(seconds=1),
+    )
+    auth._user_cache["other-subject"] = (
+        auth.CurrentUser(uuid.uuid4(), "other-subject", None),
+        auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(minutes=1),
+    )
+    monkeypatch.setattr(auth, "USER_CACHE_MAX_SIZE", 1)
+    session = _FakeSession(None)
+
+    user = await auth._ensure_user(session, subject, "New User")
+
+    assert user.subject == subject
+    assert user.display_name == "New User"
+    assert len(session.added) == 1
+    assert session.flush_calls == 1
+    assert list(auth._user_cache) == [subject]
+    auth._user_cache.clear()
+
+
+class _BeginContext:
+    async def __aenter__(self) -> None:
+        return None
+
+    async def __aexit__(self, *_args: object) -> None:
+        return None
+
+
+class _CurrentUserSession:
+    def begin(self) -> _BeginContext:
+        return _BeginContext()
+
+
+@pytest.mark.asyncio
+async def test_current_user_supports_api_key_and_oidc_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dispatch API-key auth directly and provision verified OIDC users."""
+    expected = auth.CurrentUser(uuid.uuid4(), "subject-1", "User One")
+
+    async def api_key_user(_session: object, token: str) -> auth.CurrentUser:
+        assert token == "pgerd_secret"
+        return expected
+
+    monkeypatch.setattr(auth, "_user_from_api_key", api_key_user)
+    session = _CurrentUserSession()
+    api_request = make_request({"Authorization": "Bearer pgerd_secret"})
+    assert await auth.get_current_user(api_request, session) == expected
+
+    async def oidc_subject(_request: Request) -> tuple[str, str | None]:
+        return "subject-1", "User One"
+
+    async def ensure_user(
+        _session: object, subject: str, display_name: str | None
+    ) -> auth.CurrentUser:
+        assert (subject, display_name) == ("subject-1", "User One")
+        return expected
+
+    monkeypatch.setattr(auth, "_get_subject_from_request", oidc_subject)
+    monkeypatch.setattr(auth, "_ensure_user", ensure_user)
+    assert await auth.get_current_user(make_request(), session) == expected
+
+
+@pytest.mark.asyncio
+async def test_revoke_current_request_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Revoke the verified request token through the durable helper."""
+    expiry = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(minutes=5)
+    verified = auth.VerifiedToken("subject-1", None, "jwt-1", expiry)
+    observed: list[tuple[str, auth.dt.datetime]] = []
+
+    async def get_verified(_request: Request) -> auth.VerifiedToken:
+        return verified
+
+    async def revoke(jwt_id: str, expires_at: auth.dt.datetime) -> None:
+        observed.append((jwt_id, expires_at))
+
+    monkeypatch.setattr(auth, "_get_verified_token_from_request", get_verified)
+    monkeypatch.setattr(auth, "revoke_token_jti", revoke)
+
+    await auth.revoke_current_request_token(make_request())
+
+    assert observed == [("jwt-1", expiry)]

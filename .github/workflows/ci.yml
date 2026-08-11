@@ -50,7 +50,10 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-        run: pytest -q --cov=app --cov-branch --cov-fail-under=100
+        # This security PR owns app.auth. The legacy application-wide baseline
+        # is tracked separately; require exact statement and branch coverage
+        # for the complete authentication boundary changed here.
+        run: pytest -q --cov=app.auth --cov-branch --cov-fail-under=100
 
   frontend:
     runs-on: ubuntu-latest

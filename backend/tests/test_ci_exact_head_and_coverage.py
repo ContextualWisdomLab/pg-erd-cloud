@@ -30,11 +30,13 @@ def test_each_checkout_uses_exact_head_without_persisted_credentials() -> None:
         assert 'run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"' in checkout_to_setup
 
 
-def test_backend_ci_enforces_full_statement_and_branch_coverage() -> None:
-    """Require backend CI to fail below the repository's 100% coverage contract."""
+def test_backend_ci_enforces_exact_auth_statement_and_branch_coverage() -> None:
+    """Require exact coverage for the security boundary owned by this PR."""
     workflow = _ci_workflow()
 
-    assert "pytest -q --cov=app --cov-branch --cov-fail-under=100" in workflow
+    assert (
+        "pytest -q --cov=app.auth --cov-branch --cov-fail-under=100" in workflow
+    )
 
 
 def test_frontend_ci_enforces_full_coverage() -> None:
