@@ -1412,16 +1412,28 @@ export default function App() {
               }}
               aria-disabled={nodes.length === 0 || isLayouting}
               aria-describedby={
-                nodes.length === 0 ? "auto-layout-disabled-reason" : undefined
+                isLayouting
+                  ? "auto-layout-busy-reason"
+                  : nodes.length === 0
+                    ? "auto-layout-disabled-reason"
+                    : undefined
               }
               aria-label="ERD 자동 정렬"
               aria-busy={isLayouting}
               title={
-                nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
+                isLayouting
+                  ? "정렬이 진행 중입니다"
+                  : nodes.length === 0
+                    ? "정렬할 항목이 없습니다"
+                    : "자동 정렬"
               }
             >
               {isLayouting ? "…" : "↔"}
-              {nodes.length === 0 ? (
+              {isLayouting ? (
+                <span id="auto-layout-busy-reason" className="canvasToolbar__reason" role="tooltip">
+                  정렬이 진행 중입니다
+                </span>
+              ) : nodes.length === 0 ? (
                 <span id="auto-layout-disabled-reason" className="canvasToolbar__reason" role="tooltip">
                   정렬할 항목이 없습니다
                 </span>
@@ -1438,15 +1450,27 @@ export default function App() {
               }}
               aria-disabled={!undoPositions || isLayouting}
               aria-describedby={
-                !undoPositions ? "undo-layout-disabled-reason" : undefined
+                isLayouting
+                  ? "undo-layout-busy-reason"
+                  : !undoPositions
+                    ? "undo-layout-disabled-reason"
+                    : undefined
               }
               title={
-                !undoPositions ? "되돌릴 작업이 없습니다" : "정렬 되돌리기"
+                isLayouting
+                  ? "정렬이 진행 중입니다"
+                  : !undoPositions
+                    ? "되돌릴 작업이 없습니다"
+                    : "정렬 되돌리기"
               }
               aria-label="정렬 되돌리기"
             >
               ↶
-              {!undoPositions ? (
+              {isLayouting ? (
+                <span id="undo-layout-busy-reason" className="canvasToolbar__reason" role="tooltip">
+                  정렬이 진행 중입니다
+                </span>
+              ) : !undoPositions ? (
                 <span id="undo-layout-disabled-reason" className="canvasToolbar__reason" role="tooltip">
                   되돌릴 작업이 없습니다
                 </span>

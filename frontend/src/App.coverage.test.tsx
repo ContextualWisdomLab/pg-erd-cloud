@@ -643,6 +643,40 @@ describe('App orchestration coverage', () => {
     expect(screen.getByTestId('export-modal')).toHaveAttribute('data-open', 'false')
   })
 
+  it('describes and blocks layout controls while auto-layout is in progress', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    vi.useFakeTimers()
+    fireEvent.click(openButtons[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    vi.useRealTimers()
+
+    const pendingFrame = vi.fn(() => 1)
+    vi.stubGlobal('requestAnimationFrame', pendingFrame)
+    const autoLayout = screen.getByRole('button', { name: 'ERD 자동 정렬' })
+    const undoLayout = screen.getByRole('button', { name: '정렬 되돌리기' })
+
+    fireEvent.click(autoLayout)
+    await waitFor(() => expect(autoLayout).toHaveAttribute('aria-busy', 'true'))
+
+    for (const button of [autoLayout, undoLayout]) {
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      const descriptionId = button.getAttribute('aria-describedby')
+      expect(descriptionId).toBeTruthy()
+      expect(document.getElementById(descriptionId!)).toHaveAttribute('role', 'tooltip')
+      expect(document.getElementById(descriptionId!)).toHaveTextContent('정렬이 진행 중입니다')
+      fireEvent.click(button)
+    }
+
+    expect(pendingFrame).toHaveBeenCalledTimes(1)
+    expect(autoLayout).toHaveAttribute('aria-busy', 'true')
+  })
+
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))

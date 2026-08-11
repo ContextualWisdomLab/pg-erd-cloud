@@ -59,4 +59,4 @@
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
 ## 2026-08-11 - Make Disabled Icon Buttons Accessible
 **Learning:** Native `disabled` attributes remove buttons from the keyboard tab order and often suppress pointer events, making hover `title` tooltips explaining *why* they are disabled unavailable to keyboard and pointer users.
-**Action:** When an icon-only button must remain discoverable, use `aria-disabled="true"`, guard the click handler, and reference a rendered reason with `aria-describedby`. Show that reason on hover and `:focus-visible`; do not rely on `title` alone for keyboard users.
+**Action:** When an icon-only button must remain discoverable, use `aria-disabled="true"`, guard the click handler, and reference a rendered reason with `aria-describedby`. Show that reason on hover and `:focus-visible`; do not rely on `title` alone for keyboard users. If the unavailable state can change (for example, empty canvas versus layout in progress), keep the description and tooltip synchronized with the active guard reason.
