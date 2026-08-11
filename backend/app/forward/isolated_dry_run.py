@@ -37,6 +37,37 @@ _SUPPORTED_KINDS = frozenset(
         "drop_not_null",
     }
 )
+_PLAN_FIELDS = frozenset(
+    {
+        "compiler_version",
+        "snapshot_contract_version",
+        "postgresql_major",
+        "base_digest",
+        "target_digest",
+        "statements",
+        "proposed_statements",
+        "blockers",
+        "risk_summary",
+        "requires_destructive_confirmation",
+        "can_dry_run",
+        "plan_digest",
+    }
+)
+_STATEMENT_FIELDS = frozenset(
+    {
+        "kind",
+        "target",
+        "object_ref",
+        "sql",
+        "transactional",
+        "dependencies",
+        "dependency_refs",
+        "reversible",
+        "risk",
+        "required_privileges",
+        "preconditions",
+    }
+)
 
 
 class _PreparedStatement(Protocol):
@@ -104,6 +135,8 @@ def _validated_plan(
     )
     if not verify_migration_plan_digest(plan, expected_digest):
         raise IsolatedDryRunContractError("migration plan digest is invalid")
+    if set(plan) != _PLAN_FIELDS:
+        raise IsolatedDryRunContractError("migration plan contract is invalid")
     if plan.get("compiler_version") != COMPILER_VERSION:
         raise IsolatedDryRunContractError("migration plan compiler is unsupported")
     if plan.get("can_dry_run") is not True or plan.get("blockers") != []:
@@ -119,6 +152,8 @@ def _validated_plan(
         raise IsolatedDryRunContractError("planned PostgreSQL major is invalid")
     base_digest = _require_digest(plan.get("base_digest"), name="base digest")
     target_digest = _require_digest(plan.get("target_digest"), name="target digest")
+    if plan.get("proposed_statements") != []:
+        raise IsolatedDryRunContractError("migration plan contract is invalid")
 
     raw_statements = plan.get("statements")
     if (
@@ -130,6 +165,10 @@ def _validated_plan(
     for statement in raw_statements:
         if not isinstance(statement, Mapping):
             raise IsolatedDryRunContractError("migration plan statement is invalid")
+        if set(statement) != _STATEMENT_FIELDS:
+            raise IsolatedDryRunContractError(
+                "migration plan statement contract is invalid"
+            )
         if statement.get("kind") not in _SUPPORTED_KINDS:
             raise IsolatedDryRunContractError(
                 "migration plan statement kind is unsupported"
@@ -146,6 +185,8 @@ def _validated_plan(
         ):
             raise IsolatedDryRunContractError("migration plan statement SQL is invalid")
         statements.append(sql)
+    if not statements and base_digest != target_digest:
+        raise IsolatedDryRunContractError("migration plan contract is invalid")
     return _ExecutablePlan(
         postgresql_major=postgresql_major,
         base_digest=base_digest,

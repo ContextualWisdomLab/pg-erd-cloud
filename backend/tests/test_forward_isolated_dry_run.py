@@ -354,6 +354,34 @@ async def test_rejects_resigned_invalid_plan_shapes(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "mutation",
+    [
+        {"unexpected": "authority drift"},
+        {"statements": []},
+        {"proposed_statements": [{"kind": "create_schema"}]},
+    ],
+)
+async def test_rejects_resigned_noncanonical_executable_plan(
+    mutation: Mapping[str, Any],
+) -> None:
+    base, target = _models()
+    base_snapshot, _target_snapshot = _snapshots()
+    invalid = _resign({**compile_migration_plan(base, target), **mutation})
+
+    async def capture(_connection: _Connection) -> Mapping[str, Any]:
+        return base_snapshot
+
+    with pytest.raises(IsolatedDryRunContractError, match="plan contract"):
+        await execute_isolated_dry_run(
+            _Connection(),
+            invalid,
+            expected_plan_digest=invalid["plan_digest"],
+            capture_snapshot=capture,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     ("statement_mutation", "message"),
     [
         ({"kind": "future_operation"}, "kind is unsupported"),
@@ -380,6 +408,30 @@ async def test_rejects_resigned_invalid_statement_shapes(
         return base_snapshot
 
     with pytest.raises(IsolatedDryRunContractError, match=message):
+        await execute_isolated_dry_run(
+            _Connection(),
+            invalid,
+            expected_plan_digest=invalid["plan_digest"],
+            capture_snapshot=capture,
+        )
+
+
+@pytest.mark.asyncio
+async def test_rejects_resigned_statement_with_unknown_field() -> None:
+    base, target = _models()
+    base_snapshot, _target_snapshot = _snapshots()
+    plan = compile_migration_plan(base, target)
+    invalid = _resign(
+        {
+            **plan,
+            "statements": [{**plan["statements"][0], "raw_sql": "hidden"}],
+        }
+    )
+
+    async def capture(_connection: _Connection) -> Mapping[str, Any]:
+        return base_snapshot
+
+    with pytest.raises(IsolatedDryRunContractError, match="statement contract"):
         await execute_isolated_dry_run(
             _Connection(),
             invalid,
