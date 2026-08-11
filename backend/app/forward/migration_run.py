@@ -553,6 +553,7 @@ async def transition_migration_run(
     next_state: str,
     event_type: str,
     evidence: Mapping[str, object],
+    observed_base_digest: str | None = None,
     actor_user_uuid: uuid.UUID | None,
     now: dt.datetime | None = None,
 ) -> MigrationRunTransition:
@@ -572,6 +573,10 @@ async def transition_migration_run(
         raise MigrationRunContractError("expected state version is invalid")
     if _EVENT_TYPE.fullmatch(event_type) is None:
         raise MigrationRunContractError("event type is invalid")
+    if observed_base_digest is not None and _HEX_DIGEST.fullmatch(
+        observed_base_digest
+    ) is None:
+        raise MigrationRunContractError("observed base digest is invalid")
     canonical_evidence = canonicalize_run_evidence(evidence)
     transition_time = now or dt.datetime.now(dt.timezone.utc)
     if transition_time.tzinfo is None or transition_time.utcoffset() is None:
@@ -587,6 +592,47 @@ async def transition_migration_run(
 
     current_state = run.state
     validate_run_transition(run.run_kind, current_state, next_state)
+    binds_observed_base = (
+        current_state == "live_preflight_running"
+        and next_state in {"passed", "drifted"}
+    )
+    if binds_observed_base:
+        if observed_base_digest is None:
+            raise MigrationRunContractError("observed base digest is required")
+        plan = await session.scalar(
+            select(MigrationPlan).where(
+                MigrationPlan.migration_plan_uuid == run.migration_plan_uuid
+            )
+        )
+        if (
+            plan is None
+            or plan.project_space_uuid != run.project_space_uuid
+            or run.plan_digest != plan.statement_digest
+            or not verify_migration_plan_digest(
+                plan.plan_json, plan.statement_digest
+            )
+            or plan.plan_json.get("compiler_version") != plan.compiler_version
+            or plan.plan_json.get("base_digest") != plan.base_digest
+            or plan.plan_json.get("target_digest") != plan.target_digest
+        ):
+            raise MigrationRunContractError(
+                "migration plan integrity verification failed"
+            )
+        matches_planned_base = observed_base_digest == plan.base_digest
+        if (next_state == "passed") != matches_planned_base:
+            raise MigrationRunContractError(
+                "observed base digest conflicts with preflight outcome"
+            )
+        canonical_evidence = canonicalize_run_evidence(
+            {
+                **canonical_evidence,
+                "observed_base_digest": observed_base_digest,
+            }
+        )
+    elif observed_base_digest is not None:
+        raise MigrationRunContractError(
+            "observed base digest is not allowed for this transition"
+        )
     next_version = expected_state_version + 1
     previous_event_digest = run.latest_event_digest
     event_digest = digest_run_event(
@@ -615,6 +661,8 @@ async def transition_migration_run(
     if not _TRANSITIONS[run.run_kind].get(next_state):
         finished_at = transition_time
         values["finished_at"] = finished_at
+    if binds_observed_base:
+        values["observed_base_digest"] = observed_base_digest
 
     result = cast(
         CursorResult[Any],

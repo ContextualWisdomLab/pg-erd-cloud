@@ -20,6 +20,7 @@ from app.forward.migration_run import (
     claim_one_migration_dispatch,
     create_migration_run,
     mark_migration_dispatch_published,
+    transition_migration_run,
 )
 from app.models import (
     DbConnection,
@@ -330,6 +331,54 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert dispatch.status == "published"
             assert dispatch.attempt_count == 1
             assert dispatch.published_at == now + dt.timedelta(seconds=1)
+            await transition_migration_run(
+                session,
+                migration_run_uuid=first.migration_run_uuid,
+                expected_state_version=1,
+                next_state="sandbox_running",
+                event_type="sandbox_started",
+                evidence={"postgresql_major": int(_EXPECTED_MAJOR)},
+                actor_user_uuid=None,
+                now=now + dt.timedelta(seconds=2),
+            )
+            await session.flush()
+            await transition_migration_run(
+                session,
+                migration_run_uuid=first.migration_run_uuid,
+                expected_state_version=2,
+                next_state="live_preflight_running",
+                event_type="live_preflight_started",
+                evidence={},
+                actor_user_uuid=None,
+                now=now + dt.timedelta(seconds=3),
+            )
+            await session.flush()
+            await transition_migration_run(
+                session,
+                migration_run_uuid=first.migration_run_uuid,
+                expected_state_version=3,
+                next_state="passed",
+                event_type="live_preflight_passed",
+                evidence={"check_count": 0},
+                observed_base_digest=plan.base_digest,
+                actor_user_uuid=None,
+                now=now + dt.timedelta(seconds=4),
+            )
+            await session.flush()
+            persisted_run = await session.scalar(
+                select(MigrationRun).where(
+                    MigrationRun.migration_run_uuid == first.migration_run_uuid
+                )
+            )
+            assert persisted_run is not None
+            assert persisted_run.state == "passed"
+            assert persisted_run.state_version == 4
+            assert persisted_run.observed_base_digest == plan.base_digest
+            assert await session.scalar(
+                select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
+                    MigrationRunEvent.migration_run_uuid == first.migration_run_uuid
+                )
+            ) == 4
 
             await session.rollback()
 

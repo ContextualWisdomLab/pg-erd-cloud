@@ -295,6 +295,15 @@ class _FakeTransaction:
         self.connection.rolled_back = True
 
 
+class _FakePreparedStatement:
+    def __init__(self, connection: "_FakeConnection", sql: str) -> None:
+        self.connection = connection
+        self.sql = sql
+
+    async def fetchval(self, *, timeout: float | None = None) -> object:
+        return await self.connection.fetch_prepared(self.sql, timeout=timeout)
+
+
 class _FakeConnection:
     def __init__(self, results: list[object]) -> None:
         self.results = iter(results)
@@ -303,6 +312,7 @@ class _FakeConnection:
         self.committed = False
         self.rolled_back = False
         self.executed: list[str] = []
+        self.prepared: list[str] = []
         self.queries: list[tuple[str, float | None]] = []
 
     def transaction(self, **kwargs: object) -> _FakeTransaction:
@@ -312,19 +322,29 @@ class _FakeConnection:
     async def execute(self, sql: str) -> None:
         self.executed.append(sql)
 
-    async def fetchval(self, sql: str, *, timeout: float | None = None) -> object:
+    async def prepare(self, sql: str) -> _FakePreparedStatement:
+        self.prepared.append(sql)
+        return _FakePreparedStatement(self, sql)
+
+    async def fetch_prepared(
+        self, sql: str, *, timeout: float | None = None
+    ) -> object:
         self.queries.append((sql, timeout))
         return next(self.results)
 
 
 class _FailingConnection(_FakeConnection):
-    async def fetchval(self, sql: str, *, timeout: float | None = None) -> object:
+    async def fetch_prepared(
+        self, sql: str, *, timeout: float | None = None
+    ) -> object:
         self.queries.append((sql, timeout))
         raise RuntimeError("postgresql://user:secret@db.example.com/app row=private")
 
 
 class _CancelledConnection(_FakeConnection):
-    async def fetchval(self, sql: str, *, timeout: float | None = None) -> object:
+    async def fetch_prepared(
+        self, sql: str, *, timeout: float | None = None
+    ) -> object:
         self.queries.append((sql, timeout))
         raise asyncio.CancelledError
 
@@ -358,6 +378,7 @@ async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> Non
     assert connection.committed is True
     assert connection.rolled_back is False
     assert connection.executed == ["SET LOCAL statement_timeout = '2500ms'"]
+    assert connection.prepared == [sql for sql, _ in connection.queries]
     assert [timeout for _, timeout in connection.queries] == [3.5, 3.5]
     assert evidence == {
         "passed": False,

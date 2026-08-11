@@ -638,6 +638,194 @@ async def test_transition_fails_closed_when_compare_and_swap_loses_race() -> Non
 
 
 @pytest.mark.asyncio
+async def test_preflight_terminal_transition_binds_observed_base_digest() -> None:
+    """Passed evidence persists only the exact base observed by preflight."""
+
+    plan = _migration_plan()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, plan]),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    result = await transition_migration_run(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=3,
+        next_state="passed",
+        event_type="preflight_passed",
+        evidence={"finding_count": 0},
+        observed_base_digest=plan.base_digest,
+        actor_user_uuid=None,
+    )
+
+    assert result.state == "passed"
+    assert run.observed_base_digest == plan.base_digest
+    event = session.add.call_args.args[0]
+    assert event.evidence_json == {
+        "finding_count": 0,
+        "observed_base_digest": plan.base_digest,
+    }
+
+
+@pytest.mark.asyncio
+async def test_preflight_drift_transition_persists_mismatched_base_digest() -> None:
+    """Drift evidence persists only a canonical digest unequal to the plan base."""
+
+    plan = _migration_plan()
+    observed_base_digest = "0" * 64
+    assert observed_base_digest != plan.base_digest
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, plan]),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    result = await transition_migration_run(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=3,
+        next_state="drifted",
+        event_type="preflight_drifted",
+        evidence={},
+        observed_base_digest=observed_base_digest,
+        actor_user_uuid=None,
+    )
+
+    assert result.state == "drifted"
+    assert run.observed_base_digest == observed_base_digest
+    assert session.add.call_args.args[0].evidence_json == {
+        "observed_base_digest": observed_base_digest
+    }
+
+
+@pytest.mark.parametrize(
+    "next_state, observed_base_digest",
+    [
+        ("passed", None),
+        ("passed", "A" * 64),
+        ("passed", "0" * 64),
+        ("drifted", "planned"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_preflight_terminal_transition_rejects_missing_or_conflicting_digest(
+    next_state: str, observed_base_digest: str | None
+) -> None:
+    """A worker cannot misclassify the observed base as passed or drifted."""
+
+    plan = _migration_plan()
+    if observed_base_digest == "planned":
+        observed_base_digest = plan.base_digest
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, plan]),
+        execute=AsyncMock(),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="observed base digest"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            next_state=next_state,
+            event_type=f"preflight_{next_state}",
+            evidence={},
+            observed_base_digest=observed_base_digest,
+            actor_user_uuid=None,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_preflight_terminal_transition_rejects_missing_plan_authority() -> None:
+    """Terminal evidence cannot bind when its immutable plan is unavailable."""
+
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, None]),
+        execute=AsyncMock(),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="plan integrity"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            next_state="passed",
+            event_type="preflight_passed",
+            evidence={},
+            observed_base_digest="0" * 64,
+            actor_user_uuid=None,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_transition_marks_terminal_state_without_restarting_run() -> None:
     """A terminal transition preserves start time and records one finish time."""
 
@@ -648,7 +836,7 @@ async def test_transition_marks_terminal_state_without_restarting_run() -> None:
         project_space_uuid=uuid.uuid4(),
         migration_plan_uuid=uuid.uuid4(),
         run_kind="dry_run",
-        state="live_preflight_running",
+        state="sandbox_running",
         state_version=3,
         idempotency_key_hash="a" * 64,
         plan_digest="b" * 64,
@@ -669,8 +857,8 @@ async def test_transition_marks_terminal_state_without_restarting_run() -> None:
         session,
         migration_run_uuid=run.migration_run_uuid,
         expected_state_version=3,
-        next_state="passed",
-        event_type="preflight_passed",
+        next_state="failed",
+        event_type="sandbox_failed",
         evidence={"finding_count": 0},
         actor_user_uuid=None,
         now=finished_at,
@@ -680,15 +868,56 @@ async def test_transition_marks_terminal_state_without_restarting_run() -> None:
     assert result.finished_at == finished_at
     event = session.add.call_args.args[0]
     assert event.sequence_number == 4
-    assert event.state_before == "live_preflight_running"
-    assert event.state_after == "passed"
-    assert run.state == "passed"
+    assert event.state_before == "sandbox_running"
+    assert event.state_after == "failed"
+    assert run.state == "failed"
     assert run.state_version == 4
     assert run.evidence_json == {"finding_count": 0}
     assert run.latest_event_digest == event.event_digest
     assert run.updated_at == finished_at
     assert run.started_at == started_at
     assert run.finished_at == finished_at
+
+
+@pytest.mark.asyncio
+async def test_non_preflight_transition_rejects_observed_base_digest() -> None:
+    """Other state changes cannot inject a target fingerprint into evidence."""
+
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="queued",
+        state_version=1,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="not allowed"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=1,
+            next_state="sandbox_running",
+            event_type="sandbox_started",
+            evidence={},
+            observed_base_digest="0" * 64,
+            actor_user_uuid=None,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -40,9 +40,11 @@ Current code implements only the first control-plane slice:
   internal database-selected dry-run creation writer, cancellation intent, and
   authenticated integrity-checked run polling and editor-authorized cancellation
   API, plus editor-authorized exact-digest/idempotency-bound dry-run creation;
-  no worker execution authority exists yet. The execution-neutral consumer
-  contract is **Implemented**; application startup wiring and worker execution
-  remain **Planned**.
+  the terminal preflight CAS requires and persists the canonical observed base
+  digest, revalidates plan integrity, and enforces exact `passed` match versus
+  `drifted` mismatch semantics. No worker execution authority exists yet. The
+  execution-neutral consumer contract is **Implemented**; application startup
+  wiring and worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
   them in one timed read-only transaction. It strictly adapts a caller-supplied
@@ -421,8 +423,8 @@ Terminal semantics are exact:
 
 | State | DDL/outcome claim |
 |---|---|
-| `passed` | Sandbox execution converged and bounded live read-only preflight passed for the observed base; no live DDL ran. |
-| `drifted` / `drifted_no_apply` | Target base mismatch was observed; no plan DDL ran. |
+| `passed` | Sandbox execution converged and bounded live read-only preflight passed for an observed digest equal to the integrity-checked plan base; no live DDL ran. The CAS binding is Implemented; worker evidence production is Planned. |
+| `drifted` / `drifted_no_apply` | Target base mismatch was observed; no plan DDL ran. Dry-run mismatch classification/persistence is Implemented; worker capture and apply-time classification are Planned. |
 | `failed` | Dry-run stage failed; no live DDL ran. |
 | `failed_rolled_back` | Apply started; the transactional segment is proven rolled back. |
 | `not_applied` | Reconciliation proves the exact base digest still exists. |

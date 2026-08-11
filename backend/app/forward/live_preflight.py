@@ -220,7 +220,8 @@ async def execute_live_preflight(
         client_timeout = statement_timeout_ms / 1000 + 1
         checks: list[dict[str, object]] = []
         for query in queries:
-            result = await connection.fetchval(query.sql, timeout=client_timeout)
+            prepared = await connection.prepare(query.sql)
+            result = await prepared.fetchval(timeout=client_timeout)
             if not isinstance(result, bool):
                 raise LivePreflightContractError(
                     "live preflight database result is not boolean"

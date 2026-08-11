@@ -83,6 +83,9 @@ Rules:
 
 - compare-and-swap transitions and a uniqueness constraint select one winner
   for duplicate submissions;
+- a dry-run may enter `passed` only when its canonical observed base digest
+  equals the integrity-checked immutable plan base, and `drifted` only when it
+  differs; the CAS stores the digest on the run and same-version chained event;
 - cancellation may succeed only before a worker enters `applying`; after that
   point the system records a cancellation request but finishes reconciliation
   and verification rather than claiming execution stopped;

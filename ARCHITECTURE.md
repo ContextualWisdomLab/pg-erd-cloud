@@ -60,7 +60,9 @@ Implemented in the initial safe vertical slice:
   contract version, plus a strict adapter/compiler that reject stale or lossy input;
 - optimistic compare-and-swap run transitions that update one exact state
   version and append the matching sanitized evidence event in the caller's
-  transaction;
+  transaction; dry-run `passed`/`drifted` transitions revalidate immutable plan
+  integrity, require the canonical observed base digest, enforce match/mismatch
+  semantics, and persist that digest on both the run and chained event;
 - an internal PostgreSQL conflict-winner writer that creates or reuses one
   exact, unexpired, executable dry-run intent and atomically persists its
   sequence-one event plus identifier-only dispatch outbox;

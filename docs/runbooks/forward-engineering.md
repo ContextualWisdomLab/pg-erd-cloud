@@ -135,7 +135,10 @@ operational artifact is attached to the release record.
    sandbox after bounded evidence is persisted.
 6. Run live **read-only** fingerprint and data-aware preconditions. Do not run
    live DDL. Incomplete, timed-out, or redaction-failed evidence is failure.
-7. Proceed only from `passed`; `drifted`, `failed`, and `cancelled` are terminal
+7. The terminal CAS must persist the lowercase canonical observed digest on the
+   run and chained event. It accepts `passed` only for exact plan-base equality
+   and `drifted` only for inequality after plan-integrity revalidation.
+8. Proceed only from `passed`; `drifted`, `failed`, and `cancelled` are terminal
    non-success results.
 
 ### 3. Authorize live apply

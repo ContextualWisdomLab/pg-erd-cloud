@@ -158,8 +158,11 @@ PostgreSQL 14–18 services. Each official image is pinned by multi-platform
 index digest. The focused test applies every Alembic revision, verifies the
 actual server major, creates a run/genesis/outbox transaction through the
 production writer, proves identical-key reuse produces one run/event/dispatch,
-asserts the dispatch schema has no execution payload, and rolls the transaction
-back before confirming that no partial identity survives. The same digest-pinned
+asserts the dispatch schema has no execution payload, publishes the exact
+dispatch attempt, then drives the real CAS/event writer through sandbox and
+preflight states. The terminal transition verifies and persists the plan base
+digest on the run and fourth chained event before the transaction is rolled
+back and no partial identity survives. The same digest-pinned
 matrix creates a quoted mixed-case/Unicode target fixture and executes the
 production live-preflight primitive. It proves non-empty/NULL failures,
 successful empty-table evidence, failing cast classification without database
@@ -187,8 +190,13 @@ failure, bounded timing, and fixed non-secret lifecycle logs. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,
-server/client timeout bounds, boolean-only evidence, rollback, fixed non-secret
+prepared-statement-only execution, server/client timeout bounds, boolean-only
+evidence, rollback, fixed non-secret
 database failures, and strict snapshot-to-plan-base canonical digest comparison.
+Durable-run unit tests require that observed digest for terminal preflight CAS,
+revalidate the immutable plan, persist it on the run and chained event, and
+reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
+transition injection.
 Real-target privilege/audit assertions, worker-owned fresh capture/attempt
 binding, and worker failure/recovery remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup

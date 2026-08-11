@@ -81,8 +81,9 @@ executable SQL, safety classification, approval truth, or recovery state.
   polling verifies the complete chain before returning evidence;
 - a bounded live-preflight query primitive accepts only the three structured
   compiler preconditions, validates PostgreSQL identifiers and target types,
-  runs boolean-only reads in one read-only repeatable-read transaction, applies
-  server/client timeouts, and replaces database failures with fixed diagnostics.
+  prepares every server-owned query before execution, runs boolean-only reads
+  in one read-only repeatable-read transaction, applies server/client timeouts,
+  and replaces database failures with fixed diagnostics.
 
 ### Planned and release-blocking
 
@@ -129,7 +130,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, lock-scoped dispatch claim, opt-in scheduled UUID-only publication, publish-state CAS, execution-neutral consumer contract, dry-run creation/cancellation APIs, and polling exist; application consumer wiring and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, plan-integrity-checked observed-base binding for `passed`/`drifted`, lock-scoped dispatch claim, opt-in scheduled UUID-only publication, publish-state CAS, execution-neutral consumer contract, dry-run creation/cancellation APIs, and polling exist; application consumer wiring and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, and
