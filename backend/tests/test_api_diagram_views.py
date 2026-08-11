@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.api.diagram_views import (
     MAX_LAYOUT_BYTES,
+    _get_authorized_view,
     create_view,
     delete_view,
     get_view,
@@ -101,6 +102,125 @@ async def test_create_view_rejects_oversized_layout() -> None:
     assert exc.value.status_code == 413
     session.add.assert_not_called()
     session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_view_persists_authorized_layout() -> None:
+    """Persist and return a bounded layout after editor authorization."""
+
+    session = AsyncMock()
+    session.add = Mock()
+    project_id = uuid.uuid4()
+    user = _user()
+    body = DiagramViewCreateIn(
+        name="Architecture review",
+        layout_json={"positions": {"public.member": {"x": 10, "y": 20}}},
+    )
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as membership:
+        out = await create_view(
+            project_space_uuid=project_id,
+            body=body,
+            user=user,
+            session=session,
+        )
+
+    membership.assert_awaited_once_with(
+        session, project_id, user.user_account_uuid, minimum_role="editor"
+    )
+    session.add.assert_called_once()
+    saved_view = session.add.call_args.args[0]
+    assert saved_view.project_space_uuid == project_id
+    assert saved_view.created_by == user.user_account_uuid
+    assert saved_view.name == body.name
+    assert saved_view.layout_json == body.layout_json
+    assert out.diagram_view_uuid == saved_view.diagram_view_uuid
+    assert out.created_at == saved_view.created_at
+    assert out.updated_at == saved_view.updated_at
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_authorized_view_hides_missing_identity_before_membership_check() -> None:
+    """Avoid authorization work when no saved-view identity exists."""
+
+    session = AsyncMock()
+    session.scalar.return_value = None
+    user = _user()
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as membership:
+        result = await _get_authorized_view(session, uuid.uuid4(), user)
+
+    assert result is None
+    membership.assert_not_awaited()
+    session.get.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_authorized_view_returns_resource_after_membership_check() -> None:
+    """Fetch the saved view only after the requested role is authorized."""
+
+    session = AsyncMock()
+    project_id = uuid.uuid4()
+    view_id = uuid.uuid4()
+    user = _user()
+    persisted_view = SimpleNamespace(diagram_view_uuid=view_id)
+    session.scalar.return_value = project_id
+    session.get.return_value = persisted_view
+
+    with patch(
+        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
+    ) as membership:
+        result = await _get_authorized_view(
+            session, view_id, user, minimum_role="editor"
+        )
+
+    assert result is persisted_view
+    membership.assert_awaited_once_with(
+        session, project_id, user.user_account_uuid, minimum_role="editor"
+    )
+    session.get.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_authorized_view_hides_forbidden_membership() -> None:
+    """Map forbidden membership to the same absence result as a missing view."""
+
+    session = AsyncMock()
+    session.scalar.return_value = uuid.uuid4()
+    denied = HTTPException(status_code=403, detail="Forbidden")
+
+    with patch(
+        "app.api.diagram_views.require_project_member",
+        new=AsyncMock(side_effect=denied),
+    ):
+        result = await _get_authorized_view(session, uuid.uuid4(), _user())
+
+    assert result is None
+    session.get.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_authorized_view_propagates_non_membership_http_errors() -> None:
+    """Preserve unexpected authorization failures instead of masking them."""
+
+    session = AsyncMock()
+    session.scalar.return_value = uuid.uuid4()
+    unavailable = HTTPException(status_code=503, detail="authorization unavailable")
+
+    with patch(
+        "app.api.diagram_views.require_project_member",
+        new=AsyncMock(side_effect=unavailable),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await _get_authorized_view(session, uuid.uuid4(), _user())
+
+    assert exc.value is unavailable
+    session.get.assert_not_awaited()
 
 
 @pytest.mark.asyncio

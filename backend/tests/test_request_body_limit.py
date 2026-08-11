@@ -77,6 +77,7 @@ def test_request_body_limit_configuration_is_fail_closed() -> None:
     ("headers", "expected"),
     [
         ([], None),
+        ([(b"x-request-id", b"8")], None),
         ([(b"Content-Length", b"8")], 8),
         ([(b"content-length", b"-1")], None),
         ([(b"content-length", b"invalid")], None),
