@@ -291,17 +291,18 @@ async def claim_due_migration_run_signal(
         )
         if value is None:
             return None
-        if isinstance(value, bytes):
-            value = value.decode("utf-8")
         try:
-            run_uuid = uuid.UUID(str(value))
-        except ValueError:
+            text_value = (
+                value.decode("utf-8") if isinstance(value, bytes) else str(value)
+            )
+            run_uuid = uuid.UUID(text_value)
+        except (UnicodeDecodeError, ValueError):
             await client.eval(
                 _ACK_MIGRATION_RUN_SIGNAL_SCRIPT,
                 2,
                 settings.valkey_migration_run_processing_key,
                 settings.valkey_migration_run_lease_token_key,
-                str(value),
+                value if isinstance(value, bytes) else str(value),
                 str(lease_token),
             )
             _logger.warning("valkey_migration_signal_invalid_uuid")

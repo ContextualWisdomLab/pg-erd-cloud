@@ -195,6 +195,8 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "scheduled relay lifecycle is **implemented**" in normalized_contract
     assert "dedicated valkey sorted-set key" in normalized_contract
     assert "consumer lifecycle and worker execution remain **planned**" in normalized_contract
+    assert "Startup fails closed when Valkey is unavailable" not in adr
+    assert "Startup rejects an unconfigured Valkey backend" in adr
 
 
 def test_dispatch_relay_has_explicit_deployment_and_lifecycle_contract() -> None:

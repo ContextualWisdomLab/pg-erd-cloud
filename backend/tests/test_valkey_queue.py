@@ -446,13 +446,40 @@ async def test_migration_signal_claim_handles_empty_text_and_invalid_members(
         2,
         settings.valkey_migration_run_processing_key,
         settings.valkey_migration_run_lease_token_key,
-        "not-a-run-uuid",
+        b"not-a-run-uuid",
     )
     assert isinstance(uuid.UUID(invalid_ack_args[5]), uuid.UUID)
     assert all(
         client.aclose.await_count == 1
         for client in (empty_client, text_client, invalid_client)
     )
+
+
+@pytest.mark.asyncio
+async def test_migration_signal_claim_quarantines_non_utf8_members(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A byte-invalid member is removed from processing with its lease token."""
+
+    _enable_url_valkey(monkeypatch)
+    hostile_member = b"\xff\xfe-not-utf8"
+    client = SimpleNamespace(
+        eval=AsyncMock(side_effect=[hostile_member, 1]), aclose=AsyncMock()
+    )
+    monkeypatch.setattr(valkey_queue, "_client", AsyncMock(return_value=client))
+
+    assert await valkey_queue.claim_due_migration_run_signal() is None
+
+    cleanup_args = client.eval.await_args_list[1].args
+    assert cleanup_args[:5] == (
+        valkey_queue._ACK_MIGRATION_RUN_SIGNAL_SCRIPT,
+        2,
+        settings.valkey_migration_run_processing_key,
+        settings.valkey_migration_run_lease_token_key,
+        hostile_member,
+    )
+    assert isinstance(uuid.UUID(cleanup_args[5]), uuid.UUID)
+    client.aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -145,7 +145,9 @@ Rules:
   lifecycle. It owns one fresh transaction per claim, rolls failed iterations
   back through the transaction context, emits only a fixed non-secret failure
   code, polls at a positive configured interval, and is cancelled and awaited
-  on shutdown. Startup fails closed when Valkey is unavailable.
+  on shutdown. Startup rejects an unconfigured Valkey backend; client import,
+  URL validity, and connectivity failures surface in relay iterations after
+  startup.
 - UUID-only signal claim, expiry reclaim, exact lease-token acknowledgement,
   and scheduled release are implemented and verified against real Valkey; the
   consumer lifecycle and worker execution remain **Planned**.
