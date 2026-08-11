@@ -132,7 +132,7 @@ jobs:
             -c "CREATE DATABASE pg_erd_cloud_target"
           docker exec pg-erd-cloud-postgres \
             psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
-            -c "CREATE ROLE pg_erd_cloud_preflight LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '$preflight_password'; ALTER ROLE pg_erd_cloud_preflight SET default_transaction_read_only = on; ALTER ROLE pg_erd_cloud_preflight SET statement_timeout = '5s'; REVOKE ALL ON DATABASE pg_erd_cloud_target FROM PUBLIC; GRANT CONNECT ON DATABASE pg_erd_cloud_target TO pg_erd_cloud_preflight; REVOKE CREATE, TEMPORARY ON DATABASE pg_erd_cloud_target FROM pg_erd_cloud_preflight"
+            -c "CREATE ROLE cwl_erd_preflight LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '$preflight_password'; ALTER ROLE cwl_erd_preflight SET default_transaction_read_only = on; ALTER ROLE cwl_erd_preflight SET statement_timeout = '5s'; REVOKE ALL ON DATABASE pg_erd_cloud_target FROM PUBLIC; GRANT CONNECT ON DATABASE pg_erd_cloud_target TO cwl_erd_preflight; REVOKE CREATE, TEMPORARY ON DATABASE pg_erd_cloud_target FROM cwl_erd_preflight"
           encoded_preflight_password="$(PASSWORD="$preflight_password" python3 - <<'PY'
           import os
           from urllib.parse import quote
@@ -142,7 +142,7 @@ jobs:
           )"
           sandbox_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_sandbox"
           target_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_target"
-          preflight_database_url="postgresql+asyncpg://pg_erd_cloud_preflight:${encoded_preflight_password}@127.0.0.1:5432/pg_erd_cloud_target"
+          preflight_database_url="postgresql+asyncpg://cwl_erd_preflight:${encoded_preflight_password}@127.0.0.1:5432/pg_erd_cloud_target"
           echo "::add-mask::$sandbox_database_url"
           echo "::add-mask::$target_database_url"
           echo "::add-mask::$preflight_database_url"

@@ -248,10 +248,10 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
             f"INSERT INTO {qualified} VALUES ('12'), ('not-an-integer'), (NULL)"
         )
         await admin_connection.execute(
-            f"GRANT USAGE ON SCHEMA {quoted_schema} TO pg_erd_cloud_preflight"
+            f"GRANT USAGE ON SCHEMA {quoted_schema} TO cwl_erd_preflight"
         )
         await admin_connection.execute(
-            f"GRANT SELECT ON {qualified} TO pg_erd_cloud_preflight"
+            f"GRANT SELECT ON {qualified} TO cwl_erd_preflight"
         )
         connection = await asyncpg.connect(_preflight_asyncpg_url())
         try:

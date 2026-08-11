@@ -235,7 +235,8 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "POSTGRES_SANDBOX_INTEGRATION_URL" in workflow
     assert "CREATE DATABASE pg_erd_cloud_target" in workflow
     assert "POSTGRES_TARGET_INTEGRATION_URL" in workflow
-    assert "CREATE ROLE pg_erd_cloud_preflight" in workflow
+    assert "CREATE ROLE cwl_erd_preflight" in workflow
+    assert "CREATE ROLE pg_" not in workflow
     assert "POSTGRES_PREFLIGHT_INTEGRATION_URL" in workflow
     integration_test = _read(
         Path("backend/tests/test_postgres_migration_run_integration.py")
