@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-24 - Contextual ARIA labels for generic modal actions
+**Learning:** Generic action buttons inside modals (like "Delete" or "Duplicate") must have contextual `aria-label` attributes that include the specific entity's name (e.g. `aria-label={`${editingNode.data.title} 테이블 삭제`}`). This prevents screen readers from announcing ambiguous actions when multiple modals or identical buttons might be present in the DOM.
+**Action:** Always include entity identifiers in aria-labels for generic actions within modals and list items. Also, remember to update associated React Testing Library queries (`getByRole`) because `aria-label` overrides inner text as the accessible name.
