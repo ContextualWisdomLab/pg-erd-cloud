@@ -1172,5 +1172,3 @@ async def test_cancellation_validates_metadata_before_database_access() -> None:
 
     session.scalar.assert_not_awaited()
     session.execute.assert_not_awaited()
-    claim_one_migration_dispatch,
-    mark_migration_dispatch_published,

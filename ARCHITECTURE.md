@@ -70,8 +70,10 @@ Implemented in the initial safe vertical slice:
   publishing the outbox or signaling a worker;
 - lock-scoped relay primitives that claim one due dispatch with
   `FOR UPDATE SKIP LOCKED`, increment its attempt in the caller-owned
-  transaction, and publish-state CAS only that exact identifier-only claim;
-  no relay loop or queue publisher is wired yet;
+  transaction, publish only `migration_run_uuid` to a dedicated Valkey sorted
+  set, and publish-state CAS only that exact identifier-only claim; the bounded
+  publisher does not commit or execute work, and no relay loop or consumer is
+  wired yet;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary

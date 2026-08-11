@@ -161,6 +161,13 @@ production writer, proves identical-key reuse produces one run/event/dispatch,
 asserts the dispatch schema has no execution payload, and rolls the transaction
 back before confirming that no partial identity survives.
 
+Focused relay tests prove that the bounded publisher claims and acknowledges
+one exact attempt with a single caller clock, publishes only the run UUID on a
+dedicated Valkey key, performs no transaction control, closes failed clients,
+and leaves failed publication unacknowledged for caller rollback. A real
+Valkey service, scheduled relay lifecycle, consumer restart, and worker
+execution remain release-blocking integration evidence.
+
 ## Fault-injection and recovery matrix
 
 | Injection point | Expected evidence | Forbidden behavior |

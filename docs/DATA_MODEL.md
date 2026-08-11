@@ -197,7 +197,7 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot start a run. | The public dry-run intent route delegates to the writer that verifies expiry before its conflict-winner insert; worker execution remains absent. | Partially implemented |
 | A new run, genesis event, and dispatch intent are atomic. | `create_migration_run` adds all three to the caller-owned transaction; `migration_run_dispatch.migration_run_uuid` is unique and the public route commits once. | Implemented |
-| Dispatch storage carries no execution material. | `migration_run_dispatch` contains identifiers, fixed kind/state, attempt count, and timestamps only; lock-scoped due-order claim and exact-attempt publish CAS are implemented, and the future relay/worker must reload the stored plan by run UUID. | Implemented persistence/claim boundary; relay loop and worker Planned |
+| Dispatch storage carries no execution material. | `migration_run_dispatch` contains identifiers, fixed kind/state, attempt count, and timestamps only; lock-scoped due-order claim, dedicated-key UUID-only Valkey publication, and exact-attempt publish CAS are implemented. The future consumer/worker must reload the stored plan by run UUID. | Implemented persistence/claim/publication boundary; scheduled relay loop, consumer, and worker Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
 | Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the public dry-run route delegates to the PostgreSQL conflict-winner writer, which reuses only the same request and rejects different reuse. | Implemented for dry-run intent; workers/apply Planned |
 | Run/event state tokens, sequence numbers, and digest links are valid. | Database checks constrain run kind/state, event type, before/after states, predecessor presence, and every persisted lowercase SHA-256 field (idempotency, plan, request, observed base, chain link, and run anchor); the exact application transition graph and CAS writer match UUID, kind, state, state version, and prior event anchor before appending the same-version event; event sequence is unique per run and polling recomputes every canonical digest. | Implemented persistence and polling boundary; workers Planned |
@@ -300,8 +300,9 @@ Additional **Planned** invariants:
 
 - Run creation, genesis event, and identifier-only outbox insertion are
   implemented atomically. Due work is claimed with `FOR UPDATE SKIP LOCKED`
-  and exact-attempt publish CAS in one caller-owned transaction; the future
-  relay loop publishes only `migration_run_uuid`.
+  and exact-attempt publish CAS in one caller-owned transaction. The bounded
+  publisher emits only `migration_run_uuid` to a dedicated Valkey key; the
+  scheduled relay loop and consumer remain Planned.
 - One database uniqueness rule plus `request_digest` implements idempotency:
   identical reuse returns the original run, while different effective input
   returns `409`.

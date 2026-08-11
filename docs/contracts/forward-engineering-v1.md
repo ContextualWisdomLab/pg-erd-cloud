@@ -121,8 +121,12 @@ evidence JSON. The internal cancellation-intent writer and editor-authorized
 **Implemented**. Public dry-run creation is **Implemented**; public apply
 creation remains **Planned**. Lock-scoped due-order outbox claiming and
 attempt-bound publish-state CAS are **Implemented**, while the relay loop,
-queue publisher, and worker execution remain **Planned**, as do cancellation
-propagation, sandbox/preflight workers, apply, reconciliation, and verification.
+queue consumer, and worker execution remain **Planned**. The bounded
+one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
+to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
+attempt in the same caller-owned transaction. Cancellation
+propagation, sandbox/preflight workers, apply, reconciliation, and verification
+remain **Planned**.
 
 Each event stores `previous_event_digest` and `event_digest`; the run stores
 `latest_event_digest`. Contract `migration-run-event/v1` hashes the run UUID,
@@ -148,10 +152,13 @@ function does not commit, publish the outbox, or signal a worker.
 `claim_one_migration_dispatch` selects one due pending row with
 `FOR UPDATE SKIP LOCKED`, increments its attempt in the caller-owned
 transaction, and returns only identifiers plus fixed kind and attempt.
-`mark_migration_dispatch_published` CAS-updates that exact attempt. The
-future relay must keep the transaction open across identifier-only queue
-publication and acknowledgement; a publication failure rolls the claim back.
-No relay loop, queue publisher, or migration worker is wired.
+`mark_migration_dispatch_published` CAS-updates that exact attempt.
+`publish_one_migration_dispatch` keeps the caller-owned transaction open across
+claim, UUID-only publication on the dedicated migration-run Valkey key, and
+acknowledgement. A publication failure raises before acknowledgement so the
+caller can roll the claim back. The sorted-set member is the run UUID, making
+an ambiguous retry idempotent at the signal layer. No scheduled relay loop,
+queue consumer, or migration worker is wired.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic

@@ -3,8 +3,9 @@
 - **Decision status:** Accepted
 - **Implementation status:** Partially implemented; durable storage,
   identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
-  polling, and dry-run creation/cancellation intent APIs exist, while the
-  relay loop, queue publisher, workers, and recovery do not
+  bounded UUID-only queue publication, polling, and dry-run
+  creation/cancellation intent APIs exist, while the scheduled relay loop,
+  queue consumer, workers, and recovery do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -32,11 +33,12 @@ run, genesis event, and identifier-only transactional outbox before external
 I/O, then returns `202`. The `migration_run_dispatch` row contains only its
 own identity, `migration_run_uuid`, dispatch kind, delivery state, bounded
 attempt metadata, and timestamps; it never contains DSNs, raw SQL, plan JSON,
-or row values. The implemented relay primitive claims one due row with
-`FOR UPDATE SKIP LOCKED` and attempt-bound acknowledgement in one
-caller-owned transaction. A future relay loop publishes only
-`migration_run_uuid`; publication failure rolls back the claim, while
-consumers must tolerate at-least-once redelivery after an ambiguous publish.
+or row values. The implemented bounded publisher claims one due row with
+`FOR UPDATE SKIP LOCKED`, publishes only `migration_run_uuid` on a dedicated
+Valkey sorted-set key, and acknowledges that exact attempt in one caller-owned
+transaction. It neither commits nor executes work. Publication failure raises
+before acknowledgement so the caller rolls back the claim, while consumers
+must tolerate at-least-once redelivery after an ambiguous publish.
 
 Each run binds:
 
@@ -128,6 +130,9 @@ Rules:
   `FOR UPDATE SKIP LOCKED`, and increments attempt state inside the caller's
   open transaction; `mark_migration_dispatch_published` accepts only that
   exact attempt and does not commit.
+- `publish_one_migration_dispatch` publishes only the claimed run UUID to a
+  dedicated Valkey key before exact-attempt acknowledgement. The caller owns
+  commit/rollback; the function never loads the plan or executes SQL.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
@@ -159,7 +164,7 @@ Rules:
 ### Planned before production release
 
 - authenticated apply creation route;
-- relay loop/queue publication and cancellation-worker acknowledgement;
+- scheduled relay loop/queue consumption and cancellation-worker acknowledgement;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

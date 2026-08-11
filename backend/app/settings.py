@@ -106,6 +106,7 @@ class Settings(BaseSettings):
     valkey_sentinel_hosts: str | None = None
     valkey_sentinel_master: str | None = None
     valkey_queue_key: str = "pg-erd-cloud:job-queue"
+    valkey_migration_run_queue_key: str = "pg-erd-cloud:migration-run-queue"
     valkey_lock_ttl_seconds: int = Field(300, ge=1)
 
     # Optional OIDC (Casdoor). If set, JWTs are verified.

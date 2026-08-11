@@ -74,6 +74,7 @@ def valkey_queue_config_summary() -> dict[str, object]:
         "enabled": valkey_queue_enabled(),
         "mode": valkey_queue_mode(),
         "queue_key": settings.valkey_queue_key,
+        "migration_run_queue_key": settings.valkey_migration_run_queue_key,
         "sentinel_master": settings.valkey_sentinel_master,
         "sentinel_count": len(sentinel_hosts),
         "lock_ttl_seconds": settings.valkey_lock_ttl_seconds,
@@ -140,6 +141,34 @@ async def enqueue_job_signal(
             await _close_client(client)
 
 
+async def enqueue_migration_run_signal(
+    migration_run_uuid: uuid.UUID,
+    run_after: dt.datetime | None = None,
+) -> bool:
+    """Publish only one migration-run UUID on its isolated Valkey key."""
+
+    if not valkey_queue_enabled():
+        return False
+
+    due_at = run_after or dt.datetime.now(dt.timezone.utc)
+    if due_at.tzinfo is None or due_at.utcoffset() is None:
+        raise ValueError("migration run signal time must include a timezone")
+    client: Any | None = None
+    try:
+        client = await _client()
+        await client.zadd(
+            settings.valkey_migration_run_queue_key,
+            {str(migration_run_uuid): due_at.timestamp()},
+        )
+        return True
+    except Exception:  # noqa: BLE001
+        _logger.warning("Valkey migration-run enqueue signal failed", exc_info=True)
+        return False
+    finally:
+        if client is not None:
+            await _close_client(client)
+
+
 async def pop_due_job_signal(
     now: dt.datetime | None = None,
 ) -> uuid.UUID | None:
@@ -149,21 +178,20 @@ async def pop_due_job_signal(
         return None
 
     current = now or dt.datetime.now(dt.timezone.utc)
-    client: Any | None = None
     try:
         client = await _client()
-        value = await client.eval(
-            _POP_DUE_JOB_SCRIPT,
-            1,
-            settings.valkey_queue_key,
-            current.timestamp(),
-        )
+        try:
+            value = await client.eval(
+                _POP_DUE_JOB_SCRIPT,
+                1,
+                settings.valkey_queue_key,
+                current.timestamp(),
+            )
+        finally:
+            await _close_client(client)
     except Exception:  # noqa: BLE001
         _logger.warning("Valkey job pop signal failed", exc_info=True)
         return None
-    finally:
-        if client is not None:
-            await _close_client(client)
 
     if value is None:
         return None

@@ -57,8 +57,11 @@ operational artifact is attached to the release record.
   and evidence redaction are verified by repository tests.
 - [x] Due dispatch claiming uses `FOR UPDATE SKIP LOCKED` and exact-attempt
   publish-state CAS in a caller-owned transaction.
-- [ ] Relay loop/queue publication, worker execution, restart recovery, and retention are
-  verified in the deployment environment.
+- [x] One bounded publisher emits only `migration_run_uuid` on a dedicated
+  Valkey key before exact-attempt acknowledgement; it neither commits nor
+  executes work.
+- [ ] Scheduled relay operation, queue consumption, worker execution, restart
+  recovery, and retention are verified in the deployment environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have
   finite environment-specific values below the incident-response objective.
   No repository default currently establishes forward-worker values.

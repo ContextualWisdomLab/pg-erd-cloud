@@ -161,7 +161,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep relay primitives implemented while publisher/workers stay planned."""
+    """Keep bounded publication implemented while consumers stay planned."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -190,7 +190,9 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "migration_run_dispatch" in data_model
     assert "identifier-only transactional outbox" in adr.lower()
     assert "lock-scoped due-order outbox claiming" in normalized_contract
-    assert "queue publisher, and worker execution remain **planned**" in normalized_contract
+    assert "bounded one-attempt publisher is **implemented**" in normalized_contract
+    assert "dedicated valkey sorted-set key" in normalized_contract
+    assert "queue consumer, and worker execution remain **planned**" in normalized_contract
 
 
 def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
