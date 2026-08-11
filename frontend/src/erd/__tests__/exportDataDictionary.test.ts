@@ -291,3 +291,61 @@ describe('exportDataDictionary CSV Injection Protection', () => {
 
     expect(csv).toContain('"table1","","col1","text","N","N","N","",""');
   });
+
+  it.each([
+    ['malformed', 'tgt-c-0069junk'],
+    ['wrong-role', 'src-c-0069-0064'],
+  ])('rejects a valid source handle paired with a %s target handle', (_case, targetHandle) => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'child',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'child',
+          badges: { pk: false, fk: false },
+          columns: [
+            { column_name: 'parent_id', data_type: 'integer', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'parent',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'parent',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const csv = exportDictionaryCsv(nodes, [{
+      id: `invalid-target-${_case}`,
+      source: 'child',
+      target: 'parent',
+      sourceHandle: 'src-c-0070-0061-0072-0065-006e-0074-005f-0069-0064',
+      targetHandle,
+    }]);
+
+    expect(csv).toContain('"child","","parent_id","integer","N","N","Y","",""');
+
+    const validCsv = exportDictionaryCsv(nodes, [
+      {
+        id: 'valid-pair',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: 'src-c-0070-0061-0072-0065-006e-0074-005f-0069-0064',
+        targetHandle: 'tgt-c-0069-0064',
+      },
+      {
+        id: 'valid-pair-duplicate',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: 'src-c-0070-0061-0072-0065-006e-0074-005f-0069-0064',
+        targetHandle: 'tgt-c-0069-0064',
+      },
+    ]);
+    expect(validCsv).toContain('"child","","parent_id","integer","N","Y","Y","",""');
+  });
