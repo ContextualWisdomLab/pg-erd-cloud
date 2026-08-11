@@ -122,8 +122,8 @@ Adequacy labels in this audit mean:
 
 ### Not implemented despite accepted design
 
-- Public migration-run creation/cancellation routes, queue/outbox delivery, and
-  sandbox/preflight/apply workers.
+- Queue/outbox delivery, sandbox/preflight/apply workers, and public apply-run
+  creation. Public dry-run creation and cancellation intent are implemented.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
@@ -166,7 +166,7 @@ as code or test evidence.
 
 | Gap | Why documentation cannot close it | Required evidence |
 |---|---|---|
-| Public run/event APIs and queue/outbox execution | Persistence, internal dry-run creation/CAS/cancellation writers, and integrity-checked polling exist, but public creation/cancellation and worker execution paths are unavailable. | Authorized HTTP creation/cancellation, transactional outbox/claiming, restart/cancellation integration tests |
+| Queue/outbox execution and apply-run API | Persistence, authorized dry-run creation/cancellation, CAS writers, and integrity-checked polling exist, but worker execution and public apply creation are unavailable. | Transactional outbox/claiming, restart/cancellation integration tests, approval-bound apply creation |
 | Isolated sandbox and read-only preflight | A rollback on production still creates lock/scan/rewrite risk. | Network/credential isolation proof, real PostgreSQL sandbox convergence and live no-DDL audit |
 | Drift-safe executor | Stored plan metadata alone does not acquire locks, enforce preconditions, bound time, or roll back. | Versioned stored-plan dispatch, lock/timeout/concurrency/rollback integration tests |
 | Idempotency and uncertain-commit recovery | A lease retry can duplicate destructive DDL unless apply is never replayed after the boundary. | Crash/fault injection and reconciliation to `verified`, `not_applied`, or `outcome_unknown` |

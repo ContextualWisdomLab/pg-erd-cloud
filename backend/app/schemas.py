@@ -265,6 +265,12 @@ class MigrationRunCancelIn(BaseModel):
     expected_state_version: int = Field(ge=1, strict=True)
 
 
+class MigrationRunCreateIn(BaseModel):
+    """Bind one idempotent dry-run intent to an immutable migration plan."""
+
+    plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 MigrationRunState = Literal[
     "queued",
     "sandbox_running",

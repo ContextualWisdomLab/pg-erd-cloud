@@ -109,7 +109,8 @@ future hardening opportunity, not an implemented guarantee.
 | Read model/current plan | Project member | Uniform cross-project 404 | Partially implemented |
 | Create or revise model | Editor | Valid model; strong revision-UUID `ETag` in `If-Match` | Implemented |
 | Compile a plan | Editor | Exact revision, same-project target and succeeded snapshot captured from that target | Implemented |
-| Request isolated dry run | Editor | Unexpired plan and exact digest; idempotency key | Planned |
+| Queue dry-run intent | Editor | Unexpired plan, exact digest, bounded idempotency key | Implemented; no worker authority |
+| Execute isolated dry run | Worker identity | Queued intent, governed sandbox, compatible PostgreSQL version | Planned |
 | Request live apply | Deployer | Matching passed dry run, exact plan/digest/revision, typed connection name, and destructive acknowledgement when applicable | Planned |
 | Persistent legacy `apply-sql` | Deployer | Conservative SQL parser only | Implemented transitional; not accepted target authority |
 

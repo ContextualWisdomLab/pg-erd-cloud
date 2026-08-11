@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.schemas import (
     ConnectionCreateIn,
     MigrationRunCancelIn,
+    MigrationRunCreateIn,
     ProjectCreateIn,
     ProjectMemberAddIn,
 )
@@ -59,3 +60,11 @@ def test_migration_run_cancel_requires_a_strict_positive_version(
 
     with pytest.raises(ValidationError):
         MigrationRunCancelIn(expected_state_version=version)
+
+
+@pytest.mark.parametrize("digest", ["", "a" * 63, "A" * 64, "g" * 64])
+def test_migration_run_create_rejects_invalid_plan_digest(digest: str) -> None:
+    """Public run creation accepts only a lowercase SHA-256 plan identity."""
+
+    with pytest.raises(ValidationError):
+        MigrationRunCreateIn(plan_digest=digest)

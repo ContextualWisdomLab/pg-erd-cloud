@@ -159,6 +159,39 @@ def test_cors_preflight_allows_if_match_for_schema_revisions() -> None:
     assert "if-match" in response.headers["Access-Control-Allow-Headers"].lower()
 
 
+def test_cors_preflight_allows_dry_run_idempotency_key() -> None:
+    """Browser dry-run intent submission can carry its concurrency identity."""
+
+    app = FastAPI()
+
+    @app.post("/api/migration-plans/example/dry-runs")
+    def create_dry_run() -> dict[str, bool]:
+        return {"ok": True}
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://example.com"],
+        allow_credentials=False,
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=CORS_ALLOW_HEADERS,
+    )
+
+    response = TestClient(app).options(
+        "/api/migration-plans/example/dry-runs",
+        headers={
+            "Origin": "http://example.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Idempotency-Key, Content-Type",
+        },
+    )
+
+    assert response.status_code in (200, 204)
+    assert (
+        "idempotency-key"
+        in response.headers["Access-Control-Allow-Headers"].lower()
+    )
+
+
 def test_cors_exposes_strong_revision_etag_to_browser_clients() -> None:
     """Cross-origin clients must be able to read the token used by If-Match."""
     app = FastAPI()

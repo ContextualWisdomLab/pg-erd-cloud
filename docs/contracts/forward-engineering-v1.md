@@ -39,8 +39,9 @@ Current code implements only the first control-plane slice:
   atomic optimistic compare-and-swap transition/event persistence plus an
   internal database-selected dry-run creation writer, cancellation intent, and
   authenticated integrity-checked run polling and editor-authorized cancellation
-  API; no public dry-run creation API or worker execution authority exists yet.
-- **Planned:** dry-run/apply creation and workers, isolated dry run, live preflight,
+  API, plus editor-authorized exact-digest/idempotency-bound dry-run creation;
+  no worker execution authority exists yet.
+- **Planned:** apply creation and all workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
@@ -112,7 +113,8 @@ and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. The internal cancellation-intent writer and editor-authorized
 `POST /api/migration-runs/{migration_run_uuid}/cancel` route are
-**Implemented**. Public dry-run/apply creation remains **Planned**. Queue/outbox
+**Implemented**. Public dry-run creation is **Implemented**; public apply
+creation remains **Planned**. Queue/outbox
 integration and cancellation-worker propagation remain **Planned**, as do
 sandbox/preflight workers, apply, reconciliation, and verification.
 
@@ -360,7 +362,7 @@ classified below without implying worker execution:
 | Method and target route | Required request contract | Success | Status |
 |---|---|---|---|
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
-| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
+| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | editor+; bounded `Idempotency-Key`; exact `plan_digest` | persisted queued dry-run identity, `202`; no worker signal | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
 | `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/cancellation-intent/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
 | `POST /api/migration-runs/{migration_run_uuid}/cancel` | editor+; strict positive `expected_state_version` | exact-version cancellation intent, `202`; stable correlated error envelope on rejection | **Implemented** |
@@ -396,7 +398,7 @@ Terminal semantics are exact:
 | Read models/plans/evidence | yes | yes | yes | yes | Partially implemented |
 | Create/revise a model | no | yes | yes | yes | Implemented |
 | Compile a plan | no | yes | yes | yes | Implemented |
-| Request a dry run | no | yes | yes | yes | Planned |
+| Request a dry-run intent | no | yes | yes | yes | Implemented; worker execution Planned |
 | Cancel a non-terminal run | no | yes | yes | yes | Implemented control-plane intent; worker propagation Planned |
 | Request live apply | no | no | yes | yes | Partially implemented; legacy gate only |
 | Manage membership | no | no | no | yes | Existing product contract |

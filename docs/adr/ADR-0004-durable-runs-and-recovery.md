@@ -1,7 +1,9 @@
 # ADR-0004: Durable runs, idempotency, cancellation, and recovery
 
 - **Decision status:** Accepted
-- **Implementation status:** Partially implemented
+- **Implementation status:** Partially implemented; durable storage, polling,
+  and dry-run creation/cancellation intent APIs exist, while workers and
+  recovery do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none

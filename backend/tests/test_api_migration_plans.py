@@ -322,6 +322,26 @@ def test_migration_plan_preview_route_is_published_in_openapi() -> None:
     }
 
 
+def test_dry_run_creation_route_publishes_exact_intent_contract() -> None:
+    """OpenAPI exposes the digest body and required idempotency header."""
+
+    from app.main import app
+
+    operation = app.openapi()["paths"][
+        "/api/migration-plans/{migration_plan_uuid}/dry-runs"
+    ]["post"]
+    parameters = {item["name"]: item for item in operation["parameters"]}
+
+    assert parameters["Idempotency-Key"]["in"] == "header"
+    assert parameters["Idempotency-Key"]["required"] is True
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/MigrationRunCreateIn"
+    }
+    assert operation["responses"]["202"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/MigrationRunActionOut"
+    }
+
+
 @pytest.mark.asyncio
 async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> None:
     inputs = _inputs()

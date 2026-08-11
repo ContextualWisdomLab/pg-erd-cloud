@@ -6,10 +6,10 @@ import datetime as dt
 import json
 import uuid
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import delete, exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ from app.forward.migration_plan import (
     compile_migration_plan,
     verify_migration_plan_digest,
 )
+from app.forward.migration_run import MigrationRunContractError, create_migration_run
 from app.forward.schema_model import SchemaModelValidationError
 from app.forward.snapshot_adapter import snapshot_to_schema_model
 from app.models import (
@@ -32,13 +33,83 @@ from app.models import (
     SchemaSnapshotData,
 )
 from app.permissions import require_project_member
-from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
+from app.schemas import (
+    MigrationPlanCreateIn,
+    MigrationPlanOut,
+    MigrationRunActionOut,
+    MigrationRunCreateIn,
+    MigrationRunState,
+)
 
 router = APIRouter(prefix="/api", tags=["migration-plans"])
 PLAN_LIFETIME = dt.timedelta(hours=24)
 EXPIRED_PLAN_RETENTION = dt.timedelta(days=30)
 MAX_PLAN_STATEMENTS = 1_000
 MAX_PLAN_BYTES = 4 * 1024 * 1024
+
+
+def _request_id(request: Request) -> str:
+    """Return the middleware-selected request ID or a safe local fallback."""
+
+    value = getattr(request.state, "request_id", None)
+    if isinstance(value, str) and 1 <= len(value) <= 64:
+        return value
+    return str(uuid.uuid4())
+
+
+def _creation_error(
+    request: Request, *, status_code: int, code: str, detail: str
+) -> HTTPException:
+    """Return the stable sanitized error envelope for run creation."""
+
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "code": code,
+            "detail": detail,
+            "correlation_id": _request_id(request),
+        },
+    )
+
+
+def _creation_contract_error(
+    request: Request, error: MigrationRunContractError
+) -> HTTPException:
+    """Map internal creation failures onto bounded public error codes."""
+
+    status_code, code = {
+        "migration plan integrity verification failed": (
+            status.HTTP_409_CONFLICT,
+            "plan_integrity_invalid",
+        ),
+        "migration plan expired": (status.HTTP_409_CONFLICT, "plan_expired"),
+        "migration plan cannot be dry-run": (
+            status.HTTP_409_CONFLICT,
+            "plan_not_dry_runnable",
+        ),
+        "idempotency key conflict": (
+            status.HTTP_409_CONFLICT,
+            "idempotency_key_conflict",
+        ),
+        "idempotency winner is unavailable": (
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "run_creation_unavailable",
+        ),
+        "idempotency key length is invalid": (
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "idempotency_key_invalid",
+        ),
+        "idempotency key contains a control character": (
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "idempotency_key_invalid",
+        ),
+    }.get(str(error), (status.HTTP_409_CONFLICT, "run_action_rejected"))
+    return _creation_error(
+        request,
+        status_code=status_code,
+        code=code,
+        detail="dry-run creation was rejected",
+    )
 
 
 def _compile_and_serialize_plan(
@@ -175,6 +246,91 @@ async def _load_plan_inputs(
     if any(value is None for value in (model, connection, snapshot, snapshot_data)):
         return None
     return model, revision, connection, snapshot, snapshot_data  # type: ignore[return-value]
+
+
+@router.post(
+    "/migration-plans/{migration_plan_uuid}/dry-runs",
+    response_model=MigrationRunActionOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_dry_run(
+    migration_plan_uuid: uuid.UUID,
+    body: MigrationRunCreateIn,
+    request: Request,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=255,
+            pattern=r"^[^\x00-\x1F\x7F]+$",
+        ),
+    ],
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> MigrationRunActionOut:
+    """Persist an editor-authorized dry-run intent without executing SQL."""
+
+    plan = await session.get(MigrationPlan, migration_plan_uuid)
+    if plan is None:
+        raise _creation_error(
+            request,
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="migration_plan_not_found",
+            detail="migration plan not found",
+        )
+    try:
+        await require_project_member(
+            session,
+            plan.project_space_uuid,
+            user.user_account_uuid,
+            minimum_role="editor",
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            if exc.detail == "insufficient project role":
+                raise _creation_error(
+                    request,
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    code="run_role_required",
+                    detail="editor role required",
+                ) from exc
+            raise _creation_error(
+                request,
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="migration_plan_not_found",
+                detail="migration plan not found",
+            ) from exc
+        raise
+
+    if body.plan_digest != plan.statement_digest:
+        raise _creation_error(
+            request,
+            status_code=status.HTTP_409_CONFLICT,
+            code="stale_plan",
+            detail="migration plan digest does not match",
+        )
+
+    correlation_id = _request_id(request)
+    try:
+        creation = await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="dry_run",
+            idempotency_key=idempotency_key,
+            requested_by_user_uuid=user.user_account_uuid,
+            evidence={"request_id": correlation_id, "request_source": "api"},
+        )
+    except MigrationRunContractError as exc:
+        raise _creation_contract_error(request, exc) from exc
+    await session.commit()
+    return MigrationRunActionOut(
+        migration_run_uuid=creation.migration_run_uuid,
+        state=cast(MigrationRunState, creation.state),
+        state_version=creation.state_version,
+        cancellation_requested=False,
+        reused=creation.reused,
+    )
 
 
 @router.get(

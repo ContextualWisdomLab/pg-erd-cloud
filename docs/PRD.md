@@ -67,7 +67,7 @@ for server authorization.
 | FE-PRD-005 | Dry run executes exact stored-plan DDL only in an isolated compatible sandbox; production receives bounded reads only. | **Planned** | Network-isolation and ephemeral PostgreSQL tests |
 | FE-PRD-006 | Detect base drift before dry run and again under apply-time locks before DDL. | **Planned** | Injected-drift and concurrency tests |
 | FE-PRD-007 | Require deployer authority, exact plan/dry-run digests, typed target confirmation, and destructive acknowledgement. | **Partially implemented**; deployer gates only legacy live apply | Role/tamper/race tests |
-| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Planned** | Crash, duplicate-submit, and state-machine tests |
+| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Partially implemented**; dry-run intent/resource and evidence exist, workers/apply absent | Crash, duplicate-submit, and state-machine tests |
 | FE-PRD-009 | Re-introspect after known commit and compare a persisted verification snapshot to the desired digest. | **Planned** | End-to-end empty-residual-diff assertion |
 | FE-PRD-010 | Provide a keyboard-operable five-stage review/dry-run/apply/verification journey without reusing the export modal. | **Planned** | Accessibility, component, and browser E2E tests |
 

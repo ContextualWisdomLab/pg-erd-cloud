@@ -39,11 +39,11 @@ CURRENT_ROUTES = (
     "PUT /api/schema-models/{schema_model_uuid}",
     "POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans",
     "GET /api/migration-plans/{migration_plan_uuid}",
+    "POST /api/migration-plans/{migration_plan_uuid}/dry-runs",
     "GET /api/migration-runs/{migration_run_uuid}",
 )
 
 PLANNED_ROUTES = (
-    "POST /api/migration-plans/{migration_plan_uuid}/dry-runs",
     "POST /api/migration-plans/{migration_plan_uuid}/apply-runs",
 )
 
@@ -161,7 +161,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep polling/cancellation implemented while execution remains planned."""
+    """Keep intent APIs implemented while worker execution remains planned."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -174,7 +174,11 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "## Physical run foundation — Implemented" in data_model
     assert "**Implementation status:** Partially implemented" in adr
     normalized_contract = " ".join(contract.lower().split())
-    assert "public dry-run/apply creation remains **planned**" in normalized_contract
+    assert "public apply creation remains **planned**" in normalized_contract
+    assert (
+        "post /api/migration-plans/{migration_plan_uuid}/dry-runs"
+        in normalized_contract
+    )
     assert (
         "post /api/migration-runs/{migration_run_uuid}/cancel"
         in normalized_contract

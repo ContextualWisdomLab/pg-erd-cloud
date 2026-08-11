@@ -52,8 +52,11 @@ operational artifact is attached to the release record.
 - [ ] Application metadata database is not used as a sandbox.
 - [ ] Target allowlist, DNS/IP pinning, TLS policy, certificate roots, firewall
   egress, and credential rotation are tested in the deployment environment.
-- [ ] Run/event migrations, idempotency uniqueness, compare-and-swap
-  transitions, queue outbox semantics, retention, and redaction are verified.
+- [x] Run/event migrations, idempotency uniqueness, compare-and-swap
+  transitions, dry-run intent creation, cancellation intent, and evidence
+  redaction are verified by repository tests.
+- [ ] Queue outbox semantics, worker claiming, restart recovery, and retention
+  are verified in the deployment environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have
   finite environment-specific values below the incident-response objective.
   No repository default currently establishes forward-worker values.

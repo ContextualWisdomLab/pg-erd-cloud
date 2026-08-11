@@ -33,7 +33,7 @@ support.
 | React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; desired-model adapters and live workflow **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
-| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified run polling, and cancellation-intent API **Implemented**; dry-run creation API/workers **Planned** |
+| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified polling, and dry-run creation/cancellation intent APIs **Implemented**; workers **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | **Planned** |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
@@ -63,6 +63,9 @@ Implemented in the initial safe vertical slice:
   transaction;
 - an internal PostgreSQL conflict-winner writer that creates or reuses one
   exact, unexpired, executable dry-run intent and its sequence-one event;
+- an editor-authorized `POST /api/migration-plans/{plan_uuid}/dry-runs`
+  boundary that requires the exact reviewed digest and bounded
+  `Idempotency-Key`, then returns only the queued durable identity;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary

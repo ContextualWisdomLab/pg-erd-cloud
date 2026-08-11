@@ -9,6 +9,8 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
+from app.api.migration_plans import _request_id as _plan_request_id
+from app.api.migration_plans import create_dry_run
 from app.api.migration_runs import (
     MAX_RETURNED_RUN_EVENTS,
     _request_id,
@@ -19,10 +21,11 @@ from app.auth import CurrentUser
 from app.forward.migration_run import (
     MigrationRunCancellation,
     MigrationRunContractError,
+    MigrationRunCreation,
     digest_run_event,
 )
-from app.models import MigrationRun, MigrationRunEvent
-from app.schemas import MigrationRunCancelIn, MigrationRunOut
+from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
+from app.schemas import MigrationRunCancelIn, MigrationRunCreateIn, MigrationRunOut
 
 
 def _user() -> CurrentUser:
@@ -61,6 +64,16 @@ def test_request_id_uses_safe_fallback_without_observability_middleware() -> Non
         assert _request_id(request) == str(expected)
 
 
+def test_plan_action_request_id_uses_safe_fallback_without_middleware() -> None:
+    """The plan router also bounds correlation identity when mounted alone."""
+
+    expected = uuid.uuid4()
+    request = _request()
+    del request.scope["state"]["request_id"]
+    with patch("app.api.migration_plans.uuid.uuid4", return_value=expected):
+        assert _plan_request_id(request) == str(expected)
+
+
 def _run() -> MigrationRun:
     return MigrationRun(
         migration_run_uuid=uuid.uuid4(),
@@ -83,6 +96,283 @@ def _run() -> MigrationRun:
         started_at=dt.datetime(2026, 8, 10, 0, 1, tzinfo=dt.timezone.utc),
         finished_at=None,
     )
+
+
+def _plan() -> MigrationPlan:
+    """Return one immutable plan fixture for public dry-run creation."""
+
+    return MigrationPlan(
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        schema_model_revision_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        base_schema_snapshot_uuid=uuid.uuid4(),
+        statement_digest="b" * 64,
+        base_digest="c" * 64,
+        target_digest="d" * 64,
+        compiler_version="pg-erd-cloud/1",
+        plan_json={},
+        created_by_user_uuid=uuid.uuid4(),
+        expires_at=dt.datetime(2026, 8, 12, tzinfo=dt.timezone.utc),
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_persists_correlated_editor_intent() -> None:
+    """An editor gets one accepted queued identity after transaction commit."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    creation = MigrationRunCreation(
+        migration_run_uuid=uuid.uuid4(), state="queued", state_version=1, reused=False
+    )
+    user = _user()
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ) as membership,
+        patch(
+            "app.api.migration_plans.create_migration_run",
+            new=AsyncMock(return_value=creation),
+        ) as writer,
+    ):
+        out = await create_dry_run(
+            migration_plan_uuid=plan.migration_plan_uuid,
+            body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+            request=_request(),
+            idempotency_key="dry-run-request-1",
+            user=user,
+            session=session,
+        )
+
+    assert out.migration_run_uuid == creation.migration_run_uuid
+    assert out.state == "queued"
+    assert out.state_version == 1
+    assert out.cancellation_requested is False
+    assert out.reused is False
+    membership.assert_awaited_once_with(
+        session,
+        plan.project_space_uuid,
+        user.user_account_uuid,
+        minimum_role="editor",
+    )
+    writer.assert_awaited_once_with(
+        session,
+        plan=plan,
+        run_kind="dry_run",
+        idempotency_key="dry-run-request-1",
+        requested_by_user_uuid=user.user_account_uuid,
+        evidence={"request_id": "migration-request-123", "request_source": "api"},
+    )
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_masks_plan_from_non_member() -> None:
+    """A plan UUID cannot disclose a project to a non-member."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member",
+            new=AsyncMock(side_effect=HTTPException(status_code=403, detail="denied")),
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail["code"] == "migration_plan_not_found"
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_returns_not_found_for_missing_plan() -> None:
+    """Unknown plan identities receive the same stable masked response."""
+
+    session = SimpleNamespace(get=AsyncMock(return_value=None), commit=AsyncMock())
+    with patch(
+        "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+    ) as writer:
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=uuid.uuid4(),
+                body=MigrationRunCreateIn(plan_digest="b" * 64),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail["code"] == "migration_plan_not_found"
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_rejects_viewer_without_disclosing_plan_data() -> None:
+    """An authenticated viewer receives the stable editor-role rejection."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member",
+            new=AsyncMock(
+                side_effect=HTTPException(
+                    status_code=403, detail="insufficient project role"
+                )
+            ),
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == {
+        "code": "run_role_required",
+        "detail": "editor role required",
+        "correlation_id": "migration-request-123",
+    }
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_preserves_non_authorization_http_failures() -> None:
+    """Unexpected dependency HTTP failures are not misclassified as IDOR cases."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    upstream = HTTPException(status_code=503, detail="membership unavailable")
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member",
+            new=AsyncMock(side_effect=upstream),
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value is upstream
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_rejects_stale_preview_digest_after_authorization(
+) -> None:
+    """A stale tab cannot queue a plan identity different from its preview."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ) as membership,
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationRunCreateIn(plan_digest="e" * 64),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == {
+        "code": "stale_plan",
+        "detail": "migration plan digest does not match",
+        "correlation_id": "migration-request-123",
+    }
+    membership.assert_awaited_once()
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "status_code", "code"),
+    [
+        ("migration plan integrity verification failed", 409, "plan_integrity_invalid"),
+        ("migration plan expired", 409, "plan_expired"),
+        ("migration plan cannot be dry-run", 409, "plan_not_dry_runnable"),
+        ("idempotency key conflict", 409, "idempotency_key_conflict"),
+        ("idempotency winner is unavailable", 503, "run_creation_unavailable"),
+        ("idempotency key length is invalid", 422, "idempotency_key_invalid"),
+    ],
+)
+async def test_create_dry_run_maps_contract_failures_to_stable_errors(
+    message: str, status_code: int, code: str
+) -> None:
+    """Creation failures do not expose internal plan or persistence details."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run",
+            new=AsyncMock(side_effect=MigrationRunContractError(message)),
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_dry_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+                request=_request(),
+                idempotency_key="dry-run-request-1",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.detail == {
+        "code": code,
+        "detail": "dry-run creation was rejected",
+        "correlation_id": "migration-request-123",
+    }
+    session.commit.assert_not_awaited()
 
 
 def _events(run: MigrationRun) -> list[MigrationRunEvent]:
