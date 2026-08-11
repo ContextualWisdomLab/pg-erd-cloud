@@ -349,6 +349,23 @@ class _CancelledConnection(_FakeConnection):
         raise asyncio.CancelledError
 
 
+class _TransactionCreationFailingConnection(_FakeConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        raise RuntimeError("postgresql://user:secret@db.example.com/app")
+
+
+class _TransactionStartFailingTransaction(_FakeTransaction):
+    async def start(self) -> None:
+        raise RuntimeError("postgresql://user:secret@db.example.com/app")
+
+
+class _TransactionStartFailingConnection(_FakeConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        return _TransactionStartFailingTransaction(self)
+
+
 @pytest.mark.asyncio
 async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> None:
     connection = _FakeConnection([True, False])
@@ -443,7 +460,29 @@ async def test_replaces_database_failures_with_a_fixed_non_secret_error() -> Non
 
     assert str(captured.value) == "live preflight query failed"
     assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
     assert connection.rolled_back is True
+
+
+@pytest.mark.parametrize(
+    "connection",
+    [
+        _TransactionCreationFailingConnection([]),
+        _TransactionStartFailingConnection([]),
+    ],
+)
+@pytest.mark.asyncio
+async def test_sanitizes_transaction_initialization_failures_without_rollback(
+    connection: _FakeConnection,
+) -> None:
+    with pytest.raises(LivePreflightContractError) as captured:
+        await execute_live_preflight(connection, _plan())
+
+    assert str(captured.value) == "live preflight query failed"
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
+    assert connection.committed is False
+    assert connection.rolled_back is False
 
 
 @pytest.mark.parametrize("timeout", ["5000", True, 0, 60_001])

@@ -84,7 +84,8 @@ executable SQL, safety classification, approval truth, or recovery state.
   prepares every server-owned query before execution, runs boolean-only reads
   in one read-only repeatable-read transaction, applies a parameter-bound
   transaction-local server timeout plus a bounded client timeout,
-  and replaces database failures with fixed diagnostics.
+  replaces transaction creation/start and query failures with fixed diagnostics,
+  and rolls back only after transaction startup succeeds.
 
 ### Planned and release-blocking
 

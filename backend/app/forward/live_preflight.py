@@ -12,9 +12,10 @@ import asyncio
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
+from asyncpg.transaction import Transaction
 
 from app.forward.schema_model import (
     SchemaModelValidationError,
@@ -211,9 +212,15 @@ async def execute_live_preflight(
             "live preflight statement timeout is invalid"
         )
     queries = compile_live_preflight_queries(plan)
-    transaction = connection.transaction(isolation="repeatable_read", readonly=True)
-    await transaction.start()
+    transaction: Transaction | None = None
+    transaction_started = False
+    sanitized_failure = False
     try:
+        transaction = connection.transaction(
+            isolation="repeatable_read", readonly=True
+        )
+        await transaction.start()
+        transaction_started = True
         await connection.execute(
             "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
             f"{statement_timeout_ms}ms",
@@ -236,7 +243,8 @@ async def execute_live_preflight(
                 }
             )
     except BaseException as err:
-        await transaction.rollback()
+        if transaction_started and transaction is not None:
+            await transaction.rollback()
         if isinstance(
             err,
             (
@@ -247,6 +255,8 @@ async def execute_live_preflight(
             ),
         ):
             raise
+        sanitized_failure = True
+    if sanitized_failure:
         raise LivePreflightContractError("live preflight query failed") from None
-    await transaction.commit()
+    await cast(Transaction, transaction).commit()
     return {"passed": all(bool(item["passed"]) for item in checks), "checks": checks}
