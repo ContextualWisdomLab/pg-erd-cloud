@@ -86,6 +86,23 @@ Table posts {
     assert len(parse_dbml(valid_with_following_setting)["fk_edges"]) == 1
 
 
+def test_named_block_reference_preserves_anchored_delimiters():
+    dbml = """
+Table users {
+  id integer [pk]
+}
+Table posts {
+  user_id integer
+}
+Ref user_posts { posts.user_id > users.id }
+"""
+
+    edge = parse_dbml(dbml)["fk_edges"][0]
+
+    assert edge["child_column_name"] == "user_id"
+    assert edge["parent_column_name"] == "id"
+
+
 def test_reverse_arrow_and_schema_qualified_and_quoted():
     text = '''
 Table auth.accounts {

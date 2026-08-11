@@ -44,8 +44,9 @@ _COLUMN_RE = re.compile(
 _QUOTED_IDENTIFIER = r'"(?:""|[^"])+"'
 _PATH = rf'(?:{_QUOTED_IDENTIFIER}|\w+)(?:\.(?:{_QUOTED_IDENTIFIER}|\w+))*'
 _REF_RE = re.compile(
-    r"ref\s*(?:\w+\s*)?:?\s*"
-    rf"(?P<from>{_PATH})\s*(?P<op>[<>-])\s*(?P<to>{_PATH})",
+    r"ref\s*(?:(?P<block_name>\w+)\s*\{\s*|:?\s*)"
+    rf"(?P<from>{_PATH})\s*(?P<op>[<>-])\s*(?P<to>{_PATH})\s*"
+    r"(?(block_name)\})",
     re.IGNORECASE,
 )
 _INLINE_REF_RE = re.compile(
