@@ -3,10 +3,10 @@
 ## Status and boundary
 
 Implemented. `ApplySqlIn` rejects U+0000–U+0008, U+000B, U+000C,
-U+000E–U+001F, and U+007F before authorization or database access. Horizontal
-tab, line feed, and carriage return remain accepted so ordinary multiline SQL
-is not damaged. The existing 262,144-character request limit and downstream
-PostgreSQL DDL allowlist remain authoritative.
+U+000E–U+001F, and U+007F–U+009F before authorization or database access.
+Horizontal tab, line feed, and carriage return remain accepted so ordinary
+multiline SQL is not damaged. The existing 262,144-character request limit and
+downstream PostgreSQL DDL allowlist remain authoritative.
 
 This validation protects transport, parser, driver, and audit-log integrity. It
 is not SQL-injection prevention and does not expand the permitted DDL grammar.
@@ -24,8 +24,8 @@ secret-bearing request fields from being reflected by validation responses.
 
 ## Acceptance evidence
 
-- Every rejected code point is tested at the beginning, middle, and end of a
-  realistic DDL request.
+- Every rejected C0, DEL, and C1 code point is tested at the beginning, middle,
+  and end of a realistic DDL request.
 - Tab, LF, CR, quoted Unicode identifiers, and existing length validation are
   preserved.
 - An HTTP-boundary regression proves a secret-bearing SQL literal appears in
