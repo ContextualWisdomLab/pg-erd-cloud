@@ -567,6 +567,8 @@ async def test_oidc_decode_rejects_invalid_header(
 async def test_oidc_decode_rejects_jwt_crit_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Reject malformed and unsupported JOSE critical-header values."""
+
     def mock_get_unverified_header_bad_crit(_token):
         return {"kid": "key-1", "alg": "RS256", "crit": "not-a-list"}
 
@@ -575,6 +577,21 @@ async def test_oidc_decode_rejects_jwt_crit_header(
         await auth._decode_verified_oidc_token("invalid_token")
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == "invalid crit header"
+
+    for malformed_crit in (None, [], ["extension"] * 11):
+        monkeypatch.setattr(
+            auth.jwt,
+            "get_unverified_header",
+            lambda _token, value=malformed_crit: {
+                "kid": "key-1",
+                "alg": "RS256",
+                "crit": value,
+            },
+        )
+        with pytest.raises(HTTPException) as excinfo:
+            await auth._decode_verified_oidc_token("invalid_token")
+        assert excinfo.value.status_code == 401
+        assert excinfo.value.detail == "invalid crit header"
 
     def mock_get_unverified_header_bad_crit_item(_token):
         return {"kid": "key-1", "alg": "RS256", "crit": [123]}
