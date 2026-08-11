@@ -328,7 +328,7 @@ async def create_dry_run(
         migration_run_uuid=creation.migration_run_uuid,
         state=cast(MigrationRunState, creation.state),
         state_version=creation.state_version,
-        cancellation_requested=False,
+        cancellation_requested=creation.cancellation_requested,
         reused=creation.reused,
     )
 

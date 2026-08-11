@@ -115,6 +115,7 @@ class MigrationRunCreation:
     migration_run_uuid: uuid.UUID
     state: str
     state_version: int
+    cancellation_requested: bool
     reused: bool
 
 
@@ -504,6 +505,7 @@ async def create_migration_run(
             migration_run_uuid=existing.migration_run_uuid,
             state=existing.state,
             state_version=existing.state_version,
+            cancellation_requested=existing.cancellation_requested,
             reused=True,
         )
 
@@ -538,6 +540,7 @@ async def create_migration_run(
         migration_run_uuid=inserted_uuid,
         state="queued",
         state_version=1,
+        cancellation_requested=False,
         reused=False,
     )
 

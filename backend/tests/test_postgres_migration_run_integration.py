@@ -30,9 +30,13 @@ from app.models import (
 )
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
+_EXPECTED_MAJOR = os.getenv("EXPECTED_POSTGRES_MAJOR")
 pytestmark = pytest.mark.skipif(
-    not _POSTGRES_URL,
-    reason="POSTGRES_INTEGRATION_URL is required for real PostgreSQL acceptance",
+    not _POSTGRES_URL or not _EXPECTED_MAJOR,
+    reason=(
+        "POSTGRES_INTEGRATION_URL and EXPECTED_POSTGRES_MAJOR are required "
+        "for real PostgreSQL acceptance"
+    ),
 )
 
 
@@ -63,9 +67,8 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     text("SELECT current_setting('server_version_num')")
                 )
             )
-            assert server_version_num // 10_000 == int(
-                os.environ["EXPECTED_POSTGRES_MAJOR"]
-            )
+            assert _EXPECTED_MAJOR is not None
+            assert server_version_num // 10_000 == int(_EXPECTED_MAJOR)
             session.add(
                 UserAccount(
                     user_account_uuid=user_uuid,

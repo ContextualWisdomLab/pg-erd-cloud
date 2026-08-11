@@ -867,7 +867,7 @@ async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
         ),
         latest_event_digest="d" * 64,
         requested_by_user_uuid=actor_uuid,
-        cancellation_requested=False,
+        cancellation_requested=True,
         evidence_json={},
     )
     session = SimpleNamespace(
@@ -891,6 +891,7 @@ async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
     )
     assert reused.migration_run_uuid == existing.migration_run_uuid
     assert reused.reused is True
+    assert reused.cancellation_requested is True
     session.add.assert_not_called()
 
     existing.request_digest = "f" * 64

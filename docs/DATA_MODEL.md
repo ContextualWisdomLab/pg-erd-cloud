@@ -283,26 +283,22 @@ erDiagram
   }
 ```
 
-Planned foreign-key and cardinality rules:
+Planned target foreign-key and cardinality rules follow. The implemented
+foreign-key table above is authoritative for current deletion behavior; this
+table lists only relationships that remain absent or whose target rule is not
+yet enforced.
 
 | Child foreign key | Parent | Nullable / conditional rule | Target deletion and cardinality |
 |---|---|---|---|
-| `migration_run.project_space_uuid` | `project_space` | non-null | `RESTRICT`; every run has one project, and a project has zero or more runs. |
 | `migration_run.migration_plan_uuid` | `migration_plan` | non-null | `RESTRICT`; every run attempts one immutable plan, and a plan has zero or more dry-run/apply attempts. |
-| `migration_run.requested_by_user_uuid` | `user_account` | non-null | `RESTRICT`; every run has one requesting actor, and a user can request zero or more runs. |
-| `migration_run_dispatch.migration_run_uuid` | `migration_run` | non-null and unique | `CASCADE`; each persisted dispatch belongs to exactly one run and a run has at most one dispatch row. |
 | `migration_run.passed_dry_run_uuid` | `migration_run` | null for dry runs; required for apply and must reference a `passed` run for the same plan/digest | `RESTRICT`; one passed dry run can prove zero or more apply requests until evidence becomes stale. |
 | `migration_run.verification_snapshot_uuid` | `schema_snapshot` | null until verification; required for `verified` | `RESTRICT`; a run has zero or one verification snapshot, and a snapshot can be referenced by zero or more runs physically. The service must create a dedicated snapshot per apply run. |
-| `migration_run_event.migration_run_uuid` | `migration_run` | non-null | `CASCADE` only if a separately approved retention deletion removes the run; every event has one run, and a run has zero or more events at insert time. |
-| `migration_run_event.actor_user_uuid` | `user_account` | nullable for worker/system transitions | `RESTRICT`; an event has zero or one human actor, and a user can act in zero or more events. |
 
 Additional **Planned** invariants:
 
-- Run creation, genesis event, and identifier-only outbox insertion are
-  implemented atomically. Due work is claimed with `FOR UPDATE SKIP LOCKED`
-  and exact-attempt publish CAS in one caller-owned transaction. The bounded
-  publisher emits only `migration_run_uuid` to a dedicated Valkey key; the
-  scheduled relay loop and consumer remain Planned.
+- A scheduled relay loop and queue consumer remain Planned. The implemented
+  persistence, claim, exact-attempt acknowledgement, and UUID-only bounded
+  publisher are recorded in the authoritative invariant table above.
 - One database uniqueness rule plus `request_digest` implements idempotency:
   identical reuse returns the original run, while different effective input
   returns `409`.

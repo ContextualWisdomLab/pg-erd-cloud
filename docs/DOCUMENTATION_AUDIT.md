@@ -129,11 +129,10 @@ Adequacy labels in this audit mean:
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
   recovery.
-- Relay loop/queue publication, cancellation propagation, crash/restart
-  recovery, and no-replay apply reconciliation. Atomic outbox persistence,
-  lock-scoped claim/publish-state CAS, internal idempotency,
-  compare-and-swap transitions, cancellation intent, and append-only event
-  evidence are implemented.
+- Crash/restart recovery and no-replay apply reconciliation. Atomic outbox
+  persistence, lock-scoped claim/publish-state CAS, UUID-only publication,
+  internal idempotency, compare-and-swap transitions, cancellation intent,
+  and append-only event evidence are implemented.
 - Verification snapshot, residual diff, convergence classification, alerts,
   kill switch, retention, and tested incident procedure.
 - Forward browser/API client, modal workflow, polling, accessibility, and every

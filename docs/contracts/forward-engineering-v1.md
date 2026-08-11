@@ -455,10 +455,11 @@ Current implemented endpoints use FastAPI's JSON shape
 | `413` | Model JSON exceeds 2 MiB, or a compiled plan exceeds 1,000 executable plus proposed statements or 4 MiB. |
 | `422` | Request validation, unusable/mismatched/outdated snapshot or connection, invalid model, or snapshot content unsupported by the current adapter. |
 
-Release-v1 errors remain sanitized and machine-classifiable. The first mutating
-run route fixes the repository run-action envelope as
+Release-v1 read-only endpoint errors remain sanitized and machine-classifiable
+using the current string `detail` envelope. Mutating run-action endpoints,
+including dry-run creation and cancellation, fix their envelope as
 `{"detail":{"code":"...","detail":"...","correlation_id":"..."}}`.
-Future dry-run/apply creation routes must reuse this shape; optional bounded
+Future apply creation routes must reuse this shape; optional bounded
 `findings` may be added without exposing source values. The contract distinguishes:
 
 - `stale_revision`, `stale_plan`, `plan_expired`, and `idempotency_conflict`

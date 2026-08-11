@@ -138,7 +138,7 @@ async def test_client_supports_url_and_sentinel_modes(
 async def test_client_rejects_incomplete_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(valkey_queue, "_load_redis_module", lambda: object())
+    monkeypatch.setattr(valkey_queue, "_load_redis_module", object)
     monkeypatch.setattr(settings, "valkey_url", None)
     monkeypatch.setattr(settings, "valkey_sentinel_hosts", "sentinel:26379")
     monkeypatch.setattr(settings, "valkey_sentinel_master", None)

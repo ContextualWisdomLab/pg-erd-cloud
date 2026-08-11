@@ -124,7 +124,11 @@ async def test_create_dry_run_persists_correlated_editor_intent() -> None:
     plan = _plan()
     session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
     creation = MigrationRunCreation(
-        migration_run_uuid=uuid.uuid4(), state="queued", state_version=1, reused=False
+        migration_run_uuid=uuid.uuid4(),
+        state="queued",
+        state_version=1,
+        cancellation_requested=False,
+        reused=False,
     )
     user = _user()
     with (
@@ -165,6 +169,42 @@ async def test_create_dry_run_persists_correlated_editor_intent() -> None:
         evidence={"request_id": "migration-request-123", "request_source": "api"},
     )
     session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_dry_run_reuse_returns_durable_cancellation_intent() -> None:
+    """Idempotent reuse must not hide a cancellation already stored on the run."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    creation = MigrationRunCreation(
+        migration_run_uuid=uuid.uuid4(),
+        state="queued",
+        state_version=2,
+        cancellation_requested=True,
+        reused=True,
+    )
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run",
+            new=AsyncMock(return_value=creation),
+        ),
+    ):
+        out = await create_dry_run(
+            migration_plan_uuid=plan.migration_plan_uuid,
+            body=MigrationRunCreateIn(plan_digest=plan.statement_digest),
+            request=_request(),
+            idempotency_key="cancelled-retry",
+            user=_user(),
+            session=session,
+        )
+
+    assert out.reused is True
+    assert out.state_version == 2
+    assert out.cancellation_requested is True
 
 
 @pytest.mark.asyncio
