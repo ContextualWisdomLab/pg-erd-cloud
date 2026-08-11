@@ -607,6 +607,37 @@ describe('App orchestration coverage', () => {
     await act(async () => rejectMe(new Error('late failure')))
   })
 
+  it('keeps unavailable toolbar actions discoverable without executing them', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const unavailableActions = [
+      'ERD 자동 정렬',
+      '정렬 되돌리기',
+      '관계 자동 추론',
+      '모든 노드 지우기',
+      '업무 그룹',
+      '인덱스 카디널리티 계산',
+      'DDL 내보내기',
+    ]
+    const confirm = vi.spyOn(window, 'confirm')
+
+    for (const name of unavailableActions) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      expect(button).not.toBeDisabled()
+      button.focus()
+      expect(button).toHaveFocus()
+      fireEvent.click(button)
+    }
+
+    expect(confirm).not.toHaveBeenCalled()
+    expect(exports.inferRelationships).not.toHaveBeenCalled()
+    expect(screen.getByTestId('group-modal')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('cardinality-modal')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('export-modal')).toHaveAttribute('data-open', 'false')
+  })
+
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
