@@ -48,7 +48,10 @@ _REF_RE = re.compile(
     rf"(?P<from>{_PATH})\s*(?P<op>[<>-])\s*(?P<to>{_PATH})",
     re.IGNORECASE,
 )
-_INLINE_REF_RE = re.compile(rf"ref:\s*(?P<op>[<>-])\s*(?P<to>{_PATH})", re.IGNORECASE)
+_INLINE_REF_RE = re.compile(
+    rf"ref:\s*(?P<op>[<>-])\s*(?P<to>{_PATH})(?=\s*(?:,|$))",
+    re.IGNORECASE,
+)
 _PATH_SEGMENT_RE = re.compile(rf'{_QUOTED_IDENTIFIER}|[^.]+')
 
 
@@ -273,7 +276,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
 
         # standalone Ref (works inside or outside a table body)
         if re.match(r"^ref\b", line, re.IGNORECASE):
-            rm = _REF_RE.search(line)
+            rm = _REF_RE.fullmatch(line)
             if rm is None:
                 raise DbmlParseError("malformed reference identifier")
             fs, ft, fc = _split_col_ref(rm.group("from"))

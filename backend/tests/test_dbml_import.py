@@ -54,6 +54,38 @@ def test_parses_refs_inline_and_standalone_deduped_semantics():
     assert len(snap["fk_edges"]) == 2  # parser is literal; dedup is the caller's choice
 
 
+def test_standalone_reference_rejects_trailing_tokens():
+    dbml = """
+Table users {
+  id integer [pk]
+}
+Table posts {
+  user_id integer
+}
+Ref: posts.user_id > users.id trailing
+"""
+
+    with pytest.raises(DbmlParseError, match="malformed reference identifier"):
+        parse_dbml(dbml)
+
+
+def test_inline_reference_requires_a_settings_delimiter_after_the_path():
+    malformed = """
+Table users {
+  id integer [pk]
+}
+Table posts {
+  user_id integer [ref: > users.id trailing]
+}
+"""
+    valid_with_following_setting = malformed.replace(
+        "users.id trailing", "users.id, not null"
+    )
+
+    assert parse_dbml(malformed)["fk_edges"] == []
+    assert len(parse_dbml(valid_with_following_setting)["fk_edges"]) == 1
+
+
 def test_reverse_arrow_and_schema_qualified_and_quoted():
     text = '''
 Table auth.accounts {

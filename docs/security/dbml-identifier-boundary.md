@@ -61,6 +61,21 @@ and apply-validator focused suites protect the shared renderer's consumers.
 
 ## References
 
+Su, Z., & Wassermann, G. (2006). The essence of command injection attacks in
+web applications. *Proceedings of the 33rd ACM SIGPLAN-SIGACT Symposium on
+Principles of Programming Languages*, 372–382.
+https://doi.org/10.1145/1111037.1111070. The paper formalizes injection as a
+failure to preserve the output language's grammatical structure and motivates
+parsing untrusted input into structured values before rendering it. That model
+supports this boundary's parse → canonicalize → identifier-render sequence.
+
+Ray, D., & Ligatti, J. (2012). Defining code-injection attacks. *Proceedings of
+the 39th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages*,
+179–190. https://doi.org/10.1145/2103621.2103678. The authors distinguish data
+values from executable syntax by their role in the generated output. That
+distinction supports accepting punctuation as identifier data while requiring
+the dialect renderer to keep it inside one identifier token.
+
 Open Worldwide Application Security Project. (2026). *SQL injection prevention
 cheat sheet*. OWASP Cheat Sheet Series.
 https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
