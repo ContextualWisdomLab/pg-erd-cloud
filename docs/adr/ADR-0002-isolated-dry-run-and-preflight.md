@@ -111,6 +111,11 @@ locks on the execution connection.
   It also adapts a caller-supplied snapshot through the strict capability
   boundary and returns only its canonical digest plus exact plan-base match.
   This is a primitive, not a worker or completed live-preflight claim.
+- PostgreSQL 14–18 CI creates a separate ephemeral preflight login for the
+  target database, grants it only fixture-scoped USAGE/SELECT, removes database
+  CREATE/TEMP, sets a default read-only policy, and proves both admitted reads
+  and DDL denial. This is test-environment privilege evidence, not deployed
+  credential, routing, audit, or worker-attempt evidence.
 
 ### Planned before production release
 

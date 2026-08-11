@@ -97,7 +97,7 @@ executable SQL, safety classification, approval truth, or recovery state.
 - isolated disposable PostgreSQL provisioning, complete dependency
   materialization, deployed isolation proof, cleanup, and worker binding (the
   signed-plan execution/convergence core is Partially implemented);
-- live-preflight worker wiring, separately constrained credentials, worker-owned
+- live-preflight worker wiring, deployed separately constrained credentials, worker-owned
   fresh target capture/attempt binding, and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
   idempotency, cancellation, reconciliation, and post-apply verification;

@@ -78,8 +78,10 @@ jobs:
         run: |
           set -euo pipefail
           password="$(openssl rand -hex 24)"
+          preflight_password="$(openssl rand -hex 24)"
           app_secret="$(openssl rand -hex 32)"
           echo "::add-mask::$password"
+          echo "::add-mask::$preflight_password"
           echo "::add-mask::$app_secret"
 
           credentials_file="$RUNNER_TEMP/postgres.env"
@@ -128,13 +130,26 @@ jobs:
           docker exec pg-erd-cloud-postgres \
             psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
             -c "CREATE DATABASE pg_erd_cloud_target"
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE ROLE pg_erd_cloud_preflight LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '$preflight_password'; ALTER ROLE pg_erd_cloud_preflight SET default_transaction_read_only = on; ALTER ROLE pg_erd_cloud_preflight SET statement_timeout = '5s'; REVOKE ALL ON DATABASE pg_erd_cloud_target FROM PUBLIC; GRANT CONNECT ON DATABASE pg_erd_cloud_target TO pg_erd_cloud_preflight; REVOKE CREATE, TEMPORARY ON DATABASE pg_erd_cloud_target FROM pg_erd_cloud_preflight"
+          encoded_preflight_password="$(PASSWORD="$preflight_password" python3 - <<'PY'
+          import os
+          from urllib.parse import quote
+
+          print(quote(os.environ["PASSWORD"], safe=""))
+          PY
+          )"
           sandbox_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_sandbox"
           target_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_target"
+          preflight_database_url="postgresql+asyncpg://pg_erd_cloud_preflight:${encoded_preflight_password}@127.0.0.1:5432/pg_erd_cloud_target"
           echo "::add-mask::$sandbox_database_url"
           echo "::add-mask::$target_database_url"
+          echo "::add-mask::$preflight_database_url"
           {
             echo "POSTGRES_SANDBOX_INTEGRATION_URL=$sandbox_database_url"
             echo "POSTGRES_TARGET_INTEGRATION_URL=$target_database_url"
+            echo "POSTGRES_PREFLIGHT_INTEGRATION_URL=$preflight_database_url"
           } >> "$GITHUB_ENV"
 
       - name: Setup Python

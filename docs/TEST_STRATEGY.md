@@ -51,7 +51,7 @@ flowchart TB
 |---|---|---|---|
 | Deterministic unit/property | Prove canonical JSON, quoting, digest stability, complete blocker behavior, plan ordering, risk and snapshot adaptation. | Focused forward unit tests exist. | Exact statement/branch coverage plus property/fuzz cases for every admitted grammar and unknown-field boundary. |
 | API/service contract | Prove authorization, tenancy, optimistic concurrency, immutable persistence, size limits, expiry/idempotency/error semantics. | Model and plan route functions are tested mainly with faked sessions and mocks. | HTTP-level tests against migrated PostgreSQL, full role/IDOR/CSRF/CORS/error matrix, and database constraint races. |
-| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create three distinct ephemeral databases: migrated metadata for run/outbox evidence, a sandbox for exact signed-plan DDL and strict convergence, and a target for read-only live preflight. Provisioning/cleanup/egress, production credential/attempt binding, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, privilege, concurrency, cancellation, crash, and cleanup evidence. |
+| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create three distinct ephemeral databases: migrated metadata for run/outbox evidence, a sandbox for exact signed-plan DDL and strict convergence, and a target where live preflight uses a separate login with CONNECT plus fixture-scoped USAGE/SELECT, no database CREATE/TEMP, and a default read-only policy. The matrix asserts those privileges and proves DDL denial. Provisioning/cleanup/egress, production credential/attempt binding, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
 | Browser E2E/accessibility | Prove editor-to-verified workflow, tamper resistance, state recovery, focus, keyboard, names, and live regions. | Existing ERD UI tests do not implement the forward workflow. | Composed backend/frontend/worker/sandbox/target E2E, automated accessibility checks, and manual keyboard/screen-reader evidence. |
 | Operational/fault injection | Prove no-replay recovery, kill switch, alerts, runbook, retention, backup/restore, and uncertain commit handling. | No forward run worker or drills exist. | Controlled crash/network/lock/commit-acknowledgement tests and a recorded non-production game day. |
 
@@ -163,8 +163,11 @@ dispatch attempt, then drives the real CAS/event writer through sandbox and
 preflight states. The terminal transition verifies and persists the plan base
 digest on the run and fourth chained event before the transaction is rolled
 back and no partial identity survives. The same digest-pinned
-matrix creates a quoted mixed-case/Unicode target fixture and executes the
-production live-preflight primitive. It proves non-empty/NULL failures,
+matrix creates a quoted mixed-case/Unicode target fixture as the database
+owner, grants only fixture-scoped USAGE/SELECT to an ephemeral preflight login,
+and executes the production live-preflight primitive through that login. It
+asserts that database CREATE/TEMP are absent, proves DDL denial, and proves
+non-empty/NULL failures,
 successful empty-table evidence, failing cast classification without database
 detail propagation, read-transaction cleanup, and fixture cleanup on every
 supported major. Until exact-head CI passes, these are acceptance requirements,
@@ -204,8 +207,9 @@ revalidate the immutable plan, persist it on the run and chained event, and
 reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
 transition injection. Worker evidence cannot pre-author the reserved observed
 digest field through snake-, camel-, kebab-case, or nested aliases.
-Real-target privilege/audit assertions, worker-owned fresh capture/attempt
-binding, and worker failure/recovery remain release blockers. The
+The privilege proof is CI-local rather than deployed production evidence.
+Target audit-log evidence, worker-owned fresh capture/attempt binding, and
+worker failure/recovery remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup
 wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.

@@ -44,15 +44,17 @@ from app.pg_introspect.snapshot_contract import (
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
 _POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
 _POSTGRES_TARGET_URL = os.getenv("POSTGRES_TARGET_INTEGRATION_URL")
+_POSTGRES_PREFLIGHT_URL = os.getenv("POSTGRES_PREFLIGHT_INTEGRATION_URL")
 _EXPECTED_MAJOR = os.getenv("EXPECTED_POSTGRES_MAJOR")
 pytestmark = pytest.mark.skipif(
     not _POSTGRES_URL
     or not _POSTGRES_SANDBOX_URL
     or not _POSTGRES_TARGET_URL
+    or not _POSTGRES_PREFLIGHT_URL
     or not _EXPECTED_MAJOR,
     reason=(
-        "metadata, sandbox, target, and expected-major configuration are "
-        "required for real PostgreSQL acceptance"
+        "metadata, sandbox, target-admin, preflight, and expected-major "
+        "configuration are required for real PostgreSQL acceptance"
     ),
 )
 
@@ -72,6 +74,13 @@ def _sandbox_asyncpg_url() -> str:
 def _target_asyncpg_url() -> str:
     assert _POSTGRES_TARGET_URL is not None
     return _POSTGRES_TARGET_URL.replace(
+        "postgresql+asyncpg://", "postgresql://", 1
+    )
+
+
+def _preflight_asyncpg_url() -> str:
+    assert _POSTGRES_PREFLIGHT_URL is not None
+    return _POSTGRES_PREFLIGHT_URL.replace(
         "postgresql+asyncpg://", "postgresql://", 1
     )
 
@@ -212,101 +221,145 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
 
 @pytest.mark.asyncio
 async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
-    """Prove quoted identifiers, data checks, and fixed failures on PostgreSQL."""
+    """Prove least-privilege reads, DDL denial, and fixed failures."""
 
     assert _POSTGRES_URL is not None
     assert _POSTGRES_SANDBOX_URL is not None
     assert _POSTGRES_TARGET_URL is not None
+    assert _POSTGRES_PREFLIGHT_URL is not None
     database_paths = {
         urlparse(_POSTGRES_URL).path,
         urlparse(_POSTGRES_SANDBOX_URL).path,
         urlparse(_POSTGRES_TARGET_URL).path,
     }
     assert len(database_paths) == 3
-    connection = await asyncpg.connect(_target_asyncpg_url())
+    admin_connection = await asyncpg.connect(_target_asyncpg_url())
     schema_name = f"Preflight {uuid.uuid4().hex}"
     table_name = '주문 "항목"'
     quoted_schema = '"' + schema_name.replace('"', '""') + '"'
     quoted_table = '"' + table_name.replace('"', '""') + '"'
     qualified = f"{quoted_schema}.{quoted_table}"
     try:
-        await connection.execute(f"CREATE SCHEMA {quoted_schema}")
-        await connection.execute(
+        await admin_connection.execute(f"CREATE SCHEMA {quoted_schema}")
+        await admin_connection.execute(
             f'CREATE TABLE {qualified} ("amount value" text)'
         )
-        await connection.execute(
+        await admin_connection.execute(
             f"INSERT INTO {qualified} VALUES ('12'), ('not-an-integer'), (NULL)"
         )
-
-        evidence = await execute_live_preflight(
-            connection,
-            _preflight_plan(
-                {
-                    "kind": "table_is_empty",
-                    "schema_name": schema_name,
-                    "table_name": table_name,
-                },
-                {
-                    "kind": "no_null_values",
-                    "schema_name": schema_name,
-                    "table_name": table_name,
-                    "column_name": "amount value",
-                },
-            ),
-            statement_timeout_ms=2000,
+        await admin_connection.execute(
+            f"GRANT USAGE ON SCHEMA {quoted_schema} TO pg_erd_cloud_preflight"
         )
+        await admin_connection.execute(
+            f"GRANT SELECT ON {qualified} TO pg_erd_cloud_preflight"
+        )
+        connection = await asyncpg.connect(_preflight_asyncpg_url())
+        try:
+            privileges = await connection.fetchrow(
+                "SELECT "
+                "pg_catalog.has_database_privilege("
+                "current_user, current_database(), 'CREATE') AS can_create, "
+                "pg_catalog.has_database_privilege("
+                "current_user, current_database(), 'TEMP') AS can_temp"
+            )
+            assert dict(privileges) == {
+                "can_create": False,
+                "can_temp": False,
+            }
+            role_attributes = await connection.fetchrow(
+                "SELECT rolsuper, rolcreaterole, rolcreatedb, rolreplication, "
+                "rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user"
+            )
+            assert dict(role_attributes) == {
+                "rolsuper": False,
+                "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+            }
+            with pytest.raises(
+                (
+                    asyncpg.InsufficientPrivilegeError,
+                    asyncpg.ReadOnlySQLTransactionError,
+                )
+            ):
+                await connection.execute(
+                    f'CREATE TABLE {quoted_schema}."must not exist" (id integer)'
+                )
 
-        assert evidence == {
-            "passed": False,
-            "checks": [
-                {
-                    "statement_index": 0,
-                    "precondition_index": 0,
-                    "kind": "table_is_empty",
-                    "passed": False,
-                },
-                {
-                    "statement_index": 0,
-                    "precondition_index": 1,
-                    "kind": "no_null_values",
-                    "passed": False,
-                },
-            ],
-        }
-
-        with pytest.raises(LivePreflightContractError) as captured:
-            await execute_live_preflight(
+            evidence = await execute_live_preflight(
                 connection,
                 _preflight_plan(
                     {
-                        "kind": "castable_values",
+                        "kind": "table_is_empty",
+                        "schema_name": schema_name,
+                        "table_name": table_name,
+                    },
+                    {
+                        "kind": "no_null_values",
                         "schema_name": schema_name,
                         "table_name": table_name,
                         "column_name": "amount value",
-                        "target_data_type": "integer",
+                    },
+                ),
+                statement_timeout_ms=2000,
+            )
+
+            assert evidence == {
+                "passed": False,
+                "checks": [
+                    {
+                        "statement_index": 0,
+                        "precondition_index": 0,
+                        "kind": "table_is_empty",
+                        "passed": False,
+                    },
+                    {
+                        "statement_index": 0,
+                        "precondition_index": 1,
+                        "kind": "no_null_values",
+                        "passed": False,
+                    },
+                ],
+            }
+
+            with pytest.raises(LivePreflightContractError) as captured:
+                await execute_live_preflight(
+                    connection,
+                    _preflight_plan(
+                        {
+                            "kind": "castable_values",
+                            "schema_name": schema_name,
+                            "table_name": table_name,
+                            "column_name": "amount value",
+                            "target_data_type": "integer",
+                        }
+                    ),
+                    statement_timeout_ms=2000,
+                )
+            assert str(captured.value) == "live preflight query failed"
+            assert captured.value.__cause__ is None
+
+            await admin_connection.execute(f"DELETE FROM {qualified}")
+            empty_evidence = await execute_live_preflight(
+                connection,
+                _preflight_plan(
+                    {
+                        "kind": "table_is_empty",
+                        "schema_name": schema_name,
+                        "table_name": table_name,
                     }
                 ),
                 statement_timeout_ms=2000,
             )
-        assert str(captured.value) == "live preflight query failed"
-        assert captured.value.__cause__ is None
-
-        await connection.execute(f"DELETE FROM {qualified}")
-        empty_evidence = await execute_live_preflight(
-            connection,
-            _preflight_plan(
-                {
-                    "kind": "table_is_empty",
-                    "schema_name": schema_name,
-                    "table_name": table_name,
-                }
-            ),
-            statement_timeout_ms=2000,
-        )
-        assert empty_evidence["passed"] is True
+            assert empty_evidence["passed"] is True
+        finally:
+            await connection.close()
     finally:
-        await connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
-        await connection.close()
+        await admin_connection.execute(
+            f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE"
+        )
+        await admin_connection.close()
 
 
 @pytest.mark.asyncio
