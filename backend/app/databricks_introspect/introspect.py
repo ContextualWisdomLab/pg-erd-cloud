@@ -134,6 +134,8 @@ async def _parse_databricks_dsn(dsn: str) -> DatabricksDsnConfig:
         raise ValueError("Databricks DSN must use the databricks scheme")
     if not parsed.hostname:
         raise ValueError("Databricks DSN must include a workspace hostname")
+    if unquote(parsed.username or "") != "token":
+        raise ValueError("Databricks DSN username must be token")
     if parsed.port not in (None, 443):
         raise ValueError("Databricks DSN only permits HTTPS port 443")
     if not parsed.password:

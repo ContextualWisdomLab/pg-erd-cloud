@@ -233,6 +233,10 @@ def test_databricks_snapshot_ddl_and_migration_fail_closed() -> None:
         ("postgresql://u:p@host/db", "must use the databricks scheme"),
         ("databricks:///sql/1.0/warehouses/abc?catalog=main", "workspace hostname"),
         (
+            "databricks://user:x@host/sql/1.0/warehouses/abc?catalog=main",
+            "username must be token",
+        ),
+        (
             "databricks://token:x@host:444/sql/1.0/warehouses/abc?catalog=main",
             "port 443",
         ),
