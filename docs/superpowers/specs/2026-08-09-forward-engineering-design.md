@@ -1,7 +1,7 @@
 # Forward Engineering Workflow Design
 
-**Repository:** `ContextualWisdomLab/pg-erd-cloud`  
-**Base:** `main@72afe6db712b145baaba084f64a1ff4fb36d9fd0`  
+**Repository:** `ContextualWisdomLab/pg-erd-cloud`
+**Base:** `main@72afe6db712b145baaba084f64a1ff4fb36d9fd0`
 **Status:** Approved target architecture; Phase 1 control plane partially implemented
 **Date:** 2026-08-09
 
