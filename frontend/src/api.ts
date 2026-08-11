@@ -134,7 +134,8 @@ function validateDiagramViewInput(
   layout: DiagramViewLayout,
 ): void {
   const operation = mutation === 'create' ? 'createDiagramView' : 'updateDiagramView'
-  if (name.length < 1 || name.length > MAX_DIAGRAM_VIEW_NAME_LENGTH) {
+  const nameCodePoints = Array.from(name).length
+  if (nameCodePoints < 1 || nameCodePoints > MAX_DIAGRAM_VIEW_NAME_LENGTH) {
     throw new Error(`${operation} failed: invalid name`)
   }
 

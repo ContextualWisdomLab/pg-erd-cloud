@@ -28,7 +28,10 @@ MAX_LAYOUT_BYTES = 512 * 1024
 def _bound_layout_size(layout: dict) -> None:
     """Reject saved-layout payloads that exceed the storage safety limit."""
 
-    encoded = json.dumps(layout, separators=(",", ":")).encode("utf-8")
+    serialized = json.dumps(layout, ensure_ascii=False, separators=(",", ":"))
+    # JSON.stringify preserves non-ASCII text but escapes lone UTF-16
+    # surrogates. ``backslashreplace`` gives Python the same well-formed result.
+    encoded = serialized.encode("utf-8", errors="backslashreplace")
     if len(encoded) > MAX_LAYOUT_BYTES:
         raise HTTPException(status_code=413, detail="layout payload too large")
 

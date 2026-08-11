@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.api.diagram_views import (
     MAX_LAYOUT_BYTES,
+    _bound_layout_size,
     _get_authorized_view,
     create_view,
     delete_view,
@@ -34,6 +35,35 @@ def _layout_with_serialized_size(serialized_bytes: int) -> dict[str, str]:
     if serialized_bytes < fixed_bytes:
         raise ValueError("serialized size is too small for the fixture")
     return {"blob": "a" * (serialized_bytes - fixed_bytes)}
+
+
+def _layout_with_non_ascii_serialized_size(serialized_bytes: int) -> dict[str, str]:
+    """Build compact UTF-8 JSON at an exact size with a non-ASCII value."""
+
+    fixed_bytes = len('{"blob":"한"}'.encode())
+    if serialized_bytes < fixed_bytes:
+        raise ValueError("serialized size is too small for the fixture")
+    return {"blob": "한" + "a" * (serialized_bytes - fixed_bytes)}
+
+
+def test_layout_limit_preserves_non_ascii_utf8_at_exact_boundary() -> None:
+    """Measure stored Unicode as compact UTF-8 rather than ASCII escapes."""
+
+    exact_layout = _layout_with_non_ascii_serialized_size(MAX_LAYOUT_BYTES)
+    _bound_layout_size(exact_layout)
+
+    with pytest.raises(HTTPException) as exc:
+        _bound_layout_size(
+            _layout_with_non_ascii_serialized_size(MAX_LAYOUT_BYTES + 1)
+        )
+
+    assert exc.value.status_code == 413
+
+
+def test_layout_limit_preserves_well_formed_json_surrogate_escape() -> None:
+    """Match JSON.stringify for a lone surrogate instead of failing to encode."""
+
+    _bound_layout_size({"blob": "\ud800"})
 
 
 @pytest.mark.asyncio

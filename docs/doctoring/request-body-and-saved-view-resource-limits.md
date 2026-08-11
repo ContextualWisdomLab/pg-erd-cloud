@@ -4,7 +4,7 @@
 
 Unsafe requests under `/api` are subject to a configurable pre-routing byte limit before FastAPI authentication dependencies or Pydantic request-model parsing. The default is 2 MiB through `API_REQUEST_BODY_MAX_BYTES`. The middleware rejects both an oversized valid `Content-Length` declaration and a streamed or chunked body whose observed bytes cross the limit. Accepted ASGI request messages are replayed unchanged.
 
-Saved diagram layouts retain a narrower domain limit: the compact UTF-8 JSON representation of `layout_json` may not exceed 512 KiB. The transport limit is intentionally larger than the domain limit so a layout at the exact storage boundary can still include the request envelope and a 200-character view name. The backend validates the exact 512 KiB boundary after parsing; the frontend demo implementation applies the same name and serialized-layout limits before mutating its in-memory store.
+Saved diagram layouts retain a narrower domain limit: the compact UTF-8 JSON representation of `layout_json`, with non-ASCII characters preserved rather than escaped, may not exceed 512 KiB. The transport limit is intentionally larger than the domain limit so a layout at the exact storage boundary can still include the request envelope and a 200-code-point view name. The backend validates the exact 512 KiB boundary after parsing; the frontend demo implementation applies the same name and serialized-layout limits before mutating its in-memory store.
 
 ## Security rationale
 
@@ -39,15 +39,20 @@ The exact pull-request head must pass:
 - production coverage including `app/request_body_limit.py`;
 - frontend typecheck;
 - the complete Vitest suite and production build;
-- current-head Security Scan and Semgrep;
+- current-head Security Scan, comprising `osv-scan`, diff-scoped `dependency-review` that fails on Medium-or-higher findings, and repo-wide `trivy-fs` scanning `CRITICAL`, `HIGH`, and `MEDIUM` severities;
+- current-head Semgrep;
 - review-thread resolution and independent current-head approval.
 
-The request limiter tests cover configuration rejection, valid and malformed `Content-Length`, exact-limit chunked replay, streamed over-limit rejection, disconnect replay, safe-method bypass, non-API bypass, and non-HTTP bypass. Saved-view tests cover exact 512 KiB acceptance, one-byte-over rejection without mutation, same-timestamp identifier uniqueness, isolated mutation, newest-first update ordering, invalid names, over-limit layouts, and cyclic layouts.
+The request limiter tests cover configuration rejection, valid and malformed `Content-Length`, exact-limit chunked replay, streamed over-limit rejection, disconnect replay, safe-method bypass, non-API bypass, and non-HTTP bypass. Saved-view tests cover ASCII and non-ASCII exact 512 KiB acceptance, one-byte-over rejection without mutation, same-timestamp identifier uniqueness, isolated mutation, newest-first update ordering, Unicode code-point name bounds, over-limit layouts, and cyclic layouts.
 
 ## APA 7 references
 
 Encode OSS Ltd. (n.d.). *Middleware*. Starlette. Retrieved August 5, 2026, from https://www.starlette.io/middleware/
 
 Encode OSS Ltd. (n.d.). *Requests*. Starlette. Retrieved August 5, 2026, from https://www.starlette.io/requests/
+
+Meng, W., Qian, C., Hao, S., Borgolte, K., Vigna, G., Kruegel, C., & Lee, W. (2018). Rampart: Protecting web applications from CPU-exhaustion denial-of-service attacks. In *27th USENIX Security Symposium (USENIX Security 18)* (pp. 393–410). USENIX Association. https://www.usenix.org/conference/usenixsecurity18/presentation/meng
+
+This study demonstrates that a small number of carefully constructed application requests can consume disproportionate server resources. It supports enforcing per-request bounds before expensive parsing, while retaining domain-specific validation after parsing.
 
 OWASP Foundation. (2023). *API4:2023 unrestricted resource consumption*. OWASP API Security Top 10. https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/

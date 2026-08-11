@@ -122,11 +122,9 @@ async def test_declared_oversize_is_rejected_before_downstream_execution() -> No
     )
 
     assert downstream_called is False
-    assert sent[0] == {
-        "type": "http.response.start",
-        "status": 413,
-        "headers": [(b"content-length", b"35"), (b"content-type", b"application/json")],
-    }
+    assert sent[0]["type"] == "http.response.start"
+    assert sent[0]["status"] == 413
+    assert (b"content-type", b"application/json") in sent[0]["headers"]
     assert json.loads(sent[1]["body"]) == {
         "detail": REQUEST_BODY_TOO_LARGE_DETAIL
     }

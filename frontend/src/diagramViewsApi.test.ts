@@ -24,6 +24,11 @@ function layoutWithSerializedSize(serializedBytes: number): DiagramViewLayout {
   return { blob: 'a'.repeat(serializedBytes - fixedBytes) }
 }
 
+function layoutWithNonAsciiSerializedSize(serializedBytes: number): DiagramViewLayout {
+  const fixedBytes = new TextEncoder().encode('{"blob":"한"}').byteLength
+  return { blob: `한${'a'.repeat(serializedBytes - fixedBytes)}` }
+}
+
 const initialLayout: DiagramViewLayout = {
   positions: {
     '1': { x: 12, y: 24 },
@@ -323,6 +328,41 @@ describe('saved diagram-view API client', () => {
       beforeRejectedUpdate,
     )
     await expect(api.listDiagramViews('project-1')).resolves.toEqual([created])
+  })
+
+  it('counts diagram-view names by Unicode code point for create and update', async () => {
+    const api = await loadApi(true)
+    const acceptedName = '😀'.repeat(200)
+    const rejectedName = '😀'.repeat(201)
+
+    const created = await api.createDiagramView(
+      'project-1',
+      acceptedName,
+      initialLayout,
+    )
+    await expect(
+      api.createDiagramView('project-1', rejectedName, initialLayout),
+    ).rejects.toThrow('createDiagramView failed: invalid name')
+
+    await expect(
+      api.updateDiagramView(created.diagram_view_uuid, acceptedName, updatedLayout),
+    ).resolves.toMatchObject({ name: acceptedName })
+    await expect(
+      api.updateDiagramView(created.diagram_view_uuid, rejectedName, initialLayout),
+    ).rejects.toThrow('updateDiagramView failed: invalid name')
+  })
+
+  it('uses the compact non-ASCII UTF-8 layout boundary in demo mode', async () => {
+    const api = await loadApi(true)
+    const exactLayout = layoutWithNonAsciiSerializedSize(512 * 1024)
+    const oversizedLayout = layoutWithNonAsciiSerializedSize(512 * 1024 + 1)
+
+    await expect(
+      api.createDiagramView('project-1', 'At Unicode limit', exactLayout),
+    ).resolves.toMatchObject({ name: 'At Unicode limit' })
+    await expect(
+      api.createDiagramView('project-1', 'Over Unicode limit', oversizedLayout),
+    ).rejects.toThrow('createDiagramView failed: layout payload too large')
   })
 
   it('rejects cyclic demo layouts without changing storage', async () => {
