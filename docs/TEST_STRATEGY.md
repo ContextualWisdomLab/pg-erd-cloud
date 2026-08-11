@@ -215,7 +215,9 @@ acceptance invokes that primitive through the restricted preflight login and
 re-captures the catalog on the same connection/transaction as data checks.
 `complete_live_preflight` tests reject missing/extra result fields, malformed or
 duplicate check positions, non-canonical digests, and forged aggregate flags;
-they prove server-derived passed/drifted/failed classification and bounded
+they also reject missing, extra, or kind-mismatched checks against the exact
+persisted plan precondition set, recheck plan/run integrity and expiry, and
+prove server-derived passed/drifted/failed classification with bounded
 check-count evidence. PostgreSQL integration uses this bridge rather than a
 caller-selected terminal transition.
 Durable-run unit tests require that observed digest for terminal preflight CAS,

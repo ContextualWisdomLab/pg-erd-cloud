@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import os
 import uuid
@@ -96,6 +97,54 @@ def _preflight_plan(*preconditions: dict[str, object]) -> dict[str, object]:
         "blockers": [],
         "statements": [{"preconditions": list(preconditions)}],
     }
+
+
+def _migration_models_with_precondition(
+    postgresql_major: int,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Return one base/target pair requiring a table-emptiness check."""
+
+    base_model: dict[str, object] = {
+        "format_version": 1,
+        "postgresql_major": postgresql_major,
+        "schemas": [
+            {
+                "schema_name": "public",
+                "tables": [
+                    {
+                        "table_name": "accounts",
+                        "comment": None,
+                        "columns": [
+                            {
+                                "column_name": "id",
+                                "data_type": "bigint",
+                                "nullable": False,
+                                "ordinal_position": 1,
+                            }
+                        ],
+                        "primary_key": None,
+                        "unique_constraints": [],
+                        "foreign_keys": [],
+                        "indexes": [],
+                        "unsupported_features": [],
+                    }
+                ],
+            }
+        ],
+    }
+    target_model = copy.deepcopy(base_model)
+    target_schemas = target_model["schemas"]
+    assert isinstance(target_schemas, list)
+    target_table = target_schemas[0]["tables"][0]
+    target_table["columns"].append(
+        {
+            "column_name": "tenant_id",
+            "data_type": "bigint",
+            "nullable": False,
+            "ordinal_position": 2,
+        }
+    )
+    return base_model, target_model
 
 
 async def _capture_filtered_snapshot(
@@ -401,10 +450,15 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
     plan_uuid = uuid.uuid4()
     assert _EXPECTED_MAJOR is not None
     expected_major = int(_EXPECTED_MAJOR)
-    plan_json = compile_migration_plan(
-        {"format_version": 1, "postgresql_major": expected_major, "schemas": []},
-        {"format_version": 1, "postgresql_major": expected_major, "schemas": []},
-    )
+    base_model, target_model = _migration_models_with_precondition(expected_major)
+    plan_json = compile_migration_plan(base_model, target_model)
+    assert plan_json["statements"][0]["preconditions"] == [
+        {
+            "kind": "table_is_empty",
+            "schema_name": "public",
+            "table_name": "accounts",
+        }
+    ]
 
     try:
         async with sessions() as session:
@@ -475,11 +529,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     schema_model_uuid=model_uuid,
                     revision_number=1,
                     revision_digest=plan_json["target_digest"],
-                    model_json={
-                        "format_version": 1,
-                        "postgresql_major": expected_major,
-                        "schemas": [],
-                    },
+                    model_json=target_model,
                     base_schema_snapshot_uuid=snapshot_uuid,
                     created_by_user_uuid=user_uuid,
                     created_at=now,
@@ -599,7 +649,14 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 expected_state_version=3,
                 result={
                     "preconditions_passed": True,
-                    "checks": [],
+                    "checks": [
+                        {
+                            "statement_index": 0,
+                            "precondition_index": 0,
+                            "kind": "table_is_empty",
+                            "passed": True,
+                        }
+                    ],
                     "observed_base_digest": plan.base_digest,
                     "matches_plan_base": True,
                 },

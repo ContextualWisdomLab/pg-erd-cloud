@@ -53,8 +53,11 @@ Current code implements only the first control-plane slice:
   them in one timed read-only transaction. `execute_bound_live_preflight`
   additionally binds a caller-owned fresh snapshot callback and those checks
   to that same transaction, returning its canonical digest and plan-base match.
-  `complete_live_preflight` converts only that strict shape into a bounded
-  aggregate-evidence CAS. These primitives have no credential, worker identity,
+  `complete_live_preflight` revalidates the stored run and immutable plan, then
+  requires the result's exact `(statement_index, precondition_index, kind)` set
+  to equal every persisted plan precondition before producing a bounded
+  aggregate-evidence CAS. Missing, extra, duplicate, or kind-mismatched checks
+  fail closed. These primitives have no credential, worker identity,
   durable-attempt acquisition, or DDL authority.
 - **Partially implemented:** the isolated-dry-run execution core verifies one
   signed v1 plan, compatible PostgreSQL major, strict materialized base,

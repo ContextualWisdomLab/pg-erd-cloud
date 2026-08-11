@@ -869,7 +869,7 @@ async def complete_isolated_dry_run(
 
 def _canonicalize_live_preflight_result(
     result: Mapping[str, object],
-) -> tuple[bool, bool, str, int, int]:
+) -> tuple[bool, bool, str, int, int, frozenset[tuple[int, int, str]]]:
     """Validate one exact execution result without retaining target metadata."""
 
     if (
@@ -892,6 +892,7 @@ def _canonicalize_live_preflight_result(
         raise MigrationRunContractError("live preflight result is invalid")
     failed_check_count = 0
     positions: set[tuple[int, int]] = set()
+    check_bindings: set[tuple[int, int, str]] = set()
     for check in checks:
         if not isinstance(check, Mapping) or set(check) != _LIVE_PREFLIGHT_CHECK_FIELDS:
             raise MigrationRunContractError("live preflight result is invalid")
@@ -915,6 +916,7 @@ def _canonicalize_live_preflight_result(
         if position in positions:
             raise MigrationRunContractError("live preflight result is invalid")
         positions.add(position)
+        check_bindings.add((statement_index, precondition_index, kind))
         if not passed:
             failed_check_count += 1
     if preconditions_passed != (failed_check_count == 0):
@@ -925,7 +927,46 @@ def _canonicalize_live_preflight_result(
         observed_base_digest,
         len(checks),
         failed_check_count,
+        frozenset(check_bindings),
     )
+
+
+def _expected_live_preflight_checks(
+    plan_json: Mapping[str, object],
+) -> frozenset[tuple[int, int, str]]:
+    """Derive the exact check identities from one integrity-checked plan."""
+
+    statements = plan_json.get("statements")
+    if not isinstance(statements, list):
+        raise MigrationRunContractError(
+            "migration plan integrity verification failed"
+        )
+    expected: set[tuple[int, int, str]] = set()
+    for statement_index, statement in enumerate(statements):
+        if not isinstance(statement, Mapping):
+            raise MigrationRunContractError(
+                "migration plan integrity verification failed"
+            )
+        preconditions = statement.get("preconditions")
+        if not isinstance(preconditions, list):
+            raise MigrationRunContractError(
+                "migration plan integrity verification failed"
+            )
+        for precondition_index, precondition in enumerate(preconditions):
+            if not isinstance(precondition, Mapping):
+                raise MigrationRunContractError(
+                    "migration plan integrity verification failed"
+                )
+            kind = precondition.get("kind")
+            if (
+                not isinstance(kind, str)
+                or kind not in LIVE_PREFLIGHT_PRECONDITION_KINDS
+            ):
+                raise MigrationRunContractError(
+                    "migration plan integrity verification failed"
+                )
+            expected.add((statement_index, precondition_index, kind))
+    return frozenset(expected)
 
 
 async def complete_live_preflight(
@@ -951,7 +992,46 @@ async def complete_live_preflight(
         observed_base_digest,
         check_count,
         failed_check_count,
+        check_bindings,
     ) = _canonicalize_live_preflight_result(result)
+    transition_time = now or dt.datetime.now(dt.timezone.utc)
+    if transition_time.tzinfo is None or transition_time.utcoffset() is None:
+        raise MigrationRunContractError("transition time must include a timezone")
+    run = await session.scalar(
+        select(MigrationRun).where(
+            MigrationRun.migration_run_uuid == migration_run_uuid
+        )
+    )
+    if (
+        run is None
+        or run.run_kind != "dry_run"
+        or run.state != "live_preflight_running"
+        or run.state_version != expected_state_version
+        or run.cancellation_requested
+    ):
+        raise MigrationRunContractError("migration run state version conflict")
+    plan = await session.scalar(
+        select(MigrationPlan).where(
+            MigrationPlan.migration_plan_uuid == run.migration_plan_uuid
+        )
+    )
+    if (
+        plan is None
+        or plan.project_space_uuid != run.project_space_uuid
+        or run.plan_digest != plan.statement_digest
+        or plan.expires_at <= transition_time
+        or not verify_migration_plan_digest(plan.plan_json, plan.statement_digest)
+        or plan.plan_json.get("compiler_version") != plan.compiler_version
+        or plan.plan_json.get("base_digest") != plan.base_digest
+        or plan.plan_json.get("target_digest") != plan.target_digest
+    ):
+        raise MigrationRunContractError(
+            "migration plan integrity verification failed"
+        )
+    if check_bindings != _expected_live_preflight_checks(plan.plan_json):
+        raise MigrationRunContractError(
+            "live preflight result does not match migration plan"
+        )
     if not matches_plan_base:
         next_state = "drifted"
     elif preconditions_passed:

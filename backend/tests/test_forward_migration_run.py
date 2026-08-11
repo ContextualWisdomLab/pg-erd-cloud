@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import uuid
 from datetime import datetime, timezone
 from math import nan
@@ -13,6 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.migration_run import (
+    _expected_live_preflight_checks,
     MigrationDispatchClaim,
     MigrationRunContractError,
     canonicalize_run_evidence,
@@ -62,6 +64,64 @@ def _migration_plan(
         created_by_user_uuid=uuid.uuid4(),
         expires_at=expires_at or datetime(2026, 8, 11, tzinfo=timezone.utc),
         created_at=now,
+    )
+
+
+def _migration_plan_with_preconditions() -> MigrationPlan:
+    """Return one valid plan with a required table-emptiness precondition."""
+
+    base_model = {
+        "format_version": 1,
+        "postgresql_major": 18,
+        "schemas": [
+            {
+                "schema_name": "public",
+                "tables": [
+                    {
+                        "table_name": "accounts",
+                        "comment": None,
+                        "columns": [
+                            {
+                                "column_name": "id",
+                                "data_type": "bigint",
+                                "nullable": False,
+                                "ordinal_position": 1,
+                            }
+                        ],
+                        "primary_key": None,
+                        "unique_constraints": [],
+                        "foreign_keys": [],
+                        "indexes": [],
+                        "unsupported_features": [],
+                    }
+                ],
+            }
+        ],
+    }
+    target_model = copy.deepcopy(base_model)
+    target_model["schemas"][0]["tables"][0]["columns"].append(
+        {
+            "column_name": "tenant_id",
+            "data_type": "bigint",
+            "nullable": False,
+            "ordinal_position": 2,
+        }
+    )
+    plan_json = compile_migration_plan(base_model, target_model)
+    return MigrationPlan(
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        schema_model_revision_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        base_schema_snapshot_uuid=uuid.uuid4(),
+        compiler_version=plan_json["compiler_version"],
+        base_digest=plan_json["base_digest"],
+        target_digest=plan_json["target_digest"],
+        statement_digest=plan_json["plan_digest"],
+        plan_json=plan_json,
+        created_by_user_uuid=uuid.uuid4(),
+        expires_at=datetime(2026, 8, 11, tzinfo=timezone.utc),
+        created_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
     )
 
 
@@ -995,9 +1055,9 @@ async def test_complete_isolated_dry_run_rejects_unbound_durable_context() -> No
 @pytest.mark.parametrize(
     "matches_plan_base, check_results, expected_state, expected_digest",
     [
-        (True, [True, True], "passed", "a" * 64),
+        (True, [True], "passed", "planned"),
         (False, [True], "drifted", "b" * 64),
-        (True, [True, False], "failed", None),
+        (True, [False], "failed", None),
     ],
 )
 @pytest.mark.asyncio
@@ -1009,8 +1069,26 @@ async def test_complete_live_preflight_derives_the_only_valid_terminal_state(
 ) -> None:
     """Worker evidence cannot choose its terminal classification or digest."""
 
+    plan = _migration_plan_with_preconditions()
     run_uuid = uuid.uuid4()
-    observed_digest = "a" * 64 if matches_plan_base else "b" * 64
+    run = MigrationRun(
+        migration_run_uuid=run_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    observed_digest = plan.base_digest if matches_plan_base else "b" * 64
+    if expected_digest == "planned":
+        expected_digest = plan.base_digest
     result = {
         "preconditions_passed": all(check_results),
         "checks": [
@@ -1026,16 +1104,18 @@ async def test_complete_live_preflight_derives_the_only_valid_terminal_state(
         "matches_plan_base": matches_plan_base,
     }
     transition = AsyncMock(return_value=SimpleNamespace(state=expected_state))
+    session = SimpleNamespace(scalar=AsyncMock(side_effect=[run, plan]))
 
     with patch(
         "app.forward.migration_run.transition_migration_run", new=transition
     ):
         completed = await complete_live_preflight(
-            SimpleNamespace(),  # type: ignore[arg-type]
+            session,  # type: ignore[arg-type]
             migration_run_uuid=run_uuid,
             expected_state_version=3,
             result=result,
             actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
         )
 
     assert completed.state == expected_state
@@ -1051,8 +1131,266 @@ async def test_complete_live_preflight_derives_the_only_valid_terminal_state(
         },
         observed_base_digest=expected_digest,
         actor_user_uuid=None,
-        now=None,
+        now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
     )
+
+
+@pytest.mark.parametrize(
+    "checks",
+    [
+        [],
+        [
+            {
+                "statement_index": 0,
+                "precondition_index": 0,
+                "kind": "no_null_values",
+                "passed": True,
+            }
+        ],
+        [
+            {
+                "statement_index": 0,
+                "precondition_index": 0,
+                "kind": "table_is_empty",
+                "passed": True,
+            },
+            {
+                "statement_index": 0,
+                "precondition_index": 1,
+                "kind": "table_is_empty",
+                "passed": True,
+            },
+        ],
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_live_preflight_requires_exact_plan_preconditions(
+    checks: list[dict[str, object]],
+) -> None:
+    """Missing, extra, or kind-mismatched check evidence cannot pass."""
+
+    plan = _migration_plan_with_preconditions()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    transition = AsyncMock()
+    session = SimpleNamespace(scalar=AsyncMock(side_effect=[run, plan]))
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ), pytest.raises(MigrationRunContractError, match="does not match migration plan"):
+        await complete_live_preflight(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            result={
+                "preconditions_passed": True,
+                "checks": checks,
+                "observed_base_digest": plan.base_digest,
+                "matches_plan_base": True,
+            },
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
+        )
+
+    transition.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "plan_json",
+    [
+        {},
+        {"statements": [None]},
+        {"statements": [{}]},
+        {"statements": [{"preconditions": [None]}]},
+        {"statements": [{"preconditions": [{"kind": None}]}]},
+        {"statements": [{"preconditions": [{"kind": "unknown"}]}]},
+    ],
+)
+def test_expected_live_preflight_checks_rejects_malformed_plan_structure(
+    plan_json: dict[str, object],
+) -> None:
+    """Malformed persisted statement/precondition structure fails closed."""
+
+    with pytest.raises(MigrationRunContractError, match="plan integrity"):
+        _expected_live_preflight_checks(plan_json)
+
+
+@pytest.mark.parametrize(
+    "invalid_run",
+    ["missing", "kind", "state", "version", "cancelled"],
+)
+@pytest.mark.asyncio
+async def test_complete_live_preflight_rejects_invalid_run_authority(
+    invalid_run: str,
+) -> None:
+    """Only the exact active, uncancelled dry-run state may complete."""
+
+    plan = _migration_plan_with_preconditions()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    if invalid_run == "kind":
+        run.run_kind = "apply"
+    elif invalid_run == "state":
+        run.state = "sandbox_running"
+    elif invalid_run == "version":
+        run.state_version = 2
+    elif invalid_run == "cancelled":
+        run.cancellation_requested = True
+    stored_run = None if invalid_run == "missing" else run
+    session = SimpleNamespace(scalar=AsyncMock(return_value=stored_run))
+
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await complete_live_preflight(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            result={
+                "preconditions_passed": True,
+                "checks": [
+                    {
+                        "statement_index": 0,
+                        "precondition_index": 0,
+                        "kind": "table_is_empty",
+                        "passed": True,
+                    }
+                ],
+                "observed_base_digest": plan.base_digest,
+                "matches_plan_base": True,
+            },
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_plan",
+    [
+        "missing",
+        "project",
+        "run_digest",
+        "expired",
+        "content_digest",
+        "compiler",
+        "base_digest",
+        "target_digest",
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_live_preflight_rejects_invalid_plan_authority(
+    invalid_plan: str,
+) -> None:
+    """Every stored-plan authority binding is rechecked before completion."""
+
+    plan = _migration_plan_with_preconditions()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    if invalid_plan == "project":
+        plan.project_space_uuid = uuid.uuid4()
+    elif invalid_plan == "run_digest":
+        run.plan_digest = "0" * 64
+    elif invalid_plan == "expired":
+        plan.expires_at = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    elif invalid_plan == "content_digest":
+        plan.plan_json = {**plan.plan_json, "plan_digest": "0" * 64}
+    elif invalid_plan == "compiler":
+        plan.compiler_version = "unknown"
+    elif invalid_plan == "base_digest":
+        plan.base_digest = "0" * 64
+    elif invalid_plan == "target_digest":
+        plan.target_digest = "0" * 64
+    stored_plan = None if invalid_plan == "missing" else plan
+    session = SimpleNamespace(scalar=AsyncMock(side_effect=[run, stored_plan]))
+
+    with pytest.raises(MigrationRunContractError, match="plan integrity"):
+        await complete_live_preflight(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            result={
+                "preconditions_passed": True,
+                "checks": [
+                    {
+                        "statement_index": 0,
+                        "precondition_index": 0,
+                        "kind": "table_is_empty",
+                        "passed": True,
+                    }
+                ],
+                "observed_base_digest": plan.base_digest,
+                "matches_plan_base": True,
+            },
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
+        )
+
+
+@pytest.mark.asyncio
+async def test_complete_live_preflight_rejects_naive_transition_time() -> None:
+    """A timezone-free completion clock fails before durable state access."""
+
+    plan = _migration_plan_with_preconditions()
+    session = SimpleNamespace(scalar=AsyncMock())
+    with pytest.raises(MigrationRunContractError, match="include a timezone"):
+        await complete_live_preflight(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=3,
+            result={
+                "preconditions_passed": True,
+                "checks": [
+                    {
+                        "statement_index": 0,
+                        "precondition_index": 0,
+                        "kind": "table_is_empty",
+                        "passed": True,
+                    }
+                ],
+                "observed_base_digest": plan.base_digest,
+                "matches_plan_base": True,
+            },
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1),
+        )
+
+    session.scalar.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

@@ -192,6 +192,8 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "identifier-only transactional outbox" in adr.lower()
     assert "lock-scoped due-order outbox claiming" in normalized_contract
     assert "bounded one-attempt publisher is **implemented**" in normalized_contract
+    assert "every persisted plan precondition" in normalized_contract
+    assert "missing, extra, duplicate, or kind-mismatched checks" in normalized_contract
     assert "scheduled relay lifecycle is **implemented**" in normalized_contract
     assert "dedicated valkey sorted-set key" in normalized_contract
     assert (
