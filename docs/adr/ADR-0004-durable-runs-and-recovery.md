@@ -2,9 +2,9 @@
 
 - **Decision status:** Accepted
 - **Implementation status:** Partially implemented; durable storage,
-  identifier-only transactional outbox, polling, and dry-run
-  creation/cancellation intent APIs exist, while relay, workers, and recovery
-  do not
+  identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
+  polling, and dry-run creation/cancellation intent APIs exist, while the
+  relay loop, queue publisher, workers, and recovery do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -32,7 +32,11 @@ run, genesis event, and identifier-only transactional outbox before external
 I/O, then returns `202`. The `migration_run_dispatch` row contains only its
 own identity, `migration_run_uuid`, dispatch kind, delivery state, bounded
 attempt metadata, and timestamps; it never contains DSNs, raw SQL, plan JSON,
-or row values. A future relay publishes only `migration_run_uuid`.
+or row values. The implemented relay primitive claims one due row with
+`FOR UPDATE SKIP LOCKED` and attempt-bound acknowledgement in one
+caller-owned transaction. A future relay loop publishes only
+`migration_run_uuid`; publication failure rolls back the claim, while
+consumers must tolerate at-least-once redelivery after an ambiguous publish.
 
 Each run binds:
 
@@ -119,7 +123,11 @@ Rules:
 - `MigrationRunDispatch` is the identifier-only transactional outbox. Its
   unique run foreign key prevents duplicate dispatch identities, database
   checks admit only isolated dry-run dispatch and consistent pending/published
-  timestamps, and its due index supports a future bounded relay.
+  timestamps, and its due index supports bounded relay claiming.
+- `claim_one_migration_dispatch` orders due work, uses
+  `FOR UPDATE SKIP LOCKED`, and increments attempt state inside the caller's
+  open transaction; `mark_migration_dispatch_published` accepts only that
+  exact attempt and does not commit.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
@@ -151,7 +159,7 @@ Rules:
 ### Planned before production release
 
 - authenticated apply creation route;
-- outbox relay/queue publication and cancellation-worker acknowledgement;
+- relay loop/queue publication and cancellation-worker acknowledgement;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

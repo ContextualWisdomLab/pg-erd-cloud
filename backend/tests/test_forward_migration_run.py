@@ -13,12 +13,15 @@ from sqlalchemy.dialects import postgresql
 
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.migration_run import (
+    MigrationDispatchClaim,
     MigrationRunContractError,
     canonicalize_run_evidence,
+    claim_one_migration_dispatch,
     create_migration_run,
     digest_run_event,
     digest_run_request,
     hash_idempotency_key,
+    mark_migration_dispatch_published,
     request_migration_run_cancellation,
     transition_migration_run,
     validate_run_transition,
@@ -351,6 +354,122 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     assert {index.name for index in MigrationRunDispatch.__table__.indexes} == {
         "ix_migration_run_dispatch__status_not_before",
     }
+
+
+@pytest.mark.asyncio
+async def test_dispatch_claim_uses_due_order_and_skip_locked() -> None:
+    """A relay claims one due row without blocking a concurrent relay."""
+
+    now = datetime(2026, 8, 11, 4, tzinfo=timezone.utc)
+    dispatch = MigrationRunDispatch(
+        migration_run_dispatch_uuid=uuid.uuid4(),
+        migration_run_uuid=uuid.uuid4(),
+        dispatch_kind="isolated_dry_run",
+        status="pending",
+        attempt_count=0,
+        not_before=now,
+        created_at=now,
+        published_at=None,
+    )
+    session = SimpleNamespace(scalar=AsyncMock(return_value=dispatch))
+
+    claim = await claim_one_migration_dispatch(session, now=now)
+
+    assert claim == MigrationDispatchClaim(
+        migration_run_dispatch_uuid=dispatch.migration_run_dispatch_uuid,
+        migration_run_uuid=dispatch.migration_run_uuid,
+        dispatch_kind="isolated_dry_run",
+        attempt_count=1,
+    )
+    assert dispatch.attempt_count == 1
+    statement = session.scalar.await_args.args[0]
+    compiled = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "migration_run_dispatch.status = 'pending'" in compiled
+    assert "migration_run_dispatch.not_before <=" in compiled
+    assert "ORDER BY migration_run_dispatch.not_before" in compiled
+    assert "FOR UPDATE SKIP LOCKED" in compiled
+
+
+@pytest.mark.asyncio
+async def test_dispatch_claim_returns_none_without_mutating_transaction() -> None:
+    """An empty due queue remains a no-op owned by the caller transaction."""
+
+    session = SimpleNamespace(scalar=AsyncMock(return_value=None))
+    assert await claim_one_migration_dispatch(session) is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_publish_is_attempt_bound_and_caller_owned() -> None:
+    """Publication succeeds only for the exact in-transaction claim attempt."""
+
+    now = datetime(2026, 8, 11, 4, tzinfo=timezone.utc)
+    claim = MigrationDispatchClaim(
+        migration_run_dispatch_uuid=uuid.uuid4(),
+        migration_run_uuid=uuid.uuid4(),
+        dispatch_kind="isolated_dry_run",
+        attempt_count=2,
+    )
+    result = SimpleNamespace(rowcount=1)
+    session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+    await mark_migration_dispatch_published(session, claim=claim, now=now)
+
+    statement = session.execute.await_args.args[0]
+    compiled = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "migration_run_dispatch.status = 'pending'" in compiled
+    assert "migration_run_dispatch.attempt_count = 2" in compiled
+    assert "status='published'" in compiled.replace(" ", "")
+    assert "published_at=" in compiled
+
+    session.execute.return_value = SimpleNamespace(rowcount=0)
+    with pytest.raises(MigrationRunContractError, match="claim is stale"):
+        await mark_migration_dispatch_published(session, claim=claim, now=now)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_claim_and_publish_require_timezone_aware_time() -> None:
+    """Naive clocks cannot enter durable outbox ordering or evidence."""
+
+    session = SimpleNamespace(scalar=AsyncMock(), execute=AsyncMock())
+    naive = datetime(2026, 8, 11, 4)
+    with pytest.raises(MigrationRunContractError, match="timezone"):
+        await claim_one_migration_dispatch(session, now=naive)
+    with pytest.raises(MigrationRunContractError, match="timezone"):
+        await mark_migration_dispatch_published(
+            session,
+            claim=MigrationDispatchClaim(
+                migration_run_dispatch_uuid=uuid.uuid4(),
+                migration_run_uuid=uuid.uuid4(),
+                dispatch_kind="isolated_dry_run",
+                attempt_count=1,
+            ),
+            now=naive,
+        )
+    session.scalar.assert_not_awaited()
+    session.execute.assert_not_awaited()
+
+    with pytest.raises(MigrationRunContractError, match="attempt is invalid"):
+        await mark_migration_dispatch_published(
+            session,
+            claim=MigrationDispatchClaim(
+                migration_run_dispatch_uuid=uuid.uuid4(),
+                migration_run_uuid=uuid.uuid4(),
+                dispatch_kind="isolated_dry_run",
+                attempt_count=0,
+            ),
+            now=datetime(2026, 8, 11, 4, tzinfo=timezone.utc),
+        )
+    session.execute.assert_not_awaited()
 
 
 def test_migration_run_alembic_revision_matches_model_contract() -> None:
@@ -1053,3 +1172,5 @@ async def test_cancellation_validates_metadata_before_database_access() -> None:
 
     session.scalar.assert_not_awaited()
     session.execute.assert_not_awaited()
+    claim_one_migration_dispatch,
+    mark_migration_dispatch_published,

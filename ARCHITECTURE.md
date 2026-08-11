@@ -68,6 +68,10 @@ Implemented in the initial safe vertical slice:
   boundary that requires the exact reviewed digest and bounded
   `Idempotency-Key`, then returns only the queued durable identity without
   publishing the outbox or signaling a worker;
+- lock-scoped relay primitives that claim one due dispatch with
+  `FOR UPDATE SKIP LOCKED`, increment its attempt in the caller-owned
+  transaction, and publish-state CAS only that exact identifier-only claim;
+  no relay loop or queue publisher is wired yet;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary

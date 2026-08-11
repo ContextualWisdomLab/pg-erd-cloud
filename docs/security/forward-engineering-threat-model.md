@@ -58,7 +58,7 @@ flowchart TB
 | API/worker → credential boundary | Connection UUID | Decrypt DSN only in process memory after authorization; redact failures. | Implemented for current connection/snapshot/legacy paths |
 | Credential boundary → live target | Pinned validated IP, optional verified-hostname TLS, introspection or DDL | Configured host allowlist and restricted-range rejection; planned workers additionally separate read-only preflight from execution authority. | Partially implemented |
 | Worker → sandbox | Exact stored structured plan and compatible schema closure | No production credential or route; disposable lifecycle; re-introspect and require target digest. | Planned |
-| API → outbox → queue → worker | Run identity | `migration_run_dispatch` is an identifier-only transactional outbox; a future relay publishes only `migration_run_uuid` and the worker reloads and verifies the stored plan. | Outbox persistence Implemented; relay/worker Planned |
+| API → outbox → queue → worker | Run identity | `migration_run_dispatch` is an identifier-only transactional outbox; due-order lock-scoped claim and exact-attempt publish CAS are implemented. A future relay loop publishes only `migration_run_uuid` and the worker reloads and verifies the stored plan. | Outbox persistence/claim Implemented; publisher/worker Planned |
 | Worker → browser/log/metrics | Bounded state and evidence | Identifiers, hashes, counts, durations, classified diagnostics only. | Run evidence canonicalization and verified polling Implemented; worker/log integration Planned |
 
 ## Threat actors and assumptions

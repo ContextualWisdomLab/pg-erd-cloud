@@ -122,15 +122,16 @@ Adequacy labels in this audit mean:
 
 ### Not implemented despite accepted design
 
-- Outbox relay/queue delivery, sandbox/preflight/apply workers, and public
+- Relay loop/queue delivery, sandbox/preflight/apply workers, and public
   apply-run creation. Public dry-run creation, atomic identifier-only outbox,
-  and cancellation intent are implemented.
+  lock-scoped claim/publish-state CAS, and cancellation intent are implemented.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
   recovery.
-- Outbox relay, cancellation propagation, crash/restart recovery, and no-replay
-  apply reconciliation. Atomic outbox persistence, internal idempotency,
+- Relay loop/queue publication, cancellation propagation, crash/restart
+  recovery, and no-replay apply reconciliation. Atomic outbox persistence,
+  lock-scoped claim/publish-state CAS, internal idempotency,
   compare-and-swap transitions, cancellation intent, and append-only event
   evidence are implemented.
 - Verification snapshot, residual diff, convergence classification, alerts,

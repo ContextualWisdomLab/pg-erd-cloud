@@ -119,12 +119,101 @@ class MigrationRunCreation:
 
 
 @dataclass(frozen=True)
+class MigrationDispatchClaim:
+    """Identifier-only relay claim held by the caller's open transaction."""
+
+    migration_run_dispatch_uuid: uuid.UUID
+    migration_run_uuid: uuid.UUID
+    dispatch_kind: str
+    attempt_count: int
+
+
+@dataclass(frozen=True)
 class MigrationRunCancellation:
     """The durable cancellation-intent identity selected by one CAS request."""
 
     state: str
     state_version: int
     reused: bool
+
+
+def _require_aware_dispatch_time(value: dt.datetime) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise MigrationRunContractError("dispatch time must include a timezone")
+
+
+async def claim_one_migration_dispatch(
+    session: AsyncSession,
+    *,
+    now: dt.datetime | None = None,
+) -> MigrationDispatchClaim | None:
+    """Lock one due outbox row for an identifier-only publish attempt.
+
+    The caller must keep this transaction open while publishing only the
+    migration-run UUID, then mark the claim published before committing. A
+    publish failure must roll back the transaction, restoring the pending row
+    and its attempt counter. SKIP LOCKED lets independent relays make progress
+    without publishing the same row concurrently.
+    """
+
+    transition_time = now or dt.datetime.now(dt.timezone.utc)
+    _require_aware_dispatch_time(transition_time)
+    dispatch = await session.scalar(
+        select(MigrationRunDispatch)
+        .where(
+            MigrationRunDispatch.status == "pending",
+            MigrationRunDispatch.not_before <= transition_time,
+        )
+        .order_by(
+            MigrationRunDispatch.not_before,
+            MigrationRunDispatch.migration_run_dispatch_uuid,
+        )
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    if dispatch is None:
+        return None
+    dispatch.attempt_count = int(dispatch.attempt_count) + 1
+    return MigrationDispatchClaim(
+        migration_run_dispatch_uuid=dispatch.migration_run_dispatch_uuid,
+        migration_run_uuid=dispatch.migration_run_uuid,
+        dispatch_kind=dispatch.dispatch_kind,
+        attempt_count=dispatch.attempt_count,
+    )
+
+
+async def mark_migration_dispatch_published(
+    session: AsyncSession,
+    *,
+    claim: MigrationDispatchClaim,
+    now: dt.datetime | None = None,
+) -> None:
+    """CAS one locked claim to published without committing its transaction."""
+
+    transition_time = now or dt.datetime.now(dt.timezone.utc)
+    _require_aware_dispatch_time(transition_time)
+    if claim.attempt_count < 1:
+        raise MigrationRunContractError("migration dispatch attempt is invalid")
+    result = cast(
+        CursorResult[Any],
+        await session.execute(
+            update(MigrationRunDispatch)
+            .where(
+                MigrationRunDispatch.migration_run_dispatch_uuid
+                == claim.migration_run_dispatch_uuid,
+                MigrationRunDispatch.migration_run_uuid
+                == claim.migration_run_uuid,
+                MigrationRunDispatch.dispatch_kind == claim.dispatch_kind,
+                MigrationRunDispatch.status == "pending",
+                MigrationRunDispatch.attempt_count == claim.attempt_count,
+                MigrationRunDispatch.published_at.is_(None),
+            )
+            .values(status="published", published_at=transition_time)
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if result.rowcount != 1:
+        raise MigrationRunContractError("migration dispatch claim is stale")
 
 
 def validate_run_transition(run_kind: str, current_state: str, next_state: str) -> None:

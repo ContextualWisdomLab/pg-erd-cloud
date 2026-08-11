@@ -55,7 +55,9 @@ operational artifact is attached to the release record.
 - [x] Run/event/outbox migrations, idempotency uniqueness, compare-and-swap
   transitions, atomic identifier-only dispatch creation, cancellation intent,
   and evidence redaction are verified by repository tests.
-- [ ] Outbox relay, worker claiming, restart recovery, and retention are
+- [x] Due dispatch claiming uses `FOR UPDATE SKIP LOCKED` and exact-attempt
+  publish-state CAS in a caller-owned transaction.
+- [ ] Relay loop/queue publication, worker execution, restart recovery, and retention are
   verified in the deployment environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have
   finite environment-specific values below the incident-response objective.

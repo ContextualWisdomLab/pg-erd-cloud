@@ -11,7 +11,11 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.forward.migration_plan import compile_migration_plan
-from app.forward.migration_run import create_migration_run
+from app.forward.migration_run import (
+    claim_one_migration_dispatch,
+    create_migration_run,
+    mark_migration_dispatch_published,
+)
 from app.models import (
     DbConnection,
     MigrationPlan,
@@ -198,6 +202,23 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert {
                 column.name for column in MigrationRunDispatch.__table__.columns
             }.isdisjoint({"payload_json", "dsn", "sql", "plan_json"})
+            claim = await claim_one_migration_dispatch(session, now=now)
+            assert claim is not None
+            assert claim.migration_run_uuid == first.migration_run_uuid
+            assert claim.migration_run_dispatch_uuid == (
+                dispatch.migration_run_dispatch_uuid
+            )
+            assert claim.dispatch_kind == "isolated_dry_run"
+            assert claim.attempt_count == 1
+            await mark_migration_dispatch_published(
+                session,
+                claim=claim,
+                now=now + dt.timedelta(seconds=1),
+            )
+            await session.refresh(dispatch)
+            assert dispatch.status == "published"
+            assert dispatch.attempt_count == 1
+            assert dispatch.published_at == now + dt.timedelta(seconds=1)
 
             await session.rollback()
 

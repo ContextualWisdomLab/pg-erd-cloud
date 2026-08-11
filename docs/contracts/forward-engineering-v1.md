@@ -119,9 +119,10 @@ credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. The internal cancellation-intent writer and editor-authorized
 `POST /api/migration-runs/{migration_run_uuid}/cancel` route are
 **Implemented**. Public dry-run creation is **Implemented**; public apply
-creation remains **Planned**. Outbox relay and worker execution remain
-**Planned**, as do cancellation propagation, sandbox/preflight workers, apply,
-reconciliation, and verification.
+creation remains **Planned**. Lock-scoped due-order outbox claiming and
+attempt-bound publish-state CAS are **Implemented**, while the relay loop,
+queue publisher, and worker execution remain **Planned**, as do cancellation
+propagation, sandbox/preflight workers, apply, reconciliation, and verification.
 
 Each event stores `previous_event_digest` and `event_digest`; the run stores
 `latest_event_digest`. Contract `migration-run-event/v1` hashes the run UUID,
@@ -143,8 +144,14 @@ requests, hashes the opaque idempotency key, and uses
 Only a new winner receives the sequence-one `run_queued` event and one
 `migration_run_dispatch` row in the same caller-owned transaction; a
 duplicate is reused only when its versioned request digest is identical. The
-function does not commit, publish the outbox, signal a worker, or expose an HTTP
-success path.
+function does not commit, publish the outbox, or signal a worker.
+`claim_one_migration_dispatch` selects one due pending row with
+`FOR UPDATE SKIP LOCKED`, increments its attempt in the caller-owned
+transaction, and returns only identifiers plus fixed kind and attempt.
+`mark_migration_dispatch_published` CAS-updates that exact attempt. The
+future relay must keep the transaction open across identifier-only queue
+publication and acknowledgement; a publication failure rolls the claim back.
+No relay loop, queue publisher, or migration worker is wired.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic
