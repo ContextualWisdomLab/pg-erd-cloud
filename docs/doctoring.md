@@ -48,9 +48,9 @@ capability checks maintained on the canonical forward-engineering lane.
 Focused regressions cover ASCII, mixed-case and Unicode identifiers,
 supplementary code points, the empty-name sentinel, malformed chunks, wrong
 roles, unknown columns, partial handles, distinct Prisma relations sharing a
-field, hostile CSV prefixes, and SVG text/coordinate injection. App coverage
-also exercises the Prisma download route. Repository CI remains the authority
-for the complete typecheck, test, coverage, build, and security gates.
+field, hostile CSV prefixes, and SVG text/coordinate injection. Repository CI
+remains the authority for the complete typecheck, test, coverage, build, and
+security gates.
 
 ## References
 
