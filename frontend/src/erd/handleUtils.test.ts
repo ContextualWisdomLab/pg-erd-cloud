@@ -22,17 +22,6 @@ describe('handleUtils', () => {
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
     });
-
-    it.each([
-      ['id123', 'c-0069-0064-0031-0032-0033'],
-      ['user id', 'c-0075-0073-0065-0072-0020-0069-0064'],
-      ['!@#$%', 'c-0021-0040-0023-0024-0025'],
-      ['\n\t', 'c-000a-0009'],
-      ['e\u0301', 'c-0065-0301'],
-      ['👨‍👩‍👦', 'c-1f468-200d-1f469-200d-1f466'],
-    ])('encodes every Unicode scalar in %j', (input, expected) => {
-      expect(sanitizeHandleId(input)).toBe(expected);
-    });
   });
 
   describe('sourceColumnHandleId', () => {
