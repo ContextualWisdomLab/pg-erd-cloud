@@ -82,7 +82,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 - a bounded live-preflight query primitive accepts only the three structured
   compiler preconditions, validates PostgreSQL identifiers and target types,
   prepares every server-owned query before execution, runs boolean-only reads
-  in one read-only repeatable-read transaction, applies server/client timeouts,
+  in one read-only repeatable-read transaction, applies a parameter-bound
+  transaction-local server timeout plus a bounded client timeout,
   and replaces database failures with fixed diagnostics.
 
 ### Planned and release-blocking

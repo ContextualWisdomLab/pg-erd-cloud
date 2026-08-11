@@ -311,7 +311,7 @@ class _FakeConnection:
         self.started = False
         self.committed = False
         self.rolled_back = False
-        self.executed: list[str] = []
+        self.executed: list[tuple[str, tuple[object, ...]]] = []
         self.prepared: list[str] = []
         self.queries: list[tuple[str, float | None]] = []
 
@@ -319,8 +319,8 @@ class _FakeConnection:
         self.transaction_options = kwargs
         return _FakeTransaction(self)
 
-    async def execute(self, sql: str) -> None:
-        self.executed.append(sql)
+    async def execute(self, sql: str, *args: object) -> None:
+        self.executed.append((sql, args))
 
     async def prepare(self, sql: str) -> _FakePreparedStatement:
         self.prepared.append(sql)
@@ -377,7 +377,12 @@ async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> Non
     assert connection.started is True
     assert connection.committed is True
     assert connection.rolled_back is False
-    assert connection.executed == ["SET LOCAL statement_timeout = '2500ms'"]
+    assert connection.executed == [
+        (
+            "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+            ("2500ms",),
+        )
+    ]
     assert connection.prepared == [sql for sql, _ in connection.queries]
     assert [timeout for _, timeout in connection.queries] == [3.5, 3.5]
     assert evidence == {

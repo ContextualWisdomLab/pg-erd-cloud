@@ -215,7 +215,8 @@ async def execute_live_preflight(
     await transaction.start()
     try:
         await connection.execute(
-            f"SET LOCAL statement_timeout = '{statement_timeout_ms}ms'"
+            "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+            f"{statement_timeout_ms}ms",
         )
         client_timeout = statement_timeout_ms / 1000 + 1
         checks: list[dict[str, object]] = []

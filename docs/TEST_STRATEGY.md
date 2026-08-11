@@ -190,7 +190,8 @@ failure, bounded timing, and fixed non-secret lifecycle logs. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,
-prepared-statement-only execution, server/client timeout bounds, boolean-only
+prepared-statement-only execution, parameter-bound transaction-local server
+timeout plus client timeout bounds, boolean-only
 evidence, rollback, fixed non-secret
 database failures, and strict snapshot-to-plan-base canonical digest comparison.
 Durable-run unit tests require that observed digest for terminal preflight CAS,
