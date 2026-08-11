@@ -186,9 +186,12 @@ async def export_shared_snapshot_sql(
         return "-- snapshot data not found\n"
     # Public share export: redact comments/example values so COMMENT ON / embedded
     # metadata never leave the share boundary.
-    return snapshot_json_to_sql(
-        _redacted_snapshot_dict(data.snapshot_json), target_dialect=dialect
-    )
+    try:
+        return snapshot_json_to_sql(
+            _redacted_snapshot_dict(data.snapshot_json), target_dialect=dialect
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
 @router.get(

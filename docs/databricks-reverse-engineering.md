@@ -44,6 +44,9 @@ databricks://token:<access-token>@<workspace-host>/sql/1.0/warehouses/<warehouse
 - Constraint introspection is intentionally mandatory for this slice. A runtime
   where the Preview constraint relations are unavailable fails the snapshot
   instead of silently producing an apparently complete relationship model.
+- DDL export and snapshot migration reject Databricks snapshots with HTTP 422;
+  the API does not emit guessed SQL or convert the unsupported capability into
+  an internal server error.
 - Connection and query errors cross the existing DSN-redaction boundary. Tokens
   and full DSNs must never be logged.
 

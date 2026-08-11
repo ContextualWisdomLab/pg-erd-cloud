@@ -6,15 +6,6 @@ from typing import Any
 import pytest
 
 import app.databricks_introspect.introspect as databricks_introspect_module
-from app.databricks_introspect.introspect import (
-    DatabricksDsnConfig,
-    _build_snapshot,
-    _connect,
-    _fetch_dicts,
-    _parse_databricks_dsn,
-    introspect_databricks,
-    probe_databricks,
-)
 from app.ddl.export import snapshot_json_to_sql
 from app.ddl.migration import snapshot_diff_to_migration_sql
 
@@ -144,7 +135,7 @@ async def test_parse_databricks_dsn_is_strict_and_ssrf_guarded(
     monkeypatch.setattr(
         "app.databricks_introspect.introspect._validated_ip_hosts", fake_guard
     )
-    config = await _parse_databricks_dsn(
+    config = await databricks_introspect_module._parse_databricks_dsn(
         "databricks://token:s%2Fecret@workspace.cloud.databricks.com/"
         "sql/1.0/warehouses/abc?catalog=main&schema=sales"
     )
@@ -157,12 +148,12 @@ async def test_parse_databricks_dsn_is_strict_and_ssrf_guarded(
     assert guarded == [("workspace.cloud.databricks.com", False, 443)]
 
     with pytest.raises(ValueError, match="unsupported Databricks DSN query parameter"):
-        await _parse_databricks_dsn(
+        await databricks_introspect_module._parse_databricks_dsn(
             "databricks://token:secret@workspace.cloud.databricks.com/"
             "sql/1.0/warehouses/abc?catalog=main&http_path=/evil"
         )
     with pytest.raises(ValueError, match="must include an access token"):
-        await _parse_databricks_dsn(
+        await databricks_introspect_module._parse_databricks_dsn(
             "databricks://token@workspace.cloud.databricks.com/"
             "sql/1.0/warehouses/abc?catalog=main"
         )
@@ -186,7 +177,7 @@ async def test_introspect_databricks_builds_bounded_common_snapshot(
     )
     monkeypatch.setattr("app.databricks_introspect.introspect._connect", fake_connect)
 
-    snapshot = await introspect_databricks(
+    snapshot = await databricks_introspect_module.introspect_databricks(
         "databricks://token:secret@workspace.cloud.databricks.com/"
         "sql/1.0/warehouses/abc?catalog=main&schema=sales",
         None,
@@ -268,7 +259,7 @@ async def test_parse_databricks_dsn_rejects_unsafe_or_ambiguous_inputs(
     dsn: str, error: str
 ) -> None:
     with pytest.raises(ValueError, match=error):
-        await _parse_databricks_dsn(dsn)
+        await databricks_introspect_module._parse_databricks_dsn(dsn)
 
 
 def test_optional_connector_failure_and_row_shapes(
@@ -281,7 +272,7 @@ def test_optional_connector_failure_and_row_shapes(
         databricks_introspect_module.importlib, "import_module", missing_connector
     )
     with pytest.raises(RuntimeError, match="databricks-sql-connector"):
-        _connect(server_hostname="workspace")
+        databricks_introspect_module._connect(server_hostname="workspace")
 
     class Connector:
         @staticmethod
@@ -293,7 +284,7 @@ def test_optional_connector_failure_and_row_shapes(
         "import_module",
         lambda name: Connector,
     )
-    assert _connect(server_hostname="workspace") == {
+    assert databricks_introspect_module._connect(server_hostname="workspace") == {
         "server_hostname": "workspace"
     }
 
@@ -310,8 +301,10 @@ def test_optional_connector_failure_and_row_shapes(
         def fetchall(self) -> list[dict[str, object]]:
             return self.rows
 
-    assert _fetch_dicts(DictCursor([]), "fixed") == []
-    assert _fetch_dicts(DictCursor([{"MixedCase": 1}]), "fixed") == [
+    assert databricks_introspect_module._fetch_dicts(DictCursor([]), "fixed") == []
+    assert databricks_introspect_module._fetch_dicts(
+        DictCursor([{"MixedCase": 1}]), "fixed"
+    ) == [
         {"mixedcase": 1}
     ]
 
@@ -332,7 +325,7 @@ async def test_probe_databricks_returns_version_and_closes_resources(
         "app.databricks_introspect.introspect._connect", lambda **kwargs: connection
     )
 
-    version = await probe_databricks(
+    version = await databricks_introspect_module.probe_databricks(
         "databricks://token:secret@workspace.cloud.databricks.com/"
         "sql/1.0/warehouses/abc?catalog=main"
     )
@@ -343,14 +336,14 @@ async def test_probe_databricks_returns_version_and_closes_resources(
 
 
 def test_snapshot_builder_covers_unique_materialized_and_malformed_rows() -> None:
-    config = DatabricksDsnConfig(
+    config = databricks_introspect_module.DatabricksDsnConfig(
         server_hostname="workspace",
         http_path="/sql/1.0/warehouses/abc",
         access_token="secret",
         catalog="main",
         schema=None,
     )
-    snapshot = _build_snapshot(
+    snapshot = databricks_introspect_module._build_snapshot(
         config,
         None,
         [],

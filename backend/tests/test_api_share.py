@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from app.api.share import (
     export_shared_snapshot_index_design,
@@ -161,3 +162,22 @@ async def test_shared_sql_export_redacts_sensitive_fields() -> None:
     assert _SECRET_RELATION_COMMENT not in sql
     assert _SECRET_COLUMN_COMMENT not in sql
     assert _SECRET_EXAMPLE_VALUE not in sql
+
+
+@pytest.mark.asyncio
+async def test_shared_databricks_sql_export_is_a_422_client_error() -> None:
+    """Unsupported shared exports must fail closed without becoming a 500."""
+
+    session = _share_session({"source_dialect": "databricks", "relations": []})
+    share_uuid, snapshot_uuid = session._ids
+
+    with pytest.raises(HTTPException) as exc_info:
+        await export_shared_snapshot_sql(
+            share_link_uuid=share_uuid,
+            schema_snapshot_uuid=snapshot_uuid,
+            dialect="postgresql",
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert "Databricks snapshot DDL export" in exc_info.value.detail

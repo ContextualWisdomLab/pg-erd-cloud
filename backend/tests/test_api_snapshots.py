@@ -3,7 +3,12 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 from unittest.mock import AsyncMock, call, patch
-from app.api.snapshots import create_snapshot, get_snapshot
+from app.api.snapshots import (
+    create_snapshot,
+    export_migration_sql,
+    export_snapshot_sql,
+    get_snapshot,
+)
 from app.schemas import SnapshotCreateIn
 from app.auth import CurrentUser
 from app.models import DbConnection, SchemaSnapshot, SchemaSnapshotData
@@ -130,3 +135,55 @@ async def test_create_snapshot_rejects_connection_from_other_project():
 
         assert exc_info.value.status_code == 404
         assert exc_info.value.detail == "connection not found"
+
+
+@pytest.mark.asyncio
+async def test_databricks_snapshot_export_is_a_422_client_error() -> None:
+    session = AsyncMock()
+    snapshot_id = uuid.uuid4()
+    session.get.return_value = SimpleNamespace(
+        snapshot_json={"source_dialect": "databricks", "relations": []}
+    )
+
+    with patch(
+        "app.api.snapshots._get_authorized_snapshot",
+        new=AsyncMock(return_value=SimpleNamespace()),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await export_snapshot_sql(
+                schema_snapshot_uuid=snapshot_id,
+                dialect="postgresql",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 422
+    assert "Databricks snapshot DDL export" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_databricks_snapshot_migration_is_a_422_client_error() -> None:
+    session = AsyncMock()
+    base_id = uuid.uuid4()
+    target_id = uuid.uuid4()
+    session.get.side_effect = [
+        SimpleNamespace(snapshot_json={"source_dialect": "postgresql"}),
+        SimpleNamespace(snapshot_json={"source_dialect": "databricks"}),
+    ]
+
+    with patch(
+        "app.api.snapshots._get_authorized_snapshot",
+        new=AsyncMock(return_value=SimpleNamespace()),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await export_migration_sql(
+                schema_snapshot_uuid=target_id,
+                against=base_id,
+                dialect="postgresql",
+                direction="up",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 422
+    assert "Databricks snapshot migration" in exc_info.value.detail
