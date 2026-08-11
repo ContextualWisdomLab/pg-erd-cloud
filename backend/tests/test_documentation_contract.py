@@ -280,10 +280,15 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
         Path("backend/tests/test_postgres_migration_run_integration.py")
     )
     strategy = _read(Path("docs/TEST_STRATEGY.md"))
+    changelog = _read(Path("CHANGELOG.md"))
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     assert "LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE" in integration_test
     assert "connection.is_in_transaction() is False" in integration_test
     assert "real relation-lock wait" in strategy
     assert "transaction cleanup" in strategy
+    assert "ACCESS EXCLUSIVE" in changelog
+    assert "relation-lock wait" in contract
+    assert "transaction cleanup" in contract
     for path in required_documents:
         document = _read(path)
         assert "complete_isolated_dry_run" in document
