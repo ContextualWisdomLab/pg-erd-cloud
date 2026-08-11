@@ -399,9 +399,11 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
     model_uuid = uuid.uuid4()
     revision_uuid = uuid.uuid4()
     plan_uuid = uuid.uuid4()
+    assert _EXPECTED_MAJOR is not None
+    expected_major = int(_EXPECTED_MAJOR)
     plan_json = compile_migration_plan(
-        {"format_version": 1, "postgresql_major": 18, "schemas": []},
-        {"format_version": 1, "postgresql_major": 18, "schemas": []},
+        {"format_version": 1, "postgresql_major": expected_major, "schemas": []},
+        {"format_version": 1, "postgresql_major": expected_major, "schemas": []},
     )
 
     try:
@@ -411,8 +413,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     text("SELECT current_setting('server_version_num')")
                 )
             )
-            assert _EXPECTED_MAJOR is not None
-            assert server_version_num // 10_000 == int(_EXPECTED_MAJOR)
+            assert server_version_num // 10_000 == expected_major
             session.add(
                 UserAccount(
                     user_account_uuid=user_uuid,
@@ -476,7 +477,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     revision_digest=plan_json["target_digest"],
                     model_json={
                         "format_version": 1,
-                        "postgresql_major": 18,
+                        "postgresql_major": expected_major,
                         "schemas": [],
                     },
                     base_schema_snapshot_uuid=snapshot_uuid,
@@ -572,7 +573,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 expected_state_version=1,
                 next_state="sandbox_running",
                 event_type="sandbox_started",
-                evidence={"postgresql_major": int(_EXPECTED_MAJOR)},
+                evidence={"postgresql_major": expected_major},
                 actor_user_uuid=None,
                 now=now + dt.timedelta(seconds=2),
             )
@@ -582,7 +583,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 migration_run_uuid=first.migration_run_uuid,
                 expected_state_version=2,
                 result={
-                    "postgresql_major": int(_EXPECTED_MAJOR),
+                    "postgresql_major": expected_major,
                     "statement_count": len(plan.plan_json["statements"]),
                     "base_digest": plan.base_digest,
                     "target_digest": plan.target_digest,
