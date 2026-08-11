@@ -192,6 +192,20 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "outbox relay and worker execution remain **planned**" in normalized_contract
 
 
+def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
+    """Keep PostgreSQL 14–18 acceptance explicit and image-digest pinned."""
+
+    workflow = _read(Path(".github/workflows/ci.yml"))
+    strategy = _read(Path("docs/TEST_STRATEGY.md"))
+
+    for major in range(14, 19):
+        assert f'major: "{major}"' in workflow
+    assert workflow.count("postgres@sha256:") == 5
+    assert "test_postgres_migration_run_integration.py" in workflow
+    assert "PostgreSQL 14–18" in strategy
+    assert "migration-run/outbox" in strategy
+
+
 def test_superseded_adr_is_not_restored() -> None:
     """Prevent a superseded ADR from reappearing beside canonical decisions."""
 

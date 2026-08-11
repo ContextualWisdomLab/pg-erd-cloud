@@ -153,6 +153,14 @@ Database integration must prove:
 - FK, uniqueness, expiry, retention, and conditional same-tenant invariants are
   enforced or fail atomically in the service transaction.
 
+The current CI runs the migration-run/outbox acceptance against real
+PostgreSQL 14–18 services. Each official image is pinned by multi-platform
+index digest. The focused test applies every Alembic revision, verifies the
+actual server major, creates a run/genesis/outbox transaction through the
+production writer, proves identical-key reuse produces one run/event/dispatch,
+asserts the dispatch schema has no execution payload, and rolls the transaction
+back before confirming that no partial identity survives.
+
 ## Fault-injection and recovery matrix
 
 | Injection point | Expected evidence | Forbidden behavior |
