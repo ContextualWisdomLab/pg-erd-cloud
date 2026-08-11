@@ -26,7 +26,7 @@ visual gap is a design-only issue or missing product code.
 | Projects | `03-project-list-screen.png` | Create, select, and open project workspaces. | Empty list must offer project creation in the same screen. |
 | Diagrams | `04-diagram-list-screen.png` | Search and open generated ERD snapshots. | Empty list must explain that editor reverse engineering creates diagrams. |
 | New diagram | `05-new-diagram-modal.png` | Start a reverse-engineering flow from project and connection context. | Disabled actions must expose the missing project or connection reason. |
-| ERD editor | `06-erd-editor-main.png` | Inspect and edit schema structure on the canvas. | Empty canvas must distinguish snapshot generation from ready-to-create state. |
+| ERD editor | `06-erd-editor-main.png` | Inspect and edit schema structure on the canvas. Table deletion must identify the table in an explicit confirmation and preserve it when the user cancels. | Empty canvas must distinguish snapshot generation from ready-to-create state. |
 | Add entity | `07-add-entity-modal.png` | Add a table manually when no snapshot exists or when modeling ahead. | Save remains disabled until a table name is present. |
 | Relationship settings | `08-relationship-settings-modal.png` | Edit or delete relationship labels. | Destructive actions require explicit confirmation. |
 | Share/export | `09-share-export-modal.png` | Create share links and copy/export SQL or visual formats. | Export sections must explain what is missing before output exists. |
