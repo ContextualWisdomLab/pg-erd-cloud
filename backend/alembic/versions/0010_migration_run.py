@@ -122,6 +122,53 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "migration_run_dispatch",
+        sa.Column(
+            "migration_run_dispatch_uuid",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+        ),
+        sa.Column(
+            "migration_run_uuid",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("dispatch_kind", sa.Text(), nullable=False),
+        sa.Column("status", sa.Text(), nullable=False),
+        sa.Column("attempt_count", sa.Integer(), nullable=False),
+        sa.Column("not_before", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
+        sa.UniqueConstraint(
+            "migration_run_uuid",
+            name="uq_migration_run_dispatch__migration_run_uuid",
+        ),
+        sa.CheckConstraint(
+            "dispatch_kind = 'isolated_dry_run'",
+            name="ck_migration_run_dispatch__dispatch_kind",
+        ),
+        sa.CheckConstraint(
+            "status IN ('pending', 'published')",
+            name="ck_migration_run_dispatch__status",
+        ),
+        sa.CheckConstraint(
+            "attempt_count >= 0",
+            name="ck_migration_run_dispatch__attempt_count",
+        ),
+        sa.CheckConstraint(
+            "(status = 'pending' AND published_at IS NULL) OR "
+            "(status = 'published' AND published_at IS NOT NULL)",
+            name="ck_migration_run_dispatch__published_at",
+        ),
+    )
+    op.create_index(
+        "ix_migration_run_dispatch__status_not_before",
+        "migration_run_dispatch",
+        ["status", "not_before"],
+    )
+
+    op.create_table(
         "migration_run_event",
         sa.Column(
             "migration_run_event_uuid",
@@ -190,6 +237,11 @@ def downgrade() -> None:
     """Remove run evidence before its parent run identity."""
 
     op.drop_table("migration_run_event")
+    op.drop_index(
+        "ix_migration_run_dispatch__status_not_before",
+        table_name="migration_run_dispatch",
+    )
+    op.drop_table("migration_run_dispatch")
     op.drop_index("ix_migration_run__project_state", table_name="migration_run")
     op.drop_index(
         "ix_migration_run__migration_plan_uuid", table_name="migration_run"

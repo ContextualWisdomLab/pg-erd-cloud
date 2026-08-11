@@ -97,11 +97,16 @@ rejects expired plans. Creation-time maintenance deletes only derived plans
 that expired at least 30 days earlier, belong to the authorized project, and
 have no durable `MigrationRun` history; plans with run evidence are retained.
 
-### `migration_run` and `migration_run_event` — Partially implemented
+### `migration_run`, `migration_run_dispatch`, and `migration_run_event` — Partially implemented
 
 The ORM classes and Alembic revision `0010_migration_run` persist an idempotent
-run identity and append-only, per-run event sequence. Database checks bound run
-kind, state, state version, event type, before/after state tokens, event
+run identity, one identifier-only transactional outbox row, and an append-only,
+per-run event sequence. The implemented dry-run writer adds exactly one outbox
+row for each new run; the database unique constraint enforces at most one.
+The row admits only `isolated_dry_run` and binds pending/published state to its
+publication timestamp without containing a DSN, SQL, or plan payload. Database
+checks bound
+run kind, state, state version, event type, before/after state tokens, event
 sequence, predecessor presence, and every persisted lowercase SHA-256 digest
 shape (idempotency, plan, request, observed base, chain link, and run anchor). A
 project/run-kind idempotency
@@ -114,9 +119,9 @@ credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. The internal cancellation-intent writer and editor-authorized
 `POST /api/migration-runs/{migration_run_uuid}/cancel` route are
 **Implemented**. Public dry-run creation is **Implemented**; public apply
-creation remains **Planned**. Queue/outbox
-integration and cancellation-worker propagation remain **Planned**, as do
-sandbox/preflight workers, apply, reconciliation, and verification.
+creation remains **Planned**. Outbox relay and worker execution remain
+**Planned**, as do cancellation propagation, sandbox/preflight workers, apply,
+reconciliation, and verification.
 
 Each event stores `previous_event_digest` and `event_digest`; the run stores
 `latest_event_digest`. Contract `migration-run-event/v1` hashes the run UUID,
@@ -135,9 +140,11 @@ guarantee against an actor that can rewrite the entire metadata database.
 verifies stored-plan integrity and expiry, rejects blocked plans and all apply
 requests, hashes the opaque idempotency key, and uses
 `uq_migration_run__idempotent_action` as the PostgreSQL concurrency winner.
-Only a new winner receives the sequence-one `run_queued` event; a duplicate is
-reused only when its versioned request digest is identical. The function does
-not commit, enqueue, or expose an HTTP success path.
+Only a new winner receives the sequence-one `run_queued` event and one
+`migration_run_dispatch` row in the same caller-owned transaction; a
+duplicate is reused only when its versioned request digest is identical. The
+function does not commit, publish the outbox, signal a worker, or expose an HTTP
+success path.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic
@@ -362,7 +369,7 @@ classified below without implying worker execution:
 | Method and target route | Required request contract | Success | Status |
 |---|---|---|---|
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
-| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | editor+; bounded `Idempotency-Key`; exact `plan_digest` | persisted queued dry-run identity, `202`; no worker signal | **Implemented** |
+| `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | editor+; bounded `Idempotency-Key`; exact `plan_digest` | persisted queued dry-run identity plus identifier-only transactional outbox, `202`; no worker signal | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
 | `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/cancellation-intent/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
 | `POST /api/migration-runs/{migration_run_uuid}/cancel` | editor+; strict positive `expected_state_version` | exact-version cancellation intent, `202`; stable correlated error envelope on rejection | **Implemented** |

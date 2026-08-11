@@ -1,8 +1,9 @@
 """Durable migration-run state and evidence contracts.
 
-This module is deliberately independent from queue delivery. It defines the
-states that may become durable product evidence, hashes caller idempotency keys,
-and prevents raw SQL or credential-bearing fields from entering run events.
+This module persists an execution-free dispatch outbox but remains independent
+from queue delivery. It defines the states that may become durable product
+evidence, hashes caller idempotency keys, and prevents raw SQL or
+credential-bearing fields from entering run events.
 """
 
 from __future__ import annotations
@@ -24,7 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.forward.migration_plan import verify_migration_plan_digest
-from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
+from app.models import (
+    MigrationPlan,
+    MigrationRun,
+    MigrationRunDispatch,
+    MigrationRunEvent,
+)
 
 MAX_IDEMPOTENCY_KEY_BYTES = 255
 MAX_RUN_EVIDENCE_BYTES = 16_384
@@ -318,10 +324,11 @@ async def create_migration_run(
 ) -> MigrationRunCreation:
     """Select one durable dry-run identity without exposing execution authority.
 
-    The PostgreSQL uniqueness constraint is the concurrency winner. The caller
-    owns the transaction and queue publication; this function never commits or
-    signals a worker. Apply creation remains fail-closed until approval and
-    passed-dry-run bindings are persisted.
+    The PostgreSQL uniqueness constraint is the concurrency winner. A new run,
+    its genesis event, and one identifier-only dispatch outbox row share the
+    caller's transaction. This function never commits, publishes, or signals a
+    worker. Apply creation remains fail-closed until approval and passed-dry-run
+    bindings are persisted.
     """
 
     if run_kind == "apply":
@@ -424,6 +431,18 @@ async def create_migration_run(
             event_digest=event_digest,
             actor_user_uuid=requested_by_user_uuid,
             created_at=transition_time,
+        )
+    )
+    session.add(
+        MigrationRunDispatch(
+            migration_run_dispatch_uuid=uuid.uuid4(),
+            migration_run_uuid=inserted_uuid,
+            dispatch_kind="isolated_dry_run",
+            status="pending",
+            attempt_count=0,
+            not_before=transition_time,
+            created_at=transition_time,
+            published_at=None,
         )
     )
     return MigrationRunCreation(

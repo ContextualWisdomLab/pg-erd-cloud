@@ -388,6 +388,59 @@ class MigrationRun(Base):
     )
 
 
+class MigrationRunDispatch(Base):
+    """Transactional outbox intent for one isolated dry-run dispatch."""
+
+    __tablename__ = "migration_run_dispatch"
+
+    migration_run_dispatch_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    dispatch_kind: Mapped[str] = mapped_column(Text())
+    status: Mapped[str] = mapped_column(Text())
+    attempt_count: Mapped[int] = mapped_column(Integer(), default=0)
+    not_before: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    published_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            name="uq_migration_run_dispatch__migration_run_uuid",
+        ),
+        CheckConstraint(
+            "dispatch_kind = 'isolated_dry_run'",
+            name="ck_migration_run_dispatch__dispatch_kind",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'published')",
+            name="ck_migration_run_dispatch__status",
+        ),
+        CheckConstraint(
+            "attempt_count >= 0",
+            name="ck_migration_run_dispatch__attempt_count",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND published_at IS NULL) OR "
+            "(status = 'published' AND published_at IS NOT NULL)",
+            name="ck_migration_run_dispatch__published_at",
+        ),
+        Index(
+            "ix_migration_run_dispatch__status_not_before",
+            "status",
+            "not_before",
+        ),
+    )
+
+
 class MigrationRunEvent(Base):
     """Append-only, bounded evidence for one migration-run transition."""
 

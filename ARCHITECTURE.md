@@ -62,10 +62,12 @@ Implemented in the initial safe vertical slice:
   version and append the matching sanitized evidence event in the caller's
   transaction;
 - an internal PostgreSQL conflict-winner writer that creates or reuses one
-  exact, unexpired, executable dry-run intent and its sequence-one event;
+  exact, unexpired, executable dry-run intent and atomically persists its
+  sequence-one event plus identifier-only dispatch outbox;
 - an editor-authorized `POST /api/migration-plans/{plan_uuid}/dry-runs`
   boundary that requires the exact reviewed digest and bounded
-  `Idempotency-Key`, then returns only the queued durable identity;
+  `Idempotency-Key`, then returns only the queued durable identity without
+  publishing the outbox or signaling a worker;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary

@@ -41,8 +41,9 @@ executable SQL, safety classification, approval truth, or recovery state.
 
 ### Partially implemented foundation
 
-- `MigrationRun` and `MigrationRunEvent` ORM/Alembic persistence with database
-  state/idempotency/sequence constraints;
+- `MigrationRun`, identifier-only `MigrationRunDispatch`, and
+  `MigrationRunEvent` ORM/Alembic persistence with database
+  state/idempotency/dispatch/sequence constraints;
 - a deterministic dry-run/apply transition contract, bounded hashed
   idempotency keys, and recursive rejection of SQL/credential-bearing event
   fields;
@@ -54,7 +55,8 @@ executable SQL, safety classification, approval truth, or recovery state.
   expired/tampered/blocked plans, and every apply request;
 - an editor-authorized dry-run creation HTTP boundary binding the exact
   reviewed plan digest, bounded `Idempotency-Key`, actor, and request
-  correlation identity without signaling a worker;
+  correlation identity while atomically creating the run, genesis event, and
+  dispatch outbox without signaling a worker;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - an editor-authorized cancellation HTTP boundary with strict state-version
@@ -65,7 +67,7 @@ executable SQL, safety classification, approval truth, or recovery state.
 
 ### Planned and release-blocking
 
-- migration-run HTTP creation and queue/outbox integration;
+- outbox relay, worker claiming, retry/lease policy, and dispatch retention;
 - cancellation propagation and worker acknowledgement;
 - isolated disposable PostgreSQL execution and cleanup;
 - bounded target read-only preflight and apply-time drift revalidation;
@@ -91,7 +93,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** durable evidence boundary exists; queue integration Planned |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** `migration_run_dispatch` is an identifier-only transactional outbox; relay and worker queue integration are Planned |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
@@ -106,10 +108,11 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic CAS writer, dry-run creation/cancellation APIs, and polling exist; workers absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, dry-run creation/cancellation APIs, and polling exist; relay/workers absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
-`0008_schema_model_revision` and `0009_migration_plan`. See
+`0008_schema_model_revision`, `0009_migration_plan`, and
+`0010_migration_run`. See
 [DATA_MODEL.md](DATA_MODEL.md) for actual and planned ERDs.
 
 ## Current HTTP contract

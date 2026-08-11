@@ -1,9 +1,10 @@
 # ADR-0004: Durable runs, idempotency, cancellation, and recovery
 
 - **Decision status:** Accepted
-- **Implementation status:** Partially implemented; durable storage, polling,
-  and dry-run creation/cancellation intent APIs exist, while workers and
-  recovery do not
+- **Implementation status:** Partially implemented; durable storage,
+  identifier-only transactional outbox, polling, and dry-run
+  creation/cancellation intent APIs exist, while relay, workers, and recovery
+  do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -27,8 +28,11 @@ append-only state history.
 ## Decision
 
 Dry run and apply are durable `migration_run` resources. The API persists the
-run and queue record before external I/O, then returns `202`. Queue payloads
-contain only `migration_run_uuid`; they never contain DSNs or raw SQL.
+run, genesis event, and identifier-only transactional outbox before external
+I/O, then returns `202`. The `migration_run_dispatch` row contains only its
+own identity, `migration_run_uuid`, dispatch kind, delivery state, bounded
+attempt metadata, and timestamps; it never contains DSNs, raw SQL, plan JSON,
+or row values. A future relay publishes only `migration_run_uuid`.
 
 Each run binds:
 
@@ -112,6 +116,10 @@ Rules:
   runs.
 - `MigrationRun` and `MigrationRunEvent` ORM models plus Alembic revision 0010
   persist idempotent run identity and append-only ordered evidence.
+- `MigrationRunDispatch` is the identifier-only transactional outbox. Its
+  unique run foreign key prevents duplicate dispatch identities, database
+  checks admit only isolated dry-run dispatch and consistent pending/published
+  timestamps, and its due index supports a future bounded relay.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
@@ -128,8 +136,10 @@ Rules:
   event in the caller-owned transaction. A stale worker cannot publish evidence.
 - `create_migration_run` uses the database idempotency constraint to select one
   dry-run winner, validates immutable plan integrity/expiry/executability, and
-  appends sequence-one evidence without committing or enqueueing. Apply creation
-  remains rejected until its approval and passed-dry-run bindings exist.
+  appends sequence-one evidence plus one dispatch row in the same caller-owned
+  transaction without committing, publishing, or signaling a worker. Apply
+  creation remains rejected until its approval and passed-dry-run bindings
+  exist.
 - Cancellation is a same-state, version-incrementing CAS event. A repeated
   request is idempotent, a terminal run rejects it, and a worker holding the old
   version must reload the intent before any further transition.
@@ -140,8 +150,8 @@ Rules:
 
 ### Planned before production release
 
-- authenticated dry-run and apply creation routes;
-- outbox/queue integration and cancellation-worker acknowledgement;
+- authenticated apply creation route;
+- outbox relay/queue publication and cancellation-worker acknowledgement;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

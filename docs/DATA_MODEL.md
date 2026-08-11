@@ -109,6 +109,16 @@ erDiagram
     timestamptz started_at
     timestamptz finished_at
   }
+  MIGRATION_RUN_DISPATCH {
+    uuid migration_run_dispatch_uuid PK
+    uuid migration_run_uuid FK, UK
+    text dispatch_kind
+    text status
+    int attempt_count
+    timestamptz not_before
+    timestamptz created_at
+    timestamptz published_at
+  }
   MIGRATION_RUN_EVENT {
     uuid migration_run_event_uuid PK
     uuid migration_run_uuid FK
@@ -143,6 +153,7 @@ erDiagram
   PROJECT_SPACE ||--o{ MIGRATION_RUN : scopes
   MIGRATION_PLAN ||--o{ MIGRATION_RUN : attempts
   USER_ACCOUNT ||--o{ MIGRATION_RUN : requests
+  MIGRATION_RUN ||--o| MIGRATION_RUN_DISPATCH : dispatches
   MIGRATION_RUN ||--o{ MIGRATION_RUN_EVENT : records
   USER_ACCOUNT o|--o{ MIGRATION_RUN_EVENT : acts
 ```
@@ -167,6 +178,7 @@ erDiagram
 | `migration_run.project_space_uuid` | `project_space` | no | `CASCADE` | Each durable run is scoped to one project; a project has zero or more runs. |
 | `migration_run.migration_plan_uuid` | `migration_plan` | no | `RESTRICT` | Each durable run attempts one immutable plan; plan deletion is blocked while evidence remains. |
 | `migration_run.requested_by_user_uuid` | `user_account` | no | `NO ACTION` | Each run records one requesting actor. |
+| `migration_run_dispatch.migration_run_uuid` | `migration_run` | no; unique | `CASCADE` | The implemented writer adds one identifier-only dispatch intent for each new dry run; the database permits zero or one dispatch row per run. |
 | `migration_run_event.migration_run_uuid` | `migration_run` | no | `CASCADE` | Each event belongs to one run; approved run deletion removes its event sequence atomically. |
 | `migration_run_event.actor_user_uuid` | `user_account` | yes | `NO ACTION` | Worker events may be system-authored; human actions retain an actor. |
 
@@ -184,6 +196,8 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan project, revision project, connection project, and snapshot project match; the snapshot came from that exact connection and succeeded. | `app.api.migration_plans.create_migration_plan` before insert. | Implemented in the API; not a database constraint |
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot start a run. | The public dry-run intent route delegates to the writer that verifies expiry before its conflict-winner insert; worker execution remains absent. | Partially implemented |
+| A new run, genesis event, and dispatch intent are atomic. | `create_migration_run` adds all three to the caller-owned transaction; `migration_run_dispatch.migration_run_uuid` is unique and the public route commits once. | Implemented |
+| Dispatch storage carries no execution material. | `migration_run_dispatch` contains identifiers, fixed kind/state, attempt count, and timestamps only; the future relay/worker must reload the stored plan by run UUID. | Implemented persistence boundary; relay Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
 | Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the public dry-run route delegates to the PostgreSQL conflict-winner writer, which reuses only the same request and rejects different reuse. | Implemented for dry-run intent; workers/apply Planned |
 | Run/event state tokens, sequence numbers, and digest links are valid. | Database checks constrain run kind/state, event type, before/after states, predecessor presence, and every persisted lowercase SHA-256 field (idempotency, plan, request, observed base, chain link, and run anchor); the exact application transition graph and CAS writer match UUID, kind, state, state version, and prior event anchor before appending the same-version event; event sequence is unique per run and polling recomputes every canonical digest. | Implemented persistence and polling boundary; workers Planned |
@@ -208,8 +222,9 @@ execution input.
 
 ## Physical run foundation — Implemented
 
-`migration_run` and `migration_run_event` now exist in the ORM and Alembic
-revision `0010_migration_run` with the fields shown in the implemented ERD
+`migration_run`, `migration_run_dispatch`, and `migration_run_event` now
+exist in the ORM and Alembic revision `0010_migration_run` with the fields
+shown in the implemented ERD
 above. The logical diagram below retains accepted **Planned extensions** such
 as passed-dry-run and verification-snapshot references. Those extension fields
 do not exist physically and must not be inferred from the implemented tables.
@@ -222,6 +237,7 @@ erDiagram
   MIGRATION_RUN o|--o{ MIGRATION_RUN : proves_apply
   SCHEMA_SNAPSHOT o|--o{ MIGRATION_RUN : verifies
   MIGRATION_RUN ||--o{ MIGRATION_RUN_EVENT : records
+  MIGRATION_RUN ||--o| MIGRATION_RUN_DISPATCH : dispatches
   USER_ACCOUNT o|--o{ MIGRATION_RUN_EVENT : acts
 
   MIGRATION_RUN {
@@ -255,6 +271,16 @@ erDiagram
     jsonb evidence_json
     timestamptz created_at
   }
+  MIGRATION_RUN_DISPATCH {
+    uuid migration_run_dispatch_uuid PK
+    uuid migration_run_uuid FK
+    text dispatch_kind
+    text status
+    int attempt_count
+    timestamptz not_before
+    timestamptz created_at
+    timestamptz published_at
+  }
 ```
 
 Planned foreign-key and cardinality rules:
@@ -264,6 +290,7 @@ Planned foreign-key and cardinality rules:
 | `migration_run.project_space_uuid` | `project_space` | non-null | `RESTRICT`; every run has one project, and a project has zero or more runs. |
 | `migration_run.migration_plan_uuid` | `migration_plan` | non-null | `RESTRICT`; every run attempts one immutable plan, and a plan has zero or more dry-run/apply attempts. |
 | `migration_run.requested_by_user_uuid` | `user_account` | non-null | `RESTRICT`; every run has one requesting actor, and a user can request zero or more runs. |
+| `migration_run_dispatch.migration_run_uuid` | `migration_run` | non-null and unique | `CASCADE`; each persisted dispatch belongs to exactly one run and a run has at most one dispatch row. |
 | `migration_run.passed_dry_run_uuid` | `migration_run` | null for dry runs; required for apply and must reference a `passed` run for the same plan/digest | `RESTRICT`; one passed dry run can prove zero or more apply requests until evidence becomes stale. |
 | `migration_run.verification_snapshot_uuid` | `schema_snapshot` | null until verification; required for `verified` | `RESTRICT`; a run has zero or one verification snapshot, and a snapshot can be referenced by zero or more runs physically. The service must create a dedicated snapshot per apply run. |
 | `migration_run_event.migration_run_uuid` | `migration_run` | non-null | `CASCADE` only if a separately approved retention deletion removes the run; every event has one run, and a run has zero or more events at insert time. |
@@ -271,7 +298,8 @@ Planned foreign-key and cardinality rules:
 
 Additional **Planned** invariants:
 
-- Run creation and queue insertion are atomic; the queue payload contains only
+- Run creation, genesis event, and identifier-only outbox insertion are
+  implemented atomically; future relay publication contains only
   `migration_run_uuid`.
 - One database uniqueness rule plus `request_digest` implements idempotency:
   identical reuse returns the original run, while different effective input

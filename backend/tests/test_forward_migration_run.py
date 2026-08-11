@@ -23,7 +23,12 @@ from app.forward.migration_run import (
     transition_migration_run,
     validate_run_transition,
 )
-from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
+from app.models import (
+    MigrationPlan,
+    MigrationRun,
+    MigrationRunDispatch,
+    MigrationRunEvent,
+)
 
 
 def _migration_plan(
@@ -245,6 +250,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     """ORM constraints preserve run identity, state, and evidence boundaries."""
 
     assert MigrationRun.__tablename__ == "migration_run"
+    assert MigrationRunDispatch.__tablename__ == "migration_run_dispatch"
     assert MigrationRunEvent.__tablename__ == "migration_run_event"
 
     unique_run_columns = {
@@ -315,6 +321,36 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     assert run.state == "queued"
     assert "dsn" not in MigrationRun.__table__.columns
     assert "sql" not in MigrationRunEvent.__table__.columns
+    assert {
+        column.name for column in MigrationRunDispatch.__table__.columns
+    } == {
+        "migration_run_dispatch_uuid",
+        "migration_run_uuid",
+        "dispatch_kind",
+        "status",
+        "attempt_count",
+        "not_before",
+        "created_at",
+        "published_at",
+    }
+    assert {
+        constraint.name
+        for constraint in MigrationRunDispatch.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    } == {
+        "ck_migration_run_dispatch__dispatch_kind",
+        "ck_migration_run_dispatch__status",
+        "ck_migration_run_dispatch__attempt_count",
+        "ck_migration_run_dispatch__published_at",
+    }
+    assert {
+        tuple(column.name for column in constraint.columns)
+        for constraint in MigrationRunDispatch.__table__.constraints
+        if isinstance(constraint, UniqueConstraint)
+    } == {("migration_run_uuid",)}
+    assert {index.name for index in MigrationRunDispatch.__table__.indexes} == {
+        "ix_migration_run_dispatch__status_not_before",
+    }
 
 
 def test_migration_run_alembic_revision_matches_model_contract() -> None:
@@ -329,6 +365,13 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         'down_revision = "0009_migration_plan"',
         '"migration_run"',
         '"migration_run_event"',
+        '"migration_run_dispatch"',
+        '"uq_migration_run_dispatch__migration_run_uuid"',
+        '"ck_migration_run_dispatch__dispatch_kind"',
+        '"ck_migration_run_dispatch__status"',
+        '"ck_migration_run_dispatch__attempt_count"',
+        '"ck_migration_run_dispatch__published_at"',
+        '"ix_migration_run_dispatch__status_not_before"',
         '"uq_migration_run__idempotent_action"',
         '"request_digest"',
         '"latest_event_digest"',
@@ -655,7 +698,11 @@ async def test_create_dry_run_uses_database_conflict_winner_and_initial_event() 
     compiled = str(statement.compile(dialect=postgresql.dialect()))
     assert "ON CONFLICT ON CONSTRAINT uq_migration_run__idempotent_action DO NOTHING" in compiled
     assert "RETURNING migration_run.migration_run_uuid" in compiled
-    event = session.add.call_args.args[0]
+    added = [call.args[0] for call in session.add.call_args_list]
+    event = next(item for item in added if isinstance(item, MigrationRunEvent))
+    dispatch = next(
+        item for item in added if isinstance(item, MigrationRunDispatch)
+    )
     assert isinstance(event, MigrationRunEvent)
     assert event.migration_run_uuid == run_uuid
     assert event.sequence_number == 1
@@ -664,6 +711,13 @@ async def test_create_dry_run_uses_database_conflict_winner_and_initial_event() 
     assert event.evidence_json == {"request_source": "review_ui"}
     assert event.previous_event_digest is None
     assert len(event.event_digest) == 64
+    assert dispatch.migration_run_uuid == run_uuid
+    assert dispatch.dispatch_kind == "isolated_dry_run"
+    assert dispatch.status == "pending"
+    assert dispatch.attempt_count == 0
+    assert dispatch.not_before == now
+    assert dispatch.created_at == now
+    assert dispatch.published_at is None
     assert created.migration_run_uuid == run_uuid
     assert created.reused is False
     session.scalar.assert_not_awaited()

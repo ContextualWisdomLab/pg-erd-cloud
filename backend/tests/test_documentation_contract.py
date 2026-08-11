@@ -161,7 +161,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep intent APIs implemented while worker execution remains planned."""
+    """Keep outbox intent implemented while worker execution remains planned."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -184,6 +184,12 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
         in normalized_contract
     )
     assert "stable sanitized run-action error envelope" in normalized_contract
+    assert "migration_run_dispatch" in normalized_contract
+    assert "identifier-only transactional outbox" in normalized_contract
+    assert "migration_run_dispatch" in trd
+    assert "migration_run_dispatch" in data_model
+    assert "identifier-only transactional outbox" in adr.lower()
+    assert "outbox relay and worker execution remain **planned**" in normalized_contract
 
 
 def test_superseded_adr_is_not_restored() -> None:

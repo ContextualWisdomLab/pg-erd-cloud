@@ -122,15 +122,17 @@ Adequacy labels in this audit mean:
 
 ### Not implemented despite accepted design
 
-- Queue/outbox delivery, sandbox/preflight/apply workers, and public apply-run
-  creation. Public dry-run creation and cancellation intent are implemented.
+- Outbox relay/queue delivery, sandbox/preflight/apply workers, and public
+  apply-run creation. Public dry-run creation, atomic identifier-only outbox,
+  and cancellation intent are implemented.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
   recovery.
-- Queue outbox, cancellation propagation, crash/restart recovery, and no-replay
-  apply reconciliation. Internal idempotency, compare-and-swap transitions,
-  cancellation intent, and append-only event evidence are implemented.
+- Outbox relay, cancellation propagation, crash/restart recovery, and no-replay
+  apply reconciliation. Atomic outbox persistence, internal idempotency,
+  compare-and-swap transitions, cancellation intent, and append-only event
+  evidence are implemented.
 - Verification snapshot, residual diff, convergence classification, alerts,
   kill switch, retention, and tested incident procedure.
 - Forward browser/API client, modal workflow, polling, accessibility, and every
@@ -153,9 +155,9 @@ as code or test evidence.
 | FE-INV-006: fingerprint revalidation for dry run/apply | Plan stores base digest only | — | [TRD](TRD.md), [Runbook](runbooks/forward-engineering.md) | **Planned release blocker.** |
 | FE-INV-007: in-lock data preconditions | Compiler emits precondition metadata | Compiler asserts metadata kinds/risk | [ADR-0003](adr/ADR-0003-plan-execution-segmentation.md), [Runbook](runbooks/forward-engineering.md) | **Planned runtime enforcement;** concurrency proof absent. |
 | FE-INV-008: one transactional segment | Current compiler marks admitted statements transactional | Compiler structured-plan tests | [ADR-0003](adr/ADR-0003-plan-execution-segmentation.md), [TRD](TRD.md) | **Planned executor/rollback proof.** Segment metadata/postconditions are not yet persisted. |
-| FE-INV-009: durable idempotent run, no apply replay | `models.py`; migration `0010`; `forward/migration_run.py`; `api/migration_runs.py` | `test_forward_migration_run.py`; `test_api_migration_runs.py` | [ADR-0004](adr/ADR-0004-durable-runs-and-recovery.md), [Data model](DATA_MODEL.md), [Runbook](runbooks/forward-engineering.md) | **Partially implemented:** durable identity, dry-run creation, CAS/cancellation writers, event chain, and polling exist; queue execution and apply no-replay recovery remain blockers. |
+| FE-INV-009: durable idempotent run, no apply replay | `models.py`; migration `0010`; `forward/migration_run.py`; `api/migration_runs.py` | `test_forward_migration_run.py`; `test_api_migration_runs.py` | [ADR-0004](adr/ADR-0004-durable-runs-and-recovery.md), [Data model](DATA_MODEL.md), [Runbook](runbooks/forward-engineering.md) | **Partially implemented:** durable identity, atomic identifier-only dispatch outbox, dry-run creation, CAS/cancellation writers, event chain, and polling exist; outbox relay, queue execution, and apply no-replay recovery remain blockers. |
 | FE-INV-010: deployer and evidence-bound approval | `permissions.py`; persistent legacy apply requires deployer | `test_permissions.py`; `test_api_apply_sql.py` | [ADR-0005](adr/ADR-0005-authority-approvals-and-convergence.md), [PRD](PRD.md) | **Partially implemented:** role boundary exists; exact dry-run/typed/destructive approval binding is Planned. |
-| FE-INV-011: no DSN/secret/raw SQL in queue/events/browser | Encrypted connection/redaction boundaries; `forward/migration_run.py`; sanitized worker failure codes | run-evidence and worker dispatch leakage regressions; DSN guard/redaction and snapshot error tests | [Threat model](security/forward-engineering-threat-model.md), [Data model](DATA_MODEL.md) | **Partially implemented:** durable evidence and generic worker failures reject secret-bearing content; future sandbox/apply payloads and browser surfaces remain unproved. |
+| FE-INV-011: no DSN/secret/raw SQL in queue/events/browser | Encrypted connection/redaction boundaries; `migration_run_dispatch` identifier-only schema; `forward/migration_run.py`; sanitized worker failure codes | run/outbox schema, evidence, and worker dispatch leakage regressions; DSN guard/redaction and snapshot error tests | [Threat model](security/forward-engineering-threat-model.md), [Data model](DATA_MODEL.md) | **Partially implemented:** dispatch storage contains no execution material, durable evidence and generic worker failures reject secret-bearing content; future relay, sandbox/apply payloads, and browser surfaces remain unproved. |
 | FE-INV-012: only matching verification snapshot is verified | — | — | [ADR-0005](adr/ADR-0005-authority-approvals-and-convergence.md), [UML](UML.md), [Runbook](runbooks/forward-engineering.md) | **Planned release blocker.** |
 | FE-INV-013: uniform cross-project masking | Current model/plan/connection routes | focused model/plan/apply tests | [Contract §9](contracts/forward-engineering-v1.md), [Threat model](security/forward-engineering-threat-model.md) | **Partially implemented:** full HTTP role/IDOR matrix and future resources absent. |
 | FE-INV-014: unknown fields/kinds/versions fail closed | Canonicalizer, snapshot/compiler boundary, and exact run/event state contracts | unknown-field/unsupported-feature/version and invalid run/event tests | [Contract §2, §4, §7](contracts/forward-engineering-v1.md), [Test strategy](TEST_STRATEGY.md) | **Partially implemented:** current model/plan/run boundaries fail closed; sandbox/apply executor dispatch remains absent. |
@@ -166,7 +168,7 @@ as code or test evidence.
 
 | Gap | Why documentation cannot close it | Required evidence |
 |---|---|---|
-| Queue/outbox execution and apply-run API | Persistence, authorized dry-run creation/cancellation, CAS writers, and integrity-checked polling exist, but worker execution and public apply creation are unavailable. | Transactional outbox/claiming, restart/cancellation integration tests, approval-bound apply creation |
+| Outbox relay/queue execution and apply-run API | Atomic identifier-only outbox persistence, authorized dry-run creation/cancellation, CAS writers, and integrity-checked polling exist, but relay/worker execution and public apply creation are unavailable. | Outbox relay/claiming, restart/cancellation integration tests, approval-bound apply creation |
 | Isolated sandbox and read-only preflight | A rollback on production still creates lock/scan/rewrite risk. | Network/credential isolation proof, real PostgreSQL sandbox convergence and live no-DDL audit |
 | Drift-safe executor | Stored plan metadata alone does not acquire locks, enforce preconditions, bound time, or roll back. | Versioned stored-plan dispatch, lock/timeout/concurrency/rollback integration tests |
 | Idempotency and uncertain-commit recovery | A lease retry can duplicate destructive DDL unless apply is never replayed after the boundary. | Crash/fault injection and reconciliation to `verified`, `not_applied`, or `outcome_unknown` |
