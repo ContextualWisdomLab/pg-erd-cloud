@@ -176,6 +176,48 @@ describe('computeDagreLayout', () => {
     expect(computeDagreLayout(nodes, [])).toEqual(nodes)
   })
 
+  it('preserves every prior coordinate when any node geometry is invalid', () => {
+    const nodes = [node('valid', 12, 34), node('invalid', 56, 78)]
+    vi.spyOn(dagre, 'layout').mockImplementationOnce((graph) => {
+      Object.assign(graph.node('valid'), {
+        width: 180,
+        height: 120,
+        x: 400,
+        y: 300,
+      })
+      Object.assign(graph.node('invalid'), {
+        width: 180,
+        height: 120,
+        x: Number.NaN,
+        y: 300,
+      })
+      return graph
+    })
+
+    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+  })
+
+  it('preserves every prior coordinate when top-left conversion overflows', () => {
+    const nodes = [node('valid', 12, 34), node('overflow', 56, 78)]
+    vi.spyOn(dagre, 'layout').mockImplementationOnce((graph) => {
+      Object.assign(graph.node('valid'), {
+        width: 180,
+        height: 120,
+        x: 400,
+        y: 300,
+      })
+      Object.assign(graph.node('overflow'), {
+        width: Number.MAX_VALUE,
+        height: 120,
+        x: -Number.MAX_VALUE,
+        y: 300,
+      })
+      return graph
+    })
+
+    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+  })
+
   it('preserves prior coordinates when the layout engine throws', () => {
     const nodes = [node('first', 12, 34), node('second', 56, 78)]
     vi.spyOn(dagre, 'layout').mockImplementationOnce(() => {

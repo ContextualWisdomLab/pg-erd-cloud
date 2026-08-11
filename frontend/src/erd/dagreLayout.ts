@@ -50,6 +50,15 @@ function dimensions(node: Node): { width: number; height: number } {
   return { width, height }
 }
 
+function preservePositions<NodeData extends Record<string, unknown>>(
+  nodes: ReadonlyArray<Node<NodeData>>,
+): Array<Node<NodeData>> {
+  return nodes.map((node) => ({
+    ...node,
+    position: { x: node.position.x, y: node.position.y },
+  }))
+}
+
 /**
  * Return deterministic relationship-aware top-left coordinates without
  * mutating React Flow nodes or edges. Dangling edges are ignored and any
@@ -95,21 +104,28 @@ export function computeDagreLayout<NodeData extends Record<string, unknown>>(
 
     dagre.layout(graph)
 
-    return nodes.map((node) => {
+    const nextPositions = new Map<string, { x: number; y: number }>()
+    for (const node of nodes) {
       const result = graph.node(node.id) as LayoutNode | undefined
       if (!result || !finitePositive(result.width) || !finitePositive(result.height)) {
-        return node
+        return preservePositions(nodes)
       }
-      if (!Number.isFinite(result.x) || !Number.isFinite(result.y)) return node
+      if (!Number.isFinite(result.x) || !Number.isFinite(result.y)) {
+        return preservePositions(nodes)
+      }
       const x = result.x! - result.width / 2
       const y = result.y! - result.height / 2
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return node
-      return { ...node, position: { x, y } }
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return preservePositions(nodes)
+      }
+      nextPositions.set(node.id, { x, y })
+    }
+
+    return nodes.map((node) => {
+      const position = nextPositions.get(node.id)!
+      return { ...node, position }
     })
   } catch {
-    return nodes.map((node) => ({
-      ...node,
-      position: { x: node.position.x, y: node.position.y },
-    }))
+    return preservePositions(nodes)
   }
 }
