@@ -4,9 +4,10 @@
 - **Implementation status:** Partially implemented; durable storage,
   identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
   bounded scheduled UUID-only queue publication, exact lease-token
-  ready/processing claim-ack-release primitives, polling, and dry-run
-  creation/cancellation intent APIs exist, while the queue consumer, workers,
-  deployment failover, and recovery do not
+  ready/processing claim-ack-release primitives, execution-neutral consumer
+  contract, polling, and dry-run creation/cancellation intent APIs exist, while
+  application consumer wiring, workers, deployment failover, and recovery do
+  not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -45,8 +46,11 @@ The signal adapter atomically reclaims expired processing leases and moves one
 due UUID-only ready member to an isolated processing set. A consumer-generated
 exact lease-token is stored separately from the ready payload; only that token
 may acknowledge or release the claim. This prevents a stale claimant from
-acknowledging a successor lease. The primitive does not create a consumer
-lifecycle, load execution material, access a target, or execute SQL.
+acknowledging a successor lease. The execution-neutral consumer invokes only an
+injected UUID handler, acknowledges after success, releases that exact lease at
+a bounded retry time after a sanitized failure, and treats lost acknowledgement
+or release ownership as non-success. It does not load execution material,
+access a target, or execute SQL, and is not wired into application startup.
 
 Each run binds:
 
@@ -149,8 +153,9 @@ Rules:
   URL validity, and connectivity failures surface in relay iterations after
   startup.
 - UUID-only signal claim, expiry reclaim, exact lease-token acknowledgement,
-  and scheduled release are implemented and verified against real Valkey; the
-  consumer lifecycle and worker execution remain **Planned**.
+  and scheduled release are implemented and verified against real Valkey. The
+  execution-neutral consumer contract is **Implemented**; application startup
+  wiring and worker execution remain **Planned**.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
@@ -182,7 +187,7 @@ Rules:
 ### Planned before production release
 
 - authenticated apply creation route;
-- queue consumption, cancellation-worker acknowledgement, and relay
+- application consumer wiring, cancellation-worker acknowledgement, and relay
   deployment restart/failover evidence;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.

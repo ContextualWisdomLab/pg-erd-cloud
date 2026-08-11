@@ -79,7 +79,8 @@ Implemented in the initial safe vertical slice:
 - UUID-only ready signals can be atomically moved to an isolated processing
   set with a bounded exact lease-token, reclaimed after expiry, acknowledged
   only by the current token, or released for a scheduled retry. These are
-  consumer-safety primitives only: no consumer lifecycle or worker exists;
+  execution-neutral consumer contract and consumer-safety primitives only: no
+  application consumer lifecycle or migration worker exists;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary

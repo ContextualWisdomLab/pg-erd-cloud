@@ -25,7 +25,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
 | Real-target preflight and plan expiry enforcement | Planned | No plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Planned | No current dry-run result is release evidence. |
-| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, and cancellation intent exist; no executor, retry, or recovery worker exists. |
+| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, and an execution-neutral consumer contract exist; no application consumer wiring, executor, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |
@@ -72,9 +72,13 @@ operational artifact is attached to the release record.
 - [x] Atomic ready-to-processing claim, bounded expiry reclaim, acknowledgement,
   and retry release use an exact lease-token. A stale claimant cannot complete
   a successor lease, and the ready payload remains only
-  `migration_run_uuid`. The consumer lifecycle and worker execution remain
-  **Planned**.
-- [ ] Relay deployment restart/failover, queue consumption, worker execution,
+  `migration_run_uuid`.
+- [x] The execution-neutral consumer contract is **Implemented**. It calls one
+  injected UUID handler, acknowledges only after success, releases only the
+  exact lease at a bounded retry time after sanitized failure, and fails closed
+  on lost lease ownership. It does not load plans, credentials, SQL, or target
+  data. Application startup wiring and worker execution remain **Planned**.
+- [ ] Relay deployment restart/failover, application consumer wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have

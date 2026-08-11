@@ -67,8 +67,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   logging, startup validation of the Valkey backend, and cooperative shutdown;
 - bounded UUID-only ready-to-processing claim, expiry reclaim, acknowledgement,
   and retry-release primitives use an exact lease-token so a stale claimant
-  cannot complete a successor lease. The consumer lifecycle and worker
-  execution remain **Planned**;
+  cannot complete a successor lease. The execution-neutral consumer contract
+  is **Implemented**: an injected handler must succeed before exact-lease
+  acknowledgement, and sanitized failure releases only that lease at a bounded
+  retry score. Application startup wiring and worker execution remain
+  **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - an editor-authorized cancellation HTTP boundary with strict state-version
@@ -106,7 +109,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, attempt-bound publish CAS, and exact lease-token claim/ack/release primitives exist; consumer lifecycle and worker execution remain **Planned** |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, attempt-bound publish CAS, exact lease-token claim/ack/release primitives, and the execution-neutral consumer contract are **Implemented**; application startup wiring and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
@@ -121,7 +124,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, lock-scoped dispatch claim, opt-in scheduled UUID-only publication, publish-state CAS, dry-run creation/cancellation APIs, and polling exist; queue consumer and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, lock-scoped dispatch claim, opt-in scheduled UUID-only publication, publish-state CAS, execution-neutral consumer contract, dry-run creation/cancellation APIs, and polling exist; application consumer wiring and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, and

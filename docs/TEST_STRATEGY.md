@@ -175,7 +175,11 @@ generic signal cannot consume the migration signal. Deployment restart/failover,
 consumer restart, and worker execution remain release-blocking evidence.
 The same real-service test moves a due UUID from ready to processing under an
 exact lease-token, rejects a stale acknowledgement, releases for retry,
-reclaims with a new token, and acknowledges cleanly. Consumer lifecycle,
+reclaims with a new token, and acknowledges cleanly. Focused consumer tests
+prove handler-before-ack ordering, exact-lease retry release, lost-lease
+failure, bounded timing, and fixed non-secret lifecycle logs. The
+execution-neutral consumer contract is **Implemented**; application startup
+wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.
 
 ## Fault-injection and recovery matrix

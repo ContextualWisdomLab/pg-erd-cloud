@@ -162,7 +162,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep scheduled publication implemented while consumers stay planned."""
+    """Track the consumer contract without claiming startup or execution."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -194,7 +194,14 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "bounded one-attempt publisher is **implemented**" in normalized_contract
     assert "scheduled relay lifecycle is **implemented**" in normalized_contract
     assert "dedicated valkey sorted-set key" in normalized_contract
-    assert "consumer lifecycle and worker execution remain **planned**" in normalized_contract
+    assert (
+        "execution-neutral consumer contract is **implemented**"
+        in normalized_contract
+    )
+    assert (
+        "application startup wiring and worker execution remain **planned**"
+        in normalized_contract
+    )
     assert "Startup fails closed when Valkey is unavailable" not in adr
     assert "Startup rejects an unconfigured Valkey backend" in adr
 
@@ -255,8 +262,19 @@ def test_dispatch_relay_documentation_separates_implemented_and_planned_scope() 
 
     assert "Additional **Implemented and Planned** invariants:" in data_model
     assert "- **Implemented — scheduled relay lifecycle:**" in data_model
-    assert "- **Implemented — scheduled relay lifecycle and UUID-only publication:**" in audit
-    assert "- **Planned — queue consumer, worker execution, failover, and retention:**" in audit
+    assert (
+        "- **Implemented — execution-neutral queue consumer contract:**"
+        in data_model
+    )
+    assert (
+        "- **Implemented — scheduled relay lifecycle and UUID-only publication:**"
+        in audit
+    )
+    assert "- **Implemented — execution-neutral queue consumer contract:**" in audit
+    assert (
+        "- **Planned — application consumer wiring, worker execution, "
+        "failover, and retention:**" in audit
+    )
     assert "Relay loop/queue delivery" not in audit
 
 
@@ -273,7 +291,17 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
 
     for document in (contract, trd, runbook):
         assert "exact lease-token" in document
-        assert "consumer lifecycle and worker execution remain **planned**" in document
+        assert "execution-neutral consumer contract is **implemented**" in document
+        assert (
+            "application startup wiring and worker execution remain **planned**"
+            in document
+        )
+
+    consumer = _read(Path("backend/app/jobs/migration_run_consumer.py"))
+    main = _read(Path("backend/app/main.py"))
+    assert "process_one_migration_run_signal" in consumer
+    assert "run_migration_run_consumer_forever" in consumer
+    assert "run_migration_run_consumer_forever" not in main
 
 
 def test_ci_runs_real_valkey_signal_acceptance() -> None:

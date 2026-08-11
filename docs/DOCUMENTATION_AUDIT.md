@@ -130,10 +130,13 @@ Adequacy labels in this audit mean:
 - **Implemented — UUID-only signal lease safety:** ready-to-processing claim,
   bounded expiry reclaim, acknowledgement, and retry release require an exact
   lease-token; stale claimants cannot complete successor leases.
-- **Planned — queue consumer, worker execution, failover, and retention:** no
-  signal consumer loads plans or credentials, accesses a target, or executes
-  SQL. Sandbox/preflight/apply workers and public apply-run creation remain
-  absent.
+- **Implemented — execution-neutral queue consumer contract:** one injected
+  UUID handler must succeed before exact-lease acknowledgement; sanitized
+  failure releases only that lease at a bounded retry score, and lease loss is
+  non-success. The contract loads no plan, credential, SQL, or target value.
+- **Planned — application consumer wiring, worker execution, failover, and retention:**
+  no startup task consumes migration signals, accesses a target, or executes
+  SQL. Sandbox/preflight/apply workers and public apply-run creation remain absent.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
@@ -177,7 +180,7 @@ as code or test evidence.
 
 | Gap | Why documentation cannot close it | Required evidence |
 |---|---|---|
-| Queue consumption/worker execution and apply-run API | Atomic identifier-only outbox persistence, authorized dry-run creation/cancellation, scheduled bounded UUID-only queue publication, CAS writers, and integrity-checked polling exist, but consumer/worker execution and public apply creation are unavailable. | Deployment relay failover, consumer restart/cancellation integration tests, approval-bound apply creation |
+| Application consumer wiring/worker execution and apply-run API | Atomic identifier-only outbox persistence, authorized dry-run creation/cancellation, scheduled bounded UUID-only queue publication, execution-neutral consumer contract, CAS writers, and integrity-checked polling exist, but application consumer/worker execution and public apply creation are unavailable. | Deployment relay failover, consumer restart/cancellation integration tests, approval-bound apply creation |
 | Isolated sandbox and read-only preflight | A rollback on production still creates lock/scan/rewrite risk. | Network/credential isolation proof, real PostgreSQL sandbox convergence and live no-DDL audit |
 | Drift-safe executor | Stored plan metadata alone does not acquire locks, enforce preconditions, bound time, or roll back. | Versioned stored-plan dispatch, lock/timeout/concurrency/rollback integration tests |
 | Idempotency and uncertain-commit recovery | A lease retry can duplicate destructive DDL unless apply is never replayed after the boundary. | Crash/fault injection and reconciliation to `verified`, `not_applied`, or `outcome_unknown` |

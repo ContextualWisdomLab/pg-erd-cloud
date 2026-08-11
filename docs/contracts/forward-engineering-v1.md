@@ -40,7 +40,9 @@ Current code implements only the first control-plane slice:
   internal database-selected dry-run creation writer, cancellation intent, and
   authenticated integrity-checked run polling and editor-authorized cancellation
   API, plus editor-authorized exact-digest/idempotency-bound dry-run creation;
-  no worker execution authority exists yet.
+  no worker execution authority exists yet. The execution-neutral consumer
+  contract is **Implemented**; application startup wiring and worker execution
+  remain **Planned**.
 - **Planned:** apply creation and all workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
@@ -123,8 +125,12 @@ creation remains **Planned**. Lock-scoped due-order outbox claiming,
 attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
 **Implemented**. Atomic UUID-only ready-to-processing claim, expiry reclaim,
 acknowledgement, and retry release also use an exact lease-token so a stale
-claimant cannot complete a successor lease. The consumer lifecycle and worker
-execution remain **Planned**. The bounded one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
+claimant cannot complete a successor lease. The execution-neutral consumer
+contract is **Implemented**: it invokes one injected handler for the claimed
+UUID, acknowledges only after success, releases the exact lease on a sanitized
+failure, and fails closed when either completion loses lease ownership.
+Application startup wiring and worker execution remain **Planned**. The bounded
+one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
 propagation, sandbox/preflight workers, apply, reconciliation, and verification
@@ -165,8 +171,9 @@ claim, commits only after exact-attempt acknowledgement, rolls an exception
 back through the transaction context, sleeps at a bounded positive interval
 after empty or failed iterations, and cancels cleanly with the application.
 It refuses startup unless the Valkey signal backend is configured. The
-consumer lifecycle and worker execution remain **Planned**; the lifecycle and
-lease primitives never load a plan, target credential, SQL batch, or row value.
+execution-neutral consumer contract is **Implemented**; application startup
+wiring and worker execution remain **Planned**. The consumer and lease
+primitives never load a plan, target credential, SQL batch, or row value.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic
