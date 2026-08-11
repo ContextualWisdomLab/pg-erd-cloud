@@ -11,6 +11,7 @@ from app.forward.live_preflight import (
     LivePreflightContractError,
     compare_live_preflight_snapshot,
     compile_live_preflight_queries,
+    execute_bound_live_preflight,
     execute_live_preflight,
 )
 from app.forward.schema_model import schema_model_digest
@@ -404,6 +405,196 @@ class _CancelledRollbackFailingConnection(_CancelledConnection):
     def transaction(self, **kwargs: object) -> _FakeTransaction:
         self.transaction_options = kwargs
         return _TransactionRollbackFailingTransaction(self)
+
+
+@pytest.mark.asyncio
+async def test_binds_fresh_snapshot_and_checks_to_one_read_only_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Capture and preconditions must observe one authorized DB snapshot."""
+
+    original_wait_for = asyncio.wait_for
+    client_timeouts: list[float] = []
+
+    async def record_wait_for(awaitable: Any, *, timeout: float) -> object:
+        client_timeouts.append(timeout)
+        return await original_wait_for(awaitable, timeout=timeout)
+
+    monkeypatch.setattr(
+        live_preflight_module.asyncio, "wait_for", record_wait_for
+    )
+    connection = _FakeConnection([True])
+    snapshot = _snapshot()
+    plan = _plan(
+        {
+            "kind": "table_is_empty",
+            "schema_name": "Sales Data",
+            "table_name": 'Order "Item"',
+        }
+    )
+    observed_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan["base_digest"] = observed_digest
+    capture_calls: list[_FakeConnection] = []
+
+    async def capture(owned_connection: _FakeConnection) -> Mapping[str, Any]:
+        assert owned_connection.started is True
+        assert owned_connection.committed is False
+        capture_calls.append(owned_connection)
+        return snapshot
+
+    evidence = await execute_bound_live_preflight(
+        connection,
+        plan,
+        capture_snapshot=capture,  # type: ignore[arg-type]
+        statement_timeout_ms=2500,
+    )
+
+    assert capture_calls == [connection]
+    assert connection.transaction_options == {
+        "isolation": "repeatable_read",
+        "readonly": True,
+    }
+    assert connection.committed is True
+    assert connection.rolled_back is False
+    assert client_timeouts == [3.5] * 5
+    assert evidence == {
+        "preconditions_passed": True,
+        "checks": [
+            {
+                "statement_index": 0,
+                "precondition_index": 0,
+                "kind": "table_is_empty",
+                "passed": True,
+            }
+        ],
+        "observed_base_digest": observed_digest,
+        "matches_plan_base": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_bound_capture_returns_drift_without_discarding_check_evidence() -> None:
+    connection = _FakeConnection([True])
+    planned_snapshot = _snapshot()
+    plan = _plan(
+        {
+            "kind": "table_is_empty",
+            "schema_name": "Sales Data",
+            "table_name": 'Order "Item"',
+        }
+    )
+    plan["base_digest"] = schema_model_digest(
+        snapshot_to_schema_model(planned_snapshot)
+    )
+    observed_snapshot = _snapshot()
+    observed_snapshot["relations"][0]["relation_name"] = "Changed"
+    observed_digest = schema_model_digest(
+        snapshot_to_schema_model(observed_snapshot)
+    )
+
+    async def capture(_: _FakeConnection) -> Mapping[str, Any]:
+        return observed_snapshot
+
+    evidence = await execute_bound_live_preflight(
+        connection,
+        plan,
+        capture_snapshot=capture,  # type: ignore[arg-type]
+    )
+
+    assert evidence["preconditions_passed"] is True
+    assert evidence["observed_base_digest"] == observed_digest
+    assert evidence["matches_plan_base"] is False
+    assert connection.committed is True
+
+
+@pytest.mark.parametrize("capture_result", [None, "private row"])
+@pytest.mark.asyncio
+async def test_bound_capture_rejects_non_snapshot_results(
+    capture_result: object,
+) -> None:
+    connection = _FakeConnection([])
+    plan = _plan()
+    plan["base_digest"] = "a" * 64
+
+    async def capture(_: _FakeConnection) -> object:
+        return capture_result
+
+    with pytest.raises(
+        LivePreflightContractError, match="snapshot capture is invalid"
+    ):
+        await execute_bound_live_preflight(
+            connection,
+            plan,
+            capture_snapshot=capture,  # type: ignore[arg-type]
+        )
+
+    assert connection.rolled_back is True
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RuntimeError("postgresql://user:secret@target.example/app"),
+        LivePreflightContractError("password=secret"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_bound_capture_sanitizes_failures_without_driver_detail(
+    failure: Exception,
+) -> None:
+    connection = _FakeConnection([])
+    plan = _plan()
+    plan["base_digest"] = "a" * 64
+
+    async def capture(_: _FakeConnection) -> Mapping[str, Any]:
+        raise failure
+
+    with pytest.raises(LivePreflightContractError) as captured:
+        await execute_bound_live_preflight(
+            connection,
+            plan,
+            capture_snapshot=capture,  # type: ignore[arg-type]
+        )
+
+    assert str(captured.value) == "live preflight query failed"
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
+    assert connection.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_bound_capture_requires_a_callable() -> None:
+    connection = _FakeConnection([])
+
+    with pytest.raises(
+        LivePreflightContractError, match="snapshot capture is invalid"
+    ):
+        await execute_bound_live_preflight(
+            connection,
+            _plan(),
+            capture_snapshot=None,  # type: ignore[arg-type]
+        )
+
+    assert connection.transaction_options is None
+
+
+@pytest.mark.asyncio
+async def test_bound_capture_preserves_cancellation_after_rollback() -> None:
+    connection = _FakeConnection([])
+    plan = _plan()
+    plan["base_digest"] = "a" * 64
+
+    async def capture(_: _FakeConnection) -> Mapping[str, Any]:
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        await execute_bound_live_preflight(
+            connection,
+            plan,
+            capture_snapshot=capture,  # type: ignore[arg-type]
+        )
+
+    assert connection.rolled_back is True
 
 
 @pytest.mark.asyncio

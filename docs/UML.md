@@ -61,12 +61,14 @@ Current authority boundaries:
   accepted production workflow.
 
 Components deliberately absent from this current diagram are **Planned**:
-isolated sandbox provisioning/materialization/cleanup, live-preflight
-worker-owned fresh-capture binding, live plan execution, reconciliation, and
-post-apply convergence verification.
-Durable `migration_run`/event/outbox persistence and an execution-neutral,
-bounded read-only precondition primitive are **Partially implemented**; neither
-constitutes worker execution or dry-run success evidence.
+isolated sandbox provisioning/materialization/cleanup, durable live-preflight
+worker/attempt/credential binding, live plan execution, reconciliation, and
+post-apply convergence verification. `execute_bound_live_preflight` binds a
+caller-owned fresh-capture callback and checks to one read-only repeatable-read
+transaction, but does not provide any of that durable worker authority.
+Durable `migration_run`/event/outbox persistence and this execution-neutral,
+bounded read-only primitive are **Partially implemented**; neither constitutes
+worker execution or dry-run success evidence.
 
 ## Current model-revision-plan sequence
 

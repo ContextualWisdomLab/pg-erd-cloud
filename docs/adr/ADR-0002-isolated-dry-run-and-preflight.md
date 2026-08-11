@@ -111,6 +111,11 @@ locks on the execution connection.
   It also adapts a caller-supplied snapshot through the strict capability
   boundary and returns only its canonical digest plus exact plan-base match.
   This is a primitive, not a worker or completed live-preflight claim.
+- `execute_bound_live_preflight` invokes a caller-owned fresh snapshot callback
+  and the admitted structured checks inside the same read-only repeatable-read
+  transaction. It returns bounded check evidence, the canonical observed
+  digest, and the exact plan-base match without acquiring credential, worker,
+  durable-attempt, run-transition, or DDL authority.
 - PostgreSQL 14–18 CI creates a separate ephemeral preflight login for the
   target database, grants it only fixture-scoped USAGE/SELECT, removes database
   CREATE/TEMP, sets a default read-only policy, and proves both admitted reads
@@ -123,8 +128,8 @@ locks on the execution connection.
   cleanup, and egress enforcement;
 - application worker wiring with a separately constrained read-only target
   identity and guarded connection lifecycle;
-- worker-owned fresh target capture and binding to the same authorized
-  connection/attempt before invoking the implemented digest comparison;
+- durable worker identity and attempt binding around the caller-owned
+  `execute_bound_live_preflight` same-connection transaction primitive;
 - durable, redacted evidence and a frontend presentation of both evidence
   classes.
 

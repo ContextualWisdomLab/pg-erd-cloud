@@ -202,14 +202,21 @@ database failures (including transaction creation/start, commit, and rollback
 cleanup), no rollback before a successful start, cleared exception
 cause/context, and strict
 snapshot-to-plan-base canonical digest comparison.
+`execute_bound_live_preflight` tests require a caller-owned capture callback to
+run after the read-only repeatable-read transaction starts and before it
+commits, under the same client timeout as the structured checks. They prove
+exact digest match, explicit drift, invalid capture rejection, fixed non-secret
+capture failure, rollback, and cancellation propagation. PostgreSQL 14–18
+acceptance invokes that primitive through the restricted preflight login and
+re-captures the catalog on the same connection/transaction as data checks.
 Durable-run unit tests require that observed digest for terminal preflight CAS,
 revalidate the immutable plan, persist it on the run and chained event, and
 reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
 transition injection. Worker evidence cannot pre-author the reserved observed
 digest field through snake-, camel-, kebab-case, or nested aliases.
 The privilege proof is CI-local rather than deployed production evidence.
-Target audit-log evidence, worker-owned fresh capture/attempt binding, and
-worker failure/recovery remain release blockers. The
+Target audit-log evidence and durable worker/attempt binding around the
+caller-owned same-transaction primitive remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup
 wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.

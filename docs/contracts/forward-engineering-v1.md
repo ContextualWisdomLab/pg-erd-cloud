@@ -47,16 +47,19 @@ Current code implements only the first control-plane slice:
   wiring and worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
-  them in one timed read-only transaction. It strictly adapts a caller-supplied
-  snapshot and compares its canonical digest with the plan base, but has no
-  credential, worker-owned fresh-capture, run-transition, or DDL authority.
+  them in one timed read-only transaction. `execute_bound_live_preflight`
+  additionally binds a caller-owned fresh snapshot callback and those checks
+  to that same transaction, returning its canonical digest and plan-base match.
+  It has no credential, worker identity, durable-attempt, run-transition, or
+  DDL authority.
 - **Partially implemented:** the isolated-dry-run execution core verifies one
   signed v1 plan, compatible PostgreSQL major, strict materialized base,
   all-transactional statement list, rollback boundary, and target-digest
   convergence. It does not provision, isolate, materialize, clean, or bind a
   durable worker attempt.
 - **Planned:** apply creation and all workers, isolated sandbox lifecycle,
-  complete live preflight fresh-capture/attempt binding and apply-time fingerprint
+  complete live preflight worker/attempt binding around the caller-owned
+  same-transaction capture primitive, and apply-time fingerprint
   revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.

@@ -2,15 +2,17 @@
 
 This module is an execution-neutral primitive for the planned dry-run worker.
 It consumes only the structured preconditions already bound into an immutable
-migration plan.  It neither accepts arbitrary SQL nor owns target credentials,
-fresh snapshot capture, run transitions, or apply authority.
+migration plan. ``execute_bound_live_preflight`` coordinates a caller-owned
+fresh snapshot callback and the structured checks in one transaction. The
+module neither accepts arbitrary SQL nor owns target credentials, worker
+identity, durable attempts, run transitions, or apply authority.
 """
 
 from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,10 +29,17 @@ from app.forward.snapshot_adapter import snapshot_to_schema_model
 MAX_LIVE_PREFLIGHT_QUERIES = 1000
 MAX_STATEMENT_TIMEOUT_MS = 60_000
 _SHA256_HEX_RE = re.compile(r"[0-9a-f]{64}")
+SnapshotCapture = Callable[
+    [asyncpg.Connection], Awaitable[Mapping[str, Any]]
+]
 
 
 class LivePreflightContractError(ValueError):
     """Reject malformed plans or incomplete live-preflight evidence."""
+
+
+class _LivePreflightCaptureFailure(Exception):
+    """Keep caller callback failures separate from public contract errors."""
 
 
 @dataclass(frozen=True)
@@ -195,13 +204,14 @@ def compile_live_preflight_queries(
     return tuple(queries)
 
 
-async def execute_live_preflight(
+async def _execute_live_preflight(
     connection: asyncpg.Connection,
     plan: Mapping[str, object],
     *,
+    capture_snapshot: SnapshotCapture | None,
     statement_timeout_ms: int = 5000,
 ) -> dict[str, Any]:
-    """Execute compiled checks in one bounded read-only target snapshot."""
+    """Execute optional capture and compiled checks in one target snapshot."""
 
     if (
         not isinstance(statement_timeout_ms, int)
@@ -229,6 +239,21 @@ async def execute_live_preflight(
             ),
             timeout=client_timeout,
         )
+        snapshot_evidence: dict[str, object] | None = None
+        if capture_snapshot is not None:
+            try:
+                snapshot = await asyncio.wait_for(
+                    capture_snapshot(connection), timeout=client_timeout
+                )
+            except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                raise _LivePreflightCaptureFailure from None
+            if not isinstance(snapshot, Mapping):
+                raise LivePreflightContractError(
+                    "live preflight snapshot capture is invalid"
+                )
+            snapshot_evidence = compare_live_preflight_snapshot(plan, snapshot)
         checks: list[dict[str, object]] = []
         for query in queries:
             prepared = await asyncio.wait_for(
@@ -272,4 +297,48 @@ async def execute_live_preflight(
         sanitized_failure = True
     if sanitized_failure:
         raise LivePreflightContractError("live preflight query failed") from None
-    return {"passed": all(bool(item["passed"]) for item in checks), "checks": checks}
+    preconditions_passed = all(bool(item["passed"]) for item in checks)
+    if snapshot_evidence is None:
+        return {"passed": preconditions_passed, "checks": checks}
+    return {
+        "preconditions_passed": preconditions_passed,
+        "checks": checks,
+        **snapshot_evidence,
+    }
+
+
+async def execute_live_preflight(
+    connection: asyncpg.Connection,
+    plan: Mapping[str, object],
+    *,
+    statement_timeout_ms: int = 5000,
+) -> dict[str, Any]:
+    """Execute compiled checks in one bounded read-only target snapshot."""
+
+    return await _execute_live_preflight(
+        connection,
+        plan,
+        capture_snapshot=None,
+        statement_timeout_ms=statement_timeout_ms,
+    )
+
+
+async def execute_bound_live_preflight(
+    connection: asyncpg.Connection,
+    plan: Mapping[str, object],
+    *,
+    capture_snapshot: SnapshotCapture,
+    statement_timeout_ms: int = 5000,
+) -> dict[str, Any]:
+    """Bind fresh capture and checks to one caller-owned target transaction."""
+
+    if not callable(capture_snapshot):
+        raise LivePreflightContractError(
+            "live preflight snapshot capture is invalid"
+        )
+    return await _execute_live_preflight(
+        connection,
+        plan,
+        capture_snapshot=capture_snapshot,
+        statement_timeout_ms=statement_timeout_ms,
+    )

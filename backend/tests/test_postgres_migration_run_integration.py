@@ -16,6 +16,7 @@ from app.forward.isolated_dry_run import execute_isolated_dry_run
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.live_preflight import (
     LivePreflightContractError,
+    execute_bound_live_preflight,
     execute_live_preflight,
 )
 from app.forward.migration_run import (
@@ -40,6 +41,8 @@ from app.pg_introspect import queries
 from app.pg_introspect.snapshot_contract import (
     CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
 )
+from app.forward.schema_model import schema_model_digest
+from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
 _POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
@@ -253,6 +256,25 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
         await admin_connection.execute(
             f"GRANT SELECT ON {qualified} TO cwl_erd_preflight"
         )
+        planned_snapshot = await _capture_filtered_snapshot(
+            admin_connection, schema_name
+        )
+        plan = _preflight_plan(
+            {
+                "kind": "table_is_empty",
+                "schema_name": schema_name,
+                "table_name": table_name,
+            },
+            {
+                "kind": "no_null_values",
+                "schema_name": schema_name,
+                "table_name": table_name,
+                "column_name": "amount value",
+            },
+        )
+        plan["base_digest"] = schema_model_digest(
+            snapshot_to_schema_model(planned_snapshot)
+        )
         connection = await asyncpg.connect(_preflight_asyncpg_url())
         try:
             privileges = await connection.fetchrow(
@@ -287,26 +309,22 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                     f'CREATE TABLE {quoted_schema}."must not exist" (id integer)'
                 )
 
-            evidence = await execute_live_preflight(
+            async def capture(
+                owned_connection: asyncpg.Connection[asyncpg.Record],
+            ) -> dict[str, object]:
+                return await _capture_filtered_snapshot(
+                    owned_connection, schema_name
+                )
+
+            evidence = await execute_bound_live_preflight(
                 connection,
-                _preflight_plan(
-                    {
-                        "kind": "table_is_empty",
-                        "schema_name": schema_name,
-                        "table_name": table_name,
-                    },
-                    {
-                        "kind": "no_null_values",
-                        "schema_name": schema_name,
-                        "table_name": table_name,
-                        "column_name": "amount value",
-                    },
-                ),
+                plan,
+                capture_snapshot=capture,  # type: ignore[arg-type]
                 statement_timeout_ms=2000,
             )
 
             assert evidence == {
-                "passed": False,
+                "preconditions_passed": False,
                 "checks": [
                     {
                         "statement_index": 0,
@@ -321,6 +339,8 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                         "passed": False,
                     },
                 ],
+                "observed_base_digest": plan["base_digest"],
+                "matches_plan_base": True,
             }
 
             with pytest.raises(LivePreflightContractError) as captured:

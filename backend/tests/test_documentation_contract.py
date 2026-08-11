@@ -253,6 +253,30 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "migration-run/outbox" in strategy
 
 
+def test_bound_live_preflight_maturity_is_canonical() -> None:
+    """Keep same-snapshot capture binding distinct from worker authority."""
+
+    implementation = _read(Path("backend/app/forward/live_preflight.py"))
+    required_documents = (
+        Path("ARCHITECTURE.md"),
+        Path("CHANGELOG.md"),
+        Path("docs/TRD.md"),
+        Path("docs/DATA_MODEL.md"),
+        Path("docs/DOCUMENTATION_AUDIT.md"),
+        Path("docs/UML.md"),
+        Path("docs/contracts/forward-engineering-v1.md"),
+        Path("docs/adr/ADR-0002-isolated-dry-run-and-preflight.md"),
+        Path("docs/TEST_STRATEGY.md"),
+        Path("docs/runbooks/forward-engineering.md"),
+    )
+
+    assert "execute_bound_live_preflight" in implementation
+    for path in required_documents:
+        document = _read(path)
+        assert "execute_bound_live_preflight" in document
+        assert "caller-owned" in document
+
+
 def test_ci_generates_ephemeral_integration_credentials() -> None:
     """Keep test credentials ephemeral and checkout credentials unavailable."""
 
