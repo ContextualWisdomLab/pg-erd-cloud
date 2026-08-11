@@ -223,7 +223,7 @@ async def execute_live_preflight(
         transaction_started = True
         await connection.execute(
             "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
-            f"{statement_timeout_ms}ms",
+            str(statement_timeout_ms),
         )
         client_timeout = statement_timeout_ms / 1000 + 1
         checks: list[dict[str, object]] = []
@@ -243,12 +243,12 @@ async def execute_live_preflight(
                 }
             )
         await transaction.commit()
-        transaction_started = False
     except BaseException as err:
         if transaction_started and transaction is not None:
             try:
                 await transaction.rollback()
             except Exception:
+                # Preserve the fixed non-success diagnostic, never driver detail.
                 pass
         if isinstance(
             err,

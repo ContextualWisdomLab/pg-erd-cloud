@@ -191,7 +191,8 @@ live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,
 prepared-statement-only execution, parameter-bound transaction-local server
-timeout plus client timeout bounds, boolean-only
+timeout using the exact unitless decimal millisecond bind value, client timeout
+bounds, boolean-only
 evidence, rollback, fixed non-secret
 database failures (including transaction creation/start, commit, and rollback
 cleanup), no rollback before a successful start, cleared exception

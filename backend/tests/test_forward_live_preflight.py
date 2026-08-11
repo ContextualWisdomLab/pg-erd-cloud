@@ -419,7 +419,7 @@ async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> Non
     assert connection.executed == [
         (
             "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
-            ("2500ms",),
+            ("2500",),
         )
     ]
     assert connection.prepared == [sql for sql, _ in connection.queries]

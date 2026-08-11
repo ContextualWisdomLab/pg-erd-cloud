@@ -82,8 +82,9 @@ executable SQL, safety classification, approval truth, or recovery state.
 - a bounded live-preflight query primitive accepts only the three structured
   compiler preconditions, validates PostgreSQL identifiers and target types,
   prepares every server-owned query before execution, runs boolean-only reads
-  in one read-only repeatable-read transaction, applies a parameter-bound
-  transaction-local server timeout plus a bounded client timeout,
+  in one read-only repeatable-read transaction, binds the transaction-local
+  server timeout as a unitless decimal string whose PostgreSQL default unit is
+  milliseconds, applies a bounded client timeout,
   replaces transaction creation/start, query, commit, and rollback-cleanup
   failures with fixed diagnostics, and rolls back only after transaction startup
   succeeds while preserving cancellation and process-exit signals.
