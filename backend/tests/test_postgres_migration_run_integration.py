@@ -275,7 +275,7 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
 
 @pytest.mark.asyncio
 async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
-    """Prove least-privilege reads, DDL denial, and fixed failures."""
+    """Prove least-privilege reads, DDL denial, timeout cleanup, and fixed failures."""
 
     assert _POSTGRES_URL is not None
     assert _POSTGRES_SANDBOX_URL is not None
@@ -393,6 +393,30 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                 "observed_base_digest": plan["base_digest"],
                 "matches_plan_base": True,
             }
+
+            blocking_transaction = admin_connection.transaction()
+            await blocking_transaction.start()
+            try:
+                await admin_connection.execute(
+                    f"LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE"
+                )
+                with pytest.raises(LivePreflightContractError) as timed_out:
+                    await execute_live_preflight(
+                        connection,
+                        _preflight_plan(
+                            {
+                                "kind": "table_is_empty",
+                                "schema_name": schema_name,
+                                "table_name": table_name,
+                            }
+                        ),
+                        statement_timeout_ms=100,
+                    )
+                assert str(timed_out.value) == "live preflight query failed"
+                assert timed_out.value.__cause__ is None
+                assert connection.is_in_transaction() is False
+            finally:
+                await blocking_transaction.rollback()
 
             with pytest.raises(LivePreflightContractError) as captured:
                 await execute_live_preflight(
