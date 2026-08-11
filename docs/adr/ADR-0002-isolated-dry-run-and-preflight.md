@@ -94,8 +94,9 @@ locks on the execution connection.
   version, PostgreSQL major, strict materialized-base digest, supported
   all-transactional operation list, and bounded timeouts before executing the
   exact compiler-owned statements in one sandbox transaction. It masks driver
-  failures, rolls back after a started transaction, preserves cancellation,
-  re-introspects through a worker-owned callback, and requires the strict
+  failures without retaining cause/context, bounds server and client waits,
+  rolls back after a started transaction, preserves cancellation,
+  re-introspects through a bounded worker-owned callback, and requires the strict
   target digest. The PostgreSQL 14–18 matrix exercises the real DDL/catalog
   round trip. This is an execution core, not evidence that a deployed sandbox
   is disposable or isolated.

@@ -9,6 +9,7 @@ requires a fresh strict snapshot to converge on the planned target digest.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -71,7 +72,7 @@ _STATEMENT_FIELDS = frozenset(
 
 
 class _PreparedStatement(Protocol):
-    async def fetch(self) -> Sequence[object]: ...
+    async def fetch(self, *, timeout: float) -> Sequence[object]: ...
 
 
 class _Transaction(Protocol):
@@ -196,26 +197,37 @@ def _validated_plan(
 
 
 def _captured_digest(snapshot: Mapping[str, Any]) -> str:
+    invalid_snapshot = False
     try:
         model = snapshot_to_schema_model(snapshot)
     except (SchemaModelValidationError, TypeError, ValueError):
+        invalid_snapshot = True
+    if invalid_snapshot:
         raise IsolatedDryRunContractError(
             "isolated sandbox snapshot is invalid"
-        ) from None
+        )
     return schema_model_digest(model)
 
 
 async def _capture_digest(
-    connection: IsolatedPostgresConnection, capture_snapshot: SnapshotCapture
+    connection: IsolatedPostgresConnection,
+    capture_snapshot: SnapshotCapture,
+    *,
+    timeout: float,
 ) -> str:
+    capture_failed = False
     try:
-        snapshot = await capture_snapshot(connection)
+        snapshot = await asyncio.wait_for(
+            capture_snapshot(connection), timeout=timeout
+        )
     except BaseException as exc:
         if not isinstance(exc, Exception):
             raise
+        capture_failed = True
+    if capture_failed:
         raise IsolatedDryRunContractError(
             "isolated sandbox snapshot capture failed"
-        ) from None
+        )
     if not isinstance(snapshot, Mapping):
         raise IsolatedDryRunContractError("isolated sandbox snapshot is invalid")
     return _captured_digest(snapshot)
@@ -247,10 +259,15 @@ async def execute_isolated_dry_run(
         maximum=MAX_STATEMENT_TIMEOUT_MS,
         name="statement timeout",
     )
+    client_timeout = statement_timeout_ms / 1_000 + 1
 
+    version_check_failed = False
     try:
-        server_version_num = await connection.fetchval(
-            "SELECT pg_catalog.current_setting('server_version_num')::integer"
+        server_version_num = await asyncio.wait_for(
+            connection.fetchval(
+                "SELECT pg_catalog.current_setting('server_version_num')::integer"
+            ),
+            timeout=client_timeout,
         )
         if (
             not isinstance(server_version_num, int)
@@ -265,47 +282,66 @@ async def execute_isolated_dry_run(
     except BaseException as exc:
         if not isinstance(exc, Exception):
             raise
+        version_check_failed = True
+    if version_check_failed:
         raise IsolatedDryRunContractError(
             "isolated PostgreSQL version check failed"
-        ) from None
+        )
 
-    observed_base_digest = await _capture_digest(connection, capture_snapshot)
+    observed_base_digest = await _capture_digest(
+        connection, capture_snapshot, timeout=client_timeout
+    )
     if observed_base_digest != executable.base_digest:
         raise IsolatedDryRunContractError(
             "isolated sandbox does not match the planned base"
         )
 
     transaction_started = False
+    statement_failed = False
     try:
         transaction = connection.transaction()
-        await transaction.start()
+        await asyncio.wait_for(transaction.start(), timeout=client_timeout)
         transaction_started = True
-        await connection.execute(
-            "SELECT pg_catalog.set_config('lock_timeout', $1, true)",
-            str(lock_timeout_ms),
+        await asyncio.wait_for(
+            connection.execute(
+                "SELECT pg_catalog.set_config('lock_timeout', $1, true)",
+                str(lock_timeout_ms),
+            ),
+            timeout=client_timeout,
         )
-        await connection.execute(
-            "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
-            str(statement_timeout_ms),
+        await asyncio.wait_for(
+            connection.execute(
+                "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+                str(statement_timeout_ms),
+            ),
+            timeout=client_timeout,
         )
         for sql in executable.statements:
-            prepared = await connection.prepare(sql)
-            await prepared.fetch()
-        await transaction.commit()
+            prepared = await asyncio.wait_for(
+                connection.prepare(sql), timeout=client_timeout
+            )
+            await prepared.fetch(timeout=client_timeout)
+        await asyncio.wait_for(transaction.commit(), timeout=client_timeout)
     except BaseException as exc:
         if transaction_started:
             try:
-                await transaction.rollback()
+                await asyncio.wait_for(
+                    transaction.rollback(), timeout=client_timeout
+                )
             except Exception:
                 # Preserve the fixed primary failure and never driver detail.
                 pass
         if not isinstance(exc, Exception):
             raise
+        statement_failed = True
+    if statement_failed:
         raise IsolatedDryRunContractError(
             "isolated dry-run statement failed"
-        ) from None
+        )
 
-    observed_target_digest = await _capture_digest(connection, capture_snapshot)
+    observed_target_digest = await _capture_digest(
+        connection, capture_snapshot, timeout=client_timeout
+    )
     if observed_target_digest != executable.target_digest:
         raise IsolatedDryRunContractError(
             "isolated dry run did not converge"

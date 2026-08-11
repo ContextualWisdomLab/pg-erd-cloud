@@ -95,8 +95,8 @@ class _PreparedStatement:
         self.connection = connection
         self.sql = sql
 
-    async def fetch(self) -> list[object]:
-        self.connection.calls.append(("prepared_fetch", self.sql))
+    async def fetch(self, *, timeout: float) -> list[object]:
+        self.connection.calls.append(("prepared_fetch", self.sql, timeout))
         if self.connection.fail_statement == self.sql:
             raise RuntimeError("driver detail containing a secret")
         return []
@@ -187,9 +187,9 @@ async def test_executes_exact_signed_plan_and_requires_semantic_convergence() ->
             "2500",
         ),
         ("prepare", plan["statements"][0]["sql"]),
-        ("prepared_fetch", plan["statements"][0]["sql"]),
+        ("prepared_fetch", plan["statements"][0]["sql"], 3.5),
         ("prepare", plan["statements"][1]["sql"]),
-        ("prepared_fetch", plan["statements"][1]["sql"]),
+        ("prepared_fetch", plan["statements"][1]["sql"], 3.5),
         ("commit",),
     ]
 
@@ -246,6 +246,7 @@ async def test_rolls_back_and_masks_statement_failure() -> None:
 
     assert str(captured.value) == "isolated dry-run statement failed"
     assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
     assert ("rollback",) in connection.calls
     assert ("commit",) not in connection.calls
 
@@ -260,7 +261,8 @@ async def test_propagates_cancellation_after_rollback() -> None:
     async def capture(_connection: _Connection) -> Mapping[str, Any]:
         return base_snapshot
 
-    async def cancelled_fetch() -> list[object]:
+    async def cancelled_fetch(*, timeout: float) -> list[object]:
+        assert timeout == 31.0
         raise asyncio.CancelledError
 
     statement = await connection.prepare(plan["statements"][0]["sql"])
@@ -511,11 +513,14 @@ async def test_rejects_capture_failures_invalid_snapshots_and_wrong_base() -> No
         )
     assert str(captured.value) == "isolated sandbox snapshot capture failed"
     assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
 
     async def not_mapping(_connection: _Connection) -> Any:
         return []
 
-    with pytest.raises(IsolatedDryRunContractError, match="snapshot is invalid"):
+    with pytest.raises(
+        IsolatedDryRunContractError, match="snapshot is invalid"
+    ) as captured:
         await execute_isolated_dry_run(
             _Connection(),
             plan,
@@ -535,6 +540,8 @@ async def test_rejects_capture_failures_invalid_snapshots_and_wrong_base() -> No
             expected_plan_digest=plan["plan_digest"],
             capture_snapshot=invalid,
         )
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
 
     _empty, wrong_target_snapshot = _snapshots()
 
@@ -572,6 +579,7 @@ async def test_masks_version_and_transaction_start_failures() -> None:
         )
     assert str(captured.value) == "isolated PostgreSQL version check failed"
     assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
 
     class StartFailureTransaction(_Transaction):
         async def start(self) -> None:
@@ -582,14 +590,40 @@ async def test_masks_version_and_transaction_start_failures() -> None:
             return StartFailureTransaction(self)
 
     start_failure = StartFailure()
-    with pytest.raises(IsolatedDryRunContractError, match="statement failed"):
+    with pytest.raises(
+        IsolatedDryRunContractError, match="statement failed"
+    ) as captured:
         await execute_isolated_dry_run(
             start_failure,
             plan,
             expected_plan_digest=plan["plan_digest"],
             capture_snapshot=capture,
         )
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
     assert ("rollback",) not in start_failure.calls
+
+    class CommitFailureTransaction(_Transaction):
+        async def commit(self) -> None:
+            raise RuntimeError("secret commit failure")
+
+    class CommitFailure(_Connection):
+        def transaction(self) -> _Transaction:
+            return CommitFailureTransaction(self)
+
+    commit_failure = CommitFailure()
+    with pytest.raises(
+        IsolatedDryRunContractError, match="statement failed"
+    ) as captured:
+        await execute_isolated_dry_run(
+            commit_failure,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture,
+        )
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
+    assert ("rollback",) in commit_failure.calls
 
 
 @pytest.mark.asyncio
@@ -649,3 +683,4 @@ async def test_masks_rollback_cleanup_failure_without_hiding_primary_failure() -
         )
     assert str(captured.value) == "isolated dry-run statement failed"
     assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
