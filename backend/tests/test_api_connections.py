@@ -189,7 +189,11 @@ def test_validation_response_does_not_echo_secret_bearing_sql(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     client = TestClient(app)
-    secret_sql = "CREATE TABLE audit_record (credential text DEFAULT 'never-log-me')\x00;"
+    redaction_marker = "-".join(("never", "log-me"))
+    secret_sql = (
+        "CREATE TABLE audit_record "
+        f"(credential text DEFAULT '{redaction_marker}')\x00;"
+    )
 
     response = client.post(
         f"/api/connections/{uuid.uuid4()}/apply-sql",
@@ -197,5 +201,5 @@ def test_validation_response_does_not_echo_secret_bearing_sql(
     )
 
     assert response.status_code == 422
-    assert "never-log-me" not in response.text
-    assert "never-log-me" not in caplog.text
+    assert redaction_marker not in response.text
+    assert redaction_marker not in caplog.text

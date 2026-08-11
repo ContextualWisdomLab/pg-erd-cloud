@@ -52,7 +52,13 @@ def test_apply_sql_preserves_multiline_unicode_transport_characters() -> None:
 
 @pytest.mark.parametrize(
     "codepoint",
-    [*range(0x00, 0x09), 0x0B, 0x0C, *range(0x0E, 0x20), 0x7F],
+    [
+        *range(0x00, 0x09),
+        0x0B,
+        0x0C,
+        *range(0x0E, 0x20),
+        *range(0x7F, 0xA0),
+    ],
 )
 @pytest.mark.parametrize("position", ["beginning", "middle", "end"])
 def test_apply_sql_rejects_non_text_controls_at_every_position(

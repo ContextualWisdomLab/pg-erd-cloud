@@ -88,12 +88,13 @@ class ApplySqlIn(BaseModel):
 
         Tab, line feed, and carriage return are valid SQL formatting
         characters.  Other C0 controls and DEL can corrupt log, parser, or
-        driver boundaries and therefore fail before DDL authorization.
+        driver boundaries and therefore fail before DDL authorization.  The
+        same applies to the C1 control block (U+007F through U+009F).
         """
 
         if any(
             (codepoint < 0x20 and codepoint not in {0x09, 0x0A, 0x0D})
-            or codepoint == 0x7F
+            or 0x7F <= codepoint <= 0x9F
             for codepoint in map(ord, value)
         ):
             raise ValueError("SQL contains a disallowed control character")
