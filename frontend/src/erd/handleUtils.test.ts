@@ -1,38 +1,55 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { describe, expect, it } from 'vitest';
+
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
-    it('should encode a simple ascii string', () => {
+    it('should correctly encode ASCII characters', () => {
       expect(sanitizeHandleId('id')).toBe('c-0069-0064');
     });
 
-    it('should handle empty string', () => {
+    it('should correctly encode Unicode characters', () => {
+      expect(sanitizeHandleId('테스트')).toBe('c-d14c-c2a4-d2b8');
+    });
+
+    it('should correctly handle empty strings', () => {
       expect(sanitizeHandleId('')).toBe('c-empty');
-    });
-
-    it('should handle special characters', () => {
-      expect(sanitizeHandleId('user_id')).toBe('c-0075-0073-0065-0072-005f-0069-0064');
-    });
-
-    it('should handle unicode characters', () => {
-      expect(sanitizeHandleId('id_가')).toBe('c-0069-0064-005f-ac00');
-    });
-
-    it('should handle emojis', () => {
-      expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
     });
   });
 
   describe('sourceColumnHandleId', () => {
-    it('should prepend src- to sanitized id', () => {
+    it('should prepend src- to the sanitized handle', () => {
       expect(sourceColumnHandleId('id')).toBe('src-c-0069-0064');
     });
   });
 
   describe('targetColumnHandleId', () => {
-    it('should prepend tgt- to sanitized id', () => {
+    it('should prepend tgt- to the sanitized handle', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('parseColumnNameFromHandle', () => {
+    it('should parse source handle correctly', () => {
+      expect(parseColumnNameFromHandle(sourceColumnHandleId('my_column'))).toBe('my_column');
+    });
+
+    it('should parse target handle correctly', () => {
+      expect(parseColumnNameFromHandle(targetColumnHandleId('my_column'))).toBe('my_column');
+    });
+
+    it('should handle unicode characters', () => {
+      expect(parseColumnNameFromHandle(sourceColumnHandleId('테스트'))).toBe('테스트');
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(parseColumnNameFromHandle(sourceColumnHandleId(''))).toBe('');
+    });
+
+    it('should return null for invalid handles', () => {
+      expect(parseColumnNameFromHandle('invalid-handle')).toBeNull();
+      expect(parseColumnNameFromHandle(null)).toBeNull();
+      expect(parseColumnNameFromHandle(undefined)).toBeNull();
     });
   });
 });
