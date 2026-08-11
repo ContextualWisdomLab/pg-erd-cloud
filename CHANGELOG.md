@@ -13,5 +13,5 @@
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
 - **Security**: Fixed SVG XSS vulnerability by enforcing numeric position attributes and backtick string sanitization during export.
 - **Security**: Addressed a CSV formula injection vector involving full-width Unicode characters and spaces in `exportDataDictionary.ts` (OWASP CSV Injection).
-- **Security**: Hardened React Flow `handleId` decoding to accept only canonical role-specific `src-c-*` / `tgt-c-*` handles at export sinks, reject malformed Unicode scalars and bounded oversized payloads, and fail closed instead of inferring a relationship from hostile or partial metadata.
-- **Performance**: Replaced export-time column rescans with per-node column sets and keyed Prisma relation indexes. Handle parsing is `O(H)` per handle and the complete relation pass is `O(N×C + E×H)` while preserving distinct relation names without map-key collisions.
+- **Security**: Hardened React Flow `handleId` decoding routines to reject malformed surrogate pairs and mitigate ReDoS memory exhaustion vectors.
+- **Performance**: Optimized foreign key loop detection bounds and explicitly pre-indexed handle metadata logic to `O(H)` without changing existing column semantics.

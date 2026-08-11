@@ -1,10 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import {
-  decodeSourceColumnHandleId,
-  decodeTargetColumnHandleId,
-} from './handleUtils';
+import { decodeHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[\s]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
@@ -46,45 +43,24 @@ type ForeignKeyNodeInfo = {
   columns: Set<string>;
 };
 
-export function foreignKeyColumnsByNode(
-  edges: Edge[],
-  nodes: Node<TableNodeData>[] = [],
-): Map<string, ForeignKeyNodeInfo> {
+export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
-  const columnsByNode = new Map<string, Set<string>>();
-  for (const node of nodes) {
-    const columns = new Set<string>();
-    for (const column of node.data.columns || []) {
-      columns.add(column.column_name);
-    }
-    columnsByNode.set(node.id, columns);
-  }
 
   for (const edge of edges) {
-    if (edge.sourceHandle || edge.targetHandle) {
-      const sourceColumn = decodeSourceColumnHandleId(edge.sourceHandle);
-      const targetColumn = decodeTargetColumnHandleId(edge.targetHandle);
-      if (
-        sourceColumn === null
-        || targetColumn === null
-        || !columnsByNode.get(edge.source)?.has(sourceColumn)
-        || !columnsByNode.get(edge.target)?.has(targetColumn)
-      ) {
-        continue;
-      }
+    let info = map.get(edge.source);
+    if (!info) {
+      info = { columns: new Set<string>() };
+      map.set(edge.source, info);
+    }
 
-      let info = map.get(edge.source);
-      if (!info) {
-        info = { columns: new Set<string>() };
-        map.set(edge.source, info);
+    if (edge.sourceHandle || edge.targetHandle) {
+      if (edge.sourceHandle) {
+        const decodedSourceColumn = decodeHandleId(edge.sourceHandle);
+        if (decodedSourceColumn !== null) {
+          info.columns.add(decodedSourceColumn);
+        }
       }
-      info.columns.add(sourceColumn);
     } else {
-      let info = map.get(edge.source);
-      if (!info) {
-        info = { columns: new Set<string>() };
-        map.set(edge.source, info);
-      }
       for (const column of sourceColumnsForEdge(edge)) {
         info.columns.add(column);
       }
@@ -125,7 +101,7 @@ export function exportDictionaryCsv(
     'Example Value',
   ];
   const rows: unknown[][] = [header];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges, nodes);
+  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
 
   for (const node of nodes) {
     const tableName = node.data.title || node.id;
@@ -160,7 +136,7 @@ export function exportDictionaryMarkdown(
   edges: Edge[],
 ): string {
   const lines: string[] = ['# Data Dictionary', ''];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges, nodes);
+  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
 
   if (nodes.length === 0) {
     lines.push('No tables found.');

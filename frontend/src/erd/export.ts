@@ -2,10 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import {
-  decodeSourceColumnHandleId,
-  decodeTargetColumnHandleId,
-} from './handleUtils';
+import { decodeHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -65,31 +62,27 @@ function fkColumnsForEdge(
   sourceNodeColumnNames: Set<string>,
   targetNodeColumnNames: Set<string>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
-  // A supplied handle is authoritative. Decode both roles and fail closed when
-  // either handle is malformed, partial, role-swapped, or names no live column.
-  const decodedSource = decodeSourceColumnHandleId(edge.sourceHandle);
+  const data = edge.data as ForeignKeyEdgeData | undefined;
+  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
+  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
+  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
+    return { sourceColumns, targetColumns };
+  }
+
+  // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
+  // and using a precomputed O(1) Set to check for column existence.
+  const decodedSource = decodeHandleId(edge.sourceHandle);
   const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
     ? decodedSource
     : undefined;
 
-  const decodedTarget = decodeTargetColumnHandleId(edge.targetHandle);
+  const decodedTarget = decodeHandleId(edge.targetHandle);
   const targetHandleColumn = decodedTarget !== null && targetNodeColumnNames.has(decodedTarget)
     ? decodedTarget
     : undefined;
 
   if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
-  }
-
-  if (edge.sourceHandle || edge.targetHandle) {
-    return null;
-  }
-
-  const data = edge.data as ForeignKeyEdgeData | undefined;
-  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
-  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
-    return { sourceColumns, targetColumns };
   }
 
   const fallbackSource = (sourceNode.data.columns || [])

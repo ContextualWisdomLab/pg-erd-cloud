@@ -48,6 +48,9 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
   }
 
   const hexParts = parts.slice(payloadIndex);
+  if (hexParts.length > 10000) return null;
+  if (hexParts.length === 0) return null;
+
   let decoded = '';
   for (const hex of hexParts) {
     if (!HEX_CHUNK_RE.test(hex)) {
@@ -57,22 +60,13 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
     if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
       return null;
     }
-    decoded += String.fromCodePoint(codePoint);
+    try {
+      decoded += String.fromCodePoint(codePoint);
+    } catch {
+      /* v8 ignore next */
+      return null;
+    }
   }
 
   return decoded;
-}
-
-/** Decode only a canonical source-column handle. */
-export function decodeSourceColumnHandleId(
-  handleId: string | null | undefined,
-): string | null {
-  return handleId?.startsWith('src-c-') ? decodeHandleId(handleId) : null;
-}
-
-/** Decode only a canonical target-column handle. */
-export function decodeTargetColumnHandleId(
-  handleId: string | null | undefined,
-): string | null {
-  return handleId?.startsWith('tgt-c-') ? decodeHandleId(handleId) : null;
 }

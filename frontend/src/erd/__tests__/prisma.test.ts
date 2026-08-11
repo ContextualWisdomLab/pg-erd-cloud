@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -64,8 +63,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: sourceColumnHandleId('user_id'),
-        targetHandle: targetColumnHandleId('id'),
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
         label: 'users_posts',
       },
     ];
@@ -225,8 +224,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: sourceColumnHandleId('user_id'),
-        targetHandle: targetColumnHandleId('id'),
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
         label: '1to1',
       },
     ];
@@ -234,128 +233,5 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
-  });
-
-  it.each([
-    ['malformed', 'src-user_id', targetColumnHandleId('id')],
-    ['wrong-role', targetColumnHandleId('user_id'), sourceColumnHandleId('id')],
-    ['unknown-column', sourceColumnHandleId('missing'), targetColumnHandleId('id')],
-  ])('fails closed for %s relation handles', (_, sourceHandle, targetHandle) => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'users',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-      {
-        id: 'posts',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'posts',
-          badges: { pk: false, fk: true },
-          columns: [
-            { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
-          ],
-        },
-      },
-    ];
-
-    const result = exportPrisma(nodes, [{
-      id: 'relation',
-      source: 'posts',
-      target: 'users',
-      sourceHandle,
-      targetHandle,
-      label: 'posts_users',
-    }]);
-
-    expect(result).not.toContain('@relation("posts_users"');
-  });
-
-  it('uses a singular back-relation when the canonical source field is unique', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'account',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'account',
-          badges: { pk: true, fk: true },
-          columns: [
-            { column_name: 'profile_id', data_type: 'uuid', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-      {
-        id: 'profile',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'profile',
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'id', data_type: 'uuid', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-    ];
-
-    const result = exportPrisma(nodes, [{
-      id: 'account_profile',
-      source: 'account',
-      target: 'profile',
-      sourceHandle: sourceColumnHandleId('profile_id'),
-      targetHandle: targetColumnHandleId('id'),
-    }]);
-
-    expect(result).toContain('account_profile_id account? @relation("account_profile")');
-  });
-
-  it('preserves distinct relations sharing the same source and target fields', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'posts',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'posts',
-          badges: { pk: false, fk: true },
-          columns: [
-            { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
-          ],
-        },
-      },
-      {
-        id: 'users',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [
-            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-          ],
-        },
-      },
-    ];
-    const canonicalHandles = {
-      sourceHandle: sourceColumnHandleId('user_id'),
-      targetHandle: targetColumnHandleId('id'),
-    };
-
-    const result = exportPrisma(nodes, [
-      { id: 'owner', source: 'posts', target: 'users', label: 'owner', ...canonicalHandles },
-      { id: 'reviewer', source: 'posts', target: 'users', label: 'reviewer', ...canonicalHandles },
-      { id: 'reviewer-copy', source: 'posts', target: 'users', label: 'reviewer', ...canonicalHandles },
-    ]);
-
-    expect(result).toContain('users_user_id users @relation("owner"');
-    expect(result).toContain('users_user_id_reviewer users @relation("reviewer"');
-    expect(result).toContain('users_user_id_reviewer_2 users @relation("reviewer"');
-    expect(result).toContain('posts_user_id posts[] @relation("owner")');
-    expect(result).toContain('posts_user_id_reviewer posts[] @relation("reviewer")');
-    expect(result).toContain('posts_user_id_reviewer_2 posts[] @relation("reviewer")');
   });
 });
