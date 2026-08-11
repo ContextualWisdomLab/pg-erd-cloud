@@ -257,6 +257,7 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     """Keep same-snapshot capture binding distinct from worker authority."""
 
     implementation = _read(Path("backend/app/forward/live_preflight.py"))
+    durable_implementation = _read(Path("backend/app/forward/migration_run.py"))
     required_documents = (
         Path("ARCHITECTURE.md"),
         Path("CHANGELOG.md"),
@@ -271,9 +272,11 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     )
 
     assert "execute_bound_live_preflight" in implementation
+    assert "complete_live_preflight" in durable_implementation
     for path in required_documents:
         document = _read(path)
         assert "execute_bound_live_preflight" in document
+        assert "complete_live_preflight" in document
         assert "caller-owned" in document
 
 

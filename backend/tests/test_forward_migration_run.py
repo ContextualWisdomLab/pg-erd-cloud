@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from math import nan
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import pytest
 from sqlalchemy import CheckConstraint, UniqueConstraint
@@ -17,6 +17,7 @@ from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
     claim_one_migration_dispatch,
+    complete_live_preflight,
     create_migration_run,
     digest_run_event,
     digest_run_request,
@@ -727,6 +728,201 @@ async def test_preflight_drift_transition_persists_mismatched_base_digest() -> N
     assert session.add.call_args.args[0].evidence_json == {
         "observed_base_digest": observed_base_digest
     }
+
+
+@pytest.mark.parametrize(
+    "matches_plan_base, check_results, expected_state, expected_digest",
+    [
+        (True, [True, True], "passed", "a" * 64),
+        (False, [True], "drifted", "b" * 64),
+        (True, [True, False], "failed", None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_live_preflight_derives_the_only_valid_terminal_state(
+    matches_plan_base: bool,
+    check_results: list[bool],
+    expected_state: str,
+    expected_digest: str | None,
+) -> None:
+    """Worker evidence cannot choose its terminal classification or digest."""
+
+    run_uuid = uuid.uuid4()
+    observed_digest = "a" * 64 if matches_plan_base else "b" * 64
+    result = {
+        "preconditions_passed": all(check_results),
+        "checks": [
+            {
+                "statement_index": 0,
+                "precondition_index": index,
+                "kind": "table_is_empty",
+                "passed": passed,
+            }
+            for index, passed in enumerate(check_results)
+        ],
+        "observed_base_digest": observed_digest,
+        "matches_plan_base": matches_plan_base,
+    }
+    transition = AsyncMock(return_value=SimpleNamespace(state=expected_state))
+
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ):
+        completed = await complete_live_preflight(
+            SimpleNamespace(),  # type: ignore[arg-type]
+            migration_run_uuid=run_uuid,
+            expected_state_version=3,
+            result=result,
+            actor_user_uuid=None,
+        )
+
+    assert completed.state == expected_state
+    transition.assert_awaited_once_with(
+        ANY,
+        migration_run_uuid=run_uuid,
+        expected_state_version=3,
+        next_state=expected_state,
+        event_type=f"live_preflight_{expected_state}",
+        evidence={
+            "check_count": len(check_results),
+            "failed_check_count": check_results.count(False),
+        },
+        observed_base_digest=expected_digest,
+        actor_user_uuid=None,
+        now=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        None,
+        [],
+        {},
+        {
+            "preconditions_passed": True,
+            "checks": [],
+            "observed_base_digest": "A" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": False,
+            "checks": [],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": True,
+            "checks": [{"passed": True}],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": True,
+            "checks": [
+                {
+                    "statement_index": -1,
+                    "precondition_index": 0,
+                    "kind": "table_is_empty",
+                    "passed": True,
+                }
+            ],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": True,
+            "checks": [
+                {
+                    "statement_index": 0,
+                    "precondition_index": 0,
+                    "kind": [],
+                    "passed": True,
+                }
+            ],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": True,
+            "checks": [
+                {
+                    "statement_index": 0,
+                    "precondition_index": 0,
+                    "kind": "table_is_empty",
+                    "passed": True,
+                },
+                {
+                    "statement_index": 0,
+                    "precondition_index": 0,
+                    "kind": "no_null_values",
+                    "passed": True,
+                },
+            ],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+        },
+        {
+            "preconditions_passed": True,
+            "checks": [],
+            "observed_base_digest": "a" * 64,
+            "matches_plan_base": True,
+            "next_state": "passed",
+        },
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_live_preflight_rejects_incomplete_or_forged_results(
+    result: object,
+) -> None:
+    """Only the exact bounded executor result shape may reach durable CAS."""
+
+    transition = AsyncMock()
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ), pytest.raises(MigrationRunContractError, match="preflight result"):
+        await complete_live_preflight(
+            SimpleNamespace(),  # type: ignore[arg-type]
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=3,
+            result=result,  # type: ignore[arg-type]
+            actor_user_uuid=None,
+        )
+
+    transition.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_complete_live_preflight_enforces_the_check_count_ceiling() -> None:
+    """Oversized worker results fail before durable state access."""
+
+    result = {
+        "preconditions_passed": True,
+        "checks": [
+            {
+                "statement_index": index,
+                "precondition_index": 0,
+                "kind": "table_is_empty",
+                "passed": True,
+            }
+            for index in range(1001)
+        ],
+        "observed_base_digest": "a" * 64,
+        "matches_plan_base": True,
+    }
+    transition = AsyncMock()
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ), pytest.raises(MigrationRunContractError, match="preflight result"):
+        await complete_live_preflight(
+            SimpleNamespace(),  # type: ignore[arg-type]
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=3,
+            result=result,
+            actor_user_uuid=None,
+        )
+
+    transition.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

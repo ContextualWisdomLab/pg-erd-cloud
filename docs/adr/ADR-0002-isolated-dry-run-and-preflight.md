@@ -116,6 +116,11 @@ locks on the execution connection.
   transaction. It returns bounded check evidence, the canonical observed
   digest, and the exact plan-base match without acquiring credential, worker,
   durable-attempt, run-transition, or DDL authority.
+- `complete_live_preflight` rejects extra, malformed, duplicate-position, or
+  aggregate-inconsistent result evidence and server-derives the terminal CAS:
+  base mismatch is `drifted`, exact base plus any failed check is `failed`, and
+  exact base plus all passing checks is `passed`. Durable evidence retains only
+  check counts and the separately server-authoritative observed digest.
 - PostgreSQL 14–18 CI creates a separate ephemeral preflight login for the
   target database, grants it only fixture-scoped USAGE/SELECT, removes database
   CREATE/TEMP, sets a default read-only policy, and proves both admitted reads

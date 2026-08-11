@@ -28,6 +28,9 @@ from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 MAX_LIVE_PREFLIGHT_QUERIES = 1000
 MAX_STATEMENT_TIMEOUT_MS = 60_000
+LIVE_PREFLIGHT_PRECONDITION_KINDS = frozenset(
+    {"table_is_empty", "no_null_values", "castable_values"}
+)
 _SHA256_HEX_RE = re.compile(r"[0-9a-f]{64}")
 SnapshotCapture = Callable[
     [asyncpg.Connection], Awaitable[Mapping[str, Any]]

@@ -74,6 +74,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
+- `complete_live_preflight` validates the exact bounded preflight result,
+  derives `drifted`, `failed`, or `passed` without caller-selected state, and
+  delegates only aggregate check counts plus the server-authoritative observed
+  digest to the existing durable CAS;
 - an editor-authorized cancellation HTTP boundary with strict state-version
   input, IDOR masking, stable sanitized error codes, and request correlation.
 - versioned canonical event digests covering run/sequence/type/state/evidence,

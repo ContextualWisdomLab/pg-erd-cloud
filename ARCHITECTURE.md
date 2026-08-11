@@ -35,7 +35,7 @@ support.
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
 | Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified polling, and dry-run creation/cancellation intent APIs **Implemented**; workers **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
-| Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query and canonical snapshot/base-digest comparison primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction. Durable worker identity/attempt binding and apply remain **Planned**. |
+| Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query and canonical snapshot/base-digest comparison primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification from that exact result. Durable worker identity/attempt binding and apply remain **Planned**. |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
 The browser is an intent and review surface, never a SQL authority. The API
@@ -97,8 +97,10 @@ Implemented in the initial safe vertical slice:
   `execute_bound_live_preflight` additionally runs a caller-owned fresh
   snapshot callback and those checks in the same read-only repeatable-read
   transaction, returning the canonical observed digest and plan-base match;
-  it owns no credential, worker identity, durable attempt, run-transition, or
-  DDL authority;
+  `complete_live_preflight` accepts only that exact bounded result shape and
+  derives `drifted`, `failed`, or `passed` plus bounded aggregate evidence for
+  the existing durable CAS; neither function owns credentials, worker
+  identity, durable attempt acquisition, or DDL authority;
 - an execution-only isolated-dry-run primitive accepts no DSN or browser SQL,
   verifies the immutable plan/compiler/PostgreSQL-major/base bindings, executes
   only the compiler-owned all-transactional statement list with bounded

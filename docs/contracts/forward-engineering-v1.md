@@ -42,7 +42,10 @@ Current code implements only the first control-plane slice:
   API, plus editor-authorized exact-digest/idempotency-bound dry-run creation;
   the terminal preflight CAS requires and persists the canonical observed base
   digest, revalidates plan integrity, and enforces exact `passed` match versus
-  `drifted` mismatch semantics. No worker execution authority exists yet. The
+  `drifted` mismatch semantics. `complete_live_preflight` validates the exact
+  bounded executor-result shape and server-derives `passed`, `drifted`, or
+  `failed`; a caller cannot select the state, event type, or digest. No worker
+  execution authority exists yet. The
   execution-neutral consumer contract is **Implemented**; application startup
   wiring and worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
@@ -50,8 +53,9 @@ Current code implements only the first control-plane slice:
   them in one timed read-only transaction. `execute_bound_live_preflight`
   additionally binds a caller-owned fresh snapshot callback and those checks
   to that same transaction, returning its canonical digest and plan-base match.
-  It has no credential, worker identity, durable-attempt, run-transition, or
-  DDL authority.
+  `complete_live_preflight` converts only that strict shape into a bounded
+  aggregate-evidence CAS. These primitives have no credential, worker identity,
+  durable-attempt acquisition, or DDL authority.
 - **Partially implemented:** the isolated-dry-run execution core verifies one
   signed v1 plan, compatible PostgreSQL major, strict materialized base,
   all-transactional statement list, rollback boundary, and target-digest

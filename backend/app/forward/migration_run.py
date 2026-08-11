@@ -24,6 +24,10 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
+from app.forward.live_preflight import (
+    LIVE_PREFLIGHT_PRECONDITION_KINDS,
+    MAX_LIVE_PREFLIGHT_QUERIES,
+)
 from app.forward.migration_plan import verify_migration_plan_digest
 from app.models import (
     MigrationPlan,
@@ -92,6 +96,17 @@ _POSTGRES_CONNECTION_STRING = re.compile(
 )
 _HEX_DIGEST = re.compile(r"[0-9a-f]{64}")
 _EVENT_TYPE = re.compile(r"[a-z][a-z0-9_]{0,63}")
+_LIVE_PREFLIGHT_RESULT_FIELDS = frozenset(
+    {
+        "preconditions_passed",
+        "checks",
+        "observed_base_digest",
+        "matches_plan_base",
+    }
+)
+_LIVE_PREFLIGHT_CHECK_FIELDS = frozenset(
+    {"statement_index", "precondition_index", "kind", "passed"}
+)
 
 
 class MigrationRunContractError(ValueError):
@@ -727,6 +742,115 @@ async def transition_migration_run(
         state_version=next_version,
         started_at=started_at,
         finished_at=finished_at,
+    )
+
+
+def _canonicalize_live_preflight_result(
+    result: Mapping[str, object],
+) -> tuple[bool, bool, str, int, int]:
+    """Validate one exact execution result without retaining target metadata."""
+
+    if (
+        not isinstance(result, Mapping)
+        or set(result) != _LIVE_PREFLIGHT_RESULT_FIELDS
+    ):
+        raise MigrationRunContractError("live preflight result is invalid")
+    preconditions_passed = result["preconditions_passed"]
+    matches_plan_base = result["matches_plan_base"]
+    observed_base_digest = result["observed_base_digest"]
+    checks = result["checks"]
+    if (
+        not isinstance(preconditions_passed, bool)
+        or not isinstance(matches_plan_base, bool)
+        or not isinstance(observed_base_digest, str)
+        or _HEX_DIGEST.fullmatch(observed_base_digest) is None
+        or not isinstance(checks, list)
+        or len(checks) > MAX_LIVE_PREFLIGHT_QUERIES
+    ):
+        raise MigrationRunContractError("live preflight result is invalid")
+    failed_check_count = 0
+    positions: set[tuple[int, int]] = set()
+    for check in checks:
+        if not isinstance(check, Mapping) or set(check) != _LIVE_PREFLIGHT_CHECK_FIELDS:
+            raise MigrationRunContractError("live preflight result is invalid")
+        statement_index = check["statement_index"]
+        precondition_index = check["precondition_index"]
+        kind = check["kind"]
+        passed = check["passed"]
+        if (
+            isinstance(statement_index, bool)
+            or not isinstance(statement_index, int)
+            or statement_index < 0
+            or isinstance(precondition_index, bool)
+            or not isinstance(precondition_index, int)
+            or precondition_index < 0
+            or not isinstance(kind, str)
+            or kind not in LIVE_PREFLIGHT_PRECONDITION_KINDS
+            or not isinstance(passed, bool)
+        ):
+            raise MigrationRunContractError("live preflight result is invalid")
+        position = (statement_index, precondition_index)
+        if position in positions:
+            raise MigrationRunContractError("live preflight result is invalid")
+        positions.add(position)
+        if not passed:
+            failed_check_count += 1
+    if preconditions_passed != (failed_check_count == 0):
+        raise MigrationRunContractError("live preflight result is invalid")
+    return (
+        preconditions_passed,
+        matches_plan_base,
+        observed_base_digest,
+        len(checks),
+        failed_check_count,
+    )
+
+
+async def complete_live_preflight(
+    session: AsyncSession,
+    *,
+    migration_run_uuid: uuid.UUID,
+    expected_state_version: int,
+    result: Mapping[str, object],
+    actor_user_uuid: uuid.UUID | None,
+    now: dt.datetime | None = None,
+) -> MigrationRunTransition:
+    """Derive and persist one terminal state from bounded preflight evidence.
+
+    A caller cannot choose the terminal state, event type, observed digest, or
+    durable evidence shape. Base mismatch wins ``drifted`` classification;
+    otherwise any failed structured check becomes ``failed`` and only an exact
+    base match with every check passing becomes ``passed``.
+    """
+
+    (
+        preconditions_passed,
+        matches_plan_base,
+        observed_base_digest,
+        check_count,
+        failed_check_count,
+    ) = _canonicalize_live_preflight_result(result)
+    if not matches_plan_base:
+        next_state = "drifted"
+    elif preconditions_passed:
+        next_state = "passed"
+    else:
+        next_state = "failed"
+    return await transition_migration_run(
+        session,
+        migration_run_uuid=migration_run_uuid,
+        expected_state_version=expected_state_version,
+        next_state=next_state,
+        event_type=f"live_preflight_{next_state}",
+        evidence={
+            "check_count": check_count,
+            "failed_check_count": failed_check_count,
+        },
+        observed_base_digest=(
+            observed_base_digest if next_state in {"passed", "drifted"} else None
+        ),
+        actor_user_uuid=actor_user_uuid,
+        now=now,
     )
 
 

@@ -21,6 +21,7 @@ from app.forward.live_preflight import (
 )
 from app.forward.migration_run import (
     claim_one_migration_dispatch,
+    complete_live_preflight,
     create_migration_run,
     mark_migration_dispatch_published,
     transition_migration_run,
@@ -586,14 +587,16 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 now=now + dt.timedelta(seconds=3),
             )
             await session.flush()
-            await transition_migration_run(
+            await complete_live_preflight(
                 session,
                 migration_run_uuid=first.migration_run_uuid,
                 expected_state_version=3,
-                next_state="passed",
-                event_type="live_preflight_passed",
-                evidence={"check_count": 0},
-                observed_base_digest=plan.base_digest,
+                result={
+                    "preconditions_passed": True,
+                    "checks": [],
+                    "observed_base_digest": plan.base_digest,
+                    "matches_plan_base": True,
+                },
                 actor_user_uuid=None,
                 now=now + dt.timedelta(seconds=4),
             )
