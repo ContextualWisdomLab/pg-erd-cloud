@@ -17,6 +17,7 @@ from app.forward.migration_run import (
     MigrationRunContractError,
     canonicalize_run_evidence,
     claim_one_migration_dispatch,
+    complete_isolated_dry_run,
     complete_live_preflight,
     create_migration_run,
     digest_run_event,
@@ -728,6 +729,267 @@ async def test_preflight_drift_transition_persists_mismatched_base_digest() -> N
     assert session.add.call_args.args[0].evidence_json == {
         "observed_base_digest": observed_base_digest
     }
+
+
+@pytest.mark.asyncio
+async def test_complete_isolated_dry_run_binds_exact_plan_result_to_cas() -> None:
+    """A verified executor result selects one server-authored next state."""
+
+    plan = _migration_plan()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    executor_result = {
+        "postgresql_major": 18,
+        "statement_count": 0,
+        "base_digest": plan.base_digest,
+        "target_digest": plan.target_digest,
+        "converged": True,
+    }
+    session = SimpleNamespace(scalar=AsyncMock(side_effect=[run, plan]))
+    transition = AsyncMock(
+        return_value=SimpleNamespace(state="live_preflight_running")
+    )
+    completed_at = datetime(2026, 8, 10, 1, tzinfo=timezone.utc)
+
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ):
+        completed = await complete_isolated_dry_run(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=2,
+            result=executor_result,
+            actor_user_uuid=None,
+            now=completed_at,
+        )
+
+    assert completed.state == "live_preflight_running"
+    transition.assert_awaited_once_with(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=2,
+        next_state="live_preflight_running",
+        event_type="isolated_dry_run_succeeded",
+        evidence={
+            "postgresql_major": 18,
+            "statement_count": 0,
+            "converged": True,
+        },
+        actor_user_uuid=None,
+        now=completed_at,
+    )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        None,
+        [],
+        {},
+        {
+            "postgresql_major": True,
+            "statement_count": 0,
+            "base_digest": "a" * 64,
+            "target_digest": "b" * 64,
+            "converged": True,
+        },
+        {
+            "postgresql_major": 18,
+            "statement_count": -1,
+            "base_digest": "a" * 64,
+            "target_digest": "b" * 64,
+            "converged": True,
+        },
+        {
+            "postgresql_major": 18,
+            "statement_count": 1001,
+            "base_digest": "a" * 64,
+            "target_digest": "b" * 64,
+            "converged": True,
+        },
+        {
+            "postgresql_major": 18,
+            "statement_count": 0,
+            "base_digest": "A" * 64,
+            "target_digest": "b" * 64,
+            "converged": True,
+        },
+        {
+            "postgresql_major": 18,
+            "statement_count": 0,
+            "base_digest": "a" * 64,
+            "target_digest": "b" * 64,
+            "converged": False,
+        },
+        {
+            "postgresql_major": 18,
+            "statement_count": 0,
+            "base_digest": "a" * 64,
+            "target_digest": "b" * 64,
+            "converged": True,
+            "next_state": "live_preflight_running",
+        },
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_isolated_dry_run_rejects_forged_results(
+    result: object,
+) -> None:
+    """Malformed or caller-extended executor results fail before durable I/O."""
+
+    session = SimpleNamespace(scalar=AsyncMock())
+    transition = AsyncMock()
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ), pytest.raises(MigrationRunContractError, match="isolated dry-run result"):
+        await complete_isolated_dry_run(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=uuid.uuid4(),
+            expected_state_version=2,
+            result=result,  # type: ignore[arg-type]
+            actor_user_uuid=None,
+        )
+
+    session.scalar.assert_not_awaited()
+    transition.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"postgresql_major": 17},
+        {"statement_count": 1},
+        {"base_digest": "e" * 64},
+        {"target_digest": "f" * 64},
+    ],
+)
+@pytest.mark.asyncio
+async def test_complete_isolated_dry_run_rejects_result_plan_mismatch(
+    mutation: dict[str, object],
+) -> None:
+    """Executor output cannot be rebound to a different stored plan."""
+
+    plan = _migration_plan()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    result: dict[str, object] = {
+        "postgresql_major": 18,
+        "statement_count": 0,
+        "base_digest": plan.base_digest,
+        "target_digest": plan.target_digest,
+        "converged": True,
+        **mutation,
+    }
+    session = SimpleNamespace(scalar=AsyncMock(side_effect=[run, plan]))
+    transition = AsyncMock()
+    completed_at = datetime(2026, 8, 10, 1, tzinfo=timezone.utc)
+
+    with patch(
+        "app.forward.migration_run.transition_migration_run", new=transition
+    ), pytest.raises(MigrationRunContractError, match="does not match"):
+        await complete_isolated_dry_run(
+            session,  # type: ignore[arg-type]
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=2,
+            result=result,
+            actor_user_uuid=None,
+            now=completed_at,
+        )
+
+    transition.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_complete_isolated_dry_run_rejects_unbound_durable_context() -> None:
+    """Naive time, absent run, or absent plan cannot produce success evidence."""
+
+    result = {
+        "postgresql_major": 18,
+        "statement_count": 0,
+        "base_digest": "a" * 64,
+        "target_digest": "a" * 64,
+        "converged": True,
+    }
+    migration_run_uuid = uuid.uuid4()
+    no_io = SimpleNamespace(scalar=AsyncMock())
+    with pytest.raises(MigrationRunContractError, match="include a timezone"):
+        await complete_isolated_dry_run(
+            no_io,  # type: ignore[arg-type]
+            migration_run_uuid=migration_run_uuid,
+            expected_state_version=2,
+            result=result,
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1),
+        )
+    no_io.scalar.assert_not_awaited()
+
+    missing_run = SimpleNamespace(scalar=AsyncMock(return_value=None))
+    with pytest.raises(MigrationRunContractError, match="state version conflict"):
+        await complete_isolated_dry_run(
+            missing_run,  # type: ignore[arg-type]
+            migration_run_uuid=migration_run_uuid,
+            expected_state_version=2,
+            result=result,
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
+        )
+
+    plan = _migration_plan()
+    run = MigrationRun(
+        migration_run_uuid=migration_run_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=2,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    missing_plan = SimpleNamespace(scalar=AsyncMock(side_effect=[run, None]))
+    with pytest.raises(MigrationRunContractError, match="plan integrity"):
+        await complete_isolated_dry_run(
+            missing_plan,  # type: ignore[arg-type]
+            migration_run_uuid=migration_run_uuid,
+            expected_state_version=2,
+            result={
+                **result,
+                "base_digest": plan.base_digest,
+                "target_digest": plan.target_digest,
+            },
+            actor_user_uuid=None,
+            now=datetime(2026, 8, 10, 1, tzinfo=timezone.utc),
+        )
 
 
 @pytest.mark.parametrize(

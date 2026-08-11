@@ -272,9 +272,11 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     )
 
     assert "execute_bound_live_preflight" in implementation
+    assert "complete_isolated_dry_run" in durable_implementation
     assert "complete_live_preflight" in durable_implementation
     for path in required_documents:
         document = _read(path)
+        assert "complete_isolated_dry_run" in document
         assert "execute_bound_live_preflight" in document
         assert "complete_live_preflight" in document
         assert "caller-owned" in document

@@ -21,6 +21,7 @@ from app.forward.live_preflight import (
 )
 from app.forward.migration_run import (
     claim_one_migration_dispatch,
+    complete_isolated_dry_run,
     complete_live_preflight,
     create_migration_run,
     mark_migration_dispatch_published,
@@ -576,13 +577,17 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 now=now + dt.timedelta(seconds=2),
             )
             await session.flush()
-            await transition_migration_run(
+            await complete_isolated_dry_run(
                 session,
                 migration_run_uuid=first.migration_run_uuid,
                 expected_state_version=2,
-                next_state="live_preflight_running",
-                event_type="live_preflight_started",
-                evidence={},
+                result={
+                    "postgresql_major": int(_EXPECTED_MAJOR),
+                    "statement_count": len(plan.plan_json["statements"]),
+                    "base_digest": plan.base_digest,
+                    "target_digest": plan.target_digest,
+                    "converged": True,
+                },
                 actor_user_uuid=None,
                 now=now + dt.timedelta(seconds=3),
             )

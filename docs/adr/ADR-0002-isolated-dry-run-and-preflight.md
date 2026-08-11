@@ -101,6 +101,10 @@ locks on the execution connection.
   round trip in a dedicated ephemeral sandbox database distinct from its
   migrated metadata database. This is an execution core, not evidence that a
   deployed sandbox service is disposable or network-isolated.
+- `complete_isolated_dry_run` rejects malformed or caller-extended success
+  results, revalidates PostgreSQL major, statement count, base/target digests,
+  expiry, and plan integrity, then derives only `live_preflight_running` with
+  aggregate evidence. It owns no sandbox, credential, queue lease, or attempt.
 - Existing target-connection code provides encrypted DSNs and guarded database
   connection primitives that the planned live-preflight worker must reuse.
 - `app.forward.live_preflight` compiles only the structured

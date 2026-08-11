@@ -34,7 +34,7 @@ support.
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
 | Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified polling, and dry-run creation/cancellation intent APIs **Implemented**; workers **Planned** |
-| Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
+| Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core and `complete_isolated_dry_run` server-derived success CAS **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query and canonical snapshot/base-digest comparison primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification from that exact result. Durable worker identity/attempt binding and apply remain **Planned**. |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
@@ -106,7 +106,9 @@ Implemented in the initial safe vertical slice:
   only the compiler-owned all-transactional statement list with bounded
   timeouts, rolls failures back with fixed diagnostics, and requires a fresh
   strict snapshot to equal `target_digest`; PostgreSQL 14–18 CI supplies the
-  real catalog round trip, while sandbox provisioning, dependency
+  real catalog round trip. `complete_isolated_dry_run` accepts only that exact
+  success shape, revalidates it against the stored plan, and derives the fixed
+  `live_preflight_running` CAS; sandbox provisioning, dependency
   materialization, network isolation, cleanup, and worker wiring remain absent;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.

@@ -24,6 +24,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
+from app.forward.isolated_dry_run import MAX_DRY_RUN_STATEMENTS
 from app.forward.live_preflight import (
     LIVE_PREFLIGHT_PRECONDITION_KINDS,
     MAX_LIVE_PREFLIGHT_QUERIES,
@@ -106,6 +107,15 @@ _LIVE_PREFLIGHT_RESULT_FIELDS = frozenset(
 )
 _LIVE_PREFLIGHT_CHECK_FIELDS = frozenset(
     {"statement_index", "precondition_index", "kind", "passed"}
+)
+_ISOLATED_DRY_RUN_RESULT_FIELDS = frozenset(
+    {
+        "postgresql_major",
+        "statement_count",
+        "base_digest",
+        "target_digest",
+        "converged",
+    }
 )
 
 
@@ -742,6 +752,118 @@ async def transition_migration_run(
         state_version=next_version,
         started_at=started_at,
         finished_at=finished_at,
+    )
+
+
+def _canonicalize_isolated_dry_run_result(
+    result: Mapping[str, object],
+) -> tuple[int, int, str, str]:
+    """Validate the exact bounded success shape returned by the executor."""
+
+    if (
+        not isinstance(result, Mapping)
+        or set(result) != _ISOLATED_DRY_RUN_RESULT_FIELDS
+    ):
+        raise MigrationRunContractError("isolated dry-run result is invalid")
+    postgresql_major = result["postgresql_major"]
+    statement_count = result["statement_count"]
+    base_digest = result["base_digest"]
+    target_digest = result["target_digest"]
+    if (
+        isinstance(postgresql_major, bool)
+        or not isinstance(postgresql_major, int)
+        or postgresql_major < 14
+        or postgresql_major > 18
+        or isinstance(statement_count, bool)
+        or not isinstance(statement_count, int)
+        or statement_count < 0
+        or statement_count > MAX_DRY_RUN_STATEMENTS
+        or not isinstance(base_digest, str)
+        or _HEX_DIGEST.fullmatch(base_digest) is None
+        or not isinstance(target_digest, str)
+        or _HEX_DIGEST.fullmatch(target_digest) is None
+        or result["converged"] is not True
+    ):
+        raise MigrationRunContractError("isolated dry-run result is invalid")
+    return postgresql_major, statement_count, base_digest, target_digest
+
+
+async def complete_isolated_dry_run(
+    session: AsyncSession,
+    *,
+    migration_run_uuid: uuid.UUID,
+    expected_state_version: int,
+    result: Mapping[str, object],
+    actor_user_uuid: uuid.UUID | None,
+    now: dt.datetime | None = None,
+) -> MigrationRunTransition:
+    """Verify one executor success against its stored plan and advance CAS.
+
+    The caller cannot select the next state, event type, evidence shape, plan,
+    or digests. This boundary owns no sandbox, connection, credential, queue
+    lease, durable worker attempt, or DDL execution authority.
+    """
+
+    postgresql_major, statement_count, base_digest, target_digest = (
+        _canonicalize_isolated_dry_run_result(result)
+    )
+    transition_time = now or dt.datetime.now(dt.timezone.utc)
+    if transition_time.tzinfo is None or transition_time.utcoffset() is None:
+        raise MigrationRunContractError("transition time must include a timezone")
+    run = await session.scalar(
+        select(MigrationRun).where(
+            MigrationRun.migration_run_uuid == migration_run_uuid
+        )
+    )
+    if (
+        run is None
+        or run.run_kind != "dry_run"
+        or run.state != "sandbox_running"
+        or run.state_version != expected_state_version
+        or run.cancellation_requested
+    ):
+        raise MigrationRunContractError("migration run state version conflict")
+    plan = await session.scalar(
+        select(MigrationPlan).where(
+            MigrationPlan.migration_plan_uuid == run.migration_plan_uuid
+        )
+    )
+    if (
+        plan is None
+        or plan.project_space_uuid != run.project_space_uuid
+        or run.plan_digest != plan.statement_digest
+        or plan.expires_at <= transition_time
+        or not verify_migration_plan_digest(plan.plan_json, plan.statement_digest)
+        or plan.plan_json.get("compiler_version") != plan.compiler_version
+        or plan.plan_json.get("base_digest") != plan.base_digest
+        or plan.plan_json.get("target_digest") != plan.target_digest
+    ):
+        raise MigrationRunContractError(
+            "migration plan integrity verification failed"
+        )
+    statements = plan.plan_json.get("statements")
+    if not isinstance(statements, list) or (
+        postgresql_major != plan.plan_json.get("postgresql_major")
+        or statement_count != len(statements)
+        or base_digest != plan.base_digest
+        or target_digest != plan.target_digest
+    ):
+        raise MigrationRunContractError(
+            "isolated dry-run result does not match migration plan"
+        )
+    return await transition_migration_run(
+        session,
+        migration_run_uuid=migration_run_uuid,
+        expected_state_version=expected_state_version,
+        next_state="live_preflight_running",
+        event_type="isolated_dry_run_succeeded",
+        evidence={
+            "postgresql_major": postgresql_major,
+            "statement_count": statement_count,
+            "converged": True,
+        },
+        actor_user_uuid=actor_user_uuid,
+        now=now,
     )
 
 
