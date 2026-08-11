@@ -16,6 +16,15 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
   형식의 DSN을 사용하면 Snowflake `INFORMATION_SCHEMA`에서 schema/table/column,
   PK/UNIQUE/FK 메타데이터를 수집하고 `source_dialect: "snowflake"` 스냅샷으로 저장합니다.
   실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
+- **Databricks reverse engineering(부분 구현, 선택)**:
+  `databricks://token:<access-token>@<workspace-host>/sql/1.0/warehouses/<id>?catalog=<catalog>&schema=<schema>`
+  형식으로 Unity Catalog의 schema/table/view/column과 PK/UNIQUE/FK 메타데이터를
+  고정된 읽기 전용 쿼리로 수집합니다. 실행 환경에는 선택 의존성
+  `databricks-sql-connector`가 필요합니다. Unity Catalog가 필수이며 제약조건
+  Information Schema는 Public Preview입니다. index/CHECK와 Databricks SQL apply는
+  지원하지 않고 스냅샷 capability에 명시합니다. 자세한 범위와 운영 제한은
+  [`docs/databricks-reverse-engineering.md`](docs/databricks-reverse-engineering.md)를
+  참고하세요.
 - **ERD UI**: React Flow(MIT)로 PK/FK·그룹·검색·레이아웃을 그래픽으로 렌더링
 - **Forward engineering(포워드)**: 스냅샷 기반 DDL export + 스냅샷 간 diff/마이그레이션 SQL
 
@@ -140,6 +149,13 @@ Snowflake 리버스 엔지니어링을 사용할 개발 환경에서는 백엔�
 
 ```bash
 pip install -e ".[snowflake]"
+```
+
+Databricks 리버스 엔지니어링을 사용할 개발 환경에서는 다음 선택 의존성을 설치합니다.
+
+```bash
+cd backend
+pip install -e ".[databricks]"
 ```
 
 #### 운영 팁

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🧱 **Databricks Unity Catalog 역설계 부분 지원**: 엄격한 credential-in-password DSN, 공통 SSRF 검사, 선택형 `databricks-sql-connector>=4.4,<5`, 고정 읽기 전용 Information Schema 쿼리, 결정적 schema/table/view/column/PK/UNIQUE/FK 스냅샷 변환을 추가했습니다. Unity Catalog 및 Preview 제약조건 메타데이터가 필요하며 index/CHECK/forward apply는 capability에서 명시적으로 미지원 처리합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).

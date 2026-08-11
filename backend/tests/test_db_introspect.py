@@ -21,6 +21,16 @@ from app import db_introspect
         ("mysql+pymysql://u:p@db/app", "mysql"),
         ("mariadb://u:p@db/app", "mysql"),
         ("MARIADB://u:p@db/app", "mysql"),
+        (
+            "databricks://token:secret@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/abc?catalog=main",
+            "databricks",
+        ),
+        (
+            "DATABRICKS+SQL://token:secret@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/abc?catalog=main",
+            "databricks",
+        ),
     ],
 )
 def test_detect_dsn_dialect_valid(
@@ -69,9 +79,14 @@ async def test_introspect_database_dispatches_by_dialect(
         calls.append(("mysql", dsn, schema_filter))
         return {"source_dialect": "mysql"}
 
+    async def fake_databricks(dsn: str, schema_filter: str | None) -> dict:
+        calls.append(("databricks", dsn, schema_filter))
+        return {"source_dialect": "databricks"}
+
     monkeypatch.setattr(db_introspect, "introspect_postgres", fake_postgres)
     monkeypatch.setattr(db_introspect, "introspect_snowflake", fake_snowflake)
     monkeypatch.setattr(db_introspect, "introspect_mysql", fake_mysql)
+    monkeypatch.setattr(db_introspect, "introspect_databricks", fake_databricks)
 
     assert await db_introspect.introspect_database(
         "postgresql://u:p@db/app", "public"
@@ -82,10 +97,21 @@ async def test_introspect_database_dispatches_by_dialect(
     assert await db_introspect.introspect_database(
         "mariadb://u:p@db/app", "shop"
     ) == {"source_dialect": "mysql"}
+    assert await db_introspect.introspect_database(
+        "databricks://token:secret@workspace.cloud.databricks.com/"
+        "sql/1.0/warehouses/abc?catalog=main",
+        "analytics",
+    ) == {"source_dialect": "databricks"}
     assert calls == [
         ("postgresql", "postgresql://u:p@db/app", "public"),
         ("snowflake", "snowflake://u:p@acct/APP/PUBLIC", None),
         ("mysql", "mariadb://u:p@db/app", "shop"),
+        (
+            "databricks",
+            "databricks://token:secret@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/abc?catalog=main",
+            "analytics",
+        ),
     ]
 
 
@@ -107,9 +133,14 @@ async def test_probe_database_dispatches_by_dialect(
         calls.append(("mysql", dsn))
         return "mysql 8"
 
+    async def fake_databricks(dsn: str) -> str:
+        calls.append(("databricks", dsn))
+        return "Databricks SQL"
+
     monkeypatch.setattr(db_introspect, "probe_postgres", fake_postgres)
     monkeypatch.setattr(db_introspect, "probe_snowflake", fake_snowflake)
     monkeypatch.setattr(db_introspect, "probe_mysql", fake_mysql)
+    monkeypatch.setattr(db_introspect, "probe_databricks", fake_databricks)
 
     assert (
         await db_introspect.probe_database("postgres://u:p@db/app")
@@ -122,10 +153,22 @@ async def test_probe_database_dispatches_by_dialect(
     assert (
         await db_introspect.probe_database("mysql+pymysql://u:p@db/app") == "mysql 8"
     )
+    assert (
+        await db_introspect.probe_database(
+            "databricks://token:secret@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/abc?catalog=main"
+        )
+        == "Databricks SQL"
+    )
     assert calls == [
         ("postgresql", "postgres://u:p@db/app"),
         ("snowflake", "snowflake://u:p@acct/APP"),
         ("mysql", "mysql+pymysql://u:p@db/app"),
+        (
+            "databricks",
+            "databricks://token:secret@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/abc?catalog=main",
+        ),
     ]
 
 

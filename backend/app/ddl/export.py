@@ -41,6 +41,17 @@ def _snapshot_source_dialect(snapshot: dict) -> DdlDialect:
     return "postgresql"
 
 
+def reject_unsupported_snapshot_source(snapshot: dict, operation: str) -> None:
+    """Reject known source dialects that have no deterministic DDL mapping."""
+    for key in ("source_dialect", "database_dialect", "dialect"):
+        value = snapshot.get(key)
+        if isinstance(value, str) and value.lower().replace("_", "-") == "databricks":
+            raise ValueError(
+                f"Databricks snapshot {operation} is not supported; "
+                "a deterministic type and feature mapping is required"
+            )
+
+
 def _q(ident: str) -> str:
     """Quote a SQL identifier."""
 
@@ -397,6 +408,7 @@ def _render_table_constraints_pg(
 
 def snapshot_json_to_sql(snapshot: dict, target_dialect: str = "postgresql") -> str:
     """Render a captured schema snapshot as SQL for the requested dialect."""
+    reject_unsupported_snapshot_source(snapshot, "DDL export")
     target = _normalize_dialect(target_dialect)
     if target == "snowflake":
         return _snapshot_json_to_snowflake_sql(snapshot)

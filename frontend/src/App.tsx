@@ -72,7 +72,12 @@ const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "not_found",
 ]);
 
-const SUPPORTED_DSN_PROTOCOLS = new Set(["postgres:", "postgresql:", "snowflake:"]);
+const SUPPORTED_DSN_PROTOCOLS = new Set([
+  "postgres:",
+  "postgresql:",
+  "snowflake:",
+  "databricks:",
+]);
 
 function sanitizeHtml(str: string | null | undefined): string {
   if (!str) return "";
@@ -964,7 +969,9 @@ export default function App() {
     /* v8 ignore next -- the save control is disabled until both fields are present */
     if (!nextConnectionName || !connectionDsn) return;
     if (!isSupportedConnectionDsn(connectionDsn)) {
-      setError("Connection DSN must use postgresql://, postgres://, or snowflake:// with a host.");
+      setError(
+        "Connection DSN must use postgresql://, postgres://, snowflake://, or databricks:// with a host.",
+      );
       dsnInput.value = "";
       setIsDsnPresent(false);
       return;
@@ -1141,7 +1148,7 @@ export default function App() {
             onChange={(e) =>
               setIsDsnPresent(Boolean(e.currentTarget.value.trim()))
             }
-            placeholder="postgresql://... or snowflake://..."
+            placeholder="postgresql://..., snowflake://..., or databricks://..."
             aria-label="Connection DSN"
           />
           <button
