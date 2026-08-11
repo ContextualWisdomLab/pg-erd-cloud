@@ -967,7 +967,6 @@ export default function App() {
   }
 
   async function onCreateConnection() {
-    /* v8 ignore next -- the save control is disabled without a project or while saving */
     if (!selectedProjectId || isCreatingConnection) return;
     const nextConnectionName = connName.trim();
     // The handler is mounted beside this input, so the ref is established first.

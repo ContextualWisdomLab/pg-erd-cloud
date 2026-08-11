@@ -356,7 +356,10 @@ describe('App orchestration coverage', () => {
     await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
     expect(dsnInput).toHaveValue('')
 
-    await user.type(dsnInput, 'postgresql://db.example/second{enter}')
+    const connectionForm = dsnInput.closest('form')
+    expect(connectionForm).not.toBeNull()
+    fireEvent.change(dsnInput, { target: { value: 'postgresql://db.example/second' } })
+    fireEvent.submit(connectionForm!)
     expect(api.createConnection).toHaveBeenCalledTimes(1)
     await act(async () => resolveConnection({ db_connection_uuid: 'c3', conn_name: 'New DB' }))
   })
@@ -369,14 +372,18 @@ describe('App orchestration coverage', () => {
 
     await user.type(diagramSearch, 'failed{enter}')
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
-    expect(diagramSearch.closest('form')).toHaveAttribute('role', 'search')
+    const diagramSearchForm = diagramSearch.closest('form')
+    expect(diagramSearchForm).toHaveAttribute('role', 'search')
+    expect(fireEvent.submit(diagramSearchForm!)).toBe(false)
     expect(screen.getByRole('search', { name: '다이어그램 검색' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
     const canvasSearch = screen.getByRole('searchbox', { name: '테이블 또는 컬럼 검색' })
     await user.type(canvasSearch, 'users{enter}')
     expect(canvasSearch).toHaveValue('users')
-    expect(canvasSearch.closest('form')).toHaveAttribute('role', 'search')
+    const canvasSearchForm = canvasSearch.closest('form')
+    expect(canvasSearchForm).toHaveAttribute('role', 'search')
+    expect(fireEvent.submit(canvasSearchForm!)).toBe(false)
     expect(screen.getByRole('search', { name: 'ERD 캔버스 검색' })).toBeInTheDocument()
   })
 
