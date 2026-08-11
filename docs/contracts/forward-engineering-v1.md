@@ -121,8 +121,10 @@ evidence JSON. The internal cancellation-intent writer and editor-authorized
 **Implemented**. Public dry-run creation is **Implemented**; public apply
 creation remains **Planned**. Lock-scoped due-order outbox claiming,
 attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
-**Implemented**, while the queue consumer and worker execution remain
-**Planned**. The bounded one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
+**Implemented**. Atomic UUID-only ready-to-processing claim, expiry reclaim,
+acknowledgement, and retry release also use an exact lease-token so a stale
+claimant cannot complete a successor lease. The consumer lifecycle and worker
+execution remain **Planned**. The bounded one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
 propagation, sandbox/preflight workers, apply, reconciliation, and verification
@@ -162,9 +164,9 @@ lifecycle is **Implemented**: it opens one fresh metadata transaction per
 claim, commits only after exact-attempt acknowledgement, rolls an exception
 back through the transaction context, sleeps at a bounded positive interval
 after empty or failed iterations, and cancels cleanly with the application.
-It refuses startup unless the Valkey signal backend is configured. The queue
-consumer and worker execution remain **Planned**; the lifecycle never loads a
-plan, target credential, SQL batch, or row value.
+It refuses startup unless the Valkey signal backend is configured. The
+consumer lifecycle and worker execution remain **Planned**; the lifecycle and
+lease primitives never load a plan, target credential, SQL batch, or row value.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic

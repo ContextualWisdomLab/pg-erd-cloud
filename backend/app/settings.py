@@ -107,6 +107,15 @@ class Settings(BaseSettings):
     valkey_sentinel_master: str | None = None
     valkey_queue_key: str = "pg-erd-cloud:job-queue"
     valkey_migration_run_queue_key: str = "pg-erd-cloud:migration-run-queue"
+    valkey_migration_run_processing_key: str = (
+        "pg-erd-cloud:migration-run-processing"
+    )
+    valkey_migration_run_lease_token_key: str = (
+        "pg-erd-cloud:migration-run-lease-token"
+    )
+    migration_run_signal_lease_seconds: float = Field(
+        60.0, gt=0.0, le=3600.0
+    )
     valkey_lock_ttl_seconds: int = Field(300, ge=1)
     migration_dispatch_relay_enabled: bool = False
     migration_dispatch_relay_poll_interval_seconds: float = Field(

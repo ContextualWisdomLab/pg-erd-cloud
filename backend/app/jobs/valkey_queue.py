@@ -3,8 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import importlib
 import logging
+import math
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 from app.settings import settings
@@ -22,9 +24,63 @@ end
 return nil
 """
 
+MAX_EXPIRED_SIGNAL_RECLAIMS = 100
+
+_CLAIM_MIGRATION_RUN_SIGNAL_SCRIPT = """
+local expired = redis.call(
+  'ZRANGEBYSCORE', KEYS[2], '-inf', ARGV[1], 'LIMIT', 0, ARGV[4]
+)
+for _, id in ipairs(expired) do
+  redis.call('ZREM', KEYS[2], id)
+  redis.call('HDEL', KEYS[3], id)
+  redis.call('ZADD', KEYS[1], ARGV[1], id)
+end
+
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, 1)
+if #ids == 0 then
+  return nil
+end
+if redis.call('ZREM', KEYS[1], ids[1]) ~= 1 then
+  return nil
+end
+redis.call('ZADD', KEYS[2], ARGV[2], ids[1])
+redis.call('HSET', KEYS[3], ids[1], ARGV[3])
+return ids[1]
+"""
+
+_ACK_MIGRATION_RUN_SIGNAL_SCRIPT = """
+if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[2] then
+  return 0
+end
+local removed = redis.call('ZREM', KEYS[1], ARGV[1])
+redis.call('HDEL', KEYS[2], ARGV[1])
+return removed
+"""
+
+_RELEASE_MIGRATION_RUN_SIGNAL_SCRIPT = """
+if redis.call('HGET', KEYS[3], ARGV[1]) ~= ARGV[2] then
+  return 0
+end
+if redis.call('ZREM', KEYS[2], ARGV[1]) ~= 1 then
+  redis.call('HDEL', KEYS[3], ARGV[1])
+  return 0
+end
+redis.call('HDEL', KEYS[3], ARGV[1])
+redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+return 1
+"""
+
 
 class ValkeyQueueUnavailable(RuntimeError):
     """Raised when Valkey is selected but the Python client is unavailable."""
+
+
+@dataclass(frozen=True)
+class MigrationRunSignalClaim:
+    """One UUID-only signal claim bound to an opaque, exact lease token."""
+
+    migration_run_uuid: uuid.UUID
+    lease_token: uuid.UUID
 
 
 def _parse_sentinel_hosts(raw: str | None) -> list[tuple[str, int]]:
@@ -75,6 +131,12 @@ def valkey_queue_config_summary() -> dict[str, object]:
         "mode": valkey_queue_mode(),
         "queue_key": settings.valkey_queue_key,
         "migration_run_queue_key": settings.valkey_migration_run_queue_key,
+        "migration_run_processing_key": (
+            settings.valkey_migration_run_processing_key
+        ),
+        "migration_run_signal_lease_seconds": (
+            settings.migration_run_signal_lease_seconds
+        ),
         "sentinel_master": settings.valkey_sentinel_master,
         "sentinel_count": len(sentinel_hosts),
         "lock_ttl_seconds": settings.valkey_lock_ttl_seconds,
@@ -150,6 +212,7 @@ async def enqueue_migration_run_signal(
     if not valkey_queue_enabled():
         return False
 
+    _validate_migration_signal_keys()
     due_at = run_after or dt.datetime.now(dt.timezone.utc)
     if due_at.tzinfo is None or due_at.utcoffset() is None:
         raise ValueError("migration run signal time must include a timezone")
@@ -163,6 +226,147 @@ async def enqueue_migration_run_signal(
         return True
     except Exception:  # noqa: BLE001
         _logger.warning("Valkey migration-run enqueue signal failed", exc_info=True)
+        return False
+    finally:
+        if client is not None:
+            await _close_client(client)
+
+
+def _require_aware_migration_signal_time(value: dt.datetime) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("migration run signal time must include a timezone")
+
+
+def _validate_migration_signal_keys() -> None:
+    keys = (
+        settings.valkey_queue_key,
+        settings.valkey_migration_run_queue_key,
+        settings.valkey_migration_run_processing_key,
+        settings.valkey_migration_run_lease_token_key,
+    )
+    if any(not key for key in keys) or len(set(keys)) != len(keys):
+        raise ValueError("Valkey queue and migration signal keys must be distinct")
+
+
+async def claim_due_migration_run_signal(
+    *,
+    now: dt.datetime | None = None,
+    lease_seconds: float | None = None,
+) -> MigrationRunSignalClaim | None:
+    """Atomically reclaim expired leases and claim one due run UUID.
+
+    The ready sorted-set payload remains only ``migration_run_uuid``. The
+    consumer-generated lease token is stored on the isolated processing side
+    and must match for acknowledgement or retry release, preventing a stale
+    worker from completing a successor lease. This primitive does not load a
+    plan, credentials, target metadata, or SQL.
+    """
+
+    if not valkey_queue_enabled():
+        return None
+    _validate_migration_signal_keys()
+    current = now or dt.datetime.now(dt.timezone.utc)
+    _require_aware_migration_signal_time(current)
+    duration = (
+        settings.migration_run_signal_lease_seconds
+        if lease_seconds is None
+        else lease_seconds
+    )
+    if not math.isfinite(duration) or not 0 < duration <= 3600:
+        raise ValueError("migration run signal lease must be between 0 and 3600")
+    lease_token = uuid.uuid4()
+    client: Any | None = None
+    try:
+        client = await _client()
+        value = await client.eval(
+            _CLAIM_MIGRATION_RUN_SIGNAL_SCRIPT,
+            3,
+            settings.valkey_migration_run_queue_key,
+            settings.valkey_migration_run_processing_key,
+            settings.valkey_migration_run_lease_token_key,
+            current.timestamp(),
+            current.timestamp() + duration,
+            str(lease_token),
+            MAX_EXPIRED_SIGNAL_RECLAIMS,
+        )
+        if value is None:
+            return None
+        if isinstance(value, bytes):
+            value = value.decode("utf-8")
+        try:
+            run_uuid = uuid.UUID(str(value))
+        except ValueError:
+            await client.eval(
+                _ACK_MIGRATION_RUN_SIGNAL_SCRIPT,
+                2,
+                settings.valkey_migration_run_processing_key,
+                settings.valkey_migration_run_lease_token_key,
+                str(value),
+                str(lease_token),
+            )
+            _logger.warning("valkey_migration_signal_invalid_uuid")
+            return None
+        return MigrationRunSignalClaim(run_uuid, lease_token)
+    except Exception:  # noqa: BLE001
+        _logger.warning("valkey_migration_signal_claim_failed")
+        return None
+    finally:
+        if client is not None:
+            await _close_client(client)
+
+
+async def ack_migration_run_signal(claim: MigrationRunSignalClaim) -> bool:
+    """Acknowledge only the currently leased instance of one run signal."""
+
+    if not valkey_queue_enabled():
+        return False
+    _validate_migration_signal_keys()
+    client: Any | None = None
+    try:
+        client = await _client()
+        removed = await client.eval(
+            _ACK_MIGRATION_RUN_SIGNAL_SCRIPT,
+            2,
+            settings.valkey_migration_run_processing_key,
+            settings.valkey_migration_run_lease_token_key,
+            str(claim.migration_run_uuid),
+            str(claim.lease_token),
+        )
+        return int(removed) == 1
+    except Exception:  # noqa: BLE001
+        _logger.warning("valkey_migration_signal_ack_failed")
+        return False
+    finally:
+        if client is not None:
+            await _close_client(client)
+
+
+async def release_migration_run_signal(
+    claim: MigrationRunSignalClaim,
+    retry_at: dt.datetime,
+) -> bool:
+    """Return only an exact active lease to the UUID-only ready queue."""
+
+    if not valkey_queue_enabled():
+        return False
+    _validate_migration_signal_keys()
+    _require_aware_migration_signal_time(retry_at)
+    client: Any | None = None
+    try:
+        client = await _client()
+        released = await client.eval(
+            _RELEASE_MIGRATION_RUN_SIGNAL_SCRIPT,
+            3,
+            settings.valkey_migration_run_queue_key,
+            settings.valkey_migration_run_processing_key,
+            settings.valkey_migration_run_lease_token_key,
+            str(claim.migration_run_uuid),
+            str(claim.lease_token),
+            retry_at.timestamp(),
+        )
+        return int(released) == 1
+    except Exception:  # noqa: BLE001
+        _logger.warning("valkey_migration_signal_release_failed")
         return False
     finally:
         if client is not None:

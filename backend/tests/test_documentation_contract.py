@@ -194,7 +194,7 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "bounded one-attempt publisher is **implemented**" in normalized_contract
     assert "scheduled relay lifecycle is **implemented**" in normalized_contract
     assert "dedicated valkey sorted-set key" in normalized_contract
-    assert "queue consumer and worker execution remain **planned**" in normalized_contract
+    assert "consumer lifecycle and worker execution remain **planned**" in normalized_contract
 
 
 def test_dispatch_relay_has_explicit_deployment_and_lifecycle_contract() -> None:
@@ -256,6 +256,22 @@ def test_dispatch_relay_documentation_separates_implemented_and_planned_scope() 
     assert "- **Implemented — scheduled relay lifecycle and UUID-only publication:**" in audit
     assert "- **Planned — queue consumer, worker execution, failover, and retention:**" in audit
     assert "Relay loop/queue delivery" not in audit
+
+
+def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
+    """Track exact lease ownership without claiming a worker exists."""
+
+    contract = " ".join(
+        _read(Path("docs/contracts/forward-engineering-v1.md")).lower().split()
+    )
+    trd = " ".join(_read(Path("docs/TRD.md")).lower().split())
+    runbook = " ".join(
+        _read(Path("docs/runbooks/forward-engineering.md")).lower().split()
+    )
+
+    for document in (contract, trd, runbook):
+        assert "exact lease-token" in document
+        assert "consumer lifecycle and worker execution remain **planned**" in document
 
 
 def test_ci_runs_real_valkey_signal_acceptance() -> None:

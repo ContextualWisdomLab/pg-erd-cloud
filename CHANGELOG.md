@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] Forward Engineering UUID-only Valkey 신호에 bounded processing lease를 추가했습니다. Due signal claim은 expired lease를 제한적으로 회수하고 exact lease-token을 별도 저장하며, 현재 token만 acknowledge 또는 scheduled retry release할 수 있어 stale claimant가 successor lease를 완료하지 못합니다. Consumer lifecycle, plan/credential loading, target access, worker execution은 여전히 Planned입니다.
 - [BE] Forward Engineering identifier-only dispatch에 opt-in scheduled relay lifecycle을 추가했습니다. 각 claim은 새 metadata transaction에서 처리되고 exact-attempt acknowledgement 후에만 commit되며, 실패는 rollback·고정 비밀 비노출 로그·bounded polling으로 처리됩니다. Valkey 없는 활성화는 startup에서 거부되고 shutdown은 모든 background task를 cancel/await합니다. Queue consumer, plan loading, sandbox/target SQL execution은 여전히 Planned입니다.
 - [BE/CI] 동일 `Idempotency-Key`로 취소된 dry-run을 재조회할 때 저장된 `cancellation_requested`를 정확히 반환합니다. PostgreSQL 통합 작업은 런타임마다 일회성 credential과 encryption key를 생성하고 checkout credential persistence를 끄며, 로컬 통합 테스트는 URL 또는 기대 PostgreSQL major가 없으면 원인을 명시해 skip합니다.
 - [CI] Digest-pinned real Valkey 8 서비스에서 generic job과 migration run 신호가 서로 다른 sorted set에 UUID만 저장하고, generic pop이 migration 신호를 소비하지 않음을 production adapter 경계로 검증합니다. Scheduled publisher lifecycle은 Implemented이며 deployment failover·consumer·worker 실행은 여전히 Planned입니다.

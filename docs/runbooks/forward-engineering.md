@@ -69,6 +69,11 @@ operational artifact is attached to the release record.
   `MIGRATION_DISPATCH_RELAY_ENABLED=true`, and a positive
   `MIGRATION_DISPATCH_RELAY_POLL_INTERVAL_SECONDS` to enable it. This does not
   start a queue consumer, load a plan, or execute SQL.
+- [x] Atomic ready-to-processing claim, bounded expiry reclaim, acknowledgement,
+  and retry release use an exact lease-token. A stale claimant cannot complete
+  a successor lease, and the ready payload remains only
+  `migration_run_uuid`. The consumer lifecycle and worker execution remain
+  **Planned**.
 - [ ] Relay deployment restart/failover, queue consumption, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

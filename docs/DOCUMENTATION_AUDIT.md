@@ -127,6 +127,9 @@ Adequacy labels in this audit mean:
   caller-owned metadata transaction per bounded attempt. Public dry-run
   creation, atomic identifier-only outbox, lock-scoped claim/publish-state CAS,
   and cancellation intent are also implemented.
+- **Implemented — UUID-only signal lease safety:** ready-to-processing claim,
+  bounded expiry reclaim, acknowledgement, and retry release require an exact
+  lease-token; stale claimants cannot complete successor leases.
 - **Planned — queue consumer, worker execution, failover, and retention:** no
   signal consumer loads plans or credentials, accesses a target, or executes
   SQL. Sandbox/preflight/apply workers and public apply-run creation remain

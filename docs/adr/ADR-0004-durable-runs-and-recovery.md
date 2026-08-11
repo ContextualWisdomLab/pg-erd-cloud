@@ -3,7 +3,8 @@
 - **Decision status:** Accepted
 - **Implementation status:** Partially implemented; durable storage,
   identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
-  bounded scheduled UUID-only queue publication, polling, and dry-run
+  bounded scheduled UUID-only queue publication, exact lease-token
+  ready/processing claim-ack-release primitives, polling, and dry-run
   creation/cancellation intent APIs exist, while the queue consumer, workers,
   deployment failover, and recovery do not
 - **Date:** 2026-08-09
@@ -39,6 +40,13 @@ Valkey sorted-set key, and acknowledges that exact attempt in one caller-owned
 transaction. It neither commits nor executes work. Publication failure raises
 before acknowledgement so the caller rolls back the claim, while consumers
 must tolerate at-least-once redelivery after an ambiguous publish.
+
+The signal adapter atomically reclaims expired processing leases and moves one
+due UUID-only ready member to an isolated processing set. A consumer-generated
+exact lease-token is stored separately from the ready payload; only that token
+may acknowledge or release the claim. This prevents a stale claimant from
+acknowledging a successor lease. The primitive does not create a consumer
+lifecycle, load execution material, access a target, or execute SQL.
 
 Each run binds:
 
@@ -138,6 +146,9 @@ Rules:
   back through the transaction context, emits only a fixed non-secret failure
   code, polls at a positive configured interval, and is cancelled and awaited
   on shutdown. Startup fails closed when Valkey is unavailable.
+- UUID-only signal claim, expiry reclaim, exact lease-token acknowledgement,
+  and scheduled release are implemented and verified against real Valkey; the
+  consumer lifecycle and worker execution remain **Planned**.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed

@@ -173,6 +173,10 @@ the production adapter against a digest-pinned real Valkey 8 service, proving
 generic and migration UUIDs occupy separate sorted sets and that popping a
 generic signal cannot consume the migration signal. Deployment restart/failover,
 consumer restart, and worker execution remain release-blocking evidence.
+The same real-service test moves a due UUID from ready to processing under an
+exact lease-token, rejects a stale acknowledgement, releases for retry,
+reclaims with a new token, and acknowledges cleanly. Consumer lifecycle,
+crash/restart orchestration, and worker execution remain release blockers.
 
 ## Fault-injection and recovery matrix
 
