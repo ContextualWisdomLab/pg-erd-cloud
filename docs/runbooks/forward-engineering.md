@@ -60,6 +60,8 @@ operational artifact is attached to the release record.
 - [x] One bounded publisher emits only `migration_run_uuid` on a dedicated
   Valkey key before exact-attempt acknowledgement; it neither commits nor
   executes work.
+- [x] A digest-pinned real Valkey 8 CI service verifies dedicated-key UUID-only
+  membership and generic-pop isolation through the production adapter.
 - [ ] Scheduled relay operation, queue consumption, worker execution, restart
   recovery, and retention are verified in the deployment environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have

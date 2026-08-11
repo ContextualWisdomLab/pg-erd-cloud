@@ -110,6 +110,44 @@ jobs:
           PYTHONPATH: .
         run: pytest -q tests/test_postgres_migration_run_integration.py
 
+  valkey-integration:
+    name: Valkey 8 queue signal boundary
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Install backend deps
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Verify real Valkey signal isolation
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          VALKEY_INTEGRATION_URL: redis://127.0.0.1:6379/0
+        run: pytest -q tests/test_valkey_queue_integration.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:

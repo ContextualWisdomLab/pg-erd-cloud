@@ -164,9 +164,11 @@ back before confirming that no partial identity survives.
 Focused relay tests prove that the bounded publisher claims and acknowledges
 one exact attempt with a single caller clock, publishes only the run UUID on a
 dedicated Valkey key, performs no transaction control, closes failed clients,
-and leaves failed publication unacknowledged for caller rollback. A real
-Valkey service, scheduled relay lifecycle, consumer restart, and worker
-execution remain release-blocking integration evidence.
+and leaves failed publication unacknowledged for caller rollback. CI also runs
+the production adapter against a digest-pinned real Valkey 8 service, proving
+generic and migration UUIDs occupy separate sorted sets and that popping a
+generic signal cannot consume the migration signal. Scheduled relay lifecycle,
+consumer restart, and worker execution remain release-blocking evidence.
 
 ## Fault-injection and recovery matrix
 

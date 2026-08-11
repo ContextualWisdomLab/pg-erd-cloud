@@ -2,7 +2,7 @@
 
 - **Document status:** Active engineering baseline
 - **Runtime status:** Partially implemented; no compliance certification claimed
-- **Last reviewed:** 2026-08-09
+- **Last reviewed:** 2026-08-11
 
 This document selects primary standards and one directly relevant research
 paper for design and verification. It does not assert PostgreSQL compatibility,
@@ -18,6 +18,7 @@ Status labels are normative: **Implemented**, **Partially implemented**,
 | Source | How pg-erd-cloud uses it | Normative status for this project |
 |---|---|---|
 | PostgreSQL 18 official documentation | Lock/transaction behavior, `ALTER TABLE`, index transaction capability, and timeout semantics; behavior is verified separately on supported majors 14–18. | Normative technical reference, plus version-matrix tests |
+| Valkey 8 official release and container image | Queue-signal sorted-set semantics are verified through the production adapter against a digest-pinned official image. This does not prove production topology, failover, or recovery. | Integration-test runtime reference; scheduled relay/consumer evidence remains Planned |
 | W3C WCAG 2.2 Recommendation | Keyboard, focus, labels, status/error communication, and target Level AA acceptance for the forward UI. | Normative product accessibility target; conformance not yet demonstrated |
 | OWASP ASVS 5.0.0 | Verification requirements for architecture, authentication, access control, validation, API, data protection, logging, and secure communication. | Normative security verification baseline selected by the project; not certification |
 | OWASP Top 10:2025 | Web-application risk taxonomy used to check design and test coverage. | Threat-model checklist, not a control catalog or certification |
@@ -214,6 +215,12 @@ https://www.postgresql.org/docs/18/runtime-config-client.html
 PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation:
 Explicit locking*. Retrieved August 9, 2026, from
 https://www.postgresql.org/docs/18/explicit-locking.html
+
+Valkey Project. (2026, July 21). *Valkey 8.1.9*.
+https://valkey.io/download/releases/v8-1-9/
+
+Valkey Project. (2026). *valkey/valkey official container image*. Docker Hub.
+Retrieved August 11, 2026, from https://hub.docker.com/r/valkey/valkey/
 
 Rae, I., Rollins, E., Shute, J., Sodhi, S., & Vingralek, R. (2013). Online,
 asynchronous schema change in F1. *Proceedings of the VLDB Endowment, 6*(11),

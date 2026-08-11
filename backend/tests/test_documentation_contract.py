@@ -209,6 +209,19 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "migration-run/outbox" in strategy
 
 
+def test_ci_runs_real_valkey_signal_acceptance() -> None:
+    """Keep UUID-only queue separation tested against a pinned real service."""
+
+    workflow = _read(Path(".github/workflows/ci.yml"))
+    strategy = _read(Path("docs/TEST_STRATEGY.md"))
+
+    assert "valkey-integration:" in workflow
+    assert "valkey/valkey@sha256:" in workflow
+    assert "test_valkey_queue_integration.py" in workflow
+    assert "VALKEY_INTEGRATION_URL" in workflow
+    assert "real Valkey" in strategy
+
+
 def test_superseded_adr_is_not_restored() -> None:
     """Prevent a superseded ADR from reappearing beside canonical decisions."""
 

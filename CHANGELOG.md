@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [CI] Digest-pinned real Valkey 8 서비스에서 generic job과 migration run 신호가 서로 다른 sorted set에 UUID만 저장하고, generic pop이 migration 신호를 소비하지 않음을 production adapter 경계로 검증합니다. scheduled relay·consumer·worker 실행은 여전히 Planned입니다.
 - [BE] Forward Engineering dry-run intent API: editor 이상이 immutable plan UUID, exact `plan_digest`, bounded `Idempotency-Key`를 제출하면 `POST /api/migration-plans/{migration_plan_uuid}/dry-runs`가 database conflict winner를 통해 하나의 queued run/event identity를 원자적으로 생성 또는 재사용하고 `202`를 반환합니다. nonmember IDOR를 숨기고 viewer를 거부하며 actor·request correlation을 evidence에 결합합니다. 이 경계는 worker를 신호하거나 SQL을 실행하지 않으며 sandbox/preflight/apply는 여전히 Planned입니다.
 - [BE] Forward Engineering cancellation API: editor 이상이 exact `state_version`을 제출하면 `POST /api/migration-runs/{migration_run_uuid}/cancel`이 동일 상태의 versioned CAS event를 원자적으로 기록하고 `202`를 반환합니다. nonmember identity는 숨기고 viewer를 거부하며, actor·안전한 request correlation ID를 tamper-evident evidence에 결합하고 stale/terminal/integrity 실패는 고정된 비밀 비노출 코드로 응답합니다. worker/apply는 아직 Planned입니다.
 - [BE] 만료된 불변 migration plan이 동일 입력의 재컴파일을 영구 차단하지 않도록, 만료 후 30일이 지난 파생 plan 중 durable run 이력이 없는 항목만 authorized project 범위에서 정리합니다. run evidence가 있는 plan은 보존하며, run state OpenAPI enum 정합화·중복 인덱스 제거·CAS 이후 ORM state 동기화와 경계 회귀 테스트를 추가했습니다.
