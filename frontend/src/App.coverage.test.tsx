@@ -238,7 +238,14 @@ vi.mock('./components/modals', () => ({
             <input name="title" defaultValue=" " />
             <input name="comment" defaultValue=" " />
           </form>
-          <button type="button" data-testid="table-delete" onClick={props.onDeleteTable} />
+          <button
+            type="button"
+            data-testid="table-delete"
+            onClick={() => {
+              if (!window.confirm(`'${props.editingNode.data.title}' 테이블을 삭제하시겠습니까?`)) return
+              props.onDeleteTable()
+            }}
+          />
           <button type="button" data-testid="table-cancel" onClick={props.onEditTableCancel} />
         </>
       ) : null}
@@ -406,6 +413,7 @@ describe('App orchestration coverage', () => {
     vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('edge-delete'))
     fireEvent.click(screen.getByTestId('edge-delete'))
+    vi.restoreAllMocks()
 
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.submit(screen.getByTestId('table-empty-form'))
@@ -415,9 +423,11 @@ describe('App orchestration coverage', () => {
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.click(screen.getByTestId('table-cancel'))
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const confirmTableDelete = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('table-delete'))
     fireEvent.click(screen.getByTestId('table-delete'))
+    expect(confirmTableDelete).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('node-count')).toHaveTextContent('1')
   })
 
   it('adds nodes and exercises groups, cardinality, exports, inference, and clearing', async () => {

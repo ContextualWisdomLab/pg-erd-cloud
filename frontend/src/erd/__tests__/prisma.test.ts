@@ -236,6 +236,7 @@ describe('exportPrisma', () => {
     ]);
 
     expect(result).toContain('children_id children? @relation("child_parent")');
+    expect(result).not.toContain('@relation("children_parents"');
   });
 
   it('handles missing is_not_null logic for optional relationships', () => {
