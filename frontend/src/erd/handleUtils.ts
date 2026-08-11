@@ -37,9 +37,20 @@ export function parseColumnNameFromHandle(handleId: string | null | undefined): 
   const encoded = idPart.slice(2);
   if (!encoded) return '';
 
+  const segments = encoded.split('-');
+  if (segments.some((segment) => !/^[0-9a-fA-F]{1,6}$/.test(segment))) {
+    return null;
+  }
+
   try {
-    return encoded.split('-').map(hex => String.fromCodePoint(parseInt(hex, 16))).join('');
-  } catch (e) {
+    return segments.map((hex) => {
+      const codePoint = Number.parseInt(hex, 16);
+      if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+        throw new RangeError('invalid Unicode scalar');
+      }
+      return String.fromCodePoint(codePoint);
+    }).join('');
+  } catch {
     return null;
   }
 }

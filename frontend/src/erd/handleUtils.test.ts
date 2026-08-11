@@ -69,5 +69,15 @@ describe('handleUtils', () => {
       expect(parseColumnNameFromHandle(null)).toBe(null);
       expect(parseColumnNameFromHandle(undefined)).toBe(null);
     });
+
+    it.each([
+      'c-zz',
+      'c-0069-zz',
+      'c-0069-',
+      'c-0069junk',
+      'c-0g69-0064',
+    ])('should reject malformed hexadecimal handle %s', (handle) => {
+      expect(parseColumnNameFromHandle(handle)).toBe(null);
+    });
   });
 });
