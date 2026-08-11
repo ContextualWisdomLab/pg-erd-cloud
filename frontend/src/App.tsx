@@ -1384,6 +1384,7 @@ export default function App() {
             <form
               className="workspaceSearch"
               role="search"
+              aria-label="다이어그램 검색"
               onSubmit={onSearchSubmit}
             >
               <label>
@@ -1418,6 +1419,7 @@ export default function App() {
             <form
               className="canvasToolbar__search"
               role="search"
+              aria-label="ERD 캔버스 검색"
               onSubmit={onSearchSubmit}
             >
               <label>

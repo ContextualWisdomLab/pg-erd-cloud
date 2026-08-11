@@ -365,17 +365,19 @@ describe('App orchestration coverage', () => {
     const user = userEvent.setup()
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const diagramSearch = screen.getByLabelText('다이어그램 검색')
+    const diagramSearch = screen.getByRole('searchbox', { name: '다이어그램 검색' })
 
     await user.type(diagramSearch, 'failed{enter}')
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
     expect(diagramSearch.closest('form')).toHaveAttribute('role', 'search')
+    expect(screen.getByRole('search', { name: '다이어그램 검색' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
-    const canvasSearch = screen.getByLabelText('테이블 또는 컬럼 검색')
+    const canvasSearch = screen.getByRole('searchbox', { name: '테이블 또는 컬럼 검색' })
     await user.type(canvasSearch, 'users{enter}')
     expect(canvasSearch).toHaveValue('users')
     expect(canvasSearch.closest('form')).toHaveAttribute('role', 'search')
+    expect(screen.getByRole('search', { name: 'ERD 캔버스 검색' })).toBeInTheDocument()
   })
 
   it('shows loading and explicit authentication failure', async () => {
@@ -395,9 +397,9 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: '다이어그램 검색' }), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: '다이어그램 검색' }), { target: { value: 'failed' } })
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
@@ -453,7 +455,7 @@ describe('App orchestration coverage', () => {
     expect(api.getSnapshot).toHaveBeenCalledWith('s1')
     expect(screen.getByTestId('node-count')).toHaveTextContent('2')
 
-    fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: '테이블 또는 컬럼 검색' }), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
     await act(async () => {

@@ -31,6 +31,9 @@ authentication, API payloads, polling, status rendering, or dependencies.
 ## Search forms
 
 Diagram and canvas search controls are semantic forms with `role="search"`.
+The landmarks have distinct accessible names (`다이어그램 검색` and
+`ERD 캔버스 검색`) so assistive-technology users can identify the intended
+search region rather than encountering anonymous search landmarks.
 Their submit handler only calls `preventDefault()`. Enter therefore cannot
 navigate or reload the page, while the controlled input and existing live
 filter remain unchanged. The accessible labels and visible layout are
