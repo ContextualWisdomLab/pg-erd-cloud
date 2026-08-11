@@ -82,7 +82,7 @@ vi.mock('@xyflow/react', async () => {
   return {
     Background: () => <span />,
     Controls: () => <span />,
-    MiniMap: () => <span />,
+    MiniMap: () => <span data-testid="minimap" />,
     Handle: () => <span />,
     Position: { Top: 'top', Left: 'left', Right: 'right', Bottom: 'bottom' },
     ReactFlow: ReactFlowMock,
@@ -611,6 +611,11 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
+
+    // Wait for diagrams state to render which might take a moment based on test behavior
+    await act(async () => {
+      vi.advanceTimersByTime(100)
+    })
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
@@ -669,6 +674,36 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
+  })
+
+  it('toggles the minimap visibility when the button is clicked', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+
+    // Wait for the diagrams to load and click on the "Open" button for a diagram
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0)
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+
+    // Wait for canvas elements to appear before querying for minimap
+    await waitFor(() => {
+      expect(screen.getByTestId('minimap')).toBeInTheDocument()
+    })
+
+    const toggleButton = screen.getByRole('button', { name: '미니맵 토글' })
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'true')
+    expect(toggleButton).toHaveAttribute('title', '미니맵 숨기기')
+
+    fireEvent.click(toggleButton)
+    expect(screen.queryByTestId('minimap')).not.toBeInTheDocument()
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'false')
+    expect(toggleButton).toHaveAttribute('title', '미니맵 표시')
+
+    fireEvent.click(toggleButton)
+    expect(screen.getByTestId('minimap')).toBeInTheDocument()
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renders snapshot failures and polls without a selected project', async () => {

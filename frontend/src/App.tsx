@@ -159,6 +159,7 @@ export default function App() {
 
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutMessage, setLayoutMessage] = useState<string>("");
+  const [showMiniMap, setShowMiniMap] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportDdlText, setExportDdlText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
@@ -1437,6 +1438,15 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={() => setShowMiniMap((prev) => !prev)}
+              aria-label="미니맵 토글"
+              title={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"}
+              aria-pressed={showMiniMap}
+            >
+              🗺️
+            </button>
+            <button
+              type="button"
               onClick={onClearCanvas}
               disabled={nodes.length === 0}
               title={
@@ -1560,7 +1570,7 @@ export default function App() {
           >
             <Background />
             <Controls />
-            <MiniMap />
+            {showMiniMap && <MiniMap />}
           </ReactFlow>
 
           {nodes.length === 0 && (
