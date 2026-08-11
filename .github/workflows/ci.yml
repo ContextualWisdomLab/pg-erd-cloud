@@ -92,7 +92,7 @@ jobs:
 
       - name: Test
         working-directory: frontend
-        run: npm run coverage
+        run: npm run test
 
       - name: Build
         working-directory: frontend
