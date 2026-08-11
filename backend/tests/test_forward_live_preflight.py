@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from app.forward import live_preflight as live_preflight_module
 from app.forward.live_preflight import (
     LivePreflightContractError,
     compare_live_preflight_snapshot,
@@ -406,7 +407,21 @@ class _CancelledRollbackFailingConnection(_CancelledConnection):
 
 
 @pytest.mark.asyncio
-async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> None:
+async def test_executes_only_bounded_reads_in_one_read_only_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_wait_for = asyncio.wait_for
+    client_timeouts: list[float] = []
+
+    async def record_wait_for(
+        awaitable: Any, *, timeout: float
+    ) -> object:
+        client_timeouts.append(timeout)
+        return await original_wait_for(awaitable, timeout=timeout)
+
+    monkeypatch.setattr(
+        live_preflight_module.asyncio, "wait_for", record_wait_for
+    )
     connection = _FakeConnection([True, False])
     plan = _plan(
         {
@@ -441,6 +456,7 @@ async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> Non
     ]
     assert connection.prepared == [sql for sql, _ in connection.queries]
     assert [timeout for _, timeout in connection.queries] == [3.5, 3.5]
+    assert client_timeouts == [3.5] * 5
     assert evidence == {
         "passed": False,
         "checks": [

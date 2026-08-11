@@ -212,6 +212,7 @@ async def execute_live_preflight(
             "live preflight statement timeout is invalid"
         )
     queries = compile_live_preflight_queries(plan)
+    client_timeout = statement_timeout_ms / 1000 + 1
     transaction: Transaction | None = None
     transaction_started = False
     sanitized_failure = False
@@ -219,16 +220,20 @@ async def execute_live_preflight(
         transaction = connection.transaction(
             isolation="repeatable_read", readonly=True
         )
-        await transaction.start()
+        await asyncio.wait_for(transaction.start(), timeout=client_timeout)
         transaction_started = True
-        await connection.execute(
-            "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
-            str(statement_timeout_ms),
+        await asyncio.wait_for(
+            connection.execute(
+                "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+                str(statement_timeout_ms),
+            ),
+            timeout=client_timeout,
         )
-        client_timeout = statement_timeout_ms / 1000 + 1
         checks: list[dict[str, object]] = []
         for query in queries:
-            prepared = await connection.prepare(query.sql)
+            prepared = await asyncio.wait_for(
+                connection.prepare(query.sql), timeout=client_timeout
+            )
             result = await prepared.fetchval(timeout=client_timeout)
             if not isinstance(result, bool):
                 raise LivePreflightContractError(
@@ -242,11 +247,13 @@ async def execute_live_preflight(
                     "passed": result,
                 }
             )
-        await transaction.commit()
+        await asyncio.wait_for(transaction.commit(), timeout=client_timeout)
     except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
         if transaction_started and transaction is not None:
             try:
-                await transaction.rollback()
+                await asyncio.wait_for(
+                    transaction.rollback(), timeout=client_timeout
+                )
             except Exception:
                 # Preserve cancellation/process-exit over cleanup detail.
                 pass
@@ -254,7 +261,9 @@ async def execute_live_preflight(
     except Exception as err:
         if transaction_started and transaction is not None:
             try:
-                await transaction.rollback()
+                await asyncio.wait_for(
+                    transaction.rollback(), timeout=client_timeout
+                )
             except Exception:
                 # Preserve the fixed non-success diagnostic, never driver detail.
                 pass
