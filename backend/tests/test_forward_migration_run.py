@@ -730,6 +730,59 @@ async def test_preflight_drift_transition_persists_mismatched_base_digest() -> N
 
 
 @pytest.mark.parametrize(
+    "evidence",
+    [
+        {"observed_base_digest": "0" * 64},
+        {"observedBaseDigest": "0" * 64},
+        {"nested": {"observed-base-digest": "0" * 64}},
+        {"nested": [{"observed.base.digest": "0" * 64}]},
+    ],
+)
+@pytest.mark.asyncio
+async def test_preflight_terminal_transition_rejects_worker_supplied_digest_evidence(
+    evidence: dict[str, object],
+) -> None:
+    """Only the server argument may author the observed digest audit field."""
+
+    plan = _migration_plan()
+    run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="live_preflight_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, plan]),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="server-authoritative"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=3,
+            next_state="passed",
+            event_type="preflight_passed",
+            evidence=evidence,
+            observed_base_digest=plan.base_digest,
+            actor_user_uuid=None,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
+
+
+@pytest.mark.parametrize(
     "next_state, observed_base_digest",
     [
         ("passed", None),

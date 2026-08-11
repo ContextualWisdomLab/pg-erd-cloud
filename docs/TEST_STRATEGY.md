@@ -196,7 +196,8 @@ database failures, and strict snapshot-to-plan-base canonical digest comparison.
 Durable-run unit tests require that observed digest for terminal preflight CAS,
 revalidate the immutable plan, persist it on the run and chained event, and
 reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
-transition injection.
+transition injection. Worker evidence cannot pre-author the reserved observed
+digest field through snake-, camel-, kebab-case, or nested aliases.
 Real-target privilege/audit assertions, worker-owned fresh capture/attempt
 binding, and worker failure/recovery remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup

@@ -339,6 +339,30 @@ def digest_run_event(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _evidence_field_tokens(key: str) -> tuple[str, ...]:
+    separated_key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return tuple(
+        token
+        for token in re.split(r"[^a-z0-9]+", separated_key.casefold())
+        if token
+    )
+
+
+def _contains_evidence_field(value: object, identity: str) -> bool:
+    if isinstance(value, Mapping):
+        return any(
+            "".join(_evidence_field_tokens(key)) == identity
+            or _contains_evidence_field(nested, identity)
+            for key, nested in value.items()
+            if isinstance(key, str)
+        )
+    if isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    ):
+        return any(_contains_evidence_field(item, identity) for item in value)
+    return False
+
+
 def _validate_evidence(value: object, *, path: str, depth: int) -> Any:
     if depth > MAX_RUN_EVIDENCE_DEPTH:
         raise MigrationRunContractError("run evidence nesting is too deep")
@@ -362,12 +386,7 @@ def _validate_evidence(value: object, *, path: str, depth: int) -> Any:
         for key, nested in value.items():
             if not isinstance(key, str):
                 raise MigrationRunContractError("run evidence field name must be text")
-            separated_key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
-            tokens = {
-                token
-                for token in re.split(r"[^a-z0-9]+", separated_key.casefold())
-                if token
-            }
+            tokens = set(_evidence_field_tokens(key))
             if tokens & _FORBIDDEN_EVIDENCE_TOKENS:
                 raise MigrationRunContractError(
                     f"forbidden evidence field at {path}.{key}"
@@ -599,6 +618,10 @@ async def transition_migration_run(
     if binds_observed_base:
         if observed_base_digest is None:
             raise MigrationRunContractError("observed base digest is required")
+        if _contains_evidence_field(canonical_evidence, "observedbasedigest"):
+            raise MigrationRunContractError(
+                "observed base digest evidence is server-authoritative"
+            )
         plan = await session.scalar(
             select(MigrationPlan).where(
                 MigrationPlan.migration_plan_uuid == run.migration_plan_uuid

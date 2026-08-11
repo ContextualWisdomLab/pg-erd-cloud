@@ -423,7 +423,7 @@ Terminal semantics are exact:
 
 | State | DDL/outcome claim |
 |---|---|
-| `passed` | Sandbox execution converged and bounded live read-only preflight passed for an observed digest equal to the integrity-checked plan base; no live DDL ran. The CAS binding is Implemented; worker evidence production is Planned. |
+| `passed` | Sandbox execution converged and bounded live read-only preflight passed for an observed digest equal to the integrity-checked plan base; no live DDL ran. The CAS binding and reserved server-authored digest evidence field are Implemented; worker evidence production is Planned. |
 | `drifted` / `drifted_no_apply` | Target base mismatch was observed; no plan DDL ran. Dry-run mismatch classification/persistence is Implemented; worker capture and apply-time classification are Planned. |
 | `failed` | Dry-run stage failed; no live DDL ran. |
 | `failed_rolled_back` | Apply started; the transactional segment is proven rolled back. |
