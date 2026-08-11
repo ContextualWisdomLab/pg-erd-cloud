@@ -57,6 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2024-08-11 - Make Disabled Icon Buttons Accessible
-**Learning:** Native `disabled` attributes on buttons make them completely inaccessible to keyboard users (removed from tab order) and often suppress pointer events, making hover `title` tooltips explaining *why* they are disabled invisible.
+## 2026-08-11 - Make Disabled Icon Buttons Accessible
+**Learning:** Native `disabled` attributes remove buttons from the keyboard tab order and often suppress pointer events, making hover `title` tooltips explaining *why* they are disabled unavailable to keyboard and pointer users.
 **Action:** When a button is icon-only and relies on a hover tooltip to explain why it's disabled, use `aria-disabled="true"` instead of `disabled`. Update CSS to style `button[aria-disabled="true"]` like `button:disabled`, and manually early return in the `onClick` handler. This keeps the element focusable and ensures tooltips work for both mouse and keyboard users.
