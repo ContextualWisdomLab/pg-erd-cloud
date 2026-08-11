@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sourceColumnHandleId, targetColumnHandleId, decodeSourceHandleId, decodeTargetHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,12 +67,9 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  // ⚡ Bolt: Decode hex handles in O(1) instead of iterating over every column to encode and match (O(C)).
+  const sourceHandleColumn = edge.sourceHandle ? decodeSourceHandleId(edge.sourceHandle) : undefined;
+  const targetHandleColumn = edge.targetHandle ? decodeTargetHandleId(edge.targetHandle) : undefined;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
