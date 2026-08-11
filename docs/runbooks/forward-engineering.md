@@ -24,8 +24,8 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Canonical model save/revision with `If-Match` | Implemented | May be used as a control-plane preview feature. |
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
 | Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean-read and strict snapshot/base-digest comparison primitives exist; worker identity, worker-owned fresh capture/attempt binding, and real-target integration are absent, so no plan is production-authorized. |
-| Isolated disposable PostgreSQL dry run | Planned | No current dry-run result is release evidence. |
-| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, and an execution-neutral consumer contract exist; no application consumer wiring, executor, or recovery worker exists. |
+| Isolated disposable PostgreSQL dry run | Partially implemented | Exact signed-plan execution, rollback, version/base checks, and target-digest convergence have a PostgreSQL 14–18-tested core. Provisioning, dependency materialization, deployed isolation/egress proof, cleanup, and worker binding are Planned; no current result is release evidence. |
+| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, and an execution-neutral consumer contract exist; no application consumer wiring, sandbox lifecycle, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |

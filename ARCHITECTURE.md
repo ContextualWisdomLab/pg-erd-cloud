@@ -14,7 +14,7 @@ flowchart TD
   API --> MODEL[(schema_model / schema_model_revision)]
   API --> COMPILER[Canonical model and plan compiler]
   COMPILER --> PLAN[(migration_plan)]
-  PLAN -. planned .-> SANDBOX[Isolated PostgreSQL validator]
+  PLAN -. partial core .-> SANDBOX[Isolated PostgreSQL validator]
   PLAN -. planned .-> PREFLIGHT[Read-only target preflight]
   PREFLIGHT -. planned .-> EXECUTOR[Durable migration executor]
   EXECUTOR -. planned .-> TARGET[(Target PostgreSQL)]
@@ -34,7 +34,7 @@ support.
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
 | Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified polling, and dry-run creation/cancellation intent APIs **Implemented**; workers **Planned** |
-| Isolated PostgreSQL validator | Exact-plan executable dry run | **Planned** |
+| Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query and canonical snapshot/base-digest comparison primitives **Implemented**; worker-owned fresh capture binding and apply **Planned** |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
@@ -95,6 +95,13 @@ Implemented in the initial safe vertical slice:
   quoted PostgreSQL reads, executes them in one read-only repeatable-read
   transaction with server/client timeouts, and returns boolean-only evidence;
   it owns no credential, worker, fingerprint, run-transition, or DDL authority;
+- an execution-only isolated-dry-run primitive accepts no DSN or browser SQL,
+  verifies the immutable plan/compiler/PostgreSQL-major/base bindings, executes
+  only the compiler-owned all-transactional statement list with bounded
+  timeouts, rolls failures back with fixed diagnostics, and requires a fresh
+  strict snapshot to equal `target_digest`; PostgreSQL 14–18 CI supplies the
+  real catalog round trip, while sandbox provisioning, dependency
+  materialization, network isolation, cleanup, and worker wiring remain absent;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.
 
@@ -103,7 +110,8 @@ identity/generated columns, existing-primary-key changes, views, triggers,
 partitions, extensions and distributed tables. This is a release blocker for
 general forward engineering, not a silent omission.
 
-Planned: isolated durable dry run, live-preflight worker-owned fresh snapshot
+Planned: isolated sandbox lifecycle and durable worker integration,
+live-preflight worker-owned fresh snapshot
 capture/connection binding, plan approval, idempotent apply, post-commit re-introspection and the
 accessible frontend review/apply flow. The approved detailed design is in
 `docs/superpowers/specs/2026-08-09-forward-engineering-design.md`.

@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.forward.isolated_dry_run import execute_isolated_dry_run
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.live_preflight import (
     LivePreflightContractError,
@@ -33,6 +34,10 @@ from app.models import (
     SchemaModelRevision,
     SchemaSnapshot,
     UserAccount,
+)
+from app.pg_introspect import queries
+from app.pg_introspect.snapshot_contract import (
+    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
 )
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
@@ -57,6 +62,129 @@ def _preflight_plan(*preconditions: dict[str, object]) -> dict[str, object]:
         "blockers": [],
         "statements": [{"preconditions": list(preconditions)}],
     }
+
+
+async def _capture_filtered_snapshot(
+    connection: asyncpg.Connection[asyncpg.Record], schema_name: str
+) -> dict[str, object]:
+    """Capture the strict capability rows from the owned sandbox connection."""
+
+    include_system = False
+    return {
+        "snapshot_contract_version": CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+        "server_version": str(await connection.fetchval("SHOW server_version")),
+        "schemas": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.SCHEMAS_SQL, schema_name, include_system
+            )
+        ],
+        "relations": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.RELATIONS_SQL, schema_name, include_system
+            )
+        ],
+        "columns": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.COLUMNS_SQL, schema_name, include_system
+            )
+        ],
+        "constraints": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.CONSTRAINTS_SQL, schema_name, include_system
+            )
+        ],
+        "indexes": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.INDEXES_SQL, schema_name, include_system
+            )
+        ],
+        "pk_columns": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.PK_COLUMNS_SQL, schema_name, include_system
+            )
+        ],
+        "fk_edges": [
+            dict(row)
+            for row in await connection.fetch(
+                queries.FK_EDGES_SQL, schema_name, include_system
+            )
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> None:
+    """Prove exact signed-plan execution and re-introspection on PostgreSQL."""
+
+    assert _EXPECTED_MAJOR is not None
+    major = int(_EXPECTED_MAJOR)
+    schema_name = f"Dry Run {uuid.uuid4().hex}"
+    table_name = '주문 "항목"'
+    base = {"format_version": 1, "postgresql_major": major, "schemas": []}
+    target = {
+        "format_version": 1,
+        "postgresql_major": major,
+        "schemas": [
+            {
+                "schema_name": schema_name,
+                "tables": [
+                    {
+                        "table_name": table_name,
+                        "columns": [
+                            {
+                                "column_name": "Item ID",
+                                "data_type": "bigint",
+                                "nullable": True,
+                                "ordinal_position": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    plan = compile_migration_plan(base, target)
+    connection = await asyncpg.connect(_asyncpg_url())
+
+    async def capture(
+        owned_connection: asyncpg.Connection[asyncpg.Record],
+    ) -> dict[str, object]:
+        return await _capture_filtered_snapshot(owned_connection, schema_name)
+
+    quoted_schema = '"' + schema_name.replace('"', '""') + '"'
+    try:
+        evidence = await execute_isolated_dry_run(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture,  # type: ignore[arg-type]
+            lock_timeout_ms=2_000,
+            statement_timeout_ms=5_000,
+        )
+        assert evidence == {
+            "postgresql_major": major,
+            "statement_count": 2,
+            "base_digest": plan["base_digest"],
+            "target_digest": plan["target_digest"],
+            "converged": True,
+        }
+        assert await connection.fetchval(
+            "SELECT EXISTS ("
+            "SELECT 1 FROM pg_catalog.pg_class AS c "
+            "JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = $1 AND c.relname = $2)",
+            schema_name,
+            table_name,
+        ) is True
+    finally:
+        await connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await connection.close()
 
 
 @pytest.mark.asyncio

@@ -131,7 +131,7 @@ evidence exists.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
-| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Planned** |
+| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, and bounded live-read primitive exist; sandbox lifecycle and both workers remain Planned |
 | 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Planned** |
 | 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Planned** |
 

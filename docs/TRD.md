@@ -94,7 +94,9 @@ executable SQL, safety classification, approval truth, or recovery state.
 - queue consumption, worker execution, durable retry backoff/max-attempt
   policy, and dispatch retention;
 - cancellation propagation and worker acknowledgement;
-- isolated disposable PostgreSQL execution and cleanup;
+- isolated disposable PostgreSQL provisioning, complete dependency
+  materialization, deployed isolation proof, cleanup, and worker binding (the
+  signed-plan execution/convergence core is Partially implemented);
 - live-preflight worker wiring, separately constrained credentials, worker-owned
   fresh target capture/attempt binding, and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -116,9 +118,9 @@ by the graphical target architecture.
 | FE-TRD-003 | Every admitted base→target difference yields operations or blockers; any blocker suppresses executable statements while supported independent deltas remain in `proposed_statements` for review. | **Implemented for current canonical subset** |
 | FE-TRD-004 | A plan binds exact project, model revision, connection, succeeded snapshot, compiler version, digests, actor, and expiry. | **Implemented** |
 | FE-TRD-005 | Cross-project/missing/unauthorized identities do not reveal another tenant's resource existence. | **Partially implemented; full matrix gate remains** |
-| FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
+| FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Partially implemented:** signed-plan/version/base/transaction/convergence execution core and PostgreSQL 14–18 round trip exist; provisioning, materialization, deployed isolation/egress proof, cleanup, and worker binding remain Planned |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean-read compiler/executor and strict snapshot-to-plan-base digest comparison exist; worker identity, worker-owned fresh capture/attempt binding, real-target integration, and in-lock apply repetition remain Planned |
-| FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
+| FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, attempt-bound publish CAS, exact lease-token claim/ack/release primitives, and the execution-neutral consumer contract are **Implemented**; application startup wiring and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |

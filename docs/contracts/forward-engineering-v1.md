@@ -50,8 +50,13 @@ Current code implements only the first control-plane slice:
   them in one timed read-only transaction. It strictly adapts a caller-supplied
   snapshot and compares its canonical digest with the plan base, but has no
   credential, worker-owned fresh-capture, run-transition, or DDL authority.
-- **Planned:** apply creation and all workers, isolated dry run, complete live
-  preflight fresh-capture/attempt binding and apply-time fingerprint
+- **Partially implemented:** the isolated-dry-run execution core verifies one
+  signed v1 plan, compatible PostgreSQL major, strict materialized base,
+  all-transactional statement list, rollback boundary, and target-digest
+  convergence. It does not provision, isolate, materialize, clean, or bind a
+  durable worker attempt.
+- **Planned:** apply creation and all workers, isolated sandbox lifecycle,
+  complete live preflight fresh-capture/attempt binding and apply-time fingerprint
   revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
@@ -68,8 +73,8 @@ Current code implements only the first control-plane slice:
 | FE-INV-002 | A model revision is canonical, content-digested, and append-only through the API. | Implemented |
 | FE-INV-003 | A plan binds one revision, project, connection, succeeded base snapshot, compiler version, base/target digests, actor, and expiry. | Implemented |
 | FE-INV-004 | Every admitted semantic difference becomes an operation or blocker; blockers suppress executable statements while supported independent deltas remain reviewable as proposals. | Implemented for the current admitted subset |
-| FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: bounded read-only precondition primitive only; sandbox and live worker Planned |
-| FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Planned |
+| FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: isolated execution core plus bounded live-read primitive; deployed isolation, sandbox lifecycle, and workers Planned |
+| FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Partially implemented for the isolated execution core; durable worker binding and apply remain Planned |
 | FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Planned |
 | FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Planned |
 | FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Partially implemented |

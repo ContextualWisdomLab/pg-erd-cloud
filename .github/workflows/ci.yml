@@ -46,7 +46,7 @@ jobs:
         run: pytest -q
 
   postgres-integration:
-    name: PostgreSQL ${{ matrix.major }} run/outbox + preflight reads
+    name: PostgreSQL ${{ matrix.major }} run/outbox + isolated dry run + preflight
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -135,7 +135,7 @@ jobs:
           PYTHONPATH: .
         run: alembic upgrade head
 
-      - name: Verify real PostgreSQL run/outbox and preflight-read contracts
+      - name: Verify real PostgreSQL run/outbox, isolated dry run, and preflight
         working-directory: backend
         env:
           EXPECTED_POSTGRES_MAJOR: ${{ matrix.major }}

@@ -2,7 +2,7 @@
 
 - **Document status:** Current implementation and accepted target design
 - **Runtime status:** Partially implemented; not production-ready
-- **Last reconciled with the working tree:** 2026-08-09
+- **Last reconciled with the working tree:** 2026-08-12
 
 The repository Mermaid diagrams in this document are authoritative. The
 [FigJam companion board](https://www.figma.com/board/MLWimuWoOWhatQ239QihfP)
@@ -22,8 +22,10 @@ ADRs, or these diagrams.
 
 **Status: Partially implemented.** The model/revision/plan control plane and
 snapshot worker exist. The target is contacted by guarded introspection and by
-the transitional `apply-sql` compatibility endpoint. There is no structured
-plan executor, isolated validator, or migration-run worker yet.
+the transitional `apply-sql` compatibility endpoint. A bounded isolated
+validator core now verifies and executes a signed plan on a caller-owned
+sandbox connection and requires strict target-digest convergence. There is no
+sandbox lifecycle, structured live-apply executor, or migration-run worker yet.
 
 ```mermaid
 flowchart TB
@@ -31,6 +33,7 @@ flowchart TB
   API --> Authority["Canonicalizer and plan compiler"]
   API --> Metadata[("Metadata PostgreSQL")]
   API --> Guard["Guarded PostgreSQL connection"]
+  Authority -. signed plan .-> SandboxCore["Partial: isolated execution core"]
   SnapshotWorker["Snapshot job worker"] --> Metadata
   SnapshotWorker --> Guard
   Guard --> Target[("Target PostgreSQL")]
@@ -45,6 +48,10 @@ Current authority boundaries:
   losslessly in compiler v1.
 - `app.forward.migration_plan` renders quoted SQL and structured risk data on
   the server. `migration_plan.plan_json` is immutable through the current API.
+- `app.forward.isolated_dry_run` accepts only that digest-bound plan plus a
+  caller-owned sandbox connection, validates version/base/transaction
+  contracts, executes one bounded transaction, and requires a strict fresh
+  target snapshot to converge. It does not provision or clean the sandbox.
 - `app.pg_introspect.dsn_guard` applies a configured host allowlist, rejects
   restricted addresses, resolves DNS, and pins the validated IP used to
   connect. Verified-hostname TLS is applied when the DSN requests
@@ -54,8 +61,9 @@ Current authority boundaries:
   accepted production workflow.
 
 Components deliberately absent from this current diagram are **Planned**:
-isolated sandbox provisioning, live-preflight worker-owned fresh-capture binding,
-plan execution, reconciliation, and post-apply convergence verification.
+isolated sandbox provisioning/materialization/cleanup, live-preflight
+worker-owned fresh-capture binding, live plan execution, reconciliation, and
+post-apply convergence verification.
 Durable `migration_run`/event/outbox persistence and an execution-neutral,
 bounded read-only precondition primitive are **Partially implemented**; neither
 constitutes worker execution or dry-run success evidence.

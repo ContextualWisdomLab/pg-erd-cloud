@@ -90,6 +90,15 @@ locks on the execution connection.
 ### Implemented
 
 - Plans contain base/target digests and structured statement preconditions.
+- `app.forward.isolated_dry_run` verifies the persisted plan digest, compiler
+  version, PostgreSQL major, strict materialized-base digest, supported
+  all-transactional operation list, and bounded timeouts before executing the
+  exact compiler-owned statements in one sandbox transaction. It masks driver
+  failures, rolls back after a started transaction, preserves cancellation,
+  re-introspects through a worker-owned callback, and requires the strict
+  target digest. The PostgreSQL 14–18 matrix exercises the real DDL/catalog
+  round trip. This is an execution core, not evidence that a deployed sandbox
+  is disposable or isolated.
 - Existing target-connection code provides encrypted DSNs and guarded database
   connection primitives that the planned live-preflight worker must reuse.
 - `app.forward.live_preflight` compiles only the structured
@@ -103,7 +112,8 @@ locks on the execution connection.
 
 ### Planned before production release
 
-- isolated sandbox provisioning, execution, cleanup, and egress enforcement;
+- isolated sandbox provisioning, complete base dependency materialization,
+  cleanup, and egress enforcement;
 - application worker wiring with a separately constrained read-only target
   identity and guarded connection lifecycle;
 - worker-owned fresh target capture and binding to the same authorized

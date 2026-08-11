@@ -196,5 +196,6 @@ npm run dev
 
 - Casdoor OIDC 로그인 UI/리다이렉트 플로우(현재는 토큰 검증/DEV 모드만)
 - 실시간 협업(커서/코멘트/CRDT 기반 동시 편집)
-- 포워드 엔지니어링 2–4단계: 격리 sandbox dry run, live read-only preflight,
-  durable apply/recovery, post-apply convergence, 접근 가능한 frontend workflow
+- 포워드 엔지니어링 2–4단계: 현재 Partial인 signed-plan 격리 실행 코어와
+  live read-only preflight primitive를 배포 가능한 sandbox/worker로 완성하고,
+  durable apply/recovery, post-apply convergence, 접근 가능한 frontend workflow 구현
