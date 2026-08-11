@@ -233,11 +233,15 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "test_postgres_migration_run_integration.py" in workflow
     assert "CREATE DATABASE pg_erd_cloud_sandbox" in workflow
     assert "POSTGRES_SANDBOX_INTEGRATION_URL" in workflow
+    assert "CREATE DATABASE pg_erd_cloud_target" in workflow
+    assert "POSTGRES_TARGET_INTEGRATION_URL" in workflow
     integration_test = _read(
         Path("backend/tests/test_postgres_migration_run_integration.py")
     )
     assert 'os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")' in integration_test
+    assert 'os.getenv("POSTGRES_TARGET_INTEGRATION_URL")' in integration_test
     assert "_sandbox_asyncpg_url()" in integration_test
+    assert "_target_asyncpg_url()" in integration_test
     assert "PostgreSQL 14\u201318" in strategy
     assert "migration-run/outbox" in strategy
 

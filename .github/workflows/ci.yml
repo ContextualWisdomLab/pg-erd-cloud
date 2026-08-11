@@ -125,9 +125,17 @@ jobs:
           docker exec pg-erd-cloud-postgres \
             psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
             -c "CREATE DATABASE pg_erd_cloud_sandbox"
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE DATABASE pg_erd_cloud_target"
           sandbox_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_sandbox"
+          target_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_target"
           echo "::add-mask::$sandbox_database_url"
-          echo "POSTGRES_SANDBOX_INTEGRATION_URL=$sandbox_database_url" >> "$GITHUB_ENV"
+          echo "::add-mask::$target_database_url"
+          {
+            echo "POSTGRES_SANDBOX_INTEGRATION_URL=$sandbox_database_url"
+            echo "POSTGRES_TARGET_INTEGRATION_URL=$target_database_url"
+          } >> "$GITHUB_ENV"
 
       - name: Setup Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0

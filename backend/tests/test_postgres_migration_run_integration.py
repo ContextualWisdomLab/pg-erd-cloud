@@ -43,12 +43,16 @@ from app.pg_introspect.snapshot_contract import (
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
 _POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
+_POSTGRES_TARGET_URL = os.getenv("POSTGRES_TARGET_INTEGRATION_URL")
 _EXPECTED_MAJOR = os.getenv("EXPECTED_POSTGRES_MAJOR")
 pytestmark = pytest.mark.skipif(
-    not _POSTGRES_URL or not _POSTGRES_SANDBOX_URL or not _EXPECTED_MAJOR,
+    not _POSTGRES_URL
+    or not _POSTGRES_SANDBOX_URL
+    or not _POSTGRES_TARGET_URL
+    or not _EXPECTED_MAJOR,
     reason=(
-        "POSTGRES_INTEGRATION_URL, POSTGRES_SANDBOX_INTEGRATION_URL, and "
-        "EXPECTED_POSTGRES_MAJOR are required for real PostgreSQL acceptance"
+        "metadata, sandbox, target, and expected-major configuration are "
+        "required for real PostgreSQL acceptance"
     ),
 )
 
@@ -61,6 +65,13 @@ def _asyncpg_url() -> str:
 def _sandbox_asyncpg_url() -> str:
     assert _POSTGRES_SANDBOX_URL is not None
     return _POSTGRES_SANDBOX_URL.replace(
+        "postgresql+asyncpg://", "postgresql://", 1
+    )
+
+
+def _target_asyncpg_url() -> str:
+    assert _POSTGRES_TARGET_URL is not None
+    return _POSTGRES_TARGET_URL.replace(
         "postgresql+asyncpg://", "postgresql://", 1
     )
 
@@ -203,7 +214,16 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
 async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
     """Prove quoted identifiers, data checks, and fixed failures on PostgreSQL."""
 
-    connection = await asyncpg.connect(_asyncpg_url())
+    assert _POSTGRES_URL is not None
+    assert _POSTGRES_SANDBOX_URL is not None
+    assert _POSTGRES_TARGET_URL is not None
+    database_paths = {
+        urlparse(_POSTGRES_URL).path,
+        urlparse(_POSTGRES_SANDBOX_URL).path,
+        urlparse(_POSTGRES_TARGET_URL).path,
+    }
+    assert len(database_paths) == 3
+    connection = await asyncpg.connect(_target_asyncpg_url())
     schema_name = f"Preflight {uuid.uuid4().hex}"
     table_name = '주문 "항목"'
     quoted_schema = '"' + schema_name.replace('"', '""') + '"'
