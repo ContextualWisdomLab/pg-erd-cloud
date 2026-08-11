@@ -12,7 +12,7 @@ import asyncio
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import asyncpg
 from asyncpg.transaction import Transaction
@@ -242,9 +242,14 @@ async def execute_live_preflight(
                     "passed": result,
                 }
             )
+        await transaction.commit()
+        transaction_started = False
     except BaseException as err:
         if transaction_started and transaction is not None:
-            await transaction.rollback()
+            try:
+                await transaction.rollback()
+            except Exception:
+                pass
         if isinstance(
             err,
             (
@@ -258,5 +263,4 @@ async def execute_live_preflight(
         sanitized_failure = True
     if sanitized_failure:
         raise LivePreflightContractError("live preflight query failed") from None
-    await cast(Transaction, transaction).commit()
     return {"passed": all(bool(item["passed"]) for item in checks), "checks": checks}

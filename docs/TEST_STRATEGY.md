@@ -193,8 +193,9 @@ the 1,000-query ceiling, a single read-only repeatable-read transaction,
 prepared-statement-only execution, parameter-bound transaction-local server
 timeout plus client timeout bounds, boolean-only
 evidence, rollback, fixed non-secret
-database failures (including transaction creation/start), no rollback before a
-successful start, cleared exception cause/context, and strict
+database failures (including transaction creation/start, commit, and rollback
+cleanup), no rollback before a successful start, cleared exception
+cause/context, and strict
 snapshot-to-plan-base canonical digest comparison.
 Durable-run unit tests require that observed digest for terminal preflight CAS,
 revalidate the immutable plan, persist it on the run and chained event, and

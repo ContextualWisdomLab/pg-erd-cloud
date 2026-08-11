@@ -366,6 +366,28 @@ class _TransactionStartFailingConnection(_FakeConnection):
         return _TransactionStartFailingTransaction(self)
 
 
+class _TransactionCommitFailingTransaction(_FakeTransaction):
+    async def commit(self) -> None:
+        raise RuntimeError("postgresql://user:secret@db.example.com/app")
+
+
+class _TransactionCommitFailingConnection(_FakeConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        return _TransactionCommitFailingTransaction(self)
+
+
+class _TransactionRollbackFailingTransaction(_FakeTransaction):
+    async def rollback(self) -> None:
+        raise RuntimeError("postgresql://user:secret@db.example.com/app")
+
+
+class _TransactionRollbackFailingConnection(_FailingConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        return _TransactionRollbackFailingTransaction(self)
+
+
 @pytest.mark.asyncio
 async def test_executes_only_bounded_reads_in_one_read_only_transaction() -> None:
     connection = _FakeConnection([True, False])
@@ -483,6 +505,34 @@ async def test_sanitizes_transaction_initialization_failures_without_rollback(
     assert captured.value.__context__ is None
     assert connection.committed is False
     assert connection.rolled_back is False
+
+
+@pytest.mark.parametrize(
+    "connection",
+    [
+        _TransactionCommitFailingConnection([True]),
+        _TransactionRollbackFailingConnection([]),
+    ],
+)
+@pytest.mark.asyncio
+async def test_sanitizes_transaction_finalization_failures(
+    connection: _FakeConnection,
+) -> None:
+    with pytest.raises(LivePreflightContractError) as captured:
+        await execute_live_preflight(
+            connection,
+            _plan(
+                {
+                    "kind": "table_is_empty",
+                    "schema_name": "public",
+                    "table_name": "orders",
+                }
+            ),
+        )
+
+    assert str(captured.value) == "live preflight query failed"
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
 
 
 @pytest.mark.parametrize("timeout", ["5000", True, 0, 60_001])
