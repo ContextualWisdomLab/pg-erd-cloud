@@ -33,7 +33,7 @@ support.
 | React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; desired-model adapters and live workflow **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
-| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, and verified run polling **Implemented**; creation APIs/workers **Planned** |
+| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified run polling, and cancellation-intent API **Implemented**; dry-run creation API/workers **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | **Planned** |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
@@ -65,6 +65,9 @@ Implemented in the initial safe vertical slice:
   exact, unexpired, executable dry-run intent and its sequence-one event;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
+- an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary
+  that binds the exact state version, actor, and request correlation identity
+  to that cancellation event and returns only stable sanitized error codes;
 - a versioned SHA-256 event chain anchored on each run row; polling recomputes
   every link and fails closed on payload, ordering, predecessor, or anchor drift;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply

@@ -128,6 +128,7 @@ def make_request_observability_middleware() -> Callable[
             request_id = raw_request_id
         else:
             request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
         start = time.perf_counter()
 
         try:

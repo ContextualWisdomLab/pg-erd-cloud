@@ -138,8 +138,8 @@ Rules:
 
 ### Planned before production release
 
-- authenticated dry-run/cancellation routes and apply creation;
-- outbox/queue integration and cancellation semantics;
+- authenticated dry-run and apply creation routes;
+- outbox/queue integration and cancellation-worker acknowledgement;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

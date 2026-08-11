@@ -106,7 +106,7 @@ def test_v1_contract_separates_current_routes_from_remaining_run_routes() -> Non
     assert "## 5. Current HTTP API contract" in contract
     assert "## 8. Migration-plan retrieval and bounded run API" in contract
     assert "Implemented" in contract
-    assert "remaining run routes" in contract
+    assert "each route is classified below" in " ".join(contract.split())
 
 
 def test_v1_contract_does_not_classify_plan_retrieval_as_planned() -> None:
@@ -161,7 +161,7 @@ def test_v1_contract_keeps_current_concurrency_and_identifier_authority_explicit
 
 
 def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -> None:
-    """Keep run polling implemented while mutation and execution remain planned."""
+    """Keep polling/cancellation implemented while execution remains planned."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     trd = _read(Path("docs/TRD.md"))
@@ -173,10 +173,13 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "### Partially implemented foundation" in trd
     assert "## Physical run foundation — Implemented" in data_model
     assert "**Implementation status:** Partially implemented" in adr
+    normalized_contract = " ".join(contract.lower().split())
+    assert "public dry-run/apply creation remains **planned**" in normalized_contract
     assert (
-        "public run creation/cancellation routes remain **planned**"
-        in " ".join(contract.lower().split())
+        "post /api/migration-runs/{migration_run_uuid}/cancel"
+        in normalized_contract
     )
+    assert "stable sanitized run-action error envelope" in normalized_contract
 
 
 def test_superseded_adr_is_not_restored() -> None:

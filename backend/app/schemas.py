@@ -259,6 +259,12 @@ class MigrationRunEventOut(BaseModel):
     created_at: dt.datetime
 
 
+class MigrationRunCancelIn(BaseModel):
+    """Bind a cancellation intent to the exact optimistic run version."""
+
+    expected_state_version: int = Field(ge=1, strict=True)
+
+
 MigrationRunState = Literal[
     "queued",
     "sandbox_running",
@@ -277,6 +283,16 @@ MigrationRunState = Literal[
     "applied_with_drift",
     "outcome_unknown",
 ]
+
+
+class MigrationRunActionOut(BaseModel):
+    """Accepted durable run action selected by the control-plane CAS."""
+
+    migration_run_uuid: uuid.UUID
+    state: MigrationRunState
+    state_version: int = Field(ge=1)
+    cancellation_requested: bool
+    reused: bool
 
 
 class MigrationRunOut(BaseModel):

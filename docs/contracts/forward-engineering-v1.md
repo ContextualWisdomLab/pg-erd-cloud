@@ -38,9 +38,9 @@ Current code implements only the first control-plane slice:
   validation, hashed idempotency keys, bounded evidence canonicalization, and
   atomic optimistic compare-and-swap transition/event persistence plus an
   internal database-selected dry-run creation writer, cancellation intent, and
-  authenticated integrity-checked run polling; no public creation API or worker
-  execution authority exists yet.
-- **Planned:** run creation/polling and workers, isolated dry run, live preflight,
+  authenticated integrity-checked run polling and editor-authorized cancellation
+  API; no public dry-run creation API or worker execution authority exists yet.
+- **Planned:** dry-run/apply creation and workers, isolated dry run, live preflight,
   target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
@@ -110,8 +110,9 @@ the effective request needed to reject same-key/different-request reuse.
 idempotency keys, deterministically binds project, plan, run kind, plan digest,
 and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
-evidence JSON. The internal cancellation-intent writer is **Implemented**.
-Public run creation/cancellation routes remain **Planned**. Queue/outbox
+evidence JSON. The internal cancellation-intent writer and editor-authorized
+`POST /api/migration-runs/{migration_run_uuid}/cancel` route are
+**Implemented**. Public dry-run/apply creation remains **Planned**. Queue/outbox
 integration and cancellation-worker propagation remain **Planned**, as do
 sandbox/preflight workers, apply, reconciliation, and verification.
 
@@ -149,6 +150,12 @@ updates `cancellation_requested` and `state_version` while matching the exact
 UUID, kind, state, prior version, and false cancellation flag, then appends a
 same-state event at the new sequence. Repeated intent is idempotent; terminal,
 missing, invalid, and stale runs fail closed.
+
+The public cancellation route requires a strict positive
+`expected_state_version`, editor authority, and the exact run UUID. It binds the
+middleware-selected request ID and actor to the appended evidence, commits only
+after the CAS writer succeeds, returns `202`, masks nonmembers as `404`, and
+uses the stable sanitized run-action error envelope described in section 9.
 
 ## 4. Canonical model JSON
 
@@ -347,8 +354,8 @@ string supplied in a run request.
 ## 8. Migration-plan retrieval and bounded run API
 
 Immutable plan retrieval is **Implemented**. Durable run/event persistence and
-the pure state/evidence contract are **Partially implemented**; remaining run routes
-are **Planned** and do not exist in current code:
+the pure state/evidence contract are **Partially implemented**; each route is
+classified below without implying worker execution:
 
 | Method and target route | Required request contract | Success | Status |
 |---|---|---|---|
@@ -356,6 +363,7 @@ are **Planned** and do not exist in current code:
 | `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | `Idempotency-Key`; exact `plan_digest` | persisted dry-run resource, `202` | **Planned** |
 | `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
 | `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/cancellation-intent/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
+| `POST /api/migration-runs/{migration_run_uuid}/cancel` | editor+; strict positive `expected_state_version` | exact-version cancellation intent, `202`; stable correlated error envelope on rejection | **Implemented** |
 
 Dry-run states:
 
@@ -389,6 +397,7 @@ Terminal semantics are exact:
 | Create/revise a model | no | yes | yes | yes | Implemented |
 | Compile a plan | no | yes | yes | yes | Implemented |
 | Request a dry run | no | yes | yes | yes | Planned |
+| Cancel a non-terminal run | no | yes | yes | yes | Implemented control-plane intent; worker propagation Planned |
 | Request live apply | no | no | yes | yes | Partially implemented; legacy gate only |
 | Manage membership | no | no | no | yes | Existing product contract |
 
@@ -423,10 +432,11 @@ Current implemented endpoints use FastAPI's JSON shape
 | `413` | Model JSON exceeds 2 MiB, or a compiled plan exceeds 1,000 executable plus proposed statements or 4 MiB. |
 | `422` | Request validation, unusable/mismatched/outdated snapshot or connection, invalid model, or snapshot content unsupported by the current adapter. |
 
-Release-v1 errors remain sanitized and machine-classifiable. Before mutating run
-APIs ship, the implementation must choose and test one repository-wide structured
-shape containing at least a stable `code`, human-safe `detail`, optional bounded
-`findings`, and a correlation identifier. It must distinguish:
+Release-v1 errors remain sanitized and machine-classifiable. The first mutating
+run route fixes the repository run-action envelope as
+`{"detail":{"code":"...","detail":"...","correlation_id":"..."}}`.
+Future dry-run/apply creation routes must reuse this shape; optional bounded
+`findings` may be added without exposing source values. The contract distinguishes:
 
 - `stale_revision`, `stale_plan`, `plan_expired`, and `idempotency_conflict`
   (`409`);

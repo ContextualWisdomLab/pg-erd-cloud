@@ -3,13 +3,14 @@
 - **Runbook status:** Accepted operating design; not yet executable end to end
 - **Runtime status:** Partially implemented; structured production apply is Planned
 - **Applies to:** PostgreSQL 14–18 forward-engineering v1
-- **Last reconciled with the working tree:** 2026-08-09
+- **Last reconciled with the working tree:** 2026-08-11
 
 > Do not use this runbook as evidence that structured production apply exists.
-> The repository currently persists model revisions and migration plans only.
-> Isolated dry run, live preflight, durable runs/events, apply, reconciliation,
-> verification, alerts, and the application kill switch are **Planned** release
-> gates.
+> The repository persists model revisions, migration plans, durable run/event
+> evidence, integrity-checked polling, and an editor-authorized cancellation
+> intent API. Isolated dry run, live preflight, worker cancellation propagation,
+> apply, reconciliation, verification, alerts, and the application kill switch
+> are **Planned** release gates.
 
 The legacy `POST /api/connections/{uuid}/apply-sql` endpoint is a transitional
 compatibility path. Its rollback mode operates on the live target and therefore
@@ -24,7 +25,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
 | Real-target preflight and plan expiry enforcement | Planned | No plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Planned | No current dry-run result is release evidence. |
-| Durable dry-run/apply states and events | Planned | No safe retry, cancellation, or recovery API exists. |
+| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, and cancellation intent exist; no executor, retry, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |

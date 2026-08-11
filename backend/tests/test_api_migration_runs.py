@@ -7,16 +7,58 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
-from app.api.migration_runs import MAX_RETURNED_RUN_EVENTS, get_migration_run
+from app.api.migration_runs import (
+    MAX_RETURNED_RUN_EVENTS,
+    _request_id,
+    cancel_migration_run,
+    get_migration_run,
+)
 from app.auth import CurrentUser
-from app.forward.migration_run import digest_run_event
+from app.forward.migration_run import (
+    MigrationRunCancellation,
+    MigrationRunContractError,
+    digest_run_event,
+)
 from app.models import MigrationRun, MigrationRunEvent
-from app.schemas import MigrationRunOut
+from app.schemas import MigrationRunCancelIn, MigrationRunOut
 
 
 def _user() -> CurrentUser:
     return CurrentUser(uuid.uuid4(), "reviewer", "Reviewer")
+
+
+def _request(request_id: str = "migration-request-123") -> Request:
+    """Build an HTTP request carrying the middleware-selected correlation ID."""
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "https",
+            "path": "/api/migration-runs/run/cancel",
+            "raw_path": b"/api/migration-runs/run/cancel",
+            "query_string": b"",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+            "server": ("testserver", 443),
+            "root_path": "",
+            "http_version": "1.1",
+        }
+    )
+    request.state.request_id = request_id
+    return request
+
+
+def test_request_id_uses_safe_fallback_without_observability_middleware() -> None:
+    """A directly mounted router still produces a bounded correlation identity."""
+
+    expected = uuid.uuid4()
+    request = _request()
+    del request.scope["state"]["request_id"]
+    with patch("app.api.migration_runs.uuid.uuid4", return_value=expected):
+        assert _request_id(request) == str(expected)
 
 
 def _run() -> MigrationRun:
@@ -157,6 +199,197 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "migration run not found"
     session.scalars.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancel_migration_run_persists_correlated_editor_intent() -> None:
+    """An editor gets one accepted resource after the CAS event commits."""
+
+    run = _run()
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        commit=AsyncMock(),
+    )
+    cancellation = MigrationRunCancellation(
+        state=run.state,
+        state_version=run.state_version + 1,
+        reused=False,
+    )
+    with (
+        patch(
+            "app.api.migration_runs.require_project_member",
+            new_callable=AsyncMock,
+        ) as membership,
+        patch(
+            "app.api.migration_runs.request_migration_run_cancellation",
+            new=AsyncMock(return_value=cancellation),
+        ) as writer,
+    ):
+        out = await cancel_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            body=MigrationRunCancelIn(expected_state_version=run.state_version),
+            request=_request(),
+            user=_user(),
+            session=session,
+        )
+
+    assert out.migration_run_uuid == run.migration_run_uuid
+    assert out.state == run.state
+    assert out.state_version == run.state_version + 1
+    assert out.cancellation_requested is True
+    assert out.reused is False
+    membership.assert_awaited_once()
+    assert membership.await_args.kwargs["minimum_role"] == "editor"
+    assert writer.await_args.kwargs["evidence"] == {
+        "request_id": "migration-request-123",
+        "request_source": "api",
+    }
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "code"),
+    [
+        ("migration run state version conflict", "stale_run"),
+        ("terminal migration run cannot be cancelled", "run_not_cancellable"),
+        ("migration run state is invalid", "run_integrity_invalid"),
+        ("run evidence is too large", "run_action_rejected"),
+    ],
+)
+async def test_cancel_migration_run_maps_contract_errors_without_leaking(
+    message: str, code: str
+) -> None:
+    """Cancellation failures expose stable codes instead of internal details."""
+
+    run = _run()
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        commit=AsyncMock(),
+    )
+    with (
+        patch(
+            "app.api.migration_runs.require_project_member",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.api.migration_runs.request_migration_run_cancellation",
+            new=AsyncMock(side_effect=MigrationRunContractError(message)),
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await cancel_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            body=MigrationRunCancelIn(expected_state_version=run.state_version),
+            request=_request("safe-correlation"),
+            user=_user(),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == {
+        "code": code,
+        "detail": "migration run cancellation was rejected",
+        "correlation_id": "safe-correlation",
+    }
+    assert message not in str(exc_info.value.detail)
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("membership_error", "status", "code"),
+    [
+        ("project access denied", 404, "migration_run_not_found"),
+        ("insufficient project role", 403, "run_role_required"),
+    ],
+)
+async def test_cancel_migration_run_masks_nonmembers_but_rejects_viewers(
+    membership_error: str, status: int, code: str
+) -> None:
+    """Cross-project identities stay hidden while viewers get a role error."""
+
+    run = _run()
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        commit=AsyncMock(),
+    )
+    with (
+        patch(
+            "app.api.migration_runs.require_project_member",
+            new=AsyncMock(
+                side_effect=HTTPException(status_code=403, detail=membership_error)
+            ),
+        ),
+        patch(
+            "app.api.migration_runs.request_migration_run_cancellation",
+            new_callable=AsyncMock,
+        ) as writer,
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await cancel_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            body=MigrationRunCancelIn(expected_state_version=run.state_version),
+            request=_request(),
+            user=_user(),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == status
+    assert exc_info.value.detail["code"] == code
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancel_migration_run_preserves_unexpected_authorization_errors() -> None:
+    """Only expected membership denials are converted into public action errors."""
+
+    run = _run()
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        commit=AsyncMock(),
+    )
+    with (
+        patch(
+            "app.api.migration_runs.require_project_member",
+            new=AsyncMock(side_effect=HTTPException(status_code=503, detail="busy")),
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await cancel_migration_run(
+            migration_run_uuid=run.migration_run_uuid,
+            body=MigrationRunCancelIn(expected_state_version=run.state_version),
+            request=_request(),
+            user=_user(),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "busy"
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancel_migration_run_masks_missing_identity() -> None:
+    """An unknown run returns the same structured identity error as a nonmember."""
+
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=None),
+        commit=AsyncMock(),
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await cancel_migration_run(
+            migration_run_uuid=uuid.uuid4(),
+            body=MigrationRunCancelIn(expected_state_version=1),
+            request=_request(),
+            user=_user(),
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail["code"] == "migration_run_not_found"
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio

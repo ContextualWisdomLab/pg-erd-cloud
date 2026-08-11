@@ -53,14 +53,17 @@ executable SQL, safety classification, approval truth, or recovery state.
   as the concurrency winner, rejecting same-key/different-request reuse,
   expired/tampered/blocked plans, and every apply request;
 - idempotent cancellation intent that increments the shared state version and
-  appends a same-state event, preventing a stale worker transition from winning.
+  appends a same-state event, preventing a stale worker transition from winning;
+- an editor-authorized cancellation HTTP boundary with strict state-version
+  input, IDOR masking, stable sanitized error codes, and request correlation.
 - versioned canonical event digests covering run/sequence/type/state/evidence,
   actor, UTC timestamp, and predecessor; the run stores the latest digest and
   polling verifies the complete chain before returning evidence.
 
 ### Planned and release-blocking
 
-- migration-run HTTP creation/cancellation APIs and queue/outbox integration;
+- migration-run HTTP creation and queue/outbox integration;
+- cancellation propagation and worker acknowledgement;
 - isolated disposable PostgreSQL execution and cleanup;
 - bounded target read-only preflight and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -86,7 +89,7 @@ by the graphical target architecture.
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** durable evidence boundary exists; queue integration Planned |
-| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation, transition, and cancellation CAS writers exist; HTTP/queue/recovery and apply creation Planned |
+| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation, transition, cancellation CAS, and cancellation HTTP boundary exist; dry-run HTTP/queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
 
@@ -100,7 +103,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic CAS writer, cancellation intent, and polling exist; create/cancel APIs and workers absent |
+| `MigrationRun` / `MigrationRunEvent` | Durable attempt and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic CAS writer, cancellation intent/API, and polling exist; dry-run creation API and workers absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision` and `0009_migration_plan`. See
@@ -118,12 +121,14 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest idempotent durable dry run | **Planned** |
 | `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
 | `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies count, canonical genesis, exact transition graph, one-to-one cancellation flag/event consistency, chronology, event digests, run anchor, and secret-safe evidence before returning | **Implemented** |
+| `POST /api/migration-runs/{run_uuid}/cancel` | editor+ | Exact-version CAS cancellation intent; `202`; nonmembers masked, viewers rejected, correlated stable error envelope | **Implemented** |
 
 Implemented limits: model input is at most 2 MiB; a persisted plan is at most
 1,000 executable plus proposed statements and 4 MiB; plans expire 24 hours
-after creation. Current errors
-use sanitized FastAPI `{"detail": ...}` JSON. The target contract will adopt
-stable machine codes consistent with RFC 9457 without exposing credentials.
+after creation. Read-only endpoints retain sanitized FastAPI
+`{"detail": ...}` errors. The mutating cancellation endpoint fixes the v1 run
+action envelope as `{"detail":{"code","detail","correlation_id"}}`; future
+run creation/apply routes must reuse it without exposing credentials.
 
 ## Compiler v1 capability matrix
 

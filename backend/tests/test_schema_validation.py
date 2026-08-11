@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ConnectionCreateIn, ProjectCreateIn, ProjectMemberAddIn
+from app.schemas import (
+    ConnectionCreateIn,
+    MigrationRunCancelIn,
+    ProjectCreateIn,
+    ProjectMemberAddIn,
+)
 
 
 def test_project_name_length_is_bounded() -> None:
@@ -44,3 +49,13 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+@pytest.mark.parametrize("version", [True, 0, -1, 1.5, "1"])
+def test_migration_run_cancel_requires_a_strict_positive_version(
+    version: object,
+) -> None:
+    """CAS versions cannot be coerced from booleans, strings, or decimals."""
+
+    with pytest.raises(ValidationError):
+        MigrationRunCancelIn(expected_state_version=version)
