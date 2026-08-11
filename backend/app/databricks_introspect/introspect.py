@@ -207,7 +207,7 @@ def _fetch_dicts(
         return [
             {str(key).lower(): value for key, value in row.items()} for row in rows
         ]
-    return [dict(zip(names, row)) for row in rows]
+    return [dict(zip(names, row, strict=True)) for row in rows]
 
 
 def _text(value: object) -> str | None:

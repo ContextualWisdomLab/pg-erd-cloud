@@ -392,6 +392,19 @@ def test_optional_connector_failure_and_row_shapes(
         {"mixedcase": 1}
     ]
 
+    class MismatchedTupleCursor:
+        description = [("one",), ("two",)]
+
+        def execute(self, sql: str, params: object) -> None:
+            assert sql == "fixed"
+            assert params is None
+
+        def fetchall(self) -> list[tuple[object, ...]]:
+            return [(1,)]
+
+    with pytest.raises(ValueError, match=r"zip\(\) argument 2 is shorter"):
+        databricks_introspect_module._fetch_dicts(MismatchedTupleCursor(), "fixed")
+
 
 @pytest.mark.asyncio
 async def test_probe_databricks_returns_version_and_closes_resources(
