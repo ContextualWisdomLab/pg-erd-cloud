@@ -299,6 +299,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
                 "verify_aud": bool(settings.oidc_audience),
                 "require_aud": bool(settings.oidc_audience),
                 "require_iss": True,
+                "require_iat": True,
                 "require_exp": True,
                 "require_jti": True,
                 "leeway": OIDC_JWT_LEEWAY_SECONDS,
