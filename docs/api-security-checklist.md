@@ -39,6 +39,10 @@
 - ✅ JWT 검증 시 알고리즘 allowlist 강제(토큰 헤더 `alg` 신뢰 금지)
   - 설정: `OIDC_ALGORITHMS` (default: `RS256`)
   - 근거: `backend/app/auth.py`, `backend/app/settings.py`
+- 🟡 Keyverse tenant profile은 `OIDC_ORGANIZATION`을 설정해야 활성화되며,
+  검증된 토큰의 정확한 `org` claim이 배포 tenant와 일치하지 않으면 거부한다.
+  이 모드에서는 OIDC audience도 필수이며 `pgerd_` API key 우회를 허용하지 않는다.
+  - 근거: `backend/app/auth.py`, `backend/app/settings.py`
 - 🟡 토큰 TTL/Refresh 정책(권장: 짧게) — IdP 설정에 의존(운영 가이드 필요)
 
 ### Authorization
@@ -46,6 +50,10 @@
 - ✅ 프로젝트 리소스 접근은 멤버십 기반으로 제한
   - 근거: `backend/app/permissions.py` 및 각 API handler의
     `require_project_member(...)`
+- 🟡 Keyverse `org` ABAC은 단일 tenant 배포 프로필에서만 활성화된다. 다중
+  조직을 한 DB에서 운영하려면 `ProjectSpace`에 tenant 키와 복합 membership
+  제약을 추가해야 하며, 그 전까지는 `OIDC_ORGANIZATION` 없는 배포를 외부
+  multi-tenant authorization-ready로 취급하지 않는다.
 - 🟡 공유 링크(공개 엔드포인트)는 최소 권한(읽기)만 제공
   - 근거: `backend/app/api/share.py`
 

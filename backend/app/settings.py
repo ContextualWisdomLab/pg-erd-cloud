@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
+    # Optional single-tenant Keyverse profile. When set, verified tokens must
+    # carry the exact opaque ``org`` claim; the deployment database is the
+    # tenant boundary for every project lookup.
+    oidc_organization: str | None = None
 
     # Optional allowlist for reverse-engineering database targets.
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.

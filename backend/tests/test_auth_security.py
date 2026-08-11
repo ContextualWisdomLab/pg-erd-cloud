@@ -480,6 +480,47 @@ async def test_auth_fails_closed_without_oidc(
     assert exc_info.value.detail == "OIDC configuration required"
 
 
+@pytest.mark.asyncio
+async def test_keyverse_organization_claim_is_required_and_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+    claims = {
+        "sub": "user-1",
+        "jti": "jwt-1",
+        "exp": exp_claim(),
+    }
+
+    with pytest.raises(HTTPException, match="token missing org"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = ["cwl-org"]
+    with pytest.raises(HTTPException, match="token missing org"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = "other-org"
+    with pytest.raises(HTTPException, match="token organization mismatch"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = "cwl-org"
+    verified = await auth._verified_token_from_claims(
+        claims, verify_revocation=False
+    )
+    assert verified.subject == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_keyverse_organization_mode_rejects_api_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+
+    with pytest.raises(HTTPException, match="Keyverse organization token required"):
+        await auth.get_current_user(
+            make_request({"Authorization": "Bearer pgerd_test"}), object()
+        )
+
+
 class _FakeScalarResult:
     def __init__(self, user: object | None) -> None:
         self._user = user

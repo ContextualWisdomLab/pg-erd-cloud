@@ -170,6 +170,22 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
     return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
 
 
+def _validate_configured_organization(claims: dict[str, Any]) -> None:
+    """Bind a Keyverse token to this single-tenant deployment, if enabled."""
+
+    expected = settings.oidc_organization
+    if expected is None:
+        return
+    if not expected.strip():
+        raise HTTPException(status_code=500, detail="OIDC organization required")
+
+    organization = claims.get("org")
+    if not isinstance(organization, str) or not organization.strip():
+        raise HTTPException(status_code=401, detail="token missing org")
+    if organization != expected:
+        raise HTTPException(status_code=403, detail="token organization mismatch")
+
+
 def _validate_jwt_header(header: dict[str, Any]) -> str:
     """Validate JOSE header fields before signature verification."""
 
@@ -248,6 +264,8 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             status_code=401,
             detail="unsupported token algorithm",
         )
+    if not settings.oidc_audience:
+        raise HTTPException(status_code=500, detail="OIDC audience required")
 
     jwks = await _get_jwks()
     jwk = _pick_jwk(jwks, header.get("kid"))
@@ -307,6 +325,7 @@ async def _verified_token_from_claims(
     if not isinstance(jwt_id, str) or not jwt_id.strip():
         raise HTTPException(status_code=401, detail="token missing jti")
 
+    _validate_configured_organization(claims)
     expires_at = _jwt_expiry(claims)
     if verify_revocation and await is_token_jti_revoked(jwt_id):
         raise HTTPException(status_code=401, detail="token revoked")
@@ -464,6 +483,11 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
+        if settings.oidc_organization is not None:
+            raise HTTPException(
+                status_code=401,
+                detail="Keyverse organization token required",
+            )
         return await _user_from_api_key(session, auth_header[len("Bearer "):])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
