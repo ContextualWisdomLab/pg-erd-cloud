@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.forward.migration_run import MigrationDispatchClaim
 from app.jobs.migration_dispatch_relay import (
     MigrationDispatchSignalUnavailable,
     publish_one_migration_dispatch,
+    run_migration_dispatch_relay_forever,
 )
 
 
@@ -25,6 +27,22 @@ def _claim() -> MigrationDispatchClaim:
         dispatch_kind="isolated_dry_run",
         attempt_count=1,
     )
+
+
+def _session_factory() -> MagicMock:
+    """Return one async session and transaction context for relay-loop tests."""
+
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    transaction = MagicMock()
+    transaction.__aenter__ = AsyncMock(return_value=None)
+    transaction.__aexit__ = AsyncMock(return_value=False)
+    session.begin.return_value = transaction
+    factory = MagicMock(return_value=session)
+    factory.session = session
+    factory.transaction = transaction
+    return factory
 
 
 @pytest.mark.asyncio
@@ -128,3 +146,61 @@ async def test_relay_failure_remains_pending_by_requiring_caller_rollback() -> N
     mark.assert_not_awaited()
     session_double.commit.assert_not_awaited()
     session_double.rollback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_scheduled_relay_commits_each_claim_and_polls_after_empty() -> None:
+    """The lifecycle drains one transaction at a time and idles when empty."""
+
+    claim = _claim()
+    factory = _session_factory()
+    with patch(
+        "app.jobs.migration_dispatch_relay.publish_one_migration_dispatch",
+        new=AsyncMock(side_effect=[claim, None]),
+    ) as publish, patch(
+        "app.jobs.migration_dispatch_relay.asyncio.sleep",
+        new=AsyncMock(side_effect=asyncio.CancelledError),
+    ) as sleep:
+        with pytest.raises(asyncio.CancelledError):
+            await run_migration_dispatch_relay_forever(factory, poll_interval_s=0.25)
+
+    assert publish.await_count == 2
+    assert factory.call_count == 2
+    assert factory.session.begin.call_count == 2
+    assert factory.transaction.__aexit__.await_count == 2
+    sleep.assert_awaited_once_with(0.25)
+
+
+@pytest.mark.asyncio
+async def test_scheduled_relay_rolls_back_failed_publish_and_logs_fixed_code(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Publication failure is rolled back without logging exception contents."""
+
+    secret = "postgresql://admin:secret@target.example/customer"
+    factory = _session_factory()
+    with patch(
+        "app.jobs.migration_dispatch_relay.publish_one_migration_dispatch",
+        new=AsyncMock(side_effect=[RuntimeError(secret), None]),
+    ), patch(
+        "app.jobs.migration_dispatch_relay.asyncio.sleep",
+        new=AsyncMock(side_effect=[None, asyncio.CancelledError]),
+    ):
+        with pytest.raises(asyncio.CancelledError):
+            await run_migration_dispatch_relay_forever(factory, poll_interval_s=0.5)
+
+    first_exit_args = factory.transaction.__aexit__.await_args_list[0]
+    assert first_exit_args.args[0] is RuntimeError
+    assert "migration_dispatch_relay_iteration_failed" in caplog.text
+    assert secret not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval", [0, -1, float("inf")])
+async def test_scheduled_relay_rejects_unbounded_poll_interval(interval: float) -> None:
+    """A misconfigured lifecycle cannot become a busy loop."""
+
+    with pytest.raises(ValueError, match="interval must be between"):
+        await run_migration_dispatch_relay_forever(
+            _session_factory(), poll_interval_s=interval
+        )

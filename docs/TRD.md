@@ -62,6 +62,9 @@ executable SQL, safety classification, approval truth, or recovery state.
   identifier-only publication, and acknowledgement, and rollback restores a
   failed attempt; the bounded publisher places only `migration_run_uuid` on a
   dedicated Valkey key and never commits, loads a plan, or executes SQL;
+- an opt-in scheduled relay lifecycle uses one fresh transaction per claim,
+  bounded polling after empty/failure iterations, fixed non-secret failure
+  logging, startup validation of the Valkey backend, and cooperative shutdown;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - an editor-authorized cancellation HTTP boundary with strict state-version
@@ -72,8 +75,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 
 ### Planned and release-blocking
 
-- scheduled relay loop, queue consumption, worker execution, retry backoff,
-  and dispatch retention;
+- queue consumption, worker execution, durable retry backoff/max-attempt
+  policy, and dispatch retention;
 - cancellation propagation and worker acknowledgement;
 - isolated disposable PostgreSQL execution and cleanup;
 - bounded target read-only preflight and apply-time drift revalidation;
@@ -99,7 +102,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, dedicated-key UUID-only Valkey publication, and attempt-bound publish CAS exist; the scheduled relay loop, consumer, and worker are Planned |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, and attempt-bound publish CAS exist; consumer and worker are Planned |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
@@ -114,7 +117,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, lock-scoped dispatch claim, UUID-only queue publisher, publish-state CAS, dry-run creation/cancellation APIs, and polling exist; scheduled relay loop, queue consumer, and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunEvent` | Durable attempt, identifier-only transactional outbox, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, lock-scoped dispatch claim, opt-in scheduled UUID-only publication, publish-state CAS, dry-run creation/cancellation APIs, and polling exist; queue consumer and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, and

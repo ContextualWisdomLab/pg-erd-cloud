@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     valkey_queue_key: str = "pg-erd-cloud:job-queue"
     valkey_migration_run_queue_key: str = "pg-erd-cloud:migration-run-queue"
     valkey_lock_ttl_seconds: int = Field(300, ge=1)
+    migration_dispatch_relay_enabled: bool = False
+    migration_dispatch_relay_poll_interval_seconds: float = Field(
+        1.0, gt=0.0, le=60.0
+    )
 
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None

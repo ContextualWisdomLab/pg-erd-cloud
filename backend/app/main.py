@@ -25,6 +25,8 @@ from app.auth import try_get_subject_for_rate_limit
 from app.csrf import CSRF_HEADER_NAME, generate_csrf_token, make_csrf_middleware
 from app.db import SessionLocal, get_pooler_detection
 from app.jobs.snapshot_job import handle_snapshot_job
+from app.jobs.migration_dispatch_relay import run_migration_dispatch_relay_forever
+from app.jobs.valkey_queue import valkey_queue_enabled
 from app.jobs.worker import run_worker_forever
 from app.observability import setup_observability
 from app.rate_limit import (
@@ -40,12 +42,34 @@ from app.settings import settings
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Run application startup/shutdown hooks.
 
-    Starts a background job worker on startup and ensures it is cancelled and
+    Starts configured background lifecycles and ensures each is cancelled and
     awaited on shutdown.
     """
 
+    if settings.migration_dispatch_relay_enabled and not valkey_queue_enabled():
+        raise RuntimeError(
+            "migration dispatch relay requires the Valkey queue backend"
+        )
+
     handlers = {"snapshot": handle_snapshot_job}
-    task = asyncio.create_task(run_worker_forever(SessionLocal, handlers))
+    tasks = [
+        asyncio.create_task(
+            run_worker_forever(SessionLocal, handlers),
+            name="job-queue-worker",
+        )
+    ]
+    if settings.migration_dispatch_relay_enabled:
+        tasks.append(
+            asyncio.create_task(
+                run_migration_dispatch_relay_forever(
+                    SessionLocal,
+                    poll_interval_s=(
+                        settings.migration_dispatch_relay_poll_interval_seconds
+                    ),
+                ),
+                name="migration-dispatch-relay",
+            )
+        )
     try:
         # Best-effort pooler detection (log once for ops visibility).
         try:
@@ -59,11 +83,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             logging.getLogger(__name__).exception("db_pooler_detection failed")
         yield
     finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)

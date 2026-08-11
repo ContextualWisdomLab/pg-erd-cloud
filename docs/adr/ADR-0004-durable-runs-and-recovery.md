@@ -3,9 +3,9 @@
 - **Decision status:** Accepted
 - **Implementation status:** Partially implemented; durable storage,
   identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
-  bounded UUID-only queue publication, polling, and dry-run
-  creation/cancellation intent APIs exist, while the scheduled relay loop,
-  queue consumer, workers, and recovery do not
+  bounded scheduled UUID-only queue publication, polling, and dry-run
+  creation/cancellation intent APIs exist, while the queue consumer, workers,
+  deployment failover, and recovery do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -133,6 +133,11 @@ Rules:
 - `publish_one_migration_dispatch` publishes only the claimed run UUID to a
   dedicated Valkey key before exact-attempt acknowledgement. The caller owns
   commit/rollback; the function never loads the plan or executes SQL.
+- `run_migration_dispatch_relay_forever` is an explicit opt-in application
+  lifecycle. It owns one fresh transaction per claim, rolls failed iterations
+  back through the transaction context, emits only a fixed non-secret failure
+  code, polls at a positive configured interval, and is cancelled and awaited
+  on shutdown. Startup fails closed when Valkey is unavailable.
 - Database checks constrain run kind, current state, positive state version,
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
@@ -164,7 +169,8 @@ Rules:
 ### Planned before production release
 
 - authenticated apply creation route;
-- scheduled relay loop/queue consumption and cancellation-worker acknowledgement;
+- queue consumption, cancellation-worker acknowledgement, and relay
+  deployment restart/failover evidence;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

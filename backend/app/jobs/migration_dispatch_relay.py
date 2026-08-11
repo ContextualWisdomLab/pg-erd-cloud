@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
+import logging
+import math
+from collections.abc import Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +16,8 @@ from app.forward.migration_run import (
     mark_migration_dispatch_published,
 )
 from app.jobs.valkey_queue import enqueue_migration_run_signal
+
+_logger = logging.getLogger(__name__)
 
 
 class MigrationDispatchSignalUnavailable(RuntimeError):
@@ -43,3 +49,34 @@ async def publish_one_migration_dispatch(
     else:
         await mark_migration_dispatch_published(session, claim=claim, now=now)
     return claim
+
+
+async def run_migration_dispatch_relay_forever(
+    session_factory: Callable[[], AsyncSession],
+    *,
+    poll_interval_s: float = 1.0,
+) -> None:
+    """Publish due identifier-only outbox rows until lifecycle cancellation.
+
+    Every claim owns a fresh metadata transaction. A successful context exit
+    commits the exact-attempt acknowledgement; any publication or database
+    failure exits through rollback before a bounded retry delay. Detailed
+    exception text is deliberately excluded from logs because drivers and
+    adapters may include connection strings or uncontrolled target metadata.
+    """
+
+    if not math.isfinite(poll_interval_s) or not 0 < poll_interval_s <= 60:
+        raise ValueError("migration dispatch relay interval must be between 0 and 60")
+
+    while True:
+        try:
+            async with session_factory() as session:
+                async with session.begin():
+                    claim = await publish_one_migration_dispatch(session)
+        except Exception:  # noqa: BLE001
+            _logger.warning("migration_dispatch_relay_iteration_failed")
+            await asyncio.sleep(poll_interval_s)
+            continue
+
+        if claim is None:
+            await asyncio.sleep(poll_interval_s)

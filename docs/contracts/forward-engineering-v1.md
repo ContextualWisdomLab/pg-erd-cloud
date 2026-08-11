@@ -119,10 +119,10 @@ credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. The internal cancellation-intent writer and editor-authorized
 `POST /api/migration-runs/{migration_run_uuid}/cancel` route are
 **Implemented**. Public dry-run creation is **Implemented**; public apply
-creation remains **Planned**. Lock-scoped due-order outbox claiming and
-attempt-bound publish-state CAS are **Implemented**, while the relay loop,
-queue consumer, and worker execution remain **Planned**. The bounded
-one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
+creation remains **Planned**. Lock-scoped due-order outbox claiming,
+attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
+**Implemented**, while the queue consumer and worker execution remain
+**Planned**. The bounded one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
 propagation, sandbox/preflight workers, apply, reconciliation, and verification
@@ -157,8 +157,14 @@ transaction, and returns only identifiers plus fixed kind and attempt.
 claim, UUID-only publication on the dedicated migration-run Valkey key, and
 acknowledgement. A publication failure raises before acknowledgement so the
 caller can roll the claim back. The sorted-set member is the run UUID, making
-an ambiguous retry idempotent at the signal layer. No scheduled relay loop,
-queue consumer, or migration worker is wired.
+an ambiguous retry idempotent at the signal layer. The opt-in scheduled relay
+lifecycle is **Implemented**: it opens one fresh metadata transaction per
+claim, commits only after exact-attempt acknowledgement, rolls an exception
+back through the transaction context, sleeps at a bounded positive interval
+after empty or failed iterations, and cancels cleanly with the application.
+It refuses startup unless the Valkey signal backend is configured. The queue
+consumer and worker execution remain **Planned**; the lifecycle never loads a
+plan, target credential, SQL batch, or row value.
 
 `transition_migration_run` validates event metadata and evidence before any
 database access, reads the current run identity, and executes one optimistic

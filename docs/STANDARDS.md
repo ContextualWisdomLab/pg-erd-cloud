@@ -18,7 +18,7 @@ Status labels are normative: **Implemented**, **Partially implemented**,
 | Source | How pg-erd-cloud uses it | Normative status for this project |
 |---|---|---|
 | PostgreSQL 18 official documentation | Lock/transaction behavior, `ALTER TABLE`, index transaction capability, and timeout semantics; behavior is verified separately on supported majors 14–18. | Normative technical reference, plus version-matrix tests |
-| Valkey 8 official release and container image | Queue-signal sorted-set semantics are verified through the production adapter against a digest-pinned official image. This does not prove production topology, failover, or recovery. | Integration-test runtime reference; scheduled relay/consumer evidence remains Planned |
+| Valkey 8 official release and container image | Queue-signal sorted-set semantics are verified through the production adapter against a digest-pinned official image. This does not prove production topology, failover, or recovery. | Integration-test runtime reference; scheduled publisher lifecycle Implemented, deployment failover and consumer evidence Planned |
 | W3C WCAG 2.2 Recommendation | Keyboard, focus, labels, status/error communication, and target Level AA acceptance for the forward UI. | Normative product accessibility target; conformance not yet demonstrated |
 | OWASP ASVS 5.0.0 | Verification requirements for architecture, authentication, access control, validation, API, data protection, logging, and secure communication. | Normative security verification baseline selected by the project; not certification |
 | OWASP Top 10:2025 | Web-application risk taxonomy used to check design and test coverage. | Threat-model checklist, not a control catalog or certification |

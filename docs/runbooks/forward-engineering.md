@@ -62,8 +62,16 @@ operational artifact is attached to the release record.
   executes work.
 - [x] A digest-pinned real Valkey 8 CI service verifies dedicated-key UUID-only
   membership and generic-pop isolation through the production adapter.
-- [ ] Scheduled relay operation, queue consumption, worker execution, restart
-  recovery, and retention are verified in the deployment environment.
+- [x] An opt-in scheduled relay lifecycle uses one transaction per UUID-only
+  claim, bounded polling, fixed non-secret failure logging, startup validation,
+  and cooperative application shutdown. Set `JOB_QUEUE_BACKEND=valkey`, a
+  usable `VALKEY_URL` or Sentinel configuration,
+  `MIGRATION_DISPATCH_RELAY_ENABLED=true`, and a positive
+  `MIGRATION_DISPATCH_RELAY_POLL_INTERVAL_SECONDS` to enable it. This does not
+  start a queue consumer, load a plan, or execute SQL.
+- [ ] Relay deployment restart/failover, queue consumption, worker execution,
+  recovery, retry exhaustion, and retention are verified in the deployment
+  environment.
 - [ ] `lock_timeout`, `statement_timeout`, and transaction timeout policy have
   finite environment-specific values below the incident-response objective.
   No repository default currently establishes forward-worker values.

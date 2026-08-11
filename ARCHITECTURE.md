@@ -71,9 +71,11 @@ Implemented in the initial safe vertical slice:
 - lock-scoped relay primitives that claim one due dispatch with
   `FOR UPDATE SKIP LOCKED`, increment its attempt in the caller-owned
   transaction, publish only `migration_run_uuid` to a dedicated Valkey sorted
-  set, and publish-state CAS only that exact identifier-only claim; the bounded
-  publisher does not commit or execute work, and no relay loop or consumer is
-  wired yet;
+  set, and publish-state CAS only that exact identifier-only claim;
+- an explicit opt-in application lifecycle repeatedly invokes that bounded
+  publisher in one fresh metadata transaction per claim, rolls failed
+  publication back, idles at a positive configured interval, and shuts down
+  cooperatively; it does not load plans, consume signals, or execute SQL;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary
