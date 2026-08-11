@@ -191,6 +191,53 @@ describe('exportPrisma', () => {
     expect(result).toContain('model B');
   });
 
+  it('ignores non-source handles and renders singular back-relations for primary keys', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'parent',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'parents',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'child',
+        position: { x: 100, y: 0 },
+        data: {
+          title: 'children',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [
+      {
+        id: 'ignored-handle',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: 'legacy-id',
+        targetHandle: 'tgt-id',
+      },
+      {
+        id: 'primary-key-relation',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: 'src-id',
+        targetHandle: 'tgt-id',
+        label: 'child_parent',
+      },
+    ]);
+
+    expect(result).toContain('children_id children? @relation("child_parent")');
+  });
+
   it('handles missing is_not_null logic for optional relationships', () => {
     const nodes: Node<TableNodeData>[] = [
       {

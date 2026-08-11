@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -78,6 +79,25 @@ describe('GroupModal color radio keyboard contract', () => {
     fireEvent.keyDown(radios[0]!, { key: 'Home' })
     expect(radios[0]).toHaveFocus()
     expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('preserves click and Space activation with one roving tab stop', async () => {
+    const user = userEvent.setup()
+    render(<RadioGroupHarness initialColor={BUSINESS_GROUP_COLORS[0]} />)
+    let radios = colorRadios()
+
+    await user.click(radios[2]!)
+    radios = colorRadios()
+    expect(radios[2]).toHaveAttribute('aria-checked', 'true')
+    expect(radios[2]).toHaveAttribute('tabindex', '0')
+    expect(radios.filter((radio) => radio.tabIndex === 0)).toHaveLength(1)
+
+    radios[3]!.focus()
+    await user.keyboard(' ')
+    radios = colorRadios()
+    expect(radios[3]).toHaveAttribute('aria-checked', 'true')
+    expect(radios[3]).toHaveAttribute('tabindex', '0')
+    expect(radios.filter((radio) => radio.tabIndex === 0)).toHaveLength(1)
   })
 
   it('makes the first radio tabbable when the supplied color is not selected', () => {
