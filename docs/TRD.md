@@ -78,7 +78,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   input, IDOR masking, stable sanitized error codes, and request correlation.
 - versioned canonical event digests covering run/sequence/type/state/evidence,
   actor, UTC timestamp, and predecessor; the run stores the latest digest and
-  polling verifies the complete chain before returning evidence.
+  polling verifies the complete chain before returning evidence;
+- a bounded live-preflight query primitive accepts only the three structured
+  compiler preconditions, validates PostgreSQL identifiers and target types,
+  runs boolean-only reads in one read-only repeatable-read transaction, applies
+  server/client timeouts, and replaces database failures with fixed diagnostics.
 
 ### Planned and release-blocking
 
@@ -86,7 +90,8 @@ executable SQL, safety classification, approval truth, or recovery state.
   policy, and dispatch retention;
 - cancellation propagation and worker acknowledgement;
 - isolated disposable PostgreSQL execution and cleanup;
-- bounded target read-only preflight and apply-time drift revalidation;
+- live-preflight worker wiring, separately constrained credentials, fresh
+  target-fingerprint binding, and apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
   idempotency, cancellation, reconciliation, and post-apply verification;
 - frontend graph/model adapters and `ForwardEngineeringModal`;
@@ -107,12 +112,12 @@ by the graphical target architecture.
 | FE-TRD-004 | A plan binds exact project, model revision, connection, succeeded snapshot, compiler version, digests, actor, and expiry. | **Implemented** |
 | FE-TRD-005 | Cross-project/missing/unauthorized identities do not reveal another tenant's resource existence. | **Partially implemented; full matrix gate remains** |
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Planned** |
-| FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Planned** |
+| FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean-read compiler/executor exists; worker identity, fresh fingerprint binding, real-target integration, and in-lock apply repetition remain Planned |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset implemented; executor Planned** |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, attempt-bound publish CAS, exact lease-token claim/ack/release primitives, and the execution-neutral consumer contract are **Implemented**; application startup wiring and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
-| FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
+| FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry, 30-day cleanup excludes plans with run history, and the preflight primitive bounds query count/time and rejects unknown kinds/non-boolean evidence; worker lifecycle enforcement remains Planned |
 
 ## Current persistence model
 

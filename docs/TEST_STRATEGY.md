@@ -159,7 +159,13 @@ index digest. The focused test applies every Alembic revision, verifies the
 actual server major, creates a run/genesis/outbox transaction through the
 production writer, proves identical-key reuse produces one run/event/dispatch,
 asserts the dispatch schema has no execution payload, and rolls the transaction
-back before confirming that no partial identity survives.
+back before confirming that no partial identity survives. The same digest-pinned
+matrix creates a quoted mixed-case/Unicode target fixture and executes the
+production live-preflight primitive. It proves non-empty/NULL failures,
+successful empty-table evidence, failing cast classification without database
+detail propagation, read-transaction cleanup, and fixture cleanup on every
+supported major. Until exact-head CI passes, these are acceptance requirements,
+not completed evidence.
 
 Focused relay tests prove that the bounded publisher claims and acknowledges
 one exact attempt with a single caller clock, publishes only the run UUID on a
@@ -178,6 +184,12 @@ exact lease-token, rejects a stale acknowledgement, releases for retry,
 reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, lost-lease
 failure, bounded timing, and fixed non-secret lifecycle logs. The
+live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
+the three admitted structured preconditions, fail-closed unknown fields/types,
+the 1,000-query ceiling, a single read-only repeatable-read transaction,
+server/client timeout bounds, boolean-only evidence, rollback, and fixed
+non-secret database failures. Real-target privilege/audit assertions, fresh
+fingerprint binding, and worker failure/recovery remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup
 wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.

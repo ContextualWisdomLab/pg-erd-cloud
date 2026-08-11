@@ -23,7 +23,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 |---|---|---|
 | Canonical model save/revision with `If-Match` | Implemented | May be used as a control-plane preview feature. |
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
-| Real-target preflight and plan expiry enforcement | Planned | No plan is production-authorized. |
+| Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean-read primitive exists; worker identity, fresh fingerprint binding, and real-target integration are absent, so no plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Planned | No current dry-run result is release evidence. |
 | Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, and an execution-neutral consumer contract exist; no application consumer wiring, executor, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |

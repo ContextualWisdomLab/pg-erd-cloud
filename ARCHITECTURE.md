@@ -35,7 +35,7 @@ support.
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
 | Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event storage, verified polling, and dry-run creation/cancellation intent APIs **Implemented**; workers **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | **Planned** |
-| Live preflight/apply worker | Read-only evidence, locked execution, recovery | **Planned** |
+| Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query primitive **Implemented**; worker, target-fingerprint binding, and apply **Planned** |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
 The browser is an intent and review surface, never a SQL authority. The API
@@ -88,6 +88,11 @@ Implemented in the initial safe vertical slice:
   to that cancellation event and returns only stable sanitized error codes;
 - a versioned SHA-256 event chain anchored on each run row; polling recomputes
   every link and fails closed on payload, ordering, predecessor, or anchor drift;
+- a bounded live-preflight primitive compiles only the plan's structured
+  `table_is_empty`, `no_null_values`, and `castable_values` preconditions into
+  quoted PostgreSQL reads, executes them in one read-only repeatable-read
+  transaction with server/client timeouts, and returns boolean-only evidence;
+  it owns no credential, worker, fingerprint, run-transition, or DDL authority;
 - `viewer < editor < deployer < owner`, with persistent legacy SQL apply
   restricted to `deployer`.
 
@@ -96,9 +101,9 @@ identity/generated columns, existing-primary-key changes, views, triggers,
 partitions, extensions and distributed tables. This is a release blocker for
 general forward engineering, not a silent omission.
 
-Planned: isolated durable dry run, bounded live preflight, plan approval,
-idempotent apply, post-commit re-introspection and the accessible frontend
-review/apply flow. The approved detailed design is in
+Planned: isolated durable dry run, live-preflight worker and fresh fingerprint
+binding, plan approval, idempotent apply, post-commit re-introspection and the
+accessible frontend review/apply flow. The approved detailed design is in
 `docs/superpowers/specs/2026-08-09-forward-engineering-design.md`.
 
 ## Trust and deployment boundaries

@@ -1,4 +1,4 @@
-"""Real-PostgreSQL migration-run/outbox integration acceptance."""
+"""Real-PostgreSQL migration-run/outbox and live-read integration acceptance."""
 
 from __future__ import annotations
 
@@ -6,11 +6,16 @@ import datetime as dt
 import os
 import uuid
 
+import asyncpg
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.forward.migration_plan import compile_migration_plan
+from app.forward.live_preflight import (
+    LivePreflightContractError,
+    execute_live_preflight,
+)
 from app.forward.migration_run import (
     claim_one_migration_dispatch,
     create_migration_run,
@@ -38,6 +43,109 @@ pytestmark = pytest.mark.skipif(
         "for real PostgreSQL acceptance"
     ),
 )
+
+
+def _asyncpg_url() -> str:
+    assert _POSTGRES_URL is not None
+    return _POSTGRES_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+
+def _preflight_plan(*preconditions: dict[str, object]) -> dict[str, object]:
+    return {
+        "can_dry_run": True,
+        "blockers": [],
+        "statements": [{"preconditions": list(preconditions)}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
+    """Prove quoted identifiers, data checks, and fixed failures on PostgreSQL."""
+
+    connection = await asyncpg.connect(_asyncpg_url())
+    schema_name = f"Preflight {uuid.uuid4().hex}"
+    table_name = '주문 "항목"'
+    quoted_schema = '"' + schema_name.replace('"', '""') + '"'
+    quoted_table = '"' + table_name.replace('"', '""') + '"'
+    qualified = f"{quoted_schema}.{quoted_table}"
+    try:
+        await connection.execute(f"CREATE SCHEMA {quoted_schema}")
+        await connection.execute(
+            f'CREATE TABLE {qualified} ("amount value" text)'
+        )
+        await connection.execute(
+            f"INSERT INTO {qualified} VALUES ('12'), ('not-an-integer'), (NULL)"
+        )
+
+        evidence = await execute_live_preflight(
+            connection,
+            _preflight_plan(
+                {
+                    "kind": "table_is_empty",
+                    "schema_name": schema_name,
+                    "table_name": table_name,
+                },
+                {
+                    "kind": "no_null_values",
+                    "schema_name": schema_name,
+                    "table_name": table_name,
+                    "column_name": "amount value",
+                },
+            ),
+            statement_timeout_ms=2000,
+        )
+
+        assert evidence == {
+            "passed": False,
+            "checks": [
+                {
+                    "statement_index": 0,
+                    "precondition_index": 0,
+                    "kind": "table_is_empty",
+                    "passed": False,
+                },
+                {
+                    "statement_index": 0,
+                    "precondition_index": 1,
+                    "kind": "no_null_values",
+                    "passed": False,
+                },
+            ],
+        }
+
+        with pytest.raises(LivePreflightContractError) as captured:
+            await execute_live_preflight(
+                connection,
+                _preflight_plan(
+                    {
+                        "kind": "castable_values",
+                        "schema_name": schema_name,
+                        "table_name": table_name,
+                        "column_name": "amount value",
+                        "target_data_type": "integer",
+                    }
+                ),
+                statement_timeout_ms=2000,
+            )
+        assert str(captured.value) == "live preflight query failed"
+        assert captured.value.__cause__ is None
+
+        await connection.execute(f"DELETE FROM {qualified}")
+        empty_evidence = await execute_live_preflight(
+            connection,
+            _preflight_plan(
+                {
+                    "kind": "table_is_empty",
+                    "schema_name": schema_name,
+                    "table_name": table_name,
+                }
+            ),
+            statement_timeout_ms=2000,
+        )
+        assert empty_evidence["passed"] is True
+    finally:
+        await connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await connection.close()
 
 
 @pytest.mark.asyncio

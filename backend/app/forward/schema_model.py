@@ -120,7 +120,7 @@ def _boolean(value: object, path: str) -> bool:
     return value
 
 
-def _canonical_data_type(value: object, path: str) -> str:
+def canonicalize_data_type(value: object, path: str) -> str:
     """Normalize safe SQL type syntax to ``pg_catalog.format_type`` spelling."""
 
     if not isinstance(value, str):
@@ -212,7 +212,7 @@ def _canonical_column(value: object, path: str) -> dict[str, Any]:
     ordinal = column.get("ordinal_position")
     if not isinstance(ordinal, int) or isinstance(ordinal, bool) or ordinal < 1:
         raise SchemaModelValidationError(f"{path}.ordinal_position must be a positive integer")
-    data_type = _canonical_data_type(column.get("data_type"), f"{path}.data_type")
+    data_type = canonicalize_data_type(column.get("data_type"), f"{path}.data_type")
     for field, label in (
         ("default", "default expressions"),
         ("identity", "identity columns"),

@@ -43,8 +43,12 @@ Current code implements only the first control-plane slice:
   no worker execution authority exists yet. The execution-neutral consumer
   contract is **Implemented**; application startup wiring and worker execution
   remain **Planned**.
-- **Planned:** apply creation and all workers, isolated dry run, live preflight,
-  target-fingerprint revalidation, structured execution,
+- **Partially implemented:** the live-preflight primitive compiles the current
+  structured data preconditions into bounded boolean-only reads and executes
+  them in one timed read-only transaction. It has no credential, worker,
+  fingerprint, run-transition, or DDL authority.
+- **Planned:** apply creation and all workers, isolated dry run, complete live
+  preflight and target-fingerprint revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
 - **Rejected for v1:** browser-authored SQL in the graphical workflow,
@@ -60,7 +64,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-002 | A model revision is canonical, content-digested, and append-only through the API. | Implemented |
 | FE-INV-003 | A plan binds one revision, project, connection, succeeded base snapshot, compiler version, base/target digests, actor, and expiry. | Implemented |
 | FE-INV-004 | Every admitted semantic difference becomes an operation or blocker; blockers suppress executable statements while supported independent deltas remain reviewable as proposals. | Implemented for the current admitted subset |
-| FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Planned |
+| FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: bounded read-only precondition primitive only; sandbox and live worker Planned |
 | FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Planned |
 | FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Planned |
 | FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Planned |

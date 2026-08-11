@@ -1,7 +1,7 @@
 # ADR-0002: Isolated dry run and live read-only preflight
 
 - **Decision status:** Accepted
-- **Implementation status:** Planned
+- **Implementation status:** Partially implemented
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -92,12 +92,18 @@ locks on the execution connection.
 - Plans contain base/target digests and structured statement preconditions.
 - Existing target-connection code provides encrypted DSNs and guarded database
   connection primitives that the planned live-preflight worker must reuse.
+- `app.forward.live_preflight` compiles only the structured
+  `table_is_empty`, `no_null_values`, and `castable_values` preconditions into
+  server-owned quoted reads. It enforces a 1,000-query ceiling, PostgreSQL type
+  validation, one read-only repeatable-read transaction, bounded server/client
+  timeouts, boolean-only evidence, and fixed non-secret database failures.
+  This is a primitive, not a worker or completed live-preflight claim.
 
 ### Planned before production release
 
-- `MigrationRun` persistence and the dry-run API;
 - isolated sandbox provisioning, execution, cleanup, and egress enforcement;
-- live read-only preflight queries and timeout classification;
+- application worker wiring with a separately constrained read-only target
+  identity and guarded connection lifecycle;
 - digest comparison against a fresh target snapshot;
 - durable, redacted evidence and a frontend presentation of both evidence
   classes.

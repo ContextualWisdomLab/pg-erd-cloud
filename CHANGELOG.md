@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] Forward Engineering live-preflight의 실행 중립 primitive를 추가했습니다. 저장된 계획의 구조화 `table_is_empty`·`no_null_values`·`castable_values`만 PostgreSQL 인용 read query로 컴파일하고, 최대 1,000개·server/client timeout·단일 read-only repeatable-read transaction·boolean-only evidence·고정 비밀 비노출 오류를 강제합니다. Target credential/worker, fresh fingerprint 결합, 실제 PostgreSQL 통합, run transition, sandbox와 apply는 여전히 Planned입니다.
 - [BE] Forward Engineering UUID-only Valkey 신호에 bounded processing lease를 추가했습니다. Due signal claim은 expired lease를 제한적으로 회수하고 exact lease-token을 별도 저장하며, 현재 token만 acknowledge 또는 scheduled retry release할 수 있어 stale claimant가 successor lease를 완료하지 못합니다. Consumer lifecycle, plan/credential loading, target access, worker execution은 여전히 Planned입니다.
 - [BE] Forward Engineering identifier-only dispatch에 opt-in scheduled relay lifecycle을 추가했습니다. 각 claim은 새 metadata transaction에서 처리되고 exact-attempt acknowledgement 후에만 commit되며, 실패는 rollback·고정 비밀 비노출 로그·bounded polling으로 처리됩니다. Valkey 없는 활성화는 startup에서 거부되고 shutdown은 모든 background task를 cancel/await합니다. Queue consumer, plan loading, sandbox/target SQL execution은 여전히 Planned입니다.
 - [BE/CI] 동일 `Idempotency-Key`로 취소된 dry-run을 재조회할 때 저장된 `cancellation_requested`를 정확히 반환합니다. PostgreSQL 통합 작업은 런타임마다 일회성 credential과 encryption key를 생성하고 checkout credential persistence를 끄며, 로컬 통합 테스트는 URL 또는 기대 PostgreSQL major가 없으면 원인을 명시해 skip합니다.
