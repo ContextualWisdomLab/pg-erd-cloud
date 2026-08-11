@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.api.connections import apply_sql
 from app.auth import CurrentUser
@@ -21,6 +22,23 @@ def _conn():
 
 def _body(dry_run=True):
     return ApplySqlIn(sql="CREATE TABLE safe_table (id bigint);", dry_run=dry_run)
+
+
+@pytest.mark.parametrize(
+    "control",
+    ["\x00", "\x08", "\x0b", "\x0c", "\x1f", "\x7f", "\x85", "\x9f"],
+)
+def test_apply_sql_request_rejects_non_text_controls(control: str) -> None:
+    sql = f"CREATE TABLE safe_table (\n\tid bigint{control}\n);"
+
+    with pytest.raises(ValidationError, match="non-text control character"):
+        ApplySqlIn(sql=sql)
+
+
+def test_apply_sql_request_allows_multiline_text_whitespace() -> None:
+    sql = "CREATE TABLE safe_table (\r\n\tid bigint\r\n);"
+
+    assert ApplySqlIn(sql=sql).sql == sql
 
 
 @pytest.mark.asyncio

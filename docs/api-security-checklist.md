@@ -110,6 +110,9 @@
 - ✅ 민감정보를 URL로 받지 않음(권장: Authorization header)
 - ✅ 문자열 입력에서 NUL(0x00) 제거(특히 PostgreSQL text/json 방어)
   - 근거: `backend/app/sanitize.py`
+- ✅ `apply-sql` 멀티라인 요청은 탭·LF·CR을 제외한 C0/C1 비텍스트
+  제어문자를 API 스키마 검증에서 거부
+  - 근거: `backend/app/schemas.py`, `backend/tests/test_api_apply_sql.py`
 - 🟡 스키마명 등 일부 입력은 제한(예: PostgreSQL identifier)
   - 근거: `backend/app/schemas.py` (패턴/길이 제한)
 

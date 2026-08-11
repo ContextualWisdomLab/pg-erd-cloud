@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectCreateIn(BaseModel):
@@ -80,6 +80,18 @@ class ApplySqlIn(BaseModel):
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
+
+    @field_validator("sql")
+    @classmethod
+    def reject_non_text_controls(cls, value: str) -> str:
+        """Reject C0/C1 controls except multiline text whitespace."""
+        for character in value:
+            code_point = ord(character)
+            if (code_point < 0x20 and character not in "\t\n\r") or (
+                0x7F <= code_point <= 0x9F
+            ):
+                raise ValueError("SQL contains a non-text control character")
+        return value
 
 
 class ApplySqlOut(BaseModel):
