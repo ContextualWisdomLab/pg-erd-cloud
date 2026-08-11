@@ -612,20 +612,25 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
     const unavailableActions = [
-      'ERD 자동 정렬',
-      '정렬 되돌리기',
-      '관계 자동 추론',
-      '모든 노드 지우기',
-      '업무 그룹',
-      '인덱스 카디널리티 계산',
-      'DDL 내보내기',
+      ['ERD 자동 정렬', '정렬할 항목이 없습니다'],
+      ['정렬 되돌리기', '되돌릴 작업이 없습니다'],
+      ['관계 자동 추론', '추론할 테이블이 없습니다'],
+      ['모든 노드 지우기', '지울 노드가 없습니다'],
+      ['업무 그룹', '묶을 테이블이 없습니다'],
+      ['인덱스 카디널리티 계산', '계산할 테이블이 없습니다'],
+      ['DDL 내보내기', '내보낼 테이블이 없습니다'],
     ]
     const confirm = vi.spyOn(window, 'confirm')
 
-    for (const name of unavailableActions) {
+    for (const [name, reason] of unavailableActions) {
       const button = screen.getByRole('button', { name }) as HTMLButtonElement
       expect(button).toHaveAttribute('aria-disabled', 'true')
       expect(button).not.toBeDisabled()
+      const descriptionId = button.getAttribute('aria-describedby')
+      expect(descriptionId).toBeTruthy()
+      const tooltip = document.getElementById(descriptionId!)
+      expect(tooltip).toHaveAttribute('role', 'tooltip')
+      expect(tooltip).toHaveTextContent(reason!)
       button.focus()
       expect(button).toHaveFocus()
       fireEvent.click(button)
