@@ -323,7 +323,7 @@ or supply an explicit compatibility alias before public v1 stabilization.
 | Drop table | Admitted subset | `drop_table`, destructive | Implemented control plane; execution Planned |
 | Add column | Admitted subset | `add_column`; required/no-default adds `table_is_empty` precondition | Implemented plan; precondition enforcement Planned |
 | Drop column | Admitted subset | `drop_column`, destructive | Implemented control plane; execution Planned |
-| Change data type | Catalog-spelling allow-list; aliases normalize; serial pseudo-types reject | `alter_column_type`, conservative destructive/data-loss/scan/rewrite risk and castability precondition | Implemented plan; sandbox/apply proof Planned |
+| Change data type | Catalog-spelling allow-list; aliases normalize; serial pseudo-types reject | `alter_column_type`, conservative destructive/data-loss/scan/rewrite risk and castability precondition | Implemented plan; generic isolated executor core exists, while type-change dependency/privilege/apply proof remains Planned |
 | Set/drop nullability | Admitted | `set_not_null` / `drop_not_null` | Implemented plan; live precondition Planned |
 | Primary key on a new table | Admitted | Included in `CREATE TABLE`, preserving ordered columns and deferrability | Implemented plan |
 | Change existing primary key | Admitted | `primary_key_change_unsupported` blocker | Implemented blocker |
@@ -509,7 +509,7 @@ errors, logs, events, metrics, or queue payloads.
 |---|---|---|---|
 | FE-AC-001 | Save and reopen an edited canvas as an immutable successor revision. | API + frontend adapter/E2E tests | Partially implemented |
 | FE-AC-002 | Every supported change appears in the plan; every unsupported difference blocks without partial statements. | mutation/contract tests across every canonical field | Partially implemented |
-| FE-AC-003 | Exact stored plan executes successfully in an isolated compatible PostgreSQL sandbox and reaches `target_digest`. | ephemeral PostgreSQL integration test | Planned |
+| FE-AC-003 | Exact stored plan executes successfully in an isolated compatible PostgreSQL sandbox and reaches `target_digest`. | dedicated ephemeral PostgreSQL 14–18 integration database, separate from the metadata database | Partially implemented core; deployed provisioning/isolation/cleanup and durable worker evidence Planned |
 | FE-AC-004 | Dry run performs no DDL on the live target and returns bounded preflight evidence. | network/privilege and database audit assertions | Planned |
 | FE-AC-005 | Live drift before dry run or apply results in no DDL. | injected-drift E2E tests | Planned |
 | FE-AC-006 | Apply cannot queue without editor-authored revision, deployer role, exact passed dry run, exact digest, typed target, and destructive acknowledgement when required. | role/tamper/race/API tests | Planned |

@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import uuid
+from urllib.parse import urlparse
 
 import asyncpg
 import pytest
@@ -41,12 +42,13 @@ from app.pg_introspect.snapshot_contract import (
 )
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
+_POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
 _EXPECTED_MAJOR = os.getenv("EXPECTED_POSTGRES_MAJOR")
 pytestmark = pytest.mark.skipif(
-    not _POSTGRES_URL or not _EXPECTED_MAJOR,
+    not _POSTGRES_URL or not _POSTGRES_SANDBOX_URL or not _EXPECTED_MAJOR,
     reason=(
-        "POSTGRES_INTEGRATION_URL and EXPECTED_POSTGRES_MAJOR are required "
-        "for real PostgreSQL acceptance"
+        "POSTGRES_INTEGRATION_URL, POSTGRES_SANDBOX_INTEGRATION_URL, and "
+        "EXPECTED_POSTGRES_MAJOR are required for real PostgreSQL acceptance"
     ),
 )
 
@@ -54,6 +56,13 @@ pytestmark = pytest.mark.skipif(
 def _asyncpg_url() -> str:
     assert _POSTGRES_URL is not None
     return _POSTGRES_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+
+def _sandbox_asyncpg_url() -> str:
+    assert _POSTGRES_SANDBOX_URL is not None
+    return _POSTGRES_SANDBOX_URL.replace(
+        "postgresql+asyncpg://", "postgresql://", 1
+    )
 
 
 def _preflight_plan(*preconditions: dict[str, object]) -> dict[str, object]:
@@ -123,6 +132,9 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
     """Prove exact signed-plan execution and re-introspection on PostgreSQL."""
 
     assert _EXPECTED_MAJOR is not None
+    assert _POSTGRES_URL is not None
+    assert _POSTGRES_SANDBOX_URL is not None
+    assert urlparse(_POSTGRES_URL).path != urlparse(_POSTGRES_SANDBOX_URL).path
     major = int(_EXPECTED_MAJOR)
     schema_name = f"Dry Run {uuid.uuid4().hex}"
     table_name = '주문 "항목"'
@@ -150,7 +162,7 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
         ],
     }
     plan = compile_migration_plan(base, target)
-    connection = await asyncpg.connect(_asyncpg_url())
+    connection = await asyncpg.connect(_sandbox_asyncpg_url())
 
     async def capture(
         owned_connection: asyncpg.Connection[asyncpg.Record],

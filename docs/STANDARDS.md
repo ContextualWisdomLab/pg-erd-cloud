@@ -86,7 +86,7 @@ exceptions.
 
 | Security concern | Required project evidence | Current status |
 |---|---|---|
-| Architecture and trust boundaries | Versioned ADRs, architecture/UML, threat model, separate metadata/sandbox/live authority. | Partially implemented; sandbox/run boundaries Planned |
+| Architecture and trust boundaries | Versioned ADRs, architecture/UML, threat model, separate metadata/sandbox/live authority. | Partially implemented; dedicated integration databases prove the code boundary, while deployed sandbox/run isolation remains Planned |
 | Authentication and session integrity | Existing authentication, CSRF for state changes, credentialed CORS, revocation/rate-limit tests. | Implemented general controls; forward HTTP matrix Planned |
 | Object-level and function-level authorization | Uniform other-project 404; `viewer < editor < deployer < owner`; server checks on every resource/action. | Partially implemented |
 | Input and execution safety | Unknown fields fail closed; server-rendered SQL; known structured executor kinds only; no browser SQL authority. | Partially implemented; legacy endpoint remains |

@@ -98,8 +98,9 @@ locks on the execution connection.
   rolls back after a started transaction, preserves cancellation,
   re-introspects through a bounded worker-owned callback, and requires the strict
   target digest. The PostgreSQL 14–18 matrix exercises the real DDL/catalog
-  round trip. This is an execution core, not evidence that a deployed sandbox
-  is disposable or isolated.
+  round trip in a dedicated ephemeral sandbox database distinct from its
+  migrated metadata database. This is an execution core, not evidence that a
+  deployed sandbox service is disposable or network-isolated.
 - Existing target-connection code provides encrypted DSNs and guarded database
   connection primitives that the planned live-preflight worker must reuse.
 - `app.forward.live_preflight` compiles only the structured

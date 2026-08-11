@@ -113,12 +113,21 @@ jobs:
           for attempt in {1..20}; do
             if docker exec pg-erd-cloud-postgres \
               pg_isready -U postgres -d pg_erd_cloud_test; then
-              exit 0
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs pg-erd-cloud-postgres
+              exit 1
             fi
             sleep 2
           done
-          docker logs pg-erd-cloud-postgres
-          exit 1
+
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE DATABASE pg_erd_cloud_sandbox"
+          sandbox_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_sandbox"
+          echo "::add-mask::$sandbox_database_url"
+          echo "POSTGRES_SANDBOX_INTEGRATION_URL=$sandbox_database_url" >> "$GITHUB_ENV"
 
       - name: Setup Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0

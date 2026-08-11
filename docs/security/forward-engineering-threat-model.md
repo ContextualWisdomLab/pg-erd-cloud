@@ -57,7 +57,7 @@ flowchart TB
 | API → metadata database | Canonical JSON, digests, actor/tenant IDs, encrypted DSN | Parameterized ORM access; project binding; append-only revision/plan convention. Database immutability enforcement remains absent. | Partially implemented |
 | API/worker → credential boundary | Connection UUID | Decrypt DSN only in process memory after authorization; redact failures. | Implemented for current connection/snapshot/legacy paths |
 | Credential boundary → live target | Pinned validated IP, optional verified-hostname TLS, introspection or DDL | Configured host allowlist and restricted-range rejection; planned workers additionally separate read-only preflight from execution authority. | Partially implemented |
-| Worker → sandbox | Exact stored structured plan and compatible schema closure | No production credential or route; disposable lifecycle; re-introspect and require target digest. | Planned |
+| Worker → sandbox | Exact stored structured plan and compatible schema closure | No production credential or route; disposable lifecycle; re-introspect and require target digest. | Partial execution core with dedicated ephemeral integration database; worker, closure service, deployed route isolation, and lifecycle Planned |
 | API → outbox → queue → worker | Run identity | `migration_run_dispatch` is an identifier-only transactional outbox; due-order lock-scoped claim, opt-in scheduled dedicated-key publication of only `migration_run_uuid`, exact-attempt publish CAS, rollback on failure, fixed non-secret logging, cooperative relay shutdown, exact lease-token ready/processing primitives, and an execution-neutral consumer contract are implemented. The future worker reloads and verifies the stored plan. | Outbox persistence/claim/scheduled publisher/signal lease/consumer contract Implemented; application consumer wiring/worker and deployment failover Planned |
 | Worker → browser/log/metrics | Bounded state and evidence | Identifiers, hashes, counts, durations, classified diagnostics only. | Run evidence canonicalization and verified polling Implemented; worker/log integration Planned |
 
@@ -110,7 +110,7 @@ future hardening opportunity, not an implemented guarantee.
 | Create or revise model | Editor | Valid model; strong revision-UUID `ETag` in `If-Match` | Implemented |
 | Compile a plan | Editor | Exact revision, same-project target and succeeded snapshot captured from that target | Implemented |
 | Queue dry-run intent | Editor | Unexpired plan, exact digest, bounded idempotency key | Implemented; no worker authority |
-| Execute isolated dry run | Worker identity | Queued intent, governed sandbox, compatible PostgreSQL version | Planned |
+| Execute isolated dry run | Worker identity | Queued intent, governed sandbox, compatible PostgreSQL version | Partial execution core only; worker-governed invocation Planned |
 | Request live apply | Deployer | Matching passed dry run, exact plan/digest/revision, typed connection name, and destructive acknowledgement when applicable | Planned |
 | Persistent legacy `apply-sql` | Deployer | Conservative SQL parser only | Implemented transitional; not accepted target authority |
 
