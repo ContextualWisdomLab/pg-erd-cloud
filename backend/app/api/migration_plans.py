@@ -10,7 +10,7 @@ from typing import Any, cast
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.forward.snapshot_adapter import snapshot_to_schema_model
 from app.models import (
     DbConnection,
     MigrationPlan,
+    MigrationRun,
     SchemaModel,
     SchemaModelRevision,
     SchemaSnapshot,
@@ -35,6 +36,7 @@ from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
 
 router = APIRouter(prefix="/api", tags=["migration-plans"])
 PLAN_LIFETIME = dt.timedelta(hours=24)
+EXPIRED_PLAN_RETENTION = dt.timedelta(days=30)
 MAX_PLAN_STATEMENTS = 1_000
 MAX_PLAN_BYTES = 4 * 1024 * 1024
 
@@ -113,6 +115,41 @@ async def _existing_plan(
             )
         ),
     )
+
+
+async def _cleanup_expired_unreferenced_plans(
+    session: AsyncSession,
+    *,
+    project_space_uuid: uuid.UUID,
+    now: dt.datetime,
+) -> int:
+    """Delete old derived plans only when no durable run references them.
+
+    Cleanup is tenant-scoped and retains every plan for 30 days after expiry.
+    Run evidence uses a restrictive foreign key, and the correlated exclusion
+    makes that retention boundary explicit before the database enforces it.
+    """
+
+    run_exists = exists(
+        select(MigrationRun.migration_run_uuid).where(
+            MigrationRun.migration_plan_uuid
+            == MigrationPlan.migration_plan_uuid
+        )
+    )
+    result = cast(
+        Any,
+        await session.execute(
+            delete(MigrationPlan).where(
+                MigrationPlan.project_space_uuid == project_space_uuid,
+                MigrationPlan.expires_at <= now - EXPIRED_PLAN_RETENTION,
+                ~run_exists,
+            )
+        ),
+    )
+    deleted = int(result.rowcount or 0)
+    if deleted:
+        await session.commit()
+    return deleted
 
 
 async def _load_plan_inputs(
@@ -234,6 +271,11 @@ async def create_migration_plan(
 
     now = dt.datetime.now(dt.timezone.utc)
     expires_at = now + PLAN_LIFETIME
+    await _cleanup_expired_unreferenced_plans(
+        session,
+        project_space_uuid=model.project_space_uuid,
+        now=now,
+    )
     existing = await _existing_plan(
         session,
         revision_uuid=revision.schema_model_revision_uuid,

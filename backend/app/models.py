@@ -383,7 +383,6 @@ class MigrationRun(Base):
             "observed_base_digest ~ '^[0-9a-f]{64}$'",
             name="ck_migration_run__observed_base_digest",
         ),
-        Index("ix_migration_run__project_space_uuid", "project_space_uuid"),
         Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
         Index("ix_migration_run__project_state", "project_space_uuid", "state"),
     )
@@ -455,7 +454,6 @@ class MigrationRunEvent(Base):
             "state_after IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown')",
             name="ck_migration_run_event__state_after",
         ),
-        Index("ix_migration_run_event__migration_run_uuid", "migration_run_uuid"),
     )
 
 

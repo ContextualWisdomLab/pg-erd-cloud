@@ -21,6 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.forward.migration_plan import verify_migration_plan_digest
 from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
@@ -473,14 +474,15 @@ async def transition_migration_run(
     if run is None or run.state_version != expected_state_version:
         raise MigrationRunContractError("migration run state version conflict")
 
-    validate_run_transition(run.run_kind, run.state, next_state)
+    current_state = run.state
+    validate_run_transition(run.run_kind, current_state, next_state)
     next_version = expected_state_version + 1
     previous_event_digest = run.latest_event_digest
     event_digest = digest_run_event(
         migration_run_uuid=migration_run_uuid,
         sequence_number=next_version,
         event_type=event_type,
-        state_before=run.state,
+        state_before=current_state,
         state_after=next_state,
         evidence=canonical_evidence,
         actor_user_uuid=actor_user_uuid,
@@ -496,7 +498,7 @@ async def transition_migration_run(
         "latest_event_digest": event_digest,
         "updated_at": transition_time,
     }
-    if run.state == "queued" and started_at is None:
+    if current_state == "queued" and started_at is None:
         started_at = transition_time
         values["started_at"] = started_at
     if not _TRANSITIONS[run.run_kind].get(next_state):
@@ -510,7 +512,7 @@ async def transition_migration_run(
             .where(
                 MigrationRun.migration_run_uuid == migration_run_uuid,
                 MigrationRun.run_kind == run.run_kind,
-                MigrationRun.state == run.state,
+                MigrationRun.state == current_state,
                 MigrationRun.state_version == expected_state_version,
                 MigrationRun.latest_event_digest == previous_event_digest,
             )
@@ -527,7 +529,7 @@ async def transition_migration_run(
             migration_run_uuid=migration_run_uuid,
             sequence_number=next_version,
             event_type=event_type,
-            state_before=run.state,
+            state_before=current_state,
             state_after=next_state,
             evidence_json=canonical_evidence,
             previous_event_digest=previous_event_digest,
@@ -536,6 +538,8 @@ async def transition_migration_run(
             created_at=transition_time,
         )
     )
+    for attribute, value in values.items():
+        set_committed_value(run, attribute, value)
     return MigrationRunTransition(
         state=next_state,
         state_version=next_version,
@@ -644,6 +648,13 @@ async def request_migration_run_cancellation(
             created_at=request_time,
         )
     )
+    for attribute, value in {
+        "cancellation_requested": True,
+        "state_version": next_version,
+        "updated_at": request_time,
+        "latest_event_digest": event_digest,
+    }.items():
+        set_committed_value(run, attribute, value)
     return MigrationRunCancellation(
         state=run.state,
         state_version=next_version,

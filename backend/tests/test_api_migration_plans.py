@@ -8,14 +8,19 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import UniqueConstraint
+from sqlalchemy.exc import IntegrityError
 
 from app.api.migration_plans import (
+    EXPIRED_PLAN_RETENTION,
     MAX_PLAN_STATEMENTS,
+    _cleanup_expired_unreferenced_plans,
+    _load_plan_inputs,
     create_migration_plan,
     get_migration_plan,
 )
 from app.auth import CurrentUser
 from app.forward.migration_plan import compile_migration_plan
+from app.forward.schema_model import SchemaModelValidationError
 from app.models import MigrationPlan
 from app.schemas import MigrationPlanCreateIn, MigrationPlanOut
 
@@ -36,6 +41,7 @@ class FakeSession:
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
         self.get = AsyncMock(return_value=None)
+        self.execute = AsyncMock(return_value=SimpleNamespace(rowcount=0))
 
     def add(self, value: object) -> None:
         self.added.append(value)
@@ -363,6 +369,371 @@ async def test_create_migration_plan_reuses_unexpired_immutable_identity() -> No
     assert session.added == []
     session.flush.assert_not_awaited()
     session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_rejects_recently_expired_identity() -> None:
+    """An expired identity remains a conflict until its retention window ends."""
+
+    inputs = _inputs()
+    _, revision, connection, snapshot, _ = inputs
+    existing = _stored_plan()
+    existing.expires_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)
+    session = FakeSession()
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans._existing_plan",
+        new=AsyncMock(return_value=existing),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=revision.schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=connection.db_connection_uuid,
+                    base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "expired" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_reuses_concurrent_insert_winner() -> None:
+    """A losing concurrent insert rolls back and returns the immutable winner."""
+
+    inputs = _inputs()
+    _, revision, connection, snapshot, _ = inputs
+    winner = _stored_plan()
+    session = FakeSession()
+    session.commit.side_effect = IntegrityError(
+        "INSERT INTO migration_plan", {}, RuntimeError("duplicate key")
+    )
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans._existing_plan",
+        new=AsyncMock(side_effect=[None, winner]),
+    ):
+        out = await create_migration_plan(
+            schema_model_revision_uuid=revision.schema_model_revision_uuid,
+            body=MigrationPlanCreateIn(
+                db_connection_uuid=connection.db_connection_uuid,
+                base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
+            ),
+            user=_user(),
+            session=session,
+        )
+
+    assert out.migration_plan_uuid == winner.migration_plan_uuid
+    session.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_reraises_when_concurrent_winner_is_absent() -> None:
+    """A uniqueness failure without a visible winner preserves the DB error."""
+
+    inputs = _inputs()
+    _, revision, connection, snapshot, _ = inputs
+    session = FakeSession()
+    error = IntegrityError(
+        "INSERT INTO migration_plan", {}, RuntimeError("duplicate key")
+    )
+    session.commit.side_effect = error
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans._existing_plan",
+        new=AsyncMock(side_effect=[None, None]),
+    ):
+        with pytest.raises(IntegrityError) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=revision.schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=connection.db_connection_uuid,
+                    base_schema_snapshot_uuid=snapshot.schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value is error
+    session.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_deletes_only_old_unreferenced_plans_in_one_project() -> None:
+    """Retention cleanup is tenant-scoped and excludes plans with run history."""
+
+    project_uuid = uuid.uuid4()
+    now = dt.datetime(2026, 8, 11, tzinfo=dt.timezone.utc)
+    session = FakeSession()
+    session.execute.return_value = SimpleNamespace(rowcount=2)
+
+    deleted = await _cleanup_expired_unreferenced_plans(
+        session, project_space_uuid=project_uuid, now=now
+    )
+
+    statement = session.execute.await_args.args[0]
+    compiled = statement.compile()
+    assert project_uuid in compiled.params.values()
+    assert now - EXPIRED_PLAN_RETENTION in compiled.params.values()
+    assert "NOT (EXISTS" in str(compiled)
+    assert deleted == 2
+    session.commit.assert_awaited_once()
+
+    session.execute.reset_mock()
+    session.commit.reset_mock()
+    session.execute.return_value = SimpleNamespace(rowcount=0)
+    assert (
+        await _cleanup_expired_unreferenced_plans(
+            session, project_space_uuid=project_uuid, now=now
+        )
+        == 0
+    )
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing_index", range(5))
+async def test_load_plan_inputs_returns_none_for_every_missing_resource(
+    missing_index: int,
+) -> None:
+    """Every absent revision/model/connection/snapshot/data binding is masked."""
+
+    revision_uuid = uuid.uuid4()
+    body = MigrationPlanCreateIn(
+        db_connection_uuid=uuid.uuid4(),
+        base_schema_snapshot_uuid=uuid.uuid4(),
+    )
+    revision = SimpleNamespace(schema_model_uuid=uuid.uuid4())
+    resources: list[object | None] = [
+        revision,
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+    ]
+    resources[missing_index] = None
+    session = FakeSession()
+    session.get.side_effect = resources
+
+    assert await _load_plan_inputs(session, revision_uuid, body) is None
+
+
+@pytest.mark.asyncio
+async def test_load_plan_inputs_returns_complete_binding() -> None:
+    """A complete immutable input set is returned in authority order."""
+
+    inputs = _inputs()
+    _, revision, _, _, _ = inputs
+    session = FakeSession()
+    session.get.side_effect = [revision, inputs[0], *inputs[2:]]
+    body = MigrationPlanCreateIn(
+        db_connection_uuid=inputs[2].db_connection_uuid,
+        base_schema_snapshot_uuid=inputs[3].schema_snapshot_uuid,
+    )
+
+    loaded = await _load_plan_inputs(
+        session, revision.schema_model_revision_uuid, body
+    )
+
+    assert loaded == inputs
+
+
+@pytest.mark.asyncio
+async def test_get_migration_plan_preserves_non_authorization_http_error() -> None:
+    """Only project denial is IDOR-masked; infrastructure HTTP errors survive."""
+
+    plan = _stored_plan()
+    session = FakeSession()
+    session.get.return_value = plan
+    upstream = HTTPException(status_code=503, detail="membership unavailable")
+
+    with patch(
+        "app.api.migration_plans.require_project_member",
+        new=AsyncMock(side_effect=upstream),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_migration_plan(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value is upstream
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_masks_missing_input() -> None:
+    """A missing input set exposes no partial resource identity."""
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=None),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=uuid.uuid4(),
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=uuid.uuid4(),
+                    base_schema_snapshot_uuid=uuid.uuid4(),
+                ),
+                user=_user(),
+                session=FakeSession(),
+            )
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_preserves_membership_service_error() -> None:
+    """Non-denial membership errors are not mislabeled as missing inputs."""
+
+    inputs = _inputs()
+    upstream = HTTPException(status_code=503, detail="membership unavailable")
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member",
+        new=AsyncMock(side_effect=upstream),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=inputs[1].schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=inputs[2].db_connection_uuid,
+                    base_schema_snapshot_uuid=inputs[3].schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=FakeSession(),
+            )
+
+    assert exc_info.value is upstream
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case", "expected_detail"),
+    [
+        ("wrong_connection", "base snapshot was not captured"),
+        ("snapshot_running", "base snapshot is not usable"),
+        ("wrong_revision", "model revision binding is invalid"),
+    ],
+)
+async def test_create_migration_plan_rejects_invalid_input_bindings(
+    case: str,
+    expected_detail: str,
+) -> None:
+    """Connection, snapshot status, and revision identity fail independently."""
+
+    inputs = list(_inputs())
+    if case == "wrong_connection":
+        inputs[3].db_connection_uuid = uuid.uuid4()
+    elif case == "snapshot_running":
+        inputs[3].status = "running"
+    else:
+        inputs[1].schema_model_uuid = uuid.uuid4()
+
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=tuple(inputs)),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=inputs[1].schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=inputs[2].db_connection_uuid,
+                    base_schema_snapshot_uuid=inputs[3].schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=FakeSession(),
+            )
+
+    assert exc_info.value.status_code == 422
+    assert expected_detail in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_maps_compiler_validation_to_422() -> None:
+    """Canonical snapshot/model validation errors remain non-executable input."""
+
+    inputs = _inputs()
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans.anyio.to_thread.run_sync",
+        new=AsyncMock(side_effect=SchemaModelValidationError("unsupported catalog")),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=inputs[1].schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=inputs[2].db_connection_uuid,
+                    base_schema_snapshot_uuid=inputs[3].schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=FakeSession(),
+            )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail == "unsupported catalog"
+
+
+@pytest.mark.asyncio
+async def test_create_migration_plan_rejects_expired_concurrent_winner() -> None:
+    """A concurrently selected expired winner never becomes a fresh preview."""
+
+    inputs = _inputs()
+    winner = _stored_plan()
+    winner.expires_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)
+    session = FakeSession()
+    session.commit.side_effect = IntegrityError(
+        "INSERT INTO migration_plan", {}, RuntimeError("duplicate key")
+    )
+    with patch(
+        "app.api.migration_plans._load_plan_inputs",
+        new=AsyncMock(return_value=inputs),
+    ), patch(
+        "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.migration_plans._existing_plan",
+        new=AsyncMock(side_effect=[None, winner]),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_migration_plan(
+                schema_model_revision_uuid=inputs[1].schema_model_revision_uuid,
+                body=MigrationPlanCreateIn(
+                    db_connection_uuid=inputs[2].db_connection_uuid,
+                    base_schema_snapshot_uuid=inputs[3].schema_snapshot_uuid,
+                ),
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    session.rollback.assert_awaited_once()
 
 
 @pytest.mark.asyncio

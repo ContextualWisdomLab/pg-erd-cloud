@@ -125,7 +125,7 @@ async def test_introspection_preserves_sni_for_verified_tls(
 
     assert captured["host"] == "93.184.216.34"
     assert isinstance(captured["ssl"], ssl.SSLContext)
-    assert getattr(captured["ssl"], "_server_hostname") == "db.example.com"
+    assert captured["ssl"]._server_hostname == "db.example.com"
 
 
 @pytest.mark.asyncio
@@ -192,3 +192,4 @@ async def test_optional_citus_metadata_failures_do_not_abort_snapshot(
 
     assert snapshot["citus_distributed_tables"] == []
     assert connection.transaction_rolled_back is True
+    assert connection.transaction_committed is True

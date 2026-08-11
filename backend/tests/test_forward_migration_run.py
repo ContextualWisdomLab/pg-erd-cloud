@@ -56,6 +56,8 @@ def _migration_plan(
 
 
 def test_run_state_machine_separates_dry_run_and_apply_authority() -> None:
+    """Dry-run and apply states never cross their separate authority graphs."""
+
     validate_run_transition("dry_run", "queued", "sandbox_running")
     validate_run_transition("dry_run", "live_preflight_running", "passed")
     validate_run_transition("apply", "queued", "applying")
@@ -70,6 +72,8 @@ def test_run_state_machine_separates_dry_run_and_apply_authority() -> None:
 
 
 def test_idempotency_key_is_bounded_and_stored_only_as_a_digest() -> None:
+    """Opaque retry keys are bounded before only their SHA-256 digest persists."""
+
     assert hash_idempotency_key("retry-한글-1") == hash_idempotency_key(
         "retry-한글-1"
     )
@@ -81,6 +85,8 @@ def test_idempotency_key_is_bounded_and_stored_only_as_a_digest() -> None:
 
 
 def test_run_request_digest_binds_exact_actor_plan_and_intent() -> None:
+    """The request digest changes with every execution-authority binding."""
+
     project_uuid = uuid.uuid4()
     plan_uuid = uuid.uuid4()
     actor_uuid = uuid.uuid4()
@@ -172,6 +178,8 @@ def test_run_event_digest_binds_order_state_evidence_actor_and_time() -> None:
 
 
 def test_run_evidence_rejects_secret_and_sql_bearing_fields_recursively() -> None:
+    """Durable evidence rejects nested SQL, secrets, and connection strings."""
+
     evidence = canonicalize_run_evidence(
         {
             "statement_count": 2,
@@ -234,6 +242,8 @@ def test_run_evidence_enforces_every_json_shape_and_resource_bound() -> None:
 
 
 def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> None:
+    """ORM constraints preserve run identity, state, and evidence boundaries."""
+
     assert MigrationRun.__tablename__ == "migration_run"
     assert MigrationRunEvent.__tablename__ == "migration_run_event"
 
@@ -283,12 +293,9 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     assert "event_digest" in MigrationRunEvent.__table__.columns
     assert {index.name for index in MigrationRun.__table__.indexes} == {
         "ix_migration_run__migration_plan_uuid",
-        "ix_migration_run__project_space_uuid",
         "ix_migration_run__project_state",
     }
-    assert {index.name for index in MigrationRunEvent.__table__.indexes} == {
-        "ix_migration_run_event__migration_run_uuid"
-    }
+    assert {index.name for index in MigrationRunEvent.__table__.indexes} == set()
 
     run = MigrationRun(
         migration_run_uuid=uuid.uuid4(),
@@ -311,6 +318,8 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
 
 
 def test_migration_run_alembic_revision_matches_model_contract() -> None:
+    """Alembic creates the same durable-run constraints as the ORM contract."""
+
     migration = (
         Path(__file__).resolve().parents[1]
         / "alembic/versions/0010_migration_run.py"
@@ -418,6 +427,13 @@ async def test_transition_uses_optimistic_cas_and_appends_sanitized_event() -> N
     assert result.state_version == 2
     assert result.started_at == now
     assert result.finished_at is None
+    assert run.state == "sandbox_running"
+    assert run.state_version == 2
+    assert run.evidence_json == event.evidence_json
+    assert run.latest_event_digest == event.event_digest
+    assert run.updated_at == now
+    assert run.started_at == now
+    assert run.finished_at is None
 
 
 @pytest.mark.asyncio
@@ -504,6 +520,13 @@ async def test_transition_marks_terminal_state_without_restarting_run() -> None:
     assert event.sequence_number == 4
     assert event.state_before == "live_preflight_running"
     assert event.state_after == "passed"
+    assert run.state == "passed"
+    assert run.state_version == 4
+    assert run.evidence_json == {"finding_count": 0}
+    assert run.latest_event_digest == event.event_digest
+    assert run.updated_at == finished_at
+    assert run.started_at == started_at
+    assert run.finished_at == finished_at
 
 
 @pytest.mark.asyncio
@@ -859,6 +882,10 @@ async def test_cancellation_intent_uses_cas_and_same_state_event_sequence() -> N
     assert result.state == "sandbox_running"
     assert result.state_version == 3
     assert result.reused is False
+    assert run.cancellation_requested is True
+    assert run.state_version == 3
+    assert run.updated_at == now
+    assert run.latest_event_digest == event.event_digest
 
 
 @pytest.mark.asyncio

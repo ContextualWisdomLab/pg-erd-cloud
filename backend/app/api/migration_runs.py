@@ -21,7 +21,11 @@ from app.forward.migration_run import (
 )
 from app.models import MigrationRun, MigrationRunEvent
 from app.permissions import require_project_member
-from app.schemas import MigrationRunEventOut, MigrationRunOut
+from app.schemas import (
+    MigrationRunEventOut,
+    MigrationRunOut,
+    MigrationRunState,
+)
 
 router = APIRouter(prefix="/api/migration-runs", tags=["migration-runs"])
 MAX_RETURNED_RUN_EVENTS = 1_000
@@ -125,7 +129,7 @@ def _run_out(
         project_space_uuid=run.project_space_uuid,
         migration_plan_uuid=run.migration_plan_uuid,
         run_kind=cast(Literal["dry_run", "apply"], run.run_kind),
-        state=run.state,
+        state=cast(MigrationRunState, run.state),
         state_version=run.state_version,
         plan_digest=run.plan_digest,
         requested_by_user_uuid=run.requested_by_user_uuid,

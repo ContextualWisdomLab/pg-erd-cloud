@@ -91,8 +91,10 @@ application/API rule rather than a database update-prevention trigger.
 Created by the server from one stored revision and one succeeded snapshot bound
 to the same project and exact connection. It stores `compiler_version`,
 `base_digest`, `target_digest`, `statement_digest`, `plan_json`, actor, and a
-24-hour `expires_at`. There is no update route. Expiry enforcement becomes
-mandatory when run creation is added.
+24-hour `expires_at`. There is no update route. Internal dry-run creation
+rejects expired plans. Creation-time maintenance deletes only derived plans
+that expired at least 30 days earlier, belong to the authorized project, and
+have no durable `MigrationRun` history; plans with run evidence are retained.
 
 ### `migration_run` and `migration_run_event` — Partially implemented
 
@@ -108,10 +110,10 @@ the effective request needed to reject same-key/different-request reuse.
 idempotency keys, deterministically binds project, plan, run kind, plan digest,
 and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
-evidence JSON. Public run creation/cancellation routes remain **Planned**, as do
-queue/outbox integration,
-cancellation, sandbox/preflight workers, apply,
-reconciliation, and verification.
+evidence JSON. The internal cancellation-intent writer is **Implemented**.
+Public run creation/cancellation routes remain **Planned**. Queue/outbox
+integration and cancellation-worker propagation remain **Planned**, as do
+sandbox/preflight workers, apply, reconciliation, and verification.
 
 Each event stores `previous_event_digest` and `event_digest`; the run stores
 `latest_event_digest`. Contract `migration-run-event/v1` hashes the run UUID,
@@ -141,7 +143,8 @@ digest. Only the CAS
 winner appends `migration_run_event` with the next sequence number. The caller
 owns the transaction, so an event insert failure rolls the state update back.
 
-`request_migration_run_cancellation` does not invent a synthetic state. It CAS
+The **Implemented** internal `request_migration_run_cancellation` writer does
+not invent a synthetic state. It CAS
 updates `cancellation_requested` and `state_version` while matching the exact
 UUID, kind, state, prior version, and false cancellation flag, then appends a
 same-state event at the new sequence. Repeated intent is idempotent; terminal,

@@ -111,11 +111,6 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_migration_run__project_space_uuid",
-        "migration_run",
-        ["project_space_uuid"],
-    )
-    op.create_index(
         "ix_migration_run__migration_plan_uuid",
         "migration_run",
         ["migration_plan_uuid"],
@@ -189,26 +184,14 @@ def upgrade() -> None:
             name="ck_migration_run_event__state_after",
         ),
     )
-    op.create_index(
-        "ix_migration_run_event__migration_run_uuid",
-        "migration_run_event",
-        ["migration_run_uuid"],
-    )
 
 
 def downgrade() -> None:
     """Remove run evidence before its parent run identity."""
 
-    op.drop_index(
-        "ix_migration_run_event__migration_run_uuid",
-        table_name="migration_run_event",
-    )
     op.drop_table("migration_run_event")
     op.drop_index("ix_migration_run__project_state", table_name="migration_run")
     op.drop_index(
         "ix_migration_run__migration_plan_uuid", table_name="migration_run"
-    )
-    op.drop_index(
-        "ix_migration_run__project_space_uuid", table_name="migration_run"
     )
     op.drop_table("migration_run")

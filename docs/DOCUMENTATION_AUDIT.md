@@ -1,6 +1,6 @@
 # Forward Engineering Documentation Audit
 
-- **Audit status:** Completed for the 2026-08-09 working tree
+- **Audit status:** Reconciled with the 2026-08-11 working tree
 - **Baseline:** `bcce75a64b9b658e14fe046ba4149aa8f53e94e2`
 - **Runtime conclusion:** Phase 1 control plane is Partially implemented and not production-ready
 - **Documentation conclusion:** Adequate to continue bounded implementation; insufficient to authorize production apply
@@ -71,7 +71,7 @@ Adequacy labels in this audit mean:
 | Architecture | **Missing** at repository root; detailed design was not a current component index. | [Architecture](../ARCHITECTURE.md) | **Adequate** | Runtime sandbox/worker/network topology remains Planned and needs deployment evidence. |
 | Architecture decisions | **Missing:** safety decisions existed inside one design narrative, without indexed ADR status. | [ADR index](adr/README.md) and ADR-0001–0005 | **Adequate** | Future non-transactional execution, secret-manager/key separation, and any exception need new ADRs. |
 | UML/component/sequence/state views | **Missing** | [UML](UML.md) | **Adequate** | Planned state machines have no persistence/service implementation yet. Repository Mermaid is authoritative; FigJam is companion only. |
-| Metadata ERD | **Missing** | [Data model](DATA_MODEL.md) | **Adequate for current physical schema** | Planned run/event non-key column types/indexes/retention need migration review. |
+| Metadata ERD | **Missing** | [Data model](DATA_MODEL.md) | **Adequate for current physical schema** | Planned execution bindings, indexes, and retention need migration review. |
 | API and invariant contract | **Partial:** design route names and desired shapes were not separated from current routes. | [v1 contract](contracts/forward-engineering-v1.md) | **Adequate for current truth** | Public route spelling, RFC 9457 problem details, and planned run routes remain unresolved. |
 | Security/threat model | **Partial:** general API checklist and vulnerability reporting existed, not a DDL-specific trust/abuse model. | [Forward threat model](security/forward-engineering-threat-model.md) | **Adequate for design review** | Several high-risk controls are Planned; no production risk acceptance is granted. |
 | Operational/runbook | **Missing** | [Forward runbook](runbooks/forward-engineering.md) | **Partial by design** | Run states, alerts, kill switch, timeouts, sandbox, and evidence bundle are not implemented or drilled. |
@@ -108,6 +108,10 @@ Adequacy labels in this audit mean:
 - Current schema-model create/get/revise routes and plan-create route with role,
   tenancy, snapshot/connection, size, and strong revision-UUID ETag
   optimistic-concurrency checks.
+- Immutable plan retrieval with persisted-plan digest verification, plus durable
+  `migration_run`/`migration_run_event` persistence, internal idempotent dry-run
+  creation, optimistic state/cancellation writers, tamper-evident event chains,
+  and authenticated integrity-checked run polling.
 - `deployer` between editor and owner, plus deployer gating of persistent legacy
   `apply-sql` using a primary-session authorization read.
 - Existing general controls for CSRF, credentialed CORS (allowing `If-Match`
@@ -118,13 +122,15 @@ Adequacy labels in this audit mean:
 
 ### Not implemented despite accepted design
 
-- Plan retrieval and durable `migration_run`/`migration_run_event` resources.
+- Public migration-run creation/cancellation routes, queue/outbox delivery, and
+  sandbox/preflight/apply workers.
 - Isolated version-compatible sandbox execution and live read-only preflight.
-- Plan expiry gate at run creation, target fingerprint revalidation, advisory
-  and object locking, apply-time data preconditions, stored-plan executor, and
-  explicit transactional segment recovery.
-- Idempotency, compare-and-swap state transitions, cancellation semantics,
-  queue outbox, no-replay reconciliation, and append-only event evidence.
+- Target fingerprint revalidation, advisory and object locking, apply-time data
+  preconditions, stored-plan executor, and explicit transactional segment
+  recovery.
+- Queue outbox, cancellation propagation, crash/restart recovery, and no-replay
+  apply reconciliation. Internal idempotency, compare-and-swap transitions,
+  cancellation intent, and append-only event evidence are implemented.
 - Verification snapshot, residual diff, convergence classification, alerts,
   kill switch, retention, and tested incident procedure.
 - Forward browser/API client, modal workflow, polling, accessibility, and every
@@ -147,12 +153,12 @@ as code or test evidence.
 | FE-INV-006: fingerprint revalidation for dry run/apply | Plan stores base digest only | — | [TRD](TRD.md), [Runbook](runbooks/forward-engineering.md) | **Planned release blocker.** |
 | FE-INV-007: in-lock data preconditions | Compiler emits precondition metadata | Compiler asserts metadata kinds/risk | [ADR-0003](adr/ADR-0003-plan-execution-segmentation.md), [Runbook](runbooks/forward-engineering.md) | **Planned runtime enforcement;** concurrency proof absent. |
 | FE-INV-008: one transactional segment | Current compiler marks admitted statements transactional | Compiler structured-plan tests | [ADR-0003](adr/ADR-0003-plan-execution-segmentation.md), [TRD](TRD.md) | **Planned executor/rollback proof.** Segment metadata/postconditions are not yet persisted. |
-| FE-INV-009: durable idempotent run, no apply replay | Generic `JobQueue` only; no migration run | General snapshot queue tests do not prove migration outcome | [ADR-0004](adr/ADR-0004-durable-runs-and-recovery.md), [Data model](DATA_MODEL.md), [Runbook](runbooks/forward-engineering.md) | **Planned release blocker.** Generic delivery state is not apply evidence. |
+| FE-INV-009: durable idempotent run, no apply replay | `models.py`; migration `0010`; `forward/migration_run.py`; `api/migration_runs.py` | `test_forward_migration_run.py`; `test_api_migration_runs.py` | [ADR-0004](adr/ADR-0004-durable-runs-and-recovery.md), [Data model](DATA_MODEL.md), [Runbook](runbooks/forward-engineering.md) | **Partially implemented:** durable identity, dry-run creation, CAS/cancellation writers, event chain, and polling exist; queue execution and apply no-replay recovery remain blockers. |
 | FE-INV-010: deployer and evidence-bound approval | `permissions.py`; persistent legacy apply requires deployer | `test_permissions.py`; `test_api_apply_sql.py` | [ADR-0005](adr/ADR-0005-authority-approvals-and-convergence.md), [PRD](PRD.md) | **Partially implemented:** role boundary exists; exact dry-run/typed/destructive approval binding is Planned. |
-| FE-INV-011: no DSN/secret/raw SQL in queue/events/browser | Existing encrypted connection and redaction boundaries; no run/event code | security, DSN guard/redaction, snapshot error and fuzz tests | [Threat model](security/forward-engineering-threat-model.md), [Data model](DATA_MODEL.md) | **Planned for new surfaces;** future payload schemas and negative leakage tests absent. |
+| FE-INV-011: no DSN/secret/raw SQL in queue/events/browser | Encrypted connection/redaction boundaries; `forward/migration_run.py`; sanitized worker failure codes | run-evidence and worker dispatch leakage regressions; DSN guard/redaction and snapshot error tests | [Threat model](security/forward-engineering-threat-model.md), [Data model](DATA_MODEL.md) | **Partially implemented:** durable evidence and generic worker failures reject secret-bearing content; future sandbox/apply payloads and browser surfaces remain unproved. |
 | FE-INV-012: only matching verification snapshot is verified | — | — | [ADR-0005](adr/ADR-0005-authority-approvals-and-convergence.md), [UML](UML.md), [Runbook](runbooks/forward-engineering.md) | **Planned release blocker.** |
 | FE-INV-013: uniform cross-project masking | Current model/plan/connection routes | focused model/plan/apply tests | [Contract §9](contracts/forward-engineering-v1.md), [Threat model](security/forward-engineering-threat-model.md) | **Partially implemented:** full HTTP role/IDOR matrix and future resources absent. |
-| FE-INV-014: unknown fields/kinds/versions fail closed | Canonicalizer and snapshot/compiler boundary | unknown-field/unsupported-feature/version tests | [Contract §2, §4, §7](contracts/forward-engineering-v1.md), [Test strategy](TEST_STRATEGY.md) | **Partially implemented:** executor dispatch and unknown run/event contract do not exist. |
+| FE-INV-014: unknown fields/kinds/versions fail closed | Canonicalizer, snapshot/compiler boundary, and exact run/event state contracts | unknown-field/unsupported-feature/version and invalid run/event tests | [Contract §2, §4, §7](contracts/forward-engineering-v1.md), [Test strategy](TEST_STRATEGY.md) | **Partially implemented:** current model/plan/run boundaries fail closed; sandbox/apply executor dispatch remains absent. |
 
 ## Unresolved gaps and priority
 
@@ -160,7 +166,7 @@ as code or test evidence.
 
 | Gap | Why documentation cannot close it | Required evidence |
 |---|---|---|
-| Durable run/event persistence and APIs | Without a durable attempt identity, HTTP/queue retries cannot express migration outcome safely. | Alembic/ORM/service/API, DB concurrency constraints, state/event tests |
+| Public run/event APIs and queue/outbox execution | Persistence, internal dry-run creation/CAS/cancellation writers, and integrity-checked polling exist, but public creation/cancellation and worker execution paths are unavailable. | Authorized HTTP creation/cancellation, transactional outbox/claiming, restart/cancellation integration tests |
 | Isolated sandbox and read-only preflight | A rollback on production still creates lock/scan/rewrite risk. | Network/credential isolation proof, real PostgreSQL sandbox convergence and live no-DDL audit |
 | Drift-safe executor | Stored plan metadata alone does not acquire locks, enforce preconditions, bound time, or roll back. | Versioned stored-plan dispatch, lock/timeout/concurrency/rollback integration tests |
 | Idempotency and uncertain-commit recovery | A lease retry can duplicate destructive DDL unless apply is never replayed after the boundary. | Crash/fault injection and reconciliation to `verified`, `not_applied`, or `outcome_unknown` |

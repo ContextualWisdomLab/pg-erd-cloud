@@ -114,7 +114,9 @@ Rules:
   positive event sequence, predecessor presence, and lowercase SHA-256 digest
   shapes; uniqueness selects one run per hashed
   project/run-kind idempotency identity, `request_digest` distinguishes
-  conflicting reuse, and one event exists per run sequence.
+  conflicting reuse, and at most one event is allowed per run sequence. The
+  polling boundary separately verifies that every sequence through the current
+  state version exists and is contiguous.
 - `app.forward.migration_run` owns the exact transition graph, bounded
   idempotency-key hashing, versioned request digests binding project, plan,
   run kind, plan digest, and actor, plus recursive rejection of SQL/credential

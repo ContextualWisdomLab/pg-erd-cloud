@@ -259,6 +259,26 @@ class MigrationRunEventOut(BaseModel):
     created_at: dt.datetime
 
 
+MigrationRunState = Literal[
+    "queued",
+    "sandbox_running",
+    "live_preflight_running",
+    "passed",
+    "drifted",
+    "failed",
+    "applying",
+    "reconciling",
+    "verifying",
+    "verified",
+    "drifted_no_apply",
+    "not_applied",
+    "verification_failed",
+    "failed_rolled_back",
+    "applied_with_drift",
+    "outcome_unknown",
+]
+
+
 class MigrationRunOut(BaseModel):
     """Authorized immutable view of one durable run and its event history."""
 
@@ -266,7 +286,7 @@ class MigrationRunOut(BaseModel):
     project_space_uuid: uuid.UUID
     migration_plan_uuid: uuid.UUID
     run_kind: Literal["dry_run", "apply"]
-    state: str
+    state: MigrationRunState
     state_version: int = Field(ge=1)
     plan_digest: str
     requested_by_user_uuid: uuid.UUID

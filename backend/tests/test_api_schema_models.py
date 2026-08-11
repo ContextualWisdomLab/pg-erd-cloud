@@ -39,20 +39,25 @@ class FakeWriteSession:
 
 
 @pytest.mark.parametrize(
-    "snapshot",
-    [
-        None,
-        SimpleNamespace(project_space_uuid=uuid.uuid4(), status="succeeded"),
-        SimpleNamespace(project_space_uuid=None, status="running"),
-    ],
+    ("snapshot_status", "same_project"),
+    [(None, False), ("succeeded", False), ("running", True)],
 )
 @pytest.mark.asyncio
 async def test_base_snapshot_must_exist_in_project_and_be_succeeded(
-    snapshot: object | None,
+    snapshot_status: str | None,
+    same_project: bool,
 ) -> None:
+    """Missing, cross-project, and incomplete base snapshots fail closed."""
+
     project_uuid = uuid.uuid4()
-    if snapshot is not None and getattr(snapshot, "status") == "running":
-        snapshot.project_space_uuid = project_uuid
+    snapshot = (
+        None
+        if snapshot_status is None
+        else SimpleNamespace(
+            project_space_uuid=(project_uuid if same_project else uuid.uuid4()),
+            status=snapshot_status,
+        )
+    )
     session = FakeWriteSession()
     session.get.return_value = snapshot
 
@@ -65,6 +70,8 @@ async def test_base_snapshot_must_exist_in_project_and_be_succeeded(
 
 @pytest.mark.asyncio
 async def test_base_snapshot_accepts_succeeded_snapshot_in_same_project() -> None:
+    """A succeeded snapshot owned by the project is a valid model base."""
+
     project_uuid = uuid.uuid4()
     session = FakeWriteSession()
     session.get.return_value = SimpleNamespace(

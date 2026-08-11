@@ -88,7 +88,7 @@ by the graphical target architecture.
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** durable evidence boundary exists; queue integration Planned |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation, transition, and cancellation CAS writers exist; HTTP/queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
-| FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented; expiry is stored but run enforcement Planned** |
+| FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry and 30-day cleanup excludes plans with run history; worker timeout enforcement remains Planned |
 
 ## Current persistence model
 

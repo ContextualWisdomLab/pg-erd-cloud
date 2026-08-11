@@ -8,10 +8,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.api.migration_runs import get_migration_run
+from app.api.migration_runs import MAX_RETURNED_RUN_EVENTS, get_migration_run
 from app.auth import CurrentUser
 from app.forward.migration_run import digest_run_event
 from app.models import MigrationRun, MigrationRunEvent
+from app.schemas import MigrationRunOut
 
 
 def _user() -> CurrentUser:
@@ -165,7 +166,6 @@ async def test_get_migration_run_masks_non_member_as_not_found() -> None:
         "gap",
         "chain",
         "secret",
-        "overflow",
         "state",
         "time",
         "final",
@@ -192,8 +192,6 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
         events[1].state_before = "live_preflight_running"
     elif mutation == "secret":
         events[1].evidence_json = {"databaseDsn": "postgresql://secret"}
-    elif mutation == "overflow":
-        events = events * 501
     elif mutation == "state":
         run.run_kind = "preview"
     elif mutation == "time":
@@ -253,6 +251,77 @@ async def test_get_migration_run_fails_closed_for_corrupt_history(
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "migration run integrity verification failed"
+
+
+@pytest.mark.asyncio
+async def test_get_migration_run_rejects_a_sequential_chain_over_event_limit() -> None:
+    """The size guard rejects a sequential digest chain before replay work."""
+
+    run = _run()
+    events = _events(run)[:1]
+    previous_digest = events[0].event_digest
+    for sequence_number in range(2, MAX_RETURNED_RUN_EVENTS + 2):
+        event = MigrationRunEvent(
+            migration_run_event_uuid=uuid.uuid4(),
+            migration_run_uuid=run.migration_run_uuid,
+            sequence_number=sequence_number,
+            event_type="evidence_recorded",
+            state_before="queued",
+            state_after="queued",
+            evidence_json={"record": sequence_number},
+            previous_event_digest=previous_digest,
+            event_digest="",
+            actor_user_uuid=None,
+            created_at=run.created_at + dt.timedelta(microseconds=sequence_number),
+        )
+        event.event_digest = _event_digest(event)
+        previous_digest = event.event_digest
+        events.append(event)
+    run.state = "queued"
+    run.state_version = len(events)
+    run.latest_event_digest = previous_digest
+    session = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: events)),
+    )
+
+    with patch(
+        "app.api.migration_runs.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_migration_run(
+                migration_run_uuid=run.migration_run_uuid,
+                user=_user(),
+                session=session,
+            )
+
+    assert len(events) == MAX_RETURNED_RUN_EVENTS + 1
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "migration run integrity verification failed"
+
+
+def test_migration_run_openapi_state_matches_database_contract() -> None:
+    """The public run state enum exposes every and only persisted state token."""
+
+    state_schema = MigrationRunOut.model_json_schema()["properties"]["state"]
+    assert set(state_schema["enum"]) == {
+        "queued",
+        "sandbox_running",
+        "live_preflight_running",
+        "passed",
+        "drifted",
+        "failed",
+        "applying",
+        "reconciling",
+        "verifying",
+        "verified",
+        "drifted_no_apply",
+        "not_applied",
+        "verification_failed",
+        "failed_rolled_back",
+        "applied_with_drift",
+        "outcome_unknown",
+    }
 
 
 @pytest.mark.asyncio

@@ -2,7 +2,7 @@
 
 - **Document status:** Current physical model plus accepted planned extension
 - **Runtime status:** Partially implemented; not production-ready
-- **Last reconciled with ORM and Alembic:** 2026-08-10
+- **Last reconciled with ORM and Alembic:** 2026-08-11
 
 Repository migrations, ORM definitions, and the Mermaid ERDs below are
 authoritative. The
@@ -104,6 +104,10 @@ erDiagram
     text observed_base_digest
     jsonb evidence_json
     text error_code
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz started_at
+    timestamptz finished_at
   }
   MIGRATION_RUN_EVENT {
     uuid migration_run_event_uuid PK
@@ -116,6 +120,7 @@ erDiagram
     text previous_event_digest
     text event_digest
     uuid actor_user_uuid FK
+    timestamptz created_at
   }
 
   USER_ACCOUNT ||--o{ PROJECT_SPACE : creates
@@ -178,7 +183,7 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | `current_revision_number` names an existing revision of the same model. | Current API transaction and row lock. No physical FK can express the composite pointer as modeled. | Partially implemented |
 | Plan project, revision project, connection project, and snapshot project match; the snapshot came from that exact connection and succeeded. | `app.api.migration_plans.create_migration_plan` before insert. | Implemented in the API; not a database constraint |
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
-| Expired plans cannot execute. | Expiry is stored, but run creation/execution does not exist. | Planned |
+| Expired plans cannot start a run. | The internal dry-run writer verifies expiry before its conflict-winner insert; public creation and execution remain absent. | Partially implemented |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
 | Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the internal PostgreSQL conflict-winner writer reuses only the same request and rejects different reuse. | Implemented internal dry-run writer; HTTP mapping Planned |
 | Run/event state tokens, sequence numbers, and digest links are valid. | Database checks constrain run kind/state, event type, before/after states, predecessor presence, and every persisted lowercase SHA-256 field (idempotency, plan, request, observed base, chain link, and run anchor); the exact application transition graph and CAS writer match UUID, kind, state, state version, and prior event anchor before appending the same-version event; event sequence is unique per run and polling recomputes every canonical digest. | Implemented persistence and polling boundary; workers Planned |
@@ -186,6 +191,12 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
 It is provenance, not a database idempotency key: the same logical SQL may be
 planned for different targets or recreated after expiry.
+
+`migration_plan` is a derived review artifact with a 24-hour execution lifetime.
+Creation-time maintenance may delete it only after a further 30-day retention
+window, only within the authorized project, and only when no `migration_run`
+references it. Any plan with durable run evidence is retained by policy and by
+the restrictive foreign key.
 
 `migration_plan.plan_json` separates executable `statements` from
 `proposed_statements`. When any blocker exists, `statements` is empty and
