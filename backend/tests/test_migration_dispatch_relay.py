@@ -30,18 +30,26 @@ def _claim() -> MigrationDispatchClaim:
 
 
 def _session_factory() -> MagicMock:
-    """Return one async session and transaction context for relay-loop tests."""
+    """Return a factory that records a fresh session/transaction per call."""
 
-    session = MagicMock()
-    session.__aenter__ = AsyncMock(return_value=session)
-    session.__aexit__ = AsyncMock(return_value=False)
-    transaction = MagicMock()
-    transaction.__aenter__ = AsyncMock(return_value=None)
-    transaction.__aexit__ = AsyncMock(return_value=False)
-    session.begin.return_value = transaction
-    factory = MagicMock(return_value=session)
-    factory.session = session
-    factory.transaction = transaction
+    sessions: list[MagicMock] = []
+    transactions: list[MagicMock] = []
+
+    def create_session() -> MagicMock:
+        session = MagicMock()
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=False)
+        transaction = MagicMock()
+        transaction.__aenter__ = AsyncMock(return_value=None)
+        transaction.__aexit__ = AsyncMock(return_value=False)
+        session.begin.return_value = transaction
+        sessions.append(session)
+        transactions.append(transaction)
+        return session
+
+    factory = MagicMock(side_effect=create_session)
+    factory.sessions = sessions
+    factory.transactions = transactions
     return factory
 
 
@@ -166,8 +174,16 @@ async def test_scheduled_relay_commits_each_claim_and_polls_after_empty() -> Non
 
     assert publish.await_count == 2
     assert factory.call_count == 2
-    assert factory.session.begin.call_count == 2
-    assert factory.transaction.__aexit__.await_count == 2
+    first_session = publish.await_args_list[0].args[0]
+    second_session = publish.await_args_list[1].args[0]
+    assert first_session is not second_session
+    assert factory.sessions == [first_session, second_session]
+    assert all(session.__aexit__.await_count == 1 for session in factory.sessions)
+    assert all(session.begin.call_count == 1 for session in factory.sessions)
+    assert all(
+        transaction.__aexit__.await_count == 1
+        for transaction in factory.transactions
+    )
     sleep.assert_awaited_once_with(0.25)
 
 
@@ -177,7 +193,7 @@ async def test_scheduled_relay_rolls_back_failed_publish_and_logs_fixed_code(
 ) -> None:
     """Publication failure is rolled back without logging exception contents."""
 
-    secret = "postgresql://admin:secret@target.example/customer"
+    secret = "forbidden-log-marker-7f42"
     factory = _session_factory()
     with patch(
         "app.jobs.migration_dispatch_relay.publish_one_migration_dispatch",
@@ -189,7 +205,7 @@ async def test_scheduled_relay_rolls_back_failed_publish_and_logs_fixed_code(
         with pytest.raises(asyncio.CancelledError):
             await run_migration_dispatch_relay_forever(factory, poll_interval_s=0.5)
 
-    first_exit_args = factory.transaction.__aexit__.await_args_list[0]
+    first_exit_args = factory.transactions[0].__aexit__.await_args_list[0]
     assert first_exit_args.args[0] is RuntimeError
     assert "migration_dispatch_relay_iteration_failed" in caplog.text
     assert secret not in caplog.text

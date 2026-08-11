@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -234,9 +235,27 @@ def test_ci_generates_ephemeral_integration_credentials() -> None:
     assert "postgres:postgres" not in workflow
     assert "integration-only-app-secret" not in workflow
     assert "openssl rand -hex" in workflow
-    assert workflow.count("persist-credentials: false") == workflow.count(
-        "uses: actions/checkout@"
+    step_blocks = re.findall(
+        r"(?ms)^      - (?P<step>.*?)(?=^      - |\Z)", workflow
     )
+    checkout_steps = [
+        step for step in step_blocks if "uses: actions/checkout@" in step
+    ]
+    assert checkout_steps
+    assert all("persist-credentials: false" in step for step in checkout_steps)
+
+
+def test_dispatch_relay_documentation_separates_implemented_and_planned_scope() -> None:
+    """Keep scheduler maturity distinct from consumer/worker maturity."""
+
+    data_model = _read(Path("docs/DATA_MODEL.md"))
+    audit = _read(Path("docs/DOCUMENTATION_AUDIT.md"))
+
+    assert "Additional **Implemented and Planned** invariants:" in data_model
+    assert "- **Implemented — scheduled relay lifecycle:**" in data_model
+    assert "- **Implemented — scheduled relay lifecycle and UUID-only publication:**" in audit
+    assert "- **Planned — queue consumer, worker execution, failover, and retention:**" in audit
+    assert "Relay loop/queue delivery" not in audit
 
 
 def test_ci_runs_real_valkey_signal_acceptance() -> None:

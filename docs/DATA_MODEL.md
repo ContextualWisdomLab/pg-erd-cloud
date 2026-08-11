@@ -294,13 +294,14 @@ yet enforced.
 | `migration_run.passed_dry_run_uuid` | `migration_run` | null for dry runs; required for apply and must reference a `passed` run for the same plan/digest | `RESTRICT`; one passed dry run can prove zero or more apply requests until evidence becomes stale. |
 | `migration_run.verification_snapshot_uuid` | `schema_snapshot` | null until verification; required for `verified` | `RESTRICT`; a run has zero or one verification snapshot, and a snapshot can be referenced by zero or more runs physically. The service must create a dedicated snapshot per apply run. |
 
-Additional **Planned** invariants:
+Additional **Implemented and Planned** invariants:
 
-- The scheduled relay lifecycle is Implemented as an explicit opt-in
+- **Implemented — scheduled relay lifecycle:** an explicit opt-in
   application task. Each bounded publisher attempt runs in its own
   caller-owned transaction; failure rolls back and empty/failure iterations
-  wait at a positive configured interval. Queue consumption and worker
-  execution remain Planned.
+  wait at a positive configured interval.
+- **Planned — queue consumption and worker execution:** the relay does not
+  consume signals, load plans or credentials, or execute target SQL.
 - One database uniqueness rule plus `request_digest` implements idempotency:
   identical reuse returns the original run, while different effective input
   returns `409`.

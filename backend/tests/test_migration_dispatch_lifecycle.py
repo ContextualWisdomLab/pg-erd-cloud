@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -12,7 +13,9 @@ from app import main as main_app
 from app.settings import settings
 
 
-def _blocking_task(started: asyncio.Event, cancelled: asyncio.Event):
+def _blocking_task(
+    started: asyncio.Event, cancelled: asyncio.Event
+) -> Callable[..., Awaitable[None]]:
     async def run(*_args: object, **_kwargs: object) -> None:
         started.set()
         try:

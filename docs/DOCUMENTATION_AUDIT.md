@@ -120,11 +120,17 @@ Adequacy labels in this audit mean:
   address rejection, DNS resolution/IP pinning, and optional verified-hostname
   TLS.
 
-### Not implemented despite accepted design
+### Implemented and planned execution boundaries
 
-- Relay loop/queue delivery, sandbox/preflight/apply workers, and public
-  apply-run creation. Public dry-run creation, atomic identifier-only outbox,
-  lock-scoped claim/publish-state CAS, and cancellation intent are implemented.
+- **Implemented — scheduled relay lifecycle and UUID-only publication:** the
+  opt-in application task publishes only `migration_run_uuid` from one fresh
+  caller-owned metadata transaction per bounded attempt. Public dry-run
+  creation, atomic identifier-only outbox, lock-scoped claim/publish-state CAS,
+  and cancellation intent are also implemented.
+- **Planned — queue consumer, worker execution, failover, and retention:** no
+  signal consumer loads plans or credentials, accesses a target, or executes
+  SQL. Sandbox/preflight/apply workers and public apply-run creation remain
+  absent.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
