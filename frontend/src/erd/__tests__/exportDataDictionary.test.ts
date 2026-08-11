@@ -267,3 +267,27 @@ describe('exportDataDictionary CSV Injection Protection', () => {
     // Because the edge had an explicit handle but it was malformed, the fallback should not execute and col1 should not be flagged as an FK.
     expect(csv).toContain('"table1","","col1","text","N","N","N","",""');
   });
+
+  it('ignores a target-only handle instead of using legacy source metadata', () => {
+    const nodes: Node<TableNodeData>[] = [{
+      id: 'table1',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'table1',
+        badges: { pk: false, fk: false },
+        columns: [
+          { column_name: 'col1', data_type: 'text', is_pk: false, is_not_null: false },
+        ],
+      },
+    }];
+
+    const csv = exportDictionaryCsv(nodes, [{
+      id: 'partial',
+      source: 'table1',
+      target: 'table2',
+      targetHandle: 'tgt-c-0069-0064',
+      data: { sourceColumns: ['col1'], targetColumns: ['id'] },
+    }]);
+
+    expect(csv).toContain('"table1","","col1","text","N","N","N","",""');
+  });

@@ -193,6 +193,49 @@ describe('exportDDL', () => {
     expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
   });
 
+  it.each([
+    ['malformed', 'src-c-0075junk', targetColumnHandleId('id')],
+    ['wrong-role', targetColumnHandleId('user_id'), sourceColumnHandleId('id')],
+  ])('does not infer columns from %s supplied handles', (_, sourceHandle, targetHandle) => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'parent',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'parents',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+          ],
+        },
+      },
+      {
+        id: 'child',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'children',
+          badges: { pk: false, fk: true },
+          columns: [
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, [{
+      id: 'unsafe',
+      source: 'child',
+      target: 'parent',
+      sourceHandle,
+      targetHandle,
+      data: { sourceColumns: ['user_id'], targetColumns: ['id'] },
+    }]);
+
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
+    expect(ddl).toContain('REFERENCES "parents" (/* target columns */)');
+    expect(ddl).not.toContain('FOREIGN KEY ("user_id")');
+  });
+
   it('should not throw if foreign key source or target is missing', () => {
     const nodes: Node<TableNodeData>[] = [
       {
