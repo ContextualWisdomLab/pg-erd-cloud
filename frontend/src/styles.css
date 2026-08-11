@@ -943,7 +943,7 @@ button:disabled {
   box-shadow: 0 0 0 1px var(--color-border);
 }
 
-.groupManager__swatch[aria-pressed="true"] {
+.groupManager__swatch[aria-checked="true"] {
   box-shadow: 0 0 0 3px var(--color-text-strong);
 }
 

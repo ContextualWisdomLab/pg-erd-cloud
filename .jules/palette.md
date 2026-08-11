@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-10-24 - Custom Radio Groups Accessibility
+**Learning:** 커스텀 UI 요소(색상 스와치 등)를 라디오 그룹으로 사용할 때 `role="radio"` 대신 일반 버튼에 `aria-pressed`를 사용하는 경우가 많습니다. 이는 `radiogroup` 내부에 라디오 대신 버튼이 존재하는 잘못된 ARIA 구조를 만들어 스크린 리더에 혼란을 줍니다.
+**Action:** `role="radiogroup"`을 가진 커스텀 라디오 그룹을 만들 때, 자식 요소들은 일반 버튼과 `aria-pressed` 대신 명시적으로 `role="radio"`와 `aria-checked`를 사용하도록 하십시오. 또한 React Testing Library의 쿼리도 'button' 대신 'radio' 역할을 찾도록 업데이트하십시오.
