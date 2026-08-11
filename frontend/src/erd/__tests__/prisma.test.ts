@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -79,6 +80,77 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
+  });
+
+  it('preserves every canonical-handle relation sharing one source field', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'accounts',
+        position: { x: 100, y: 0 },
+        data: {
+          title: 'accounts',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'events',
+        position: { x: 0, y: 100 },
+        data: {
+          title: 'events',
+          badges: { pk: false, fk: true },
+          columns: [
+            { column_name: 'owner_id', data_type: 'integer', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'users-owner',
+        source: 'events',
+        target: 'users',
+        sourceHandle: sourceColumnHandleId('owner_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'events_users_owner',
+      },
+      {
+        id: 'accounts-owner',
+        source: 'events',
+        target: 'accounts',
+        sourceHandle: sourceColumnHandleId('owner_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'events_accounts_owner',
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+
+    expect(result).toContain(
+      'users_owner_id users @relation("events_users_owner", fields: [owner_id], references: [id])',
+    );
+    expect(result).toContain(
+      'accounts_owner_id accounts @relation("events_accounts_owner", fields: [owner_id], references: [id])',
+    );
+    expect(result).toContain(
+      'events_owner_id events[] @relation("events_users_owner")',
+    );
+    expect(result).toContain(
+      'events_owner_id events[] @relation("events_accounts_owner")',
+    );
   });
 
   it('maps various types properly', () => {
