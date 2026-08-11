@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from unittest.mock import AsyncMock, call, patch
 
 import pytest
