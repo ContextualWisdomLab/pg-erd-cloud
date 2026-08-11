@@ -684,3 +684,64 @@ async def test_masks_rollback_cleanup_failure_without_hiding_primary_failure() -
     assert str(captured.value) == "isolated dry-run statement failed"
     assert captured.value.__cause__ is None
     assert captured.value.__context__ is None
+
+
+@pytest.mark.asyncio
+async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
+    base, target = _models()
+    base_snapshot, _target_snapshot = _snapshots()
+    plan = compile_migration_plan(base, target)
+
+    async def capture(_connection: _Connection) -> Mapping[str, Any]:
+        return base_snapshot
+
+    class CancelledPreparedStatement(_PreparedStatement):
+        async def fetch(self, *, timeout: float) -> list[object]:
+            raise asyncio.CancelledError
+
+    class RollbackFailureTransaction(_Transaction):
+        async def rollback(self) -> None:
+            raise RuntimeError("secret rollback failure")
+
+    class CancelledRollbackFailureConnection(_Connection):
+        def transaction(self) -> _Transaction:
+            return RollbackFailureTransaction(self)
+
+        async def prepare(self, sql: str) -> _PreparedStatement:
+            return CancelledPreparedStatement(self, sql)
+
+    with pytest.raises(asyncio.CancelledError):
+        await execute_isolated_dry_run(
+            CancelledRollbackFailureConnection(),
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture,
+        )
+
+
+@pytest.mark.asyncio
+async def test_preserves_cancellation_before_transaction_start() -> None:
+    base, target = _models()
+    base_snapshot, _target_snapshot = _snapshots()
+    plan = compile_migration_plan(base, target)
+
+    async def capture(_connection: _Connection) -> Mapping[str, Any]:
+        return base_snapshot
+
+    class CancelledStartTransaction(_Transaction):
+        async def start(self) -> None:
+            raise asyncio.CancelledError
+
+    class CancelledStartConnection(_Connection):
+        def transaction(self) -> _Transaction:
+            return CancelledStartTransaction(self)
+
+    connection = CancelledStartConnection()
+    with pytest.raises(asyncio.CancelledError):
+        await execute_isolated_dry_run(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture,
+        )
+    assert ("rollback",) not in connection.calls

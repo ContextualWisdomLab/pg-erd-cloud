@@ -366,6 +366,17 @@ class _TransactionStartFailingConnection(_FakeConnection):
         return _TransactionStartFailingTransaction(self)
 
 
+class _TransactionStartCancelledTransaction(_FakeTransaction):
+    async def start(self) -> None:
+        raise asyncio.CancelledError
+
+
+class _TransactionStartCancelledConnection(_FakeConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        return _TransactionStartCancelledTransaction(self)
+
+
 class _TransactionCommitFailingTransaction(_FakeTransaction):
     async def commit(self) -> None:
         raise RuntimeError("postgresql://user:secret@db.example.com/app")
@@ -383,6 +394,12 @@ class _TransactionRollbackFailingTransaction(_FakeTransaction):
 
 
 class _TransactionRollbackFailingConnection(_FailingConnection):
+    def transaction(self, **kwargs: object) -> _FakeTransaction:
+        self.transaction_options = kwargs
+        return _TransactionRollbackFailingTransaction(self)
+
+
+class _CancelledRollbackFailingConnection(_CancelledConnection):
     def transaction(self, **kwargs: object) -> _FakeTransaction:
         self.transaction_options = kwargs
         return _TransactionRollbackFailingTransaction(self)
@@ -563,3 +580,30 @@ async def test_propagates_cancellation_after_rolling_back() -> None:
         )
 
     assert connection.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
+    connection = _CancelledRollbackFailingConnection([])
+
+    with pytest.raises(asyncio.CancelledError):
+        await execute_live_preflight(
+            connection,
+            _plan(
+                {
+                    "kind": "table_is_empty",
+                    "schema_name": "public",
+                    "table_name": "orders",
+                }
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_preserves_cancellation_before_transaction_start() -> None:
+    connection = _TransactionStartCancelledConnection([])
+
+    with pytest.raises(asyncio.CancelledError):
+        await execute_live_preflight(connection, _plan())
+
+    assert connection.rolled_back is False

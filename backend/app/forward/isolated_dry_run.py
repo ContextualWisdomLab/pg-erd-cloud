@@ -72,27 +72,35 @@ _STATEMENT_FIELDS = frozenset(
 
 
 class _PreparedStatement(Protocol):
-    async def fetch(self, *, timeout: float) -> Sequence[object]: ...
+    async def fetch(self, *, timeout: float) -> Sequence[object]:
+        """Execute the prepared statement with a client-side timeout."""
 
 
 class _Transaction(Protocol):
-    async def start(self) -> None: ...
+    async def start(self) -> None:
+        """Start the owned transaction."""
 
-    async def commit(self) -> None: ...
+    async def commit(self) -> None:
+        """Commit the owned transaction."""
 
-    async def rollback(self) -> None: ...
+    async def rollback(self) -> None:
+        """Roll back the owned transaction."""
 
 
 class IsolatedPostgresConnection(Protocol):
     """Minimum asyncpg-compatible surface used by the sandbox executor."""
 
-    async def fetchval(self, query: str) -> object: ...
+    async def fetchval(self, query: str) -> object:
+        """Fetch one scalar value from a compiler-owned query."""
 
-    def transaction(self) -> _Transaction: ...
+    def transaction(self) -> _Transaction:
+        """Create a transaction bound to this sandbox connection."""
 
-    async def execute(self, query: str, value: str) -> str: ...
+    async def execute(self, query: str, value: str) -> str:
+        """Execute a parameterized control query."""
 
-    async def prepare(self, query: str) -> _PreparedStatement: ...
+    async def prepare(self, query: str) -> _PreparedStatement:
+        """Prepare one compiler-owned statement."""
 
 
 SnapshotCapture = Callable[
@@ -220,9 +228,7 @@ async def _capture_digest(
         snapshot = await asyncio.wait_for(
             capture_snapshot(connection), timeout=timeout
         )
-    except BaseException as exc:
-        if not isinstance(exc, Exception):
-            raise
+    except Exception:
         capture_failed = True
     if capture_failed:
         raise IsolatedDryRunContractError(
@@ -279,9 +285,7 @@ async def execute_isolated_dry_run(
             )
     except IsolatedDryRunContractError:
         raise
-    except BaseException as exc:
-        if not isinstance(exc, Exception):
-            raise
+    except Exception:
         version_check_failed = True
     if version_check_failed:
         raise IsolatedDryRunContractError(
@@ -322,7 +326,17 @@ async def execute_isolated_dry_run(
             )
             await prepared.fetch(timeout=client_timeout)
         await asyncio.wait_for(transaction.commit(), timeout=client_timeout)
-    except BaseException as exc:
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        if transaction_started:
+            try:
+                await asyncio.wait_for(
+                    transaction.rollback(), timeout=client_timeout
+                )
+            except Exception:
+                # Preserve cancellation/process-exit over cleanup detail.
+                pass
+        raise
+    except Exception:
         if transaction_started:
             try:
                 await asyncio.wait_for(
@@ -331,8 +345,6 @@ async def execute_isolated_dry_run(
             except Exception:
                 # Preserve the fixed primary failure and never driver detail.
                 pass
-        if not isinstance(exc, Exception):
-            raise
         statement_failed = True
     if statement_failed:
         raise IsolatedDryRunContractError(

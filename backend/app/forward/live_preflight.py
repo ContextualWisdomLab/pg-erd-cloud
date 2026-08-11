@@ -243,22 +243,22 @@ async def execute_live_preflight(
                 }
             )
         await transaction.commit()
-    except BaseException as err:
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        if transaction_started and transaction is not None:
+            try:
+                await transaction.rollback()
+            except Exception:
+                # Preserve cancellation/process-exit over cleanup detail.
+                pass
+        raise
+    except Exception as err:
         if transaction_started and transaction is not None:
             try:
                 await transaction.rollback()
             except Exception:
                 # Preserve the fixed non-success diagnostic, never driver detail.
                 pass
-        if isinstance(
-            err,
-            (
-                LivePreflightContractError,
-                asyncio.CancelledError,
-                KeyboardInterrupt,
-                SystemExit,
-            ),
-        ):
+        if isinstance(err, LivePreflightContractError):
             raise
         sanitized_failure = True
     if sanitized_failure:
