@@ -99,6 +99,7 @@ ORDER BY tc.table_schema, tc.table_name, tc.constraint_name, kcu.ordinal_positio
 """
 
 _SUPPORTED_QUERY_PARAMS = {"catalog", "schema"}
+_PROVIDER_HOST_SUFFIXES = (".databricks.com", ".azuredatabricks.net")
 
 
 @dataclass(frozen=True)
@@ -164,9 +165,18 @@ async def _parse_databricks_dsn(dsn: str) -> DatabricksDsnConfig:
     if not catalog:
         raise ValueError("Databricks DSN must include a catalog query parameter")
 
-    await _validated_ip_hosts(parsed.hostname, is_hostaddr=False, port=443)
+    hostname = parsed.hostname.lower()
+    if not any(
+        hostname.endswith(suffix) and len(hostname) > len(suffix)
+        for suffix in _PROVIDER_HOST_SUFFIXES
+    ):
+        raise ValueError(
+            "Databricks DSN must use a provider-owned workspace hostname"
+        )
+
+    await _validated_ip_hosts(hostname, is_hostaddr=False, port=443)
     return DatabricksDsnConfig(
-        server_hostname=parsed.hostname,
+        server_hostname=hostname,
         http_path=http_path,
         access_token=unquote(parsed.password),
         catalog=catalog,
@@ -338,12 +348,16 @@ def _build_snapshot(
             continue
         ordered = sorted(rows, key=lambda row: _int_or_zero(row.get("ordinal_position")))
         kind = _constraint_type(ordered[0].get("constraint_type"))
-        names = [
-            column
-            for row in ordered
-            if (column := _text(row.get("column_name"))) is not None
-        ]
-        attnums = [positions[(schema, table)][column] for column in names]
+        known_positions = positions[(schema, table)]
+        names: list[str] = []
+        for row in ordered:
+            column = _text(row.get("column_name"))
+            if column is None or column not in known_positions:
+                break
+            names.append(column)
+        if not names or len(names) != len(ordered):
+            continue
+        attnums = [known_positions[column] for column in names]
         constraint_oid = len(constraints) + 1
         referenced_schema = _text(ordered[0].get("referenced_table_schema"))
         referenced_table = _text(ordered[0].get("referenced_table_name"))
@@ -388,7 +402,7 @@ def _build_snapshot(
                 "constraint_enforced": str(ordered[0].get("enforced") or "NO").upper()
                 == "YES",
                 "constraint_deferrable": str(
-                    ordered[0].get("is_deferrable") or "YES"
+                    ordered[0].get("is_deferrable") or "NO"
                 ).upper()
                 == "YES",
                 "constraint_initially_deferred": str(

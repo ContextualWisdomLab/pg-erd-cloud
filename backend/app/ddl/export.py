@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Literal
 
 DdlDialect = Literal["postgresql", "snowflake"]
@@ -41,7 +42,9 @@ def _snapshot_source_dialect(snapshot: dict) -> DdlDialect:
     return "postgresql"
 
 
-def reject_unsupported_snapshot_source(snapshot: dict, operation: str) -> None:
+def reject_unsupported_snapshot_source(
+    snapshot: Mapping[str, object], operation: str
+) -> None:
     """Reject known source dialects that have no deterministic DDL mapping."""
     for key in ("source_dialect", "database_dialect", "dialect"):
         value = snapshot.get(key)

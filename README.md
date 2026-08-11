@@ -21,8 +21,9 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
   형식으로 Unity Catalog의 schema/table/view/column과 PK/UNIQUE/FK 메타데이터를
   고정된 읽기 전용 쿼리로 수집합니다. 실행 환경에는 선택 의존성
   `databricks-sql-connector`가 필요합니다. Unity Catalog가 필수이며 제약조건
-  Information Schema는 Public Preview입니다. index/CHECK와 Databricks SQL apply는
-  지원하지 않고 스냅샷 capability에 명시합니다. 자세한 범위와 운영 제한은
+  Information Schema는 Public Preview입니다. 연결 호스트는 Databricks 운영
+  도메인만 허용하며 index/CHECK와 Databricks SQL apply는 지원하지 않고 스냅샷
+  capability에 명시합니다. 자세한 범위와 운영 제한은
   [`docs/databricks-reverse-engineering.md`](docs/databricks-reverse-engineering.md)를
   참고하세요.
 - **ERD UI**: React Flow(MIT)로 PK/FK·그룹·검색·레이아웃을 그래픽으로 렌더링

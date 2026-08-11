@@ -147,6 +147,13 @@ async def test_parse_databricks_dsn_is_strict_and_ssrf_guarded(
     assert config.schema == "sales"
     assert guarded == [("workspace.cloud.databricks.com", False, 443)]
 
+    with pytest.raises(ValueError, match="provider-owned workspace hostname"):
+        await databricks_introspect_module._parse_databricks_dsn(
+            "databricks://token:secret@attacker.example/"
+            "sql/1.0/warehouses/abc?catalog=main"
+        )
+    assert guarded == [("workspace.cloud.databricks.com", False, 443)]
+
     with pytest.raises(ValueError, match="unsupported Databricks DSN query parameter"):
         await databricks_introspect_module._parse_databricks_dsn(
             "databricks://token:secret@workspace.cloud.databricks.com/"
@@ -212,9 +219,14 @@ async def test_introspect_databricks_builds_bounded_common_snapshot(
     }
 
 
-def test_databricks_snapshot_ddl_and_migration_fail_closed() -> None:
+@pytest.mark.parametrize(
+    "dialect_key", ["source_dialect", "database_dialect", "dialect"]
+)
+def test_databricks_snapshot_ddl_and_migration_fail_closed(
+    dialect_key: str,
+) -> None:
     snapshot = {
-        "source_dialect": "databricks",
+        dialect_key: "databricks",
         "relations": [],
         "columns": [],
         "constraints": [],
@@ -224,6 +236,74 @@ def test_databricks_snapshot_ddl_and_migration_fail_closed() -> None:
         snapshot_json_to_sql(snapshot)
     with pytest.raises(ValueError, match="Databricks snapshot migration"):
         snapshot_diff_to_migration_sql({}, snapshot)
+    with pytest.raises(ValueError, match="Databricks snapshot migration"):
+        snapshot_diff_to_migration_sql(snapshot, {})
+
+
+def test_snapshot_skips_constraints_with_unknown_columns_and_defaults_flags() -> None:
+    snapshot = databricks_introspect_module._build_snapshot(
+        databricks_introspect_module.DatabricksDsnConfig(
+            server_hostname="workspace.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/abc",
+            access_token="secret",  # noqa: S106 - inert unit-test fixture
+            catalog="main",
+            schema="sales",
+        ),
+        "sales",
+        [],
+        [{"schema_name": "sales"}],
+        [
+            {
+                "table_schema": "sales",
+                "table_name": "customers",
+                "table_type": "MANAGED",
+            }
+        ],
+        [
+            {
+                "table_schema": "sales",
+                "table_name": "customers",
+                "ordinal_position": 1,
+                "column_name": "customer_id",
+                "full_data_type": "BIGINT",
+                "is_nullable": "NO",
+            }
+        ],
+        [
+            {
+                "constraint_schema": "sales",
+                "constraint_name": "customers_missing_pk",
+                "constraint_type": "PRIMARY KEY",
+                "table_schema": "sales",
+                "table_name": "customers",
+                "column_name": "customer_id",
+                "ordinal_position": 1,
+            },
+            {
+                "constraint_schema": "sales",
+                "constraint_name": "customers_missing_pk",
+                "constraint_type": "PRIMARY KEY",
+                "table_schema": "sales",
+                "table_name": "customers",
+                "column_name": "privilege_filtered_column",
+                "ordinal_position": 2,
+            },
+            {
+                "constraint_schema": "sales",
+                "constraint_name": "customers_unique",
+                "constraint_type": "UNIQUE",
+                "table_schema": "sales",
+                "table_name": "customers",
+                "column_name": "customer_id",
+                "ordinal_position": 1,
+            },
+        ],
+    )
+
+    assert [row["constraint_name"] for row in snapshot["constraints"]] == [
+        "customers_unique"
+    ]
+    assert snapshot["constraints"][0]["constraint_deferrable"] is False
 
 
 @pytest.mark.asyncio
