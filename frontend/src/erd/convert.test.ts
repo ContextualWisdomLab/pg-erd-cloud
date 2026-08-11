@@ -93,6 +93,9 @@ describe('snapshotToGraph', () => {
 
     expect(graph.nodes.find((n) => n.id === '2')?.data.badges.fk).toBe(true)
     expect(graph.nodes.find((n) => n.id === '1')?.data.badges.fk).toBe(false)
+    expect(graph.nodes.find((n) => n.id === '2')!.position.x).toBeLessThan(
+      graph.nodes.find((n) => n.id === '1')!.position.x,
+    )
   })
 
   it('identifies composite foreign keys correctly via fk_edges', () => {
