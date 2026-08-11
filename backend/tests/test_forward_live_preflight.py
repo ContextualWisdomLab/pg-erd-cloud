@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
 from app.forward.live_preflight import (
     LivePreflightContractError,
+    compare_live_preflight_snapshot,
     compile_live_preflight_queries,
     execute_live_preflight,
 )
+from app.forward.schema_model import schema_model_digest
+from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 
 def _plan(*preconditions: Mapping[str, object]) -> dict[str, object]:
@@ -23,6 +27,73 @@ def _plan(*preconditions: Mapping[str, object]) -> dict[str, object]:
             }
         ],
     }
+
+
+def _snapshot() -> dict[str, Any]:
+    return {
+        "snapshot_contract_version": 1,
+        "server_version_num": 180002,
+        "schemas": [{"schema_oid": 11, "schema_name": "Sales Data"}],
+        "relations": [
+            {
+                "relation_oid": 42,
+                "schema_name": "Sales Data",
+                "relation_name": 'Order "Item"',
+                "relation_kind": "r",
+            }
+        ],
+        "columns": [
+            {
+                "relation_oid": 42,
+                "column_name": "Item ID",
+                "data_type": "bigint",
+                "is_not_null": True,
+                "column_position": 1,
+            }
+        ],
+        "pk_columns": [],
+        "constraints": [],
+        "fk_edges": [],
+        "indexes": [],
+    }
+
+
+def test_compares_strict_snapshot_digest_without_execution_authority() -> None:
+    snapshot = _snapshot()
+    observed_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan = _plan()
+    plan["base_digest"] = observed_digest
+
+    assert compare_live_preflight_snapshot(plan, snapshot) == {
+        "observed_base_digest": observed_digest,
+        "matches_plan_base": True,
+    }
+
+    snapshot["relations"][0]["relation_name"] = "Changed"
+    drifted_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    assert compare_live_preflight_snapshot(plan, snapshot) == {
+        "observed_base_digest": drifted_digest,
+        "matches_plan_base": False,
+    }
+
+
+@pytest.mark.parametrize("base_digest", [None, True, "A" * 64, "a" * 63])
+def test_rejects_invalid_planned_base_digest(base_digest: object) -> None:
+    plan = _plan()
+    plan["base_digest"] = base_digest
+
+    with pytest.raises(LivePreflightContractError, match="base digest is invalid"):
+        compare_live_preflight_snapshot(plan, _snapshot())
+
+
+def test_snapshot_comparison_fails_closed_for_unsupported_target_semantics() -> None:
+    snapshot = _snapshot()
+    snapshot["relations"][0]["relation_kind"] = "v"
+    plan = _plan()
+    plan["base_digest"] = "a" * 64
+
+    with pytest.raises(LivePreflightContractError, match="relation kind"):
+        compare_live_preflight_snapshot(plan, snapshot)
 
 
 def test_compiles_bounded_preconditions_with_postgresql_identifier_quoting() -> None:

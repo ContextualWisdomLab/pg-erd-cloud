@@ -3,12 +3,13 @@
 This module is an execution-neutral primitive for the planned dry-run worker.
 It consumes only the structured preconditions already bound into an immutable
 migration plan.  It neither accepts arbitrary SQL nor owns target credentials,
-run transitions, snapshot digest comparison, or apply authority.
+fresh snapshot capture, run transitions, or apply authority.
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -18,10 +19,13 @@ import asyncpg
 from app.forward.schema_model import (
     SchemaModelValidationError,
     canonicalize_data_type,
+    schema_model_digest,
 )
+from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 MAX_LIVE_PREFLIGHT_QUERIES = 1000
 MAX_STATEMENT_TIMEOUT_MS = 60_000
+_SHA256_HEX_RE = re.compile(r"[0-9a-f]{64}")
 
 
 class LivePreflightContractError(ValueError):
@@ -36,6 +40,31 @@ class LivePreflightQuery:
     precondition_index: int
     kind: str
     sql: str
+
+
+def compare_live_preflight_snapshot(
+    plan: Mapping[str, object], snapshot: Mapping[str, Any]
+) -> dict[str, object]:
+    """Compare one strictly adapted target snapshot with the planned base.
+
+    The caller owns fresh capture, connection authorization, and durable state
+    transitions. This pure boundary only rejects malformed inputs and returns
+    the canonical observed digest plus an explicit match result.
+    """
+
+    expected_digest = plan.get("base_digest")
+    if not isinstance(expected_digest, str) or _SHA256_HEX_RE.fullmatch(
+        expected_digest
+    ) is None:
+        raise LivePreflightContractError("live preflight base digest is invalid")
+    try:
+        observed_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    except SchemaModelValidationError as err:
+        raise LivePreflightContractError(str(err)) from None
+    return {
+        "observed_base_digest": observed_digest,
+        "matches_plan_base": observed_digest == expected_digest,
+    }
 
 
 def _quote_identifier(identifier: object) -> str:

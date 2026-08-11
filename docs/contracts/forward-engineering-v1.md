@@ -45,10 +45,12 @@ Current code implements only the first control-plane slice:
   remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
-  them in one timed read-only transaction. It has no credential, worker,
-  fingerprint, run-transition, or DDL authority.
+  them in one timed read-only transaction. It strictly adapts a caller-supplied
+  snapshot and compares its canonical digest with the plan base, but has no
+  credential, worker-owned fresh-capture, run-transition, or DDL authority.
 - **Planned:** apply creation and all workers, isolated dry run, complete live
-  preflight and target-fingerprint revalidation, structured execution,
+  preflight fresh-capture/attempt binding and apply-time fingerprint
+  revalidation, structured execution,
   idempotency/cancellation/recovery, post-apply convergence, and all frontend
   workflow surfaces.
 - **Rejected for v1:** browser-authored SQL in the graphical workflow,

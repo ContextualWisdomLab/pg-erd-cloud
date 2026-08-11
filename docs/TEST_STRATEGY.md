@@ -187,9 +187,10 @@ failure, bounded timing, and fixed non-secret lifecycle logs. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,
-server/client timeout bounds, boolean-only evidence, rollback, and fixed
-non-secret database failures. Real-target privilege/audit assertions, fresh
-fingerprint binding, and worker failure/recovery remain release blockers. The
+server/client timeout bounds, boolean-only evidence, rollback, fixed non-secret
+database failures, and strict snapshot-to-plan-base canonical digest comparison.
+Real-target privilege/audit assertions, worker-owned fresh capture/attempt
+binding, and worker failure/recovery remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup
 wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.

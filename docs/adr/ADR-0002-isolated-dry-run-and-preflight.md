@@ -97,6 +97,8 @@ locks on the execution connection.
   server-owned quoted reads. It enforces a 1,000-query ceiling, PostgreSQL type
   validation, one read-only repeatable-read transaction, bounded server/client
   timeouts, boolean-only evidence, and fixed non-secret database failures.
+  It also adapts a caller-supplied snapshot through the strict capability
+  boundary and returns only its canonical digest plus exact plan-base match.
   This is a primitive, not a worker or completed live-preflight claim.
 
 ### Planned before production release
@@ -104,7 +106,8 @@ locks on the execution connection.
 - isolated sandbox provisioning, execution, cleanup, and egress enforcement;
 - application worker wiring with a separately constrained read-only target
   identity and guarded connection lifecycle;
-- digest comparison against a fresh target snapshot;
+- worker-owned fresh target capture and binding to the same authorized
+  connection/attempt before invoking the implemented digest comparison;
 - durable, redacted evidence and a frontend presentation of both evidence
   classes.
 

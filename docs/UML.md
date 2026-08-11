@@ -54,7 +54,7 @@ Current authority boundaries:
   accepted production workflow.
 
 Components deliberately absent from this current diagram are **Planned**:
-isolated sandbox provisioning, live-preflight worker/fresh-fingerprint binding,
+isolated sandbox provisioning, live-preflight worker-owned fresh-capture binding,
 plan execution, reconciliation, and post-apply convergence verification.
 Durable `migration_run`/event/outbox persistence and an execution-neutral,
 bounded read-only precondition primitive are **Partially implemented**; neither
