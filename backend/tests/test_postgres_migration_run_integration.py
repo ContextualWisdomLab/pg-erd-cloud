@@ -62,29 +62,38 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert server_version_num // 10_000 == int(
                 os.environ["EXPECTED_POSTGRES_MAJOR"]
             )
+            session.add(
+                UserAccount(
+                    user_account_uuid=user_uuid,
+                    oidc_subject=f"integration:{user_uuid}",
+                    display_name="PostgreSQL integration",
+                    created_at=now,
+                )
+            )
+            await session.flush()
+            session.add(
+                ProjectSpace(
+                    project_space_uuid=project_uuid,
+                    project_name="migration run integration",
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
+            )
+            await session.flush()
+            session.add(
+                DbConnection(
+                    db_connection_uuid=connection_uuid,
+                    project_space_uuid=project_uuid,
+                    conn_name="integration target",
+                    dsn_ciphertext=b"not-used",
+                    dsn_nonce=b"not-used",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await session.flush()
             session.add_all(
                 [
-                    UserAccount(
-                        user_account_uuid=user_uuid,
-                        oidc_subject=f"integration:{user_uuid}",
-                        display_name="PostgreSQL integration",
-                        created_at=now,
-                    ),
-                    ProjectSpace(
-                        project_space_uuid=project_uuid,
-                        project_name="migration run integration",
-                        created_by_user_uuid=user_uuid,
-                        created_at=now,
-                    ),
-                    DbConnection(
-                        db_connection_uuid=connection_uuid,
-                        project_space_uuid=project_uuid,
-                        conn_name="integration target",
-                        dsn_ciphertext=b"not-used",
-                        dsn_nonce=b"not-used",
-                        created_at=now,
-                        updated_at=now,
-                    ),
                     SchemaSnapshot(
                         schema_snapshot_uuid=snapshot_uuid,
                         project_space_uuid=project_uuid,
@@ -105,21 +114,24 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                         created_at=now,
                         updated_at=now,
                     ),
-                    SchemaModelRevision(
-                        schema_model_revision_uuid=revision_uuid,
-                        schema_model_uuid=model_uuid,
-                        revision_number=1,
-                        revision_digest=plan_json["target_digest"],
-                        model_json={
-                            "format_version": 1,
-                            "postgresql_major": 18,
-                            "schemas": [],
-                        },
-                        base_schema_snapshot_uuid=snapshot_uuid,
-                        created_by_user_uuid=user_uuid,
-                        created_at=now,
-                    ),
                 ]
+            )
+            await session.flush()
+            session.add(
+                SchemaModelRevision(
+                    schema_model_revision_uuid=revision_uuid,
+                    schema_model_uuid=model_uuid,
+                    revision_number=1,
+                    revision_digest=plan_json["target_digest"],
+                    model_json={
+                        "format_version": 1,
+                        "postgresql_major": 18,
+                        "schemas": [],
+                    },
+                    base_schema_snapshot_uuid=snapshot_uuid,
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
             )
             await session.flush()
             plan = MigrationPlan(
