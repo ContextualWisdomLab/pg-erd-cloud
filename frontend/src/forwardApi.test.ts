@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import {
   cancelMigrationRun,
@@ -7,6 +7,7 @@ import {
   getMigrationPlan,
   getMigrationRun,
 } from './api'
+import type { MigrationPlan } from './types'
 
 function response(payload: unknown, ok = true, status = ok ? 200 : 500): Response {
   return {
@@ -23,6 +24,40 @@ describe('Forward Engineering API client', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('exposes the server-authoritative structured statement contract', () => {
+    expectTypeOf<MigrationPlan['statements'][number]>().toMatchTypeOf<{
+      kind: string
+      target: string
+      object_ref: {
+        database: string | null
+        schema_name: string | null
+        table_name: string | null
+        column_name: string | null
+      }
+      sql: string
+      transactional: boolean
+      dependencies: ReadonlyArray<string>
+      dependency_refs: ReadonlyArray<Readonly<Record<string, string | null>>>
+      reversible: boolean
+      risk: {
+        severity: 'safe' | 'warning' | 'destructive'
+        lock_mode: string
+        possible_rewrite: boolean
+        table_scan: boolean
+        data_loss: boolean
+        detail: string
+      }
+      required_privileges: ReadonlyArray<string>
+      preconditions: ReadonlyArray<Readonly<Record<string, unknown>>>
+    }>()
+    expectTypeOf<MigrationPlan['blockers'][number]>().toMatchTypeOf<{
+      code: string
+      object: string
+      object_ref: Readonly<Record<string, string | null>>
+      detail: string
+    }>()
   })
 
   it('reads immutable plans and durable run evidence with credentials', async () => {

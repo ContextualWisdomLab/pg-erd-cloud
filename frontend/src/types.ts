@@ -116,6 +116,43 @@ export type MigrationRunState =
   | 'applied_with_drift'
   | 'outcome_unknown'
 
+export type MigrationPlanObjectRef = Readonly<{
+  database: string | null
+  schema_name: string | null
+  table_name: string | null
+  column_name: string | null
+}>
+
+export type MigrationPlanRisk = Readonly<{
+  severity: 'safe' | 'warning' | 'destructive'
+  lock_mode: string
+  possible_rewrite: boolean
+  table_scan: boolean
+  data_loss: boolean
+  detail: string
+}>
+
+export type MigrationPlanStatement = Readonly<{
+  kind: string
+  target: string
+  object_ref: MigrationPlanObjectRef
+  sql: string
+  transactional: boolean
+  dependencies: ReadonlyArray<string>
+  dependency_refs: ReadonlyArray<MigrationPlanObjectRef>
+  reversible: boolean
+  risk: MigrationPlanRisk
+  required_privileges: ReadonlyArray<string>
+  preconditions: ReadonlyArray<Readonly<Record<string, unknown>>>
+}>
+
+export type MigrationPlanBlocker = Readonly<{
+  code: string
+  object: string
+  object_ref: MigrationPlanObjectRef
+  detail: string
+}>
+
 export type MigrationPlan = {
   migration_plan_uuid: string
   project_space_uuid: string
@@ -132,9 +169,9 @@ export type MigrationPlan = {
   created_at: string
   can_dry_run: boolean
   requires_destructive_confirmation: boolean
-  statements: ReadonlyArray<Readonly<Record<string, unknown>>>
-  proposed_statements: ReadonlyArray<Readonly<Record<string, unknown>>>
-  blockers: ReadonlyArray<Readonly<Record<string, unknown>>>
+  statements: ReadonlyArray<MigrationPlanStatement>
+  proposed_statements: ReadonlyArray<MigrationPlanStatement>
+  blockers: ReadonlyArray<MigrationPlanBlocker>
   risk_summary: Readonly<{ safe: number; warning: number; destructive: number }>
   expires_at: string
 }
