@@ -81,8 +81,10 @@ operational artifact is attached to the release record.
   lease ownership. The ready payload remains UUID-only. It does not load plans,
   credentials, SQL, or target data. Application startup wiring and worker
   execution remain **Planned**.
-- [ ] A future worker schedules bounded heartbeat calls to the implemented
-  renewal primitive and treats renewal loss as cancellation of its authority.
+- [x] Automatic heartbeat is **Implemented** in the execution-neutral consumer.
+  It renews only the exact claim while the injected handler runs, cancels and
+  retrieves the handler task on renewal loss, and never acknowledges that loss
+  as success. No consumer startup wiring or execution worker is implied.
 - [ ] Relay deployment restart/failover, application consumer wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

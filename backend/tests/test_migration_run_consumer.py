@@ -144,6 +144,92 @@ async def test_consumer_fails_closed_when_exact_lease_cannot_be_completed() -> N
 
 
 @pytest.mark.asyncio
+async def test_consumer_renews_exact_lease_while_handler_runs() -> None:
+    """Long-running work renews its own claim before acknowledgement."""
+
+    claim = MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4())
+    handler_can_finish = asyncio.Event()
+
+    async def handler(
+        _factory: Callable[[], AsyncSession], actual_claim: MigrationRunSignalClaim
+    ) -> None:
+        assert actual_claim == claim
+        await handler_can_finish.wait()
+
+    async def renew(
+        actual_claim: MigrationRunSignalClaim, **_kwargs: object
+    ) -> bool:
+        assert actual_claim == claim
+        handler_can_finish.set()
+        return True
+
+    with patch(
+        "app.jobs.migration_run_consumer.claim_due_migration_run_signal",
+        new=AsyncMock(return_value=claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_signal",
+        new=AsyncMock(side_effect=renew),
+    ) as renewal, patch(
+        "app.jobs.migration_run_consumer.ack_migration_run_signal",
+        new=AsyncMock(return_value=True),
+    ) as ack, patch(
+        "app.jobs.migration_run_consumer.release_migration_run_signal",
+        new=AsyncMock(),
+    ) as release:
+        assert await process_one_migration_run_signal(
+            _session_factory,
+            handler,
+            lease_seconds=0.1,
+            heartbeat_interval_s=0.01,
+        )
+
+    renewal.assert_awaited_once_with(claim, lease_seconds=0.1)
+    ack.assert_awaited_once_with(claim)
+    release.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_consumer_cancels_handler_when_exact_renewal_is_lost() -> None:
+    """Lease loss removes handler authority and cannot become success or retry."""
+
+    claim = MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4())
+    cancelled = asyncio.Event()
+
+    async def handler(
+        _factory: Callable[[], AsyncSession], _claim: MigrationRunSignalClaim
+    ) -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    with patch(
+        "app.jobs.migration_run_consumer.claim_due_migration_run_signal",
+        new=AsyncMock(return_value=claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_signal",
+        new=AsyncMock(return_value=False),
+    ), patch(
+        "app.jobs.migration_run_consumer.ack_migration_run_signal",
+        new=AsyncMock(),
+    ) as ack, patch(
+        "app.jobs.migration_run_consumer.release_migration_run_signal",
+        new=AsyncMock(),
+    ) as release:
+        with pytest.raises(MigrationRunSignalLeaseLost, match="renewal"):
+            await process_one_migration_run_signal(
+                _session_factory,
+                handler,
+                lease_seconds=0.1,
+                heartbeat_interval_s=0.01,
+            )
+
+    assert cancelled.is_set()
+    ack.assert_not_awaited()
+    release.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_consumer_empty_queue_and_invalid_timing_are_io_free() -> None:
     """An empty queue sleeps, while invalid bounds fail before signal I/O."""
 
@@ -170,6 +256,14 @@ async def test_consumer_empty_queue_and_invalid_timing_are_io_free() -> None:
                     _session_factory,
                     handler,
                     retry_delay_s=retry_delay,
+                )
+        for heartbeat_interval in (0, float("inf"), 60):
+            with pytest.raises(ValueError, match="heartbeat interval"):
+                await process_one_migration_run_signal(
+                    _session_factory,
+                    handler,
+                    lease_seconds=60,
+                    heartbeat_interval_s=heartbeat_interval,
                 )
         with pytest.raises(ValueError, match="include a timezone"):
             await process_one_migration_run_signal(

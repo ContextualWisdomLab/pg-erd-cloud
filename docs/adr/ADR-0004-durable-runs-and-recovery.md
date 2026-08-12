@@ -52,9 +52,11 @@ consumer invokes only an injected handler with the exact signal claim (run UUID
 plus opaque lease-token), acknowledges after success, releases that exact lease
 at a bounded retry time after a sanitized failure, and treats lost
 acknowledgement or release ownership as non-success. The ready payload remains
-UUID-only. It does not load execution material, access a target, or execute SQL,
-and is not wired into application startup.
-Automatic heartbeat and DB-durable worker-attempt acquisition remain Planned.
+UUID-only. Automatic heartbeat is **Implemented** around the injected handler:
+renewal loss cancels and retrieves its task and cannot be acknowledged as
+success. The consumer still does not load execution material, access a target,
+or execute SQL, and is not wired into application startup. DB-durable
+worker-attempt acquisition remains Planned.
 
 Each run binds:
 

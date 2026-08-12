@@ -189,8 +189,9 @@ The same real-service test moves a due UUID from ready to processing under an
 exact lease-token, performs monotonic exact lease renewal, rejects stale
 renewal and acknowledgement, releases for retry,
 reclaims with a new token, and acknowledges cleanly. Focused consumer tests
-prove handler-before-ack ordering, exact-lease retry release, lost-lease
-failure, bounded timing, and fixed non-secret lifecycle logs. The
+prove handler-before-ack ordering, exact-lease retry release, heartbeat
+renewal, handler cancellation and task retrieval on lease loss, bounded
+timing, and fixed non-secret lifecycle logs. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,

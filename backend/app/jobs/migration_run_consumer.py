@@ -9,6 +9,7 @@ payloads from becoming plan, credential, or SQL authority.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
 import math
@@ -23,7 +24,9 @@ from app.jobs.valkey_queue import (
     ack_migration_run_signal,
     claim_due_migration_run_signal,
     release_migration_run_signal,
+    renew_migration_run_signal,
 )
+from app.settings import settings
 
 _logger = logging.getLogger(__name__)
 
@@ -61,12 +64,74 @@ async def _handler_succeeded_without_retaining_error(
     return True
 
 
+async def _renew_claim_until_cancelled(
+    claim: MigrationRunSignalClaim,
+    *,
+    heartbeat_interval_s: float,
+    lease_seconds: float,
+) -> None:
+    """Keep one exact claim live until cancelled or ownership is lost."""
+
+    while True:
+        await sleep(heartbeat_interval_s)
+        if not await renew_migration_run_signal(
+            claim, lease_seconds=lease_seconds
+        ):
+            raise MigrationRunSignalLeaseLost(
+                "migration run renewal lost its exact lease"
+            )
+
+
+async def _run_handler_under_exact_lease(
+    handler: MigrationRunHandler,
+    session_factory: Callable[[], AsyncSession],
+    claim: MigrationRunSignalClaim,
+    *,
+    heartbeat_interval_s: float,
+    lease_seconds: float,
+) -> bool:
+    """Cancel handler authority immediately when exact renewal is lost."""
+
+    handler_task = asyncio.create_task(
+        _handler_succeeded_without_retaining_error(handler, session_factory, claim)
+    )
+    heartbeat_task = asyncio.create_task(
+        _renew_claim_until_cancelled(
+            claim,
+            heartbeat_interval_s=heartbeat_interval_s,
+            lease_seconds=lease_seconds,
+        )
+    )
+    try:
+        done, _ = await asyncio.wait(
+            {handler_task, heartbeat_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if heartbeat_task in done:
+            handler_task.cancel()
+            await asyncio.gather(handler_task, return_exceptions=True)
+            heartbeat_task.result()
+            raise MigrationRunSignalLeaseLost(
+                "migration run renewal ended without handler completion"
+            )
+        heartbeat_task.cancel()
+        await asyncio.gather(heartbeat_task, return_exceptions=True)
+        return handler_task.result()
+    finally:
+        for task in (handler_task, heartbeat_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(handler_task, heartbeat_task, return_exceptions=True)
+
+
 async def process_one_migration_run_signal(
     session_factory: Callable[[], AsyncSession],
     handler: MigrationRunHandler,
     *,
     now: dt.datetime | None = None,
     retry_delay_s: float = 5.0,
+    lease_seconds: float | None = None,
+    heartbeat_interval_s: float | None = None,
 ) -> bool:
     """Process one exact signal lease and return whether work was claimed.
 
@@ -79,16 +144,38 @@ async def process_one_migration_run_signal(
     """
 
     _validate_interval(retry_delay_s, label="retry delay", maximum=3600)
+    duration = (
+        settings.migration_run_signal_lease_seconds
+        if lease_seconds is None
+        else lease_seconds
+    )
+    _validate_interval(duration, label="lease", maximum=3600)
+    heartbeat = duration / 3 if heartbeat_interval_s is None else heartbeat_interval_s
+    _validate_interval(
+        heartbeat,
+        label="heartbeat interval",
+        maximum=duration,
+    )
+    if heartbeat >= duration:
+        raise ValueError(
+            "migration run consumer heartbeat interval must be shorter than lease"
+        )
     current = now or dt.datetime.now(dt.timezone.utc)
     if current.tzinfo is None or current.utcoffset() is None:
         raise ValueError("migration run consumer time must include a timezone")
 
-    claim = await claim_due_migration_run_signal(now=current)
+    claim = await claim_due_migration_run_signal(
+        now=current, lease_seconds=duration
+    )
     if claim is None:
         return False
 
-    if not await _handler_succeeded_without_retaining_error(
-        handler, session_factory, claim
+    if not await _run_handler_under_exact_lease(
+        handler,
+        session_factory,
+        claim,
+        heartbeat_interval_s=heartbeat,
+        lease_seconds=duration,
     ):
         retry_at = current + dt.timedelta(seconds=retry_delay_s)
         if not await release_migration_run_signal(claim, retry_at):

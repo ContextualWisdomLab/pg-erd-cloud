@@ -137,6 +137,9 @@ Adequacy labels in this audit mean:
   releases only that lease at a bounded retry score, and lease loss is
   non-success. The ready payload remains UUID-only. The contract loads no plan,
   credential, SQL, or target value.
+- **Implemented — automatic heartbeat:** the consumer renews the exact claim
+  while its handler runs, cancels and retrieves that task on renewal loss, and
+  cannot acknowledge the lost lease as success.
 - **Planned — application consumer wiring, worker execution, failover, and retention:**
   no startup task consumes migration signals, accesses a target, or executes
   SQL. Sandbox/preflight/apply workers and public apply-run creation remain absent.

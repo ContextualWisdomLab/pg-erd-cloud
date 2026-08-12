@@ -72,9 +72,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   contract is **Implemented**: an injected handler receives the exact signal
   claim (run UUID plus opaque lease-token) and must succeed before exact-lease
   acknowledgement; sanitized failure releases only that lease at a bounded
-  retry score. The queue payload remains UUID-only. Application startup wiring,
-  automatic heartbeat, and worker execution remain
-  **Planned**;
+  retry score. The queue payload remains UUID-only. Automatic heartbeat is
+  **Implemented**: exact renewal runs while the injected handler is active;
+  renewal loss cancels and retrieves the handler task and is never
+  acknowledged as success. Application startup wiring, DB-durable
+  worker-attempt acquisition, and worker execution remain **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - `complete_isolated_dry_run` revalidates an exact successful executor result

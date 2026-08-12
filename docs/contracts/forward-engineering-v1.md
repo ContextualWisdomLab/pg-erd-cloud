@@ -157,8 +157,11 @@ signal claim (the run UUID plus its opaque lease-token), acknowledges only
 after success, releases the exact lease on a sanitized failure, and fails
 closed when either completion loses lease ownership. The ready-queue payload
 remains UUID-only; the token is processing metadata, not execution authority.
-Renewal never shortens an existing expiry. Automatic heartbeat, application
-startup wiring, and worker execution remain **Planned**. The bounded
+Renewal never shortens an existing expiry. Automatic heartbeat is
+**Implemented**: the consumer renews while its injected handler runs, cancels
+the handler when exact renewal is lost, and never acknowledges that loss as
+success. Application startup wiring, DB-durable worker-attempt acquisition,
+and worker execution remain **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
