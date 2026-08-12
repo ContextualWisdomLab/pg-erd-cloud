@@ -383,6 +383,7 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
     for document in (contract, trd, runbook):
         assert "exact lease-token" in document
         assert "exact signal claim" in document
+        assert "exact lease renewal" in document
         assert "execution-neutral consumer contract is **implemented**" in document
         assert (
             "application startup wiring and worker execution remain **planned**"
@@ -390,9 +391,11 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
         )
 
     consumer = _read(Path("backend/app/jobs/migration_run_consumer.py"))
+    queue = _read(Path("backend/app/jobs/valkey_queue.py"))
     main = _read(Path("backend/app/main.py"))
     assert "process_one_migration_run_signal" in consumer
     assert "run_migration_run_consumer_forever" in consumer
+    assert "renew_migration_run_signal" in queue
     assert "run_migration_run_consumer_forever" not in main
 
 

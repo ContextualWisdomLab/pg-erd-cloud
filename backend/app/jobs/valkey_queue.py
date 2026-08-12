@@ -57,6 +57,20 @@ redis.call('HDEL', KEYS[2], ARGV[1])
 return removed
 """
 
+_RENEW_MIGRATION_RUN_SIGNAL_SCRIPT = """
+if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[2] then
+  return 0
+end
+local current_expiry = redis.call('ZSCORE', KEYS[1], ARGV[1])
+if not current_expiry then
+  return 0
+end
+if tonumber(ARGV[3]) > tonumber(current_expiry) then
+  redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+end
+return 1
+"""
+
 _RELEASE_MIGRATION_RUN_SIGNAL_SCRIPT = """
 if redis.call('HGET', KEYS[3], ARGV[1]) ~= ARGV[2] then
   return 0
@@ -336,6 +350,47 @@ async def ack_migration_run_signal(claim: MigrationRunSignalClaim) -> bool:
         return int(removed) == 1
     except Exception:  # noqa: BLE001
         _logger.warning("valkey_migration_signal_ack_failed")
+        return False
+    finally:
+        if client is not None:
+            await _close_client(client)
+
+
+async def renew_migration_run_signal(
+    claim: MigrationRunSignalClaim,
+    *,
+    now: dt.datetime | None = None,
+    lease_seconds: float | None = None,
+) -> bool:
+    """Extend only the exact active lease without shortening its expiry."""
+
+    if not valkey_queue_enabled():
+        return False
+    _validate_migration_signal_keys()
+    current = now or dt.datetime.now(dt.timezone.utc)
+    _require_aware_migration_signal_time(current)
+    duration = (
+        settings.migration_run_signal_lease_seconds
+        if lease_seconds is None
+        else lease_seconds
+    )
+    if not math.isfinite(duration) or not 0 < duration <= 3600:
+        raise ValueError("migration run signal lease must be between 0 and 3600")
+    client: Any | None = None
+    try:
+        client = await _client()
+        renewed = await client.eval(
+            _RENEW_MIGRATION_RUN_SIGNAL_SCRIPT,
+            2,
+            settings.valkey_migration_run_processing_key,
+            settings.valkey_migration_run_lease_token_key,
+            str(claim.migration_run_uuid),
+            str(claim.lease_token),
+            current.timestamp() + duration,
+        )
+        return int(renewed) == 1
+    except Exception:  # noqa: BLE001
+        _logger.warning("valkey_migration_signal_renew_failed")
         return False
     finally:
         if client is not None:

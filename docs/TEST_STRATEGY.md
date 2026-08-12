@@ -186,7 +186,8 @@ generic and migration UUIDs occupy separate sorted sets and that popping a
 generic signal cannot consume the migration signal. Deployment restart/failover,
 consumer restart, and worker execution remain release-blocking evidence.
 The same real-service test moves a due UUID from ready to processing under an
-exact lease-token, rejects a stale acknowledgement, releases for retry,
+exact lease-token, performs monotonic exact lease renewal, rejects stale
+renewal and acknowledgement, releases for retry,
 reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, lost-lease
 failure, bounded timing, and fixed non-secret lifecycle logs. The

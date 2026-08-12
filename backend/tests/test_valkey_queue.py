@@ -328,6 +328,41 @@ async def test_migration_signal_ack_and_release_require_exact_lease_token(
 
 
 @pytest.mark.asyncio
+async def test_migration_signal_renewal_requires_exact_bounded_lease(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the current claimant can extend one processing lease."""
+
+    _enable_url_valkey(monkeypatch)
+    claim = valkey_queue.MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4())
+    stale = replace(claim, lease_token=uuid.uuid4())
+    now = dt.datetime(2026, 8, 11, 6, 2, tzinfo=dt.timezone.utc)
+    client = SimpleNamespace(
+        eval=AsyncMock(side_effect=[1, 0]),
+        aclose=AsyncMock(),
+    )
+    monkeypatch.setattr(valkey_queue, "_client", AsyncMock(return_value=client))
+
+    assert await valkey_queue.renew_migration_run_signal(
+        claim, now=now, lease_seconds=15.0
+    )
+    assert not await valkey_queue.renew_migration_run_signal(
+        stale, now=now, lease_seconds=15.0
+    )
+
+    assert client.eval.await_args_list[0].args == (
+        valkey_queue._RENEW_MIGRATION_RUN_SIGNAL_SCRIPT,
+        2,
+        settings.valkey_migration_run_processing_key,
+        settings.valkey_migration_run_lease_token_key,
+        str(claim.migration_run_uuid),
+        str(claim.lease_token),
+        now.timestamp() + 15.0,
+    )
+    assert client.aclose.await_count == 2
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("lease_seconds", [0.0, -1.0, float("inf"), 3600.1])
 async def test_migration_signal_claim_rejects_invalid_lease_before_io(
     monkeypatch: pytest.MonkeyPatch,
@@ -342,6 +377,11 @@ async def test_migration_signal_claim_rejects_invalid_lease_before_io(
     with pytest.raises(ValueError, match="lease must be between"):
         await valkey_queue.claim_due_migration_run_signal(
             lease_seconds=lease_seconds
+        )
+    with pytest.raises(ValueError, match="lease must be between"):
+        await valkey_queue.renew_migration_run_signal(
+            valkey_queue.MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4()),
+            lease_seconds=lease_seconds,
         )
 
     client_factory.assert_not_awaited()

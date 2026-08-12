@@ -69,9 +69,10 @@ operational artifact is attached to the release record.
   `MIGRATION_DISPATCH_RELAY_ENABLED=true`, and a positive
   `MIGRATION_DISPATCH_RELAY_POLL_INTERVAL_SECONDS` to enable it. This does not
   start a queue consumer, load a plan, or execute SQL.
-- [x] Atomic ready-to-processing claim, bounded expiry reclaim, acknowledgement,
-  and retry release use an exact lease-token. A stale claimant cannot complete
-  a successor lease, and the ready payload remains only
+- [x] Atomic ready-to-processing claim, bounded expiry reclaim, exact lease
+  renewal, acknowledgement, and retry release use an exact lease-token. A stale
+  claimant cannot extend or complete a successor lease, renewal cannot shorten
+  the current expiry, and the ready payload remains only
   `migration_run_uuid`.
 - [x] The execution-neutral consumer contract is **Implemented**. It calls one
   injected handler with the exact signal claim (run UUID plus opaque
@@ -80,6 +81,8 @@ operational artifact is attached to the release record.
   lease ownership. The ready payload remains UUID-only. It does not load plans,
   credentials, SQL, or target data. Application startup wiring and worker
   execution remain **Planned**.
+- [ ] A future worker schedules bounded heartbeat calls to the implemented
+  renewal primitive and treats renewal loss as cancellation of its authority.
 - [ ] Relay deployment restart/failover, application consumer wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

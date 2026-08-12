@@ -149,14 +149,16 @@ evidence JSON. The internal cancellation-intent writer and editor-authorized
 creation remains **Planned**. Lock-scoped due-order outbox claiming,
 attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
 **Implemented**. Atomic UUID-only ready-to-processing claim, expiry reclaim,
-acknowledgement, and retry release also use an exact lease-token so a stale
-claimant cannot complete a successor lease. The execution-neutral consumer
+exact lease renewal, acknowledgement, and retry release use an exact
+lease-token so a stale claimant cannot extend or complete a successor lease.
+The execution-neutral consumer
 contract is **Implemented**: it invokes one injected handler with the exact
 signal claim (the run UUID plus its opaque lease-token), acknowledges only
 after success, releases the exact lease on a sanitized failure, and fails
 closed when either completion loses lease ownership. The ready-queue payload
 remains UUID-only; the token is processing metadata, not execution authority.
-Application startup wiring and worker execution remain **Planned**. The bounded
+Renewal never shortens an existing expiry. Automatic heartbeat, application
+startup wiring, and worker execution remain **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
