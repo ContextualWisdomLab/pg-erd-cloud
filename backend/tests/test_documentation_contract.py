@@ -157,6 +157,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     run_surface = _read(
         Path("frontend/src/components/forward/RunStatusSurface.tsx")
     )
+    dry_run_intent = _read(
+        Path("frontend/src/components/forward/DryRunIntentPanel.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -210,6 +213,16 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "active = false",
     ):
         assert symbol in run_surface
+    for symbol in (
+        "createDryRun",
+        "plan.plan_digest",
+        "plan.can_dry_run",
+        "web-dry-run-",
+        "globalThis.crypto.randomUUID",
+        "inFlightRef",
+        "같은 요청 다시 시도",
+    ):
+        assert symbol in dry_run_intent
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
@@ -218,6 +231,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         assert "forward engineering modal shell is **partially implemented**" in normalized
         assert "run status and audit panel is **partially implemented**" in normalized
         assert "terminal-aware polling is **partially implemented**" in normalized
+        assert "dry-run intent control is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

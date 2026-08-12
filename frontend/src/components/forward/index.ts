@@ -1,5 +1,6 @@
 export { ForwardEngineeringModal } from './ForwardEngineeringModal'
 export { PlanReviewPanel } from './PlanReviewPanel'
 export { PlanReviewSurface } from './PlanReviewSurface'
+export { DryRunIntentPanel } from './DryRunIntentPanel'
 export { RunStatusPanel } from './RunStatusPanel'
 export { RunStatusSurface } from './RunStatusSurface'

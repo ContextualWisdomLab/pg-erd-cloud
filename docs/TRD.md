@@ -122,7 +122,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
   idempotency, cancellation, reconciliation, and post-apply verification;
 - frontend graph/model adapters and `ForwardEngineeringModal` workflow
-  orchestration (the actionless accessible modal shell is Partially implemented);
+  orchestration (the accessible modal shell and bounded exact-digest dry-run
+  intent control are Partially implemented; apply/recovery controls are absent);
 - real PostgreSQL integration, fault-injection, accessibility, and browser E2E.
 
 The legacy `POST /api/connections/{db_connection_uuid}/apply-sql` remains a
@@ -176,7 +177,12 @@ without buttons or execution authority. Its `PlanReviewSurface` wrapper exposes
 fixed loading/error/retry states and stale-response suppression is **Partially
 implemented** when a requested plan changes. The Forward Engineering modal
 shell is **Partially implemented** with focus entry/trap/restoration, Escape,
-and explicit close behavior; it contains no dry-run/apply control. The run
+and explicit close behavior. The dry-run intent control is **Partially
+implemented**: it exposes an action only for a server-runnable unblocked plan,
+submits only its UUID and exact digest, admits one request at a time, preserves
+the bounded idempotency key across ambiguous retry, ignores stale responses,
+and hands the durable run UUID to the read-only polling surface. It has no SQL,
+credential, target-selection, worker, or apply authority. The run
 status and audit panel is **Partially implemented** as an optional exact-run
 loader with fixed loading/error/retry behavior and stale-response suppression.
 It announces state, cancellation intent, and sanitized error codes, and shows

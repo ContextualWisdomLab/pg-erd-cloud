@@ -289,7 +289,11 @@ blocked plan. Fixed loading/error/retry states and stale-response suppression
 is **Partially implemented** and covered for both late success and late failure.
 The Forward Engineering modal shell is **Partially implemented** with closed
 no-fetch, labelled dialog, focus entry/trap/restoration, Escape, explicit close,
-and absence-of-action-control coverage. The run status and audit panel is
+and absence of an apply control. The dry-run intent control is **Partially
+implemented** with component coverage for server blocker gating, exact-digest
+and no-SQL submission, synchronous single-flight exclusion, fixed secret-safe
+errors, same-key ambiguous retry, reused-run reporting, and stale-response
+suppression after plan identity changes. The run status and audit panel is
 **Partially implemented** with exact-run loading, fixed error/retry,
 stale-response suppression, bounded terminal-state semantics, cancellation and
 sanitized error alerts, hostile event text rendering, digest-chain metadata,

@@ -109,4 +109,46 @@ describe('PlanReviewSurface', () => {
     rejectFirst(new Error('obsolete failure with secret response'))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
+
+  it('hands an accepted exact-digest intent to terminal-aware run polling', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response(plan('plan-run')))
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))
+      .mockResolvedValueOnce(response({
+        migration_run_uuid: 'run-created',
+        state: 'queued',
+        state_version: 1,
+        cancellation_requested: false,
+        reused: false,
+      }, true, 202))
+      .mockResolvedValueOnce(response({
+        migration_run_uuid: 'run-created',
+        project_space_uuid: 'project-1',
+        migration_plan_uuid: 'plan-run',
+        run_kind: 'dry_run',
+        state: 'passed',
+        state_version: 4,
+        plan_digest: 'a'.repeat(64),
+        requested_by_user_uuid: 'user-1',
+        cancellation_requested: false,
+        observed_base_digest: 'b'.repeat(64),
+        evidence: {},
+        error_code: null,
+        created_at: '2026-08-12T05:00:00Z',
+        updated_at: '2026-08-12T05:01:00Z',
+        started_at: '2026-08-12T05:00:10Z',
+        finished_at: '2026-08-12T05:01:00Z',
+        events: [],
+      }))
+
+    render(<PlanReviewSurface planId="plan-run" />)
+    await screen.findByText('plan-run')
+    fireEvent.click(screen.getByRole('button', { name: '격리 dry-run 요청' }))
+
+    expect(await screen.findByRole('status', { name: '마이그레이션 실행 상태' }))
+      .toHaveTextContent('격리 검증 및 읽기 전용 사전 점검 통과')
+    expect(fetch).toHaveBeenNthCalledWith(4, '/api/migration-runs/run-created', {
+      credentials: 'include',
+    })
+  })
 })

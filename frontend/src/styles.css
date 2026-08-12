@@ -906,6 +906,25 @@ button:disabled {
   padding: 20px;
 }
 
+.forwardDryRunIntent {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  color: #172033;
+}
+
+.forwardDryRunIntent h3,
+.forwardDryRunIntent p {
+  margin: 0;
+}
+
+.forwardDryRunIntent button {
+  justify-self: start;
+}
+
 .forwardRunStatus {
   display: grid;
   gap: 16px;

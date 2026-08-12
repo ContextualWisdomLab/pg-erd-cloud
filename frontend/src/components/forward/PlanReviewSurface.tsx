@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 
 import { getMigrationPlan } from '../../api'
 import type { MigrationPlan } from '../../types'
+import { DryRunIntentPanel } from './DryRunIntentPanel'
 import { PlanReviewPanel } from './PlanReviewPanel'
+import { RunStatusSurface } from './RunStatusSurface'
 
 type PlanReviewSurfaceProps = {
   planId: string
@@ -15,10 +17,12 @@ type LoadState =
 
 export function PlanReviewSurface({ planId }: PlanReviewSurfaceProps) {
   const [attempt, setAttempt] = useState(0)
+  const [createdRunId, setCreatedRunId] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
 
   useEffect(() => {
     let active = true
+    setCreatedRunId(null)
     setLoadState({ status: 'loading' })
 
     void getMigrationPlan(planId).then(
@@ -50,5 +54,11 @@ export function PlanReviewSurface({ planId }: PlanReviewSurfaceProps) {
     )
   }
 
-  return <PlanReviewPanel plan={loadState.plan} />
+  return (
+    <>
+      <PlanReviewPanel plan={loadState.plan} />
+      <DryRunIntentPanel plan={loadState.plan} onRunCreated={setCreatedRunId} />
+      {createdRunId ? <RunStatusSurface runId={createdRunId} /> : null}
+    </>
+  )
 }

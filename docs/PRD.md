@@ -35,14 +35,18 @@ read-only view of provenance, risk, blockers, executable statements, and
 review-only proposals. Fixed loading/error/retry behavior and stale-response
 suppression is **Partially implemented** for exact plan retrieval; Forward UI
 remains **Planned**. The Forward Engineering modal shell is **Partially
-implemented** as a dedicated accessible container, but graph/model adapters,
-workflow controls, and orchestration remain absent. The run status and audit
+implemented** as a dedicated accessible container. The dry-run intent control
+is **Partially implemented**: it follows the server's `can_dry_run` and blocker
+decision, submits only the exact plan identity/digest, prevents concurrent
+submits, and retains one bounded idempotency key across an ambiguous retry.
+Graph/model adapters, apply controls, and broader orchestration remain absent.
+The run status and audit
 panel is **Partially implemented** as an optional read-only exact-run view. It
 announces the bounded state meaning, cancellation intent, and sanitized error
 code, and renders hash-chain event metadata without exposing generic evidence
 payloads. Sequential terminal-aware polling is **Partially implemented**: a
 new request is scheduled only after the preceding response and stops at the
-first terminal state. Workflow controls and browser E2E remain absent.
+first terminal state. Apply/recovery controls and browser E2E remain absent.
 
 ## Actors and authority
 

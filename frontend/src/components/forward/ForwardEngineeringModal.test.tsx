@@ -90,7 +90,8 @@ describe('ForwardEngineeringModal', () => {
     const dialog = screen.getByRole('dialog', { name: 'Forward Engineering' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(await screen.findByText('plan-modal')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /dry|apply|적용|실행/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '격리 dry-run 요청' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /apply|적용/i })).not.toBeInTheDocument()
   })
 
   it('shows an exact read-only run audit surface when a run identity is supplied', async () => {
@@ -112,7 +113,8 @@ describe('ForwardEngineeringModal', () => {
     expect(screen.getByRole('status', { name: '마이그레이션 실행 상태' })).toHaveTextContent(
       '대기 중',
     )
-    expect(screen.queryByRole('button', { name: /dry|apply|적용|실행/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '격리 dry-run 요청' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /apply|적용/i })).not.toBeInTheDocument()
   })
 
   it('closes with the explicit button or Escape', () => {
