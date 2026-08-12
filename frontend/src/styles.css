@@ -900,8 +900,49 @@ button:disabled {
 }
 
 .forwardEngineeringModal__body {
+  display: grid;
+  gap: 20px;
   overflow: auto;
   padding: 20px;
+}
+
+.forwardRunStatus {
+  display: grid;
+  gap: 16px;
+  color: #172033;
+}
+
+.forwardRunStatus > header,
+.forwardRunStatus > section {
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.forwardRunStatus dl,
+.forwardRunStatus ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.forwardRunStatus dl > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.forwardRunStatus dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.forwardRunStatus ol > li {
+  border-left: 4px solid #0f766e;
+  background: #f8fafc;
+  padding: 12px;
 }
 
 .cardinalityWizard {

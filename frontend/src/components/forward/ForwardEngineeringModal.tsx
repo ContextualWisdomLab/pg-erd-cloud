@@ -1,15 +1,18 @@
 import { useDialogAccessibility } from '../modals/useDialogAccessibility'
 import { PlanReviewSurface } from './PlanReviewSurface'
+import { RunStatusSurface } from './RunStatusSurface'
 
 type ForwardEngineeringModalProps = {
   isOpen: boolean
   planId: string
+  runId?: string
   onClose: () => void
 }
 
 export function ForwardEngineeringModal({
   isOpen,
   planId,
+  runId,
   onClose,
 }: ForwardEngineeringModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onClose)
@@ -34,6 +37,7 @@ export function ForwardEngineeringModal({
         </header>
         <div className="forwardEngineeringModal__body">
           <PlanReviewSurface planId={planId} />
+          {runId ? <RunStatusSurface runId={runId} /> : null}
         </div>
       </div>
     </div>

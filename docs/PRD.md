@@ -36,7 +36,11 @@ review-only proposals. Fixed loading/error/retry behavior and stale-response
 suppression is **Partially implemented** for exact plan retrieval; Forward UI
 remains **Planned**. The Forward Engineering modal shell is **Partially
 implemented** as a dedicated accessible container, but graph/model adapters,
-workflow controls, and orchestration remain absent.
+workflow controls, and orchestration remain absent. The run status and audit
+panel is **Partially implemented** as an optional read-only exact-run view. It
+announces the bounded state meaning, cancellation intent, and sanitized error
+code, and renders hash-chain event metadata without exposing generic evidence
+payloads. Automatic polling, workflow controls, and browser E2E remain absent.
 
 ## Actors and authority
 

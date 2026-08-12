@@ -176,9 +176,13 @@ without buttons or execution authority. Its `PlanReviewSurface` wrapper exposes
 fixed loading/error/retry states and stale-response suppression is **Partially
 implemented** when a requested plan changes. The Forward Engineering modal
 shell is **Partially implemented** with focus entry/trap/restoration, Escape,
-and explicit close behavior; it contains no dry-run/apply control. Forward UI
-remains **Planned**, so these unit-tested components are not browser E2E or
-complete accessibility evidence.
+and explicit close behavior; it contains no dry-run/apply control. The run
+status and audit panel is **Partially implemented** as an optional exact-run
+loader with fixed loading/error/retry behavior and stale-response suppression.
+It announces state, cancellation intent, and sanitized error codes, and shows
+only integrity-checked event-chain metadata; generic run/event evidence is not
+rendered. Forward UI remains **Planned**, so these unit-tested components are
+not browser E2E or complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|

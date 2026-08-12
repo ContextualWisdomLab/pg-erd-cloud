@@ -151,6 +151,12 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     modal = _read(
         Path("frontend/src/components/forward/ForwardEngineeringModal.tsx")
     )
+    run_panel = _read(
+        Path("frontend/src/components/forward/RunStatusPanel.tsx")
+    )
+    run_surface = _read(
+        Path("frontend/src/components/forward/RunStatusSurface.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -186,14 +192,30 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         'role="dialog"',
         'aria-modal="true"',
         "PlanReviewSurface",
+        "RunStatusSurface",
     ):
         assert symbol in modal
+    for symbol in (
+        "MigrationRun",
+        'role="status"',
+        "자동 재실행이 금지됩니다",
+        "서버가 검증한 이벤트 메타데이터만 표시합니다",
+    ):
+        assert symbol in run_panel
+    for symbol in (
+        "getMigrationRun",
+        "실행 상태를 불러오는 중입니다",
+        "실행 상태를 불러오지 못했습니다",
+        "active = false",
+    ):
+        assert symbol in run_surface
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
         assert "plan review panel is **partially implemented**" in normalized
         assert "stale-response suppression is **partially implemented**" in normalized
         assert "forward engineering modal shell is **partially implemented**" in normalized
+        assert "run status and audit panel is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

@@ -35,6 +35,26 @@ const plan = {
   expires_at: '2026-08-13T05:00:00Z',
 }
 
+const run = {
+  migration_run_uuid: 'run-modal',
+  project_space_uuid: 'project-1',
+  migration_plan_uuid: 'plan-modal',
+  run_kind: 'dry_run',
+  state: 'queued',
+  state_version: 1,
+  plan_digest: 'a'.repeat(64),
+  requested_by_user_uuid: 'user-1',
+  cancellation_requested: false,
+  observed_base_digest: null,
+  evidence: {},
+  error_code: null,
+  created_at: '2026-08-12T05:00:00Z',
+  updated_at: '2026-08-12T05:00:00Z',
+  started_at: null,
+  finished_at: null,
+  events: [],
+}
+
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(plan)))
 })
@@ -70,6 +90,28 @@ describe('ForwardEngineeringModal', () => {
     const dialog = screen.getByRole('dialog', { name: 'Forward Engineering' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(await screen.findByText('plan-modal')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /dry|apply|적용|실행/i })).not.toBeInTheDocument()
+  })
+
+  it('shows an exact read-only run audit surface when a run identity is supplied', async () => {
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input)
+      return Promise.resolve(response(url.includes('/migration-runs/') ? run : plan))
+    })
+
+    render(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('run-modal')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: '마이그레이션 실행 상태' })).toHaveTextContent(
+      '대기 중',
+    )
     expect(screen.queryByRole('button', { name: /dry|apply|적용|실행/i })).not.toBeInTheDocument()
   })
 

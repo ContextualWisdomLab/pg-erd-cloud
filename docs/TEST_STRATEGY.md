@@ -289,9 +289,14 @@ blocked plan. Fixed loading/error/retry states and stale-response suppression
 is **Partially implemented** and covered for both late success and late failure.
 The Forward Engineering modal shell is **Partially implemented** with closed
 no-fetch, labelled dialog, focus entry/trap/restoration, Escape, explicit close,
-and absence-of-action-control coverage. Forward UI remains **Planned**. These unit tests are not browser
-E2E or complete accessibility evidence. Tests must cover the complete user-observable
-state model, not only a happy-path button click:
+and absence-of-action-control coverage. The run status and audit panel is
+**Partially implemented** with exact-run loading, fixed error/retry,
+stale-response suppression, bounded terminal-state semantics, cancellation and
+sanitized error alerts, hostile event text rendering, digest-chain metadata,
+and non-rendering of generic evidence payloads. Forward UI remains **Planned**.
+These unit tests are not browser E2E or complete accessibility evidence. Tests
+must cover the complete user-observable state model, not only a happy-path
+button click:
 
 - dirty/save/saved model state and `409` optimistic-concurrency recovery;
 - exact connection/snapshot selection, plan supersession, blocker and risk
