@@ -181,8 +181,10 @@ status and audit panel is **Partially implemented** as an optional exact-run
 loader with fixed loading/error/retry behavior and stale-response suppression.
 It announces state, cancellation intent, and sanitized error codes, and shows
 only integrity-checked event-chain metadata; generic run/event evidence is not
-rendered. Forward UI remains **Planned**, so these unit-tested components are
-not browser E2E or complete accessibility evidence.
+rendered. Sequential terminal-aware polling is **Partially implemented** with
+one outstanding request, cleanup on identity/unmount, and no polling after a
+terminal response. Forward UI remains **Planned**, so these unit-tested
+components are not browser E2E or complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|

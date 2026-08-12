@@ -40,7 +40,9 @@ workflow controls, and orchestration remain absent. The run status and audit
 panel is **Partially implemented** as an optional read-only exact-run view. It
 announces the bounded state meaning, cancellation intent, and sanitized error
 code, and renders hash-chain event metadata without exposing generic evidence
-payloads. Automatic polling, workflow controls, and browser E2E remain absent.
+payloads. Sequential terminal-aware polling is **Partially implemented**: a
+new request is scheduled only after the preceding response and stops at the
+first terminal state. Workflow controls and browser E2E remain absent.
 
 ## Actors and authority
 

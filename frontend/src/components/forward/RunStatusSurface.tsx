@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 
 import { getMigrationRun } from '../../api'
-import type { MigrationRun } from '../../types'
+import type { MigrationRun, MigrationRunState } from '../../types'
 import { RunStatusPanel } from './RunStatusPanel'
 
 type RunStatusSurfaceProps = {
   runId: string
+  refreshIntervalMs?: number
 }
 
 type LoadState =
@@ -13,27 +14,51 @@ type LoadState =
   | { status: 'ready'; run: MigrationRun }
   | { status: 'error' }
 
-export function RunStatusSurface({ runId }: RunStatusSurfaceProps) {
+const TERMINAL_RUN_STATES: ReadonlySet<MigrationRunState> = new Set([
+  'passed',
+  'drifted',
+  'failed',
+  'verified',
+  'drifted_no_apply',
+  'not_applied',
+  'verification_failed',
+  'failed_rolled_back',
+  'applied_with_drift',
+  'outcome_unknown',
+])
+
+export function RunStatusSurface({
+  runId,
+  refreshIntervalMs = 2_000,
+}: RunStatusSurfaceProps) {
   const [attempt, setAttempt] = useState(0)
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
 
   useEffect(() => {
     let active = true
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined
     setLoadState({ status: 'loading' })
 
-    void getMigrationRun(runId).then(
-      (run) => {
-        if (active) setLoadState({ status: 'ready', run })
-      },
-      () => {
+    const load = async () => {
+      try {
+        const run = await getMigrationRun(runId)
+        if (!active) return
+        setLoadState({ status: 'ready', run })
+        if (!TERMINAL_RUN_STATES.has(run.state)) {
+          refreshTimer = setTimeout(() => void load(), Math.max(1, refreshIntervalMs))
+        }
+      } catch {
         if (active) setLoadState({ status: 'error' })
-      },
-    )
+      }
+    }
+
+    void load()
 
     return () => {
       active = false
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer)
     }
-  }, [attempt, runId])
+  }, [attempt, refreshIntervalMs, runId])
 
   if (loadState.status === 'loading') {
     return <p role="status" aria-live="polite">실행 상태를 불러오는 중입니다.</p>

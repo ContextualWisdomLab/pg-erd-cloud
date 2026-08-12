@@ -204,6 +204,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         assert symbol in run_panel
     for symbol in (
         "getMigrationRun",
+        "TERMINAL_RUN_STATES",
         "실행 상태를 불러오는 중입니다",
         "실행 상태를 불러오지 못했습니다",
         "active = false",
@@ -216,6 +217,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         assert "stale-response suppression is **partially implemented**" in normalized
         assert "forward engineering modal shell is **partially implemented**" in normalized
         assert "run status and audit panel is **partially implemented**" in normalized
+        assert "terminal-aware polling is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

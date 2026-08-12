@@ -293,7 +293,9 @@ and absence-of-action-control coverage. The run status and audit panel is
 **Partially implemented** with exact-run loading, fixed error/retry,
 stale-response suppression, bounded terminal-state semantics, cancellation and
 sanitized error alerts, hostile event text rendering, digest-chain metadata,
-and non-rendering of generic evidence payloads. Forward UI remains **Planned**.
+and non-rendering of generic evidence payloads. Sequential terminal-aware
+polling is **Partially implemented** and tested to issue one request at a time
+and stop after the first terminal response. Forward UI remains **Planned**.
 These unit tests are not browser E2E or complete accessibility evidence. Tests
 must cover the complete user-observable state model, not only a happy-path
 button click:

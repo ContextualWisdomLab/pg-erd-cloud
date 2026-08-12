@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { MigrationRun } from '../../types'
@@ -90,5 +90,22 @@ describe('RunStatusSurface', () => {
     first.resolve(response(run))
     await first.promise
     expect(screen.queryByText('run-1')).not.toBeInTheDocument()
+  })
+
+  it('polls one request at a time until the run reaches a terminal state', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response(run))
+      .mockResolvedValueOnce(response({ ...run, state: 'passed', state_version: 4 }))
+
+    render(<RunStatusSurface runId="run-1" refreshIntervalMs={5} />)
+
+    expect(await screen.findByText('run-1')).toBeInTheDocument()
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('status', { name: '마이그레이션 실행 상태' })).toHaveTextContent(
+      '격리 검증 및 읽기 전용 사전 점검 통과',
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 })
