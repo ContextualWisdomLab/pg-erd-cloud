@@ -333,10 +333,10 @@ or supply an explicit compatibility alias before public v1 stabilization.
 | Remove schema | Admitted model difference | `schema_removal_unsupported` blocker | Implemented blocker |
 | Create table | Admitted subset | `create_table` | Implemented control plane; execution Planned |
 | Drop table | Admitted subset | `drop_table`, destructive | Implemented control plane; execution Planned |
-| Add column | Admitted subset | `add_column`; required/no-default adds `table_is_empty` precondition | Implemented plan; precondition enforcement Planned |
+| Add column | Admitted subset | `add_column`; required/no-default adds `table_is_empty` precondition | Implemented plan; bounded live-read `table_is_empty` precondition primitive and completion CAS are Implemented; durable worker binding and apply remain Planned |
 | Drop column | Admitted subset | `drop_column`, destructive | Implemented control plane; execution Planned |
-| Change data type | Catalog-spelling allow-list; aliases normalize; serial pseudo-types reject | `alter_column_type`, conservative destructive/data-loss/scan/rewrite risk and castability precondition | Implemented plan; generic isolated executor core exists, while type-change dependency/privilege/apply proof remains Planned |
-| Set/drop nullability | Admitted | `set_not_null` / `drop_not_null` | Implemented plan; live precondition Planned |
+| Change data type | Catalog-spelling allow-list; aliases normalize; serial pseudo-types reject | `alter_column_type`, conservative destructive/data-loss/scan/rewrite risk and castability precondition | Implemented plan; generic isolated executor core plus bounded live-read `castable_values` precondition primitive and completion CAS are Implemented; durable worker binding and type-change dependency/privilege/apply proof remain Planned |
+| Set/drop nullability | Admitted | `set_not_null` / `drop_not_null` | Implemented plan; bounded live-read `no_null_values` precondition primitive and completion CAS are Implemented for set-not-null; durable worker binding and apply remain Planned |
 | Primary key on a new table | Admitted | Included in `CREATE TABLE`, preserving ordered columns and deferrability | Implemented plan |
 | Change existing primary key | Admitted | `primary_key_change_unsupported` blocker | Implemented blocker |
 | Table/column comment change | Admitted and digest-affecting | Explicit comment blocker; no partial statements | Implemented blocker |

@@ -297,6 +297,18 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     assert "relation-lock wait" in contract
     assert "SELECT denial" in contract
     assert "terminates the restricted backend" in contract
+    assert (
+        "`table_is_empty` precondition primitive and completion CAS are "
+        "Implemented" in contract
+    )
+    assert (
+        "`no_null_values` precondition primitive and completion CAS are "
+        "Implemented" in contract
+    )
+    assert (
+        "`castable_values` precondition primitive and completion CAS are "
+        "Implemented" in contract
+    )
     for path in required_documents:
         document = _read(path)
         assert "complete_isolated_dry_run" in document
