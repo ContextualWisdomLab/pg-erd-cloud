@@ -9,11 +9,10 @@ payloads from becoming plan, credential, or SQL authority.
 
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import logging
 import math
-from asyncio import sleep
+from asyncio import FIRST_COMPLETED, create_task, gather, sleep, wait
 from collections.abc import Awaitable, Callable
 from typing import TypeAlias
 
@@ -92,10 +91,10 @@ async def _run_handler_under_exact_lease(
 ) -> bool:
     """Cancel handler authority immediately when exact renewal is lost."""
 
-    handler_task = asyncio.create_task(
+    handler_task = create_task(
         _handler_succeeded_without_retaining_error(handler, session_factory, claim)
     )
-    heartbeat_task = asyncio.create_task(
+    heartbeat_task = create_task(
         _renew_claim_until_cancelled(
             claim,
             heartbeat_interval_s=heartbeat_interval_s,
@@ -103,25 +102,25 @@ async def _run_handler_under_exact_lease(
         )
     )
     try:
-        done, _ = await asyncio.wait(
+        done, _ = await wait(
             {handler_task, heartbeat_task},
-            return_when=asyncio.FIRST_COMPLETED,
+            return_when=FIRST_COMPLETED,
         )
         if heartbeat_task in done:
             handler_task.cancel()
-            await asyncio.gather(handler_task, return_exceptions=True)
+            await gather(handler_task, return_exceptions=True)
             heartbeat_task.result()
             raise MigrationRunSignalLeaseLost(
                 "migration run renewal ended without handler completion"
             )
         heartbeat_task.cancel()
-        await asyncio.gather(heartbeat_task, return_exceptions=True)
+        await gather(heartbeat_task, return_exceptions=True)
         return handler_task.result()
     finally:
         for task in (handler_task, heartbeat_task):
             if not task.done():
                 task.cancel()
-        await asyncio.gather(handler_task, heartbeat_task, return_exceptions=True)
+        await gather(handler_task, heartbeat_task, return_exceptions=True)
 
 
 async def process_one_migration_run_signal(
