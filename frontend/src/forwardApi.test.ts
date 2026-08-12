@@ -147,4 +147,28 @@ describe('Forward Engineering API client', () => {
 
     await expect(invoke()).rejects.toThrow(`${name} failed: 409`)
   })
+
+  it.each([
+    ['createDryRun', () => createDryRun('plan-1', 'a'.repeat(64), 'dry-request-1')],
+    [
+      'createApplyRun',
+      () => createApplyRun(
+        'plan-1',
+        {
+          plan_digest: 'a'.repeat(64),
+          passed_dry_run_uuid: 'dry-1',
+          target_connection_name: 'production-readonly',
+          destructive_acknowledged: false,
+        },
+        'apply-request-1',
+      ),
+    ],
+    ['cancelMigrationRun', () => cancelMigrationRun('run-1', 3)],
+  ])('reports %s write failures without echoing request data', async (name, invoke) => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))
+      .mockResolvedValueOnce(response({}, false, 409))
+
+    await expect(invoke()).rejects.toThrow(`${name} failed: 409`)
+  })
 })
