@@ -519,7 +519,11 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                     "SELECT pg_catalog.pg_terminate_backend($1)", backend_pid
                 ) is True
                 with pytest.raises(LivePreflightContractError) as disconnected:
-                    await interrupted
+                    unexpected_result = await interrupted
+                    pytest.fail(
+                        "terminated live preflight unexpectedly returned "
+                        f"{type(unexpected_result).__name__}"
+                    )
                 assert str(disconnected.value) == "live preflight query failed"
                 assert disconnected.value.__cause__ is None
                 assert connection.is_closed() is True
