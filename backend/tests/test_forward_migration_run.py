@@ -661,6 +661,15 @@ async def test_attempt_renewal_and_finish_are_exact_claim_cas() -> None:
         succeeded=False,
         now=now,
     ) is False
+    with pytest.raises(MigrationRunContractError, match="outcome"):
+        await finish_migration_run_attempt(
+            session,
+            claim=claim,
+            worker_identity="worker-a",
+            signal_lease_token=token,
+            succeeded=1,  # type: ignore[arg-type]
+            now=now,
+        )
 
 
 @pytest.mark.asyncio
@@ -703,6 +712,16 @@ async def test_attempt_contract_rejects_inactive_runs_and_unsafe_inputs() -> Non
             migration_run_uuid=uuid.uuid4(),
             worker_identity=None,  # type: ignore[arg-type]
             signal_lease_token=uuid.uuid4(),
+            lease_seconds=60,
+            now=now,
+        )
+
+    with pytest.raises(MigrationRunContractError, match="signal lease token"):
+        await acquire_migration_run_attempt(
+            SimpleNamespace(scalar=AsyncMock(), add=Mock()),
+            migration_run_uuid=uuid.uuid4(),
+            worker_identity="worker-a",
+            signal_lease_token="not-a-uuid",  # type: ignore[arg-type]
             lease_seconds=60,
             now=now,
         )
