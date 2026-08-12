@@ -42,6 +42,27 @@ describe('Forward Engineering API client', () => {
     })
   })
 
+  it('encodes resource identifiers as single path segments', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(response({ migration_plan_uuid: 'plan/../other' }))
+      .mockResolvedValueOnce(response({ migration_run_uuid: 'run?tenant=other' }))
+
+    await getMigrationPlan('plan/../other')
+    await getMigrationRun('run?tenant=other')
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/migration-plans/plan%2F..%2Fother',
+      { credentials: 'include' },
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/migration-runs/run%3Ftenant%3Dother',
+      { credentials: 'include' },
+    )
+  })
+
   it('creates exact dry-run and apply intents without accepting SQL', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock

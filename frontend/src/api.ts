@@ -273,7 +273,7 @@ export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
 }
 
 export async function getMigrationPlan(planId: string): Promise<MigrationPlan> {
-  const r = await fetch(`${API_BASE}/api/migration-plans/${planId}`, {
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}`, {
     credentials: 'include',
   })
   if (!r.ok) throw new Error(`getMigrationPlan failed: ${r.status}`)
@@ -285,7 +285,7 @@ export async function createDryRun(
   planDigest: string,
   idempotencyKey: string,
 ): Promise<MigrationRunAction> {
-  const r = await fetch(`${API_BASE}/api/migration-plans/${planId}/dry-runs`, {
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}/dry-runs`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -303,7 +303,7 @@ export async function createApplyRun(
   intent: MigrationApplyIntent,
   idempotencyKey: string,
 ): Promise<MigrationRunAction> {
-  const r = await fetch(`${API_BASE}/api/migration-plans/${planId}/apply-runs`, {
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}/apply-runs`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -317,7 +317,7 @@ export async function createApplyRun(
 }
 
 export async function getMigrationRun(runId: string): Promise<MigrationRun> {
-  const r = await fetch(`${API_BASE}/api/migration-runs/${runId}`, {
+  const r = await fetch(`${API_BASE}/api/migration-runs/${encodeURIComponent(runId)}`, {
     credentials: 'include',
   })
   if (!r.ok) throw new Error(`getMigrationRun failed: ${r.status}`)
@@ -328,7 +328,7 @@ export async function cancelMigrationRun(
   runId: string,
   expectedStateVersion: number,
 ): Promise<MigrationRunAction> {
-  const r = await fetch(`${API_BASE}/api/migration-runs/${runId}/cancel`, {
+  const r = await fetch(`${API_BASE}/api/migration-runs/${encodeURIComponent(runId)}/cancel`, {
     method: 'POST',
     credentials: 'include',
     headers: await jsonHeaders(),
