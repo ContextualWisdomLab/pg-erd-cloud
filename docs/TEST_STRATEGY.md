@@ -51,7 +51,7 @@ flowchart TB
 |---|---|---|---|
 | Deterministic unit/property | Prove canonical JSON, quoting, digest stability, complete blocker behavior, plan ordering, risk and snapshot adaptation. | Focused forward unit tests exist. | Exact statement/branch coverage plus property/fuzz cases for every admitted grammar and unknown-field boundary. |
 | API/service contract | Prove authorization, tenancy, optimistic concurrency, immutable persistence, size limits, expiry/idempotency/error semantics. | Model and plan route functions are tested mainly with faked sessions and mocks. | HTTP-level tests against migrated PostgreSQL, full role/IDOR/CSRF/CORS/error matrix, and database constraint races. |
-| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create three distinct ephemeral databases: migrated metadata for run/outbox evidence, a sandbox for exact signed-plan DDL and strict convergence whose exact success result enters `complete_isolated_dry_run`, and a target where live preflight uses a separate login with CONNECT plus fixture-scoped USAGE/SELECT, no database CREATE/TEMP, and a default read-only policy. The matrix asserts those privileges, proves DDL denial, holds an `ACCESS EXCLUSIVE` lock until the bounded preflight statement timeout fires, requires a fixed non-secret failure, and verifies that the preflight transaction is no longer open before reuse. Provisioning/cleanup/egress, production credential/attempt binding, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
+| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create three distinct ephemeral databases: migrated metadata for run/outbox evidence, a sandbox for exact signed-plan DDL and strict convergence whose exact success result enters `complete_isolated_dry_run`, and a target where live preflight uses a separate login with CONNECT plus fixture-scoped USAGE/SELECT, no database CREATE/TEMP, and a default read-only policy. The matrix asserts those privileges, proves DDL denial and SELECT denial on an ungranted fixture table, holds an `ACCESS EXCLUSIVE` lock until the bounded preflight statement timeout fires, and terminates the restricted backend during a lock wait. Every failure must expose only the fixed non-secret error; recoverable failures must leave no open transaction before connection reuse, while forced disconnect must leave the connection closed. Provisioning/cleanup/egress, production credential/attempt binding, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
 | Browser E2E/accessibility | Prove editor-to-verified workflow, tamper resistance, state recovery, focus, keyboard, names, and live regions. | Existing ERD UI tests do not implement the forward workflow. | Composed backend/frontend/worker/sandbox/target E2E, automated accessibility checks, and manual keyboard/screen-reader evidence. |
 | Operational/fault injection | Prove no-replay recovery, kill switch, alerts, runbook, retention, backup/restore, and uncertain commit handling. | No forward run worker or drills exist. | Controlled crash/network/lock/commit-acknowledgement tests and a recorded non-production game day. |
 
@@ -212,9 +212,11 @@ commits, under the same client timeout as the structured checks. They prove
 exact digest match, explicit drift, invalid capture rejection, fixed non-secret
 capture failure, rollback, and cancellation propagation. PostgreSQL 14–18
 acceptance invokes that primitive through the restricted preflight login,
-forces a real relation-lock wait past its bounded statement timeout, verifies
-the sanitized failure and transaction cleanup, and
-re-captures the catalog on the same connection/transaction as data checks.
+proves an ungranted-table SELECT failure, forces a real relation-lock wait past
+its bounded statement timeout, terminates the backend during another wait, and
+verifies sanitized failures plus the appropriate reusable-or-closed connection
+state. It also re-captures the catalog on the same connection/transaction as
+data checks.
 `complete_live_preflight` tests reject missing/extra result fields, malformed or
 duplicate check positions, non-canonical digests, and forged aggregate flags;
 they also reject missing, extra, or kind-mismatched checks against the exact

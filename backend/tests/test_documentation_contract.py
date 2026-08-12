@@ -284,11 +284,17 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
     assert "LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE" in integration_test
     assert "connection.is_in_transaction() is False" in integration_test
+    assert "denied_table_name" in integration_test
+    assert "pg_catalog.pg_terminate_backend" in integration_test
+    assert "connection.is_closed() is True" in integration_test
     assert "real relation-lock wait" in strategy
-    assert "transaction cleanup" in strategy
+    assert "ungranted-table SELECT failure" in strategy
+    assert "terminates the backend" in strategy
     assert "ACCESS EXCLUSIVE" in changelog
+    assert "pg_terminate_backend" in changelog
     assert "relation-lock wait" in contract
-    assert "transaction cleanup" in contract
+    assert "SELECT denial" in contract
+    assert "terminates the restricted backend" in contract
     for path in required_documents:
         document = _read(path)
         assert "complete_isolated_dry_run" in document

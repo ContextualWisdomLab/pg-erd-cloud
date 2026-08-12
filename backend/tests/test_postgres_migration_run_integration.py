@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import datetime as dt
 import os
@@ -290,13 +291,19 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
     admin_connection = await asyncpg.connect(_target_asyncpg_url())
     schema_name = f"Preflight {uuid.uuid4().hex}"
     table_name = '주문 "항목"'
+    denied_table_name = '비공개 "항목"'
     quoted_schema = '"' + schema_name.replace('"', '""') + '"'
     quoted_table = '"' + table_name.replace('"', '""') + '"'
+    quoted_denied_table = '"' + denied_table_name.replace('"', '""') + '"'
     qualified = f"{quoted_schema}.{quoted_table}"
+    denied_qualified = f"{quoted_schema}.{quoted_denied_table}"
     try:
         await admin_connection.execute(f"CREATE SCHEMA {quoted_schema}")
         await admin_connection.execute(
             f'CREATE TABLE {qualified} ("amount value" text)'
+        )
+        await admin_connection.execute(
+            f'CREATE TABLE {denied_qualified} ("private value" text)'
         )
         await admin_connection.execute(
             f"INSERT INTO {qualified} VALUES ('12'), ('not-an-integer'), (NULL)"
@@ -418,6 +425,22 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
             finally:
                 await blocking_transaction.rollback()
 
+            with pytest.raises(LivePreflightContractError) as denied:
+                await execute_live_preflight(
+                    connection,
+                    _preflight_plan(
+                        {
+                            "kind": "table_is_empty",
+                            "schema_name": schema_name,
+                            "table_name": denied_table_name,
+                        }
+                    ),
+                    statement_timeout_ms=2000,
+                )
+            assert str(denied.value) == "live preflight query failed"
+            assert denied.value.__cause__ is None
+            assert connection.is_in_transaction() is False
+
             with pytest.raises(LivePreflightContractError) as captured:
                 await execute_live_preflight(
                     connection,
@@ -448,6 +471,42 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                 statement_timeout_ms=2000,
             )
             assert empty_evidence["passed"] is True
+
+            backend_pid = connection.get_server_pid()
+            blocking_transaction = admin_connection.transaction()
+            await blocking_transaction.start()
+            interrupted = None
+            try:
+                await admin_connection.execute(
+                    f"LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE"
+                )
+                interrupted = asyncio.create_task(
+                    execute_live_preflight(
+                        connection,
+                        _preflight_plan(
+                            {
+                                "kind": "table_is_empty",
+                                "schema_name": schema_name,
+                                "table_name": table_name,
+                            }
+                        ),
+                        statement_timeout_ms=2000,
+                    )
+                )
+                await asyncio.sleep(0.1)
+                assert await admin_connection.fetchval(
+                    "SELECT pg_catalog.pg_terminate_backend($1)", backend_pid
+                ) is True
+                with pytest.raises(LivePreflightContractError) as disconnected:
+                    await interrupted
+                assert str(disconnected.value) == "live preflight query failed"
+                assert disconnected.value.__cause__ is None
+                assert connection.is_closed() is True
+            finally:
+                if interrupted is not None and not interrupted.done():
+                    interrupted.cancel()
+                    await asyncio.gather(interrupted, return_exceptions=True)
+                await blocking_transaction.rollback()
         finally:
             await connection.close()
     finally:
