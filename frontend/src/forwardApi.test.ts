@@ -105,18 +105,16 @@ describe('Forward Engineering API client', () => {
       .mockResolvedValueOnce(response({ migration_run_uuid: 'dry-1', state: 'queued' }, true, 202))
       .mockResolvedValueOnce(response({ csrf_token: 'csrf-apply' }))
       .mockResolvedValueOnce(response({ migration_run_uuid: 'apply-1', state: 'queued' }, true, 202))
+    const hostileIntent = {
+      plan_digest: 'a'.repeat(64),
+      passed_dry_run_uuid: 'dry-1',
+      target_connection_name: 'production-readonly',
+      destructive_acknowledged: false,
+      sql: 'DROP SCHEMA public CASCADE;',
+    }
 
     await createDryRun('plan-1', 'a'.repeat(64), 'dry-request-1')
-    await createApplyRun(
-      'plan-1',
-      {
-        plan_digest: 'a'.repeat(64),
-        passed_dry_run_uuid: 'dry-1',
-        target_connection_name: 'production-readonly',
-        destructive_acknowledged: false,
-      },
-      'apply-request-1',
-    )
+    await createApplyRun('plan-1', hostileIntent, 'apply-request-1')
 
     const dryRequest = fetchMock.mock.calls[1]
     const applyRequest = fetchMock.mock.calls[3]

@@ -303,6 +303,12 @@ export async function createApplyRun(
   intent: MigrationApplyIntent,
   idempotencyKey: string,
 ): Promise<MigrationRunAction> {
+  const requestBody: MigrationApplyIntent = {
+    plan_digest: intent.plan_digest,
+    passed_dry_run_uuid: intent.passed_dry_run_uuid,
+    target_connection_name: intent.target_connection_name,
+    destructive_acknowledged: intent.destructive_acknowledged,
+  }
   const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}/apply-runs`, {
     method: 'POST',
     credentials: 'include',
@@ -310,7 +316,7 @@ export async function createApplyRun(
       ...(await jsonHeaders()),
       'Idempotency-Key': idempotencyKey,
     },
-    body: JSON.stringify(intent),
+    body: JSON.stringify(requestBody),
   })
   if (!r.ok) throw new Error(`createApplyRun failed: ${r.status}`)
   return r.json()
