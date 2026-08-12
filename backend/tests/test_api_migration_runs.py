@@ -9,9 +9,8 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-import app.api.migration_plans as migration_plan_api
 from app.api.migration_plans import _request_id as _plan_request_id
-from app.api.migration_plans import create_dry_run
+from app.api.migration_plans import create_apply_run, create_dry_run
 from app.api.migration_runs import (
     MAX_RETURNED_RUN_EVENTS,
     _request_id,
@@ -181,8 +180,6 @@ async def test_create_dry_run_persists_correlated_editor_intent() -> None:
 async def test_create_apply_run_persists_deployer_confirmation_without_dispatch() -> None:
     """A deployer can persist exact reviewed apply intent, never execute it."""
 
-    handler = getattr(migration_plan_api, "create_apply_run", None)
-    assert handler is not None
     plan = _plan()
     passed_run = _run()
     passed_run.migration_run_uuid = uuid.uuid4()
@@ -221,7 +218,7 @@ async def test_create_apply_run_persists_deployer_confirmation_without_dispatch(
             new=AsyncMock(return_value=creation),
         ) as writer,
     ):
-        out = await handler(
+        out = await create_apply_run(
             migration_plan_uuid=plan.migration_plan_uuid,
             body=MigrationApplyRunCreateIn(
                 plan_digest=plan.statement_digest,
@@ -284,7 +281,7 @@ async def test_create_apply_run_enforces_deployer_and_masks_non_members(
         ) as writer,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await migration_plan_api.create_apply_run(
+            await create_apply_run(
                 migration_plan_uuid=plan.migration_plan_uuid,
                 body=MigrationApplyRunCreateIn(
                     plan_digest=plan.statement_digest,
@@ -319,7 +316,7 @@ async def test_create_apply_run_rejects_stale_plan_before_loading_evidence() -> 
         ) as writer,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await migration_plan_api.create_apply_run(
+            await create_apply_run(
                 migration_plan_uuid=plan.migration_plan_uuid,
                 body=MigrationApplyRunCreateIn(
                     plan_digest="e" * 64,
@@ -379,7 +376,7 @@ async def test_create_apply_run_maps_contract_failures_without_source_values(
         ),
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await migration_plan_api.create_apply_run(
+            await create_apply_run(
                 migration_plan_uuid=plan.migration_plan_uuid,
                 body=MigrationApplyRunCreateIn(
                     plan_digest=plan.statement_digest,
