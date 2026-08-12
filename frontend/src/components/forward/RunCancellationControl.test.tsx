@@ -90,6 +90,38 @@ describe('RunCancellationControl', () => {
     csrf.resolve(response({ csrf_token: 'csrf' }))
   })
 
+  it('keeps the single-flight guard when polling advances the non-terminal version', async () => {
+    const cancellation = deferred<Response>()
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))
+      .mockReturnValueOnce(cancellation.promise)
+    const { rerender } = render(
+      <RunCancellationControl run={run} onRefresh={vi.fn()} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '실행 취소 요청' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    rerender(
+      <RunCancellationControl
+        run={{ ...run, state_version: 4, state: 'live_preflight_running' }}
+        onRefresh={vi.fn()}
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: '취소 요청 중…' })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    cancellation.resolve(response({
+      migration_run_uuid: 'run-1',
+      state: 'sandbox_running',
+      state_version: 4,
+      cancellation_requested: true,
+      reused: false,
+    }, true, 202))
+  })
+
   it('does not replay an ambiguous cancellation and offers status refresh only', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))

@@ -25,7 +25,7 @@ export function RunCancellationControl({ run, onRefresh }: RunCancellationContro
       generationRef.current += 1
       inFlightRef.current = false
     }
-  }, [run.cancellation_requested, run.migration_run_uuid, run.state_version])
+  }, [run.migration_run_uuid])
 
   const requestCancellation = async () => {
     if (inFlightRef.current) return

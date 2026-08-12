@@ -303,7 +303,9 @@ and stop after the first terminal response. The cancellation intent control is
 **Partially implemented** with component coverage for terminal/existing-intent
 suppression, exact optimistic state-version submission, synchronous
 single-flight exclusion, accepted-state refresh, fixed secret-safe ambiguous
-errors, and refresh-only recovery without mutation replay. Forward UI remains **Planned**.
+errors, refresh-only recovery without mutation replay, and retention of the
+single-flight guard while polling advances a non-terminal state version.
+Forward UI remains **Planned**.
 These unit tests are not browser E2E or complete accessibility evidence. Tests
 must cover the complete user-observable state model, not only a happy-path
 button click:
