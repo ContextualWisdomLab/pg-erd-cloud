@@ -92,6 +92,15 @@ async def test_real_valkey_keeps_migration_and_generic_signals_isolated(
         assert await client.zscore(processing_key, str(migration_uuid)) == (
             renew_at.timestamp() + 30.0
         )
+        expires_at = renew_at + dt.timedelta(seconds=30)
+        assert not await valkey_queue.renew_migration_run_signal(
+            claim, now=expires_at, lease_seconds=30.0
+        )
+        assert not await valkey_queue.renew_migration_run_signal(
+            claim,
+            now=expires_at + dt.timedelta(microseconds=1),
+            lease_seconds=30.0,
+        )
         assert await valkey_queue.ack_migration_run_signal(stale_claim) is False
         assert await client.zrange(processing_key, 0, -1) == [
             str(migration_uuid).encode()

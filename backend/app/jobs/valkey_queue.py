@@ -65,8 +65,11 @@ local current_expiry = redis.call('ZSCORE', KEYS[1], ARGV[1])
 if not current_expiry then
   return 0
 end
-if tonumber(ARGV[3]) > tonumber(current_expiry) then
-  redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+if tonumber(current_expiry) <= tonumber(ARGV[3]) then
+  return 0
+end
+if tonumber(ARGV[4]) > tonumber(current_expiry) then
+  redis.call('ZADD', KEYS[1], ARGV[4], ARGV[1])
 end
 return 1
 """
@@ -386,6 +389,7 @@ async def renew_migration_run_signal(
             settings.valkey_migration_run_lease_token_key,
             str(claim.migration_run_uuid),
             str(claim.lease_token),
+            current.timestamp(),
             current.timestamp() + duration,
         )
         return int(renewed) == 1

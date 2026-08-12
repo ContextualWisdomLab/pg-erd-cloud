@@ -357,7 +357,11 @@ async def test_migration_signal_renewal_requires_exact_bounded_lease(
         settings.valkey_migration_run_lease_token_key,
         str(claim.migration_run_uuid),
         str(claim.lease_token),
+        now.timestamp(),
         now.timestamp() + 15.0,
+    )
+    assert "tonumber(current_expiry) <= tonumber(ARGV[3])" in (
+        valkey_queue._RENEW_MIGRATION_RUN_SIGNAL_SCRIPT
     )
     assert client.aclose.await_count == 2
 

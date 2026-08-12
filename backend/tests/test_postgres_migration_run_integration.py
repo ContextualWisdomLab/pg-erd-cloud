@@ -865,6 +865,11 @@ async def test_real_postgres_and_valkey_recover_failure_and_crash(
                     ) is False
 
             await asyncio.sleep(1.1)
+            assert not await valkey_queue.renew_migration_run_signal(
+                crash_signal_claim,
+                now=dt.datetime.now(dt.timezone.utc),
+                lease_seconds=60,
+            )
             recovered_attempts: list[MigrationRunAttemptClaim] = []
             recovered_signals: list[valkey_queue.MigrationRunSignalClaim] = []
 

@@ -129,8 +129,9 @@ Adequacy labels in this audit mean:
   and cancellation intent are also implemented.
 - **Implemented — UUID-only signal lease safety:** ready-to-processing claim,
   bounded expiry reclaim, exact lease renewal, acknowledgement, and retry
-  release require an exact lease-token; renewal cannot shorten the current
-  expiry and stale claimants cannot extend or complete successor leases.
+  release require an exact lease-token; an expired signal owner cannot renew,
+  renewal cannot shorten the current expiry, and stale claimants cannot extend
+  or complete successor leases.
 - **Implemented — execution-neutral queue consumer contract:** one injected
   handler receives the exact signal claim (run UUID plus opaque lease-token)
   and must succeed before exact-lease acknowledgement; sanitized failure

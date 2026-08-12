@@ -79,8 +79,9 @@ Implemented in the initial safe vertical slice:
   publication back, idles at a positive configured interval, and shuts down
   cooperatively; it does not load plans, consume signals, or execute SQL;
 - UUID-only ready signals can be atomically moved to an isolated processing
-  set with a bounded exact lease-token, reclaimed after expiry, acknowledged
-  only by the current token, or released for a scheduled retry. These are
+  set with a bounded exact lease-token, renewable only before expiry, reclaimed
+  after expiry, acknowledged only by the current token, or released for a
+  scheduled retry. These are
   execution-neutral consumer contract and consumer-safety primitives only: no
   application consumer lifecycle or migration worker exists;
 - DB-durable `migration_run_attempt` history serializes acquisition on the run,

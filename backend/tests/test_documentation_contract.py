@@ -394,6 +394,7 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
         assert "exact lease-token" in document
         assert "exact signal claim" in document
         assert "exact lease renewal" in document
+        assert "expired signal owner cannot renew" in document
         assert "automatic heartbeat is **implemented**" in document
         assert "execution-neutral consumer contract is **implemented**" in document
         assert "application startup wiring" in document

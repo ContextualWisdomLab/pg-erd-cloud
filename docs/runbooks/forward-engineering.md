@@ -82,8 +82,9 @@ operational artifact is attached to the release record.
   start a queue consumer, load a plan, or execute SQL.
 - [x] Atomic ready-to-processing claim, bounded expiry reclaim, exact lease
   renewal, acknowledgement, and retry release use an exact lease-token. A stale
-  claimant cannot extend or complete a successor lease, renewal cannot shorten
-  the current expiry, and the ready payload remains only
+  claimant cannot extend or complete a successor lease, an expired signal
+  owner cannot renew, renewal cannot shorten the current expiry, and the ready
+  payload remains only
   `migration_run_uuid`.
 - [x] The execution-neutral consumer contract is **Implemented**. It calls one
   injected handler with the exact signal claim (run UUID plus opaque

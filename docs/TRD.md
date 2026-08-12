@@ -68,7 +68,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 - bounded UUID-only ready-to-processing claim, expiry reclaim, exact lease
   renewal, acknowledgement, and retry-release primitives use an exact
   lease-token so a stale claimant cannot extend or complete a successor lease.
-  Renewal never shortens the current expiry. The execution-neutral consumer
+  An expired signal owner cannot renew, and renewal never shortens the current
+  expiry. The execution-neutral consumer
   contract is **Implemented**: an injected handler receives the exact signal
   claim (run UUID plus opaque lease-token) and must succeed before exact-lease
   acknowledgement; sanitized failure releases only that lease at a bounded

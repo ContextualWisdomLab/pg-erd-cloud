@@ -159,7 +159,8 @@ signal claim (the run UUID plus its opaque lease-token), acknowledges only
 after success, releases the exact lease on a sanitized failure, and fails
 closed when either completion loses lease ownership. The ready-queue payload
 remains UUID-only; the token is processing metadata, not execution authority.
-Renewal never shortens an existing expiry. Automatic heartbeat is
+An expired signal owner cannot renew, and renewal never shortens an existing
+expiry. Automatic heartbeat is
 **Implemented**: the consumer renews while its injected handler runs, cancels
 the handler when exact renewal is lost, and never acknowledges that loss as
 success. A separate DB-durable attempt contract is **Implemented**: acquisition

@@ -45,8 +45,9 @@ must tolerate at-least-once redelivery after an ambiguous publish.
 The signal adapter atomically reclaims expired processing leases and moves one
 due UUID-only ready member to an isolated processing set. A consumer-generated
 exact lease-token is stored separately from the ready payload; only that token
-may perform exact lease renewal, acknowledgement, or release. Renewal is
-monotonic and cannot shorten the current expiry. This prevents a stale claimant
+may perform exact lease renewal, acknowledgement, or release. An expired signal
+owner cannot renew; renewal is monotonic and cannot shorten the current expiry.
+This prevents a stale claimant
 from extending or acknowledging a successor lease. The execution-neutral
 consumer invokes only an injected handler with the exact signal claim (run UUID
 plus opaque lease-token), acknowledges after success, releases that exact lease
