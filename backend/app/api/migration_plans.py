@@ -122,6 +122,7 @@ def _apply_creation_contract_error(
         "migration plan integrity verification failed": (409, "plan_integrity_invalid"),
         "migration plan expired": (409, "plan_expired"),
         "migration plan cannot be dry-run": (409, "plan_not_executable"),
+        "migration model revision is stale": (409, "stale_revision"),
         "passed dry run is invalid": (409, "passed_dry_run_invalid"),
         "target connection confirmation mismatch": (409, "target_confirmation_mismatch"),
         "destructive confirmation mismatch": (409, "destructive_confirmation_mismatch"),
@@ -426,6 +427,26 @@ async def create_apply_run(
             detail="migration plan digest does not match",
         )
 
+    model_revision = await session.get(
+        SchemaModelRevision, plan.schema_model_revision_uuid
+    )
+    if model_revision is None:
+        raise _creation_error(
+            request,
+            status_code=409,
+            code="stale_revision",
+            detail="migration model revision is stale",
+        )
+    schema_model = await session.get(
+        SchemaModel, model_revision.schema_model_uuid, with_for_update=True
+    )
+    if schema_model is None:
+        raise _creation_error(
+            request,
+            status_code=409,
+            code="stale_revision",
+            detail="migration model revision is stale",
+        )
     passed_dry_run = await session.get(MigrationRun, body.passed_dry_run_uuid)
     connection = await session.get(DbConnection, plan.db_connection_uuid)
     if passed_dry_run is None:
@@ -455,6 +476,8 @@ async def create_apply_run(
             connection=connection,
             typed_connection_name=body.target_connection_name,
             destructive_acknowledged=body.destructive_acknowledged,
+            model_revision=model_revision,
+            schema_model=schema_model,
         )
     except MigrationRunContractError as exc:
         raise _apply_creation_contract_error(request, exc) from exc

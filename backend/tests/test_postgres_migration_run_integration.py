@@ -1009,6 +1009,16 @@ async def test_real_postgres_and_valkey_recover_failure_and_crash(
 
             target_connection = await session.get(DbConnection, connection_uuid)
             assert target_connection is not None
+            model_revision = await session.get(
+                SchemaModelRevision, plan.schema_model_revision_uuid
+            )
+            assert model_revision is not None
+            schema_model = await session.get(
+                SchemaModel,
+                model_revision.schema_model_uuid,
+                with_for_update=True,
+            )
+            assert schema_model is not None
             apply_intent = await create_migration_run(
                 session,
                 plan=plan,
@@ -1020,6 +1030,8 @@ async def test_real_postgres_and_valkey_recover_failure_and_crash(
                 connection=target_connection,
                 typed_connection_name="integration target",
                 destructive_acknowledged=False,
+                model_revision=model_revision,
+                schema_model=schema_model,
                 now=dt.datetime.now(dt.timezone.utc),
             )
             await session.flush()

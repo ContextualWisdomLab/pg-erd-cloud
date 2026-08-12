@@ -176,6 +176,8 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "**Implementation status:** Partially implemented" in adr
     normalized_contract = " ".join(contract.lower().split())
     assert "public apply intent creation is **implemented**" in normalized_contract
+    assert "for update" in normalized_contract
+    assert "stale_revision" in normalized_contract
     assert (
         "post /api/migration-plans/{migration_plan_uuid}/dry-runs"
         in normalized_contract

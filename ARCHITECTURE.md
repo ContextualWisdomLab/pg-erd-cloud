@@ -76,6 +76,9 @@ Implemented in the initial safe vertical slice:
   exact destructive-confirmation requirement into a queued durable intent and
   hash-chained genesis event; it deliberately creates no dispatch, worker
   signal, credential access, SQL execution, or DDL authority;
+- apply-intent creation locks the plan's schema-model row `FOR UPDATE` and
+  rejects `stale_revision` unless the plan-bound revision UUID, number, digest,
+  model, and project still match the current exact authority;
 - lock-scoped relay primitives that claim one due dispatch with
   `FOR UPDATE SKIP LOCKED`, increment its attempt in the caller-owned
   transaction, publish only `migration_run_uuid` to a dedicated Valkey sorted

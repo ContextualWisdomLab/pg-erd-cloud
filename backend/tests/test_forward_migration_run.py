@@ -41,6 +41,8 @@ from app.models import (
     MigrationRunAttempt,
     MigrationRunDispatch,
     MigrationRunEvent,
+    SchemaModel,
+    SchemaModelRevision,
 )
 
 
@@ -151,6 +153,29 @@ def _migration_plan_with_preconditions() -> MigrationPlan:
         expires_at=datetime(2026, 8, 11, tzinfo=timezone.utc),
         created_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
     )
+
+
+def _current_revision(
+    plan: MigrationPlan, *, actor_uuid: uuid.UUID
+) -> tuple[SchemaModelRevision, SchemaModel]:
+    """Return one current model/revision binding for apply-intent tests."""
+
+    model = SchemaModel(
+        schema_model_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        model_name="reviewed model",
+        current_revision_number=3,
+        created_by_user_uuid=actor_uuid,
+    )
+    revision = SchemaModelRevision(
+        schema_model_revision_uuid=plan.schema_model_revision_uuid,
+        schema_model_uuid=model.schema_model_uuid,
+        revision_number=model.current_revision_number,
+        revision_digest=plan.target_digest,
+        model_json={},
+        created_by_user_uuid=actor_uuid,
+    )
+    return revision, model
 
 
 def test_run_state_machine_separates_dry_run_and_apply_authority() -> None:
@@ -2326,6 +2351,7 @@ async def test_create_apply_intent_binds_passed_run_and_exact_confirmation() -> 
         dsn_ciphertext=b"ciphertext",
         dsn_nonce=b"nonce",
     )
+    revision, model = _current_revision(plan, actor_uuid=actor_uuid)
     run_uuid = uuid.uuid4()
     session = SimpleNamespace(
         execute=AsyncMock(
@@ -2348,6 +2374,8 @@ async def test_create_apply_intent_binds_passed_run_and_exact_confirmation() -> 
         connection=connection,
         typed_connection_name='Production "Primary"',
         destructive_acknowledged=False,
+        model_revision=revision,
+        schema_model=model,
         now=now,
     )
 
@@ -2399,6 +2427,7 @@ async def test_create_apply_intent_rejects_unbounded_internal_connection_name() 
         dsn_ciphertext=b"ciphertext",
         dsn_nonce=b"nonce",
     )
+    revision, model = _current_revision(plan, actor_uuid=actor_uuid)
     session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
 
     with pytest.raises(MigrationRunContractError, match="confirmation"):
@@ -2413,6 +2442,8 @@ async def test_create_apply_intent_rejects_unbounded_internal_connection_name() 
             connection=connection,
             typed_connection_name="x" * 129,
             destructive_acknowledged=False,
+            model_revision=revision,
+            schema_model=model,
             now=datetime(2026, 8, 10, 3, tzinfo=timezone.utc),
         )
 
@@ -2429,6 +2460,7 @@ async def test_create_apply_intent_rejects_unbounded_internal_connection_name() 
         ("passed_base", "passed dry run is invalid"),
         ("destructive", "destructive confirmation mismatch"),
         ("reserved_evidence", "apply evidence is invalid"),
+        ("stale_revision", "migration model revision is stale"),
     ],
 )
 async def test_create_apply_intent_rejects_every_cross_authority_binding(
@@ -2461,6 +2493,7 @@ async def test_create_apply_intent_rejects_every_cross_authority_binding(
         dsn_ciphertext=b"ciphertext",
         dsn_nonce=b"nonce",
     )
+    revision, model = _current_revision(plan, actor_uuid=actor_uuid)
     destructive_acknowledged = False
     evidence: dict[str, object] = {}
     if mutation == "connection_project":
@@ -2473,6 +2506,8 @@ async def test_create_apply_intent_rejects_every_cross_authority_binding(
         passed_run.observed_base_digest = "e" * 64
     elif mutation == "destructive":
         destructive_acknowledged = True
+    elif mutation == "stale_revision":
+        model.current_revision_number += 1
     else:
         evidence = {"targetConnectionConfirmed": True}
     session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
@@ -2489,6 +2524,8 @@ async def test_create_apply_intent_rejects_every_cross_authority_binding(
             connection=connection,
             typed_connection_name=connection.conn_name,
             destructive_acknowledged=destructive_acknowledged,
+            model_revision=revision,
+            schema_model=model,
             now=datetime(2026, 8, 10, 3, tzinfo=timezone.utc),
         )
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, call, patch
 
 import pytest
 from fastapi import HTTPException
@@ -24,7 +24,14 @@ from app.forward.migration_run import (
     MigrationRunCreation,
     digest_run_event,
 )
-from app.models import DbConnection, MigrationPlan, MigrationRun, MigrationRunEvent
+from app.models import (
+    DbConnection,
+    MigrationPlan,
+    MigrationRun,
+    MigrationRunEvent,
+    SchemaModel,
+    SchemaModelRevision,
+)
 from app.schemas import (
     MigrationApplyRunCreateIn,
     MigrationRunCancelIn,
@@ -122,6 +129,27 @@ def _plan() -> MigrationPlan:
     )
 
 
+def _current_revision(plan: MigrationPlan) -> tuple[SchemaModelRevision, SchemaModel]:
+    """Return the exact model revision pair an apply request must lock."""
+
+    model = SchemaModel(
+        schema_model_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        model_name="reviewed model",
+        current_revision_number=3,
+        created_by_user_uuid=uuid.uuid4(),
+    )
+    revision = SchemaModelRevision(
+        schema_model_revision_uuid=plan.schema_model_revision_uuid,
+        schema_model_uuid=model.schema_model_uuid,
+        revision_number=model.current_revision_number,
+        revision_digest=plan.target_digest,
+        model_json={},
+        created_by_user_uuid=uuid.uuid4(),
+    )
+    return revision, model
+
+
 @pytest.mark.asyncio
 async def test_create_dry_run_persists_correlated_editor_intent() -> None:
     """An editor gets one accepted queued identity after transaction commit."""
@@ -197,8 +225,9 @@ async def test_create_apply_run_persists_deployer_confirmation_without_dispatch(
         dsn_ciphertext=b"ciphertext",
         dsn_nonce=b"nonce",
     )
+    revision, model = _current_revision(plan)
     session = SimpleNamespace(
-        get=AsyncMock(side_effect=[plan, passed_run, connection]),
+        get=AsyncMock(side_effect=[plan, revision, model, passed_run, connection]),
         commit=AsyncMock(),
     )
     creation = MigrationRunCreation(
@@ -250,6 +279,11 @@ async def test_create_apply_run_persists_deployer_confirmation_without_dispatch(
         connection=connection,
         typed_connection_name="Production Primary",
         destructive_acknowledged=False,
+        model_revision=revision,
+        schema_model=model,
+    )
+    assert session.get.await_args_list[2] == call(
+        SchemaModel, model.schema_model_uuid, with_for_update=True
     )
     session.commit.assert_awaited_once()
 
@@ -345,6 +379,7 @@ async def test_create_apply_run_rejects_stale_plan_before_loading_evidence() -> 
         ("target connection confirmation mismatch", 409, "target_confirmation_mismatch"),
         ("destructive confirmation mismatch", 409, "destructive_confirmation_mismatch"),
         ("apply evidence is invalid", 422, "apply_confirmation_invalid"),
+        ("migration model revision is stale", 409, "stale_revision"),
         ("idempotency key conflict", 409, "idempotency_key_conflict"),
     ],
 )
@@ -355,6 +390,7 @@ async def test_create_apply_run_maps_contract_failures_without_source_values(
 
     plan = _plan()
     passed_run = _run()
+    revision, model = _current_revision(plan)
     connection = DbConnection(
         db_connection_uuid=plan.db_connection_uuid,
         project_space_uuid=plan.project_space_uuid,
@@ -363,7 +399,7 @@ async def test_create_apply_run_maps_contract_failures_without_source_values(
         dsn_nonce=b"nonce",
     )
     session = SimpleNamespace(
-        get=AsyncMock(side_effect=[plan, passed_run, connection]),
+        get=AsyncMock(side_effect=[plan, revision, model, passed_run, connection]),
         commit=AsyncMock(),
     )
     with (

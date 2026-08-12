@@ -152,7 +152,10 @@ evidence JSON. The internal cancellation-intent writer and editor-authorized
 **Implemented**. Public dry-run creation is **Implemented**. Public apply intent
 creation is **Implemented**. Apply intent creation binds a deployer, exact plan digest,
 same-plan passed dry-run UUID/base digest, exact typed target connection name,
-and the plan's exact destructive-confirmation requirement. It creates no
+and the plan's exact destructive-confirmation requirement. The API locks the
+plan's schema-model row `FOR UPDATE` and rejects `stale_revision` unless the
+plan-bound revision UUID, number, target/revision digest, model, and project
+still match the current row. It creates no
 dispatch, signal, credential access, SQL execution, or executor authority.
 Lock-scoped due-order outbox claiming,
 attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are

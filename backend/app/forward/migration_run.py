@@ -37,6 +37,8 @@ from app.models import (
     MigrationRunAttempt,
     MigrationRunDispatch,
     MigrationRunEvent,
+    SchemaModel,
+    SchemaModelRevision,
 )
 
 MAX_IDEMPOTENCY_KEY_BYTES = 255
@@ -701,6 +703,8 @@ async def create_migration_run(
     connection: DbConnection | None = None,
     typed_connection_name: str | None = None,
     destructive_acknowledged: bool | None = None,
+    model_revision: SchemaModelRevision | None = None,
+    schema_model: SchemaModel | None = None,
     now: dt.datetime | None = None,
 ) -> MigrationRunCreation:
     """Select one durable run intent without exposing execution authority.
@@ -743,6 +747,8 @@ async def create_migration_run(
                 connection,
                 typed_connection_name,
                 destructive_acknowledged,
+                model_revision,
+                schema_model,
             )
         ):
             raise MigrationRunContractError("dry-run confirmation is invalid")
@@ -757,6 +763,8 @@ async def create_migration_run(
             or connection is None
             or not isinstance(typed_connection_name, str)
             or not isinstance(destructive_acknowledged, bool)
+            or model_revision is None
+            or schema_model is None
         ):
             raise MigrationRunContractError("apply confirmation is invalid")
         encoded_connection_name = typed_connection_name.encode("utf-8")
@@ -769,6 +777,15 @@ async def create_migration_run(
             )
         ):
             raise MigrationRunContractError("apply confirmation is invalid")
+        if (
+            model_revision.schema_model_revision_uuid
+            != plan.schema_model_revision_uuid
+            or model_revision.schema_model_uuid != schema_model.schema_model_uuid
+            or model_revision.revision_number != schema_model.current_revision_number
+            or model_revision.revision_digest != plan.target_digest
+            or schema_model.project_space_uuid != plan.project_space_uuid
+        ):
+            raise MigrationRunContractError("migration model revision is stale")
         if (
             connection.db_connection_uuid != plan.db_connection_uuid
             or connection.project_space_uuid != plan.project_space_uuid

@@ -178,6 +178,8 @@ DDL execution. Every operation in section 4 remains Planned.
 1. Confirm the actor has server-verified deployer authority.
 2. Bind the exact unexpired plan/digest, current model revision, and passed
    dry-run UUID for the same base observation.
+   The server locks the schema-model row `FOR UPDATE`; `stale_revision` means a
+   successor model revision won and no intent was created.
 3. Require the deployer to type the exact connection name.
 4. Require a separate destructive acknowledgement when any operation has
    destructive severity or data-loss risk.

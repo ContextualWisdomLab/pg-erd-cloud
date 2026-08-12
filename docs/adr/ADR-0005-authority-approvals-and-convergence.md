@@ -119,6 +119,9 @@ acceptance. A central green signal cannot replace leaf convergence evidence.
   passed dry-run/base evidence, typed connection name, destructive decision,
   actor, and idempotency key. It persists a confirmation digest and chained
   genesis evidence but deliberately creates no dispatch or execution authority.
+- The route locks the plan's schema-model row `FOR UPDATE`; a plan-bound
+  revision that is no longer the current exact UUID/number/digest fails as
+  `stale_revision` before intent insertion.
 
 ### Planned before production release
 
