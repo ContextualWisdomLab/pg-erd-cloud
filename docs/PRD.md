@@ -27,7 +27,10 @@ preflight cores, durable run/event/outbox identity, and hashed lease-bound
 worker-attempt ownership. Consumer-to-attempt binding is **Implemented** as an
 execution-neutral dual-lease adapter. Application startup wiring, credentials,
 sandbox lifecycle, worker execution, durable apply, post-apply convergence,
-and the frontend workflow are **Planned** release blockers.
+and the frontend workflow are **Planned** release blockers. Typed browser
+transport is **Partially implemented** for the current plan/run endpoints and
+accepts only identifiers, digests, typed confirmation, and optimistic state
+versions; Forward UI remains **Planned**.
 
 ## Actors and authority
 

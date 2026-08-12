@@ -165,6 +165,12 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 
 ## Current HTTP contract
 
+Typed browser transport is **Partially implemented** in `frontend/src/api.ts`
+for immutable plan retrieval, exact dry-run and non-dispatched apply-intent
+creation, durable run polling, and exact-version cancellation. It exposes no
+arbitrary SQL request field. Forward UI remains **Planned**, so these functions
+are not browser E2E or accessibility evidence.
+
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|
 | `POST /api/schema-models/by-project/{project_space_uuid}` | editor+ | Create identity and revision 1 | **Implemented** |

@@ -118,6 +118,31 @@ def test_published_apply_intent_route_is_not_classified_as_planned() -> None:
     assert route not in PLANNED_ROUTES
 
 
+def test_forward_browser_transport_is_partial_without_execution_authority() -> None:
+    """Track typed browser transport without claiming the forward UI exists."""
+
+    client = _read(Path("frontend/src/api.ts"))
+    documents = (
+        _read(Path("ARCHITECTURE.md")),
+        _read(Path("docs/PRD.md")),
+        _read(Path("docs/TRD.md")),
+        _read(Path("docs/TEST_STRATEGY.md")),
+    )
+
+    for symbol in (
+        "getMigrationPlan",
+        "createDryRun",
+        "createApplyRun",
+        "getMigrationRun",
+        "cancelMigrationRun",
+    ):
+        assert symbol in client
+    for document in documents:
+        normalized = " ".join(document.lower().split())
+        assert "typed browser transport is **partially implemented**" in normalized
+        assert "forward ui remains **planned**" in normalized
+
+
 def test_v1_contract_does_not_classify_plan_retrieval_as_planned() -> None:
     """Keep the implemented immutable-plan read surface out of planned scope."""
 
