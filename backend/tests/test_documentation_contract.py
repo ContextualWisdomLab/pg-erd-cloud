@@ -363,7 +363,7 @@ def test_dispatch_relay_documentation_separates_implemented_and_planned_scope() 
     )
     assert "- **Implemented — execution-neutral queue consumer contract:**" in audit
     assert (
-        "- **Planned — application consumer wiring, worker execution, "
+        "- **Planned — application startup wiring, worker execution, "
         "failover, and retention:**" in audit
     )
     assert "Relay loop/queue delivery" not in audit
@@ -428,8 +428,35 @@ def test_durable_attempt_documentation_is_implemented_without_authority_claim() 
     contract = documents["docs/contracts/forward-engineering-v1.md"]
     assert "exact-token cas" in contract
     assert "complete an expired attempt" in contract
-    assert "consumer wiring" in documents["docs/DOCUMENTATION_AUDIT.md"]
+    assert "consumer-to-attempt binding" in documents["docs/DOCUMENTATION_AUDIT.md"]
+    assert "application startup wiring" in documents["docs/DOCUMENTATION_AUDIT.md"]
     assert "partial foundation" in documents["docs/PRD.md"]
+
+
+def test_consumer_attempt_binding_is_documented_without_startup_or_sql_authority() -> None:
+    """Track the exact dual-lease adapter while keeping deployment Planned."""
+
+    documents = [
+        " ".join(_read(Path(path)).lower().split())
+        for path in (
+            "ARCHITECTURE.md",
+            "docs/PRD.md",
+            "docs/TRD.md",
+            "docs/contracts/forward-engineering-v1.md",
+            "docs/runbooks/forward-engineering.md",
+            "docs/TEST_STRATEGY.md",
+        )
+    ]
+    for document in documents:
+        assert "consumer-to-attempt binding is **implemented**" in document
+        assert "application startup wiring" in document
+        assert "worker execution" in document
+        assert "**planned**" in document
+
+    consumer = _read(Path("backend/app/jobs/migration_run_consumer.py"))
+    main = _read(Path("backend/app/main.py"))
+    assert "make_attempt_bound_migration_run_handler" in consumer
+    assert "run_migration_run_consumer_forever" not in main
 
 
 def test_ci_runs_real_valkey_signal_acceptance() -> None:

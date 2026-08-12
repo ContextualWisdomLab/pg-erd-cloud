@@ -77,8 +77,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   renewal loss cancels and retrieves the handler task and is never
   acknowledged as success. DB-durable attempt acquisition, renewal, expired
   takeover, and exact-owner finish are **Implemented** with hashed worker and
-  signal-token identities. Application startup wiring, consumer-to-attempt
-  binding, credentials, and worker execution remain **Planned**;
+  signal-token identities. Consumer-to-attempt binding is **Implemented**: an
+  execution-neutral adapter commits acquisition, renews through fresh metadata
+  transactions, cancels on ownership loss, and finishes the exact owner before
+  signal acknowledgement. Application startup wiring, credentials, and worker
+  execution remain **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - `complete_isolated_dry_run` revalidates an exact successful executor result
@@ -112,7 +115,7 @@ executable SQL, safety classification, approval truth, or recovery state.
   materialization, deployed isolation proof, cleanup, and worker binding (the
   signed-plan execution/convergence core is Partially implemented);
 - live-preflight worker wiring, separately constrained deployed credentials,
-  consumer/credential binding around the durable attempt and implemented caller-owned
+  credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -137,7 +140,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Partially implemented:** signed-plan/version/base/transaction/convergence execution core, `complete_isolated_dry_run` server-derived success CAS, and PostgreSQL 14–18 round trip exist; provisioning, materialization, deployed isolation/egress proof, cleanup, and worker binding remain Planned |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean reads, strict snapshot comparison, and durable hashed attempt ownership exist; `execute_bound_live_preflight` binds capture/checks to one read-only repeatable-read transaction and completion matches every persisted precondition. Consumer/credential binding, deployed target integration, worker execution, and in-lock apply repetition remain Planned. |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, and the execution-neutral consumer contract with automatic heartbeat are **Implemented**; DB-durable hashed worker-attempt acquire/renew/finish CAS is also **Implemented**. Application startup wiring, consumer-to-attempt/credential binding, and worker execution remain **Planned** |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, the execution-neutral consumer contract with automatic heartbeat, DB-durable hashed worker-attempt CAS, and exact consumer-to-attempt binding are **Implemented**. Application startup wiring, credential binding, and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry, 30-day cleanup excludes plans with run history, and the preflight primitive bounds query count/time and rejects unknown kinds/non-boolean evidence; worker lifecycle enforcement remains Planned |
@@ -152,7 +155,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, dry-run creation/cancellation, and polling exist; application consumer-to-attempt wiring, credentials, and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation, and polling exist; application startup wiring, credentials, and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, and

@@ -33,9 +33,9 @@ support.
 | React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; desired-model adapters and live workflow **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
-| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event/outbox storage, verified polling, dry-run creation/cancellation, and lease-bound hashed worker-attempt primitives **Implemented**; application worker wiring **Planned** |
+| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event/outbox storage, verified polling, dry-run creation/cancellation, lease-bound hashed worker-attempt primitives, and the exact dual-lease adapter **Implemented**; application worker wiring **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core and `complete_isolated_dry_run` server-derived success CAS **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
-| Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query, canonical snapshot/base-digest comparison, and DB-durable hashed attempt acquire/renew/finish primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification. Consumer-to-attempt wiring, credential binding, execution, and apply remain **Planned**. |
+| Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query, canonical snapshot/base-digest comparison, and DB-durable hashed attempt acquire/renew/finish primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification. Consumer-to-attempt binding is **Implemented** as an execution-neutral dual-lease adapter; application startup wiring, credential binding, worker execution, and apply remain **Planned**. |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
 The browser is an intent and review surface, never a SQL authority. The API
@@ -87,8 +87,9 @@ Implemented in the initial safe vertical slice:
   stores only SHA-256 hashes of bounded worker identity and the opaque signal
   lease token, permits one active attempt per run, reclaims only expired owners,
   renews monotonically by exact CAS while the run remains executable, and
-  finishes only an unexpired exact owner. It is not wired to the consumer and
-  grants no credential, sandbox, target, or DDL authority;
+  finishes only an unexpired exact owner. Consumer-to-attempt binding is
+  **Implemented** by an execution-neutral dual-lease adapter, but no application
+  startup task, credential, sandbox, target, or DDL authority exists;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary
@@ -105,8 +106,8 @@ Implemented in the initial safe vertical slice:
   transaction, returning the canonical observed digest and plan-base match;
   `complete_live_preflight` accepts only that exact bounded result shape and
   derives `drifted`, `failed`, or `passed` plus bounded aggregate evidence for
-  the existing durable CAS; neither function owns credentials, worker
-  credential, consumer wiring, or DDL authority;
+  the existing durable CAS; neither function owns credentials, application
+  worker wiring, or DDL authority;
 - an execution-only isolated-dry-run primitive accepts no DSN or browser SQL,
   verifies the immutable plan/compiler/PostgreSQL-major/base bindings, executes
   only the compiler-owned all-transactional statement list with bounded
@@ -124,8 +125,9 @@ identity/generated columns, existing-primary-key changes, views, triggers,
 partitions, extensions and distributed tables. This is a release blocker for
 general forward engineering, not a silent omission.
 
-Planned: isolated sandbox lifecycle and application worker integration,
-live-preflight consumer/credential binding around the durable attempt and caller-owned
+Consumer-to-attempt binding is **Implemented** without execution authority.
+Planned: isolated sandbox lifecycle, application startup wiring and worker execution,
+live-preflight credential binding around the durable attempt and caller-owned
 same-transaction snapshot primitive, plan approval, idempotent apply,
 post-commit re-introspection and the
 accessible frontend review/apply flow. The approved detailed design is in

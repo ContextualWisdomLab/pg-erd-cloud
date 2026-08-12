@@ -343,7 +343,12 @@ Additional **Implemented and Planned** invariants:
   releases only that lease at a bounded retry time. The ready payload remains
   UUID-only. The contract never loads a plan, credential, SQL batch, or target
   value.
-- **Planned — application consumer wiring and worker execution:** no startup
+- **Implemented — consumer-to-attempt binding:** the dual-lease adapter commits
+  exact attempt acquisition before invoking an injected handler, renews in
+  fresh metadata transactions, cancels on ownership loss, and records exact
+  completion before the signal may be acknowledged. It accepts no execution
+  material or credentials.
+- **Planned — application startup wiring and worker execution:** no startup
   task consumes migration signals or executes target SQL.
 - One database uniqueness rule plus `request_digest` implements idempotency:
   identical reuse returns the original run, while different effective input

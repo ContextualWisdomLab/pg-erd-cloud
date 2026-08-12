@@ -51,7 +51,7 @@ flowchart TB
 |---|---|---|---|
 | Deterministic unit/property | Prove canonical JSON, quoting, digest stability, complete blocker behavior, plan ordering, risk and snapshot adaptation. | Focused forward unit tests exist. | Exact statement/branch coverage plus property/fuzz cases for every admitted grammar and unknown-field boundary. |
 | API/service contract | Prove authorization, tenancy, optimistic concurrency, immutable persistence, size limits, expiry/idempotency/error semantics. | Model and plan route functions are tested mainly with faked sessions and mocks. | HTTP-level tests against migrated PostgreSQL, full role/IDOR/CSRF/CORS/error matrix, and database constraint races. |
-| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create distinct metadata, sandbox, and restricted-target databases. The matrix covers run/outbox/hashed-attempt persistence, exact signed-plan convergence, same-transaction preflight, privilege/DDL/SELECT denial, lock timeout, forced disconnect, sanitized failures, and cleanup. Provisioning/cleanup/egress, production credential and consumer-to-attempt binding, worker recovery, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
+| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create distinct metadata, sandbox, and restricted-target databases. The matrix covers run/outbox/hashed-attempt persistence, exact signed-plan convergence, same-transaction preflight, privilege/DDL/SELECT denial, lock timeout, forced disconnect, sanitized failures, and cleanup. The execution-neutral consumer-to-attempt adapter has deterministic lifecycle tests against those real-database-tested primitives. Provisioning/cleanup/egress, production credentials, deployed consumer lifecycle, worker recovery, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
 | Browser E2E/accessibility | Prove editor-to-verified workflow, tamper resistance, state recovery, focus, keyboard, names, and live regions. | Existing ERD UI tests do not implement the forward workflow. | Composed backend/frontend/worker/sandbox/target E2E, automated accessibility checks, and manual keyboard/screen-reader evidence. |
 | Operational/fault injection | Prove no-replay recovery, kill switch, alerts, runbook, retention, backup/restore, and uncertain commit handling. | No forward run worker or drills exist. | Controlled crash/network/lock/commit-acknowledgement tests and a recorded non-production game day. |
 
@@ -239,10 +239,12 @@ reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
 transition injection. Worker evidence cannot pre-author the reserved observed
 digest field through snake-, camel-, kebab-case, or nested aliases.
 The privilege proof is CI-local rather than deployed production evidence.
-Target audit-log evidence and consumer/credential binding around the durable
-attempt and caller-owned same-transaction primitive remain release blockers. The
-execution-neutral consumer contract is **Implemented**; application startup
-wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
+Target audit-log evidence, credential binding around the durable attempt, and
+the caller-owned same-transaction primitive remain release blockers. The
+execution-neutral consumer contract is **Implemented** and consumer-to-attempt
+binding is **Implemented** with success, sanitized failure, heartbeat-loss
+cancellation, and unsafe-timing tests. Application startup wiring and worker
+execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.
 
 ## Fault-injection and recovery matrix

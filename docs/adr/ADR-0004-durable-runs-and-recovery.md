@@ -5,9 +5,9 @@
   identifier-only transactional outbox, lock-scoped claim/publish-state CAS,
   bounded scheduled UUID-only queue publication, exact lease-token
   ready/processing claim-ack-release primitives, execution-neutral consumer
-  contract, polling, and dry-run creation/cancellation intent APIs exist, while
-  application consumer wiring, workers, deployment failover, and recovery do
-  not
+  contract, DB-durable hashed attempt ownership and dual-lease binding, polling,
+  and dry-run creation/cancellation intent APIs exist, while application startup
+  wiring, workers, deployment failover, and recovery do not
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and operators
 - **Supersedes:** none
@@ -205,7 +205,7 @@ Rules:
 ### Planned before production release
 
 - authenticated apply creation route;
-- application consumer wiring, cancellation-worker acknowledgement, and relay
+- application startup wiring, cancellation-worker acknowledgement, and relay
   deployment restart/failover evidence;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.

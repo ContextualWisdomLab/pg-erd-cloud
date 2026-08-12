@@ -46,8 +46,9 @@ Current code implements only the first control-plane slice:
   bounded executor-result shape and server-derives `passed`, `drifted`, or
   `failed`; a caller cannot select the state, event type, or digest. No worker
   execution authority exists yet. The
-  execution-neutral consumer contract is **Implemented**; application startup
-  wiring and worker execution remain **Planned**.
+  execution-neutral consumer contract is **Implemented**; consumer-to-attempt
+  binding is **Implemented** without plan, credential, or SQL authority.
+  Application startup wiring and worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
   them in one timed read-only transaction. `execute_bound_live_preflight`
@@ -166,9 +167,13 @@ serializes on an executable uncancelled dry run, stores only hashes of bounded
 worker identity and the opaque signal token, permits one active owner, abandons
 only an expired owner, and creates a monotonic attempt number. Renewal and
 finish are exact-token CAS operations; renewal also requires an executable run,
-and neither operation can revive or complete an expired attempt. Application
-startup wiring, consumer-to-attempt binding, credentials, and worker execution
-remain **Planned**. The bounded
+and neither operation can revive or complete an expired attempt.
+Consumer-to-attempt binding is **Implemented** by an execution-neutral adapter:
+it commits acquisition before invoking an injected handler, renews the exact
+attempt through fresh metadata transactions, cancels work on lease loss, and
+finishes the exact owner before the outer consumer may acknowledge the signal.
+Application startup wiring, credentials, and worker execution remain
+**Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation
@@ -210,8 +215,9 @@ claim, commits only after exact-attempt acknowledgement, rolls an exception
 back through the transaction context, sleeps at a bounded positive interval
 after empty or failed iterations, and cancels cleanly with the application.
 It refuses startup unless the Valkey signal backend is configured. The
-execution-neutral consumer contract is **Implemented**; application startup
-wiring and worker execution remain **Planned**. The consumer and lease
+execution-neutral consumer contract is **Implemented**; consumer-to-attempt
+binding is **Implemented** without plan, credential, or SQL authority.
+Application startup wiring and worker execution remain **Planned**. The consumer and lease
 primitives never load a plan, target credential, SQL batch, or row value.
 
 `transition_migration_run` validates event metadata and evidence before any
