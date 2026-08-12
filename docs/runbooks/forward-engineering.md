@@ -23,7 +23,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 |---|---|---|
 | Canonical model save/revision with `If-Match` | Implemented | May be used as a control-plane preview feature. |
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
-| Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean reads, strict snapshot/base-digest comparison, `execute_bound_live_preflight` caller-owned same-transaction capture/check binding, and `complete_live_preflight` server-derived terminal CAS classification exist. PostgreSQL 14–18 CI uses a separate ephemeral target login with fixture-scoped USAGE/SELECT, no database CREATE/TEMP, and proves DDL denial. Deployed credential isolation, durable worker identity/attempt binding, and target audit evidence are absent, so no plan is production-authorized. |
+| Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean reads, `execute_bound_live_preflight` same-transaction snapshot/check binding, `complete_live_preflight` server-derived terminal CAS, `complete_isolated_dry_run` sandbox result binding, and DB-durable hashed attempt ownership exist. PostgreSQL 14–18 CI uses a restricted ephemeral target login and proves DDL denial. Deployed credential isolation, consumer-to-attempt binding, worker execution, and target audit evidence are absent, so no plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Partially implemented | Exact signed-plan execution, rollback, version/base checks, target-digest convergence, and `complete_isolated_dry_run` server-derived success CAS have a PostgreSQL 14–18-tested core. Provisioning, dependency materialization, deployed isolation/egress proof, cleanup, and worker binding are Planned; no current result is release evidence. |
 | Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, and an execution-neutral consumer contract exist; no application consumer wiring, sandbox lifecycle, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
@@ -85,6 +85,10 @@ operational artifact is attached to the release record.
   It renews only the exact claim while the injected handler runs, cancels and
   retrieves the handler task on renewal loss, and never acknowledges that loss
   as success. No consumer startup wiring or execution worker is implied.
+- [x] DB-durable attempt ownership primitives are **Implemented**. They store
+  only hashed worker/signal-token identity, permit one active owner, reclaim
+  only expiry, and require exact unexpired-owner CAS for renew/finish.
+  Consumer wiring, credentials, and execution authority remain absent.
 - [ ] Relay deployment restart/failover, application consumer wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

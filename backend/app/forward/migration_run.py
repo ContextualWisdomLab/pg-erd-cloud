@@ -18,7 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,7 @@ from app.forward.migration_plan import verify_migration_plan_digest
 from app.models import (
     MigrationPlan,
     MigrationRun,
+    MigrationRunAttempt,
     MigrationRunDispatch,
     MigrationRunEvent,
 )
@@ -42,6 +43,8 @@ MAX_RUN_EVIDENCE_BYTES = 16_384
 MAX_RUN_EVIDENCE_DEPTH = 8
 MAX_RUN_EVIDENCE_ITEMS = 256
 MAX_RUN_EVIDENCE_STRING_BYTES = 2_048
+MAX_MIGRATION_ATTEMPT_LEASE_SECONDS = 300
+MAX_WORKER_IDENTITY_BYTES = 255
 
 DRY_RUN_STATES = frozenset(
     {
@@ -155,6 +158,17 @@ class MigrationDispatchClaim:
 
 
 @dataclass(frozen=True)
+class MigrationRunAttemptClaim:
+    """Exact durable worker-attempt identity owned by one signal claimant."""
+
+    migration_run_attempt_uuid: uuid.UUID
+    migration_run_uuid: uuid.UUID
+    attempt_number: int
+    acquired_state_version: int
+    lease_expires_at: dt.datetime
+
+
+@dataclass(frozen=True)
 class MigrationRunCancellation:
     """The durable cancellation-intent identity selected by one CAS request."""
 
@@ -166,6 +180,223 @@ class MigrationRunCancellation:
 def _require_aware_dispatch_time(value: dt.datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise MigrationRunContractError("dispatch time must include a timezone")
+
+
+def _validate_attempt_inputs(
+    *, worker_identity: str, lease_seconds: int, now: dt.datetime
+) -> tuple[str, dt.datetime]:
+    """Validate bounded ownership input and return its hash and expiry."""
+
+    _require_aware_dispatch_time(now)
+    if not isinstance(worker_identity, str):
+        raise MigrationRunContractError("worker identity is invalid")
+    encoded_identity = worker_identity.encode("utf-8")
+    if (
+        not encoded_identity
+        or len(encoded_identity) > MAX_WORKER_IDENTITY_BYTES
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,254}", worker_identity)
+        is None
+    ):
+        raise MigrationRunContractError("worker identity is invalid")
+    if (
+        isinstance(lease_seconds, bool)
+        or not isinstance(lease_seconds, int)
+        or not 1 <= lease_seconds <= MAX_MIGRATION_ATTEMPT_LEASE_SECONDS
+    ):
+        raise MigrationRunContractError("migration attempt lease is invalid")
+    return (
+        hashlib.sha256(encoded_identity).hexdigest(),
+        now + dt.timedelta(seconds=lease_seconds),
+    )
+
+
+def _hash_signal_lease_token(signal_lease_token: uuid.UUID) -> str:
+    """Hash an opaque signal lease token before durable comparison/storage."""
+
+    if not isinstance(signal_lease_token, uuid.UUID):
+        raise MigrationRunContractError("signal lease token is invalid")
+    return hashlib.sha256(signal_lease_token.bytes).hexdigest()
+
+
+async def acquire_migration_run_attempt(
+    session: AsyncSession,
+    *,
+    migration_run_uuid: uuid.UUID,
+    worker_identity: str,
+    signal_lease_token: uuid.UUID,
+    lease_seconds: int,
+    now: dt.datetime | None = None,
+) -> MigrationRunAttemptClaim:
+    """Acquire one DB-durable attempt after serializing on an executable run."""
+
+    acquired_at = now or dt.datetime.now(dt.timezone.utc)
+    worker_identity_hash, lease_expires_at = _validate_attempt_inputs(
+        worker_identity=worker_identity,
+        lease_seconds=lease_seconds,
+        now=acquired_at,
+    )
+    signal_lease_token_hash = _hash_signal_lease_token(signal_lease_token)
+    run = await session.scalar(
+        select(MigrationRun)
+        .where(MigrationRun.migration_run_uuid == migration_run_uuid)
+        .with_for_update()
+    )
+    if (
+        run is None
+        or run.run_kind != "dry_run"
+        or run.state
+        not in {"queued", "sandbox_running", "live_preflight_running"}
+        or run.cancellation_requested
+    ):
+        raise MigrationRunContractError("migration run is not executable")
+
+    active_attempt = await session.scalar(
+        select(MigrationRunAttempt)
+        .where(
+            MigrationRunAttempt.migration_run_uuid == migration_run_uuid,
+            MigrationRunAttempt.status == "active",
+        )
+        .with_for_update()
+        .limit(1)
+    )
+    if active_attempt is not None:
+        if active_attempt.lease_expires_at > acquired_at:
+            raise MigrationRunContractError("migration run attempt is already active")
+        active_attempt.status = "abandoned"
+        active_attempt.finished_at = acquired_at
+
+    latest_attempt_number = await session.scalar(
+        select(func.max(MigrationRunAttempt.attempt_number)).where(
+            MigrationRunAttempt.migration_run_uuid == migration_run_uuid
+        )
+    )
+    attempt_number = int(latest_attempt_number or 0) + 1
+    attempt = MigrationRunAttempt(
+        migration_run_attempt_uuid=uuid.uuid4(),
+        migration_run_uuid=migration_run_uuid,
+        attempt_number=attempt_number,
+        acquired_state_version=run.state_version,
+        status="active",
+        worker_identity_hash=worker_identity_hash,
+        signal_lease_token_hash=signal_lease_token_hash,
+        lease_expires_at=lease_expires_at,
+        acquired_at=acquired_at,
+        last_heartbeat_at=acquired_at,
+        finished_at=None,
+    )
+    session.add(attempt)
+    return MigrationRunAttemptClaim(
+        migration_run_attempt_uuid=attempt.migration_run_attempt_uuid,
+        migration_run_uuid=attempt.migration_run_uuid,
+        attempt_number=attempt.attempt_number,
+        acquired_state_version=attempt.acquired_state_version,
+        lease_expires_at=attempt.lease_expires_at,
+    )
+
+
+async def renew_migration_run_attempt(
+    session: AsyncSession,
+    *,
+    claim: MigrationRunAttemptClaim,
+    worker_identity: str,
+    signal_lease_token: uuid.UUID,
+    lease_seconds: int,
+    now: dt.datetime | None = None,
+) -> bool:
+    """Monotonically renew one exact, unexpired attempt while its run is active."""
+
+    heartbeat_at = now or dt.datetime.now(dt.timezone.utc)
+    worker_identity_hash, requested_expiry = _validate_attempt_inputs(
+        worker_identity=worker_identity,
+        lease_seconds=lease_seconds,
+        now=heartbeat_at,
+    )
+    signal_lease_token_hash = _hash_signal_lease_token(signal_lease_token)
+    executable_run = (
+        select(MigrationRun.migration_run_uuid)
+        .where(
+            MigrationRun.migration_run_uuid == claim.migration_run_uuid,
+            MigrationRun.run_kind == "dry_run",
+            MigrationRun.state.in_(
+                {"queued", "sandbox_running", "live_preflight_running"}
+            ),
+            MigrationRun.cancellation_requested.is_(False),
+        )
+        .exists()
+    )
+    result = cast(
+        CursorResult[Any],
+        await session.execute(
+            update(MigrationRunAttempt)
+            .where(
+                MigrationRunAttempt.migration_run_attempt_uuid
+                == claim.migration_run_attempt_uuid,
+                MigrationRunAttempt.migration_run_uuid
+                == claim.migration_run_uuid,
+                MigrationRunAttempt.attempt_number == claim.attempt_number,
+                MigrationRunAttempt.status == "active",
+                MigrationRunAttempt.worker_identity_hash == worker_identity_hash,
+                MigrationRunAttempt.signal_lease_token_hash
+                == signal_lease_token_hash,
+                MigrationRunAttempt.lease_expires_at > heartbeat_at,
+                executable_run,
+            )
+            .values(
+                lease_expires_at=func.greatest(
+                    MigrationRunAttempt.lease_expires_at, requested_expiry
+                ),
+                last_heartbeat_at=heartbeat_at,
+            )
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    return result.rowcount == 1
+
+
+async def finish_migration_run_attempt(
+    session: AsyncSession,
+    *,
+    claim: MigrationRunAttemptClaim,
+    worker_identity: str,
+    signal_lease_token: uuid.UUID,
+    succeeded: bool,
+    now: dt.datetime | None = None,
+) -> bool:
+    """Finish one exact active attempt as completed or abandoned."""
+
+    finished_at = now or dt.datetime.now(dt.timezone.utc)
+    worker_identity_hash, _ = _validate_attempt_inputs(
+        worker_identity=worker_identity,
+        lease_seconds=1,
+        now=finished_at,
+    )
+    signal_lease_token_hash = _hash_signal_lease_token(signal_lease_token)
+    if not isinstance(succeeded, bool):
+        raise MigrationRunContractError("migration attempt outcome is invalid")
+    result = cast(
+        CursorResult[Any],
+        await session.execute(
+            update(MigrationRunAttempt)
+            .where(
+                MigrationRunAttempt.migration_run_attempt_uuid
+                == claim.migration_run_attempt_uuid,
+                MigrationRunAttempt.migration_run_uuid
+                == claim.migration_run_uuid,
+                MigrationRunAttempt.attempt_number == claim.attempt_number,
+                MigrationRunAttempt.status == "active",
+                MigrationRunAttempt.worker_identity_hash == worker_identity_hash,
+                MigrationRunAttempt.signal_lease_token_hash
+                == signal_lease_token_hash,
+                MigrationRunAttempt.lease_expires_at > finished_at,
+            )
+            .values(
+                status="completed" if succeeded else "abandoned",
+                finished_at=finished_at,
+            )
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    return result.rowcount == 1
 
 
 async def claim_one_migration_dispatch(

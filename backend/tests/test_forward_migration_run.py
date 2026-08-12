@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import nan
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,7 +16,9 @@ from app.forward.migration_plan import compile_migration_plan
 from app.forward.migration_run import (
     _expected_live_preflight_checks,
     MigrationDispatchClaim,
+    MigrationRunAttemptClaim,
     MigrationRunContractError,
+    acquire_migration_run_attempt,
     canonicalize_run_evidence,
     claim_one_migration_dispatch,
     complete_isolated_dry_run,
@@ -26,16 +28,41 @@ from app.forward.migration_run import (
     digest_run_request,
     hash_idempotency_key,
     mark_migration_dispatch_published,
+    finish_migration_run_attempt,
     request_migration_run_cancellation,
+    renew_migration_run_attempt,
     transition_migration_run,
     validate_run_transition,
 )
 from app.models import (
     MigrationPlan,
     MigrationRun,
+    MigrationRunAttempt,
     MigrationRunDispatch,
     MigrationRunEvent,
 )
+
+
+def _queued_migration_run(*, now: datetime) -> MigrationRun:
+    """Return one active dry-run row suitable for worker-attempt tests."""
+
+    return MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="queued",
+        state_version=1,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        evidence_json={},
+        created_at=now,
+        updated_at=now,
+    )
 
 
 def _migration_plan(
@@ -418,6 +445,279 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     }
 
 
+def test_migration_run_attempt_persistence_is_lease_bound_and_secret_free() -> None:
+    """Attempt history stores only hashes and permits one active owner per run."""
+
+    assert MigrationRunAttempt.__tablename__ == "migration_run_attempt"
+    assert {
+        column.name for column in MigrationRunAttempt.__table__.columns
+    } == {
+        "migration_run_attempt_uuid",
+        "migration_run_uuid",
+        "attempt_number",
+        "acquired_state_version",
+        "status",
+        "worker_identity_hash",
+        "signal_lease_token_hash",
+        "lease_expires_at",
+        "acquired_at",
+        "last_heartbeat_at",
+        "finished_at",
+    }
+    assert {
+        constraint.name
+        for constraint in MigrationRunAttempt.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    } == {
+        "ck_migration_run_attempt__attempt_number",
+        "ck_migration_run_attempt__acquired_state_version",
+        "ck_migration_run_attempt__status",
+        "ck_migration_run_attempt__worker_identity_hash",
+        "ck_migration_run_attempt__signal_lease_token_hash",
+        "ck_migration_run_attempt__timestamps",
+    }
+    assert {
+        tuple(column.name for column in constraint.columns)
+        for constraint in MigrationRunAttempt.__table__.constraints
+        if isinstance(constraint, UniqueConstraint)
+    } == {("migration_run_uuid", "attempt_number")}
+    assert {index.name for index in MigrationRunAttempt.__table__.indexes} == {
+        "ix_migration_run_attempt__active_run",
+        "ix_migration_run_attempt__lease_expiry",
+    }
+    assert {
+        column.name for column in MigrationRunAttempt.__table__.columns
+    }.isdisjoint(
+        {"worker_identity", "signal_lease_token", "dsn", "sql", "plan_json"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_attempt_acquire_locks_run_and_creates_first_hashed_claim() -> None:
+    """Acquisition serializes on the run and persists hashes, never raw identity."""
+
+    now = datetime(2026, 8, 12, 2, tzinfo=timezone.utc)
+    run = _queued_migration_run(now=now)
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, None, None]),
+        add=Mock(),
+    )
+    token = uuid.uuid4()
+
+    claim = await acquire_migration_run_attempt(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        worker_identity="worker-a",
+        signal_lease_token=token,
+        lease_seconds=60,
+        now=now,
+    )
+
+    assert claim.migration_run_uuid == run.migration_run_uuid
+    assert claim.attempt_number == 1
+    assert claim.acquired_state_version == 1
+    assert claim.lease_expires_at == now + timedelta(seconds=60)
+    assert session.scalar.await_count == 3
+    run_statement = session.scalar.await_args_list[0].args[0]
+    assert "FOR UPDATE" in str(
+        run_statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    attempt = session.add.call_args.args[0]
+    assert isinstance(attempt, MigrationRunAttempt)
+    assert attempt.worker_identity_hash != "worker-a"
+    assert attempt.signal_lease_token_hash != str(token)
+    assert len(attempt.worker_identity_hash) == 64
+    assert len(attempt.signal_lease_token_hash) == 64
+    assert attempt.status == "active"
+    assert attempt.finished_at is None
+
+
+@pytest.mark.asyncio
+async def test_attempt_acquire_reclaims_only_an_expired_owner() -> None:
+    """An unexpired owner blocks takeover; expiry is durably abandoned first."""
+
+    now = datetime(2026, 8, 12, 2, tzinfo=timezone.utc)
+    run = _queued_migration_run(now=now)
+    active = MigrationRunAttempt(
+        migration_run_attempt_uuid=uuid.uuid4(),
+        migration_run_uuid=run.migration_run_uuid,
+        attempt_number=1,
+        acquired_state_version=1,
+        status="active",
+        worker_identity_hash="a" * 64,
+        signal_lease_token_hash="b" * 64,
+        lease_expires_at=now + timedelta(seconds=1),
+        acquired_at=now - timedelta(seconds=10),
+        last_heartbeat_at=now - timedelta(seconds=10),
+        finished_at=None,
+    )
+    token = uuid.uuid4()
+    blocked_session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, active]), add=Mock()
+    )
+    with pytest.raises(MigrationRunContractError, match="already active"):
+        await acquire_migration_run_attempt(
+            blocked_session,
+            migration_run_uuid=run.migration_run_uuid,
+            worker_identity="worker-b",
+            signal_lease_token=token,
+            lease_seconds=60,
+            now=now,
+        )
+    blocked_session.add.assert_not_called()
+
+    active.lease_expires_at = now
+    reclaim_session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[run, active, 1]), add=Mock()
+    )
+    claim = await acquire_migration_run_attempt(
+        reclaim_session,
+        migration_run_uuid=run.migration_run_uuid,
+        worker_identity="worker-b",
+        signal_lease_token=token,
+        lease_seconds=60,
+        now=now,
+    )
+    assert active.status == "abandoned"
+    assert active.finished_at == now
+    assert claim.attempt_number == 2
+
+
+@pytest.mark.asyncio
+async def test_attempt_renewal_and_finish_are_exact_claim_cas() -> None:
+    """Heartbeat and finish require the exact active attempt and hashed owner."""
+
+    now = datetime(2026, 8, 12, 2, tzinfo=timezone.utc)
+    claim = MigrationRunAttemptClaim(
+        migration_run_attempt_uuid=uuid.uuid4(),
+        migration_run_uuid=uuid.uuid4(),
+        attempt_number=2,
+        acquired_state_version=3,
+        lease_expires_at=now + timedelta(seconds=60),
+    )
+    token = uuid.uuid4()
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1))
+    )
+
+    assert await renew_migration_run_attempt(
+        session,
+        claim=claim,
+        worker_identity="worker-a",
+        signal_lease_token=token,
+        lease_seconds=60,
+        now=now,
+    ) is True
+    renewal = str(
+        session.execute.await_args.args[0].compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "migration_run_attempt.status = 'active'" in renewal
+    assert "migration_run_attempt.lease_expires_at >" in renewal
+    assert "migration_run.cancellation_requested IS false" in renewal
+    assert "greatest(" in renewal.lower()
+    assert "worker-a" not in renewal
+    assert str(token) not in renewal
+
+    session.execute.return_value = SimpleNamespace(rowcount=1)
+    assert await finish_migration_run_attempt(
+        session,
+        claim=claim,
+        worker_identity="worker-a",
+        signal_lease_token=token,
+        succeeded=True,
+        now=now,
+    ) is True
+    finish = str(
+        session.execute.await_args.args[0].compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "migration_run_attempt.status = 'active'" in finish
+    assert "migration_run_attempt.lease_expires_at >" in finish
+    assert "status='completed'" in finish.replace(" ", "")
+    assert "finished_at=" in finish
+
+    session.execute.return_value = SimpleNamespace(rowcount=0)
+    assert await renew_migration_run_attempt(
+        session,
+        claim=claim,
+        worker_identity="worker-a",
+        signal_lease_token=uuid.uuid4(),
+        lease_seconds=60,
+        now=now,
+    ) is False
+    assert await finish_migration_run_attempt(
+        session,
+        claim=claim,
+        worker_identity="worker-a",
+        signal_lease_token=uuid.uuid4(),
+        succeeded=False,
+        now=now,
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_attempt_contract_rejects_inactive_runs_and_unsafe_inputs() -> None:
+    """Terminal/cancelled runs, naive clocks, and unbounded leases fail closed."""
+
+    now = datetime(2026, 8, 12, 2, tzinfo=timezone.utc)
+    run = _queued_migration_run(now=now)
+    run.cancellation_requested = True
+    session = SimpleNamespace(scalar=AsyncMock(return_value=run), add=Mock())
+    with pytest.raises(MigrationRunContractError, match="not executable"):
+        await acquire_migration_run_attempt(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            worker_identity="worker-a",
+            signal_lease_token=uuid.uuid4(),
+            lease_seconds=60,
+            now=now,
+        )
+
+    for worker_identity, lease_seconds, expected in (
+        ("", 60, "worker identity"),
+        ("worker a", 60, "worker identity"),
+        ("worker-a", 0, "lease"),
+        ("worker-a", 301, "lease"),
+    ):
+        with pytest.raises(MigrationRunContractError, match=expected):
+            await acquire_migration_run_attempt(
+                SimpleNamespace(scalar=AsyncMock(), add=Mock()),
+                migration_run_uuid=uuid.uuid4(),
+                worker_identity=worker_identity,
+                signal_lease_token=uuid.uuid4(),
+                lease_seconds=lease_seconds,
+                now=now,
+            )
+
+    with pytest.raises(MigrationRunContractError, match="worker identity"):
+        await acquire_migration_run_attempt(
+            SimpleNamespace(scalar=AsyncMock(), add=Mock()),
+            migration_run_uuid=uuid.uuid4(),
+            worker_identity=None,  # type: ignore[arg-type]
+            signal_lease_token=uuid.uuid4(),
+            lease_seconds=60,
+            now=now,
+        )
+
+    with pytest.raises(MigrationRunContractError, match="timezone"):
+        await acquire_migration_run_attempt(
+            SimpleNamespace(scalar=AsyncMock(), add=Mock()),
+            migration_run_uuid=uuid.uuid4(),
+            worker_identity="worker-a",
+            signal_lease_token=uuid.uuid4(),
+            lease_seconds=60,
+            now=datetime(2026, 8, 12, 2),
+        )
+
+
 @pytest.mark.asyncio
 async def test_dispatch_claim_uses_due_order_and_skip_locked() -> None:
     """A relay claims one due row without blocking a concurrent relay."""
@@ -575,6 +875,27 @@ def test_migration_run_alembic_revision_matches_model_contract() -> None:
         'ondelete="CASCADE"',
     ):
         assert required in migration
+
+    attempt_migration = (
+        Path(__file__).resolve().parents[1]
+        / "alembic/versions/0011_migration_run_attempt.py"
+    ).read_text(encoding="utf-8")
+    for required in (
+        'down_revision = "0010_migration_run"',
+        '"migration_run_attempt"',
+        '"uq_migration_run_attempt__run_number"',
+        '"ck_migration_run_attempt__attempt_number"',
+        '"ck_migration_run_attempt__acquired_state_version"',
+        '"ck_migration_run_attempt__status"',
+        '"ck_migration_run_attempt__worker_identity_hash"',
+        '"ck_migration_run_attempt__signal_lease_token_hash"',
+        '"ck_migration_run_attempt__timestamps"',
+        '"ix_migration_run_attempt__active_run"',
+        '"ix_migration_run_attempt__lease_expiry"',
+        'postgresql_where=sa.text("status = \'active\'")',
+        'ondelete="CASCADE"',
+    ):
+        assert required in attempt_migration
 
 
 @pytest.mark.asyncio

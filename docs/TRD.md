@@ -75,8 +75,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   retry score. The queue payload remains UUID-only. Automatic heartbeat is
   **Implemented**: exact renewal runs while the injected handler is active;
   renewal loss cancels and retrieves the handler task and is never
-  acknowledged as success. Application startup wiring, DB-durable
-  worker-attempt acquisition, and worker execution remain **Planned**;
+  acknowledged as success. DB-durable attempt acquisition, renewal, expired
+  takeover, and exact-owner finish are **Implemented** with hashed worker and
+  signal-token identities. Application startup wiring, consumer-to-attempt
+  binding, credentials, and worker execution remain **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - `complete_isolated_dry_run` revalidates an exact successful executor result
@@ -110,7 +112,7 @@ executable SQL, safety classification, approval truth, or recovery state.
   materialization, deployed isolation proof, cleanup, and worker binding (the
   signed-plan execution/convergence core is Partially implemented);
 - live-preflight worker wiring, separately constrained deployed credentials,
-  durable worker/attempt binding around the implemented caller-owned
+  consumer/credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
@@ -135,7 +137,7 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Partially implemented:** signed-plan/version/base/transaction/convergence execution core, `complete_isolated_dry_run` server-derived success CAS, and PostgreSQL 14–18 round trip exist; provisioning, materialization, deployed isolation/egress proof, cleanup, and worker binding remain Planned |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean reads and strict snapshot comparison exist; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, while completion requires an exact one-to-one match with every persisted plan precondition. Worker identity, durable attempt binding, deployed target integration, and in-lock apply repetition remain Planned. |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` claim, opt-in scheduled dedicated-key UUID-only publication, attempt-bound publish CAS, exact lease-token claim/renew/ack/release primitives, and the execution-neutral consumer contract with automatic heartbeat are **Implemented**; application startup wiring, DB-durable worker attempts, and worker execution remain **Planned** |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, and the execution-neutral consumer contract with automatic heartbeat are **Implemented**; DB-durable hashed worker-attempt acquire/renew/finish CAS is also **Implemented**. Application startup wiring, consumer-to-attempt/credential binding, and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry, 30-day cleanup excludes plans with run history, and the preflight primitive bounds query count/time and rejects unknown kinds/non-boolean evidence; worker lifecycle enforcement remains Planned |

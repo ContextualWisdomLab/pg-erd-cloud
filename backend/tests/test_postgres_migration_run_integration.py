@@ -22,17 +22,21 @@ from app.forward.live_preflight import (
     execute_live_preflight,
 )
 from app.forward.migration_run import (
+    acquire_migration_run_attempt,
     claim_one_migration_dispatch,
     complete_isolated_dry_run,
     complete_live_preflight,
     create_migration_run,
+    finish_migration_run_attempt,
     mark_migration_dispatch_published,
+    renew_migration_run_attempt,
     transition_migration_run,
 )
 from app.models import (
     DbConnection,
     MigrationPlan,
     MigrationRun,
+    MigrationRunAttempt,
     MigrationRunDispatch,
     MigrationRunEvent,
     ProjectSpace,
@@ -726,6 +730,48 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert dispatch.status == "published"
             assert dispatch.attempt_count == 1
             assert dispatch.published_at == now + dt.timedelta(seconds=1)
+
+            signal_lease_token = uuid.uuid4()
+            attempt_claim = await acquire_migration_run_attempt(
+                session,
+                migration_run_uuid=first.migration_run_uuid,
+                worker_identity="postgres-matrix-worker",
+                signal_lease_token=signal_lease_token,
+                lease_seconds=60,
+                now=now + dt.timedelta(seconds=2),
+            )
+            await session.flush()
+            persisted_attempt = await session.scalar(
+                select(MigrationRunAttempt).where(
+                    MigrationRunAttempt.migration_run_attempt_uuid
+                    == attempt_claim.migration_run_attempt_uuid
+                )
+            )
+            assert persisted_attempt is not None
+            assert persisted_attempt.status == "active"
+            assert persisted_attempt.attempt_number == 1
+            assert persisted_attempt.worker_identity_hash != (
+                "postgres-matrix-worker"
+            )
+            assert persisted_attempt.signal_lease_token_hash != str(
+                signal_lease_token
+            )
+            assert await renew_migration_run_attempt(
+                session,
+                claim=attempt_claim,
+                worker_identity="postgres-matrix-worker",
+                signal_lease_token=uuid.uuid4(),
+                lease_seconds=60,
+                now=now + dt.timedelta(seconds=3),
+            ) is False
+            assert await renew_migration_run_attempt(
+                session,
+                claim=attempt_claim,
+                worker_identity="postgres-matrix-worker",
+                signal_lease_token=signal_lease_token,
+                lease_seconds=60,
+                now=now + dt.timedelta(seconds=3),
+            ) is True
             await transition_migration_run(
                 session,
                 migration_run_uuid=first.migration_run_uuid,
@@ -734,7 +780,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 event_type="sandbox_started",
                 evidence={"postgresql_major": expected_major},
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=2),
+                now=now + dt.timedelta(seconds=4),
             )
             await session.flush()
             await complete_isolated_dry_run(
@@ -749,7 +795,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     "converged": True,
                 },
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=3),
+                now=now + dt.timedelta(seconds=5),
             )
             await session.flush()
             await complete_live_preflight(
@@ -770,7 +816,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     "matches_plan_base": True,
                 },
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=4),
+                now=now + dt.timedelta(seconds=6),
             )
             await session.flush()
             persisted_run = await session.scalar(
@@ -782,6 +828,25 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert persisted_run.state == "passed"
             assert persisted_run.state_version == 4
             assert persisted_run.observed_base_digest == plan.base_digest
+            assert await renew_migration_run_attempt(
+                session,
+                claim=attempt_claim,
+                worker_identity="postgres-matrix-worker",
+                signal_lease_token=signal_lease_token,
+                lease_seconds=60,
+                now=now + dt.timedelta(seconds=7),
+            ) is False
+            assert await finish_migration_run_attempt(
+                session,
+                claim=attempt_claim,
+                worker_identity="postgres-matrix-worker",
+                signal_lease_token=signal_lease_token,
+                succeeded=True,
+                now=now + dt.timedelta(seconds=7),
+            ) is True
+            await session.refresh(persisted_attempt)
+            assert persisted_attempt.status == "completed"
+            assert persisted_attempt.finished_at == now + dt.timedelta(seconds=7)
             assert await session.scalar(
                 select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
                     MigrationRunEvent.migration_run_uuid == first.migration_run_uuid
@@ -799,6 +864,12 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert await session.scalar(
                 select(func.count(MigrationRunDispatch.migration_run_uuid)).where(
                     MigrationRunDispatch.migration_run_uuid
+                    == first.migration_run_uuid
+                )
+            ) == 0
+            assert await session.scalar(
+                select(func.count(MigrationRunAttempt.migration_run_uuid)).where(
+                    MigrationRunAttempt.migration_run_uuid
                     == first.migration_run_uuid
                 )
             ) == 0

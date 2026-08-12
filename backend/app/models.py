@@ -13,6 +13,7 @@ from sqlalchemy import (
     LargeBinary,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -437,6 +438,78 @@ class MigrationRunDispatch(Base):
             "ix_migration_run_dispatch__status_not_before",
             "status",
             "not_before",
+        ),
+    )
+
+
+class MigrationRunAttempt(Base):
+    """Durable, lease-bound worker ownership history for one migration run."""
+
+    __tablename__ = "migration_run_attempt"
+
+    migration_run_attempt_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer())
+    acquired_state_version: Mapped[int] = mapped_column(Integer())
+    status: Mapped[str] = mapped_column(Text())
+    worker_identity_hash: Mapped[str] = mapped_column(Text())
+    signal_lease_token_hash: Mapped[str] = mapped_column(Text())
+    lease_expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    acquired_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    last_heartbeat_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            "attempt_number",
+            name="uq_migration_run_attempt__run_number",
+        ),
+        CheckConstraint(
+            "attempt_number >= 1",
+            name="ck_migration_run_attempt__attempt_number",
+        ),
+        CheckConstraint(
+            "acquired_state_version >= 1",
+            name="ck_migration_run_attempt__acquired_state_version",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'completed', 'abandoned')",
+            name="ck_migration_run_attempt__status",
+        ),
+        CheckConstraint(
+            "worker_identity_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_attempt__worker_identity_hash",
+        ),
+        CheckConstraint(
+            "signal_lease_token_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_attempt__signal_lease_token_hash",
+        ),
+        CheckConstraint(
+            "last_heartbeat_at >= acquired_at AND "
+            "lease_expires_at > acquired_at AND "
+            "((status = 'active' AND finished_at IS NULL) OR "
+            "(status IN ('completed', 'abandoned') AND finished_at IS NOT NULL "
+            "AND finished_at >= last_heartbeat_at))",
+            name="ck_migration_run_attempt__timestamps",
+        ),
+        Index(
+            "ix_migration_run_attempt__active_run",
+            "migration_run_uuid",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+        Index(
+            "ix_migration_run_attempt__lease_expiry",
+            "status",
+            "lease_expires_at",
         ),
     )
 

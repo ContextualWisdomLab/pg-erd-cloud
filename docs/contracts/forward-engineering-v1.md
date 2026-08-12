@@ -124,9 +124,10 @@ rejects expired plans. Creation-time maintenance deletes only derived plans
 that expired at least 30 days earlier, belong to the authorized project, and
 have no durable `MigrationRun` history; plans with run evidence are retained.
 
-### `migration_run`, `migration_run_dispatch`, and `migration_run_event` — Partially implemented
+### `migration_run`, dispatch, attempt, and event — Partially implemented
 
-The ORM classes and Alembic revision `0010_migration_run` persist an idempotent
+The ORM classes and Alembic revisions `0010_migration_run` and
+`0011_migration_run_attempt` persist an idempotent
 run identity, one identifier-only transactional outbox row, and an append-only,
 per-run event sequence. The implemented dry-run writer adds exactly one outbox
 row for each new run; the database unique constraint enforces at most one.
@@ -160,8 +161,14 @@ remains UUID-only; the token is processing metadata, not execution authority.
 Renewal never shortens an existing expiry. Automatic heartbeat is
 **Implemented**: the consumer renews while its injected handler runs, cancels
 the handler when exact renewal is lost, and never acknowledges that loss as
-success. Application startup wiring, DB-durable worker-attempt acquisition,
-and worker execution remain **Planned**. The bounded
+success. A separate DB-durable attempt contract is **Implemented**: acquisition
+serializes on an executable uncancelled dry run, stores only hashes of bounded
+worker identity and the opaque signal token, permits one active owner, abandons
+only an expired owner, and creates a monotonic attempt number. Renewal and
+finish are exact-token CAS operations; renewal also requires an executable run,
+and neither operation can revive or complete an expired attempt. Application
+startup wiring, consumer-to-attempt binding, credentials, and worker execution
+remain **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
 attempt in the same caller-owned transaction. Cancellation

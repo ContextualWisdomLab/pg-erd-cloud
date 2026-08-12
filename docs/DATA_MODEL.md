@@ -119,6 +119,19 @@ erDiagram
     timestamptz created_at
     timestamptz published_at
   }
+  MIGRATION_RUN_ATTEMPT {
+    uuid migration_run_attempt_uuid PK
+    uuid migration_run_uuid FK
+    int attempt_number UK
+    int acquired_state_version
+    text status
+    text worker_identity_hash
+    text signal_lease_token_hash
+    timestamptz lease_expires_at
+    timestamptz acquired_at
+    timestamptz last_heartbeat_at
+    timestamptz finished_at
+  }
   MIGRATION_RUN_EVENT {
     uuid migration_run_event_uuid PK
     uuid migration_run_uuid FK
@@ -153,6 +166,7 @@ erDiagram
   PROJECT_SPACE ||--o{ MIGRATION_RUN : scopes
   MIGRATION_PLAN ||--o{ MIGRATION_RUN : attempts
   USER_ACCOUNT ||--o{ MIGRATION_RUN : requests
+  MIGRATION_RUN ||--o{ MIGRATION_RUN_ATTEMPT : owns
   MIGRATION_RUN ||--o| MIGRATION_RUN_DISPATCH : dispatches
   MIGRATION_RUN ||--o{ MIGRATION_RUN_EVENT : records
   USER_ACCOUNT o|--o{ MIGRATION_RUN_EVENT : acts
@@ -179,6 +193,7 @@ erDiagram
 | `migration_run.migration_plan_uuid` | `migration_plan` | no | `RESTRICT` | Each durable run attempts one immutable plan; plan deletion is blocked while evidence remains. |
 | `migration_run.requested_by_user_uuid` | `user_account` | no | `NO ACTION` | Each run records one requesting actor. |
 | `migration_run_dispatch.migration_run_uuid` | `migration_run` | no; unique | `CASCADE` | The implemented writer adds one identifier-only dispatch intent for each new dry run; the database permits zero or one dispatch row per run. |
+| `migration_run_attempt.migration_run_uuid` | `migration_run` | no | `CASCADE` | A run has numbered attempt history and at most one partial-indexed active owner. |
 | `migration_run_event.migration_run_uuid` | `migration_run` | no | `CASCADE` | Each event belongs to one run; approved run deletion removes its event sequence atomically. |
 | `migration_run_event.actor_user_uuid` | `user_account` | yes | `NO ACTION` | Worker events may be system-authored; human actions retain an actor. |
 
@@ -197,10 +212,17 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot start a run. | The public dry-run intent route delegates to the writer that verifies expiry before its conflict-winner insert; worker execution remains absent. | Partially implemented |
 | A new run, genesis event, and dispatch intent are atomic. | `create_migration_run` adds all three to the caller-owned transaction; `migration_run_dispatch.migration_run_uuid` is unique and the public route commits once. | Implemented |
-| Dispatch storage carries no execution material. | `migration_run_dispatch` contains identifiers, fixed kind/state, attempt count, and timestamps only; lock-scoped due-order claim, opt-in scheduled dedicated-key UUID-only Valkey publication, exact-attempt publish CAS, failure rollback, monotonic exact lease renewal and ready/processing primitives, and an execution-neutral consumer contract with automatic heartbeat are implemented. A future worker must reload the stored plan by run UUID and acquire a DB-durable attempt. | Implemented persistence/claim/scheduled-publication/signal-lease/consumer-contract boundary; application startup wiring and worker execution Planned |
+| Dispatch and attempt storage carry no execution material. | Dispatch contains identifiers/timestamps only. Attempts contain numbered ownership timestamps plus SHA-256 worker/signal-token hashes—never raw identity, DSN, SQL, plan, or credential. Exact unexpired-owner acquire/renew/finish and expiry takeover are implemented. | Implemented persistence/signal/attempt boundary; application wiring, credential binding, and execution Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
 | Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the public dry-run route delegates to the PostgreSQL conflict-winner writer, which reuses only the same request and rejects different reuse. | Implemented for dry-run intent; workers/apply Planned |
-| Run/event state tokens, sequence numbers, and digest links are valid. | Database checks constrain run kind/state, event type, before/after states, predecessor presence, and every persisted lowercase SHA-256 field (idempotency, plan, request, observed base, chain link, and run anchor); the exact application transition graph and CAS writer match UUID, kind, state, state version, and prior event anchor before appending the same-version event; `complete_isolated_dry_run` revalidates exact success evidence against the stored plan and derives the fixed next CAS; `passed` requires observed base equality and `drifted` requires inequality against the integrity-checked plan, with the digest stored on both run and event; event sequence is unique per run and polling recomputes every canonical digest. `execute_bound_live_preflight` binds caller-owned fresh capture and checks to one read-only repeatable-read transaction; `complete_live_preflight` validates that exact bounded result and derives the only valid terminal CAS state without acquiring a durable attempt. | Implemented persistence/polling and caller-owned executor-result bridges; durable worker/attempt binding Planned |
+| Run/event state tokens, sequence numbers, digest links, and attempt ownership are valid. | Database checks constrain run/event state and SHA-256 shapes; exact transition/result CAS writers preserve plan/evidence identity. Attempt acquisition serializes on the run, one partial unique index permits at most one active owner, history numbering is unique, renewal requires an executable uncancelled run, and renew/finish require the exact unexpired hashed owner. | Implemented persistence/polling/result bridges and durable attempt primitives; consumer/credential/execution binding Planned |
+
+The existing result boundaries remain explicit: `complete_isolated_dry_run`
+revalidates sandbox evidence and derives the fixed next CAS;
+`execute_bound_live_preflight` binds fresh capture and checks to one read-only
+repeatable-read transaction; `complete_live_preflight` validates that exact
+result and derives the only terminal classification. Durable attempt ownership
+does not replace or grant authority to any of these boundaries.
 
 `migration_plan.statement_digest` stores the compiler's current `plan_digest`.
 It is provenance, not a database idempotency key: the same logical SQL may be
@@ -222,8 +244,9 @@ execution input.
 
 ## Physical run foundation — Implemented
 
-`migration_run`, `migration_run_dispatch`, and `migration_run_event` now
-exist in the ORM and Alembic revision `0010_migration_run` with the fields
+`migration_run`, `migration_run_dispatch`, `migration_run_event`, and
+`migration_run_attempt` now exist in the ORM and Alembic revisions
+`0010_migration_run` and `0011_migration_run_attempt` with the fields
 shown in the implemented ERD
 above. The logical diagram below retains accepted **Planned extensions** such
 as passed-dry-run and verification-snapshot references. Those extension fields
@@ -238,6 +261,7 @@ erDiagram
   SCHEMA_SNAPSHOT o|--o{ MIGRATION_RUN : verifies
   MIGRATION_RUN ||--o{ MIGRATION_RUN_EVENT : records
   MIGRATION_RUN ||--o| MIGRATION_RUN_DISPATCH : dispatches
+  MIGRATION_RUN ||--o{ MIGRATION_RUN_ATTEMPT : owns
   USER_ACCOUNT o|--o{ MIGRATION_RUN_EVENT : acts
 
   MIGRATION_RUN {
@@ -280,6 +304,19 @@ erDiagram
     timestamptz not_before
     timestamptz created_at
     timestamptz published_at
+  }
+  MIGRATION_RUN_ATTEMPT {
+    uuid migration_run_attempt_uuid PK
+    uuid migration_run_uuid FK
+    int attempt_number
+    int acquired_state_version
+    text status
+    text worker_identity_hash
+    text signal_lease_token_hash
+    timestamptz lease_expires_at
+    timestamptz acquired_at
+    timestamptz last_heartbeat_at
+    timestamptz finished_at
   }
 ```
 

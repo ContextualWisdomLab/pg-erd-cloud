@@ -68,7 +68,9 @@ caller-owned fresh-capture callback and checks to one read-only repeatable-read
 transaction; `complete_live_preflight` strictly derives its terminal durable
 CAS classification. `complete_isolated_dry_run` similarly revalidates exact
 sandbox success against the stored plan and derives only the fixed next CAS.
-None provides durable worker, attempt, or credential authority.
+The metadata layer now provides hashed, lease-bound durable attempt ownership,
+but it is not wired to the consumer and provides no credential or execution
+authority.
 Durable `migration_run`/event/outbox persistence and this execution-neutral,
 bounded read-only primitive are **Partially implemented**; neither constitutes
 worker execution or dry-run success evidence.

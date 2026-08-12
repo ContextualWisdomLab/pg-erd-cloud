@@ -55,8 +55,17 @@ acknowledgement or release ownership as non-success. The ready payload remains
 UUID-only. Automatic heartbeat is **Implemented** around the injected handler:
 renewal loss cancels and retrieves its task and cannot be acknowledged as
 success. The consumer still does not load execution material, access a target,
-or execute SQL, and is not wired into application startup. DB-durable
-worker-attempt acquisition remains Planned.
+or execute SQL, and is not wired into application startup.
+
+`migration_run_attempt` ownership primitives are **Implemented** separately.
+Acquisition locks the active dry run, permits one active attempt, marks only an
+expired predecessor abandoned, and assigns a monotonic per-run attempt number.
+Only SHA-256 hashes of a bounded worker identity and the opaque Valkey signal
+lease token are persisted. Renewal requires the exact unexpired owner and an
+uncancelled executable run and never shortens expiry; finish requires that same
+unexpired owner. These primitives grant no credential or execution authority.
+Consumer/startup integration, credential routing, and worker execution remain
+Planned.
 
 Each run binds:
 

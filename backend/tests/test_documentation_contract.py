@@ -400,6 +400,38 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
     assert "run_migration_run_consumer_forever" not in main
 
 
+def test_durable_attempt_documentation_is_implemented_without_authority_claim() -> None:
+    """Keep durable ownership distinct from consumer, credentials, and execution."""
+
+    documents = {
+        path: " ".join(_read(Path(path)).lower().split())
+        for path in (
+            "ARCHITECTURE.md",
+            "docs/PRD.md",
+            "docs/TRD.md",
+            "docs/DATA_MODEL.md",
+            "docs/DOCUMENTATION_AUDIT.md",
+            "docs/adr/ADR-0004-durable-runs-and-recovery.md",
+            "docs/contracts/forward-engineering-v1.md",
+            "docs/security/forward-engineering-threat-model.md",
+            "docs/runbooks/forward-engineering.md",
+            "docs/TEST_STRATEGY.md",
+        )
+    }
+    for document in documents.values():
+        assert "attempt" in document
+        assert "hash" in document
+        assert "planned" in document
+
+    assert "0011_migration_run_attempt" in documents["docs/DATA_MODEL.md"]
+    assert "at most one" in documents["docs/DATA_MODEL.md"]
+    contract = documents["docs/contracts/forward-engineering-v1.md"]
+    assert "exact-token cas" in contract
+    assert "complete an expired attempt" in contract
+    assert "consumer wiring" in documents["docs/DOCUMENTATION_AUDIT.md"]
+    assert "partial foundation" in documents["docs/PRD.md"]
+
+
 def test_ci_runs_real_valkey_signal_acceptance() -> None:
     """Keep UUID-only queue separation tested against a pinned real service."""
 

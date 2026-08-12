@@ -20,10 +20,13 @@ schema converged. A missing proof, unsupported construct, stale target, or
 uncertain outcome must stop the workflow or be reported honestly; it must never
 be converted into apparent success.
 
-The current repository implements only the first control-plane slice: canonical
-model revisions, server-compiled immutable plans, fail-closed subset handling,
-and a `deployer` role. Isolated dry run, durable apply, post-apply convergence,
-and the frontend workflow are **Planned** and remain production release blockers.
+The current repository implements the control-plane foundation plus partial
+validation/recovery primitives: canonical model revisions, immutable plans,
+fail-closed subset handling, a `deployer` role, isolated execution and bounded
+preflight cores, durable run/event/outbox identity, and hashed lease-bound
+worker-attempt ownership. Consumer wiring, credentials, sandbox lifecycle,
+durable apply, post-apply convergence, and the frontend workflow are **Planned**
+release blockers.
 
 ## Actors and authority
 
@@ -67,7 +70,7 @@ for server authorization.
 | FE-PRD-005 | Dry run executes exact stored-plan DDL only in an isolated compatible sandbox; production receives bounded reads only. | **Partially implemented:** execution core and dedicated ephemeral PostgreSQL 14–18 database round trip exist; deployed isolation/lifecycle and workers Planned | Network/egress-isolation, cleanup, and live no-DDL evidence |
 | FE-PRD-006 | Detect base drift before dry run and again under apply-time locks before DDL. | **Planned** | Injected-drift and concurrency tests |
 | FE-PRD-007 | Require deployer authority, exact plan/dry-run digests, typed target confirmation, and destructive acknowledgement. | **Partially implemented**; deployer gates only legacy live apply | Role/tamper/race tests |
-| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Partially implemented**; dry-run intent/resource and evidence exist, workers/apply absent | Crash, duplicate-submit, and state-machine tests |
+| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Partially implemented**; dry-run intent/resource/evidence plus DB-durable hashed attempt acquire/renew/finish CAS exist; consumer wiring, crash recovery, and apply remain absent | Crash, duplicate-submit, state-machine, and exact-owner lease tests |
 | FE-PRD-009 | Re-introspect after known commit and compare a persisted verification snapshot to the desired digest. | **Planned** | End-to-end empty-residual-diff assertion |
 | FE-PRD-010 | Provide a keyboard-operable five-stage review/dry-run/apply/verification journey without reusing the export modal. | **Planned** | Accessibility, component, and browser E2E tests |
 
@@ -131,8 +134,8 @@ evidence exists.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
-| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, and bounded live-read primitive exist; sandbox lifecycle and both workers remain Planned |
-| 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Planned** |
+| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, and durable attempt ownership exist; sandbox lifecycle, consumer/credential binding, and execution workers remain Planned |
+| 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation CAS, and exact-owner attempt leases exist; apply creation/approval/execution/recovery remain Planned |
 | 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Planned** |
 
 No phase may describe the end-to-end feature as production-ready before every

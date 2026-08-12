@@ -192,6 +192,13 @@ reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, heartbeat
 renewal, handler cancellation and task retrieval on lease loss, bounded
 timing, and fixed non-secret lifecycle logs. The
+durable-attempt unit contract proves run-row serialization, one-active-owner
+uniqueness, monotonic numbering, expired-owner abandonment, hashed identity
+storage, executable/cancellation checks, monotonic exact-owner renewal, and
+unexpired exact-owner finish. PostgreSQL 14–18 acceptance applies the attempt
+migration and proves stale-token rejection, terminal-run renewal denial,
+exact-owner completion, and rollback cleanup. Consumer-to-attempt wiring,
+crash/restart orchestration, and credential-bound execution remain unproved. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,
@@ -232,8 +239,8 @@ reject missing, malformed, `passed`-mismatched, `drifted`-matched, or unrelated
 transition injection. Worker evidence cannot pre-author the reserved observed
 digest field through snake-, camel-, kebab-case, or nested aliases.
 The privilege proof is CI-local rather than deployed production evidence.
-Target audit-log evidence and durable worker/attempt binding around the
-caller-owned same-transaction primitive remain release blockers. The
+Target audit-log evidence and consumer/credential binding around the durable
+attempt and caller-owned same-transaction primitive remain release blockers. The
 execution-neutral consumer contract is **Implemented**; application startup
 wiring and worker execution remain **Planned**. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.
