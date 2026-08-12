@@ -30,6 +30,13 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |
 
+The PostgreSQL 14–18 CI matrix composes each metadata server with a
+digest-pinned ephemeral Valkey 8 service. It verifies that a sanitized handler
+failure abandons the exact durable attempt and releases the exact signal, then
+that retry completes the next attempt before acknowledgement and removes all
+ready/processing/token entries. This is ephemeral recovery evidence only; it
+does not authorize deployment startup wiring, credentials, or worker execution.
+
 Actors:
 
 - **Editor:** save/revise models, compile plans, request dry run when available.

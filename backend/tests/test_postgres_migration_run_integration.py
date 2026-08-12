@@ -51,11 +51,19 @@ from app.pg_introspect.snapshot_contract import (
 )
 from app.forward.schema_model import schema_model_digest
 from app.forward.snapshot_adapter import snapshot_to_schema_model
+from app.jobs import valkey_queue
+from app.jobs.migration_run_consumer import (
+    MigrationRunConsumerError,
+    make_attempt_bound_migration_run_handler,
+    process_one_migration_run_signal,
+)
+from app.settings import settings
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
 _POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
 _POSTGRES_TARGET_URL = os.getenv("POSTGRES_TARGET_INTEGRATION_URL")
 _POSTGRES_PREFLIGHT_URL = os.getenv("POSTGRES_PREFLIGHT_INTEGRATION_URL")
+_VALKEY_URL = os.getenv("VALKEY_INTEGRATION_URL")
 _EXPECTED_MAJOR = os.getenv("EXPECTED_POSTGRES_MAJOR")
 pytestmark = pytest.mark.skipif(
     not _POSTGRES_URL
@@ -346,6 +354,7 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                 "pg_catalog.has_database_privilege("
                 "current_user, current_database(), 'TEMP') AS can_temp"
             )
+            assert privileges is not None
             assert dict(privileges) == {
                 "can_create": False,
                 "can_temp": False,
@@ -354,6 +363,7 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                 "SELECT rolsuper, rolcreaterole, rolcreatedb, rolreplication, "
                 "rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user"
             )
+            assert role_attributes is not None
             assert dict(role_attributes) == {
                 "rolsuper": False,
                 "rolcreaterole": False,
@@ -547,12 +557,22 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> None:
-    """Prove migration, idempotency, outbox shape, and rollback on PostgreSQL."""
+async def test_real_postgres_and_valkey_recover_exact_consumer_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prove dual-lease failure/retry across real PostgreSQL and Valkey."""
 
     assert _POSTGRES_URL is not None
+    if not _VALKEY_URL:
+        pytest.skip("VALKEY_INTEGRATION_URL is not configured")
     engine = create_async_engine(_POSTGRES_URL)
-    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    connection = await engine.connect()
+    outer_transaction = await connection.begin()
+    sessions = async_sessionmaker(
+        connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     now = dt.datetime.now(dt.timezone.utc)
     user_uuid = uuid.uuid4()
     project_uuid = uuid.uuid4()
@@ -573,7 +593,25 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
         }
     ]
 
+    suffix = uuid.uuid4().hex
+    queue_key = f"pg-erd-cloud:test:migration:{suffix}"
+    processing_key = f"pg-erd-cloud:test:migration-processing:{suffix}"
+    lease_token_key = f"pg-erd-cloud:test:migration-lease:{suffix}"
+    monkeypatch.setattr(settings, "job_queue_backend", "valkey")
+    monkeypatch.setattr(settings, "valkey_url", _VALKEY_URL)
+    monkeypatch.setattr(settings, "valkey_sentinel_hosts", None)
+    monkeypatch.setattr(settings, "valkey_migration_run_queue_key", queue_key)
+    monkeypatch.setattr(
+        settings, "valkey_migration_run_processing_key", processing_key
+    )
+    monkeypatch.setattr(
+        settings, "valkey_migration_run_lease_token_key", lease_token_key
+    )
+    redis_asyncio = valkey_queue._load_redis_module()
+    client = redis_asyncio.from_url(_VALKEY_URL)
+
     try:
+        await client.delete(queue_key, processing_key, lease_token_key)
         async with sessions() as session:
             server_version_num = int(
                 await session.scalar(
@@ -731,6 +769,67 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             assert dispatch.attempt_count == 1
             assert dispatch.published_at == now + dt.timedelta(seconds=1)
 
+            await session.commit()
+            assert await valkey_queue.enqueue_migration_run_signal(
+                first.migration_run_uuid, now + dt.timedelta(seconds=2)
+            )
+            handler_calls = 0
+            secret = "postgresql://owner:secret@target/private"
+
+            async def fail_then_succeed(*_args: object) -> None:
+                nonlocal handler_calls
+                handler_calls += 1
+                if handler_calls == 1:
+                    raise RuntimeError(secret)
+
+            handler = make_attempt_bound_migration_run_handler(
+                fail_then_succeed,
+                worker_identity="composed-postgres-valkey-worker",
+                attempt_lease_seconds=60,
+            )
+            with pytest.raises(MigrationRunConsumerError) as failed:
+                await process_one_migration_run_signal(
+                    sessions,
+                    handler,
+                    now=now + dt.timedelta(seconds=2),
+                    retry_delay_s=1,
+                )
+            assert str(failed.value) == "migration run handler failed"
+            assert secret not in repr(failed.value)
+            assert await process_one_migration_run_signal(
+                sessions,
+                handler,
+                now=now + dt.timedelta(seconds=3),
+                retry_delay_s=1,
+            )
+            assert handler_calls == 2
+            persisted_consumer_attempts = list(
+                await session.scalars(
+                    select(MigrationRunAttempt)
+                    .where(
+                        MigrationRunAttempt.migration_run_uuid
+                        == first.migration_run_uuid
+                    )
+                    .order_by(MigrationRunAttempt.attempt_number)
+                )
+            )
+            assert [attempt.status for attempt in persisted_consumer_attempts] == [
+                "abandoned",
+                "completed",
+            ]
+            assert [attempt.attempt_number for attempt in persisted_consumer_attempts] == [
+                1,
+                2,
+            ]
+            assert all(
+                len(attempt.worker_identity_hash) == 64
+                and len(attempt.signal_lease_token_hash) == 64
+                for attempt in persisted_consumer_attempts
+            )
+            assert await client.zrange(queue_key, 0, -1) == []
+            assert await client.zrange(processing_key, 0, -1) == []
+            assert await client.hlen(lease_token_key) == 0
+
             signal_lease_token = uuid.uuid4()
             attempt_claim = await acquire_migration_run_attempt(
                 session,
@@ -738,7 +837,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 worker_identity="postgres-matrix-worker",
                 signal_lease_token=signal_lease_token,
                 lease_seconds=60,
-                now=now + dt.timedelta(seconds=2),
+                now=now + dt.timedelta(seconds=4),
             )
             await session.flush()
             persisted_attempt = await session.scalar(
@@ -749,7 +848,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
             )
             assert persisted_attempt is not None
             assert persisted_attempt.status == "active"
-            assert persisted_attempt.attempt_number == 1
+            assert persisted_attempt.attempt_number == 3
             assert persisted_attempt.worker_identity_hash != (
                 "postgres-matrix-worker"
             )
@@ -762,7 +861,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 worker_identity="postgres-matrix-worker",
                 signal_lease_token=uuid.uuid4(),
                 lease_seconds=60,
-                now=now + dt.timedelta(seconds=3),
+                now=now + dt.timedelta(seconds=5),
             ) is False
             assert await renew_migration_run_attempt(
                 session,
@@ -770,7 +869,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 worker_identity="postgres-matrix-worker",
                 signal_lease_token=signal_lease_token,
                 lease_seconds=60,
-                now=now + dt.timedelta(seconds=3),
+                now=now + dt.timedelta(seconds=5),
             ) is True
             await transition_migration_run(
                 session,
@@ -780,7 +879,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 event_type="sandbox_started",
                 evidence={"postgresql_major": expected_major},
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=4),
+                now=now + dt.timedelta(seconds=6),
             )
             await session.flush()
             await complete_isolated_dry_run(
@@ -795,7 +894,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     "converged": True,
                 },
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=5),
+                now=now + dt.timedelta(seconds=7),
             )
             await session.flush()
             await complete_live_preflight(
@@ -816,7 +915,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                     "matches_plan_base": True,
                 },
                 actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=6),
+                now=now + dt.timedelta(seconds=8),
             )
             await session.flush()
             persisted_run = await session.scalar(
@@ -834,7 +933,7 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 worker_identity="postgres-matrix-worker",
                 signal_lease_token=signal_lease_token,
                 lease_seconds=60,
-                now=now + dt.timedelta(seconds=7),
+                now=now + dt.timedelta(seconds=9),
             ) is False
             assert await finish_migration_run_attempt(
                 session,
@@ -842,18 +941,20 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 worker_identity="postgres-matrix-worker",
                 signal_lease_token=signal_lease_token,
                 succeeded=True,
-                now=now + dt.timedelta(seconds=7),
+                now=now + dt.timedelta(seconds=9),
             ) is True
             await session.refresh(persisted_attempt)
             assert persisted_attempt.status == "completed"
-            assert persisted_attempt.finished_at == now + dt.timedelta(seconds=7)
+            assert persisted_attempt.finished_at == now + dt.timedelta(seconds=9)
             assert await session.scalar(
                 select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
                     MigrationRunEvent.migration_run_uuid == first.migration_run_uuid
                 )
             ) == 4
 
-            await session.rollback()
+            await session.commit()
+
+        await outer_transaction.rollback()
 
         async with sessions() as session:
             assert await session.scalar(
@@ -874,4 +975,9 @@ async def test_real_postgres_creates_one_atomic_identifier_only_dispatch() -> No
                 )
             ) == 0
     finally:
+        if outer_transaction.is_active:
+            await outer_transaction.rollback()
+        await client.delete(queue_key, processing_key, lease_token_key)
+        await valkey_queue._close_client(client)
+        await connection.close()
         await engine.dispose()

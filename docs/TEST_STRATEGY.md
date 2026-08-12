@@ -51,7 +51,7 @@ flowchart TB
 |---|---|---|---|
 | Deterministic unit/property | Prove canonical JSON, quoting, digest stability, complete blocker behavior, plan ordering, risk and snapshot adaptation. | Focused forward unit tests exist. | Exact statement/branch coverage plus property/fuzz cases for every admitted grammar and unknown-field boundary. |
 | API/service contract | Prove authorization, tenancy, optimistic concurrency, immutable persistence, size limits, expiry/idempotency/error semantics. | Model and plan route functions are tested mainly with faked sessions and mocks. | HTTP-level tests against migrated PostgreSQL, full role/IDOR/CSRF/CORS/error matrix, and database constraint races. |
-| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create distinct metadata, sandbox, and restricted-target databases. The matrix covers run/outbox/hashed-attempt persistence, exact signed-plan convergence, same-transaction preflight, privilege/DDL/SELECT denial, lock timeout, forced disconnect, sanitized failures, and cleanup. The execution-neutral consumer-to-attempt adapter has deterministic lifecycle tests against those real-database-tested primitives. Provisioning/cleanup/egress, production credentials, deployed consumer lifecycle, worker recovery, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 matrix plus separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
+| PostgreSQL integration | Prove real catalog mapping, executable SQL, locks, timeouts, transactions, privileges, fingerprinting, and convergence. | PostgreSQL 14–18 create distinct metadata, sandbox, and restricted-target databases. Every matrix cell also starts digest-pinned Valkey 8 and composes the production UUID-only signal consumer with PostgreSQL-backed attempt acquisition/finish: a sanitized handler failure durably abandons attempt 1 and releases only its exact signal lease, retry completes attempt 2 and exact acknowledgement empties ready/processing/token state. The matrix also covers run/outbox persistence, exact signed-plan convergence, same-transaction preflight, privilege/DDL/SELECT denial, lock timeout, forced disconnect, sanitized failures, and rollback cleanup. Provisioning/cleanup/egress, production credentials, deployed consumer lifecycle, worker recovery, and apply concurrency evidence remain absent. | Ephemeral PostgreSQL 14, 15, 16, 17, and 18 plus digest-pinned Valkey 8 matrix, then separate deployed sandbox lifecycle, production privilege, concurrency, cancellation, crash, and cleanup evidence. |
 | Browser E2E/accessibility | Prove editor-to-verified workflow, tamper resistance, state recovery, focus, keyboard, names, and live regions. | Existing ERD UI tests do not implement the forward workflow. | Composed backend/frontend/worker/sandbox/target E2E, automated accessibility checks, and manual keyboard/screen-reader evidence. |
 | Operational/fault injection | Prove no-replay recovery, kill switch, alerts, runbook, retention, backup/restore, and uncertain commit handling. | No forward run worker or drills exist. | Controlled crash/network/lock/commit-acknowledgement tests and a recorded non-production game day. |
 
@@ -197,8 +197,13 @@ uniqueness, monotonic numbering, expired-owner abandonment, hashed identity
 storage, executable/cancellation checks, monotonic exact-owner renewal, and
 unexpired exact-owner finish. PostgreSQL 14–18 acceptance applies the attempt
 migration and proves stale-token rejection, terminal-run renewal denial,
-exact-owner completion, and rollback cleanup. Consumer-to-attempt wiring,
-crash/restart orchestration, and credential-bound execution remain unproved. The
+exact-owner completion, and rollback cleanup. The same matrix composes both
+stores at the consumer boundary: failure abandons the exact PostgreSQL attempt
+and reschedules the exact Valkey claim; retry creates the next monotonic
+attempt, completes it, acknowledges the signal, and leaves no ready,
+processing, or lease-token entry. This remains ephemeral topology evidence;
+crash/restart orchestration, deployed consumer lifecycle, and credential-bound
+execution remain unproved. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,

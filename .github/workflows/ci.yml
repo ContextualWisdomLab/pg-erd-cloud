@@ -46,8 +46,18 @@ jobs:
         run: pytest -q
 
   postgres-integration:
-    name: PostgreSQL ${{ matrix.major }} run/outbox + isolated dry run + preflight
+    name: PostgreSQL ${{ matrix.major }} + Valkey dual-lease acceptance
     runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -167,11 +177,12 @@ jobs:
           PYTHONPATH: .
         run: alembic upgrade head
 
-      - name: Verify real PostgreSQL run/outbox, isolated dry run, and preflight
+      - name: Verify PostgreSQL and Valkey dual-lease recovery
         working-directory: backend
         env:
           EXPECTED_POSTGRES_MAJOR: ${{ matrix.major }}
           PYTHONPATH: .
+          VALKEY_INTEGRATION_URL: redis://127.0.0.1:6379/0
         run: pytest -q tests/test_postgres_migration_run_integration.py
 
   valkey-integration:

@@ -240,6 +240,16 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "CREATE ROLE cwl_erd_preflight" in workflow
     assert "CREATE ROLE pg_" not in workflow
     assert "POSTGRES_PREFLIGHT_INTEGRATION_URL" in workflow
+    assert "VALKEY_INTEGRATION_URL: redis://127.0.0.1:6379/0" in workflow
+    assert "Verify PostgreSQL and Valkey dual-lease recovery" in workflow
+    postgres_job = workflow.split("  postgres-integration:", 1)[1].split(
+        "  valkey-integration:", 1
+    )[0]
+    assert "services:" in postgres_job
+    assert "valkey/valkey@sha256:" in postgres_job
+    assert "test_real_postgres_and_valkey_recover_exact_consumer_attempt" in _read(
+        Path("backend/tests/test_postgres_migration_run_integration.py")
+    )
     integration_test = _read(
         Path("backend/tests/test_postgres_migration_run_integration.py")
     )
