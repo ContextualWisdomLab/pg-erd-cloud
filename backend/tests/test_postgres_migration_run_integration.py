@@ -7,12 +7,17 @@ import copy
 import datetime as dt
 import os
 import uuid
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 import asyncpg
 import pytest
 from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.forward.isolated_dry_run import execute_isolated_dry_run
 from app.forward.migration_plan import compile_migration_plan
@@ -22,6 +27,7 @@ from app.forward.live_preflight import (
     execute_live_preflight,
 )
 from app.forward.migration_run import (
+    MigrationRunAttemptClaim,
     acquire_migration_run_attempt,
     claim_one_migration_dispatch,
     complete_isolated_dry_run,
@@ -557,10 +563,10 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_postgres_and_valkey_recover_exact_consumer_attempt(
+async def test_real_postgres_and_valkey_recover_failure_and_crash(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Prove dual-lease failure/retry across real PostgreSQL and Valkey."""
+    """Prove dual-lease failure/retry and crash takeover across both stores."""
 
     assert _POSTGRES_URL is not None
     if not _VALKEY_URL:
@@ -830,94 +836,138 @@ async def test_real_postgres_and_valkey_recover_exact_consumer_attempt(
             assert await client.zrange(processing_key, 0, -1) == []
             assert await client.hlen(lease_token_key) == 0
 
-            signal_lease_token = uuid.uuid4()
-            attempt_claim = await acquire_migration_run_attempt(
-                session,
-                migration_run_uuid=first.migration_run_uuid,
-                worker_identity="postgres-matrix-worker",
-                signal_lease_token=signal_lease_token,
-                lease_seconds=60,
-                now=now + dt.timedelta(seconds=4),
+            crash_started_at = dt.datetime.now(dt.timezone.utc)
+            assert await valkey_queue.enqueue_migration_run_signal(
+                first.migration_run_uuid, crash_started_at
             )
-            await session.flush()
-            persisted_attempt = await session.scalar(
-                select(MigrationRunAttempt).where(
-                    MigrationRunAttempt.migration_run_attempt_uuid
-                    == attempt_claim.migration_run_attempt_uuid
+            crash_signal_claim = await valkey_queue.claim_due_migration_run_signal(
+                now=crash_started_at,
+                lease_seconds=1,
+            )
+            assert crash_signal_claim is not None
+            async with sessions() as crash_session:
+                async with crash_session.begin():
+                    crash_attempt_claim = await acquire_migration_run_attempt(
+                        crash_session,
+                        migration_run_uuid=first.migration_run_uuid,
+                        worker_identity="crashed-postgres-valkey-worker",
+                        signal_lease_token=crash_signal_claim.lease_token,
+                        lease_seconds=1,
+                        now=crash_started_at,
+                    )
+                    assert await renew_migration_run_attempt(
+                        crash_session,
+                        claim=crash_attempt_claim,
+                        worker_identity="crashed-postgres-valkey-worker",
+                        signal_lease_token=uuid.uuid4(),
+                        lease_seconds=1,
+                        now=crash_started_at,
+                    ) is False
+
+            await asyncio.sleep(1.1)
+            recovered_attempts: list[MigrationRunAttemptClaim] = []
+            recovered_signals: list[valkey_queue.MigrationRunSignalClaim] = []
+
+            async def recover_to_pass(
+                factory: Callable[[], AsyncSession],
+                recovered_signal: valkey_queue.MigrationRunSignalClaim,
+                recovered_attempt: MigrationRunAttemptClaim,
+            ) -> None:
+                recovered_signals.append(recovered_signal)
+                recovered_attempts.append(recovered_attempt)
+                async with factory() as worker_session:
+                    async with worker_session.begin():
+                        await transition_migration_run(
+                            worker_session,
+                            migration_run_uuid=first.migration_run_uuid,
+                            expected_state_version=1,
+                            next_state="sandbox_running",
+                            event_type="sandbox_started",
+                            evidence={"postgresql_major": expected_major},
+                            actor_user_uuid=None,
+                        )
+                async with factory() as worker_session:
+                    async with worker_session.begin():
+                        await complete_isolated_dry_run(
+                            worker_session,
+                            migration_run_uuid=first.migration_run_uuid,
+                            expected_state_version=2,
+                            result={
+                                "postgresql_major": expected_major,
+                                "statement_count": len(plan.plan_json["statements"]),
+                                "base_digest": plan.base_digest,
+                                "target_digest": plan.target_digest,
+                                "converged": True,
+                            },
+                            actor_user_uuid=None,
+                        )
+                async with factory() as worker_session:
+                    async with worker_session.begin():
+                        await complete_live_preflight(
+                            worker_session,
+                            migration_run_uuid=first.migration_run_uuid,
+                            expected_state_version=3,
+                            result={
+                                "preconditions_passed": True,
+                                "checks": [
+                                    {
+                                        "statement_index": 0,
+                                        "precondition_index": 0,
+                                        "kind": "table_is_empty",
+                                        "passed": True,
+                                    }
+                                ],
+                                "observed_base_digest": plan.base_digest,
+                                "matches_plan_base": True,
+                            },
+                            actor_user_uuid=None,
+                        )
+
+            recovery_handler = make_attempt_bound_migration_run_handler(
+                recover_to_pass,
+                worker_identity="recovered-postgres-valkey-worker",
+                attempt_lease_seconds=60,
+            )
+            recovery_time = dt.datetime.now(dt.timezone.utc)
+            assert await process_one_migration_run_signal(
+                sessions,
+                recovery_handler,
+                now=recovery_time,
+            )
+            assert len(recovered_attempts) == 1
+            assert len(recovered_signals) == 1
+            assert recovered_signals[0].lease_token != crash_signal_claim.lease_token
+            assert not await valkey_queue.ack_migration_run_signal(
+                crash_signal_claim
+            )
+
+            persisted_attempts = list(
+                await session.scalars(
+                    select(MigrationRunAttempt)
+                    .where(
+                        MigrationRunAttempt.migration_run_uuid
+                        == first.migration_run_uuid
+                    )
+                    .order_by(MigrationRunAttempt.attempt_number)
                 )
             )
-            assert persisted_attempt is not None
-            assert persisted_attempt.status == "active"
-            assert persisted_attempt.attempt_number == 3
-            assert persisted_attempt.worker_identity_hash != (
-                "postgres-matrix-worker"
+            assert [attempt.attempt_number for attempt in persisted_attempts] == [
+                1,
+                2,
+                3,
+                4,
+            ]
+            assert [attempt.status for attempt in persisted_attempts] == [
+                "abandoned",
+                "completed",
+                "abandoned",
+                "completed",
+            ]
+            assert all(
+                len(attempt.worker_identity_hash) == 64
+                and len(attempt.signal_lease_token_hash) == 64
+                for attempt in persisted_attempts
             )
-            assert persisted_attempt.signal_lease_token_hash != str(
-                signal_lease_token
-            )
-            assert await renew_migration_run_attempt(
-                session,
-                claim=attempt_claim,
-                worker_identity="postgres-matrix-worker",
-                signal_lease_token=uuid.uuid4(),
-                lease_seconds=60,
-                now=now + dt.timedelta(seconds=5),
-            ) is False
-            assert await renew_migration_run_attempt(
-                session,
-                claim=attempt_claim,
-                worker_identity="postgres-matrix-worker",
-                signal_lease_token=signal_lease_token,
-                lease_seconds=60,
-                now=now + dt.timedelta(seconds=5),
-            ) is True
-            await transition_migration_run(
-                session,
-                migration_run_uuid=first.migration_run_uuid,
-                expected_state_version=1,
-                next_state="sandbox_running",
-                event_type="sandbox_started",
-                evidence={"postgresql_major": expected_major},
-                actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=6),
-            )
-            await session.flush()
-            await complete_isolated_dry_run(
-                session,
-                migration_run_uuid=first.migration_run_uuid,
-                expected_state_version=2,
-                result={
-                    "postgresql_major": expected_major,
-                    "statement_count": len(plan.plan_json["statements"]),
-                    "base_digest": plan.base_digest,
-                    "target_digest": plan.target_digest,
-                    "converged": True,
-                },
-                actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=7),
-            )
-            await session.flush()
-            await complete_live_preflight(
-                session,
-                migration_run_uuid=first.migration_run_uuid,
-                expected_state_version=3,
-                result={
-                    "preconditions_passed": True,
-                    "checks": [
-                        {
-                            "statement_index": 0,
-                            "precondition_index": 0,
-                            "kind": "table_is_empty",
-                            "passed": True,
-                        }
-                    ],
-                    "observed_base_digest": plan.base_digest,
-                    "matches_plan_base": True,
-                },
-                actor_user_uuid=None,
-                now=now + dt.timedelta(seconds=8),
-            )
-            await session.flush()
             persisted_run = await session.scalar(
                 select(MigrationRun).where(
                     MigrationRun.migration_run_uuid == first.migration_run_uuid
@@ -929,28 +979,28 @@ async def test_real_postgres_and_valkey_recover_exact_consumer_attempt(
             assert persisted_run.observed_base_digest == plan.base_digest
             assert await renew_migration_run_attempt(
                 session,
-                claim=attempt_claim,
-                worker_identity="postgres-matrix-worker",
-                signal_lease_token=signal_lease_token,
+                claim=recovered_attempts[0],
+                worker_identity="recovered-postgres-valkey-worker",
+                signal_lease_token=recovered_signals[0].lease_token,
                 lease_seconds=60,
-                now=now + dt.timedelta(seconds=9),
+                now=dt.datetime.now(dt.timezone.utc),
             ) is False
             assert await finish_migration_run_attempt(
                 session,
-                claim=attempt_claim,
-                worker_identity="postgres-matrix-worker",
-                signal_lease_token=signal_lease_token,
+                claim=recovered_attempts[0],
+                worker_identity="recovered-postgres-valkey-worker",
+                signal_lease_token=recovered_signals[0].lease_token,
                 succeeded=True,
-                now=now + dt.timedelta(seconds=9),
-            ) is True
-            await session.refresh(persisted_attempt)
-            assert persisted_attempt.status == "completed"
-            assert persisted_attempt.finished_at == now + dt.timedelta(seconds=9)
+                now=dt.datetime.now(dt.timezone.utc),
+            ) is False
             assert await session.scalar(
                 select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
                     MigrationRunEvent.migration_run_uuid == first.migration_run_uuid
                 )
             ) == 4
+            assert await client.zrange(queue_key, 0, -1) == []
+            assert await client.zrange(processing_key, 0, -1) == []
+            assert await client.hlen(lease_token_key) == 0
 
             await session.commit()
 

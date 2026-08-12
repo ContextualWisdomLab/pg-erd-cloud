@@ -34,8 +34,12 @@ The PostgreSQL 14–18 CI matrix composes each metadata server with a
 digest-pinned ephemeral Valkey 8 service. It verifies that a sanitized handler
 failure abandons the exact durable attempt and releases the exact signal, then
 that retry completes the next attempt before acknowledgement and removes all
-ready/processing/token entries. This is ephemeral recovery evidence only; it
-does not authorize deployment startup wiring, credentials, or worker execution.
+ready/processing/token entries. It then leaves one one-second signal/attempt
+pair unacknowledged, waits for actual expiry, and proves a successor reclaims
+both stores, marks the expired attempt abandoned, reaches `passed`, completes
+the successor, and rejects the stale signal. This is in-process ephemeral
+recovery evidence only; it does not prove process/container restart or authorize
+deployment startup wiring, credentials, or worker execution.
 
 Actors:
 
