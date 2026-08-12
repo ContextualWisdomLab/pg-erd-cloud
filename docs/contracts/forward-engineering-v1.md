@@ -127,11 +127,13 @@ have no durable `MigrationRun` history; plans with run evidence are retained.
 
 ### `migration_run`, dispatch, attempt, and event — Partially implemented
 
-The ORM classes and Alembic revisions `0010_migration_run` and
-`0011_migration_run_attempt` persist an idempotent
-run identity, one identifier-only transactional outbox row, and an append-only,
-per-run event sequence. The implemented dry-run writer adds exactly one outbox
-row for each new run; the database unique constraint enforces at most one.
+The ORM classes and Alembic revisions `0010_migration_run`,
+`0011_migration_run_attempt`, and `0012_apply_intent_confirmation` persist an
+idempotent run identity, optional passed-dry-run/confirmation bindings, one
+identifier-only transactional outbox row for executable dry runs, and an
+append-only per-run event sequence. The implemented dry-run writer adds exactly
+one outbox row for each new run; apply-intent creation adds none. The database
+unique constraint enforces at most one dispatch per run.
 The row admits only `isolated_dry_run` and binds pending/published state to its
 publication timestamp without containing a DSN, SQL, or plan payload. Database
 checks bound
@@ -147,8 +149,12 @@ and requesting actor in versioned `request_digest`, and rejects raw SQL,
 credential-bearing fields, or PostgreSQL connection-string values from bounded
 evidence JSON. The internal cancellation-intent writer and editor-authorized
 `POST /api/migration-runs/{migration_run_uuid}/cancel` route are
-**Implemented**. Public dry-run creation is **Implemented**; public apply
-creation remains **Planned**. Lock-scoped due-order outbox claiming,
+**Implemented**. Public dry-run creation is **Implemented**. Public apply intent
+creation is **Implemented**. Apply intent creation binds a deployer, exact plan digest,
+same-plan passed dry-run UUID/base digest, exact typed target connection name,
+and the plan's exact destructive-confirmation requirement. It creates no
+dispatch, signal, credential access, SQL execution, or executor authority.
+Lock-scoped due-order outbox claiming,
 attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
 **Implemented**. Atomic UUID-only ready-to-processing claim, expiry reclaim,
 exact lease renewal, acknowledgement, and retry release use an exact
@@ -445,7 +451,7 @@ classified below without implying worker execution:
 |---|---|---|---|
 | `GET /api/migration-plans/{migration_plan_uuid}` | authenticated member; no body | immutable IDOR-masked plan preview, `200` | **Implemented** |
 | `POST /api/migration-plans/{migration_plan_uuid}/dry-runs` | editor+; bounded `Idempotency-Key`; exact `plan_digest` | persisted queued dry-run identity plus identifier-only transactional outbox, `202`; no worker signal | **Implemented** |
-| `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | `Idempotency-Key`; exact `plan_digest`; passed dry-run UUID; exact typed connection name; destructive acknowledgement when required | persisted apply resource, `202` | **Planned** |
+| `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` | deployer+; `Idempotency-Key`; exact `plan_digest`; same-plan passed dry-run UUID with exact observed base; exact typed connection name; destructive acknowledgement equal to plan requirement | persisted queued apply intent and hash-chained confirmation evidence, `202`; creates no dispatch or execution authority | **Implemented intent boundary; executor Planned** |
 | `GET /api/migration-runs/{migration_run_uuid}` | authenticated member; no body | IDOR-masked bounded state/evidence view; corrupt count/sequence/genesis/transition-graph/cancellation-intent/chronology/evidence/digest-chain/anchor returns sanitized `409` | **Implemented** |
 | `POST /api/migration-runs/{migration_run_uuid}/cancel` | editor+; strict positive `expected_state_version` | exact-version cancellation intent, `202`; stable correlated error envelope on rejection | **Implemented** |
 
@@ -482,7 +488,7 @@ Terminal semantics are exact:
 | Compile a plan | no | yes | yes | yes | Implemented |
 | Request a dry-run intent | no | yes | yes | yes | Implemented; worker execution Planned |
 | Cancel a non-terminal run | no | yes | yes | yes | Implemented control-plane intent; worker propagation Planned |
-| Request live apply | no | no | yes | yes | Partially implemented; legacy gate only |
+| Request live apply | no | no | yes | yes | Implemented as non-dispatched confirmed intent; executor Planned |
 | Manage membership | no | no | no | yes | Existing product contract |
 
 The server is authoritative. UI gating never substitutes for authorization.
@@ -520,7 +526,8 @@ Release-v1 read-only endpoint errors remain sanitized and machine-classifiable
 using the current string `detail` envelope. Mutating run-action endpoints,
 including dry-run creation and cancellation, fix their envelope as
 `{"detail":{"code":"...","detail":"...","correlation_id":"..."}}`.
-Future apply creation routes must reuse this shape; optional bounded
+The apply-intent creation route reuses this shape; future executor routes must
+also reuse it. Optional bounded
 `findings` may be added without exposing source values. The contract distinguishes:
 
 - `stale_revision`, `stale_plan`, `plan_expired`, and `idempotency_conflict`

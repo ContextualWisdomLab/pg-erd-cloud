@@ -34,6 +34,7 @@ from app.models import (
 )
 from app.permissions import require_project_member
 from app.schemas import (
+    MigrationApplyRunCreateIn,
     MigrationPlanCreateIn,
     MigrationPlanOut,
     MigrationRunActionOut,
@@ -109,6 +110,36 @@ def _creation_contract_error(
         status_code=status_code,
         code=code,
         detail="dry-run creation was rejected",
+    )
+
+
+def _apply_creation_contract_error(
+    request: Request, error: MigrationRunContractError
+) -> HTTPException:
+    """Map apply-intent rejection onto stable non-executing API errors."""
+
+    status_code, code = {
+        "migration plan integrity verification failed": (409, "plan_integrity_invalid"),
+        "migration plan expired": (409, "plan_expired"),
+        "migration plan cannot be dry-run": (409, "plan_not_executable"),
+        "passed dry run is invalid": (409, "passed_dry_run_invalid"),
+        "target connection confirmation mismatch": (409, "target_confirmation_mismatch"),
+        "destructive confirmation mismatch": (409, "destructive_confirmation_mismatch"),
+        "apply confirmation is invalid": (422, "apply_confirmation_invalid"),
+        "apply evidence is invalid": (422, "apply_confirmation_invalid"),
+        "idempotency key conflict": (409, "idempotency_key_conflict"),
+        "idempotency winner is unavailable": (503, "run_creation_unavailable"),
+        "idempotency key length is invalid": (422, "idempotency_key_invalid"),
+        "idempotency key contains a control character": (
+            422,
+            "idempotency_key_invalid",
+        ),
+    }.get(str(error), (409, "run_action_rejected"))
+    return _creation_error(
+        request,
+        status_code=status_code,
+        code=code,
+        detail="apply intent creation was rejected",
     )
 
 
@@ -323,6 +354,110 @@ async def create_dry_run(
         )
     except MigrationRunContractError as exc:
         raise _creation_contract_error(request, exc) from exc
+    await session.commit()
+    return MigrationRunActionOut(
+        migration_run_uuid=creation.migration_run_uuid,
+        state=cast(MigrationRunState, creation.state),
+        state_version=creation.state_version,
+        cancellation_requested=creation.cancellation_requested,
+        reused=creation.reused,
+    )
+
+
+@router.post(
+    "/migration-plans/{migration_plan_uuid}/apply-runs",
+    response_model=MigrationRunActionOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_apply_run(
+    migration_plan_uuid: uuid.UUID,
+    body: MigrationApplyRunCreateIn,
+    request: Request,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=255,
+            pattern=r"^[^\x00-\x1F\x7F]+$",
+        ),
+    ],
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> MigrationRunActionOut:
+    """Persist deployer-reviewed apply intent without dispatch or execution."""
+
+    plan = await session.get(MigrationPlan, migration_plan_uuid)
+    if plan is None:
+        raise _creation_error(
+            request,
+            status_code=404,
+            code="migration_plan_not_found",
+            detail="migration plan not found",
+        )
+    try:
+        await require_project_member(
+            session,
+            plan.project_space_uuid,
+            user.user_account_uuid,
+            minimum_role="deployer",
+        )
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            if exc.detail == "insufficient project role":
+                raise _creation_error(
+                    request,
+                    status_code=403,
+                    code="run_role_required",
+                    detail="deployer role required",
+                ) from exc
+            raise _creation_error(
+                request,
+                status_code=404,
+                code="migration_plan_not_found",
+                detail="migration plan not found",
+            ) from exc
+        raise
+    if body.plan_digest != plan.statement_digest:
+        raise _creation_error(
+            request,
+            status_code=409,
+            code="stale_plan",
+            detail="migration plan digest does not match",
+        )
+
+    passed_dry_run = await session.get(MigrationRun, body.passed_dry_run_uuid)
+    connection = await session.get(DbConnection, plan.db_connection_uuid)
+    if passed_dry_run is None:
+        raise _creation_error(
+            request,
+            status_code=409,
+            code="passed_dry_run_invalid",
+            detail="passed dry run is invalid",
+        )
+    if connection is None:
+        raise _creation_error(
+            request,
+            status_code=409,
+            code="target_confirmation_mismatch",
+            detail="target connection confirmation does not match",
+        )
+    correlation_id = _request_id(request)
+    try:
+        creation = await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="apply",
+            idempotency_key=idempotency_key,
+            requested_by_user_uuid=user.user_account_uuid,
+            evidence={"request_id": correlation_id, "request_source": "api"},
+            passed_dry_run=passed_dry_run,
+            connection=connection,
+            typed_connection_name=body.target_connection_name,
+            destructive_acknowledged=body.destructive_acknowledged,
+        )
+    except MigrationRunContractError as exc:
+        raise _apply_creation_contract_error(request, exc) from exc
     await session.commit()
     return MigrationRunActionOut(
         migration_run_uuid=creation.migration_run_uuid,

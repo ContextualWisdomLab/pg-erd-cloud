@@ -156,7 +156,7 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation, and polling exist; application startup wiring, credentials, and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation, non-dispatched apply-intent confirmation, and polling exist; application startup wiring, credentials, and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, and
@@ -173,7 +173,7 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 | `POST /api/schema-model-revisions/{revision_uuid}/migration-plans` | editor+ | Validate exact tenant/connection/snapshot binding, compile, bound, persist | **Implemented** |
 | `GET /api/migration-plans/{plan_uuid}` | member | Immutable preview with project/revision/connection/snapshot/capability/actor/time bindings, IDOR-masked | **Implemented** |
 | `POST /api/migration-plans/{plan_uuid}/dry-runs` | editor+ | Exact-digest, `Idempotency-Key`-bound durable queued intent; `202`; does not signal a worker | **Implemented** |
-| `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation | **Planned** |
+| `POST /api/migration-plans/{plan_uuid}/apply-runs` | deployer+ | Exact passed evidence + typed/destructive confirmation; persists a queued intent with no dispatch | **Implemented intent boundary; executor Planned** |
 | `GET /api/migration-runs/{run_uuid}` | member | IDOR-masked bounded state/evidence view; verifies count, canonical genesis, exact transition graph, one-to-one cancellation flag/event consistency, chronology, event digests, run anchor, and secret-safe evidence before returning | **Implemented** |
 | `POST /api/migration-runs/{run_uuid}/cancel` | editor+ | Exact-version CAS cancellation intent; `202`; nonmembers masked, viewers rejected, correlated stable error envelope | **Implemented** |
 

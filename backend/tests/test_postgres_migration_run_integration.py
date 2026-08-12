@@ -1007,6 +1007,38 @@ async def test_real_postgres_and_valkey_recover_failure_and_crash(
             assert await client.zrange(processing_key, 0, -1) == []
             assert await client.hlen(lease_token_key) == 0
 
+            target_connection = await session.get(DbConnection, connection_uuid)
+            assert target_connection is not None
+            apply_intent = await create_migration_run(
+                session,
+                plan=plan,
+                run_kind="apply",
+                idempotency_key="real-postgres-apply-intent",
+                requested_by_user_uuid=user_uuid,
+                evidence={"request_source": "postgresql_matrix"},
+                passed_dry_run=persisted_run,
+                connection=target_connection,
+                typed_connection_name="integration target",
+                destructive_acknowledged=False,
+                now=dt.datetime.now(dt.timezone.utc),
+            )
+            await session.flush()
+            persisted_apply = await session.get(
+                MigrationRun, apply_intent.migration_run_uuid
+            )
+            assert persisted_apply is not None
+            assert persisted_apply.run_kind == "apply"
+            assert persisted_apply.state == "queued"
+            assert persisted_apply.passed_dry_run_uuid == first.migration_run_uuid
+            assert len(persisted_apply.confirmation_digest or "") == 64
+            assert persisted_apply.destructive_confirmation is False
+            assert await session.scalar(
+                select(func.count(MigrationRunDispatch.migration_run_uuid)).where(
+                    MigrationRunDispatch.migration_run_uuid
+                    == apply_intent.migration_run_uuid
+                )
+            ) == 0
+
             await session.commit()
 
         await outer_transaction.rollback()

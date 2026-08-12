@@ -305,12 +305,21 @@ class MigrationRun(Base):
         UUID(as_uuid=True),
         ForeignKey("migration_plan.migration_plan_uuid", ondelete="RESTRICT"),
     )
+    passed_dry_run_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="RESTRICT"),
+        nullable=True,
+    )
     run_kind: Mapped[str] = mapped_column(Text())
     state: Mapped[str] = mapped_column(Text())
     state_version: Mapped[int] = mapped_column(Integer(), default=1)
     idempotency_key_hash: Mapped[str] = mapped_column(Text())
     plan_digest: Mapped[str] = mapped_column(Text())
     request_digest: Mapped[str] = mapped_column(Text())
+    confirmation_digest: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    destructive_confirmation: Mapped[bool | None] = mapped_column(
+        Boolean(), nullable=True
+    )
     latest_event_digest: Mapped[str] = mapped_column(Text())
     requested_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
@@ -384,7 +393,20 @@ class MigrationRun(Base):
             "observed_base_digest ~ '^[0-9a-f]{64}$'",
             name="ck_migration_run__observed_base_digest",
         ),
+        CheckConstraint(
+            "confirmation_digest IS NULL OR "
+            "confirmation_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__confirmation_digest",
+        ),
+        CheckConstraint(
+            "(run_kind = 'dry_run' AND passed_dry_run_uuid IS NULL AND "
+            "confirmation_digest IS NULL AND destructive_confirmation IS NULL) OR "
+            "(run_kind = 'apply' AND passed_dry_run_uuid IS NOT NULL AND "
+            "confirmation_digest IS NOT NULL AND destructive_confirmation IS NOT NULL)",
+            name="ck_migration_run__apply_confirmation",
+        ),
         Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
+        Index("ix_migration_run__passed_dry_run_uuid", "passed_dry_run_uuid"),
         Index("ix_migration_run__project_state", "project_space_uuid", "state"),
     )
 

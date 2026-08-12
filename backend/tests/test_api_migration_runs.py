@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
+import app.api.migration_plans as migration_plan_api
 from app.api.migration_plans import _request_id as _plan_request_id
 from app.api.migration_plans import create_dry_run
 from app.api.migration_runs import (
@@ -24,8 +25,13 @@ from app.forward.migration_run import (
     MigrationRunCreation,
     digest_run_event,
 )
-from app.models import MigrationPlan, MigrationRun, MigrationRunEvent
-from app.schemas import MigrationRunCancelIn, MigrationRunCreateIn, MigrationRunOut
+from app.models import DbConnection, MigrationPlan, MigrationRun, MigrationRunEvent
+from app.schemas import (
+    MigrationApplyRunCreateIn,
+    MigrationRunCancelIn,
+    MigrationRunCreateIn,
+    MigrationRunOut,
+)
 
 
 def _user() -> CurrentUser:
@@ -169,6 +175,231 @@ async def test_create_dry_run_persists_correlated_editor_intent() -> None:
         evidence={"request_id": "migration-request-123", "request_source": "api"},
     )
     session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_apply_run_persists_deployer_confirmation_without_dispatch() -> None:
+    """A deployer can persist exact reviewed apply intent, never execute it."""
+
+    handler = getattr(migration_plan_api, "create_apply_run", None)
+    assert handler is not None
+    plan = _plan()
+    passed_run = _run()
+    passed_run.migration_run_uuid = uuid.uuid4()
+    passed_run.project_space_uuid = plan.project_space_uuid
+    passed_run.migration_plan_uuid = plan.migration_plan_uuid
+    passed_run.run_kind = "dry_run"
+    passed_run.state = "passed"
+    passed_run.plan_digest = plan.statement_digest
+    passed_run.observed_base_digest = plan.base_digest
+    passed_run.cancellation_requested = False
+    connection = DbConnection(
+        db_connection_uuid=plan.db_connection_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        conn_name="Production Primary",
+        dsn_ciphertext=b"ciphertext",
+        dsn_nonce=b"nonce",
+    )
+    session = SimpleNamespace(
+        get=AsyncMock(side_effect=[plan, passed_run, connection]),
+        commit=AsyncMock(),
+    )
+    creation = MigrationRunCreation(
+        migration_run_uuid=uuid.uuid4(),
+        state="queued",
+        state_version=1,
+        cancellation_requested=False,
+        reused=False,
+    )
+    user = _user()
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ) as membership,
+        patch(
+            "app.api.migration_plans.create_migration_run",
+            new=AsyncMock(return_value=creation),
+        ) as writer,
+    ):
+        out = await handler(
+            migration_plan_uuid=plan.migration_plan_uuid,
+            body=MigrationApplyRunCreateIn(
+                plan_digest=plan.statement_digest,
+                passed_dry_run_uuid=passed_run.migration_run_uuid,
+                target_connection_name=connection.conn_name,
+                destructive_acknowledged=False,
+            ),
+            request=_request(),
+            idempotency_key="apply-request-1",
+            user=user,
+            session=session,
+        )
+
+    assert out.migration_run_uuid == creation.migration_run_uuid
+    membership.assert_awaited_once_with(
+        session,
+        plan.project_space_uuid,
+        user.user_account_uuid,
+        minimum_role="deployer",
+    )
+    writer.assert_awaited_once_with(
+        session,
+        plan=plan,
+        run_kind="apply",
+        idempotency_key="apply-request-1",
+        requested_by_user_uuid=user.user_account_uuid,
+        evidence={"request_id": "migration-request-123", "request_source": "api"},
+        passed_dry_run=passed_run,
+        connection=connection,
+        typed_connection_name="Production Primary",
+        destructive_acknowledged=False,
+    )
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("membership_error", "status_code", "code"),
+    [
+        ("insufficient project role", 403, "run_role_required"),
+        ("denied", 404, "migration_plan_not_found"),
+    ],
+)
+async def test_create_apply_run_enforces_deployer_and_masks_non_members(
+    membership_error: str, status_code: int, code: str
+) -> None:
+    """Apply intent authority is server-side and tenant identities stay masked."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member",
+            new=AsyncMock(
+                side_effect=HTTPException(status_code=403, detail=membership_error)
+            ),
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await migration_plan_api.create_apply_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationApplyRunCreateIn(
+                    plan_digest=plan.statement_digest,
+                    passed_dry_run_uuid=uuid.uuid4(),
+                    target_connection_name="Production Primary",
+                    destructive_acknowledged=False,
+                ),
+                request=_request(),
+                idempotency_key="apply-request-role",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.detail["code"] == code
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_apply_run_rejects_stale_plan_before_loading_evidence() -> None:
+    """A changed preview digest cannot select dry-run or target evidence."""
+
+    plan = _plan()
+    session = SimpleNamespace(get=AsyncMock(return_value=plan), commit=AsyncMock())
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run", new_callable=AsyncMock
+        ) as writer,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await migration_plan_api.create_apply_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationApplyRunCreateIn(
+                    plan_digest="e" * 64,
+                    passed_dry_run_uuid=uuid.uuid4(),
+                    target_connection_name="Production Primary",
+                    destructive_acknowledged=False,
+                ),
+                request=_request(),
+                idempotency_key="apply-request-stale",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "stale_plan"
+    assert session.get.await_count == 1
+    writer.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("contract_error", "status_code", "code"),
+    [
+        ("passed dry run is invalid", 409, "passed_dry_run_invalid"),
+        ("target connection confirmation mismatch", 409, "target_confirmation_mismatch"),
+        ("destructive confirmation mismatch", 409, "destructive_confirmation_mismatch"),
+        ("apply evidence is invalid", 422, "apply_confirmation_invalid"),
+        ("idempotency key conflict", 409, "idempotency_key_conflict"),
+    ],
+)
+async def test_create_apply_run_maps_contract_failures_without_source_values(
+    contract_error: str, status_code: int, code: str
+) -> None:
+    """Rejected confirmation inputs produce stable bounded action errors."""
+
+    plan = _plan()
+    passed_run = _run()
+    connection = DbConnection(
+        db_connection_uuid=plan.db_connection_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        conn_name="Production Primary",
+        dsn_ciphertext=b"ciphertext",
+        dsn_nonce=b"nonce",
+    )
+    session = SimpleNamespace(
+        get=AsyncMock(side_effect=[plan, passed_run, connection]),
+        commit=AsyncMock(),
+    )
+    with (
+        patch(
+            "app.api.migration_plans.require_project_member", new_callable=AsyncMock
+        ),
+        patch(
+            "app.api.migration_plans.create_migration_run",
+            new=AsyncMock(side_effect=MigrationRunContractError(contract_error)),
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await migration_plan_api.create_apply_run(
+                migration_plan_uuid=plan.migration_plan_uuid,
+                body=MigrationApplyRunCreateIn(
+                    plan_digest=plan.statement_digest,
+                    passed_dry_run_uuid=passed_run.migration_run_uuid,
+                    target_connection_name=connection.conn_name,
+                    destructive_acknowledged=False,
+                ),
+                request=_request(),
+                idempotency_key="apply-request-rejected",
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.detail == {
+        "code": code,
+        "detail": "apply intent creation was rejected",
+        "correlation_id": "migration-request-123",
+    }
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -20,7 +20,9 @@ need stronger evidence of informed intent than a generic confirmation.
 The repository already encrypts DSNs and has project roles. The current role
 ordering is `viewer < editor < deployer < owner`, and live
 `apply-sql` (`dry_run=false`) now requires `deployer`. The complete immutable
-plan approval and convergence flow is not implemented.
+plan execution and convergence flow is not implemented. A non-dispatched apply
+intent boundary now persists exact deployer confirmation without granting
+credential, queue, target, SQL, or DDL authority.
 
 ## Decision
 
@@ -112,11 +114,16 @@ acceptance. A central green signal cannot replace leaf convergence evidence.
   reused for database access.
 - Plans bind actor, project, connection, base snapshot, model revision, digests,
   compiler version, and expiry.
+- `POST /api/migration-plans/{migration_plan_uuid}/apply-runs` requires
+  deployer authority and binds the exact unexpired plan digest, same-plan
+  passed dry-run/base evidence, typed connection name, destructive decision,
+  actor, and idempotency key. It persists a confirmation digest and chained
+  genesis evidence but deliberately creates no dispatch or execution authority.
 
 ### Planned before production release
 
-- evidence-bound apply-run request and compare-and-swap enqueue;
-- typed connection-name and destructive acknowledgements;
+- independent approval policy beyond the initiating deployer confirmation;
+- apply-time target drift/precondition revalidation and executable dispatch;
 - uniform IDOR masking across every new resource;
 - verification snapshots, convergence comparison, residual diffs, and UI;
 - audit events, privilege tests, secret-boundary tests, and leaf operational

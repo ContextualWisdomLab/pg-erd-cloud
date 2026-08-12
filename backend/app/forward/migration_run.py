@@ -31,6 +31,7 @@ from app.forward.live_preflight import (
 )
 from app.forward.migration_plan import verify_migration_plan_digest
 from app.models import (
+    DbConnection,
     MigrationPlan,
     MigrationRun,
     MigrationRunAttempt,
@@ -503,6 +504,8 @@ def digest_run_request(
     run_kind: str,
     plan_digest: str,
     requested_by_user_uuid: uuid.UUID,
+    passed_dry_run_uuid: uuid.UUID | None = None,
+    confirmation_digest: str | None = None,
 ) -> str:
     """Bind one versioned run intent for idempotency conflict detection."""
 
@@ -518,6 +521,15 @@ def digest_run_request(
         "requested_by_user_uuid": str(requested_by_user_uuid),
         "run_kind": run_kind,
     }
+    if run_kind == "apply":
+        if not isinstance(passed_dry_run_uuid, uuid.UUID):
+            raise MigrationRunContractError("passed dry run is invalid")
+        if confirmation_digest is None or _HEX_DIGEST.fullmatch(
+            confirmation_digest
+        ) is None:
+            raise MigrationRunContractError("apply confirmation is invalid")
+        request["passed_dry_run_uuid"] = str(passed_dry_run_uuid)
+        request["confirmation_digest"] = confirmation_digest
     encoded = json.dumps(
         request, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
@@ -685,20 +697,22 @@ async def create_migration_run(
     idempotency_key: str,
     requested_by_user_uuid: uuid.UUID,
     evidence: Mapping[str, object],
+    passed_dry_run: MigrationRun | None = None,
+    connection: DbConnection | None = None,
+    typed_connection_name: str | None = None,
+    destructive_acknowledged: bool | None = None,
     now: dt.datetime | None = None,
 ) -> MigrationRunCreation:
-    """Select one durable dry-run identity without exposing execution authority.
+    """Select one durable run intent without exposing execution authority.
 
     The PostgreSQL uniqueness constraint is the concurrency winner. A new run,
     its genesis event, and one identifier-only dispatch outbox row share the
     caller's transaction. This function never commits, publishes, or signals a
-    worker. Apply creation remains fail-closed until approval and passed-dry-run
-    bindings are persisted.
+    worker. Apply intents persist exact confirmation evidence but deliberately
+    create no dispatch row, worker signal, credential access, or DDL authority.
     """
 
-    if run_kind == "apply":
-        raise MigrationRunContractError("apply run creation is not implemented")
-    if run_kind != "dry_run":
+    if run_kind not in {"dry_run", "apply"}:
         raise MigrationRunContractError("run kind is invalid")
     transition_time = now or dt.datetime.now(dt.timezone.utc)
     if transition_time.tzinfo is None or transition_time.utcoffset() is None:
@@ -718,12 +732,102 @@ async def create_migration_run(
     if plan_json.get("can_dry_run") is not True or plan_json.get("blockers"):
         raise MigrationRunContractError("migration plan cannot be dry-run")
 
+    passed_dry_run_uuid: uuid.UUID | None = None
+    confirmation_digest: str | None = None
+    destructive_confirmation: bool | None = None
+    if run_kind == "dry_run":
+        if any(
+            value is not None
+            for value in (
+                passed_dry_run,
+                connection,
+                typed_connection_name,
+                destructive_acknowledged,
+            )
+        ):
+            raise MigrationRunContractError("dry-run confirmation is invalid")
+    else:
+        required_destructive = plan_json.get(
+            "requires_destructive_confirmation"
+        )
+        if not isinstance(required_destructive, bool):
+            raise MigrationRunContractError("apply confirmation is invalid")
+        if (
+            passed_dry_run is None
+            or connection is None
+            or not isinstance(typed_connection_name, str)
+            or not isinstance(destructive_acknowledged, bool)
+        ):
+            raise MigrationRunContractError("apply confirmation is invalid")
+        encoded_connection_name = typed_connection_name.encode("utf-8")
+        if (
+            not encoded_connection_name
+            or len(typed_connection_name) > 128
+            or any(
+                ord(character) < 0x20 or ord(character) == 0x7F
+                for character in typed_connection_name
+            )
+        ):
+            raise MigrationRunContractError("apply confirmation is invalid")
+        if (
+            connection.db_connection_uuid != plan.db_connection_uuid
+            or connection.project_space_uuid != plan.project_space_uuid
+            or typed_connection_name != connection.conn_name
+        ):
+            raise MigrationRunContractError("target connection confirmation mismatch")
+        if (
+            passed_dry_run.run_kind != "dry_run"
+            or passed_dry_run.state != "passed"
+            or passed_dry_run.cancellation_requested
+            or passed_dry_run.project_space_uuid != plan.project_space_uuid
+            or passed_dry_run.migration_plan_uuid != plan.migration_plan_uuid
+            or passed_dry_run.plan_digest != plan.statement_digest
+            or passed_dry_run.observed_base_digest != plan.base_digest
+        ):
+            raise MigrationRunContractError("passed dry run is invalid")
+        if destructive_acknowledged is not required_destructive:
+            raise MigrationRunContractError("destructive confirmation mismatch")
+        passed_dry_run_uuid = passed_dry_run.migration_run_uuid
+        destructive_confirmation = destructive_acknowledged
+        confirmation_payload = {
+            "actor_user_uuid": str(requested_by_user_uuid),
+            "connection_name": typed_connection_name,
+            "connection_uuid": str(connection.db_connection_uuid),
+            "contract_version": "migration-apply-confirmation/v1",
+            "destructive_acknowledged": destructive_acknowledged,
+            "passed_dry_run_uuid": str(passed_dry_run_uuid),
+            "plan_digest": plan.statement_digest,
+        }
+        confirmation_digest = hashlib.sha256(
+            json.dumps(
+                confirmation_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        for reserved in (
+            "passed_dry_run_uuid",
+            "target_connection_confirmed",
+            "destructive_acknowledged",
+        ):
+            if _contains_evidence_field(canonical_evidence, reserved.replace("_", "")):
+                raise MigrationRunContractError("apply evidence is invalid")
+        canonical_evidence = {
+            **canonical_evidence,
+            "destructive_acknowledged": destructive_acknowledged,
+            "passed_dry_run_uuid": str(passed_dry_run_uuid),
+            "target_connection_confirmed": True,
+        }
+
     request_digest = digest_run_request(
         project_space_uuid=plan.project_space_uuid,
         migration_plan_uuid=plan.migration_plan_uuid,
         run_kind=run_kind,
         plan_digest=plan.statement_digest,
         requested_by_user_uuid=requested_by_user_uuid,
+        passed_dry_run_uuid=passed_dry_run_uuid,
+        confirmation_digest=confirmation_digest,
     )
     run_uuid = uuid.uuid4()
     event_digest = digest_run_event(
@@ -743,12 +847,15 @@ async def create_migration_run(
             migration_run_uuid=run_uuid,
             project_space_uuid=plan.project_space_uuid,
             migration_plan_uuid=plan.migration_plan_uuid,
+            passed_dry_run_uuid=passed_dry_run_uuid,
             run_kind=run_kind,
             state="queued",
             state_version=1,
             idempotency_key_hash=key_hash,
             plan_digest=plan.statement_digest,
             request_digest=request_digest,
+            confirmation_digest=confirmation_digest,
+            destructive_confirmation=destructive_confirmation,
             latest_event_digest=event_digest,
             requested_by_user_uuid=requested_by_user_uuid,
             cancellation_requested=False,
@@ -799,18 +906,19 @@ async def create_migration_run(
             created_at=transition_time,
         )
     )
-    session.add(
-        MigrationRunDispatch(
-            migration_run_dispatch_uuid=uuid.uuid4(),
-            migration_run_uuid=inserted_uuid,
-            dispatch_kind="isolated_dry_run",
-            status="pending",
-            attempt_count=0,
-            not_before=transition_time,
-            created_at=transition_time,
-            published_at=None,
+    if run_kind == "dry_run":
+        session.add(
+            MigrationRunDispatch(
+                migration_run_dispatch_uuid=uuid.uuid4(),
+                migration_run_uuid=inserted_uuid,
+                dispatch_kind="isolated_dry_run",
+                status="pending",
+                attempt_count=0,
+                not_before=transition_time,
+                created_at=transition_time,
+                published_at=None,
+            )
         )
-    )
     return MigrationRunCreation(
         migration_run_uuid=inserted_uuid,
         state="queued",

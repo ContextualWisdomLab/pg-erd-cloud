@@ -78,6 +78,16 @@ Each run binds:
 - current state plus compare-and-swap version;
 - redacted classified error, timestamps, and verification outcome.
 
+Apply intent creation is **Implemented without execution authority**. The
+deployer route verifies the immutable plan digest and expiry, exact target
+connection name, same-plan `passed` dry run with exact observed base, and the
+plan's destructive-confirmation requirement. Migration
+`0012_apply_intent_confirmation` persists the restrictive passed-dry-run
+self-reference, confirmation digest, and destructive boolean. Its genesis
+event is hash chained, but no `migration_run_dispatch` row or Valkey signal is
+created. Apply-time drift/privilege checks, locks, credentials, execution,
+reconciliation, and verification remain Planned.
+
 `migration_run_event` is append-only and records state transitions,
 confirmation, drift, commit acknowledgement, reconciliation, and verification
 using identifiers, hashes, counts, and sanitized diagnostics.
@@ -190,11 +200,10 @@ Rules:
   UUID, kind, state, and state version, then appends the same-version sanitized
   event in the caller-owned transaction. A stale worker cannot publish evidence.
 - `create_migration_run` uses the database idempotency constraint to select one
-  dry-run winner, validates immutable plan integrity/expiry/executability, and
-  appends sequence-one evidence plus one dispatch row in the same caller-owned
-  transaction without committing, publishing, or signaling a worker. Apply
-  creation remains rejected until its approval and passed-dry-run bindings
-  exist.
+  exact dry-run or apply-intent winner. Dry-run creation appends sequence-one
+  evidence plus one dispatch row. Apply-intent creation validates and persists
+  exact confirmation bindings plus sequence-one evidence but creates no
+  dispatch. Neither path commits, publishes, accesses credentials, or executes.
 - Cancellation is a same-state, version-incrementing CAS event. A repeated
   request is idempotent, a terminal run rejects it, and a worker holding the old
   version must reload the intent before any further transition.
@@ -205,7 +214,7 @@ Rules:
 
 ### Planned before production release
 
-- authenticated apply creation route;
+- apply executor and apply-time drift/privilege/lock/precondition revalidation;
 - application startup wiring, cancellation-worker acknowledgement, and relay
   deployment restart/failover evidence;
 - reconciliation and post-commit verification workers;

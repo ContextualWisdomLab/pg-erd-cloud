@@ -143,8 +143,10 @@ transitional and does not satisfy this sequence.
 
 ## Target apply and verification sequence
 
-**Status: Planned.** The worker consumes only the stored structured plan. It
-must not accept a replacement SQL string from the browser or queue payload.
+**Status: Partially implemented.** The API-side confirmed apply intent is
+Implemented and deliberately non-dispatched. The worker/executor sequence is
+Planned and must consume only the stored structured plan; it must not accept a
+replacement SQL string from the browser or queue payload.
 
 ```mermaid
 sequenceDiagram
@@ -156,8 +158,9 @@ sequenceDiagram
 
   Client->>API: POST apply-run with exact plan and dry-run evidence
   API->>API: Verify role, confirmations, expiry and idempotency
-  API->>DB: Persist run and queue identity atomically
+  API->>DB: Persist queued intent and confirmation digest; no dispatch
   API-->>Client: 202 migration_run UUID
+  Note over API,DB: Implemented boundary ends here
   Worker->>Target: Lock, recheck fingerprint and data preconditions
   Worker->>Target: Execute one transactional segment and commit
   Worker->>Target: Re-introspect target after commit
@@ -195,7 +198,8 @@ stateDiagram-v2
 
 ### Apply and recovery
 
-**Status: Planned.** Cancellation may stop a queued run. After `applying`
+**Status: Partially implemented.** Confirmed queued intent persistence exists;
+all executor transitions remain Planned. Cancellation may stop a queued run. After `applying`
 begins, a cancellation request cannot produce a claim that execution stopped;
 reconciliation and verification continue.
 

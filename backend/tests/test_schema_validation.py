@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
+
+import app.schemas as schemas
 
 from app.schemas import (
     ConnectionCreateIn,
@@ -68,3 +72,25 @@ def test_migration_run_create_rejects_invalid_plan_digest(digest: str) -> None:
 
     with pytest.raises(ValidationError):
         MigrationRunCreateIn(plan_digest=digest)
+
+
+def test_apply_run_create_requires_exact_review_confirmation_shape() -> None:
+    """Apply intent input is typed and cannot omit explicit destructive intent."""
+
+    model = getattr(schemas, "MigrationApplyRunCreateIn", None)
+    assert model is not None
+    passed_uuid = uuid.uuid4()
+    value = model(
+        plan_digest="a" * 64,
+        passed_dry_run_uuid=passed_uuid,
+        target_connection_name='Production "Primary"',
+        destructive_acknowledged=False,
+    )
+    assert value.passed_dry_run_uuid == passed_uuid
+    with pytest.raises(ValidationError):
+        model(
+            plan_digest="a" * 64,
+            passed_dry_run_uuid=passed_uuid,
+            target_connection_name="",
+            destructive_acknowledged=False,
+        )

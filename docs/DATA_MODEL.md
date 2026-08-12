@@ -92,12 +92,15 @@ erDiagram
     uuid migration_run_uuid PK
     uuid project_space_uuid FK
     uuid migration_plan_uuid FK
+    uuid passed_dry_run_uuid FK
     text run_kind
     text state
     int state_version
     text idempotency_key_hash
     text plan_digest
     text request_digest
+    text confirmation_digest
+    boolean destructive_confirmation
     text latest_event_digest
     uuid requested_by_user_uuid FK
     boolean cancellation_requested
@@ -191,6 +194,7 @@ erDiagram
 | `migration_plan.base_schema_snapshot_uuid` | `schema_snapshot` | no | `RESTRICT` | Each plan binds one base snapshot; a snapshot can base zero or more plans. |
 | `migration_run.project_space_uuid` | `project_space` | no | `CASCADE` | Each durable run is scoped to one project; a project has zero or more runs. |
 | `migration_run.migration_plan_uuid` | `migration_plan` | no | `RESTRICT` | Each durable run attempts one immutable plan; plan deletion is blocked while evidence remains. |
+| `migration_run.passed_dry_run_uuid` | `migration_run` | nullable for dry runs; required for apply | `RESTRICT` | Each apply intent names one exact dry run; the writer additionally requires same project, plan, digest, passed state, no cancellation, and exact observed base. |
 | `migration_run.requested_by_user_uuid` | `user_account` | no | `NO ACTION` | Each run records one requesting actor. |
 | `migration_run_dispatch.migration_run_uuid` | `migration_run` | no; unique | `CASCADE` | The implemented writer adds one identifier-only dispatch intent for each new dry run; the database permits zero or one dispatch row per run. |
 | `migration_run_attempt.migration_run_uuid` | `migration_run` | no | `CASCADE` | A run has numbered attempt history and at most one partial-indexed active owner. |
@@ -211,10 +215,11 @@ All `created_by_user_uuid` columns shown are non-null foreign keys to
 | Plan project, revision project, connection project, and snapshot project match; the snapshot came from that exact connection and succeeded. | `app.api.migration_plans.create_migration_plan` before insert. | Implemented in the API; not a database constraint |
 | Plan SQL and execution fields cannot change. | No current update route. There is no database immutability trigger. | Partially implemented |
 | Expired plans cannot start a run. | The public dry-run intent route delegates to the writer that verifies expiry before its conflict-winner insert; worker execution remains absent. | Partially implemented |
-| A new run, genesis event, and dispatch intent are atomic. | `create_migration_run` adds all three to the caller-owned transaction; `migration_run_dispatch.migration_run_uuid` is unique and the public route commits once. | Implemented |
+| A new run and genesis event are atomic; only dry runs receive a dispatch. | `create_migration_run` adds the run/event and, for dry runs only, one unique dispatch to the caller-owned transaction. Confirmed apply intents deliberately receive no dispatch. | Implemented |
+| An apply intent cannot become executable by creation. | The writer validates exact plan/connection/passed-run/base/destructive bindings, persists a confirmation digest and genesis evidence, and creates no dispatch. Database checks require confirmation fields only for apply rows. | Implemented intent boundary; executor Planned |
 | Dispatch and attempt storage carry no execution material. | Dispatch contains identifiers/timestamps only. Attempts contain numbered ownership timestamps plus SHA-256 worker/signal-token hashes—never raw identity, DSN, SQL, plan, or credential. Exact unexpired-owner acquire/renew/finish and expiry takeover are implemented. | Implemented persistence/signal/attempt boundary; application wiring, credential binding, and execution Planned |
 | Secrets or raw SQL never appear in run evidence. | `canonicalize_run_evidence` recursively rejects SQL, DSN, password, secret, token, and credential field tokens and bounds depth, items, strings, and total JSON bytes. | Implemented at the evidence-construction boundary; all writers must use it |
-| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; the public dry-run route delegates to the PostgreSQL conflict-winner writer, which reuses only the same request and rejects different reuse. | Implemented for dry-run intent; workers/apply Planned |
+| Duplicate run requests select one durable identity. | Unique `(project_space_uuid, run_kind, idempotency_key_hash)` plus separately persisted `request_digest`; public dry-run/apply-intent routes delegate to the PostgreSQL conflict-winner writer, which reuses only the same effective request and rejects different reuse. | Implemented for dry-run and non-dispatched apply intent; workers Planned |
 | Run/event state tokens, sequence numbers, digest links, and attempt ownership are valid. | Database checks constrain run/event state and SHA-256 shapes; exact transition/result CAS writers preserve plan/evidence identity. Attempt acquisition serializes on the run, one partial unique index permits at most one active owner, history numbering is unique, renewal requires an executable uncancelled run, and renew/finish require the exact unexpired hashed owner. | Implemented persistence/polling/result bridges and durable attempt primitives; consumer/credential/execution binding Planned |
 
 The existing result boundaries remain explicit: `complete_isolated_dry_run`
@@ -246,11 +251,14 @@ execution input.
 
 `migration_run`, `migration_run_dispatch`, `migration_run_event`, and
 `migration_run_attempt` now exist in the ORM and Alembic revisions
-`0010_migration_run` and `0011_migration_run_attempt` with the fields
+`0010_migration_run`, `0011_migration_run_attempt`,
+`0012_apply_intent_confirmation`, and
+`0012_apply_intent_confirmation` with the fields
 shown in the implemented ERD
-above. The logical diagram below retains accepted **Planned extensions** such
-as passed-dry-run and verification-snapshot references. Those extension fields
-do not exist physically and must not be inferred from the implemented tables.
+above. Passed-dry-run, confirmation-digest, and destructive-confirmation
+bindings are physical and Implemented. The logical diagram below retains the
+verification-snapshot reference as a **Planned extension**; that field does not
+exist physically and must not be inferred from the implemented tables.
 
 ```mermaid
 erDiagram
@@ -275,6 +283,8 @@ erDiagram
     text bound_plan_digest
     text idempotency_key
     text request_digest
+    text confirmation_digest
+    boolean destructive_confirmation
     text state
     int state_version
     text observed_base_digest
@@ -320,15 +330,14 @@ erDiagram
   }
 ```
 
-Planned target foreign-key and cardinality rules follow. The implemented
-foreign-key table above is authoritative for current deletion behavior; this
-table lists only relationships that remain absent or whose target rule is not
-yet enforced.
+Target foreign-key and cardinality rules follow. The implemented foreign-key
+table above is authoritative for current deletion behavior; this table marks
+the implemented passed-dry-run relationship and the remaining planned field.
 
 | Child foreign key | Parent | Nullable / conditional rule | Target deletion and cardinality |
 |---|---|---|---|
 | `migration_run.migration_plan_uuid` | `migration_plan` | non-null | `RESTRICT`; every run attempts one immutable plan, and a plan has zero or more dry-run/apply attempts. |
-| `migration_run.passed_dry_run_uuid` | `migration_run` | null for dry runs; required for apply and must reference a `passed` run for the same plan/digest | `RESTRICT`; one passed dry run can prove zero or more apply requests until evidence becomes stale. |
+| `migration_run.passed_dry_run_uuid` | `migration_run` | null for dry runs; required for apply and must reference a `passed` run for the same plan/digest/base | **Implemented:** `RESTRICT`; one passed dry run can prove zero or more non-dispatched apply intents while its exact plan remains unexpired. |
 | `migration_run.verification_snapshot_uuid` | `schema_snapshot` | null until verification; required for `verified` | `RESTRICT`; a run has zero or one verification snapshot, and a snapshot can be referenced by zero or more runs physically. The service must create a dedicated snapshot per apply run. |
 
 Additional **Implemented and Planned** invariants:

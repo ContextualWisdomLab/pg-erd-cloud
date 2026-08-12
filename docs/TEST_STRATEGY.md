@@ -207,7 +207,11 @@ consumer reclaims both stores, abandons the expired attempt, advances the run
 to `passed`, completes its successor attempt, and rejects the stale signal.
 This remains in-process ephemeral topology evidence; process/container restart
 orchestration, deployed consumer lifecycle, and credential-bound execution
-remain unproved. The
+remain unproved. The same PostgreSQL 14–18 transaction then persists an exact
+confirmed apply intent referencing the passed dry run and asserts its
+confirmation-digest/destructive fields plus the deliberate absence of an apply
+dispatch. This is control-plane evidence only; it does not exercise target
+apply DDL. The
 live-preflight unit contract proves exact quoting for mixed/quoted identifiers,
 the three admitted structured preconditions, fail-closed unknown fields/types,
 the 1,000-query ceiling, a single read-only repeatable-read transaction,

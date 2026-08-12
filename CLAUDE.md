@@ -99,7 +99,7 @@ Three deployable pieces in one repo:
 1. A user registers a target-DB connection; the DSN is encrypted with `APP_SECRET` before being stored in the app DB.
 2. Requesting a snapshot enqueues a job; the background worker connects to the target DB, introspects it, and stores a JSON snapshot (`SchemaSnapshot` + `SchemaSnapshotData`).
 3. The frontend fetches snapshots via `/api/*` and renders the ERD; all exports (DDL, diff/migration SQL, reversing spec, DBML/Mermaid) are derived from the stored snapshot, not from live DB access.
-4. The partial safe-live control plane stores canonical `SchemaModelRevision` rows and compiles an exact revision/connection/succeeded snapshot into an immutable `MigrationPlan`. It does not yet execute sandbox or durable apply runs.
+4. The partial safe-live control plane stores canonical `SchemaModelRevision` rows, compiles an exact revision/connection/succeeded snapshot into an immutable `MigrationPlan`, persists dry-run intent/evidence, and persists exact confirmed apply intents without dispatch. It does not start a migration consumer or execute target apply DDL.
 5. Share links expose read-only snapshot/export routes under `/api/share/{share_uuid}/...` with a tighter rate limit, and sensitive fields (schema comments, example values) are redacted from publicly shared payloads.
 
 ### Dev vs prod compose

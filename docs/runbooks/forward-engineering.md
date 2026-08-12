@@ -7,10 +7,11 @@
 
 > Do not use this runbook as evidence that structured production apply exists.
 > The repository persists model revisions, migration plans, durable run/event
-> evidence, integrity-checked polling, and an editor-authorized cancellation
-> intent API. Isolated dry run, live preflight, worker cancellation propagation,
-> apply, reconciliation, verification, alerts, and the application kill switch
-> are **Planned** release gates.
+> evidence, integrity-checked polling, an editor-authorized cancellation API,
+> and a deployer-confirmed apply intent that creates no dispatch. Isolated dry
+> run and live-preflight execution cores are Partial; deployed worker binding,
+> apply execution, reconciliation, verification, alerts, and the application
+> kill switch remain **Planned** release gates.
 
 The legacy `POST /api/connections/{uuid}/apply-sql` endpoint is a transitional
 compatibility path. Its rollback mode operates on the live target and therefore
@@ -25,7 +26,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
 | Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean reads, `execute_bound_live_preflight` same-transaction snapshot/check binding, `complete_live_preflight` server-derived terminal CAS, `complete_isolated_dry_run` sandbox result binding, DB-durable hashed attempt ownership, and execution-neutral consumer-to-attempt binding exist. PostgreSQL 14–18 CI uses a restricted ephemeral target login and proves DDL denial. Deployed credential isolation, application startup wiring, worker execution, and target audit evidence are absent, so no plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Partially implemented | Exact signed-plan execution, rollback, version/base checks, target-digest convergence, and `complete_isolated_dry_run` server-derived success CAS have a PostgreSQL 14–18-tested core. Provisioning, dependency materialization, deployed isolation/egress proof, cleanup, and worker binding are Planned; no current result is release evidence. |
-| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, an execution-neutral consumer contract, and consumer-to-attempt binding exist; no application startup wiring, sandbox lifecycle, or recovery worker exists. |
+| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, an execution-neutral consumer contract, consumer-to-attempt binding, and an exact deployer-confirmed apply intent with no dispatch exist; no application startup wiring, sandbox lifecycle, apply executor, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |
@@ -169,6 +170,11 @@ operational artifact is attached to the release record.
 
 ### 3. Authorize live apply
 
+This section's intent-creation boundary is implemented. Completing it produces
+only a durable queued intent and chained confirmation evidence; it creates no
+outbox dispatch, queue signal, credential access, target connection, SQL, or
+DDL execution. Every operation in section 4 remains Planned.
+
 1. Confirm the actor has server-verified deployer authority.
 2. Bind the exact unexpired plan/digest, current model revision, and passed
    dry-run UUID for the same base observation.
@@ -177,6 +183,8 @@ operational artifact is attached to the release record.
    destructive severity or data-loss risk.
 5. Submit once using a new idempotency key. Identical reuse returns the original
    run; different input under the same key returns `409`.
+6. Verify the returned intent has no dispatch. Stop here until the separately
+   reviewed executor, apply-time revalidation, and recovery gates are enabled.
 
 ### 4. Execute and verify
 

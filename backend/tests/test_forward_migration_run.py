@@ -35,6 +35,7 @@ from app.forward.migration_run import (
     validate_run_transition,
 )
 from app.models import (
+    DbConnection,
     MigrationPlan,
     MigrationRun,
     MigrationRunAttempt,
@@ -202,13 +203,30 @@ def test_run_request_digest_binds_exact_actor_plan_and_intent() -> None:
     for field, value in (
         ("project_space_uuid", uuid.uuid4()),
         ("migration_plan_uuid", uuid.uuid4()),
-        ("run_kind", "apply"),
         ("plan_digest", "b" * 64),
         ("requested_by_user_uuid", uuid.uuid4()),
     ):
         changed = dict(kwargs)
         changed[field] = value
         assert digest_run_request(**changed) != first
+
+    passed_dry_run_uuid = uuid.uuid4()
+    apply_digest = digest_run_request(
+        **{**kwargs, "run_kind": "apply"},
+        passed_dry_run_uuid=passed_dry_run_uuid,
+        confirmation_digest="b" * 64,
+    )
+    assert apply_digest != first
+    assert digest_run_request(
+        **{**kwargs, "run_kind": "apply"},
+        passed_dry_run_uuid=uuid.uuid4(),
+        confirmation_digest="b" * 64,
+    ) != apply_digest
+    assert digest_run_request(
+        **{**kwargs, "run_kind": "apply"},
+        passed_dry_run_uuid=passed_dry_run_uuid,
+        confirmation_digest="c" * 64,
+    ) != apply_digest
 
     with pytest.raises(MigrationRunContractError, match="run kind"):
         digest_run_request(**{**kwargs, "run_kind": "preview"})
@@ -355,7 +373,11 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         "run_kind",
         "idempotency_key_hash",
     ) in unique_run_columns
-    assert {constraint.name for constraint in MigrationRun.__table__.constraints if isinstance(constraint, CheckConstraint)} == {
+    assert {
+        constraint.name
+        for constraint in MigrationRun.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    } == {
         "ck_migration_run__run_kind",
         "ck_migration_run__state",
         "ck_migration_run__kind_state",
@@ -365,6 +387,8 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
         "ck_migration_run__plan_digest",
         "ck_migration_run__request_digest",
         "ck_migration_run__observed_base_digest",
+        "ck_migration_run__confirmation_digest",
+        "ck_migration_run__apply_confirmation",
     }
 
     unique_event_columns = {
@@ -391,6 +415,7 @@ def test_migration_run_persistence_enforces_idempotent_identity_and_state() -> N
     assert "event_digest" in MigrationRunEvent.__table__.columns
     assert {index.name for index in MigrationRun.__table__.indexes} == {
         "ix_migration_run__migration_plan_uuid",
+        "ix_migration_run__passed_dry_run_uuid",
         "ix_migration_run__project_state",
     }
     assert {index.name for index in MigrationRunEvent.__table__.indexes} == set()
@@ -2261,6 +2286,205 @@ async def test_create_dry_run_uses_database_conflict_winner_and_initial_event() 
 
 
 @pytest.mark.asyncio
+async def test_create_apply_intent_binds_passed_run_and_exact_confirmation() -> None:
+    """Apply creation persists reviewed evidence but creates no executor dispatch."""
+
+    now = datetime(2026, 8, 10, 3, tzinfo=timezone.utc)
+    plan = _migration_plan()
+    actor_uuid = uuid.uuid4()
+    passed_run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="passed",
+        state_version=4,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        observed_base_digest=plan.base_digest,
+        evidence_json={},
+    )
+    connection = DbConnection(
+        db_connection_uuid=plan.db_connection_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        conn_name='Production "Primary"',
+        dsn_ciphertext=b"ciphertext",
+        dsn_nonce=b"nonce",
+    )
+    run_uuid = uuid.uuid4()
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            return_value=SimpleNamespace(
+                scalar_one_or_none=Mock(return_value=run_uuid)
+            )
+        ),
+        scalar=AsyncMock(),
+        add=Mock(),
+    )
+
+    created = await create_migration_run(
+        session,
+        plan=plan,
+        run_kind="apply",
+        idempotency_key="apply-request-1",
+        requested_by_user_uuid=actor_uuid,
+        evidence={"request_source": "review_ui"},
+        passed_dry_run=passed_run,
+        connection=connection,
+        typed_connection_name='Production "Primary"',
+        destructive_acknowledged=False,
+        now=now,
+    )
+
+    statement = session.execute.await_args.args[0]
+    params = statement.compile(dialect=postgresql.dialect()).params
+    assert params["run_kind"] == "apply"
+    assert params["passed_dry_run_uuid"] == passed_run.migration_run_uuid
+    assert params["destructive_confirmation"] is False
+    assert len(params["confirmation_digest"]) == 64
+    added = [call.args[0] for call in session.add.call_args_list]
+    event = next(item for item in added if isinstance(item, MigrationRunEvent))
+    assert event.evidence_json == {
+        "destructive_acknowledged": False,
+        "passed_dry_run_uuid": str(passed_run.migration_run_uuid),
+        "request_source": "review_ui",
+        "target_connection_confirmed": True,
+    }
+    assert not any(isinstance(item, MigrationRunDispatch) for item in added)
+    assert created.migration_run_uuid == run_uuid
+    assert created.reused is False
+
+
+@pytest.mark.asyncio
+async def test_create_apply_intent_rejects_unbounded_internal_connection_name() -> None:
+    """Non-HTTP callers cannot bypass the typed target-name input bound."""
+
+    plan = _migration_plan()
+    actor_uuid = uuid.uuid4()
+    passed_run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="passed",
+        state_version=4,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        observed_base_digest=plan.base_digest,
+        evidence_json={},
+    )
+    connection = DbConnection(
+        db_connection_uuid=plan.db_connection_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        conn_name="x" * 129,
+        dsn_ciphertext=b"ciphertext",
+        dsn_nonce=b"nonce",
+    )
+    session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
+
+    with pytest.raises(MigrationRunContractError, match="confirmation"):
+        await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="apply",
+            idempotency_key="apply-request-oversized",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            passed_dry_run=passed_run,
+            connection=connection,
+            typed_connection_name="x" * 129,
+            destructive_acknowledged=False,
+            now=datetime(2026, 8, 10, 3, tzinfo=timezone.utc),
+        )
+
+    session.execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("connection_project", "target connection confirmation mismatch"),
+        ("passed_plan", "passed dry run is invalid"),
+        ("passed_cancelled", "passed dry run is invalid"),
+        ("passed_base", "passed dry run is invalid"),
+        ("destructive", "destructive confirmation mismatch"),
+        ("reserved_evidence", "apply evidence is invalid"),
+    ],
+)
+async def test_create_apply_intent_rejects_every_cross_authority_binding(
+    mutation: str, message: str
+) -> None:
+    """No mismatched target, evidence, or confirmation can reach insertion."""
+
+    plan = _migration_plan()
+    actor_uuid = uuid.uuid4()
+    passed_run = MigrationRun(
+        migration_run_uuid=uuid.uuid4(),
+        project_space_uuid=plan.project_space_uuid,
+        migration_plan_uuid=plan.migration_plan_uuid,
+        run_kind="dry_run",
+        state="passed",
+        state_version=4,
+        idempotency_key_hash="a" * 64,
+        plan_digest=plan.statement_digest,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=actor_uuid,
+        cancellation_requested=False,
+        observed_base_digest=plan.base_digest,
+        evidence_json={},
+    )
+    connection = DbConnection(
+        db_connection_uuid=plan.db_connection_uuid,
+        project_space_uuid=plan.project_space_uuid,
+        conn_name="Production Primary",
+        dsn_ciphertext=b"ciphertext",
+        dsn_nonce=b"nonce",
+    )
+    destructive_acknowledged = False
+    evidence: dict[str, object] = {}
+    if mutation == "connection_project":
+        connection.project_space_uuid = uuid.uuid4()
+    elif mutation == "passed_plan":
+        passed_run.migration_plan_uuid = uuid.uuid4()
+    elif mutation == "passed_cancelled":
+        passed_run.cancellation_requested = True
+    elif mutation == "passed_base":
+        passed_run.observed_base_digest = "e" * 64
+    elif mutation == "destructive":
+        destructive_acknowledged = True
+    else:
+        evidence = {"targetConnectionConfirmed": True}
+    session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
+
+    with pytest.raises(MigrationRunContractError, match=message):
+        await create_migration_run(
+            session,
+            plan=plan,
+            run_kind="apply",
+            idempotency_key=f"apply-request-{mutation}",
+            requested_by_user_uuid=actor_uuid,
+            evidence=evidence,
+            passed_dry_run=passed_run,
+            connection=connection,
+            typed_connection_name=connection.conn_name,
+            destructive_acknowledged=destructive_acknowledged,
+            now=datetime(2026, 8, 10, 3, tzinfo=timezone.utc),
+        )
+
+    session.execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_create_dry_run_reuses_only_the_same_effective_request() -> None:
     """A duplicate key reuses the winner only when its request digest matches."""
 
@@ -2353,7 +2577,7 @@ async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert
     session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
 
     apply_plan = _migration_plan()
-    with pytest.raises(MigrationRunContractError, match="apply run creation"):
+    with pytest.raises(MigrationRunContractError, match="apply confirmation"):
         await create_migration_run(
             session,
             plan=apply_plan,

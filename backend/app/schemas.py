@@ -271,6 +271,19 @@ class MigrationRunCreateIn(BaseModel):
     plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class MigrationApplyRunCreateIn(BaseModel):
+    """Bind an execution-free apply intent to exact reviewed evidence."""
+
+    plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    passed_dry_run_uuid: uuid.UUID
+    target_connection_name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
+    destructive_acknowledged: bool = Field(strict=True)
+
+
 MigrationRunState = Literal[
     "queued",
     "sandbox_running",

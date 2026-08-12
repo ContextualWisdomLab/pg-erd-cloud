@@ -175,7 +175,7 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     assert "## Physical run foundation — Implemented" in data_model
     assert "**Implementation status:** Partially implemented" in adr
     normalized_contract = " ".join(contract.lower().split())
-    assert "public apply creation remains **planned**" in normalized_contract
+    assert "public apply intent creation is **implemented**" in normalized_contract
     assert (
         "post /api/migration-plans/{migration_plan_uuid}/dry-runs"
         in normalized_contract
@@ -184,6 +184,12 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
         "post /api/migration-runs/{migration_run_uuid}/cancel"
         in normalized_contract
     )
+    assert (
+        "post /api/migration-plans/{migration_plan_uuid}/apply-runs"
+        in normalized_contract
+    )
+    assert "creates no dispatch" in normalized_contract
+    assert "0012_apply_intent_confirmation" in data_model
     assert "stable sanitized run-action error envelope" in normalized_contract
     assert "migration_run_dispatch" in normalized_contract
     assert "identifier-only transactional outbox" in normalized_contract

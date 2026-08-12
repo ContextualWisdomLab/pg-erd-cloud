@@ -70,6 +70,12 @@ Implemented in the initial safe vertical slice:
   boundary that requires the exact reviewed digest and bounded
   `Idempotency-Key`, then returns only the queued durable identity without
   publishing the outbox or signaling a worker;
+- a deployer-authorized `POST /api/migration-plans/{plan_uuid}/apply-runs`
+  boundary that binds an exact immutable plan, same-plan passed dry run and
+  observed base, typed target connection name, actor, idempotency key, and the
+  exact destructive-confirmation requirement into a queued durable intent and
+  hash-chained genesis event; it deliberately creates no dispatch, worker
+  signal, credential access, SQL execution, or DDL authority;
 - lock-scoped relay primitives that claim one due dispatch with
   `FOR UPDATE SKIP LOCKED`, increment its attempt in the caller-owned
   transaction, publish only `migration_run_uuid` to a dedicated Valkey sorted
