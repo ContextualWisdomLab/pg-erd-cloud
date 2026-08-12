@@ -74,10 +74,12 @@ operational artifact is attached to the release record.
   a successor lease, and the ready payload remains only
   `migration_run_uuid`.
 - [x] The execution-neutral consumer contract is **Implemented**. It calls one
-  injected UUID handler, acknowledges only after success, releases only the
-  exact lease at a bounded retry time after sanitized failure, and fails closed
-  on lost lease ownership. It does not load plans, credentials, SQL, or target
-  data. Application startup wiring and worker execution remain **Planned**.
+  injected handler with the exact signal claim (run UUID plus opaque
+  lease-token), acknowledges only after success, releases only the exact lease
+  at a bounded retry time after sanitized failure, and fails closed on lost
+  lease ownership. The ready payload remains UUID-only. It does not load plans,
+  credentials, SQL, or target data. Application startup wiring and worker
+  execution remain **Planned**.
 - [ ] Relay deployment restart/failover, application consumer wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

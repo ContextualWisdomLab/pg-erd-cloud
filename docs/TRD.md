@@ -68,9 +68,11 @@ executable SQL, safety classification, approval truth, or recovery state.
 - bounded UUID-only ready-to-processing claim, expiry reclaim, acknowledgement,
   and retry-release primitives use an exact lease-token so a stale claimant
   cannot complete a successor lease. The execution-neutral consumer contract
-  is **Implemented**: an injected handler must succeed before exact-lease
-  acknowledgement, and sanitized failure releases only that lease at a bounded
-  retry score. Application startup wiring and worker execution remain
+  is **Implemented**: an injected handler receives the exact signal claim (run
+  UUID plus opaque lease-token) and must succeed before exact-lease
+  acknowledgement; sanitized failure releases only that lease at a bounded
+  retry score. The queue payload remains UUID-only. Application startup wiring
+  and worker execution remain
   **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;

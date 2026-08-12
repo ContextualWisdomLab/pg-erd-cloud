@@ -151,9 +151,11 @@ attempt-bound publish-state CAS, and the opt-in scheduled relay lifecycle are
 **Implemented**. Atomic UUID-only ready-to-processing claim, expiry reclaim,
 acknowledgement, and retry release also use an exact lease-token so a stale
 claimant cannot complete a successor lease. The execution-neutral consumer
-contract is **Implemented**: it invokes one injected handler for the claimed
-UUID, acknowledges only after success, releases the exact lease on a sanitized
-failure, and fails closed when either completion loses lease ownership.
+contract is **Implemented**: it invokes one injected handler with the exact
+signal claim (the run UUID plus its opaque lease-token), acknowledges only
+after success, releases the exact lease on a sanitized failure, and fails
+closed when either completion loses lease ownership. The ready-queue payload
+remains UUID-only; the token is processing metadata, not execution authority.
 Application startup wiring and worker execution remain **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed

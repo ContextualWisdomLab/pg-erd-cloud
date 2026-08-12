@@ -35,10 +35,10 @@ async def test_consumer_acknowledges_exact_lease_only_after_handler_success() ->
     order: list[str] = []
 
     async def handler(
-        factory: Callable[[], AsyncSession], migration_run_uuid: uuid.UUID
+        factory: Callable[[], AsyncSession], actual_claim: MigrationRunSignalClaim
     ) -> None:
         assert factory is _session_factory
-        assert migration_run_uuid == run_uuid
+        assert actual_claim == claim
         order.append("handled")
 
     async def ack(actual: MigrationRunSignalClaim) -> bool:

@@ -300,10 +300,12 @@ Additional **Implemented and Planned** invariants:
   application task. Each bounded publisher attempt runs in its own
   caller-owned transaction; failure rolls back and empty/failure iterations
   wait at a positive configured interval.
-- **Implemented — execution-neutral queue consumer contract:** an injected UUID
-  handler must complete before exact-lease acknowledgement; sanitized failure
-  releases only that lease at a bounded retry time. The contract never loads a
-  plan, credential, SQL batch, or target value.
+- **Implemented — execution-neutral queue consumer contract:** an injected
+  handler receives the exact signal claim (run UUID plus opaque lease-token)
+  and must complete before exact-lease acknowledgement; sanitized failure
+  releases only that lease at a bounded retry time. The ready payload remains
+  UUID-only. The contract never loads a plan, credential, SQL batch, or target
+  value.
 - **Planned — application consumer wiring and worker execution:** no startup
   task consumes migration signals or executes target SQL.
 - One database uniqueness rule plus `request_digest` implements idempotency:

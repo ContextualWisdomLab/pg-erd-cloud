@@ -131,9 +131,11 @@ Adequacy labels in this audit mean:
   bounded expiry reclaim, acknowledgement, and retry release require an exact
   lease-token; stale claimants cannot complete successor leases.
 - **Implemented — execution-neutral queue consumer contract:** one injected
-  UUID handler must succeed before exact-lease acknowledgement; sanitized
-  failure releases only that lease at a bounded retry score, and lease loss is
-  non-success. The contract loads no plan, credential, SQL, or target value.
+  handler receives the exact signal claim (run UUID plus opaque lease-token)
+  and must succeed before exact-lease acknowledgement; sanitized failure
+  releases only that lease at a bounded retry score, and lease loss is
+  non-success. The ready payload remains UUID-only. The contract loads no plan,
+  credential, SQL, or target value.
 - **Planned — application consumer wiring, worker execution, failover, and retention:**
   no startup task consumes migration signals, accesses a target, or executes
   SQL. Sandbox/preflight/apply workers and public apply-run creation remain absent.

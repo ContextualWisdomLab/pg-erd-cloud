@@ -47,10 +47,12 @@ due UUID-only ready member to an isolated processing set. A consumer-generated
 exact lease-token is stored separately from the ready payload; only that token
 may acknowledge or release the claim. This prevents a stale claimant from
 acknowledging a successor lease. The execution-neutral consumer invokes only an
-injected UUID handler, acknowledges after success, releases that exact lease at
-a bounded retry time after a sanitized failure, and treats lost acknowledgement
-or release ownership as non-success. It does not load execution material,
-access a target, or execute SQL, and is not wired into application startup.
+injected handler with the exact signal claim (run UUID plus opaque lease-token),
+acknowledges after success, releases that exact lease at a bounded retry time
+after a sanitized failure, and treats lost acknowledgement or release ownership
+as non-success. The ready payload remains UUID-only. It does not load execution
+material, access a target, or execute SQL, and is not wired into application
+startup.
 
 Each run binds:
 

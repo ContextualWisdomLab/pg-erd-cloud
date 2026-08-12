@@ -1,10 +1,10 @@
 """Consume UUID-only migration-run signals without execution authority.
 
 The consumer owns only Valkey lease completion and retry cadence. An injected
-handler remains responsible for loading durable metadata, enforcing optimistic
-state transitions, and eventually performing an isolated dry run. Keeping that
-boundary explicit prevents queue payloads from becoming plan, credential, or
-SQL authority.
+handler receives the exact signal claim and remains responsible for loading
+durable metadata, enforcing optimistic state transitions, and eventually
+performing an isolated dry run. Keeping that boundary explicit prevents queue
+payloads from becoming plan, credential, or SQL authority.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import math
-import uuid
 from asyncio import sleep
 from collections.abc import Awaitable, Callable
 from typing import TypeAlias
@@ -20,6 +19,7 @@ from typing import TypeAlias
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.valkey_queue import (
+    MigrationRunSignalClaim,
     ack_migration_run_signal,
     claim_due_migration_run_signal,
     release_migration_run_signal,
@@ -28,7 +28,7 @@ from app.jobs.valkey_queue import (
 _logger = logging.getLogger(__name__)
 
 MigrationRunHandler: TypeAlias = Callable[
-    [Callable[[], AsyncSession], uuid.UUID], Awaitable[None]
+    [Callable[[], AsyncSession], MigrationRunSignalClaim], Awaitable[None]
 ]
 
 
@@ -50,12 +50,12 @@ def _validate_interval(value: float, *, label: str, maximum: float) -> None:
 async def _handler_succeeded_without_retaining_error(
     handler: MigrationRunHandler,
     session_factory: Callable[[], AsyncSession],
-    migration_run_uuid: uuid.UUID,
+    claim: MigrationRunSignalClaim,
 ) -> bool:
     """Discard handler exceptions before the fixed public error is created."""
 
     try:
-        await handler(session_factory, migration_run_uuid)
+        await handler(session_factory, claim)
     except Exception:  # noqa: BLE001
         return False
     return True
@@ -70,7 +70,8 @@ async def process_one_migration_run_signal(
 ) -> bool:
     """Process one exact signal lease and return whether work was claimed.
 
-    A successful handler must win exact-lease acknowledgement. A failed handler
+    The handler receives the exact claim rather than an unbound UUID. A
+    successful handler must win exact-lease acknowledgement. A failed handler
     receives no acknowledgement and the same exact lease is released at a
     bounded future score. Handler exceptions are deliberately replaced with a
     fixed error so DSNs, SQL, credentials, or target data cannot escape through
@@ -87,7 +88,7 @@ async def process_one_migration_run_signal(
         return False
 
     if not await _handler_succeeded_without_retaining_error(
-        handler, session_factory, claim.migration_run_uuid
+        handler, session_factory, claim
     ):
         retry_at = current + dt.timedelta(seconds=retry_delay_s)
         if not await release_migration_run_signal(claim, retry_at):

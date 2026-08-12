@@ -382,6 +382,7 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
 
     for document in (contract, trd, runbook):
         assert "exact lease-token" in document
+        assert "exact signal claim" in document
         assert "execution-neutral consumer contract is **implemented**" in document
         assert (
             "application startup wiring and worker execution remain **planned**"
