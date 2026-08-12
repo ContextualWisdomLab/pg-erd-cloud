@@ -865,6 +865,45 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.forwardEngineeringModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 65%);
+}
+
+.forwardEngineeringModal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1040px, 100%);
+  max-height: min(880px, 94vh);
+  border-radius: 12px;
+  background: #f8fafc;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 35%);
+}
+
+.forwardEngineeringModal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #d8dfeb;
+  padding: 16px 20px;
+}
+
+.forwardEngineeringModal__header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.forwardEngineeringModal__body {
+  overflow: auto;
+  padding: 20px;
+}
+
 .cardinalityWizard {
   width: min(760px, 96vw);
   padding: 20px;

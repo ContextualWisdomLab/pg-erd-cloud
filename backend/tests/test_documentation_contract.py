@@ -148,6 +148,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     review_surface = _read(
         Path("frontend/src/components/forward/PlanReviewSurface.tsx")
     )
+    modal = _read(
+        Path("frontend/src/components/forward/ForwardEngineeringModal.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -178,11 +181,19 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "active = false",
     ):
         assert symbol in review_surface
+    for symbol in (
+        "useDialogAccessibility",
+        'role="dialog"',
+        'aria-modal="true"',
+        "PlanReviewSurface",
+    ):
+        assert symbol in modal
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
         assert "plan review panel is **partially implemented**" in normalized
         assert "stale-response suppression is **partially implemented**" in normalized
+        assert "forward engineering modal shell is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

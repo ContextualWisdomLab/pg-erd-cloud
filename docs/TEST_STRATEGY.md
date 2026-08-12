@@ -287,7 +287,9 @@ tests for immutable provenance, risk, executable versus review-only SQL,
 blockers, hostile markup text rendering, and absence of action controls on a
 blocked plan. Fixed loading/error/retry states and stale-response suppression
 is **Partially implemented** and covered for both late success and late failure.
-Forward UI remains **Planned**. These unit tests are not browser
+The Forward Engineering modal shell is **Partially implemented** with closed
+no-fetch, labelled dialog, focus entry/trap/restoration, Escape, explicit close,
+and absence-of-action-control coverage. Forward UI remains **Planned**. These unit tests are not browser
 E2E or complete accessibility evidence. Tests must cover the complete user-observable
 state model, not only a happy-path button click:
 

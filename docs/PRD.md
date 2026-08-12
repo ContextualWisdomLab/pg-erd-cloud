@@ -34,7 +34,9 @@ versions. The plan review panel is **Partially implemented** as an accessible,
 read-only view of provenance, risk, blockers, executable statements, and
 review-only proposals. Fixed loading/error/retry behavior and stale-response
 suppression is **Partially implemented** for exact plan retrieval; Forward UI
-remains **Planned**.
+remains **Planned**. The Forward Engineering modal shell is **Partially
+implemented** as a dedicated accessible container, but graph/model adapters,
+workflow controls, and orchestration remain absent.
 
 ## Actors and authority
 

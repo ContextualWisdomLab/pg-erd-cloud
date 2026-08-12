@@ -121,7 +121,8 @@ executable SQL, safety classification, approval truth, or recovery state.
   apply-time drift revalidation;
 - stored-plan executor, transaction segmentation, locks, timeouts, approval,
   idempotency, cancellation, reconciliation, and post-apply verification;
-- frontend graph/model adapters and `ForwardEngineeringModal`;
+- frontend graph/model adapters and `ForwardEngineeringModal` workflow
+  orchestration (the actionless accessible modal shell is Partially implemented);
 - real PostgreSQL integration, fault-injection, accessibility, and browser E2E.
 
 The legacy `POST /api/connections/{db_connection_uuid}/apply-sql` remains a
@@ -173,8 +174,11 @@ in `frontend/src/components/forward/PlanReviewPanel.tsx`; it renders immutable
 provenance, risk, blockers, structured statements, and review-only proposals
 without buttons or execution authority. Its `PlanReviewSurface` wrapper exposes
 fixed loading/error/retry states and stale-response suppression is **Partially
-implemented** when a requested plan changes. Forward UI remains **Planned**, so
-these unit-tested components are not browser E2E or complete accessibility evidence.
+implemented** when a requested plan changes. The Forward Engineering modal
+shell is **Partially implemented** with focus entry/trap/restoration, Escape,
+and explicit close behavior; it contains no dry-run/apply control. Forward UI
+remains **Planned**, so these unit-tested components are not browser E2E or
+complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|
