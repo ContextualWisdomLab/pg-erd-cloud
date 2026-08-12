@@ -171,8 +171,10 @@ creation, durable run polling, and exact-version cancellation. It exposes no
 arbitrary SQL request field. The plan review panel is **Partially implemented**
 in `frontend/src/components/forward/PlanReviewPanel.tsx`; it renders immutable
 provenance, risk, blockers, structured statements, and review-only proposals
-without buttons or execution authority. Forward UI remains **Planned**, so this
-unit-tested component is not browser E2E or complete accessibility evidence.
+without buttons or execution authority. Its `PlanReviewSurface` wrapper exposes
+fixed loading/error/retry states and stale-response suppression is **Partially
+implemented** when a requested plan changes. Forward UI remains **Planned**, so
+these unit-tested components are not browser E2E or complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|

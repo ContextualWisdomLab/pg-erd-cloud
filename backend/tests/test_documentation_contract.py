@@ -145,6 +145,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     review_panel = _read(
         Path("frontend/src/components/forward/PlanReviewPanel.tsx")
     )
+    review_surface = _read(
+        Path("frontend/src/components/forward/PlanReviewSurface.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -167,10 +170,19 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "이 화면은 SQL 실행 권한을 갖지 않습니다",
     ):
         assert symbol in review_panel
+    for symbol in (
+        "getMigrationPlan",
+        "계획을 불러오는 중입니다",
+        "계획을 불러오지 못했습니다",
+        "다시 시도",
+        "active = false",
+    ):
+        assert symbol in review_surface
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
         assert "plan review panel is **partially implemented**" in normalized
+        assert "stale-response suppression is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 
