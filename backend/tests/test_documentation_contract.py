@@ -282,6 +282,7 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     strategy = _read(Path("docs/TEST_STRATEGY.md"))
     changelog = _read(Path("CHANGELOG.md"))
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    standards = _read(Path("docs/STANDARDS.md"))
     assert "LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE" in integration_test
     assert "connection.is_in_transaction() is False" in integration_test
     assert "denied_table_name" in integration_test
@@ -308,6 +309,14 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     assert (
         "`castable_values` precondition primitive and completion CAS are "
         "Implemented" in contract
+    )
+    assert (
+        "bounded live-preflight execution and completion CAS are Implemented"
+        in standards
+    )
+    assert (
+        "bounded all-transactional isolated executor core is Implemented"
+        in standards
     )
     for path in required_documents:
         document = _read(path)

@@ -71,8 +71,8 @@ major.
 |---|---|---|
 | SQL authority | Canonical server model and structured compiler; dialect-correct identifier quoting. | Partially implemented |
 | Lock/rewrite disclosure | Each current statement has risk severity, declared lock, scan/rewrite/data-loss fields. | Implemented control-plane metadata; runtime measurement Planned |
-| Live preconditions | Table-empty, no-NULL, and castability preconditions are represented. | Implemented plan metadata; live enforcement Planned |
-| Transaction capability | Current emitted statements declare `transactional: true`; blockers set executable `statements=[]`. Supported deltas may remain as review-only `proposed_statements`, with their risks included. | Implemented compiler subset; executor/segment Planned |
+| Live preconditions | Table-empty, no-NULL, and castability preconditions are represented. | Implemented plan metadata; bounded live-preflight execution and completion CAS are Implemented; durable worker binding and apply-time in-lock repetition remain Planned |
+| Transaction capability | Current emitted statements declare `transactional: true`; blockers set executable `statements=[]`. Supported deltas may remain as review-only `proposed_statements`, with their risks included. | Implemented compiler subset; bounded all-transactional isolated executor core is Implemented; deployed sandbox worker and apply segmentation remain Planned |
 | Drift control | Plans store base/target digests and bind a succeeded snapshot. | Implemented provenance; pre-apply revalidation Planned |
 | Completion evidence | Exact post-apply target digest from a persisted verification snapshot. | Planned |
 
