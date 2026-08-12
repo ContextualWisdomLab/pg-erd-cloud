@@ -142,7 +142,7 @@ by the graphical target architecture.
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean reads, strict snapshot comparison, and durable hashed attempt ownership exist; `execute_bound_live_preflight` binds capture/checks to one read-only repeatable-read transaction and completion matches every persisted precondition. Consumer/credential binding, deployed target integration, worker execution, and in-lock apply repetition remain Planned. |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, the execution-neutral consumer contract with automatic heartbeat, DB-durable hashed worker-attempt CAS, and exact consumer-to-attempt binding are **Implemented**. Application startup wiring, credential binding, and worker execution remain **Planned** |
-| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run creation HTTP, transition, and cancellation CAS/HTTP exist; queue/recovery and apply creation Planned |
+| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run and non-dispatched apply-intent creation HTTP, transition, and cancellation CAS/HTTP exist; queue consumption, recovery, and apply execution remain Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry, 30-day cleanup excludes plans with run history, and the preflight primitive bounds query count/time and rejects unknown kinds/non-boolean evidence; worker lifecycle enforcement remains Planned |
 
@@ -159,8 +159,8 @@ by the graphical target architecture.
 | `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation, current-revision-locked non-dispatched apply-intent confirmation, and polling exist; application startup wiring, credentials, and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
-`0008_schema_model_revision`, `0009_migration_plan`, and
-`0010_migration_run`. See
+`0008_schema_model_revision`, `0009_migration_plan`, `0010_migration_run`,
+`0011_migration_run_attempt`, and `0012_apply_intent_confirmation`. See
 [DATA_MODEL.md](DATA_MODEL.md) for actual and planned ERDs.
 
 ## Current HTTP contract
@@ -188,8 +188,8 @@ Implemented limits: model input is at most 2 MiB; a persisted plan is at most
 after creation. Read-only endpoints retain sanitized FastAPI
 `{"detail": ...}` errors. The mutating dry-run creation and cancellation
 endpoints fix the v1 run-action envelope as
-`{"detail":{"code","detail","correlation_id"}}`; future apply routes must
-reuse it without exposing credentials.
+`{"detail":{"code","detail","correlation_id"}}`; the apply-intent route
+reuses it without exposing credentials.
 
 ## Compiler v1 capability matrix
 

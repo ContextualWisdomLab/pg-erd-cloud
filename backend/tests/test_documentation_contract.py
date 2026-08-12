@@ -118,6 +118,26 @@ def test_published_apply_intent_route_is_not_classified_as_planned() -> None:
     assert route not in PLANNED_ROUTES
 
 
+def test_trd_tracks_current_apply_intent_and_migration_contract() -> None:
+    """Keep the TRD aligned with the implemented non-dispatched intent slice."""
+
+    trd = _read(Path("docs/TRD.md"))
+    normalized = " ".join(trd.split())
+
+    assert "apply creation Planned" not in normalized
+    assert "future apply routes must reuse it" not in normalized
+    assert "apply-intent creation HTTP" in normalized
+    assert "the apply-intent route reuses it" in normalized
+    for revision in (
+        "0008_schema_model_revision",
+        "0009_migration_plan",
+        "0010_migration_run",
+        "0011_migration_run_attempt",
+        "0012_apply_intent_confirmation",
+    ):
+        assert revision in trd
+
+
 def test_forward_browser_transport_is_partial_without_execution_authority() -> None:
     """Track typed browser transport without claiming the forward UI exists."""
 
