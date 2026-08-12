@@ -46,7 +46,11 @@ announces the bounded state meaning, cancellation intent, and sanitized error
 code, and renders hash-chain event metadata without exposing generic evidence
 payloads. Sequential terminal-aware polling is **Partially implemented**: a
 new request is scheduled only after the preceding response and stops at the
-first terminal state. Apply/recovery controls and browser E2E remain absent.
+first terminal state. The cancellation intent control is **Partially
+implemented**: it appears only before a terminal state and before a recorded
+intent, submits the exact current state version once, refreshes after acceptance,
+and never replays an ambiguous write automatically. Apply/recovery controls and
+browser E2E remain absent.
 
 ## Actors and authority
 

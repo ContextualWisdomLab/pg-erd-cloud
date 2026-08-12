@@ -160,6 +160,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     dry_run_intent = _read(
         Path("frontend/src/components/forward/DryRunIntentPanel.tsx")
     )
+    cancellation_control = _read(
+        Path("frontend/src/components/forward/RunCancellationControl.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -223,6 +226,15 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "같은 요청 다시 시도",
     ):
         assert symbol in dry_run_intent
+    for symbol in (
+        "cancelMigrationRun",
+        "run.state_version",
+        "isTerminalMigrationRunState",
+        "inFlightRef",
+        "요청을 자동으로 반복하지 말고",
+        "실행 상태 새로고침",
+    ):
+        assert symbol in cancellation_control
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
@@ -232,6 +244,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         assert "run status and audit panel is **partially implemented**" in normalized
         assert "terminal-aware polling is **partially implemented**" in normalized
         assert "dry-run intent control is **partially implemented**" in normalized
+        assert "cancellation intent control is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

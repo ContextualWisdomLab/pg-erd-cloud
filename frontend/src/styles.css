@@ -964,6 +964,24 @@ button:disabled {
   padding: 12px;
 }
 
+.forwardRunAction {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  color: #172033;
+}
+
+.forwardRunAction p {
+  margin: 0;
+}
+
+.forwardRunAction button {
+  justify-self: start;
+}
+
 .cardinalityWizard {
   width: min(760px, 96vw);
   padding: 20px;

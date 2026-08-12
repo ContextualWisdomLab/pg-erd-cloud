@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 
 import { getMigrationRun } from '../../api'
-import type { MigrationRun, MigrationRunState } from '../../types'
+import type { MigrationRun } from '../../types'
+import { RunCancellationControl } from './RunCancellationControl'
 import { RunStatusPanel } from './RunStatusPanel'
+import { TERMINAL_RUN_STATES } from './runStates'
 
 type RunStatusSurfaceProps = {
   runId: string
@@ -13,19 +15,6 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; run: MigrationRun }
   | { status: 'error' }
-
-const TERMINAL_RUN_STATES: ReadonlySet<MigrationRunState> = new Set([
-  'passed',
-  'drifted',
-  'failed',
-  'verified',
-  'drifted_no_apply',
-  'not_applied',
-  'verification_failed',
-  'failed_rolled_back',
-  'applied_with_drift',
-  'outcome_unknown',
-])
 
 export function RunStatusSurface({
   runId,
@@ -75,5 +64,13 @@ export function RunStatusSurface({
     )
   }
 
-  return <RunStatusPanel run={loadState.run} />
+  return (
+    <>
+      <RunStatusPanel run={loadState.run} />
+      <RunCancellationControl
+        run={loadState.run}
+        onRefresh={() => setAttempt((value) => value + 1)}
+      />
+    </>
+  )
 }

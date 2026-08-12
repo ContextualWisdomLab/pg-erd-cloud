@@ -189,7 +189,11 @@ It announces state, cancellation intent, and sanitized error codes, and shows
 only integrity-checked event-chain metadata; generic run/event evidence is not
 rendered. Sequential terminal-aware polling is **Partially implemented** with
 one outstanding request, cleanup on identity/unmount, and no polling after a
-terminal response. Forward UI remains **Planned**, so these unit-tested
+terminal response. The cancellation intent control is **Partially
+implemented** for non-terminal runs without an existing intent. It submits one
+exact optimistic state version, refreshes the verified run after `202`, and on
+an ambiguous result exposes only a fixed error plus explicit status refresh;
+it never automatically repeats the mutation. Forward UI remains **Planned**, so these unit-tested
 components are not browser E2E or complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
