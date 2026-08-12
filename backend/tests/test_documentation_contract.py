@@ -386,10 +386,10 @@ def test_signal_lease_documentation_keeps_execution_boundary_explicit() -> None:
         assert "exact lease renewal" in document
         assert "automatic heartbeat is **implemented**" in document
         assert "execution-neutral consumer contract is **implemented**" in document
-        assert (
-            "application startup wiring and worker execution remain **planned**"
-            in document
-        )
+        assert "application startup wiring" in document
+        assert "worker execution remain **planned**" in document
+
+    assert "exact lease-token claim/renew/ack/release primitives" in trd
 
     consumer = _read(Path("backend/app/jobs/migration_run_consumer.py"))
     queue = _read(Path("backend/app/jobs/valkey_queue.py"))
