@@ -306,8 +306,8 @@ async def test_attempt_bound_handler_abandons_when_lifecycle_is_cancelled() -> N
         )
         await started.wait()
         task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
+        [cancellation] = await asyncio.gather(task, return_exceptions=True)
+        assert isinstance(cancellation, asyncio.CancelledError)
 
     finish.assert_awaited_once_with(
         factory.sessions[1],
@@ -625,8 +625,8 @@ async def test_consumer_lifecycle_cancellation_retrieves_both_tasks() -> None:
         )
         await started.wait()
         task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
+        [cancellation] = await asyncio.gather(task, return_exceptions=True)
+        assert isinstance(cancellation, asyncio.CancelledError)
 
     assert cancelled.is_set()
     ack.assert_not_awaited()
