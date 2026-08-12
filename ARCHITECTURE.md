@@ -30,7 +30,7 @@ support.
 
 | Component | Responsibility | Status |
 |---|---|---|
-| React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; typed browser transport is **Partially implemented** for immutable plan retrieval, exact dry-run/apply intent creation, run polling, and version-bound cancellation; Forward UI remains **Planned** |
+| React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; typed browser transport is **Partially implemented** for immutable plan retrieval, exact dry-run/apply intent creation, run polling, and version-bound cancellation; the plan review panel is **Partially implemented** as a read-only provenance/risk/blocker/statement surface with no action authority; Forward UI remains **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
 | Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event/outbox storage, verified polling, dry-run creation/cancellation, lease-bound hashed worker-attempt primitives, and the exact dual-lease adapter **Implemented**; application worker wiring **Planned** |

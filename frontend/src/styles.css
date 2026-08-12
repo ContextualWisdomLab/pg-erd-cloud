@@ -807,6 +807,64 @@ button:disabled {
   gap: 8px;
 }
 
+.forwardPlanReview {
+  display: grid;
+  gap: 16px;
+  color: #172033;
+}
+
+.forwardPlanReview > header,
+.forwardPlanReview > section {
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.forwardPlanReview dl,
+.forwardPlanReview__statementList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.forwardPlanReview dl > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.forwardPlanReview dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.forwardPlanReview__statementList {
+  list-style-position: inside;
+}
+
+.forwardPlanReview__statementList > li {
+  border-left: 4px solid #f59e0b;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.forwardPlanReview__statementList header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.forwardPlanReview pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .cardinalityWizard {
   width: min(760px, 96vw);
   padding: 20px;

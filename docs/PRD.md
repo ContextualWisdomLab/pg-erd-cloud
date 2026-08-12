@@ -30,7 +30,9 @@ sandbox lifecycle, worker execution, durable apply, post-apply convergence,
 and the frontend workflow are **Planned** release blockers. Typed browser
 transport is **Partially implemented** for the current plan/run endpoints and
 accepts only identifiers, digests, typed confirmation, and optimistic state
-versions; Forward UI remains **Planned**.
+versions. The plan review panel is **Partially implemented** as an accessible,
+read-only view of provenance, risk, blockers, executable statements, and
+review-only proposals; Forward UI remains **Planned**.
 
 ## Actors and authority
 
@@ -70,7 +72,7 @@ for server authorization.
 | FE-PRD-001 | Persist a project-scoped desired model as immutable numbered revisions; reject stale saves. | **Implemented** in backend | API concurrency and authorization tests |
 | FE-PRD-002 | Compile one exact revision against one exact connection and succeeded snapshot; the browser supplies intent, not executable SQL. | **Implemented** for a narrow PostgreSQL subset | Model/plan API and compiler tests |
 | FE-PRD-003 | Every admitted target difference becomes an operation or blocker; a blocked plan contains no executable statements while retaining independent supported deltas as review-only proposals. | **Implemented** for the current canonical subset | Per-field mutation tests and realistic snapshot fixtures |
-| FE-PRD-004 | Show immutable plan provenance, executable or review-only proposed SQL, risk, preconditions, blockers, digest, and expiry. | **Partially implemented**; API returns data, UI absent | Typed API contract and UI tests |
+| FE-PRD-004 | Show immutable plan provenance, executable or review-only proposed SQL, risk, preconditions, blockers, digest, and expiry. | **Partially implemented**; API and standalone read-only review panel exist, while workflow orchestration and browser E2E are absent | Typed API contract and UI tests |
 | FE-PRD-005 | Dry run executes exact stored-plan DDL only in an isolated compatible sandbox; production receives bounded reads only. | **Partially implemented:** execution core and dedicated ephemeral PostgreSQL 14–18 database round trip exist; deployed isolation/lifecycle and workers Planned | Network/egress-isolation, cleanup, and live no-DDL evidence |
 | FE-PRD-006 | Detect base drift before dry run and again under apply-time locks before DDL. | **Planned** | Injected-drift and concurrency tests |
 | FE-PRD-007 | Require deployer authority, exact current model revision, plan/dry-run digests, typed target confirmation, and destructive acknowledgement. | **Partially implemented**; the non-dispatched apply-intent route locks the model row, rejects `stale_revision`, and persists those exact bindings, while apply-time target revalidation/execution remain Planned | Role/tamper/race tests |

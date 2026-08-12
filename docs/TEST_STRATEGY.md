@@ -282,8 +282,11 @@ crash/restart orchestration, and worker execution remain release blockers.
 Typed browser transport is **Partially implemented** with unit coverage for
 credentialed plan/run reads, CSRF-protected exact dry-run/apply intent creation,
 idempotency headers, optimistic cancellation, and the absence of a browser SQL
-parameter. Forward UI remains **Planned**. These transport tests are not browser
-E2E or accessibility evidence. Tests must cover the complete user-observable
+parameter. The plan review panel is **Partially implemented** with component
+tests for immutable provenance, risk, executable versus review-only SQL,
+blockers, hostile markup text rendering, and absence of action controls on a
+blocked plan. Forward UI remains **Planned**. These unit tests are not browser
+E2E or complete accessibility evidence. Tests must cover the complete user-observable
 state model, not only a happy-path button click:
 
 - dirty/save/saved model state and `409` optimistic-concurrency recovery;

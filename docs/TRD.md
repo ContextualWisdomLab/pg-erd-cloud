@@ -168,8 +168,11 @@ Database schema truth is defined in `backend/app/models.py` and Alembic revision
 Typed browser transport is **Partially implemented** in `frontend/src/api.ts`
 for immutable plan retrieval, exact dry-run and non-dispatched apply-intent
 creation, durable run polling, and exact-version cancellation. It exposes no
-arbitrary SQL request field. Forward UI remains **Planned**, so these functions
-are not browser E2E or accessibility evidence.
+arbitrary SQL request field. The plan review panel is **Partially implemented**
+in `frontend/src/components/forward/PlanReviewPanel.tsx`; it renders immutable
+provenance, risk, blockers, structured statements, and review-only proposals
+without buttons or execution authority. Forward UI remains **Planned**, so this
+unit-tested component is not browser E2E or complete accessibility evidence.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|

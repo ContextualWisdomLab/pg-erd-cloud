@@ -142,6 +142,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     """Track typed browser transport without claiming the forward UI exists."""
 
     client = _read(Path("frontend/src/api.ts"))
+    review_panel = _read(
+        Path("frontend/src/components/forward/PlanReviewPanel.tsx")
+    )
     documents = (
         _read(Path("ARCHITECTURE.md")),
         _read(Path("docs/PRD.md")),
@@ -157,9 +160,17 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "cancelMigrationRun",
     ):
         assert symbol in client
+    for symbol in (
+        "MigrationPlan",
+        "plan.proposed_statements",
+        "plan.blockers",
+        "이 화면은 SQL 실행 권한을 갖지 않습니다",
+    ):
+        assert symbol in review_panel
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
+        assert "plan review panel is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 
