@@ -227,6 +227,17 @@ def test_run_request_digest_binds_exact_actor_plan_and_intent() -> None:
         passed_dry_run_uuid=passed_dry_run_uuid,
         confirmation_digest="c" * 64,
     ) != apply_digest
+    with pytest.raises(MigrationRunContractError, match="passed dry run"):
+        digest_run_request(
+            **{**kwargs, "run_kind": "apply"},
+            confirmation_digest="b" * 64,
+        )
+    with pytest.raises(MigrationRunContractError, match="apply confirmation"):
+        digest_run_request(
+            **{**kwargs, "run_kind": "apply"},
+            passed_dry_run_uuid=passed_dry_run_uuid,
+            confirmation_digest="not-a-digest",
+        )
 
     with pytest.raises(MigrationRunContractError, match="run kind"):
         digest_run_request(**{**kwargs, "run_kind": "preview"})
@@ -2577,12 +2588,46 @@ async def test_create_dry_run_rejects_unexecutable_or_expired_plan_before_insert
     session = SimpleNamespace(execute=AsyncMock(), scalar=AsyncMock(), add=Mock())
 
     apply_plan = _migration_plan()
+    with pytest.raises(MigrationRunContractError, match="dry-run confirmation"):
+        await create_migration_run(
+            session,
+            plan=apply_plan,
+            run_kind="dry_run",
+            idempotency_key="dry-run-with-confirmation",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            typed_connection_name="must-not-be-present",
+            now=now,
+        )
+
     with pytest.raises(MigrationRunContractError, match="apply confirmation"):
         await create_migration_run(
             session,
             plan=apply_plan,
             run_kind="apply",
             idempotency_key="apply-key",
+            requested_by_user_uuid=actor_uuid,
+            evidence={},
+            now=now,
+        )
+
+    malformed_confirmation_plan = _migration_plan()
+    malformed_confirmation_plan.plan_json = {
+        **malformed_confirmation_plan.plan_json,
+        "requires_destructive_confirmation": "yes",
+    }
+    with (
+        patch(
+            "app.forward.migration_run.verify_migration_plan_digest",
+            return_value=True,
+        ),
+        pytest.raises(MigrationRunContractError, match="apply confirmation"),
+    ):
+        await create_migration_run(
+            session,
+            plan=malformed_confirmation_plan,
+            run_kind="apply",
+            idempotency_key="malformed-confirmation-plan",
             requested_by_user_uuid=actor_uuid,
             evidence={},
             now=now,
