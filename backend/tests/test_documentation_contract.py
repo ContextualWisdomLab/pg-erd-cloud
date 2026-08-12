@@ -41,12 +41,11 @@ CURRENT_ROUTES = (
     "POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans",
     "GET /api/migration-plans/{migration_plan_uuid}",
     "POST /api/migration-plans/{migration_plan_uuid}/dry-runs",
+    "POST /api/migration-plans/{migration_plan_uuid}/apply-runs",
     "GET /api/migration-runs/{migration_run_uuid}",
 )
 
-PLANNED_ROUTES = (
-    "POST /api/migration-plans/{migration_plan_uuid}/apply-runs",
-)
+PLANNED_ROUTES: tuple[str, ...] = ()
 
 README_CORE_LINKS = (
     "ARCHITECTURE.md",
@@ -108,6 +107,15 @@ def test_v1_contract_separates_current_routes_from_remaining_run_routes() -> Non
     assert "## 8. Migration-plan retrieval and bounded run API" in contract
     assert "Implemented" in contract
     assert "each route is classified below" in " ".join(contract.split())
+
+
+def test_published_apply_intent_route_is_not_classified_as_planned() -> None:
+    """Keep the non-dispatched intent endpoint separate from planned execution."""
+
+    route = "POST /api/migration-plans/{migration_plan_uuid}/apply-runs"
+
+    assert route in CURRENT_ROUTES
+    assert route not in PLANNED_ROUTES
 
 
 def test_v1_contract_does_not_classify_plan_retrieval_as_planned() -> None:
