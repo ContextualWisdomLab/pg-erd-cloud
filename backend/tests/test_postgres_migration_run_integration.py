@@ -493,7 +493,28 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                         statement_timeout_ms=2000,
                     )
                 )
-                await asyncio.sleep(0.1)
+                for _ in range(100):
+                    if await admin_connection.fetchval(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM pg_catalog.pg_stat_activity
+                            WHERE pid = $1
+                              AND state = 'active'
+                              AND wait_event_type = 'Lock'
+                        )
+                        """,
+                        backend_pid,
+                    ):
+                        break
+                    assert not interrupted.done(), (
+                        "live preflight finished before entering its lock wait"
+                    )
+                    await asyncio.sleep(0.01)
+                else:
+                    pytest.fail(
+                        "live preflight did not enter a lock wait before timeout"
+                    )
                 assert await admin_connection.fetchval(
                     "SELECT pg_catalog.pg_terminate_backend($1)", backend_pid
                 ) is True
@@ -503,8 +524,9 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                 assert disconnected.value.__cause__ is None
                 assert connection.is_closed() is True
             finally:
-                if interrupted is not None and not interrupted.done():
-                    interrupted.cancel()
+                if interrupted is not None:
+                    if not interrupted.done():
+                        interrupted.cancel()
                     await asyncio.gather(interrupted, return_exceptions=True)
                 await blocking_transaction.rollback()
         finally:
