@@ -4,7 +4,7 @@
 - **Capability status:** Partial
 - **Implemented boundary:** deterministic attempt orchestration
 - **Not implemented:** concrete sandbox/credential providers, deployment wiring,
-  live apply, production acceptance
+  live apply or production readiness
 
 ## Purpose
 
