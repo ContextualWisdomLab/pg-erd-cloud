@@ -24,11 +24,16 @@ async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
     app.db._pooler_cache = None
     app.db._pooler_cache_at = 0.0
 
+    cancelled = asyncio.Event()
+
     async def mock_probe(admin_db):
         if admin_db == "pgbouncer":
-            await asyncio.sleep(0.5)
-            return None
-        elif admin_db == "pgcat":
+            try:
+                await asyncio.sleep(0.5)
+                return None
+            finally:
+                cancelled.set()
+        if admin_db == "pgcat":
             await asyncio.sleep(0.01)
             return "PgCat 0.10.0"
         return None
@@ -41,6 +46,7 @@ async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
 
     assert result.detected is True
     assert result.kind == PoolerKind.PGCAT
+    assert cancelled.is_set(), "losing probes must finish cancellation before return"
     assert elapsed < 0.25, f"Took {elapsed:.2f}s, expected < 0.25s (did not run concurrently)"
 
 
