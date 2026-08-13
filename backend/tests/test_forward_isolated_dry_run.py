@@ -1,3 +1,5 @@
+"""Isolated PostgreSQL dry-run contract tests."""
+
 from __future__ import annotations
 
 import asyncio
@@ -145,6 +147,7 @@ class _Connection:
 
 @pytest.mark.asyncio
 async def test_executes_exact_signed_plan_and_requires_semantic_convergence() -> None:
+    """Verify executes exact signed plan and requires semantic convergence."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
     connection = _Connection()
@@ -196,6 +199,7 @@ async def test_executes_exact_signed_plan_and_requires_semantic_convergence() ->
 
 @pytest.mark.asyncio
 async def test_rejects_wrong_server_or_tampered_plan_before_transaction() -> None:
+    """Verify rejects wrong server or tampered plan before transaction."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
     base_snapshot, _target_snapshot = _snapshots()
@@ -227,6 +231,7 @@ async def test_rejects_wrong_server_or_tampered_plan_before_transaction() -> Non
 
 @pytest.mark.asyncio
 async def test_rolls_back_and_masks_statement_failure() -> None:
+    """Verify rolls back and masks statement failure."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
     base_snapshot, _target_snapshot = _snapshots()
@@ -253,6 +258,7 @@ async def test_rolls_back_and_masks_statement_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_propagates_cancellation_after_rollback() -> None:
+    """Verify propagates cancellation after rollback."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
     base_snapshot, _target_snapshot = _snapshots()
@@ -284,6 +290,7 @@ async def test_propagates_cancellation_after_rollback() -> None:
 
 @pytest.mark.asyncio
 async def test_rejects_non_transactional_or_nonconvergent_plan() -> None:
+    """Verify rejects non transactional or nonconvergent plan."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
     base_snapshot, _target_snapshot = _snapshots()
@@ -338,6 +345,7 @@ async def test_rejects_non_transactional_or_nonconvergent_plan() -> None:
 async def test_rejects_resigned_invalid_plan_shapes(
     mutation: Mapping[str, Any], message: str
 ) -> None:
+    """Verify rejects resigned invalid plan shapes."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     invalid = _resign({**compile_migration_plan(base, target), **mutation})
@@ -366,6 +374,7 @@ async def test_rejects_resigned_invalid_plan_shapes(
 async def test_rejects_resigned_noncanonical_executable_plan(
     mutation: Mapping[str, Any],
 ) -> None:
+    """Verify rejects resigned noncanonical executable plan."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     invalid = _resign({**compile_migration_plan(base, target), **mutation})
@@ -396,6 +405,7 @@ async def test_rejects_resigned_noncanonical_executable_plan(
 async def test_rejects_resigned_invalid_statement_shapes(
     statement_mutation: Mapping[str, Any], message: str
 ) -> None:
+    """Verify rejects resigned invalid statement shapes."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -420,6 +430,7 @@ async def test_rejects_resigned_invalid_statement_shapes(
 
 @pytest.mark.asyncio
 async def test_rejects_resigned_statement_with_unknown_field() -> None:
+    """Verify rejects resigned statement with unknown field."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -450,6 +461,7 @@ async def test_rejects_resigned_statement_with_unknown_field() -> None:
 async def test_rejects_timeout_bounds(
     lock_timeout: int, statement_timeout: int
 ) -> None:
+    """Verify rejects timeout bounds."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -470,6 +482,7 @@ async def test_rejects_timeout_bounds(
 
 @pytest.mark.asyncio
 async def test_rejects_invalid_expected_digest_and_oversized_statement_list() -> None:
+    """Verify rejects invalid expected digest and oversized statement list."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -497,6 +510,7 @@ async def test_rejects_invalid_expected_digest_and_oversized_statement_list() ->
 
 @pytest.mark.asyncio
 async def test_rejects_capture_failures_invalid_snapshots_and_wrong_base() -> None:
+    """Verify rejects capture failures invalid snapshots and wrong base."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -533,7 +547,9 @@ async def test_rejects_capture_failures_invalid_snapshots_and_wrong_base() -> No
     async def invalid(_connection: _Connection) -> Mapping[str, Any]:
         return invalid_snapshot
 
-    with pytest.raises(IsolatedDryRunContractError, match="snapshot is invalid"):
+    with pytest.raises(
+        IsolatedDryRunContractError, match="snapshot is invalid"
+    ) as captured:
         await execute_isolated_dry_run(
             _Connection(),
             plan,
@@ -559,6 +575,7 @@ async def test_rejects_capture_failures_invalid_snapshots_and_wrong_base() -> No
 
 @pytest.mark.asyncio
 async def test_masks_version_and_transaction_start_failures() -> None:
+    """Verify masks version and transaction start failures."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -628,6 +645,7 @@ async def test_masks_version_and_transaction_start_failures() -> None:
 
 @pytest.mark.asyncio
 async def test_preserves_cancellation_during_capture_and_version_check() -> None:
+    """Verify preserves cancellation during capture and version check."""
     base, target = _models()
     plan = compile_migration_plan(base, target)
 
@@ -657,6 +675,7 @@ async def test_preserves_cancellation_during_capture_and_version_check() -> None
 
 @pytest.mark.asyncio
 async def test_masks_rollback_cleanup_failure_without_hiding_primary_failure() -> None:
+    """Verify masks rollback cleanup failure without hiding primary failure."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -688,6 +707,7 @@ async def test_masks_rollback_cleanup_failure_without_hiding_primary_failure() -
 
 @pytest.mark.asyncio
 async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
+    """Verify preserves cancellation when rollback cleanup fails."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
@@ -721,6 +741,7 @@ async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
 
 @pytest.mark.asyncio
 async def test_preserves_cancellation_before_transaction_start() -> None:
+    """Verify preserves cancellation before transaction start."""
     base, target = _models()
     base_snapshot, _target_snapshot = _snapshots()
     plan = compile_migration_plan(base, target)
