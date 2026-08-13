@@ -298,7 +298,7 @@ See the [threat model](security/forward-engineering-threat-model.md) and
 |---|---|---|---|
 | FE-TRD-001–004 | `app/forward/*`, schema-model/plan APIs, models, migrations | `test_forward_*`, `test_api_schema_models.py`, `test_api_migration_plans.py` | Real PostgreSQL round trip |
 | FE-TRD-005 | Uniform masking in schema-model/plan routes; project roles | API/permission tests | Full HTTP IDOR matrix |
-| FE-TRD-006–008 | Isolated dry-run execution/convergence core and bound read-only live preflight | `test_forward_isolated_dry_run.py`, `test_forward_live_preflight.py`, `test_forward_live_preflight_execution.py`, and PostgreSQL 14–18 acceptance | Sandbox provisioning/materialization/isolation/cleanup, credential-bound worker execution, apply-time revalidation, and live apply |
+| FE-TRD-006–008 | Isolated dry-run execution/convergence core and bound read-only live preflight | `test_forward_isolated_dry_run.py`, `test_forward_live_preflight.py`, and PostgreSQL 14–18 acceptance | Sandbox provisioning/materialization/isolation/cleanup, credential-bound worker execution, apply-time revalidation, and live apply |
 | FE-TRD-009–012 | Durable run/event/outbox/attempt persistence, UUID-only dispatch, exact signal/attempt leases, and dry-run/apply-intent/cancellation APIs | `test_migration_run_consumer.py`, `test_postgres_migration_run_integration.py`, and run/API contract suites | Application startup/credentials/deployed worker, crash recovery/no-replay reconciliation, and live apply/convergence |
 | FE-NFR-006 | Existing modal accessibility utilities only | Existing dialog tests | Forward workflow accessibility/E2E |
 

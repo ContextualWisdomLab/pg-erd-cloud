@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -44,3 +45,18 @@ def test_trd_traceability_records_current_forward_foundations() -> None:
     assert "application startup/credentials/deployed worker" in durable_runs
     assert "crash recovery/no-replay reconciliation" in durable_runs
     assert "live apply/convergence" in durable_runs
+
+
+def test_trd_traceability_names_existing_test_files() -> None:
+    """Reject stale exact test filenames in the evidence matrix."""
+
+    trd = (REPOSITORY_ROOT / "docs/TRD.md").read_text(encoding="utf-8")
+    traceability = trd.split("## Requirement-to-evidence traceability", 1)[1]
+    test_filenames = set(re.findall(r"`(test_[^`*]+\.py)`", traceability))
+
+    missing = sorted(
+        filename
+        for filename in test_filenames
+        if not (REPOSITORY_ROOT / "backend/tests" / filename).is_file()
+    )
+    assert missing == []
