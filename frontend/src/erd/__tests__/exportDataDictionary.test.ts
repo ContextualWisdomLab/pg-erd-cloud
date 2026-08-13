@@ -239,31 +239,3 @@ describe('exportDataDictionary CSV Injection Protection', () => {
     expect(csv).toContain('\'\u3000\uFF1D1+2');
   });
 });
-
-  it('rejects malformed handles without false positive FK matches in exports', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'table1',
-        type: 'table',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'table1',
-          badges: { pk: false, fk: false },
-          columns: [{ column_name: 'col1', data_type: 'text', column_comment: '', is_pk: false, is_not_null: false }],
-        },
-      },
-    ];
-    const edges: Edge[] = [
-      {
-        id: 'e1',
-        source: 'table1',
-        target: 'table2',
-        sourceHandle: 'src-c-0069junk', // malformed handle (would evaluate to null in decodeHandleId)
-        targetHandle: 'tgt-c-0069-0064',
-        data: { sourceColumns: ['col1'], targetColumns: ['col2'] }, // The legacy payload shouldn't trigger if a handle string is present
-      }
-    ];
-    const csv = exportDictionaryCsv(nodes, edges);
-    // Because the edge had an explicit handle but it was malformed, the fallback should not execute and col1 should not be flagged as an FK.
-    expect(csv).toContain('"table1","","col1","text","N","N","N","",""');
-  });

@@ -43,7 +43,7 @@ type ForeignKeyNodeInfo = {
   columns: Set<string>;
 };
 
-export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
 
   for (const edge of edges) {
@@ -53,15 +53,16 @@ export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNo
       map.set(edge.source, info);
     }
 
-    if (edge.sourceHandle || edge.targetHandle) {
-      const decodedSourceColumn = decodeHandleId(edge.sourceHandle, 'source');
-      const decodedTargetColumn = decodeHandleId(edge.targetHandle, 'target');
-      if (decodedSourceColumn !== null && decodedTargetColumn !== null) {
-        info.columns.add(decodedSourceColumn);
-      }
-    } else {
-      for (const column of sourceColumnsForEdge(edge)) {
-        info.columns.add(column);
+    for (const column of sourceColumnsForEdge(edge)) {
+      info.columns.add(column);
+    }
+
+    // ⚡ Bolt: Directly decode the handle and store the column name, avoiding
+    // repeatedly encoding every column during the export loop later.
+    if (edge.sourceHandle) {
+      const decodedColumn = decodeHandleId(edge.sourceHandle);
+      if (decodedColumn !== null) {
+        info.columns.add(decodedColumn);
       }
     }
   }

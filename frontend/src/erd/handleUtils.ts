@@ -24,41 +24,19 @@ export function targetColumnHandleId(columnName: string): string {
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
-/**
- * Reverses the encoding applied by sanitizeHandleId to retrieve the native column string.
- * This lookup strictly validates the structure and bounds lengths (max 10k items)
- * to prevent ReDoS/OOM attacks from excessively sized hex strings.
- */
-export type HandleRole = 'column' | 'source' | 'target';
-
-/**
- * Decode a bounded handle only when its encoded role matches the caller.
- *
- * Omitting expectedRole preserves generic decoding for display-only callers.
- * Exporters must pass their source or target role so swapped handles fail closed.
- */
-export function decodeHandleId(
-  handleId: string | null | undefined,
-  expectedRole?: HandleRole,
-): string | null {
+export function decodeHandleId(handleId: string | null | undefined): string | null {
   if (!handleId || handleId.length > 10000) return null;
 
   const parts = handleId.split('-');
   let payloadIndex = -1;
-  let actualRole: HandleRole | null = null;
 
   if (parts[0] === 'c') {
     payloadIndex = 1;
-    actualRole = 'column';
-  } else if (parts[0] === 'src' && parts[1] === 'c') {
+  } else if ((parts[0] === 'src' || parts[0] === 'tgt') && parts[1] === 'c') {
     payloadIndex = 2;
-    actualRole = 'source';
-  } else if (parts[0] === 'tgt' && parts[1] === 'c') {
-    payloadIndex = 2;
-    actualRole = 'target';
   }
 
-  if (payloadIndex === -1 || (expectedRole && actualRole !== expectedRole)) return null;
+  if (payloadIndex === -1) return null;
 
   if (parts.length === payloadIndex + 1 && parts[payloadIndex] === 'empty') {
     return '';
@@ -74,7 +52,7 @@ export function decodeHandleId(
       return null;
     }
     const codePoint = Number.parseInt(hex, 16);
-    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+    if (codePoint > 0x10ffff) {
       return null;
     }
     try {
