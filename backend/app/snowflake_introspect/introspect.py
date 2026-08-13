@@ -9,9 +9,10 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlparse
 
+from app.ddl.identifiers import quote_identifier
 from app.pg_introspect.column_examples import add_column_examples
-from app.sanitize import sanitize_for_storage
 from app.pg_introspect.dsn_guard import _validated_ip_hosts
+from app.sanitize import sanitize_for_storage
 
 SCHEMAS_SQL = """
 SELECT schema_name
@@ -246,7 +247,7 @@ def _table_key(row: dict) -> tuple[str, str]:
 
 
 def _q(ident: str) -> str:
-    return '"' + ident.replace('"', '""') + '"'
+    return quote_identifier(ident)
 
 
 def _constraint_type(value: object) -> str | None:
