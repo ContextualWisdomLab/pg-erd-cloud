@@ -254,6 +254,52 @@ async def test_attempt_bound_handler_renews_and_cancels_on_ownership_loss() -> N
 
 
 @pytest.mark.asyncio
+async def test_attempt_renewal_failure_is_sanitized_before_it_escapes() -> None:
+    """Replace durable-heartbeat provider failures with one fixed lease error."""
+
+    marker = "opaque durable-heartbeat provider detail"
+    run_uuid = uuid.uuid4()
+    signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    attempt_claim = _attempt_claim(run_uuid)
+    factory = _transactional_session_factory()
+
+    async def executor(*_args: object) -> None:
+        await asyncio.Event().wait()
+
+    with patch(
+        "app.jobs.migration_run_consumer.acquire_migration_run_attempt",
+        new=AsyncMock(return_value=attempt_claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_attempt",
+        new=AsyncMock(side_effect=RuntimeError(marker)),
+    ), patch(
+        "app.jobs.migration_run_consumer.finish_migration_run_attempt",
+        new=AsyncMock(return_value=True),
+    ) as finish:
+        handler = make_attempt_bound_migration_run_handler(
+            executor,
+            worker_identity="forward-worker-1",
+            attempt_lease_seconds=2,
+            heartbeat_interval_s=0.01,
+        )
+        with pytest.raises(MigrationRunAttemptLeaseLost) as caught:
+            await handler(factory, signal_claim)
+
+    assert str(caught.value) == (
+        "migration run attempt renewal ended without handler completion"
+    )
+    assert marker not in repr(caught.value)
+    assert caught.value.__cause__ is None
+    finish.assert_awaited_once_with(
+        factory.sessions[2],
+        claim=attempt_claim,
+        worker_identity="forward-worker-1",
+        signal_lease_token=signal_claim.lease_token,
+        succeeded=False,
+    )
+
+
+@pytest.mark.asyncio
 async def test_attempt_bound_handler_finishes_when_handler_and_heartbeat_complete_together(
 ) -> None:
     """Let exact attempt completion decide a simultaneous terminal heartbeat race."""
@@ -631,6 +677,48 @@ async def test_consumer_cancels_handler_when_exact_renewal_is_lost() -> None:
             )
 
     assert cancelled.is_set()
+    ack.assert_not_awaited()
+    release.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_signal_renewal_failure_is_sanitized_before_it_escapes() -> None:
+    """Replace signal-heartbeat provider failures with one fixed lease error."""
+
+    marker = "opaque signal-heartbeat provider detail"
+    claim = MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4())
+
+    async def handler(
+        _factory: Callable[[], AsyncSession], _claim: MigrationRunSignalClaim
+    ) -> None:
+        await asyncio.Event().wait()
+
+    with patch(
+        "app.jobs.migration_run_consumer.claim_due_migration_run_signal",
+        new=AsyncMock(return_value=claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_signal",
+        new=AsyncMock(side_effect=RuntimeError(marker)),
+    ), patch(
+        "app.jobs.migration_run_consumer.ack_migration_run_signal",
+        new=AsyncMock(),
+    ) as ack, patch(
+        "app.jobs.migration_run_consumer.release_migration_run_signal",
+        new=AsyncMock(),
+    ) as release:
+        with pytest.raises(MigrationRunSignalLeaseLost) as caught:
+            await process_one_migration_run_signal(
+                _session_factory,
+                handler,
+                lease_seconds=0.1,
+                heartbeat_interval_s=0.01,
+            )
+
+    assert str(caught.value) == (
+        "migration run renewal ended without handler completion"
+    )
+    assert marker not in repr(caught.value)
+    assert caught.value.__cause__ is None
     ack.assert_not_awaited()
     release.assert_not_awaited()
 

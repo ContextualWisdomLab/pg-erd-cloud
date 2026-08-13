@@ -107,8 +107,10 @@ plan digest verifier remains authoritative.
 
 Provider exceptions are replaced with fixed worker-boundary errors using
 `from None`. Provider diagnostics, DSNs, credentials, SQL and row data are not
-persisted or returned. Durable evidence continues to be canonicalized by the
-existing migration-run transition functions.
+persisted or returned. This includes durable-attempt and signal-heartbeat
+renewal failures; both cancel and retrieve in-flight work before exposing only
+their fixed lease-loss error. Durable evidence continues to be canonicalized
+by the existing migration-run transition functions.
 
 ## Explicit non-goals
 

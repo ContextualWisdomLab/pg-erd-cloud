@@ -189,10 +189,10 @@ async def _run_attempt_handler_under_exact_lease(
         if handler_task not in done:
             handler_task.cancel()
             await gather(handler_task, return_exceptions=True)
-            heartbeat_task.result()
+            await gather(heartbeat_task, return_exceptions=True)
             raise MigrationRunAttemptLeaseLost(
                 "migration run attempt renewal ended without handler completion"
-            )
+            ) from None
         heartbeat_task.cancel()
         await gather(heartbeat_task, return_exceptions=True)
         return handler_task.result()
@@ -354,10 +354,10 @@ async def _run_handler_under_exact_lease(
         if heartbeat_task in done:
             handler_task.cancel()
             await gather(handler_task, return_exceptions=True)
-            heartbeat_task.result()
+            await gather(heartbeat_task, return_exceptions=True)
             raise MigrationRunSignalLeaseLost(
                 "migration run renewal ended without handler completion"
-            )
+            ) from None
         heartbeat_task.cancel()
         await gather(heartbeat_task, return_exceptions=True)
         return handler_task.result()
