@@ -18,8 +18,9 @@ Use the GitHub Actions UI and run `codeql-sast-backfill` with:
 - `branch`: `main`
 - `commit_count`: `30`
 
-The workflow enumerates recent commits from `origin/<branch>` and analyzes each
-commit for:
+The workflow fetches the requested `refs/heads/<branch>` into an explicit
+`refs/remotes/origin/<branch>` tracking ref, enumerates that ref, and analyzes
+each commit for:
 
 - `javascript-typescript`
 - `python`
@@ -31,6 +32,10 @@ commit for:
 - Repository contents are read-only except the analyze job, which requires
   `security-events: write` to upload CodeQL results.
 - Checkout credentials are not persisted.
+- Dispatch inputs enter shell steps only through reviewed `env` mappings.
+  Branch input must be a valid branch name and must equal Git's normalized
+  result, so previous-checkout aliases such as `@{-1}` are rejected before an
+  explicit, option-terminated refspec is constructed.
 - The uploaded SARIF analysis is attributed to `refs/heads/<branch>` and the
   specific commit SHA selected by the matrix.
 - `commit_count` is capped at `127` so the two-language matrix plus the
@@ -46,4 +51,7 @@ python scripts\ci\validate_codeql_backfill.py
 
 The verifier checks that the workflow remains manually dispatched, keeps the
 expected inputs, grants `security-events: write` only where the CodeQL upload
-needs it, and keeps the expected language matrix for this repository.
+needs it, and keeps the expected language matrix for this repository. It also
+allowlists every `branch` and `commit_count` expression location, rejects legacy
+`github.event.inputs.*` shell references, and requires the normalized-branch
+equality guard.

@@ -57,8 +57,13 @@ jobs:
             exit 1
           fi
 
-          if ! git check-ref-format --branch "${branch}" >/dev/null; then
+          if ! normalized_branch="$(git check-ref-format --branch "${branch}")"; then
             echo "branch must be a valid Git branch name" >&2
+            exit 1
+          fi
+
+          if [[ "${normalized_branch}" != "${branch}" ]]; then
+            echo "branch aliases are not accepted" >&2
             exit 1
           fi
 

@@ -10,6 +10,20 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
+INPUT_EXPRESSION = re.compile(
+    r"\$\{\{\s*(?P<expression>"
+    r"inputs\.(?:branch|commit_count)|github\.event\.inputs\.[^}\s]+"
+    r")\s*\}\}"
+)
+ALLOWED_INPUT_EXPRESSION_LINES = {
+    "inputs.branch": {
+        "BRANCH_INPUT: ${{ inputs.branch }}",
+        'ref: "refs/heads/${{ inputs.branch }}"',
+    },
+    "inputs.commit_count": {
+        "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -17,8 +31,34 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def main() -> int:
-    text = WORKFLOW.read_text(encoding="utf-8")
+def _validate_input_expressions(text: str) -> None:
+    """Allow workflow-dispatch inputs only at reviewed non-shell boundaries."""
+
+    observed = {expression: set() for expression in ALLOWED_INPUT_EXPRESSION_LINES}
+    for line in text.splitlines():
+        stripped = line.strip()
+        for match in INPUT_EXPRESSION.finditer(line):
+            expression = match.group("expression")
+            require(
+                not expression.startswith("github.event.inputs."),
+                "unapproved workflow input expression: github.event.inputs.*",
+            )
+            allowed_lines = ALLOWED_INPUT_EXPRESSION_LINES.get(expression, set())
+            require(
+                stripped in allowed_lines,
+                f"unapproved workflow input expression: {expression}",
+            )
+            observed[expression].add(stripped)
+
+    for expression, allowed_lines in ALLOWED_INPUT_EXPRESSION_LINES.items():
+        require(
+            observed[expression] == allowed_lines,
+            f"workflow input expression locations changed: {expression}",
+        )
+
+
+def validate_workflow(text: str) -> None:
+    """Validate one complete CodeQL backfill workflow document."""
 
     require("workflow_dispatch:" in text, "workflow must be manual-only")
     require("branch:" in text, "branch input is required")
@@ -50,17 +90,15 @@ def main() -> int:
         'count="${COMMIT_COUNT_INPUT}"' in text,
         "shell must read commit_count from its environment",
     )
+    _validate_input_expressions(text)
     require(
-        'branch="${{ inputs.branch }}"' not in text,
-        "branch input must not be interpolated into run scripts",
+        'normalized_branch="$(git check-ref-format --branch "${branch}")"'
+        in text,
+        "branch input must produce a normalized branch name",
     )
     require(
-        'count="${{ inputs.commit_count }}"' not in text,
-        "commit_count input must not be interpolated into run scripts",
-    )
-    require(
-        'git check-ref-format --branch "${branch}"' in text,
-        "branch input must be validated as a Git branch name",
+        'if [[ "${normalized_branch}" != "${branch}" ]]' in text,
+        "normalized branch must equal the original input",
     )
     require(
         'source_ref="refs/heads/${branch}"' in text,
@@ -94,6 +132,10 @@ def main() -> int:
         languages == {"javascript-typescript", "python"},
         f"unexpected language matrix: {sorted(languages)}",
     )
+
+
+def main() -> int:
+    validate_workflow(WORKFLOW.read_text(encoding="utf-8"))
 
     return 0
 
