@@ -12,7 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
 INPUT_EXPRESSION = re.compile(
     r"\$\{\{\s*(?P<expression>"
-    r"inputs\.(?:branch|commit_count)|github\.event\.inputs\.[^}\s]+"
+    r"inputs\.[A-Za-z_][A-Za-z0-9_-]*|github\.event\.inputs\.[^}\s]+"
     r")\s*\}\}"
 )
 ALLOWED_INPUT_EXPRESSION_LINES = {
@@ -57,6 +57,91 @@ def _validate_input_expressions(text: str) -> None:
         )
 
 
+def _permission_mapping(text: str, *, job: str | None) -> dict[str, str]:
+    """Return one exact workflow or job permission mapping."""
+
+    lines = text.splitlines()
+    if job is None:
+        header = "permissions:"
+        header_index = next(
+            (index for index, line in enumerate(lines) if line == header),
+            None,
+        )
+    else:
+        job_header = f"  {job}:"
+        job_index = next(
+            (index for index, line in enumerate(lines) if line == job_header),
+            None,
+        )
+        require(job_index is not None, f"missing workflow job: {job}")
+        assert job_index is not None
+        next_job_index = next(
+            (
+                index
+                for index in range(job_index + 1, len(lines))
+                if re.fullmatch(r"  [A-Za-z0-9_-]+:", lines[index])
+            ),
+            len(lines),
+        )
+        header = "    permissions:"
+        header_index = next(
+            (
+                index
+                for index in range(job_index + 1, next_job_index)
+                if lines[index] == header
+            ),
+            None,
+        )
+    require(
+        header_index is not None,
+        "missing workflow permissions"
+        if job is None
+        else f"missing permissions for job: {job}",
+    )
+    assert header_index is not None
+    header_indent = len(header) - len(header.lstrip())
+    expected_indent = header_indent + 2
+    permissions: dict[str, str] = {}
+    for line in lines[header_index + 1 :]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent <= header_indent:
+            break
+        match = re.fullmatch(
+            rf" {{{expected_indent}}}(?P<name>[A-Za-z-]+):\s*(?P<value>\S+)",
+            line,
+        )
+        require(match is not None, "workflow permission mapping is invalid")
+        assert match is not None
+        name = match.group("name")
+        require(name not in permissions, f"duplicate workflow permission: {name}")
+        permissions[name] = match.group("value")
+    return permissions
+
+
+def _validate_permissions(text: str) -> None:
+    """Keep CodeQL upload authority confined to the analysis job."""
+
+    require(
+        _permission_mapping(text, job=None) == {"contents": "read"},
+        "workflow security-events: write permission is invalid",
+    )
+    require(
+        _permission_mapping(text, job="enumerate") == {"contents": "read"},
+        "enumerate security-events: write permission is invalid",
+    )
+    require(
+        _permission_mapping(text, job="analyze")
+        == {
+            "actions": "read",
+            "contents": "read",
+            "security-events": "write",
+        },
+        "analysis security-events: write permission is invalid",
+    )
+
+
 def validate_workflow(text: str) -> None:
     """Validate one complete CodeQL backfill workflow document."""
 
@@ -65,7 +150,7 @@ def validate_workflow(text: str) -> None:
     require("commit_count:" in text, "commit_count input is required")
     require('default: "main"' in text, "branch default must remain main")
     require('default: "30"' in text, "commit_count default must remain 30")
-    require("security-events: write" in text, "CodeQL upload permission is required")
+    _validate_permissions(text)
     require("persist-credentials: false" in text, "checkout credentials must not persist")
     require("git rev-list --max-count" in text, "must enumerate recent commits")
     require("--first-parent" not in text, "must not skip non-first-parent commits")

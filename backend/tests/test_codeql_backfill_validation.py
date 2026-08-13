@@ -57,6 +57,45 @@ def test_validator_rejects_unapproved_input_expression_use(
         _validate(unsafe)
 
 
+def test_validator_rejects_unknown_direct_input_expression() -> None:
+    """Reject newly declared dispatch inputs outside the reviewed allowlist."""
+
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    unsafe = workflow.replace(
+        "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
+        "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}\n"
+        "          EXTRA_INPUT: ${{ inputs.unreviewed_input }}",
+        1,
+    )
+
+    with pytest.raises(AssertionError, match="workflow input expression"):
+        _validate(unsafe)
+
+
+@pytest.mark.parametrize(
+    "unsafe",
+    (
+        "permissions:\n  contents: read\n  security-events: write",
+        "    permissions:\n      contents: read\n      security-events: write",
+    ),
+)
+def test_validator_limits_security_event_write_to_analysis_job(
+    unsafe: str,
+) -> None:
+    """Reject CodeQL upload authority at workflow or enumerate-job scope."""
+
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    original = (
+        "permissions:\n  contents: read"
+        if unsafe.startswith("permissions:")
+        else "    permissions:\n      contents: read"
+    )
+    mutated = workflow.replace(original, unsafe, 1)
+
+    with pytest.raises(AssertionError, match="security-events: write"):
+        _validate(mutated)
+
+
 def test_validator_requires_previous_branch_alias_rejection() -> None:
     """Keep @{-n} aliases from passing validation with their raw refspec form."""
 
