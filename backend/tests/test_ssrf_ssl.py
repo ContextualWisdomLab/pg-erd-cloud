@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import parse_qsl, urlencode, urlparse
@@ -69,7 +70,7 @@ def test_tls_file_parameter_rejects_missing_file(
 
 
 def test_tls_file_parameter_rejects_symlink_escape(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     password_free_dsn: str,
 ) -> None:
@@ -101,7 +102,7 @@ def test_tls_file_parameter_rejects_symlink_escape(
 
 
 def test_tls_file_parameters_are_canonicalized_before_connect(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     password_free_dsn: str,
 ) -> None:
@@ -141,7 +142,7 @@ def test_tls_file_parameters_are_canonicalized_before_connect(
 
 
 def test_verified_context_loads_canonical_client_chain(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     password_free_dsn: str,
 ) -> None:

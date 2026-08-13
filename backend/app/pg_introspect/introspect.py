@@ -119,15 +119,33 @@ async def _connect_guarded_postgres(
         if _requires_verified_tls_hostname(guarded_dsn)
         else None
     )
-    connect_kwargs: dict[str, object] = {
-        "host": connect_host,
-        "timeout": timeout,
-    }
     if target.port is not None:
-        connect_kwargs["port"] = target.port
+        if ssl_context is not None:
+            return await asyncpg.connect(
+                guarded_dsn,
+                host=connect_host,
+                port=target.port,
+                timeout=timeout,
+                ssl=ssl_context,
+            )
+        return await asyncpg.connect(
+            guarded_dsn,
+            host=connect_host,
+            port=target.port,
+            timeout=timeout,
+        )
     if ssl_context is not None:
-        connect_kwargs["ssl"] = ssl_context
-    return await asyncpg.connect(guarded_dsn, **connect_kwargs)
+        return await asyncpg.connect(
+            guarded_dsn,
+            host=connect_host,
+            timeout=timeout,
+            ssl=ssl_context,
+        )
+    return await asyncpg.connect(
+        guarded_dsn,
+        host=connect_host,
+        timeout=timeout,
+    )
 
 
 async def probe_postgres(dsn: str) -> str:
