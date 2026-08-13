@@ -1,3 +1,5 @@
+"""Durable dry-run worker stage orchestration contract tests."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +23,8 @@ from app.jobs.migration_dry_run_worker import (
 def _work(
     *, state: str = "sandbox_running", state_version: int = 2
 ) -> _MigrationDryRunWork:
+    """Build deterministic durable dry-run work metadata for stage tests."""
+
     return _MigrationDryRunWork(
         migration_run_uuid=uuid.uuid4(),
         migration_plan_uuid=uuid.uuid4(),
@@ -260,17 +264,17 @@ async def test_sandbox_failure_is_sanitized_and_lease_cleanup_runs() -> None:
         attempt_number=work.attempt_number,
         acquired_state_version=1,
     )
-    secret = "opaque sandbox provider detail"
+    marker = "opaque sandbox provider detail"
     with patch(
         "app.jobs.migration_dry_run_worker._load_and_begin",
         new=AsyncMock(return_value=work),
     ), patch(
         "app.jobs.migration_dry_run_worker.execute_isolated_dry_run",
-        new=AsyncMock(side_effect=RuntimeError(secret)),
+        new=AsyncMock(side_effect=RuntimeError(marker)),
     ):
         with pytest.raises(MigrationDryRunWorkerError) as caught:
             await handler(MagicMock(), signal_claim, attempt_claim)
     assert str(caught.value) == "isolated dry-run stage failed"
-    assert secret not in repr(caught.value)
+    assert marker not in repr(caught.value)
     assert caught.value.__cause__ is None
     assert cleaned
