@@ -40,6 +40,11 @@ const SQL_ACCESS_METHOD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SQL_DATA_TYPE_RE = /^[A-Za-z0-9_ .,[\]()]+$/;
 const PLANT_TEXT_ESCAPE_RE = /[\\\r\n]/g;
 
+function finiteCoordinate(value: unknown): number {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? coordinate : 0;
+}
+
 function quoteSqlIdentifier(value: unknown): string {
   const text = String(value ?? '').trim() || 'unnamed';
   return `"${text.replace(SQL_IDENTIFIER_QUOTE_RE, '""')}"`;
@@ -62,15 +67,8 @@ function fkColumnsForEdge(
   sourceNodeColumnNames: Set<string>,
   targetNodeColumnNames: Set<string>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
-  const data = edge.data as ForeignKeyEdgeData | undefined;
-  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
-  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
-    return { sourceColumns, targetColumns };
-  }
-
-  // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
-  // and using a precomputed O(1) Set to check for column existence.
+  // Supplied handles are authoritative. Validate both endpoints before considering
+  // metadata so a partial, malformed, or role-swapped edge cannot fall back open.
   if (edge.sourceHandle || edge.targetHandle) {
     const decodedSource = decodeHandleId(edge.sourceHandle, 'source');
     const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
@@ -85,7 +83,14 @@ function fkColumnsForEdge(
     if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
       return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
     }
-    return null; // Do not fallback if handles are supplied but partial/malformed
+    return null;
+  }
+
+  const data = edge.data as ForeignKeyEdgeData | undefined;
+  const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
+  const targetColumns = data?.targetColumns?.filter(Boolean) || [];
+  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
+    return { sourceColumns, targetColumns };
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
@@ -159,6 +164,9 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
         nodeColumnSets.get(sourceNode.id)!,
         nodeColumnSets.get(targetNode.id)!
       );
+      if (!fkColumns && (edge.sourceHandle || edge.targetHandle)) {
+        continue;
+      }
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
@@ -339,8 +347,8 @@ export function exportDiagramSvg(
 
   // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
   for (const n of nodes) {
-    const x = Number(n.position.x) || 0;
-    const y = Number(n.position.y) || 0;
+    const x = finiteCoordinate(n.position.x);
+    const y = finiteCoordinate(n.position.y);
     const h = heights.get(n.id)!;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
@@ -361,10 +369,10 @@ export function exportDiagramSvg(
     const source = nodesById.get(edge.source);
     const target = nodesById.get(edge.target);
     if (!source || !target) continue;
-    const sx = (Number(source.position.x) || 0) + offsetX + width;
-    const sy = (Number(source.position.y) || 0) + offsetY + heights.get(source.id)! / 2;
-    const tx = (Number(target.position.x) || 0) + offsetX;
-    const ty = (Number(target.position.y) || 0) + offsetY + heights.get(target.id)! / 2;
+    const sx = (finiteCoordinate(source.position.x)) + offsetX + width;
+    const sy = (finiteCoordinate(source.position.y)) + offsetY + heights.get(source.id)! / 2;
+    const tx = (finiteCoordinate(target.position.x)) + offsetX;
+    const ty = (finiteCoordinate(target.position.y)) + offsetY + heights.get(target.id)! / 2;
     const mx = (sx + tx) / 2;
     parts.push(`<path d="M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>`);
     if (edge.label) {
@@ -373,8 +381,8 @@ export function exportDiagramSvg(
   }
 
   for (const node of nodes) {
-    const x = (Number(node.position.x) || 0) + offsetX;
-    const y = (Number(node.position.y) || 0) + offsetY;
+    const x = (finiteCoordinate(node.position.x)) + offsetX;
+    const y = (finiteCoordinate(node.position.y)) + offsetY;
     const height = heights.get(node.id)!;
     const groupColor = node.data.businessGroup
       ? normalizeBusinessGroupColor(node.data.businessGroup.color)

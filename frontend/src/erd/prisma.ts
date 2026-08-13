@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { decodeHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -38,7 +38,6 @@ function mapToPrismaType(pgType: string, isFk: boolean): string {
   return "String"; // fallback
 }
 
-import { decodeHandleId } from './handleUtils';
 
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
@@ -63,13 +62,17 @@ export function exportPrisma(
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
 
-  // Cache pk lookup for O(1) checks
+  // Cache column membership and primary keys for fail-closed endpoint checks.
+  const columnNamesByNode = new Map<string, Set<string>>();
   const pkColumnsByNode = new Map<string, Set<string>>();
   for (const n of nodes) {
+    const columns = new Set<string>();
     const pks = new Set<string>();
     for (const c of n.data.columns || []) {
+      columns.add(c.column_name);
       if (c.is_pk) pks.add(c.column_name);
     }
+    columnNamesByNode.set(n.id, columns);
     pkColumnsByNode.set(n.id, pks);
   }
 
@@ -81,29 +84,23 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle) {
+    let targetField = "id";
+    if (edge.sourceHandle || edge.targetHandle) {
       const decodedSource = decodeHandleId(edge.sourceHandle, 'source');
-      if (decodedSource !== null) {
-        sourceField = decodedSource;
-      } else if (edge.sourceHandle.startsWith("src-")) {
-        // Fallback for tests/legacy handles that are not hex-encoded
-        sourceField = edge.sourceHandle.slice(4);
+      const decodedTarget = decodeHandleId(edge.targetHandle, 'target');
+      if (
+        decodedSource === null ||
+        decodedTarget === null ||
+        !columnNamesByNode.get(edge.source)?.has(decodedSource) ||
+        !columnNamesByNode.get(edge.target)?.has(decodedTarget)
+      ) {
+        continue;
       }
-      if (sourceField) {
-        fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-      }
+      sourceField = decodedSource;
+      targetField = decodedTarget;
+      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
     } else {
       fkNodesWithoutHandles.add(edge.source);
-    }
-
-    let targetField = "id"; // fallback
-    if (edge.targetHandle) {
-      const decodedTarget = decodeHandleId(edge.targetHandle, 'target');
-      if (decodedTarget !== null) {
-        targetField = decodedTarget;
-      } else if (edge.targetHandle.startsWith("tgt-")) {
-        targetField = edge.targetHandle.slice(4);
-      }
     }
 
     if (sourceField) {
@@ -138,7 +135,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);

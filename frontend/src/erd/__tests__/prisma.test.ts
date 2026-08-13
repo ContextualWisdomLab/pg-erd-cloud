@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -63,8 +64,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: 'users_posts',
       },
     ];
@@ -79,6 +80,38 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
+  });
+
+  it('fails closed when either canonical relation endpoint is malformed', () => {
+    const nodes = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'posts',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'posts',
+          badges: { pk: false, fk: true },
+          columns: [{ column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true }],
+        },
+      },
+    ] as Node<TableNodeData>[];
+    const result = exportPrisma(nodes, [{
+      id: 'bad',
+      source: 'posts',
+      target: 'users',
+      sourceHandle: sourceColumnHandleId('user_id'),
+      targetHandle: sourceColumnHandleId('id'),
+    }]);
+
+    expect(result).not.toContain('@relation');
   });
 
   it('maps various types properly', () => {
@@ -224,8 +257,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: '1to1',
       },
     ];

@@ -14,4 +14,4 @@
 - **Security**: Fixed SVG XSS vulnerability by enforcing numeric position attributes and backtick string sanitization during export.
 - **Security**: Addressed a CSV formula injection vector involving full-width Unicode characters and spaces in `exportDataDictionary.ts` (OWASP CSV Injection).
 - **Security**: Hardened React Flow `handleId` decoding routines to reject malformed surrogate pairs and mitigate ReDoS memory exhaustion vectors.
-- **Performance**: Optimized foreign key loop detection bounds and explicitly pre-indexed handle metadata logic to `O(H)` without changing existing column semantics.
+- **Performance**: Pre-indexed node column membership so each decoded relationship handle is validated in O(1), while the required one-time node/column indexing pass remains O(C).

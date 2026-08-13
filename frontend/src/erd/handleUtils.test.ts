@@ -18,6 +18,12 @@ describe('sanitizeHandleId', () => {
   it('should return c-empty for an empty string', () => {
     expect(sanitizeHandleId('')).toBe('c-empty');
   });
+
+  it('round-trips Unicode and non-BMP column names', () => {
+    for (const columnName of ['사용자', 'emoji_😀']) {
+      expect(decodeHandleId(sanitizeHandleId(columnName), 'column')).toBe(columnName);
+    }
+  });
 });
 
 describe('sourceColumnHandleId', () => {

@@ -807,3 +807,19 @@ describe('downloadText lifecycle', () => {
     }
   });
 });
+
+
+describe('exportDiagramSvg finite coordinates', () => {
+  it('normalizes infinite node coordinates instead of emitting invalid SVG numbers', () => {
+    const nodes = [{
+      id: 'infinite',
+      type: 'tableNode',
+      position: { x: Number.POSITIVE_INFINITY, y: Number.NEGATIVE_INFINITY },
+      data: { title: 'safe', columns: [], badges: { pk: false, fk: false } },
+    }] as Node<TableNodeData>[];
+
+    const svg = exportDiagramSvg(nodes, []);
+    expect(svg).not.toContain('Infinity');
+    expect(svg).not.toContain('NaN');
+  });
+});
