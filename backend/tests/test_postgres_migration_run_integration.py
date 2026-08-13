@@ -7,8 +7,9 @@ import copy
 import datetime as dt
 import os
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from typing import cast
 from urllib.parse import urlparse
 
 import asyncpg
@@ -20,7 +21,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.forward.isolated_dry_run import execute_isolated_dry_run
+from app.forward.isolated_dry_run import (
+    IsolatedPostgresConnection,
+    execute_isolated_dry_run,
+)
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.live_preflight import (
     LivePreflightContractError,
@@ -66,7 +70,9 @@ from app.jobs.migration_run_consumer import (
 )
 from app.jobs.migration_dry_run_worker import (
     IsolatedSandboxExecution,
+    IsolatedSandboxRequest,
     LivePreflightExecution,
+    LivePreflightRequest,
     make_durable_dry_run_attempt_handler,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
@@ -570,8 +576,8 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() -> None:
-    """Drive one durable dry run through real isolated and read-only leases."""
+async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() -> None:
+    """Resume a crashed durable dry run without replaying committed sandbox DDL."""
 
     assert _POSTGRES_URL is not None
     assert _POSTGRES_SANDBOX_URL is not None
@@ -627,21 +633,25 @@ async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() 
     revision_uuid = uuid.uuid4()
     plan_uuid = uuid.uuid4()
     signal_token = uuid.uuid4()
-    sandbox_requests = []
-    live_requests = []
+    sandbox_requests: list[IsolatedSandboxRequest] = []
+    live_requests: list[LivePreflightRequest] = []
     capability_order: list[str] = []
+    crash_before_first_live_read = True
 
     @asynccontextmanager
-    async def sandbox_factory(request):
+    async def sandbox_factory(
+        request: IsolatedSandboxRequest,
+    ) -> AsyncIterator[IsolatedSandboxExecution]:
         sandbox_requests.append(request)
         capability_order.append("sandbox-enter")
         connection = await asyncpg.connect(_sandbox_asyncpg_url())
 
         async def capture(
-            owned_connection: asyncpg.Connection[asyncpg.Record],
+            owned_connection: IsolatedPostgresConnection,
         ) -> dict[str, object]:
             return await _capture_filtered_snapshot(
-                owned_connection, schema_name
+                cast(asyncpg.Connection[asyncpg.Record], owned_connection),
+                schema_name,
             )
 
         try:
@@ -654,8 +664,15 @@ async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() 
             capability_order.append("sandbox-exit")
 
     @asynccontextmanager
-    async def live_factory(request):
+    async def live_factory(
+        request: LivePreflightRequest,
+    ) -> AsyncIterator[LivePreflightExecution]:
+        nonlocal crash_before_first_live_read
         live_requests.append(request)
+        if crash_before_first_live_read:
+            crash_before_first_live_read = False
+            capability_order.append("live-crash")
+            raise asyncio.CancelledError
         capability_order.append("live-enter")
         connection = await asyncpg.connect(_preflight_asyncpg_url())
 
@@ -772,9 +789,9 @@ async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() 
                 attempt_claim = await acquire_migration_run_attempt(
                     claim_session,
                     migration_run_uuid=created.migration_run_uuid,
-                    worker_identity="real-postgres-durable-worker",
+                    worker_identity="crashed-real-postgres-worker",
                     signal_lease_token=signal_token,
-                    lease_seconds=60,
+                    lease_seconds=1,
                     now=now + dt.timedelta(seconds=1),
                 )
 
@@ -785,23 +802,44 @@ async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() 
             sandbox_statement_timeout_ms=5_000,
             preflight_statement_timeout_ms=2_000,
         )
+        with pytest.raises(asyncio.CancelledError):
+            await handler(
+                sessions,
+                MigrationRunSignalClaim(
+                    created.migration_run_uuid, signal_token
+                ),
+                attempt_claim,
+            )
+
+        recovery_token = uuid.uuid4()
+        async with sessions() as recovery_claim_session:
+            async with recovery_claim_session.begin():
+                recovery_claim = await acquire_migration_run_attempt(
+                    recovery_claim_session,
+                    migration_run_uuid=created.migration_run_uuid,
+                    worker_identity="recovered-real-postgres-worker",
+                    signal_lease_token=recovery_token,
+                    lease_seconds=60,
+                    now=now + dt.timedelta(seconds=3),
+                )
+
         await handler(
             sessions,
             MigrationRunSignalClaim(
-                created.migration_run_uuid, signal_token
+                created.migration_run_uuid, recovery_token
             ),
-            attempt_claim,
+            recovery_claim,
         )
 
         async with sessions() as finish_session:
             async with finish_session.begin():
                 assert await finish_migration_run_attempt(
                     finish_session,
-                    claim=attempt_claim,
-                    worker_identity="real-postgres-durable-worker",
-                    signal_lease_token=signal_token,
+                    claim=recovery_claim,
+                    worker_identity="recovered-real-postgres-worker",
+                    signal_lease_token=recovery_token,
                     succeeded=True,
-                    now=now + dt.timedelta(seconds=2),
+                    now=now + dt.timedelta(seconds=4),
                 )
 
         async with sessions() as verify_session:
@@ -818,26 +856,45 @@ async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() 
                     == created.migration_run_uuid
                 )
             ) == 4
-            persisted_attempt = await verify_session.get(
-                MigrationRunAttempt,
-                attempt_claim.migration_run_attempt_uuid,
+            persisted_attempts = list(
+                await verify_session.scalars(
+                    select(MigrationRunAttempt)
+                    .where(
+                        MigrationRunAttempt.migration_run_uuid
+                        == created.migration_run_uuid
+                    )
+                    .order_by(MigrationRunAttempt.attempt_number)
+                )
             )
-            assert persisted_attempt is not None
-            assert persisted_attempt.status == "completed"
+            assert [attempt.status for attempt in persisted_attempts] == [
+                "abandoned",
+                "completed",
+            ]
+            assert [attempt.acquired_state_version for attempt in persisted_attempts] == [
+                1,
+                3,
+            ]
 
         assert len(sandbox_requests) == 1
-        assert len(live_requests) == 1
+        assert len(live_requests) == 2
         assert sandbox_requests[0].migration_run_attempt_uuid == (
             attempt_claim.migration_run_attempt_uuid
         )
         assert live_requests[0].migration_run_attempt_uuid == (
             attempt_claim.migration_run_attempt_uuid
         )
+        assert live_requests[1].migration_run_attempt_uuid == (
+            recovery_claim.migration_run_attempt_uuid
+        )
         assert not hasattr(sandbox_requests[0], "db_connection_uuid")
-        assert live_requests[0].db_connection_uuid == connection_uuid
+        assert all(
+            request.db_connection_uuid == connection_uuid
+            for request in live_requests
+        )
         assert capability_order == [
             "sandbox-enter",
             "sandbox-exit",
+            "live-crash",
             "live-enter",
             "live-exit",
         ]

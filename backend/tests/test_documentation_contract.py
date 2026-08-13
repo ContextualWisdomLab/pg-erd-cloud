@@ -699,8 +699,15 @@ def test_forward_contract_tracks_real_durable_worker_postgres_evidence() -> None
     )
 
     assert (
-        "test_real_postgres_durable_worker_binds_separate_sandbox_and_reader"
+        "test_real_postgres_durable_worker_recovers_without_sandbox_replay"
         in acceptance_row
+    )
+    integration = _read(
+        Path("backend/tests/test_postgres_migration_run_integration.py")
+    )
+    assert (
+        "test_real_postgres_durable_worker_recovers_without_sandbox_replay"
+        in integration
     )
     assert "test-owned injected capabilities" in acceptance_row
     assert "deployed provisioning" in acceptance_row
