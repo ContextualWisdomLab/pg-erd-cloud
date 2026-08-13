@@ -1,13 +1,12 @@
 import uuid
 import datetime as dt
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.projects import router
 from app.auth import CurrentUser, get_current_user
-from app.db import get_read_session, get_session
+from app.db import get_read_session
 from app.models import ProjectSpace
 
 app = FastAPI()
