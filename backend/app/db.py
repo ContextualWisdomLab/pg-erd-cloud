@@ -148,10 +148,8 @@ async def get_pooler_detection() -> PoolerDetectionResult:
                         # Best-effort probe; allow other concurrent tasks to continue or fail.
                         pass
         finally:
-            for task in pending:
-                task.cancel()
-            if pending:
-                await asyncio.gather(*pending, return_exceptions=True)
+            for p in pending:
+                p.cancel()
 
         _pooler_cache = PoolerDetectionResult(
             kind=PoolerKind.UNKNOWN, detected=False, version_text=None
