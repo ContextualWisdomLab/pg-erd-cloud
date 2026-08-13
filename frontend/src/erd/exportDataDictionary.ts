@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { decodeHandleId } from './handleUtils';
+import { decodeSourceColumnHandleId, decodeTargetColumnHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[\s]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
@@ -30,41 +30,65 @@ function markdownText(value: unknown): string {
     .replace(MARKDOWN_ESCAPE_RE, (char) => `\\${char}`);
 }
 
-function sourceColumnsForEdge(edge: Edge): Set<string> {
-  const columns = new Set<string>();
-  const data = edge.data as ForeignKeyEdgeData | undefined;
-  for (const column of data?.sourceColumns || []) {
-    if (column) columns.add(column);
+function columnNamesByNode(nodes: Node<TableNodeData>[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  for (const node of nodes) {
+    result.set(node.id, new Set((node.data.columns || []).map((column) => column.column_name)));
   }
-  return columns;
+  return result;
 }
 
 type ForeignKeyNodeInfo = {
   columns: Set<string>;
 };
 
-export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+export function foreignKeyColumnsByNode(
+  nodes: Node<TableNodeData>[],
+  edges: Edge[],
+): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
+  const columnsByNode = columnNamesByNode(nodes);
 
   for (const edge of edges) {
+    const sourceColumns = columnsByNode.get(edge.source);
+    const targetColumns = columnsByNode.get(edge.target);
+    if (!sourceColumns || !targetColumns) continue;
+
+    const resolvedSourceColumns: string[] = [];
+    if (edge.sourceHandle || edge.targetHandle) {
+      if (!edge.sourceHandle || !edge.targetHandle) continue;
+      const sourceColumn = decodeSourceColumnHandleId(edge.sourceHandle);
+      const targetColumn = decodeTargetColumnHandleId(edge.targetHandle);
+      if (
+        sourceColumn === null ||
+        targetColumn === null ||
+        !sourceColumns.has(sourceColumn) ||
+        !targetColumns.has(targetColumn)
+      ) {
+        continue;
+      }
+      resolvedSourceColumns.push(sourceColumn);
+    } else {
+      const data = edge.data as ForeignKeyEdgeData | undefined;
+      const dataSourceColumns = data?.sourceColumns?.filter(Boolean) || [];
+      const dataTargetColumns = data?.targetColumns?.filter(Boolean) || [];
+      if (
+        dataSourceColumns.length === 0 ||
+        dataSourceColumns.length !== dataTargetColumns.length ||
+        !dataSourceColumns.every((column) => sourceColumns.has(column)) ||
+        !dataTargetColumns.every((column) => targetColumns.has(column))
+      ) {
+        continue;
+      }
+      resolvedSourceColumns.push(...dataSourceColumns);
+    }
+
     let info = map.get(edge.source);
     if (!info) {
       info = { columns: new Set<string>() };
       map.set(edge.source, info);
     }
-
-    if (edge.sourceHandle || edge.targetHandle) {
-      if (edge.sourceHandle) {
-        const decodedSourceColumn = decodeHandleId(edge.sourceHandle);
-        if (decodedSourceColumn !== null) {
-          info.columns.add(decodedSourceColumn);
-        }
-      }
-    } else {
-      for (const column of sourceColumnsForEdge(edge)) {
-        info.columns.add(column);
-      }
-    }
+    for (const column of resolvedSourceColumns) info.columns.add(column);
   }
 
   return map;
@@ -101,7 +125,7 @@ export function exportDictionaryCsv(
     'Example Value',
   ];
   const rows: unknown[][] = [header];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkColumnsByNode = foreignKeyColumnsByNode(nodes, edges);
 
   for (const node of nodes) {
     const tableName = node.data.title || node.id;
@@ -136,7 +160,7 @@ export function exportDictionaryMarkdown(
   edges: Edge[],
 ): string {
   const lines: string[] = ['# Data Dictionary', ''];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkColumnsByNode = foreignKeyColumnsByNode(nodes, edges);
 
   if (nodes.length === 0) {
     lines.push('No tables found.');
