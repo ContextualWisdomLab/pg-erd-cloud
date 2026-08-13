@@ -126,7 +126,17 @@ _ISOLATED_DRY_RUN_RESULT_FIELDS = frozenset(
 
 
 class MigrationRunContractError(ValueError):
-    """Raised when run state or durable evidence violates the v1 contract."""
+    """Raised when run state or durable evidence violates the v1 contract.
+
+    ``code`` is a stable machine-readable identity for API and audit mapping;
+    the human-readable message may evolve without changing that contract.
+    """
+
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        """Store one bounded contract code independently from diagnostic text."""
+
+        super().__init__(message)
+        self.code = code or message
 
 
 @dataclass(frozen=True)
@@ -493,9 +503,9 @@ def hash_idempotency_key(value: str) -> str:
 
     encoded = value.encode("utf-8")
     if not encoded or len(encoded) > MAX_IDEMPOTENCY_KEY_BYTES:
-        raise MigrationRunContractError("idempotency key length is invalid")
+        raise MigrationRunContractError("idempotency key length is invalid", code="idempotency_key_invalid")
     if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
-        raise MigrationRunContractError("idempotency key contains a control character")
+        raise MigrationRunContractError("idempotency key contains a control character", code="idempotency_key_invalid")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -525,11 +535,11 @@ def digest_run_request(
     }
     if run_kind == "apply":
         if not isinstance(passed_dry_run_uuid, uuid.UUID):
-            raise MigrationRunContractError("passed dry run is invalid")
+            raise MigrationRunContractError("passed dry run is invalid", code="passed_dry_run_invalid")
         if confirmation_digest is None or _HEX_DIGEST.fullmatch(
             confirmation_digest
         ) is None:
-            raise MigrationRunContractError("apply confirmation is invalid")
+            raise MigrationRunContractError("apply confirmation is invalid", code="apply_confirmation_invalid")
         request["passed_dry_run_uuid"] = str(passed_dry_run_uuid)
         request["confirmation_digest"] = confirmation_digest
     encoded = json.dumps(
@@ -730,11 +740,11 @@ async def create_migration_run(
         or plan_json.get("base_digest") != plan.base_digest
         or plan_json.get("target_digest") != plan.target_digest
     ):
-        raise MigrationRunContractError("migration plan integrity verification failed")
+        raise MigrationRunContractError("migration plan integrity verification failed", code="plan_integrity_invalid")
     if plan.expires_at <= transition_time:
-        raise MigrationRunContractError("migration plan expired")
+        raise MigrationRunContractError("migration plan expired", code="plan_expired")
     if plan_json.get("can_dry_run") is not True or plan_json.get("blockers"):
-        raise MigrationRunContractError("migration plan cannot be dry-run")
+        raise MigrationRunContractError("migration plan cannot be dry-run", code="plan_not_executable")
 
     passed_dry_run_uuid: uuid.UUID | None = None
     confirmation_digest: str | None = None
@@ -757,7 +767,7 @@ async def create_migration_run(
             "requires_destructive_confirmation"
         )
         if not isinstance(required_destructive, bool):
-            raise MigrationRunContractError("apply confirmation is invalid")
+            raise MigrationRunContractError("apply confirmation is invalid", code="apply_confirmation_invalid")
         if (
             passed_dry_run is None
             or connection is None
@@ -766,7 +776,7 @@ async def create_migration_run(
             or model_revision is None
             or schema_model is None
         ):
-            raise MigrationRunContractError("apply confirmation is invalid")
+            raise MigrationRunContractError("apply confirmation is invalid", code="apply_confirmation_invalid")
         encoded_connection_name = typed_connection_name.encode("utf-8")
         if (
             not encoded_connection_name
@@ -776,7 +786,7 @@ async def create_migration_run(
                 for character in typed_connection_name
             )
         ):
-            raise MigrationRunContractError("apply confirmation is invalid")
+            raise MigrationRunContractError("apply confirmation is invalid", code="apply_confirmation_invalid")
         if (
             model_revision.schema_model_revision_uuid
             != plan.schema_model_revision_uuid
@@ -785,13 +795,13 @@ async def create_migration_run(
             or model_revision.revision_digest != plan.target_digest
             or schema_model.project_space_uuid != plan.project_space_uuid
         ):
-            raise MigrationRunContractError("migration model revision is stale")
+            raise MigrationRunContractError("migration model revision is stale", code="stale_revision")
         if (
             connection.db_connection_uuid != plan.db_connection_uuid
             or connection.project_space_uuid != plan.project_space_uuid
             or typed_connection_name != connection.conn_name
         ):
-            raise MigrationRunContractError("target connection confirmation mismatch")
+            raise MigrationRunContractError("target connection confirmation mismatch", code="target_confirmation_mismatch")
         if (
             passed_dry_run.run_kind != "dry_run"
             or passed_dry_run.state != "passed"
@@ -801,9 +811,9 @@ async def create_migration_run(
             or passed_dry_run.plan_digest != plan.statement_digest
             or passed_dry_run.observed_base_digest != plan.base_digest
         ):
-            raise MigrationRunContractError("passed dry run is invalid")
+            raise MigrationRunContractError("passed dry run is invalid", code="passed_dry_run_invalid")
         if destructive_acknowledged is not required_destructive:
-            raise MigrationRunContractError("destructive confirmation mismatch")
+            raise MigrationRunContractError("destructive confirmation mismatch", code="destructive_confirmation_mismatch")
         passed_dry_run_uuid = passed_dry_run.migration_run_uuid
         destructive_confirmation = destructive_acknowledged
         confirmation_payload = {
@@ -829,7 +839,7 @@ async def create_migration_run(
             "destructive_acknowledged",
         ):
             if _contains_evidence_field(canonical_evidence, reserved.replace("_", "")):
-                raise MigrationRunContractError("apply evidence is invalid")
+                raise MigrationRunContractError("apply evidence is invalid", code="apply_confirmation_invalid")
         canonical_evidence = {
             **canonical_evidence,
             "destructive_acknowledged": destructive_acknowledged,
@@ -897,9 +907,9 @@ async def create_migration_run(
             )
         )
         if existing is None:
-            raise MigrationRunContractError("idempotency winner is unavailable")
+            raise MigrationRunContractError("idempotency winner is unavailable", code="run_creation_unavailable")
         if existing.request_digest != request_digest:
-            raise MigrationRunContractError("idempotency key conflict")
+            raise MigrationRunContractError("idempotency key conflict", code="idempotency_key_conflict")
         return MigrationRunCreation(
             migration_run_uuid=existing.migration_run_uuid,
             state=existing.state,

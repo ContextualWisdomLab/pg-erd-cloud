@@ -118,24 +118,29 @@ def _apply_creation_contract_error(
 ) -> HTTPException:
     """Map apply-intent rejection onto stable non-executing API errors."""
 
+    public_code = error.code
     status_code, code = {
-        "migration plan integrity verification failed": (409, "plan_integrity_invalid"),
-        "migration plan expired": (409, "plan_expired"),
-        "migration plan cannot be dry-run": (409, "plan_not_executable"),
-        "migration model revision is stale": (409, "stale_revision"),
-        "passed dry run is invalid": (409, "passed_dry_run_invalid"),
-        "target connection confirmation mismatch": (409, "target_confirmation_mismatch"),
-        "destructive confirmation mismatch": (409, "destructive_confirmation_mismatch"),
-        "apply confirmation is invalid": (422, "apply_confirmation_invalid"),
-        "apply evidence is invalid": (422, "apply_confirmation_invalid"),
-        "idempotency key conflict": (409, "idempotency_key_conflict"),
-        "idempotency winner is unavailable": (503, "run_creation_unavailable"),
-        "idempotency key length is invalid": (422, "idempotency_key_invalid"),
-        "idempotency key contains a control character": (
-            422,
-            "idempotency_key_invalid",
+        "plan_integrity_invalid": (status.HTTP_409_CONFLICT, public_code),
+        "plan_expired": (status.HTTP_409_CONFLICT, public_code),
+        "plan_not_executable": (status.HTTP_409_CONFLICT, public_code),
+        "stale_revision": (status.HTTP_409_CONFLICT, public_code),
+        "passed_dry_run_invalid": (status.HTTP_409_CONFLICT, public_code),
+        "target_confirmation_mismatch": (status.HTTP_409_CONFLICT, public_code),
+        "destructive_confirmation_mismatch": (status.HTTP_409_CONFLICT, public_code),
+        "apply_confirmation_invalid": (
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            public_code,
         ),
-    }.get(str(error), (409, "run_action_rejected"))
+        "idempotency_key_conflict": (status.HTTP_409_CONFLICT, public_code),
+        "run_creation_unavailable": (
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            public_code,
+        ),
+        "idempotency_key_invalid": (
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            public_code,
+        ),
+    }.get(public_code, (status.HTTP_409_CONFLICT, "run_action_rejected"))
     return _creation_error(
         request,
         status_code=status_code,

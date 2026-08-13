@@ -373,18 +373,18 @@ async def test_create_apply_run_rejects_stale_plan_before_loading_evidence() -> 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("contract_error", "status_code", "code"),
+    ("contract_error", "error_code", "status_code", "code"),
     [
-        ("passed dry run is invalid", 409, "passed_dry_run_invalid"),
-        ("target connection confirmation mismatch", 409, "target_confirmation_mismatch"),
-        ("destructive confirmation mismatch", 409, "destructive_confirmation_mismatch"),
-        ("apply evidence is invalid", 422, "apply_confirmation_invalid"),
-        ("migration model revision is stale", 409, "stale_revision"),
-        ("idempotency key conflict", 409, "idempotency_key_conflict"),
+        ("passed dry run wording may change", "passed_dry_run_invalid", 409, "passed_dry_run_invalid"),
+        ("target confirmation wording may change", "target_confirmation_mismatch", 409, "target_confirmation_mismatch"),
+        ("destructive confirmation wording may change", "destructive_confirmation_mismatch", 409, "destructive_confirmation_mismatch"),
+        ("apply evidence wording may change", "apply_confirmation_invalid", 422, "apply_confirmation_invalid"),
+        ("stale model wording may change", "stale_revision", 409, "stale_revision"),
+        ("idempotency conflict wording may change", "idempotency_key_conflict", 409, "idempotency_key_conflict"),
     ],
 )
 async def test_create_apply_run_maps_contract_failures_without_source_values(
-    contract_error: str, status_code: int, code: str
+    contract_error: str, error_code: str, status_code: int, code: str
 ) -> None:
     """Rejected confirmation inputs produce stable bounded action errors."""
 
@@ -408,7 +408,11 @@ async def test_create_apply_run_maps_contract_failures_without_source_values(
         ),
         patch(
             "app.api.migration_plans.create_migration_run",
-            new=AsyncMock(side_effect=MigrationRunContractError(contract_error)),
+            new=AsyncMock(
+                side_effect=MigrationRunContractError(
+                    contract_error, code=error_code
+                )
+            ),
         ),
     ):
         with pytest.raises(HTTPException) as exc_info:
