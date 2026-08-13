@@ -59,9 +59,7 @@ async def _get_authorized_annotation(
     return await session.get(TableAnnotation, table_annotation_uuid)
 
 
-@router.get(
-    "/by-project/{project_space_uuid}", response_model=list[TableAnnotationOut]
-)
+@router.get("/by-project/{project_space_uuid}", response_model=list[TableAnnotationOut])
 async def list_annotations(
     project_space_uuid: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
@@ -77,9 +75,7 @@ async def list_annotations(
     return [_to_out(a) for a in rows.scalars().all()]
 
 
-@router.put(
-    "/by-project/{project_space_uuid}", response_model=TableAnnotationOut
-)
+@router.put("/by-project/{project_space_uuid}", response_model=TableAnnotationOut)
 async def upsert_annotation(
     project_space_uuid: uuid.UUID,
     body: TableAnnotationUpsertIn,

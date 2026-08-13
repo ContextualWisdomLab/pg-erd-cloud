@@ -5,7 +5,9 @@ from app.spec.sensitive_columns import detect_sensitive_columns
 
 def _snap(columns):
     return {
-        "relations": [{"relation_oid": 1, "schema_name": "public", "relation_name": "member"}],
+        "relations": [
+            {"relation_oid": 1, "schema_name": "public", "relation_name": "member"}
+        ],
         "columns": [{"relation_oid": 1, "column_name": c} for c in columns],
     }
 
@@ -16,7 +18,17 @@ def _by_col(report):
 
 def test_classifies_common_sensitive_columns():
     report = detect_sensitive_columns(
-        _snap(["password_hash", "ssn", "credit_card_no", "email", "home_address", "date_of_birth", "first_name"])
+        _snap(
+            [
+                "password_hash",
+                "ssn",
+                "credit_card_no",
+                "email",
+                "home_address",
+                "date_of_birth",
+                "first_name",
+            ]
+        )
     )
     byc = _by_col(report)
     assert byc["password_hash"] == ("credential", "high")
@@ -29,7 +41,9 @@ def test_classifies_common_sensitive_columns():
 
 
 def test_ignores_plain_columns_and_sorts_high_first():
-    report = detect_sensitive_columns(_snap(["id", "created_at", "quantity", "email", "api_key"]))
+    report = detect_sensitive_columns(
+        _snap(["id", "created_at", "quantity", "email", "api_key"])
+    )
     cols = _by_col(report)
     assert "id" not in cols and "quantity" not in cols
     severities = [i["severity"] for i in report["items"]]
@@ -38,13 +52,17 @@ def test_ignores_plain_columns_and_sorts_high_first():
 
 
 def test_maps_findings_to_compliance_frameworks():
-    report = detect_sensitive_columns(_snap(["card_number", "email", "medical_history"]))
+    report = detect_sensitive_columns(
+        _snap(["card_number", "email", "medical_history"])
+    )
     fw = {i["column"]: i["framework"] for i in report["items"]}
     assert "PCI DSS" in fw["card_number"]
     assert "GDPR" in fw["email"]
     assert "sensitive" in fw["medical_history"].lower()  # special category
     # per-framework breakdown lets a user answer "what is in PCI DSS scope?"
-    assert report["summary"]["by_framework"]["PCI DSS (cardholder data environment)"] == 1
+    assert (
+        report["summary"]["by_framework"]["PCI DSS (cardholder data environment)"] == 1
+    )
 
 
 def test_first_most_sensitive_match_wins():

@@ -11,9 +11,7 @@ from app.db_introspect import probe_database
 
 
 def _user():
-    return CurrentUser(
-        user_account_uuid=uuid.uuid4(), subject="t", display_name="T"
-    )
+    return CurrentUser(user_account_uuid=uuid.uuid4(), subject="t", display_name="T")
 
 
 def _conn():
@@ -53,15 +51,17 @@ async def test_test_connection_reports_ok_true_on_success():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=uuid.uuid4())
     session.get = AsyncMock(return_value=_conn())
-    with patch(
-        "app.api.connections.require_project_member", new_callable=AsyncMock
-    ), patch(
-        "app.api.connections.decrypt_text",
-        return_value="postgresql://u@db.example.com/app",
-    ), patch(
-        "app.api.connections.probe_database",
-        new_callable=AsyncMock,
-        return_value="16.2",
+    with (
+        patch("app.api.connections.require_project_member", new_callable=AsyncMock),
+        patch(
+            "app.api.connections.decrypt_text",
+            return_value="postgresql://u@db.example.com/app",
+        ),
+        patch(
+            "app.api.connections.probe_database",
+            new_callable=AsyncMock,
+            return_value="16.2",
+        ),
     ):
         out = await run_connection_test(
             db_connection_uuid=uuid.uuid4(), user=_user(), session=session
@@ -76,16 +76,18 @@ async def test_test_connection_reports_ok_false_on_probe_failure():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=uuid.uuid4())
     session.get = AsyncMock(return_value=_conn())
-    with patch(
-        "app.api.connections.require_project_member", new_callable=AsyncMock
-    ), patch(
-        "app.api.connections.decrypt_text",
-        return_value="postgresql://u@db.example.com/app",
-    ), patch(
-        "app.api.connections.probe_database",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError(
-            "database host is not in the introspection allowlist"
+    with (
+        patch("app.api.connections.require_project_member", new_callable=AsyncMock),
+        patch(
+            "app.api.connections.decrypt_text",
+            return_value="postgresql://u@db.example.com/app",
+        ),
+        patch(
+            "app.api.connections.probe_database",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError(
+                "database host is not in the introspection allowlist"
+            ),
         ),
     ):
         out = await run_connection_test(

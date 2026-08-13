@@ -79,9 +79,9 @@ async def test_introspect_database_dispatches_by_dialect(
     assert await db_introspect.introspect_database(
         "snowflake://u:p@acct/APP/PUBLIC", None
     ) == {"source_dialect": "snowflake"}
-    assert await db_introspect.introspect_database(
-        "mariadb://u:p@db/app", "shop"
-    ) == {"source_dialect": "mysql"}
+    assert await db_introspect.introspect_database("mariadb://u:p@db/app", "shop") == {
+        "source_dialect": "mysql"
+    }
     assert calls == [
         ("postgresql", "postgresql://u:p@db/app", "public"),
         ("snowflake", "snowflake://u:p@acct/APP/PUBLIC", None),
@@ -112,16 +112,12 @@ async def test_probe_database_dispatches_by_dialect(
     monkeypatch.setattr(db_introspect, "probe_mysql", fake_mysql)
 
     assert (
-        await db_introspect.probe_database("postgres://u:p@db/app")
-        == "postgresql 17"
+        await db_introspect.probe_database("postgres://u:p@db/app") == "postgresql 17"
     )
     assert (
-        await db_introspect.probe_database("snowflake://u:p@acct/APP")
-        == "snowflake 9"
+        await db_introspect.probe_database("snowflake://u:p@acct/APP") == "snowflake 9"
     )
-    assert (
-        await db_introspect.probe_database("mysql+pymysql://u:p@db/app") == "mysql 8"
-    )
+    assert await db_introspect.probe_database("mysql+pymysql://u:p@db/app") == "mysql 8"
     assert calls == [
         ("postgresql", "postgres://u:p@db/app"),
         ("snowflake", "snowflake://u:p@acct/APP"),

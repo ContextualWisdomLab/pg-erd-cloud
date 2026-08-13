@@ -50,9 +50,7 @@ async def test_get_view_returns_detail_when_authorized():
         new_callable=AsyncMock,
         return_value=view,
     ):
-        out = await get_view(
-            diagram_view_uuid=view_id, user=_user(), session=session
-        )
+        out = await get_view(diagram_view_uuid=view_id, user=_user(), session=session)
     assert out.diagram_view_uuid == view_id
     assert out.name == "my view"
     assert out.layout_json["positions"]["public.member"] == {"x": 10, "y": 20}
@@ -63,9 +61,7 @@ async def test_create_view_rejects_oversized_layout():
     session = AsyncMock()
     huge = {"blob": "a" * (600 * 1024)}  # > 512KB serialized
     body = DiagramViewCreateIn(name="big", layout_json=huge)
-    with patch(
-        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
-    ):
+    with patch("app.api.diagram_views.require_project_member", new_callable=AsyncMock):
         with pytest.raises(HTTPException) as exc:
             await create_view(
                 project_space_uuid=uuid.uuid4(),

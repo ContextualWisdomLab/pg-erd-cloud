@@ -65,8 +65,7 @@ def compute_schema_stats(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         return f"{rel.get('schema_name')}.{rel.get('relation_name')}"
 
     widest = [
-        {"table": _qname(oid), "columns": n}
-        for oid, n in cols_per_oid.most_common(5)
+        {"table": _qname(oid), "columns": n} for oid, n in cols_per_oid.most_common(5)
     ]
 
     return {
@@ -75,7 +74,9 @@ def compute_schema_stats(snapshot: dict[str, Any] | None) -> dict[str, Any]:
             "total": total_columns,
             "nullable": nullable,
             "not_null": total_columns - nullable,
-            "avg_per_table": round(total_columns / table_total, 1) if table_total else 0.0,
+            "avg_per_table": round(total_columns / table_total, 1)
+            if table_total
+            else 0.0,
             "max_per_table": max(cols_per_oid.values(), default=0),
         },
         "constraints": {

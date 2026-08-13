@@ -73,7 +73,12 @@ def _case_style(name: str) -> str | None:
 
 
 def _item(category: str, severity: str, target: str, detail: str) -> dict[str, Any]:
-    return {"category": category, "severity": severity, "target": target, "detail": detail}
+    return {
+        "category": category,
+        "severity": severity,
+        "target": target,
+        "detail": detail,
+    }
 
 
 def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
@@ -102,18 +107,30 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         lower = name.lower()
         if lower in RESERVED_WORDS:
             items.append(
-                _item("reserved_word", HIGH, label,
-                      f"'{name}' is a SQL reserved word — only usable double-quoted; unquoted use breaks.")
+                _item(
+                    "reserved_word",
+                    HIGH,
+                    label,
+                    f"'{name}' is a SQL reserved word — only usable double-quoted; unquoted use breaks.",
+                )
             )
         elif not _VALID_UNQUOTED.match(name) or len(name) > 63:
             items.append(
-                _item("requires_quoting", HIGH, label,
-                      f"'{name}' is not a legal unquoted identifier (case/char/length) — forces double-quoting everywhere.")
+                _item(
+                    "requires_quoting",
+                    HIGH,
+                    label,
+                    f"'{name}' is not a legal unquoted identifier (case/char/length) — forces double-quoting everywhere.",
+                )
             )
         elif lower in DISCOURAGED_KEYWORDS:
             items.append(
-                _item("discouraged_keyword", INFO, label,
-                      f"'{name}' is a non-reserved keyword / type name — legal unquoted, but shadows a keyword and confuses tooling.")
+                _item(
+                    "discouraged_keyword",
+                    INFO,
+                    label,
+                    f"'{name}' is a non-reserved keyword / type name — legal unquoted, but shadows a keyword and confuses tooling.",
+                )
             )
         style = _case_style(name)
         if style is not None:
@@ -127,8 +144,12 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
             style = _case_style(name)
             if style is not None and style != dominant:
                 items.append(
-                    _item("inconsistent_case", INFO, label,
-                          f"'{name}' is {style}, but the schema is predominantly {dominant}.")
+                    _item(
+                        "inconsistent_case",
+                        INFO,
+                        label,
+                        f"'{name}' is {style}, but the schema is predominantly {dominant}.",
+                    )
                 )
 
     items.sort(key=lambda i: (_SEVERITY_RANK.get(i["severity"], 9), i["target"]))

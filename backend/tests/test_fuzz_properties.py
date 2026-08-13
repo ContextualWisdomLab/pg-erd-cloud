@@ -98,9 +98,7 @@ def _row(draw: st.DrawFn) -> dict:
         "constraint_type": draw(st.sampled_from(["p", "u", "c", "f", "x", "", None])),
         "constraint_name": draw(_HOSTILE_TEXT),
         "constraint_def": draw(_HOSTILE_TEXT),
-        "constrained_attnums": draw(
-            st.one_of(st.none(), st.lists(_OID, max_size=5))
-        ),
+        "constrained_attnums": draw(st.one_of(st.none(), st.lists(_OID, max_size=5))),
         "index_def": draw(_HOSTILE_TEXT),
         "index_name": draw(_HOSTILE_TEXT),
         "index_tablespace_name": draw(_HOSTILE_TEXT),

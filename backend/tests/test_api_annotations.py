@@ -46,9 +46,7 @@ async def test_upsert_creates_new_annotation_when_absent():
     body = TableAnnotationUpsertIn(
         schema_name="public", relation_name="orders", body="핵심 주문 테이블"
     )
-    with patch(
-        "app.api.annotations.require_project_member", new_callable=AsyncMock
-    ):
+    with patch("app.api.annotations.require_project_member", new_callable=AsyncMock):
         out = await upsert_annotation(
             project_space_uuid=uuid.uuid4(),
             body=body,
@@ -79,9 +77,7 @@ async def test_upsert_updates_existing_annotation_without_insert():
     body = TableAnnotationUpsertIn(
         schema_name="public", relation_name="orders", body="new note"
     )
-    with patch(
-        "app.api.annotations.require_project_member", new_callable=AsyncMock
-    ):
+    with patch("app.api.annotations.require_project_member", new_callable=AsyncMock):
         out = await upsert_annotation(
             project_space_uuid=uuid.uuid4(),
             body=body,
@@ -106,13 +102,9 @@ async def test_list_annotations_returns_project_notes():
         created_at=now,
         updated_at=now,
     )
-    result = SimpleNamespace(
-        scalars=lambda: SimpleNamespace(all=lambda: [ann])
-    )
+    result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [ann]))
     session.execute = AsyncMock(return_value=result)
-    with patch(
-        "app.api.annotations.require_project_member", new_callable=AsyncMock
-    ):
+    with patch("app.api.annotations.require_project_member", new_callable=AsyncMock):
         out = await list_annotations(
             project_space_uuid=uuid.uuid4(), user=_user(), session=session
         )
