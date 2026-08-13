@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import datetime as dt
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -17,7 +14,6 @@ from app.jobs.migration_dry_run_worker import (
     LivePreflightRequest,
     MigrationDryRunWorkerError,
     _MigrationDryRunWork,
-    _make_work,
     make_durable_dry_run_attempt_handler,
 )
 
