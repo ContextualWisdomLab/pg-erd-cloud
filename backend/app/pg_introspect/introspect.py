@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 import ssl
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 import asyncpg
 
@@ -49,31 +49,59 @@ def _requires_verified_tls_hostname(dsn: str) -> bool:
     return query.get("sslmode", "").lower() == "verify-full"
 
 
+_TLS_FILE_QUERY_KEYS = frozenset({"sslrootcert", "sslcert", "sslkey"})
+_TLS_FILE_ALLOWED_BASES = tuple(
+    Path(directory).resolve()
+    for directory in ("/etc/ssl", "/etc/pki", "/run/secrets")
+)
+
+
 def _validate_tls_file_path(path_str: str) -> str:
     path = Path(path_str).resolve()
-    allowed_bases = [
-        Path("/etc/ssl").resolve(),
-        Path("/etc/pki").resolve(),
-        Path("/run/secrets").resolve(),
-    ]
-    if not any(path.is_relative_to(base) for base in allowed_bases):
+    if not any(
+        path.is_relative_to(base) for base in _TLS_FILE_ALLOWED_BASES
+    ):
         raise ValueError("TLS certificate path is not in an allowed directory")
     if not path.is_file():
-        raise ValueError("TLS certificate path does not exist or is not a file")
+        raise ValueError(
+            "TLS certificate path does not exist or is not a file"
+        )
     return str(path)
 
 
-def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
-    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
+def _guard_tls_file_paths(dsn: str) -> str:
+    """Validate and canonicalize every file-bearing TLS query parameter."""
+
+    parsed = urlparse(dsn)
+    guarded_query: list[tuple[str, str]] = []
+    for key, value in parse_qsl(
+        parsed.query, keep_blank_values=True
+    ):
+        if key in _TLS_FILE_QUERY_KEYS and value:
+            value = _validate_tls_file_path(value)
+        guarded_query.append((key, value))
+    return parsed._replace(query=urlencode(guarded_query)).geturl()
+
+
+def _verified_tls_context(
+    dsn: str, server_hostname: str
+) -> ssl.SSLContext:
+    guarded_dsn = _guard_tls_file_paths(dsn)
+    query = dict(
+        parse_qsl(
+            urlparse(guarded_dsn).query,
+            keep_blank_values=True,
+        )
+    )
     context = _ServerHostnameSSLContext(server_hostname)
     if query.get("sslrootcert"):
-        context.load_verify_locations(cafile=_validate_tls_file_path(query["sslrootcert"]))
+        context.load_verify_locations(cafile=query["sslrootcert"])
     else:
         context.load_default_certs()
     if query.get("sslcert") and query.get("sslkey"):
         context.load_cert_chain(
-            _validate_tls_file_path(query["sslcert"]),
-            _validate_tls_file_path(query["sslkey"])
+            query["sslcert"],
+            query["sslkey"],
         )
     return context
 
@@ -82,31 +110,24 @@ async def _connect_guarded_postgres(
     dsn: str, *, timeout: float
 ) -> asyncpg.Connection:
     target = await validate_postgres_dsn_target(dsn)
+    guarded_dsn = _guard_tls_file_paths(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
     ssl_context = (
-        _verified_tls_context(dsn, target.hostname)
-        if _requires_verified_tls_hostname(dsn)
+        _verified_tls_context(guarded_dsn, target.hostname)
+        if _requires_verified_tls_hostname(guarded_dsn)
         else None
     )
+    connect_kwargs: dict[str, object] = {
+        "host": connect_host,
+        "timeout": timeout,
+    }
     if target.port is not None:
-        if ssl_context is not None:
-            return await asyncpg.connect(
-                dsn,
-                host=connect_host,
-                port=target.port,
-                timeout=timeout,
-                ssl=ssl_context,
-            )
-        return await asyncpg.connect(
-            dsn, host=connect_host, port=target.port, timeout=timeout
-        )
+        connect_kwargs["port"] = target.port
     if ssl_context is not None:
-        return await asyncpg.connect(
-            dsn, host=connect_host, timeout=timeout, ssl=ssl_context
-        )
-    return await asyncpg.connect(dsn, host=connect_host, timeout=timeout)
+        connect_kwargs["ssl"] = ssl_context
+    return await asyncpg.connect(guarded_dsn, **connect_kwargs)
 
 
 async def probe_postgres(dsn: str) -> str:
