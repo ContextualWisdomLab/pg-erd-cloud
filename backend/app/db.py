@@ -144,10 +144,8 @@ async def get_pooler_detection() -> PoolerDetectionResult:
                             )
                             _pooler_cache_at = time.monotonic()
                             return _pooler_cache
-                    except Exception:  # noqa: BLE001
-                        # Each probe is best-effort; another concurrent probe
-                        # may still identify the pooler before UNKNOWN fallback.
-                        continue
+                    except Exception:
+                        pass
         finally:
             for p in pending:
                 p.cancel()

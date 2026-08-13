@@ -12,8 +12,11 @@ _DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
 
 import asyncio
 import time
+from unittest.mock import patch, MagicMock
+
 import pytest
 
+from app.db import get_pooler_detection
 import app.db
 
 @pytest.mark.asyncio
@@ -36,7 +39,7 @@ async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
     monkeypatch.setattr(app.db, "_probe_pooler_admin_console", mock_probe)
 
     start = time.monotonic()
-    result = await app.db.get_pooler_detection()
+    result = await get_pooler_detection()
     elapsed = time.monotonic() - start
 
     assert result.detected is True
