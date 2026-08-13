@@ -254,6 +254,54 @@ async def test_attempt_bound_handler_renews_and_cancels_on_ownership_loss() -> N
 
 
 @pytest.mark.asyncio
+async def test_attempt_bound_handler_finishes_when_handler_and_heartbeat_complete_together(
+) -> None:
+    """Let exact attempt completion decide a simultaneous terminal heartbeat race."""
+
+    run_uuid = uuid.uuid4()
+    signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    attempt_claim = _attempt_claim(run_uuid)
+    factory = _transactional_session_factory()
+
+    async def wait_for_both(
+        tasks: set[asyncio.Task[object]], *, return_when: object
+    ) -> tuple[set[asyncio.Task[object]], set[asyncio.Task[object]]]:
+        assert return_when is asyncio.FIRST_COMPLETED
+        await asyncio.gather(*tasks)
+        return set(tasks), set()
+
+    with patch(
+        "app.jobs.migration_run_consumer.acquire_migration_run_attempt",
+        new=AsyncMock(return_value=attempt_claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_attempt",
+        new=AsyncMock(return_value=False),
+    ) as renew, patch(
+        "app.jobs.migration_run_consumer.finish_migration_run_attempt",
+        new=AsyncMock(return_value=True),
+    ) as finish, patch(
+        "app.jobs.migration_run_consumer.wait",
+        new=wait_for_both,
+    ):
+        handler = make_attempt_bound_migration_run_handler(
+            AsyncMock(),
+            worker_identity="forward-worker-1",
+            attempt_lease_seconds=2,
+            heartbeat_interval_s=0.01,
+        )
+        await handler(factory, signal_claim)
+
+    renew.assert_awaited_once()
+    finish.assert_awaited_once_with(
+        factory.sessions[2],
+        claim=attempt_claim,
+        worker_identity="forward-worker-1",
+        signal_lease_token=signal_claim.lease_token,
+        succeeded=True,
+    )
+
+
+@pytest.mark.asyncio
 async def test_attempt_bound_handler_fails_closed_when_completion_owner_is_lost() -> None:
     """A successful callback cannot authorize signal ack after DB lease loss."""
 

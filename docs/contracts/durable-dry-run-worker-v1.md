@@ -95,6 +95,11 @@ plan digest verifier remains authoritative.
 - `asyncio.CancelledError`, `KeyboardInterrupt` and `SystemExit` propagate.
 - Both injected async context managers must close on success, failure and
   cancellation.
+- If handler completion and heartbeat termination become observable in the
+  same scheduler turn, the handler result proceeds to the exact-attempt
+  completion CAS. That CAS remains authoritative: an expired, replaced or
+  otherwise lost owner still fails closed and cannot authorize signal
+  acknowledgement.
 - A cancellation or CAS loss between sandbox completion and target access must
   prevent the target capability from opening.
 

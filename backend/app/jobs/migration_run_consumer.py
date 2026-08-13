@@ -186,7 +186,7 @@ async def _run_attempt_handler_under_exact_lease(
             {handler_task, heartbeat_task},
             return_when=FIRST_COMPLETED,
         )
-        if heartbeat_task in done:
+        if handler_task not in done:
             handler_task.cancel()
             await gather(handler_task, return_exceptions=True)
             heartbeat_task.result()
