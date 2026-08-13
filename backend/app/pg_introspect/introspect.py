@@ -81,6 +81,11 @@ def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
 async def _connect_guarded_postgres(
     dsn: str, *, timeout: float
 ) -> asyncpg.Connection:
+    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
+    for key in ("sslrootcert", "sslcert", "sslkey"):
+        if query.get(key):
+            _validate_tls_file_path(query[key])
+
     target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
