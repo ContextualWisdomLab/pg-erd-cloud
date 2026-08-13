@@ -8,6 +8,8 @@ import { RunStatusSurface } from './RunStatusSurface'
 
 type PlanReviewSurfaceProps = {
   planId: string
+  onRunCreated?: (runId: string) => void
+  renderCreatedRunStatus?: boolean
 }
 
 type LoadState =
@@ -15,7 +17,11 @@ type LoadState =
   | { status: 'ready'; plan: MigrationPlan }
   | { status: 'error' }
 
-export function PlanReviewSurface({ planId }: PlanReviewSurfaceProps) {
+export function PlanReviewSurface({
+  planId,
+  onRunCreated,
+  renderCreatedRunStatus = true,
+}: PlanReviewSurfaceProps) {
   const [attempt, setAttempt] = useState(0)
   const [createdRunId, setCreatedRunId] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
@@ -54,11 +60,18 @@ export function PlanReviewSurface({ planId }: PlanReviewSurfaceProps) {
     )
   }
 
+  const handleRunCreated = (runId: string) => {
+    setCreatedRunId(runId)
+    onRunCreated?.(runId)
+  }
+
   return (
     <>
       <PlanReviewPanel plan={loadState.plan} />
-      <DryRunIntentPanel plan={loadState.plan} onRunCreated={setCreatedRunId} />
-      {createdRunId ? <RunStatusSurface runId={createdRunId} /> : null}
+      <DryRunIntentPanel plan={loadState.plan} onRunCreated={handleRunCreated} />
+      {renderCreatedRunStatus && createdRunId
+        ? <RunStatusSurface runId={createdRunId} />
+        : null}
     </>
   )
 }

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { useDialogAccessibility } from '../modals/useDialogAccessibility'
 import { PlanReviewSurface } from './PlanReviewSurface'
 import { RunStatusSurface } from './RunStatusSurface'
@@ -16,8 +18,15 @@ export function ForwardEngineeringModal({
   onClose,
 }: ForwardEngineeringModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onClose)
+  const [createdRun, setCreatedRun] = useState<{
+    scope: string
+    runId: string
+  } | null>(null)
 
   if (!isOpen) return null
+
+  const runScope = `${planId}\u0000${runId ?? ''}`
+  const activeRunId = createdRun?.scope === runScope ? createdRun.runId : runId
 
   return (
     <div className="forwardEngineeringModalOverlay">
@@ -36,8 +45,15 @@ export function ForwardEngineeringModal({
           </button>
         </header>
         <div className="forwardEngineeringModal__body">
-          <PlanReviewSurface planId={planId} />
-          {runId ? <RunStatusSurface runId={runId} /> : null}
+          <PlanReviewSurface
+            planId={planId}
+            onRunCreated={(newRunId) => setCreatedRun({
+              scope: runScope,
+              runId: newRunId,
+            })}
+            renderCreatedRunStatus={false}
+          />
+          {activeRunId ? <RunStatusSurface runId={activeRunId} /> : null}
         </div>
       </div>
     </div>

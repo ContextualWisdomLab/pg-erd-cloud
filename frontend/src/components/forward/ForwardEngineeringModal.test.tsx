@@ -117,6 +117,53 @@ describe('ForwardEngineeringModal', () => {
     expect(screen.queryByRole('button', { name: /apply|적용/i })).not.toBeInTheDocument()
   })
 
+  it('replaces the supplied audit surface when a new dry run is accepted', async () => {
+    const createdRun = {
+      ...run,
+      migration_run_uuid: 'run-created',
+      state: 'passed',
+      state_version: 4,
+      observed_base_digest: 'b'.repeat(64),
+      finished_at: '2026-08-12T05:01:00Z',
+      updated_at: '2026-08-12T05:01:00Z',
+    }
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input)
+      if (url === '/api/csrf-token') return Promise.resolve(response({ csrf_token: 'csrf' }))
+      if (url.endsWith('/dry-runs') && init?.method === 'POST') {
+        return Promise.resolve(response({
+          migration_run_uuid: 'run-created',
+          state: 'queued',
+          state_version: 1,
+          cancellation_requested: false,
+          reused: false,
+        }))
+      }
+      if (url.endsWith('/migration-runs/run-created')) {
+        return Promise.resolve(response(createdRun))
+      }
+      if (url.endsWith('/migration-runs/run-modal')) return Promise.resolve(response(run))
+      return Promise.resolve(response(plan))
+    })
+
+    render(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    await screen.findByText('run-modal')
+    fireEvent.click(screen.getByRole('button', { name: '격리 dry-run 요청' }))
+
+    expect(await screen.findByText('run-created')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('run-modal')).not.toBeInTheDocument())
+    expect(screen.getAllByRole('status', { name: '마이그레이션 실행 상태' }))
+      .toHaveLength(1)
+  })
+
   it('closes with the explicit button or Escape', () => {
     const onClose = vi.fn()
     const { rerender } = render(
