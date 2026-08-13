@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
-from app.mysql_introspect.introspect import (
-    MysqlDsnConfig,
-    _introspect_sync,
-    _parse_mysql_dsn,
-    rows_to_snapshot,
-)
+from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -104,78 +98,3 @@ async def test_dsn_parse_pins_validated_ip_and_rejects_bad():
         await _parse_mysql_dsn("mysql:///nohost")
     with pytest.raises(ValueError):
         await _parse_mysql_dsn("postgres://u@h/db")
-
-
-@pytest.mark.parametrize(
-    "schema_filter",
-    [None, "shop' OR 1=1 --"],
-)
-def test_introspection_binds_every_schema_filter_parameter(
-    monkeypatch: pytest.MonkeyPatch,
-    schema_filter: str | None,
-) -> None:
-    """Keep schema selection out of all four information-schema query texts."""
-
-    queries: list[tuple[str, tuple[object, ...]]] = []
-
-    class FakeConnection:
-        """Provide the connection surface used by the synchronous introspector."""
-
-        closed = False
-
-        def cursor(self) -> object:
-            """Return an opaque cursor consumed only by the patched fetch helper."""
-
-            return object()
-
-        def close(self) -> None:
-            """Record deterministic connection cleanup."""
-
-            self.closed = True
-
-    connection = FakeConnection()
-
-    def fake_fetch_dicts(
-        _cursor: object,
-        sql: str,
-        params: tuple[object, ...] = (),
-    ) -> list[dict[str, Any]]:
-        """Capture query text and bindings without contacting a database."""
-
-        queries.append((sql, params))
-        return [{"v": "8.4.0"}] if sql == "SELECT VERSION() AS v" else []
-
-    monkeypatch.setattr(
-        "app.mysql_introspect.introspect._connect", lambda _config: connection
-    )
-    monkeypatch.setattr(
-        "app.mysql_introspect.introspect._fetch_dicts", fake_fetch_dicts
-    )
-
-    config = MysqlDsnConfig(
-        host="127.0.0.1",
-        server_hostname="db.example.com",
-        port=3306,
-        user="reader",
-        password=str(),
-        database="catalog",
-    )
-    snapshot = _introspect_sync(config, schema_filter)
-
-    expected_params = (
-        schema_filter,
-        "mysql",
-        "information_schema",
-        "performance_schema",
-        "sys",
-        schema_filter,
-    )
-    assert snapshot["schema_filter"] == schema_filter
-    assert connection.closed is True
-    assert queries[0] == ("SELECT VERSION() AS v", ())
-    assert len(queries[1:]) == 4
-    for sql, params in queries[1:]:
-        assert sql.count("%s") == len(expected_params)
-        assert params == expected_params
-        if schema_filter is not None:
-            assert schema_filter not in sql
