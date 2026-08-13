@@ -41,7 +41,7 @@ The forward-engineering release must prove all of these properties:
 flowchart TB
   Operational["Operational and fault-injection drills — Planned"]
   E2E["Browser and composed-service E2E — Planned"]
-  Integration["Real PostgreSQL 14–18 integration — Planned"]
+  Integration["Real PostgreSQL 14–18 integration — Partial"]
   Contract["API, persistence and authorization contracts — Partial"]
   Unit["Canonicalizer, adapter and compiler units — Implemented"]
   Operational --> E2E --> Integration --> Contract --> Unit

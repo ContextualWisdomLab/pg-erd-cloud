@@ -119,11 +119,16 @@ executable SQL, safety classification, approval truth, or recovery state.
   credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
-- stored-plan executor, transaction segmentation, locks, timeouts, approval,
-  idempotency, cancellation, reconciliation, and post-apply verification;
+- exact deployer-confirmed apply-intent creation is **Implemented** as an
+  execution-free, non-dispatched control-plane boundary; stored-plan dispatch,
+  executor, transaction segmentation, locks, timeouts, apply-time approval
+  revalidation, cancellation propagation, reconciliation, and post-apply
+  verification remain **Planned**;
 - frontend graph/model adapters and `ForwardEngineeringModal` workflow
-  orchestration (the accessible modal shell and bounded exact-digest dry-run
-  intent control are Partially implemented; apply/recovery controls are absent);
+  orchestration are **Partially implemented** through the accessible modal,
+  read-only plan review, exact-digest dry-run intent, verified run status/audit,
+  polling, and exact-version cancellation controls; apply/recovery controls and
+  composed browser E2E remain absent;
 - real PostgreSQL integration, fault-injection, accessibility, and browser E2E.
 
 The legacy `POST /api/connections/{db_connection_uuid}/apply-sql` remains a

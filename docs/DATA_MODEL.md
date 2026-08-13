@@ -251,8 +251,7 @@ execution input.
 
 `migration_run`, `migration_run_dispatch`, `migration_run_event`, and
 `migration_run_attempt` now exist in the ORM and Alembic revisions
-`0010_migration_run`, `0011_migration_run_attempt`,
-`0012_apply_intent_confirmation`, and
+`0010_migration_run`, `0011_migration_run_attempt`, and
 `0012_apply_intent_confirmation` with the fields
 shown in the implemented ERD
 above. Passed-dry-run, confirmation-digest, and destructive-confirmation

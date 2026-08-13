@@ -177,8 +177,10 @@ replaying: target digest means `verified`, unchanged base digest means
 
 ### Dry run
 
-**Status: Planned.** `cancelled` is included as a target pre-execution terminal
-state; the persistence and transition service do not yet exist.
+**Status: Partially implemented.** Durable persistence, authorized creation,
+integrity-checked polling, cancellation intent, and bounded transition cores
+exist. Deployed sandbox/preflight worker execution, cancellation propagation,
+and terminal-state orchestration remain **Planned**.
 
 ```mermaid
 stateDiagram-v2

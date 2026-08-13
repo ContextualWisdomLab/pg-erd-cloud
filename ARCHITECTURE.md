@@ -137,10 +137,10 @@ general forward engineering, not a silent omission.
 
 Consumer-to-attempt binding is **Implemented** without execution authority.
 Planned: isolated sandbox lifecycle, application startup wiring and worker execution,
-live-preflight credential binding around the durable attempt and caller-owned
-same-transaction snapshot primitive, plan approval, idempotent apply,
-post-commit re-introspection and the
-accessible frontend review/apply flow. The approved detailed design is in
+live-preflight credential binding around the durable attempt, plan approval,
+idempotent apply, post-commit re-introspection, and the complete accessible
+frontend apply/recovery flow. The caller-owned same-transaction snapshot
+primitive is **Implemented** without credential or worker authority. The approved detailed design is in
 `docs/superpowers/specs/2026-08-09-forward-engineering-design.md`.
 
 ## Trust and deployment boundaries
@@ -169,3 +169,10 @@ Explicit locking*. https://www.postgresql.org/docs/18/explicit-locking.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation:
 Transactions*. https://www.postgresql.org/docs/18/tutorial-transactions.html
+
+Rae, I., Rollins, E., Shute, J., Sodhi, S., & Vingralek, R. (2013). Online,
+asynchronous schema change in F1. *Proceedings of the VLDB Endowment, 6*(11),
+1045–1056. https://doi.org/10.14778/2536222.2536230
+
+Research applicability and limits are recorded in
+[Standards and evidence](docs/STANDARDS.md#research-use-and-limits).

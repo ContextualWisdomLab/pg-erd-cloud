@@ -1,3 +1,5 @@
+"""Durable dry-run worker metadata contract tests."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -17,6 +19,8 @@ from app.jobs.migration_dry_run_worker import (
 def _work(
     *, state: str = "sandbox_running", state_version: int = 2
 ) -> _MigrationDryRunWork:
+    """Build deterministic durable work metadata for persistence tests."""
+
     return _MigrationDryRunWork(
         migration_run_uuid=uuid.uuid4(),
         migration_plan_uuid=uuid.uuid4(),
@@ -91,6 +95,8 @@ def test_make_work_rejects_tampered_or_cancelled_metadata() -> None:
 
 
 def _transactional_session_factory(*scalar_values: object) -> MagicMock:
+    """Build a recording transaction factory with ordered scalar results."""
+
     session = MagicMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)

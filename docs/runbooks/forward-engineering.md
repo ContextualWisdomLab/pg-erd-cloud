@@ -29,7 +29,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, an execution-neutral consumer contract, consumer-to-attempt binding, and an exact deployer-confirmed apply intent with no dispatch exist; no application startup wiring, sandbox lifecycle, apply executor, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
-| Browser forward-engineering workflow | Planned | Do not simulate success in demo or production UI. |
+| Browser forward-engineering workflow | Partially implemented | Read-only plan review, bounded dry-run intent, verified run polling/audit, and exact-version cancellation are available. Apply/recovery and composed browser E2E remain Planned; do not simulate success. |
 
 The PostgreSQL 14–18 CI matrix composes each metadata server with a
 digest-pinned ephemeral Valkey 8 service. It verifies that a sanitized handler

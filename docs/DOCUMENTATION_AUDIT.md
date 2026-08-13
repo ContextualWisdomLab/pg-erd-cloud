@@ -151,7 +151,8 @@ Adequacy labels in this audit mean:
   completion. It accepts no credentials or execution material.
 - **Planned — application startup wiring, worker execution, failover, and retention:**
   no startup task consumes migration signals, accesses a target, or executes
-  SQL. Sandbox/preflight/apply workers and public apply-run creation remain absent.
+  SQL. An exact deployer-confirmed apply-intent route exists without dispatch;
+  sandbox/preflight/apply workers and live apply execution remain absent.
 - Isolated version-compatible sandbox execution and live read-only preflight.
 - Target fingerprint revalidation, advisory and object locking, apply-time data
   preconditions, stored-plan executor, and explicit transactional segment
@@ -195,12 +196,12 @@ as code or test evidence.
 
 | Gap | Why documentation cannot close it | Required evidence |
 |---|---|---|
-| Application startup wiring/worker execution and apply-run API | Atomic identifier-only outbox persistence, authorized dry-run creation/cancellation, scheduled bounded UUID-only queue publication, execution-neutral consumer and dual-lease binding contracts, CAS writers, and integrity-checked polling exist, but application consumer lifecycle/worker execution and public apply creation are unavailable. | Deployment relay failover, consumer restart/cancellation integration tests, approval-bound apply creation |
+| Application startup wiring, worker execution, and live apply dispatch | Atomic identifier-only outbox persistence, authorized dry-run creation/cancellation, scheduled bounded UUID-only queue publication, execution-neutral consumer and dual-lease binding contracts, CAS writers, integrity-checked polling, and exact non-dispatched apply-intent creation exist. Application consumer lifecycle, credential-bound worker execution, and live apply dispatch remain unavailable. | Deployment relay failover, consumer restart/cancellation integration tests, approval-bound dispatch and executor evidence |
 | Isolated sandbox and read-only preflight | Exact-plan/read-only cores, durable attempt primitives, and execution-neutral consumer binding still have no startup wiring, provisioning, deployed isolation, cleanup, production credential, or worker execution authority. CI-only evidence does not establish deployment controls. | Network/credential isolation and cleanup proof, dependency materialization, application lifecycle binding, and live target audit evidence |
 | Drift-safe executor | Stored plan metadata alone does not acquire locks, enforce preconditions, bound time, or roll back. | Versioned stored-plan dispatch, lock/timeout/concurrency/rollback integration tests |
 | Idempotency and uncertain-commit recovery | A lease retry can duplicate destructive DDL unless apply is never replayed after the boundary. | Crash/fault injection and reconciliation to `verified`, `not_applied`, or `outcome_unknown` |
 | Post-apply convergence | Commit acknowledgement is not desired-state proof. | Dedicated verification snapshot and exact/third-digest E2E assertions |
-| Product UI and accessibility | Users cannot safely review, authorize, observe, or recover through the current frontend. | Typed API client, forward modal, state polling, WCAG 2.2-oriented automation and manual evidence |
+| Product UI and accessibility | Users can review plans, request dry runs, observe verified run evidence, and request cancellation, but cannot complete apply, recovery, or convergence through the frontend. | Complete forward modal orchestration, apply/recovery controls, browser E2E, and WCAG 2.2-oriented automation and manual evidence |
 | Real PostgreSQL/version evidence | The 14–18 matrix separates migrated metadata, DDL sandbox, and preflight target databases while proving exact-plan convergence, run/outbox, and preflight reads through an ephemeral restricted login that lacks database CREATE/TEMP and is denied DDL; it does not prove deployed lifecycle, production credentials, audit, concurrency, failures, or representative sizes. | Adversarial catalogs, deployed least-privilege identities, external writers, cleanup/fault injection, representative sizes |
 | Kill switch, alerts, recovery drill | Operators cannot contain or classify a live incident using design prose. | Implemented gate, metrics/alerts, backup/restore posture, non-production game day |
 | Legacy live-route retirement/containment | The transitional path bypasses immutable plan, dry-run, evidence, and convergence authority. | Disable/retire decision, ingress/app gate, regression tests and operator procedure |

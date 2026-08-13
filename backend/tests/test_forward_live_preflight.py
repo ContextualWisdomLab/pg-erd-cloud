@@ -1,3 +1,5 @@
+"""Read-only live PostgreSQL preflight contract tests."""
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +21,8 @@ from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 
 def _plan(*preconditions: Mapping[str, object]) -> dict[str, object]:
+    """Build a canonical executable plan for live-preflight tests."""
+
     return {
         "can_dry_run": True,
         "blockers": [],
@@ -32,6 +36,8 @@ def _plan(*preconditions: Mapping[str, object]) -> dict[str, object]:
 
 
 def _snapshot() -> dict[str, Any]:
+    """Build a strict canonical target snapshot for digest checks."""
+
     return {
         "snapshot_contract_version": 1,
         "server_version_num": 180002,
@@ -61,6 +67,7 @@ def _snapshot() -> dict[str, Any]:
 
 
 def test_compares_strict_snapshot_digest_without_execution_authority() -> None:
+    """Verify compares strict snapshot digest without execution authority."""
     snapshot = _snapshot()
     observed_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
     plan = _plan()
@@ -81,6 +88,7 @@ def test_compares_strict_snapshot_digest_without_execution_authority() -> None:
 
 @pytest.mark.parametrize("base_digest", [None, True, "A" * 64, "a" * 63])
 def test_rejects_invalid_planned_base_digest(base_digest: object) -> None:
+    """Verify rejects invalid planned base digest."""
     plan = _plan()
     plan["base_digest"] = base_digest
 
@@ -89,6 +97,7 @@ def test_rejects_invalid_planned_base_digest(base_digest: object) -> None:
 
 
 def test_snapshot_comparison_fails_closed_for_unsupported_target_semantics() -> None:
+    """Verify snapshot comparison fails closed for unsupported target semantics."""
     snapshot = _snapshot()
     snapshot["relations"][0]["relation_kind"] = "v"
     plan = _plan()
@@ -99,6 +108,7 @@ def test_snapshot_comparison_fails_closed_for_unsupported_target_semantics() -> 
 
 
 def test_compiles_bounded_preconditions_with_postgresql_identifier_quoting() -> None:
+    """Verify compiles bounded preconditions with postgresql identifier quoting."""
     queries = compile_live_preflight_queries(
         _plan(
             {
@@ -175,6 +185,7 @@ def test_compiles_bounded_preconditions_with_postgresql_identifier_quoting() -> 
 def test_rejects_unknown_or_tampered_preconditions(
     precondition: Mapping[str, object], message: str
 ) -> None:
+    """Verify rejects unknown or tampered preconditions."""
     with pytest.raises(LivePreflightContractError, match=message):
         compile_live_preflight_queries(_plan(precondition))
 
@@ -191,6 +202,7 @@ def test_rejects_unknown_or_tampered_preconditions(
 def test_rejects_invalid_postgresql_identifiers(
     schema_name: object, message: str
 ) -> None:
+    """Verify rejects invalid postgresql identifiers."""
     with pytest.raises(LivePreflightContractError, match=message):
         compile_live_preflight_queries(
             _plan(
@@ -216,6 +228,7 @@ def test_rejects_invalid_postgresql_identifiers(
 def test_rejects_missing_fields_and_non_text_kinds(
     precondition: Mapping[str, object], message: str
 ) -> None:
+    """Verify rejects missing fields and non text kinds."""
     with pytest.raises(LivePreflightContractError, match=message):
         compile_live_preflight_queries(_plan(precondition))
 
@@ -260,11 +273,13 @@ def test_rejects_missing_fields_and_non_text_kinds(
 def test_rejects_non_executable_or_malformed_plan_shapes(
     plan: Mapping[str, object], message: str
 ) -> None:
+    """Verify rejects non executable or malformed plan shapes."""
     with pytest.raises(LivePreflightContractError, match=message):
         compile_live_preflight_queries(plan)
 
 
 def test_rejects_more_than_the_bounded_query_count() -> None:
+    """Verify rejects more than the bounded query count."""
     precondition = {
         "kind": "table_is_empty",
         "schema_name": "public",
@@ -474,6 +489,7 @@ async def test_binds_fresh_snapshot_and_checks_to_one_read_only_transaction(
 
 @pytest.mark.asyncio
 async def test_bound_capture_returns_drift_without_discarding_check_evidence() -> None:
+    """Verify bound capture returns drift without discarding check evidence."""
     connection = _FakeConnection([True])
     planned_snapshot = _snapshot()
     plan = _plan(
@@ -512,6 +528,7 @@ async def test_bound_capture_returns_drift_without_discarding_check_evidence() -
 async def test_bound_capture_rejects_non_snapshot_results(
     capture_result: object,
 ) -> None:
+    """Verify bound capture rejects non snapshot results."""
     connection = _FakeConnection([])
     plan = _plan()
     plan["base_digest"] = "a" * 64
@@ -542,6 +559,7 @@ async def test_bound_capture_rejects_non_snapshot_results(
 async def test_bound_capture_sanitizes_failures_without_driver_detail(
     failure: Exception,
 ) -> None:
+    """Verify bound capture sanitizes failures without driver detail."""
     connection = _FakeConnection([])
     plan = _plan()
     plan["base_digest"] = "a" * 64
@@ -564,6 +582,7 @@ async def test_bound_capture_sanitizes_failures_without_driver_detail(
 
 @pytest.mark.asyncio
 async def test_bound_capture_requires_a_callable() -> None:
+    """Verify bound capture requires a callable."""
     connection = _FakeConnection([])
 
     with pytest.raises(
@@ -580,6 +599,7 @@ async def test_bound_capture_requires_a_callable() -> None:
 
 @pytest.mark.asyncio
 async def test_bound_capture_preserves_cancellation_after_rollback() -> None:
+    """Verify bound capture preserves cancellation after rollback."""
     connection = _FakeConnection([])
     plan = _plan()
     plan["base_digest"] = "a" * 64
@@ -601,6 +621,7 @@ async def test_bound_capture_preserves_cancellation_after_rollback() -> None:
 async def test_executes_only_bounded_reads_in_one_read_only_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify executes only bounded reads in one read only transaction."""
     original_wait_for = asyncio.wait_for
     client_timeouts: list[float] = []
 
@@ -669,6 +690,7 @@ async def test_executes_only_bounded_reads_in_one_read_only_transaction(
 
 @pytest.mark.asyncio
 async def test_rejects_non_boolean_database_evidence_without_row_values() -> None:
+    """Verify rejects non boolean database evidence without row values."""
     connection = _FakeConnection(["secret row value"])
 
     with pytest.raises(
@@ -690,6 +712,7 @@ async def test_rejects_non_boolean_database_evidence_without_row_values() -> Non
 
 @pytest.mark.asyncio
 async def test_replaces_database_failures_with_a_fixed_non_secret_error() -> None:
+    """Verify replaces database failures with a fixed non secret error."""
     connection = _FailingConnection([])
 
     with pytest.raises(LivePreflightContractError) as captured:
@@ -721,6 +744,7 @@ async def test_replaces_database_failures_with_a_fixed_non_secret_error() -> Non
 async def test_sanitizes_transaction_initialization_failures_without_rollback(
     connection: _FakeConnection,
 ) -> None:
+    """Verify sanitizes transaction initialization failures without rollback."""
     with pytest.raises(LivePreflightContractError) as captured:
         await execute_live_preflight(connection, _plan())
 
@@ -742,6 +766,7 @@ async def test_sanitizes_transaction_initialization_failures_without_rollback(
 async def test_sanitizes_transaction_finalization_failures(
     connection: _FakeConnection,
 ) -> None:
+    """Verify sanitizes transaction finalization failures."""
     with pytest.raises(LivePreflightContractError) as captured:
         await execute_live_preflight(
             connection,
@@ -762,6 +787,7 @@ async def test_sanitizes_transaction_finalization_failures(
 @pytest.mark.parametrize("timeout", ["5000", True, 0, 60_001])
 @pytest.mark.asyncio
 async def test_rejects_invalid_statement_timeouts(timeout: object) -> None:
+    """Verify rejects invalid statement timeouts."""
     with pytest.raises(LivePreflightContractError, match="timeout is invalid"):
         await execute_live_preflight(  # type: ignore[arg-type]
             _FakeConnection([]),
@@ -772,6 +798,7 @@ async def test_rejects_invalid_statement_timeouts(timeout: object) -> None:
 
 @pytest.mark.asyncio
 async def test_propagates_cancellation_after_rolling_back() -> None:
+    """Verify propagates cancellation after rolling back."""
     connection = _CancelledConnection([])
 
     with pytest.raises(asyncio.CancelledError):
@@ -791,6 +818,7 @@ async def test_propagates_cancellation_after_rolling_back() -> None:
 
 @pytest.mark.asyncio
 async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
+    """Verify preserves cancellation when rollback cleanup fails."""
     connection = _CancelledRollbackFailingConnection([])
 
     with pytest.raises(asyncio.CancelledError):
@@ -808,6 +836,7 @@ async def test_preserves_cancellation_when_rollback_cleanup_fails() -> None:
 
 @pytest.mark.asyncio
 async def test_preserves_cancellation_before_transaction_start() -> None:
+    """Verify preserves cancellation before transaction start."""
     connection = _TransactionStartCancelledConnection([])
 
     with pytest.raises(asyncio.CancelledError):

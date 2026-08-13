@@ -67,12 +67,19 @@ Current code implements only the first control-plane slice:
   success result, revalidates plan provenance, and derives the fixed
   `live_preflight_running` CAS. It does not provision, isolate, materialize,
   clean, or bind a durable worker attempt.
-- **Planned:** apply creation and all workers, isolated sandbox lifecycle,
-  complete live preflight worker/attempt binding around the caller-owned
-  same-transaction capture primitive, and apply-time fingerprint
-  revalidation, structured execution,
-  idempotency/cancellation/recovery, post-apply convergence, and all frontend
-  workflow surfaces.
+- **Implemented:** exact deployer-confirmed, execution-free apply-intent
+  creation binds the current model revision, immutable plan, passed dry run,
+  observed base digest, confirmation digest, actor, and idempotency key without
+  creating dispatch or DDL authority.
+- **Partially implemented:** browser plan review, dry-run submission, durable run
+  polling/status/audit, and exact-version cancellation intent surfaces exist.
+  They remain bounded intent/review surfaces and provide no credential or SQL
+  authority.
+- **Planned:** deployed isolated sandbox lifecycle, credential binding,
+  application worker execution, live apply dispatch/executor, apply-time
+  fingerprint revalidation, cancellation propagation, terminal transition and
+  recovery, post-apply convergence, and the complete browser apply/recovery
+  workflow.
 - **Rejected for v1:** browser-authored SQL in the graphical workflow,
   production DDL rollback as dry-run evidence, DML/backfills, heuristic rename
   inference, automatic rollback generation, scheduled apply, MySQL/Snowflake
