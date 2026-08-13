@@ -78,9 +78,13 @@ describe('RunCancellationControl', () => {
 
   it('admits only one request while cancellation is in flight', async () => {
     const csrf = deferred<Response>()
-    vi.mocked(fetch).mockReturnValueOnce(csrf.promise)
+    const cancellation = deferred<Response>()
+    vi.mocked(fetch)
+      .mockReturnValueOnce(csrf.promise)
+      .mockReturnValueOnce(cancellation.promise)
+    const onRefresh = vi.fn()
 
-    render(<RunCancellationControl run={run} onRefresh={vi.fn()} />)
+    render(<RunCancellationControl run={run} onRefresh={onRefresh} />)
     const button = screen.getByRole('button', { name: '실행 취소 요청' })
     fireEvent.click(button)
     fireEvent.click(button)
@@ -88,7 +92,19 @@ describe('RunCancellationControl', () => {
     expect(button).toBeDisabled()
     expect(fetch).toHaveBeenCalledTimes(1)
     csrf.resolve(response({ csrf_token: 'csrf' }))
-    await waitFor(() => expect(button).not.toBeDisabled())
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    cancellation.resolve(response({
+      migration_run_uuid: 'run-1',
+      state: 'sandbox_running',
+      state_version: 4,
+      cancellation_requested: true,
+      reused: false,
+    }, true, 202))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledOnce())
   })
 
   it('keeps the single-flight guard when polling advances the non-terminal version', async () => {

@@ -87,9 +87,13 @@ describe('DryRunIntentPanel', () => {
 
   it('allows only one in-flight request when the action is activated repeatedly', async () => {
     const csrf = deferred<Response>()
-    vi.mocked(fetch).mockReturnValueOnce(csrf.promise)
+    const creation = deferred<Response>()
+    vi.mocked(fetch)
+      .mockReturnValueOnce(csrf.promise)
+      .mockReturnValueOnce(creation.promise)
+    const onRunCreated = vi.fn()
 
-    render(<DryRunIntentPanel plan={plan} onRunCreated={vi.fn()} />)
+    render(<DryRunIntentPanel plan={plan} onRunCreated={onRunCreated} />)
     const button = screen.getByRole('button', { name: '격리 dry-run 요청' })
     fireEvent.click(button)
     fireEvent.click(button)
@@ -97,7 +101,19 @@ describe('DryRunIntentPanel', () => {
     expect(button).toBeDisabled()
     expect(fetch).toHaveBeenCalledTimes(1)
     csrf.resolve(response({ csrf_token: 'csrf' }))
-    await waitFor(() => expect(button).not.toBeDisabled())
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    creation.resolve(response({
+      migration_run_uuid: 'run-single-flight',
+      state: 'queued',
+      state_version: 1,
+      cancellation_requested: false,
+      reused: false,
+    }, true, 202))
+    await waitFor(() => expect(onRunCreated).toHaveBeenCalledWith('run-single-flight'))
   })
 
   it('retries an ambiguous failure with the same bounded idempotency key', async () => {
