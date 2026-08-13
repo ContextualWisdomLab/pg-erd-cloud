@@ -644,3 +644,22 @@ def test_readme_links_the_core_forward_engineering_documents() -> None:
     missing_links = [target for target in README_CORE_LINKS if target not in readme]
 
     assert missing_links == []
+
+
+def test_claude_guidance_tracks_partial_forward_engineering_authority() -> None:
+    """Keep coding-agent guidance aligned without claiming live apply readiness."""
+
+    guidance = _read(Path("CLAUDE.md"))
+    normalized = " ".join(guidance.split())
+
+    for route_group in (
+        "schema_models",
+        "migration_plans",
+        "migration_runs",
+    ):
+        assert route_group in guidance
+    assert "UUID-only migration dispatch relay" in normalized
+    assert "provider-neutral dry-run/preflight orchestration" in normalized
+    assert "concrete sandbox and target credential providers" in normalized
+    assert "It is not a production apply executor" in normalized
+    assert "Never describe this partial control plane as production apply readiness" in normalized
