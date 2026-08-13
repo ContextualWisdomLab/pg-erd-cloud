@@ -393,11 +393,12 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     )[0]
     assert "services:" in postgres_job
     assert "valkey/valkey@sha256:" in postgres_job
-    assert "test_real_postgres_and_valkey_recover_failure_and_crash" in _read(
-        Path("backend/tests/test_postgres_migration_run_integration.py")
-    )
     integration_test = _read(
         Path("backend/tests/test_postgres_migration_run_integration.py")
+    )
+    assert (
+        "test_real_postgres_and_valkey_recover_failure_and_crash"
+        in integration_test
     )
     assert 'os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")' in integration_test
     assert 'os.getenv("POSTGRES_TARGET_INTEGRATION_URL")' in integration_test

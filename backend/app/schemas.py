@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreateIn(BaseModel):
@@ -273,6 +273,8 @@ class MigrationRunCreateIn(BaseModel):
 
 class MigrationApplyRunCreateIn(BaseModel):
     """Bind an execution-free apply intent to exact reviewed evidence."""
+
+    model_config = ConfigDict(extra="forbid")
 
     plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     passed_dry_run_uuid: uuid.UUID

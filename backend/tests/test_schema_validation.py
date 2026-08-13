@@ -91,3 +91,11 @@ def test_apply_run_create_requires_exact_review_confirmation_shape() -> None:
             target_connection_name="",
             destructive_acknowledged=False,
         )
+    with pytest.raises(ValidationError, match="destructive_acknowledge"):
+        MigrationApplyRunCreateIn(
+            plan_digest="a" * 64,
+            passed_dry_run_uuid=passed_uuid,
+            target_connection_name="Production Primary",
+            destructive_acknowledged=False,
+            destructive_acknowledge=True,
+        )

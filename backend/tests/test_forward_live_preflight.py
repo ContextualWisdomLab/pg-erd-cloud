@@ -734,17 +734,18 @@ async def test_replaces_database_failures_with_a_fixed_non_secret_error() -> Non
 
 
 @pytest.mark.parametrize(
-    "connection",
+    "connection_class",
     [
-        _TransactionCreationFailingConnection([]),
-        _TransactionStartFailingConnection([]),
+        _TransactionCreationFailingConnection,
+        _TransactionStartFailingConnection,
     ],
 )
 @pytest.mark.asyncio
 async def test_sanitizes_transaction_initialization_failures_without_rollback(
-    connection: _FakeConnection,
+    connection_class: type[_FakeConnection],
 ) -> None:
     """Verify sanitizes transaction initialization failures without rollback."""
+    connection = connection_class([])
     with pytest.raises(LivePreflightContractError) as captured:
         await execute_live_preflight(connection, _plan())
 
@@ -756,17 +757,19 @@ async def test_sanitizes_transaction_initialization_failures_without_rollback(
 
 
 @pytest.mark.parametrize(
-    "connection",
+    ("connection_class", "results"),
     [
-        _TransactionCommitFailingConnection([True]),
-        _TransactionRollbackFailingConnection([]),
+        (_TransactionCommitFailingConnection, (True,)),
+        (_TransactionRollbackFailingConnection, ()),
     ],
 )
 @pytest.mark.asyncio
 async def test_sanitizes_transaction_finalization_failures(
-    connection: _FakeConnection,
+    connection_class: type[_FakeConnection],
+    results: tuple[object, ...],
 ) -> None:
     """Verify sanitizes transaction finalization failures."""
+    connection = connection_class(list(results))
     with pytest.raises(LivePreflightContractError) as captured:
         await execute_live_preflight(
             connection,

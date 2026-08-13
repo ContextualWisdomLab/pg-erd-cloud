@@ -111,7 +111,7 @@ class Settings(BaseSettings):
         "pg-erd-cloud:migration-run-processing"
     )
     valkey_migration_run_lease_token_key: str = (
-        "pg-erd-cloud:migration-run-lease-token"
+        "pg-erd-cloud:migration-run-lease-token"  # noqa: S105 - Valkey key name
     )
     migration_run_signal_lease_seconds: float = Field(
         60.0, gt=0.0, le=3600.0
