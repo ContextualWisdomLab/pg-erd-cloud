@@ -55,6 +55,8 @@ def _transactional_session_factory() -> MagicMock:
 
 
 def _attempt_claim(run_uuid: uuid.UUID) -> MigrationRunAttemptClaim:
+    """Build an exact durable attempt claim for one migration run."""
+
     return MigrationRunAttemptClaim(
         migration_run_attempt_uuid=uuid.uuid4(),
         migration_run_uuid=run_uuid,
@@ -165,7 +167,7 @@ async def test_composed_consumer_acks_only_after_durable_attempt_completion() ->
 async def test_attempt_bound_handler_abandons_sanitized_failure() -> None:
     """Worker details cannot escape, while an exact failed owner is abandoned."""
 
-    secret = "postgresql://owner:secret@target/private"
+    marker = "postgresql://owner:secret@target/private"
     run_uuid = uuid.uuid4()
     signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
     attempt_claim = _attempt_claim(run_uuid)
@@ -179,7 +181,7 @@ async def test_attempt_bound_handler_abandons_sanitized_failure() -> None:
         new=AsyncMock(return_value=True),
     ) as finish:
         handler = make_attempt_bound_migration_run_handler(
-            AsyncMock(side_effect=RuntimeError(secret)),
+            AsyncMock(side_effect=RuntimeError(marker)),
             worker_identity="forward-worker-1",
             attempt_lease_seconds=60,
         )
@@ -187,7 +189,7 @@ async def test_attempt_bound_handler_abandons_sanitized_failure() -> None:
             await handler(factory, signal_claim)
 
     assert str(caught.value) == "migration run attempt handler failed"
-    assert secret not in repr(caught.value)
+    assert marker not in repr(caught.value)
     finish.assert_awaited_once_with(
         factory.sessions[1],
         claim=attempt_claim,
@@ -324,7 +326,7 @@ async def test_attempt_abandonment_failure_logs_only_fixed_code(
 ) -> None:
     """Cleanup driver details cannot escape when durable renewal is lost."""
 
-    secret = "postgresql://owner:secret@metadata/private"
+    marker = "postgresql://owner:secret@metadata/private"
     run_uuid = uuid.uuid4()
     signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
     attempt_claim = _attempt_claim(run_uuid)
@@ -341,7 +343,7 @@ async def test_attempt_abandonment_failure_logs_only_fixed_code(
         new=AsyncMock(return_value=False),
     ), patch(
         "app.jobs.migration_run_consumer.finish_migration_run_attempt",
-        new=AsyncMock(side_effect=RuntimeError(secret)),
+        new=AsyncMock(side_effect=RuntimeError(marker)),
     ):
         handler = make_attempt_bound_migration_run_handler(
             executor,
@@ -353,7 +355,7 @@ async def test_attempt_abandonment_failure_logs_only_fixed_code(
             await handler(factory, signal_claim)
 
     assert "migration_run_attempt_abandon_failed" in caplog.text
-    assert secret not in caplog.text
+    assert marker not in caplog.text
 
 
 @pytest.mark.asyncio
