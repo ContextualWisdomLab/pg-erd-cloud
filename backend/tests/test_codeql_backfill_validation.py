@@ -88,6 +88,23 @@ def test_validator_rejects_unknown_workflow_expression(
         _validate(unsafe)
 
 
+def test_validator_rejects_multiline_workflow_expression() -> None:
+    """Reject folded expressions that the line-oriented verifier cannot parse."""
+
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    unsafe = workflow.replace(
+        "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
+        "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}\n"
+        "          EXTRA_INPUT: >-\n"
+        "            ${{ toJSON(\n"
+        "            inputs) }}",
+        1,
+    )
+
+    with pytest.raises(AssertionError, match="workflow expression"):
+        _validate(unsafe)
+
+
 @pytest.mark.parametrize(
     "unsafe",
     (

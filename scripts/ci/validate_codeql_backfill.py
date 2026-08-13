@@ -53,7 +53,16 @@ def _validate_workflow_expressions(text: str) -> None:
     }
     for line in text.splitlines():
         stripped = line.strip()
-        for match in WORKFLOW_EXPRESSION.finditer(line):
+        matches = list(WORKFLOW_EXPRESSION.finditer(line))
+        require(
+            line.count("${{") == len(matches),
+            "unparseable multiline workflow expression",
+        )
+        require(
+            line.count("}}") == len(matches),
+            "unparseable multiline workflow expression",
+        )
+        for match in matches:
             expression = match.group("expression")
             allowed_lines = ALLOWED_EXPRESSION_LINES.get(expression, set())
             require(
