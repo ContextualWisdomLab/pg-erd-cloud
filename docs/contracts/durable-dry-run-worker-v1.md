@@ -96,10 +96,10 @@ plan digest verifier remains authoritative.
 - Both injected async context managers must close on success, failure and
   cancellation.
 - If handler completion and heartbeat termination become observable in the
-  same scheduler turn, the handler result proceeds to the exact-attempt
-  completion CAS. That CAS remains authoritative: an expired, replaced or
-  otherwise lost owner still fails closed and cannot authorize signal
-  acknowledgement.
+  same scheduler turn, the handler result proceeds first to the exact-attempt
+  completion CAS and then to exact signal acknowledgement. Those CAS
+  operations remain authoritative: an expired, replaced or otherwise lost
+  owner still fails closed and cannot authorize acknowledgement.
 - A cancellation or CAS loss between sandbox completion and target access must
   prevent the target capability from opening.
 

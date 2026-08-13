@@ -724,6 +724,48 @@ async def test_signal_renewal_failure_is_sanitized_before_it_escapes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_consumer_acks_when_handler_and_signal_heartbeat_complete_together(
+) -> None:
+    """Let exact signal acknowledgement decide simultaneous completion."""
+
+    claim = MigrationRunSignalClaim(uuid.uuid4(), uuid.uuid4())
+
+    async def wait_for_both(
+        tasks: set[asyncio.Task[object]], *, return_when: object
+    ) -> tuple[set[asyncio.Task[object]], set[asyncio.Task[object]]]:
+        assert return_when is asyncio.FIRST_COMPLETED
+        await asyncio.gather(*tasks)
+        return set(tasks), set()
+
+    with patch(
+        "app.jobs.migration_run_consumer.claim_due_migration_run_signal",
+        new=AsyncMock(return_value=claim),
+    ), patch(
+        "app.jobs.migration_run_consumer.renew_migration_run_signal",
+        new=AsyncMock(return_value=False),
+    ) as renew, patch(
+        "app.jobs.migration_run_consumer.ack_migration_run_signal",
+        new=AsyncMock(return_value=True),
+    ) as ack, patch(
+        "app.jobs.migration_run_consumer.release_migration_run_signal",
+        new=AsyncMock(),
+    ) as release, patch(
+        "app.jobs.migration_run_consumer.wait",
+        new=wait_for_both,
+    ):
+        assert await process_one_migration_run_signal(
+            _session_factory,
+            AsyncMock(),
+            lease_seconds=0.1,
+            heartbeat_interval_s=0.01,
+        )
+
+    renew.assert_awaited_once()
+    ack.assert_awaited_once_with(claim)
+    release.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_consumer_lifecycle_cancellation_retrieves_both_tasks() -> None:
     """Shutdown cancellation cannot leave handler or heartbeat tasks running."""
 
