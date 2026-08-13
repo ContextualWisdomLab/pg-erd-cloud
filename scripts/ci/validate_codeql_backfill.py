@@ -10,10 +10,18 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
+_INPUT_KEY = r"(?:\.[A-Za-z_][A-Za-z0-9_-]*|\s*\[[^]\r\n]+\])"
+_EVENT_SEGMENT = r"(?:\.event|\s*\[\s*['\"]event['\"]\s*\])"
+_INPUTS_SEGMENT = r"(?:\.inputs|\s*\[\s*['\"]inputs['\"]\s*\])"
 INPUT_EXPRESSION = re.compile(
     r"\$\{\{\s*(?P<expression>"
-    r"(?:inputs|github\.event\.inputs)"
-    r"(?:\.[A-Za-z_][A-Za-z0-9_-]*|\s*\[[^]\r\n]+\])"
+    r"(?:inputs"
+    + _INPUT_KEY
+    + r"|github"
+    + _EVENT_SEGMENT
+    + _INPUTS_SEGMENT
+    + _INPUT_KEY
+    + r")"
     r")\s*\}\}"
 )
 ALLOWED_INPUT_EXPRESSION_LINES = {

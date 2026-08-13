@@ -63,6 +63,8 @@ def test_validator_rejects_unapproved_input_expression_use(
         "${{ inputs.unreviewed_input }}",
         "${{ inputs['unreviewed_input'] }}",
         "${{ github.event.inputs['unreviewed_input'] }}",
+        "${{ github['event']['inputs']['unreviewed_input'] }}",
+        "${{ github.event['inputs'].unreviewed_input }}",
     ),
 )
 def test_validator_rejects_unknown_direct_input_expression(
