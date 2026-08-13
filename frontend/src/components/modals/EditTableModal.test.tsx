@@ -184,4 +184,53 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
   });
+
+  it('updates contextual table action labels when the editing table changes', () => {
+    const firstTable = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'public.users',
+        comment: '',
+        columns: [],
+      },
+    };
+    const secondTable = {
+      ...firstTable,
+      id: 'table-2',
+      data: {
+        ...firstTable.data,
+        title: 'audit.events',
+      },
+    };
+
+    const { rerender } = render(
+      <EditTableModal {...defaultProps} editingNode={firstTable as any} />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'public.users 테이블 삭제' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'public.users 테이블 복제' }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <EditTableModal {...defaultProps} editingNode={secondTable as any} />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'audit.events 테이블 삭제' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'audit.events 테이블 복제' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'public.users 테이블 삭제' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'public.users 테이블 복제' }),
+    ).not.toBeInTheDocument();
+  });
 });
