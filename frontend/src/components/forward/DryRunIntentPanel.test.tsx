@@ -97,6 +97,7 @@ describe('DryRunIntentPanel', () => {
     expect(button).toBeDisabled()
     expect(fetch).toHaveBeenCalledTimes(1)
     csrf.resolve(response({ csrf_token: 'csrf' }))
+    await waitFor(() => expect(button).not.toBeDisabled())
   })
 
   it('retries an ambiguous failure with the same bounded idempotency key', async () => {
