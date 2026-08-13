@@ -62,33 +62,30 @@ function fkColumnsForEdge(
   sourceNodeColumnNames: Set<string>,
   targetNodeColumnNames: Set<string>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
-  if (edge.sourceHandle || edge.targetHandle) {
-    if (!edge.sourceHandle || !edge.targetHandle) return null;
-    const sourceColumn = decodeHandleId(edge.sourceHandle);
-    const targetColumn = decodeHandleId(edge.targetHandle);
-    if (
-      sourceColumn === null ||
-      targetColumn === null ||
-      !edge.sourceHandle.startsWith('src-') ||
-      !edge.targetHandle.startsWith('tgt-') ||
-      !sourceNodeColumnNames.has(sourceColumn) ||
-      !targetNodeColumnNames.has(targetColumn)
-    ) {
-      return null;
-    }
-    return { sourceColumns: [sourceColumn], targetColumns: [targetColumn] };
-  }
-
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
   const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (
-    sourceColumns.length > 0 &&
-    sourceColumns.length === targetColumns.length &&
-    sourceColumns.every((column) => sourceNodeColumnNames.has(column)) &&
-    targetColumns.every((column) => targetNodeColumnNames.has(column))
-  ) {
+  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
     return { sourceColumns, targetColumns };
+  }
+
+  // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
+  // and using a precomputed O(1) Set to check for column existence.
+  if (edge.sourceHandle || edge.targetHandle) {
+    const decodedSource = decodeHandleId(edge.sourceHandle);
+    const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
+      ? decodedSource
+      : undefined;
+
+    const decodedTarget = decodeHandleId(edge.targetHandle);
+    const targetHandleColumn = decodedTarget !== null && targetNodeColumnNames.has(decodedTarget)
+      ? decodedTarget
+      : undefined;
+
+    if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
+      return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+    }
+    return null; // Do not fallback if handles are supplied but partial/malformed
   }
 
   const fallbackSource = (sourceNode.data.columns || [])

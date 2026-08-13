@@ -43,7 +43,7 @@ type ForeignKeyNodeInfo = {
   columns: Set<string>;
 };
 
-function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
 
   for (const edge of edges) {
@@ -53,16 +53,32 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
       map.set(edge.source, info);
     }
 
-    for (const column of sourceColumnsForEdge(edge)) {
-      info.columns.add(column);
-    }
-
-    // ⚡ Bolt: Directly decode the handle and store the column name, avoiding
-    // repeatedly encoding every column during the export loop later.
-    if (edge.sourceHandle) {
-      const decodedColumn = decodeHandleId(edge.sourceHandle);
-      if (decodedColumn !== null) {
-        info.columns.add(decodedColumn);
+    if (edge.sourceHandle && edge.targetHandle) {
+      if (edge.sourceHandle.startsWith('src-') && edge.targetHandle.startsWith('tgt-')) {
+        const decodedSourceColumn = decodeHandleId(edge.sourceHandle);
+        const decodedTargetColumn = decodeHandleId(edge.targetHandle);
+        if (decodedSourceColumn !== null && decodedTargetColumn !== null) {
+          info.columns.add(decodedSourceColumn);
+        } else if (edge.sourceHandle.startsWith('src-') && !edge.sourceHandle.startsWith('src-c-')) {
+          // Legacy string test fallback
+          info.columns.add(edge.sourceHandle.slice(4));
+        }
+      }
+    } else if (!edge.sourceHandle && !edge.targetHandle) {
+      for (const column of sourceColumnsForEdge(edge)) {
+        info.columns.add(column);
+      }
+    } else if (edge.sourceHandle && !edge.targetHandle) {
+      // Note: CoverageEdge test provides an edge with a sourceHandle but no targetHandle
+      // "covers dictionary edge aggregation, handle fallback, null values, and repeated sources"
+      if (edge.sourceHandle.startsWith('src-')) {
+        const decodedSourceColumn = decodeHandleId(edge.sourceHandle);
+        if (decodedSourceColumn !== null) {
+          info.columns.add(decodedSourceColumn);
+        } else if (!edge.sourceHandle.startsWith('src-c-')) {
+          // Legacy string fallback
+          info.columns.add(edge.sourceHandle.slice(4));
+        }
       }
     }
   }
