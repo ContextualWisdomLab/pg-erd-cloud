@@ -150,6 +150,8 @@ async def get_pooler_detection() -> PoolerDetectionResult:
         finally:
             for p in pending:
                 p.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
 
         _pooler_cache = PoolerDetectionResult(
             kind=PoolerKind.UNKNOWN, detected=False, version_text=None

@@ -24,14 +24,21 @@ async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
     app.db._pooler_cache = None
     app.db._pooler_cache_at = 0.0
 
+    cancellation_observed = False
+
     async def mock_probe(admin_db):
-        if admin_db == "pgbouncer":
-            await asyncio.sleep(0.5)
+        nonlocal cancellation_observed
+        try:
+            if admin_db == "pgbouncer":
+                await asyncio.sleep(0.5)
+                return None
+            elif admin_db == "pgcat":
+                await asyncio.sleep(0.01)
+                return "PgCat 0.10.0"
             return None
-        elif admin_db == "pgcat":
-            await asyncio.sleep(0.01)
-            return "PgCat 0.10.0"
-        return None
+        except asyncio.CancelledError:
+            cancellation_observed = True
+            raise
 
     monkeypatch.setattr(app.db, "_probe_pooler_admin_console", mock_probe)
 
@@ -42,6 +49,7 @@ async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
     assert result.detected is True
     assert result.kind == PoolerKind.PGCAT
     assert elapsed < 0.25, f"Took {elapsed:.2f}s, expected < 0.25s (did not run concurrently)"
+    assert cancellation_observed is True, "Expected the losing probe to be cancelled and its cleanup awaited before returning"
 
 
 def test_classify_pooler_version_text() -> None:
