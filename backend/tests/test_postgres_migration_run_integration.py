@@ -8,6 +8,7 @@ import datetime as dt
 import os
 import uuid
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import asyncpg
@@ -63,6 +64,12 @@ from app.jobs.migration_run_consumer import (
     make_attempt_bound_migration_run_handler,
     process_one_migration_run_signal,
 )
+from app.jobs.migration_dry_run_worker import (
+    IsolatedSandboxExecution,
+    LivePreflightExecution,
+    make_durable_dry_run_attempt_handler,
+)
+from app.jobs.valkey_queue import MigrationRunSignalClaim
 from app.settings import settings
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
@@ -560,6 +567,298 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
             f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE"
         )
         await admin_connection.close()
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_durable_worker_binds_separate_sandbox_and_reader() -> None:
+    """Drive one durable dry run through real isolated and read-only leases."""
+
+    assert _POSTGRES_URL is not None
+    assert _POSTGRES_SANDBOX_URL is not None
+    assert _POSTGRES_TARGET_URL is not None
+    assert _POSTGRES_PREFLIGHT_URL is not None
+    assert _EXPECTED_MAJOR is not None
+    database_paths = {
+        urlparse(_POSTGRES_URL).path,
+        urlparse(_POSTGRES_SANDBOX_URL).path,
+        urlparse(_POSTGRES_TARGET_URL).path,
+    }
+    assert len(database_paths) == 3
+    major = int(_EXPECTED_MAJOR)
+    schema_name = f"Worker Dry Run {uuid.uuid4().hex}"
+    table_name = '검증 "테이블"'
+    quoted_schema = '"' + schema_name.replace('"', '""') + '"'
+    base_model: dict[str, object] = {
+        "format_version": 1,
+        "postgresql_major": major,
+        "schemas": [],
+    }
+    target_model: dict[str, object] = {
+        "format_version": 1,
+        "postgresql_major": major,
+        "schemas": [
+            {
+                "schema_name": schema_name,
+                "tables": [
+                    {
+                        "table_name": table_name,
+                        "columns": [
+                            {
+                                "column_name": "ID 값",
+                                "data_type": "bigint",
+                                "nullable": True,
+                                "ordinal_position": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    plan_json = compile_migration_plan(base_model, target_model)
+    engine = create_async_engine(_POSTGRES_URL)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    now = dt.datetime.now(dt.timezone.utc)
+    user_uuid = uuid.uuid4()
+    project_uuid = uuid.uuid4()
+    connection_uuid = uuid.uuid4()
+    snapshot_uuid = uuid.uuid4()
+    model_uuid = uuid.uuid4()
+    revision_uuid = uuid.uuid4()
+    plan_uuid = uuid.uuid4()
+    signal_token = uuid.uuid4()
+    sandbox_requests = []
+    live_requests = []
+    capability_order: list[str] = []
+
+    @asynccontextmanager
+    async def sandbox_factory(request):
+        sandbox_requests.append(request)
+        capability_order.append("sandbox-enter")
+        connection = await asyncpg.connect(_sandbox_asyncpg_url())
+
+        async def capture(
+            owned_connection: asyncpg.Connection[asyncpg.Record],
+        ) -> dict[str, object]:
+            return await _capture_filtered_snapshot(
+                owned_connection, schema_name
+            )
+
+        try:
+            yield IsolatedSandboxExecution(connection, capture)
+        finally:
+            await connection.execute(
+                f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE"
+            )
+            await connection.close()
+            capability_order.append("sandbox-exit")
+
+    @asynccontextmanager
+    async def live_factory(request):
+        live_requests.append(request)
+        capability_order.append("live-enter")
+        connection = await asyncpg.connect(_preflight_asyncpg_url())
+
+        async def capture(
+            owned_connection: asyncpg.Connection[asyncpg.Record],
+        ) -> dict[str, object]:
+            return await _capture_filtered_snapshot(
+                owned_connection, schema_name
+            )
+
+        try:
+            yield LivePreflightExecution(connection, capture)
+        finally:
+            await connection.close()
+            capability_order.append("live-exit")
+
+    try:
+        async with sessions() as setup_session:
+            setup_session.add(
+                UserAccount(
+                    user_account_uuid=user_uuid,
+                    oidc_subject=f"durable-worker-integration:{user_uuid}",
+                    display_name="Durable worker integration",
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            setup_session.add(
+                ProjectSpace(
+                    project_space_uuid=project_uuid,
+                    project_name="durable worker integration",
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            setup_session.add_all(
+                [
+                    DbConnection(
+                        db_connection_uuid=connection_uuid,
+                        project_space_uuid=project_uuid,
+                        conn_name="durable worker target",
+                        dsn_ciphertext=b"not-used",
+                        dsn_nonce=b"not-used",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    SchemaSnapshot(
+                        schema_snapshot_uuid=snapshot_uuid,
+                        project_space_uuid=project_uuid,
+                        db_connection_uuid=connection_uuid,
+                        status="succeeded",
+                        schema_filter=None,
+                        started_at=now,
+                        finished_at=now,
+                        error_message=None,
+                        created_at=now,
+                    ),
+                    SchemaModel(
+                        schema_model_uuid=model_uuid,
+                        project_space_uuid=project_uuid,
+                        model_name="durable_worker_model",
+                        current_revision_number=1,
+                        created_by_user_uuid=user_uuid,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ]
+            )
+            await setup_session.flush()
+            setup_session.add(
+                SchemaModelRevision(
+                    schema_model_revision_uuid=revision_uuid,
+                    schema_model_uuid=model_uuid,
+                    revision_number=1,
+                    revision_digest=plan_json["target_digest"],
+                    model_json=target_model,
+                    base_schema_snapshot_uuid=snapshot_uuid,
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            plan = MigrationPlan(
+                migration_plan_uuid=plan_uuid,
+                project_space_uuid=project_uuid,
+                schema_model_revision_uuid=revision_uuid,
+                db_connection_uuid=connection_uuid,
+                base_schema_snapshot_uuid=snapshot_uuid,
+                compiler_version=plan_json["compiler_version"],
+                base_digest=plan_json["base_digest"],
+                target_digest=plan_json["target_digest"],
+                statement_digest=plan_json["plan_digest"],
+                plan_json=plan_json,
+                created_by_user_uuid=user_uuid,
+                expires_at=now + dt.timedelta(hours=1),
+                created_at=now,
+            )
+            setup_session.add(plan)
+            await setup_session.flush()
+            created = await create_migration_run(
+                setup_session,
+                plan=plan,
+                run_kind="dry_run",
+                idempotency_key="real-postgres-durable-worker",
+                requested_by_user_uuid=user_uuid,
+                evidence={"request_source": "postgresql_matrix"},
+                now=now,
+            )
+            await setup_session.commit()
+
+        async with sessions() as claim_session:
+            async with claim_session.begin():
+                attempt_claim = await acquire_migration_run_attempt(
+                    claim_session,
+                    migration_run_uuid=created.migration_run_uuid,
+                    worker_identity="real-postgres-durable-worker",
+                    signal_lease_token=signal_token,
+                    lease_seconds=60,
+                    now=now + dt.timedelta(seconds=1),
+                )
+
+        handler = make_durable_dry_run_attempt_handler(
+            sandbox_factory,
+            live_factory,
+            lock_timeout_ms=2_000,
+            sandbox_statement_timeout_ms=5_000,
+            preflight_statement_timeout_ms=2_000,
+        )
+        await handler(
+            sessions,
+            MigrationRunSignalClaim(
+                created.migration_run_uuid, signal_token
+            ),
+            attempt_claim,
+        )
+
+        async with sessions() as finish_session:
+            async with finish_session.begin():
+                assert await finish_migration_run_attempt(
+                    finish_session,
+                    claim=attempt_claim,
+                    worker_identity="real-postgres-durable-worker",
+                    signal_lease_token=signal_token,
+                    succeeded=True,
+                    now=now + dt.timedelta(seconds=2),
+                )
+
+        async with sessions() as verify_session:
+            persisted_run = await verify_session.get(
+                MigrationRun, created.migration_run_uuid
+            )
+            assert persisted_run is not None
+            assert persisted_run.state == "passed"
+            assert persisted_run.state_version == 4
+            assert persisted_run.observed_base_digest == plan_json["base_digest"]
+            assert await verify_session.scalar(
+                select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
+                    MigrationRunEvent.migration_run_uuid
+                    == created.migration_run_uuid
+                )
+            ) == 4
+            persisted_attempt = await verify_session.get(
+                MigrationRunAttempt,
+                attempt_claim.migration_run_attempt_uuid,
+            )
+            assert persisted_attempt is not None
+            assert persisted_attempt.status == "completed"
+
+        assert len(sandbox_requests) == 1
+        assert len(live_requests) == 1
+        assert sandbox_requests[0].migration_run_attempt_uuid == (
+            attempt_claim.migration_run_attempt_uuid
+        )
+        assert live_requests[0].migration_run_attempt_uuid == (
+            attempt_claim.migration_run_attempt_uuid
+        )
+        assert not hasattr(sandbox_requests[0], "db_connection_uuid")
+        assert live_requests[0].db_connection_uuid == connection_uuid
+        assert capability_order == [
+            "sandbox-enter",
+            "sandbox-exit",
+            "live-enter",
+            "live-exit",
+        ]
+    finally:
+        async with sessions() as cleanup_session:
+            await cleanup_session.execute(
+                text(
+                    "DELETE FROM project_space "
+                    "WHERE project_space_uuid = :project_space_uuid"
+                ),
+                {"project_space_uuid": project_uuid},
+            )
+            await cleanup_session.execute(
+                text(
+                    "DELETE FROM user_account "
+                    "WHERE user_account_uuid = :user_account_uuid"
+                ),
+                {"user_account_uuid": user_uuid},
+            )
+            await cleanup_session.commit()
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

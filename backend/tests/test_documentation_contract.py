@@ -688,3 +688,20 @@ def test_forward_contract_tracks_concurrent_apply_intent_evidence() -> None:
     assert "same-key apply" in acceptance_row
     assert "Partially implemented" in acceptance_row
     assert "live apply" in acceptance_row
+
+
+def test_forward_contract_tracks_real_durable_worker_postgres_evidence() -> None:
+    """Keep worker evidence distinct from deployed provider readiness."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    acceptance_row = next(
+        line for line in contract.splitlines() if "| FE-AC-003 |" in line
+    )
+
+    assert (
+        "test_real_postgres_durable_worker_binds_separate_sandbox_and_reader"
+        in acceptance_row
+    )
+    assert "test-owned injected capabilities" in acceptance_row
+    assert "deployed provisioning" in acceptance_row
+    assert "Planned" in acceptance_row

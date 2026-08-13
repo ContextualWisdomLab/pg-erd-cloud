@@ -138,6 +138,12 @@ locks on the execution connection.
   CREATE/TEMP, sets a default read-only policy, and proves both admitted reads
   and DDL denial. This is test-environment privilege evidence, not deployed
   credential, routing, audit, or worker-attempt evidence.
+- The same matrix composes the durable handler with test-owned injected
+  sandbox and live-reader capabilities. It proves sandbox DDL/convergence,
+  sandbox cleanup before live-reader entry, exact attempt binding, read-only
+  base capture, terminal `passed`, and four durable events. This is integration
+  evidence for provider-neutral orchestration only; it is not deployed
+  provisioning, credential resolution, route isolation, or worker operation.
 
 ### Planned before production release
 
