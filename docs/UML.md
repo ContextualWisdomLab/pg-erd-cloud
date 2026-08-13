@@ -115,9 +115,15 @@ authoritative; joined target/dependency labels are display-only.
 
 ## Target dry-run sequence
 
-**Status: Planned.** A successful dry run requires two separately identified
-evidence classes. The sandbox executes the exact stored plan; the live target
-receives read-only introspection and bounded precondition queries only.
+**Status: Partially implemented.** Authorized idempotent intent creation,
+durable run/event/dispatch storage, exact signal and attempt leases, and
+provider-neutral durable worker orchestration are Implemented. The exact-plan
+sandbox executor and same-transaction read-only live-preflight cores are
+Partially implemented. Concrete sandbox provisioning and cleanup, target
+credential binding, application startup wiring, and deployed worker isolation
+remain **Planned**. A successful dry run requires two separately identified
+evidence classes: the sandbox executes the exact stored plan, while the live
+target receives read-only introspection and bounded precondition queries only.
 
 ```mermaid
 sequenceDiagram

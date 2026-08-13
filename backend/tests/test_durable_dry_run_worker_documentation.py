@@ -58,3 +58,20 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     assert "_refresh_live_stage" in implementation
     assert "class IsolatedSandboxRequest" in authority
     assert "class LivePreflightRequest" in authority
+
+
+def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() -> None:
+    """Keep the sequence maturity aligned with orchestration and provider gaps."""
+
+    uml = _read(Path("docs/UML.md"))
+    dry_run_section = uml.split("## Target dry-run sequence", 1)[1].split(
+        "## Target apply and verification sequence", 1
+    )[0]
+    normalized = " ".join(dry_run_section.split())
+
+    assert "**Status: Partially implemented.**" in normalized
+    assert "provider-neutral durable worker orchestration" in normalized
+    assert "sandbox provisioning" in normalized
+    assert "target credential binding" in normalized
+    assert "application startup wiring" in normalized
+    assert "**Planned**" in normalized
