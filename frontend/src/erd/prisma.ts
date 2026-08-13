@@ -66,7 +66,7 @@ export function exportPrisma(
     sourceField: string;
     isUnique: boolean;
   }>>();
-  const relationBySourceField = new Map<string, RelationInfo>();
+  const relationsBySourceField = new Map<string, RelationInfo[]>();
   const pkColumnsByNode = new Map<string, Set<string>>();
   const columnNamesByNode = new Map<string, Set<string>>();
   for (const node of nodes) {
@@ -109,7 +109,13 @@ export function exportPrisma(
       targetFields: [sanitizeName(targetField)],
       relationName,
     };
-    relationBySourceField.set(`${edge.source}:${sanitizedSourceField}`, relationInfo);
+    const relationKey = `${edge.source}:${sanitizedSourceField}`;
+    const relations = relationsBySourceField.get(relationKey);
+    if (relations) {
+      relations.push(relationInfo);
+    } else {
+      relationsBySourceField.set(relationKey, [relationInfo]);
+    }
 
     const incoming = incomingRelationsByNode.get(edge.target) || [];
     incoming.push({
@@ -130,7 +136,7 @@ export function exportPrisma(
     for (const col of node.data.columns) {
       const fieldName = sanitizeName(col.column_name);
 
-      const edgeInfo = relationBySourceField.get(`${node.id}:${fieldName}`);
+      const edgeInfos = relationsBySourceField.get(`${node.id}:${fieldName}`) || [];
       const prismaType = mapToPrismaType(col.data_type);
 
       let attributes = "";
@@ -150,9 +156,12 @@ export function exportPrisma(
       const optional = col.is_not_null ? "" : "?";
 
       let relationDef = "";
-      if (edgeInfo) {
-        const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-        relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
+      for (const edgeInfo of edgeInfos) {
+        const baseRelationField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
+        const relationField = edgeInfos.length === 1
+          ? baseRelationField
+          : sanitizeName(`${baseRelationField}_${edgeInfo.relationName}`);
+        relationDef += `\n  ${relationField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;
@@ -160,9 +169,18 @@ export function exportPrisma(
 
     // Add back-relations
     const incoming = incomingRelationsByNode.get(node.id) || [];
+    const incomingBaseCounts = new Map<string, number>();
+    for (const relation of incoming) {
+      const base = `${relation.sourceModel}_${relation.sourceField}`;
+      incomingBaseCounts.set(base, (incomingBaseCounts.get(base) || 0) + 1);
+    }
     for (const inc of incoming) {
       const typeSuffix = inc.isUnique ? "?" : "[]";
-      output += `  ${inc.sourceModel}_${inc.sourceField} ${inc.sourceModel}${typeSuffix} @relation("${inc.relationName}")\n`;
+      const baseField = `${inc.sourceModel}_${inc.sourceField}`;
+      const relationField = (incomingBaseCounts.get(baseField) || 0) === 1
+        ? baseField
+        : sanitizeName(`${baseField}_${inc.relationName}`);
+      output += `  ${relationField} ${inc.sourceModel}${typeSuffix} @relation("${inc.relationName}")\n`;
     }
 
 
