@@ -13,29 +13,29 @@ WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
 WORKFLOW_EXPRESSION = re.compile(
     r"\$\{\{\s*(?P<expression>[^}\r\n]+?)\s*\}\}"
 )
-ALLOWED_EXPRESSION_LINES = {
+ALLOWED_EXPRESSION_LOCATIONS = {
     "steps.commits.outputs.commits": {
-        "commits: ${{ steps.commits.outputs.commits }}",
+        (30, "commits: ${{ steps.commits.outputs.commits }}"),
     },
     "inputs.branch": {
-        "BRANCH_INPUT: ${{ inputs.branch }}",
-        'ref: "refs/heads/${{ inputs.branch }}"',
+        (42, "BRANCH_INPUT: ${{ inputs.branch }}"),
+        (110, 'ref: "refs/heads/${{ inputs.branch }}"'),
     },
     "inputs.commit_count": {
-        "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
+        (43, "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}"),
     },
     "matrix.language": {
-        "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}",
-        "languages: ${{ matrix.language }}",
-        'category: "/language:${{ matrix.language }}/backfill"',
+        (78, "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}"),
+        (101, "languages: ${{ matrix.language }}"),
+        (109, 'category: "/language:${{ matrix.language }}/backfill"'),
     },
     "matrix.commit": {
-        "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}",
-        "ref: ${{ matrix.commit }}",
-        "sha: ${{ matrix.commit }}",
+        (78, "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}"),
+        (94, "ref: ${{ matrix.commit }}"),
+        (111, "sha: ${{ matrix.commit }}"),
     },
     "fromJson(needs.enumerate.outputs.commits)": {
-        "commit: ${{ fromJson(needs.enumerate.outputs.commits) }}",
+        (88, "commit: ${{ fromJson(needs.enumerate.outputs.commits) }}"),
     },
 }
 
@@ -48,10 +48,10 @@ def require(condition: bool, message: str) -> None:
 def _validate_workflow_expressions(text: str) -> None:
     """Allow only reviewed workflow expressions at their exact boundaries."""
 
-    observed: dict[str, set[str]] = {
-        expression: set() for expression in ALLOWED_EXPRESSION_LINES
+    observed: dict[str, set[tuple[int, str]]] = {
+        expression: set() for expression in ALLOWED_EXPRESSION_LOCATIONS
     }
-    for line in text.splitlines():
+    for line_number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
         matches = list(WORKFLOW_EXPRESSION.finditer(line))
         require(
@@ -64,16 +64,17 @@ def _validate_workflow_expressions(text: str) -> None:
         )
         for match in matches:
             expression = match.group("expression")
-            allowed_lines = ALLOWED_EXPRESSION_LINES.get(expression, set())
+            location = (line_number, stripped)
+            allowed_locations = ALLOWED_EXPRESSION_LOCATIONS.get(expression, set())
             require(
-                stripped in allowed_lines,
+                location in allowed_locations,
                 f"unapproved workflow expression: {expression}",
             )
-            observed[expression].add(stripped)
+            observed[expression].add(location)
 
-    for expression, allowed_lines in ALLOWED_EXPRESSION_LINES.items():
+    for expression, allowed_locations in ALLOWED_EXPRESSION_LOCATIONS.items():
         require(
-            observed[expression] == allowed_lines,
+            observed[expression] == allowed_locations,
             f"workflow expression locations changed: {expression}",
         )
 
@@ -196,7 +197,6 @@ def validate_workflow(text: str) -> None:
         'count="${COMMIT_COUNT_INPUT}"' in text,
         "shell must read commit_count from its environment",
     )
-    _validate_workflow_expressions(text)
     require(
         'normalized_branch="$(git check-ref-format --branch "${branch}")"'
         in text,
@@ -227,6 +227,7 @@ def validate_workflow(text: str) -> None:
         '"origin/${branch}"' not in text,
         "revision enumeration must use the explicit tracking ref",
     )
+    _validate_workflow_expressions(text)
 
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")

@@ -53,7 +53,7 @@ The verifier checks that the workflow remains manually dispatched, keeps the
 expected inputs, requires read-only workflow and enumeration permissions, and
 grants `security-events: write` only to the CodeQL analysis job. It also keeps
 the expected language matrix and exact-allowlists every workflow expression by
-expression body and line location. Unknown contexts, direct or indexed input
+expression body, source line, and line content. Unknown contexts, direct or indexed input
 access, function-wrapped input access, and relocated expressions are rejected.
 Multiline or otherwise unparseable expressions fail closed. The verifier also
 requires the normalized-branch equality guard.

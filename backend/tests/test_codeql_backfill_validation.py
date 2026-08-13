@@ -105,6 +105,24 @@ def test_validator_rejects_multiline_workflow_expression() -> None:
         _validate(unsafe)
 
 
+def test_validator_rejects_approved_expression_at_new_location() -> None:
+    """Reject an approved spelling copied into another step or mapping."""
+
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    unsafe = workflow.replace(
+        "      - name: Initialize CodeQL",
+        "      - name: Unreviewed input consumer\n"
+        "        env:\n"
+        "          BRANCH_INPUT: ${{ inputs.branch }}\n"
+        "        run: echo unreviewed\n\n"
+        "      - name: Initialize CodeQL",
+        1,
+    )
+
+    with pytest.raises(AssertionError, match="workflow expression"):
+        _validate(unsafe)
+
+
 @pytest.mark.parametrize(
     "unsafe",
     (
