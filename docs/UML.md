@@ -195,9 +195,11 @@ stateDiagram-v2
   queued --> sandbox_running
   queued --> cancelled: cancellation wins
   sandbox_running --> live_preflight_running: sandbox converged
+  sandbox_running --> cancelled: cancellation wins
   sandbox_running --> failed: sandbox failed
   live_preflight_running --> passed: live evidence passed
   live_preflight_running --> drifted: base mismatch
+  live_preflight_running --> cancelled: cancellation wins
   live_preflight_running --> failed: incomplete or failed evidence
   passed --> [*]
   drifted --> [*]

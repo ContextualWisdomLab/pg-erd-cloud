@@ -387,6 +387,19 @@ def test_terminal_cancellation_maturity_is_canonical() -> None:
     )
 
 
+def test_dry_run_cancellation_transitions_are_complete_in_uml() -> None:
+    """Keep the UML aligned with every implemented cancellable dry-run state."""
+
+    uml = _read(Path("docs/UML.md"))
+
+    for source_state in (
+        "queued",
+        "sandbox_running",
+        "live_preflight_running",
+    ):
+        assert f"{source_state} --> cancelled: cancellation wins" in uml
+
+
 def test_dispatch_relay_has_explicit_deployment_and_lifecycle_contract() -> None:
     """Keep the opt-in relay wired without implying execution authority."""
 
