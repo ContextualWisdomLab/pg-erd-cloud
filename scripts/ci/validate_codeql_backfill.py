@@ -34,6 +34,30 @@ def main() -> int:
     require("github/codeql-action/analyze@" in text, "must upload CodeQL analysis")
     require('ref: "refs/heads/${{ inputs.branch }}"' in text, "analysis ref must target the requested branch")
     require("sha: ${{ matrix.commit }}" in text, "analysis SHA must use the selected commit")
+    require(
+        "BRANCH_INPUT: ${{ inputs.branch }}" in text,
+        "branch input must enter the shell through env",
+    )
+    require(
+        "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}" in text,
+        "commit_count input must enter the shell through env",
+    )
+    require(
+        'branch="${BRANCH_INPUT}"' in text,
+        "shell must read the branch from its environment",
+    )
+    require(
+        'count="${COMMIT_COUNT_INPUT}"' in text,
+        "shell must read commit_count from its environment",
+    )
+    require(
+        'branch="${{ inputs.branch }}"' not in text,
+        "branch input must not be interpolated into run scripts",
+    )
+    require(
+        'count="${{ inputs.commit_count }}"' not in text,
+        "commit_count input must not be interpolated into run scripts",
+    )
 
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")
