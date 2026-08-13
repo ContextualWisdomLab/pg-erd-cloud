@@ -563,6 +563,287 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
 
 
 @pytest.mark.asyncio
+async def test_real_postgres_concurrent_duplicate_apply_intents_choose_one_winner() -> None:
+    """Prove concurrent same-key apply requests persist one execution-free intent."""
+
+    assert _POSTGRES_URL is not None
+    engine = create_async_engine(_POSTGRES_URL)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    now = dt.datetime.now(dt.timezone.utc)
+    user_uuid = uuid.uuid4()
+    project_uuid = uuid.uuid4()
+    connection_uuid = uuid.uuid4()
+    snapshot_uuid = uuid.uuid4()
+    model_uuid = uuid.uuid4()
+    revision_uuid = uuid.uuid4()
+    plan_uuid = uuid.uuid4()
+    passed_run_uuid = uuid.uuid4()
+    assert _EXPECTED_MAJOR is not None
+    base_model, target_model = _migration_models_with_precondition(
+        int(_EXPECTED_MAJOR)
+    )
+    plan_json = compile_migration_plan(base_model, target_model)
+
+    try:
+        async with sessions() as setup_session:
+            setup_session.add(
+                UserAccount(
+                    user_account_uuid=user_uuid,
+                    oidc_subject=f"concurrent-integration:{user_uuid}",
+                    display_name="Concurrent PostgreSQL integration",
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            setup_session.add(
+                ProjectSpace(
+                    project_space_uuid=project_uuid,
+                    project_name="concurrent migration run integration",
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            setup_session.add_all(
+                [
+                    DbConnection(
+                        db_connection_uuid=connection_uuid,
+                        project_space_uuid=project_uuid,
+                        conn_name="concurrent integration target",
+                        dsn_ciphertext=b"not-used",
+                        dsn_nonce=b"not-used",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    SchemaSnapshot(
+                        schema_snapshot_uuid=snapshot_uuid,
+                        project_space_uuid=project_uuid,
+                        db_connection_uuid=connection_uuid,
+                        status="succeeded",
+                        schema_filter=None,
+                        started_at=now,
+                        finished_at=now,
+                        error_message=None,
+                        created_at=now,
+                    ),
+                    SchemaModel(
+                        schema_model_uuid=model_uuid,
+                        project_space_uuid=project_uuid,
+                        model_name="concurrent_integration_model",
+                        current_revision_number=1,
+                        created_by_user_uuid=user_uuid,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ]
+            )
+            await setup_session.flush()
+            setup_session.add(
+                SchemaModelRevision(
+                    schema_model_revision_uuid=revision_uuid,
+                    schema_model_uuid=model_uuid,
+                    revision_number=1,
+                    revision_digest=plan_json["target_digest"],
+                    model_json=target_model,
+                    base_schema_snapshot_uuid=snapshot_uuid,
+                    created_by_user_uuid=user_uuid,
+                    created_at=now,
+                )
+            )
+            await setup_session.flush()
+            setup_session.add(
+                MigrationPlan(
+                    migration_plan_uuid=plan_uuid,
+                    project_space_uuid=project_uuid,
+                    schema_model_revision_uuid=revision_uuid,
+                    db_connection_uuid=connection_uuid,
+                    base_schema_snapshot_uuid=snapshot_uuid,
+                    compiler_version=plan_json["compiler_version"],
+                    base_digest=plan_json["base_digest"],
+                    target_digest=plan_json["target_digest"],
+                    statement_digest=plan_json["plan_digest"],
+                    plan_json=plan_json,
+                    created_by_user_uuid=user_uuid,
+                    expires_at=now + dt.timedelta(hours=1),
+                    created_at=now,
+                )
+            )
+            setup_session.add(
+                MigrationRun(
+                    migration_run_uuid=passed_run_uuid,
+                    project_space_uuid=project_uuid,
+                    migration_plan_uuid=plan_uuid,
+                    passed_dry_run_uuid=None,
+                    run_kind="dry_run",
+                    state="passed",
+                    state_version=1,
+                    idempotency_key_hash="a" * 64,
+                    plan_digest=plan_json["plan_digest"],
+                    request_digest="b" * 64,
+                    confirmation_digest=None,
+                    destructive_confirmation=None,
+                    latest_event_digest="c" * 64,
+                    requested_by_user_uuid=user_uuid,
+                    cancellation_requested=False,
+                    observed_base_digest=plan_json["base_digest"],
+                    evidence_json={},
+                    error_code=None,
+                    created_at=now,
+                    updated_at=now,
+                    started_at=now,
+                    finished_at=now,
+                )
+            )
+            await setup_session.commit()
+
+        first_session = sessions()
+        second_session = sessions()
+        try:
+            first_plan = await first_session.get(MigrationPlan, plan_uuid)
+            second_plan = await second_session.get(MigrationPlan, plan_uuid)
+            first_passed_run = await first_session.get(
+                MigrationRun, passed_run_uuid
+            )
+            second_passed_run = await second_session.get(
+                MigrationRun, passed_run_uuid
+            )
+            first_connection = await first_session.get(
+                DbConnection, connection_uuid
+            )
+            second_connection = await second_session.get(
+                DbConnection, connection_uuid
+            )
+            first_revision = await first_session.get(
+                SchemaModelRevision, revision_uuid
+            )
+            second_revision = await second_session.get(
+                SchemaModelRevision, revision_uuid
+            )
+            first_model = await first_session.get(SchemaModel, model_uuid)
+            second_model = await second_session.get(SchemaModel, model_uuid)
+            assert first_plan is not None
+            assert second_plan is not None
+            assert first_passed_run is not None
+            assert second_passed_run is not None
+            assert first_connection is not None
+            assert second_connection is not None
+            assert first_revision is not None
+            assert second_revision is not None
+            assert first_model is not None
+            assert second_model is not None
+            second_backend_pid = await second_session.scalar(
+                text("SELECT pg_backend_pid()")
+            )
+            assert isinstance(second_backend_pid, int)
+            first = await create_migration_run(
+                first_session,
+                plan=first_plan,
+                run_kind="apply",
+                idempotency_key="concurrent-real-postgres-apply-key",
+                requested_by_user_uuid=user_uuid,
+                evidence={"request_source": "concurrent_postgresql_matrix"},
+                passed_dry_run=first_passed_run,
+                connection=first_connection,
+                typed_connection_name=first_connection.conn_name,
+                destructive_acknowledged=bool(
+                    plan_json["requires_destructive_confirmation"]
+                ),
+                model_revision=first_revision,
+                schema_model=first_model,
+                now=now,
+            )
+            await first_session.flush()
+            second_task = asyncio.create_task(
+                create_migration_run(
+                    second_session,
+                    plan=second_plan,
+                    run_kind="apply",
+                    idempotency_key="concurrent-real-postgres-apply-key",
+                    requested_by_user_uuid=user_uuid,
+                    evidence={
+                        "request_source": "concurrent_postgresql_matrix"
+                    },
+                    passed_dry_run=second_passed_run,
+                    connection=second_connection,
+                    typed_connection_name=second_connection.conn_name,
+                    destructive_acknowledged=bool(
+                        plan_json["requires_destructive_confirmation"]
+                    ),
+                    model_revision=second_revision,
+                    schema_model=second_model,
+                    now=now,
+                )
+            )
+            async with sessions() as observer_session:
+                for _ in range(500):
+                    waiting_on_winner = await observer_session.scalar(
+                        text(
+                            "SELECT EXISTS ("
+                            "SELECT 1 FROM pg_catalog.pg_stat_activity "
+                            "WHERE pid = :pid AND wait_event_type = 'Lock'"
+                            ")"
+                        ),
+                        {"pid": second_backend_pid},
+                    )
+                    if waiting_on_winner:
+                        break
+                    assert not second_task.done(), (
+                        "duplicate insert completed before the winner committed"
+                    )
+                    await asyncio.sleep(0.01)
+                else:
+                    pytest.fail(
+                        "duplicate insert did not wait on the concurrent winner"
+                    )
+            await first_session.commit()
+            second = await asyncio.wait_for(second_task, timeout=5)
+            await second_session.commit()
+        finally:
+            await first_session.close()
+            await second_session.close()
+
+        assert second.reused is True
+        assert second.migration_run_uuid == first.migration_run_uuid
+        async with sessions() as verify_session:
+            assert await verify_session.scalar(
+                select(func.count(MigrationRun.migration_run_uuid)).where(
+                    MigrationRun.project_space_uuid == project_uuid,
+                    MigrationRun.run_kind == "apply",
+                )
+            ) == 1
+            assert await verify_session.scalar(
+                select(func.count(MigrationRunEvent.migration_run_event_uuid)).where(
+                    MigrationRunEvent.migration_run_uuid
+                    == first.migration_run_uuid
+                )
+            ) == 1
+            assert await verify_session.scalar(
+                select(func.count(MigrationRunDispatch.migration_run_uuid)).where(
+                    MigrationRunDispatch.migration_run_uuid
+                    == first.migration_run_uuid
+                )
+            ) == 0
+    finally:
+        async with sessions() as cleanup_session:
+            await cleanup_session.execute(
+                text(
+                    "DELETE FROM project_space "
+                    "WHERE project_space_uuid = :project_space_uuid"
+                ),
+                {"project_space_uuid": project_uuid},
+            )
+            await cleanup_session.execute(
+                text(
+                    "DELETE FROM user_account "
+                    "WHERE user_account_uuid = :user_account_uuid"
+                ),
+                {"user_account_uuid": user_uuid},
+            )
+            await cleanup_session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_real_postgres_and_valkey_recover_failure_and_crash(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

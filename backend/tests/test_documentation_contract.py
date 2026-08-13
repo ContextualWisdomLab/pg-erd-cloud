@@ -674,3 +674,17 @@ def test_claude_guidance_tracks_partial_forward_engineering_authority() -> None:
         "Never describe this partial control plane as production apply readiness"
         in normalized
     )
+
+
+def test_forward_contract_tracks_concurrent_apply_intent_evidence() -> None:
+    """Keep FE-AC-007 aligned with exact real-PostgreSQL concurrency evidence."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    acceptance_row = next(
+        line for line in contract.splitlines() if "| FE-AC-007 |" in line
+    )
+
+    assert "PostgreSQL 14–18" in acceptance_row
+    assert "same-key apply" in acceptance_row
+    assert "Partially implemented" in acceptance_row
+    assert "live apply" in acceptance_row
