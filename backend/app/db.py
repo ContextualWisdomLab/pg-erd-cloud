@@ -145,6 +145,7 @@ async def get_pooler_detection() -> PoolerDetectionResult:
                             _pooler_cache_at = time.monotonic()
                             return _pooler_cache
                     except Exception:
+                        # Best-effort probe; allow other concurrent tasks to continue or fail.
                         pass
         finally:
             for p in pending:
