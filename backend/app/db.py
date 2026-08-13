@@ -134,19 +134,23 @@ async def get_pooler_detection() -> PoolerDetectionResult:
                 done, pending = await asyncio.wait(
                     pending, return_when=asyncio.FIRST_COMPLETED
                 )
+                result_to_return = None
                 for task in done:
                     try:
                         version_text = task.result()
-                        if version_text:
+                        if version_text and result_to_return is None:
                             kind = classify_pooler_version_text(version_text)
                             _pooler_cache = PoolerDetectionResult(
                                 kind=kind, detected=True, version_text=version_text
                             )
                             _pooler_cache_at = time.monotonic()
-                            return _pooler_cache
+                            result_to_return = _pooler_cache
                     except Exception:
                         # Best-effort probe; allow other concurrent tasks to continue or fail.
                         pass
+
+                if result_to_return:
+                    return result_to_return
         finally:
             for p in pending:
                 p.cancel()
