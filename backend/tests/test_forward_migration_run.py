@@ -782,7 +782,7 @@ async def test_attempt_contract_rejects_inactive_runs_and_unsafe_inputs() -> Non
             SimpleNamespace(scalar=AsyncMock(), add=Mock()),
             migration_run_uuid=uuid.uuid4(),
             worker_identity="worker-a",
-            signal_lease_token="not-a-uuid",  # type: ignore[arg-type]
+            signal_lease_token=object(),  # type: ignore[arg-type]
             lease_seconds=60,
             now=now,
         )
