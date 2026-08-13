@@ -191,11 +191,13 @@ export function EditTableModal({
               type="button"
               onClick={onDeleteTable}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+              aria-label={`${editingNode.data.title} 테이블 삭제`}
             >
               테이블 삭제
             </button>
             <button
               type="button"
+              aria-label={`${editingNode.data.title} 복제`}
               onClick={() => {
                 const dupId = `${editingNode.id}_copy_${Date.now()}`;
                 setNodes((nds) => [
