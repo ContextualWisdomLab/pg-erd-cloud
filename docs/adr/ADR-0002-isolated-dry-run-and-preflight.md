@@ -7,7 +7,8 @@
 - **Supersedes:** none
 - **Related:** [ADR-0001](ADR-0001-server-authoritative-planning.md),
   [ADR-0003](ADR-0003-plan-execution-segmentation.md),
-  [forward-engineering v1 contract](../contracts/forward-engineering-v1.md)
+  [forward-engineering v1 contract](../contracts/forward-engineering-v1.md),
+  [durable dry-run worker v1](../contracts/durable-dry-run-worker-v1.md)
 
 ## Context
 
@@ -105,26 +106,33 @@ locks on the execution connection.
   results, revalidates PostgreSQL major, statement count, base/target digests,
   expiry, and plan integrity, then derives only `live_preflight_running` with
   aggregate evidence. It owns no sandbox, credential, queue lease, or attempt.
-- Existing target-connection code provides encrypted DSNs and guarded database
-  connection primitives that the planned live-preflight worker must reuse.
 - `app.forward.live_preflight` compiles only the structured
   `table_is_empty`, `no_null_values`, and `castable_values` preconditions into
   server-owned quoted reads. It enforces a 1,000-query ceiling, PostgreSQL type
   validation, one read-only repeatable-read transaction, bounded server/client
   timeouts, boolean-only evidence, and fixed non-secret database failures.
-  It also adapts a caller-supplied snapshot through the strict capability
-  boundary and returns only its canonical digest plus exact plan-base match.
-  This is a primitive, not a worker or completed live-preflight claim.
 - `execute_bound_live_preflight` invokes a caller-owned fresh snapshot callback
   and the admitted structured checks inside the same read-only repeatable-read
   transaction. It returns bounded check evidence, the canonical observed
-  digest, and the exact plan-base match without acquiring credential, worker,
-  durable-attempt, run-transition, or DDL authority.
+  digest, and the exact plan-base match without acquiring credential or DDL
+  authority.
 - `complete_live_preflight` rejects extra, malformed, duplicate-position, or
   aggregate-inconsistent result evidence and server-derives the terminal CAS:
   base mismatch is `drifted`, exact base plus any failed check is `failed`, and
-  exact base plus all passing checks is `passed`. Durable evidence retains only
-  check counts and the separately server-authoritative observed digest.
+  exact base plus all passing checks is `passed`.
+- `app.jobs.migration_dry_run_worker_contract` defines least-authority sandbox
+  and live-reader requests. The sandbox request omits target identity, target
+  digest, plan JSON and SQL; the live-reader request omits plan JSON, SQL,
+  PostgreSQL major and base digest. Both bind the exact durable attempt UUID and
+  attempt number.
+- `app.jobs.migration_dry_run_worker` composes the existing dual-lease attempt
+  handler with the isolated and read-only cores. It locks and reloads the exact
+  run/plan, verifies immutable plan authority, advances queued work through the
+  existing CAS/event contract, supports restart from `sandbox_running` or
+  `live_preflight_running`, and rechecks cancellation, state version and plan
+  integrity immediately before opening the target reader. Provider failures
+  are replaced by fixed diagnostics and async capability cleanup is retained.
+  This is deterministic orchestration, not a concrete deployed worker.
 - PostgreSQL 14–18 CI creates a separate ephemeral preflight login for the
   target database, grants it only fixture-scoped USAGE/SELECT, removes database
   CREATE/TEMP, sets a default read-only policy, and proves both admitted reads
@@ -134,17 +142,24 @@ locks on the execution connection.
 ### Planned before production release
 
 - isolated sandbox provisioning, complete base dependency materialization,
-  cleanup, and egress enforcement;
-- application worker wiring with a separately constrained read-only target
-  identity and guarded connection lifecycle;
-- durable worker identity and attempt binding around the caller-owned
-  `execute_bound_live_preflight` same-connection transaction primitive;
-- durable, redacted evidence and a frontend presentation of both evidence
+  cleanup, capacity controls, and egress enforcement;
+- concrete target credential resolution, guarded connection lifecycle and
+  separately constrained network identity;
+- application startup and queue registration for the injected worker handler;
+- real provider-backed PostgreSQL/Valkey restart, cancellation, network-loss and
+  cleanup acceptance;
+- redacted operational telemetry and a frontend presentation of both evidence
   classes.
 
 ## Acceptance evidence
 
-An integration test must observe the exact plan executing in the sandbox,
-verify that the live target received only bounded reads, prove sandbox cleanup
-on success and failure, and show that a live fingerprint mismatch produces a
-terminal drift result before any DDL.
+Focused repository tests cover exact attempt binding, least-authority provider
+requests, sandbox-to-preflight order, restart without sandbox replay, queued CAS
+evidence, cancellation propagation, failure redaction, capability cleanup,
+bounded configuration and the target-access cancellation race. These tests are
+component evidence only.
+
+Production acceptance must additionally observe the exact plan executing in a
+real isolated provider, verify that the live target received only bounded reads,
+prove cleanup on success, failure, cancellation and worker loss, and show that a
+live fingerprint mismatch produces terminal drift before any DDL.
