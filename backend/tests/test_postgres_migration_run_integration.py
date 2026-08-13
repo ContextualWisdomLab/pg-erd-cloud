@@ -712,7 +712,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
         ) -> dict[str, object]:
             sandbox_stages.append("capture-started")
             snapshot = await _capture_filtered_snapshot(
-                cast(asyncpg.Connection[asyncpg.Record], owned_connection),
+                cast("asyncpg.Connection[asyncpg.Record]", owned_connection),
                 schema_name,
                 stage_evidence=sandbox_stages,
             )
