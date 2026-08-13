@@ -122,7 +122,7 @@ describe('exportPrisma', () => {
         ] },
       },
     ];
-    const edges: Edge[] = ['a-b', 'a_b'].map((label) => ({
+    const edges: Edge[] = ['a-b', 'a_b', 'a_b_2'].map((label) => ({
       id: label,
       source: 'child',
       target: 'parent',
@@ -134,8 +134,10 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('parent_parent_id_a_b parent @relation("a_b"');
     expect(result).toContain('parent_parent_id_a_b_2 parent @relation("a_b_2"');
+    expect(result).toContain('parent_parent_id_a_b_2_2 parent @relation("a_b_2_2"');
     expect(result).toContain('child_parent_id_a_b child[] @relation("a_b")');
     expect(result).toContain('child_parent_id_a_b_2 child[] @relation("a_b_2")');
+    expect(result).toContain('child_parent_id_a_b_2_2 child[] @relation("a_b_2_2")');
   });
 
   it('maps various types properly', () => {
