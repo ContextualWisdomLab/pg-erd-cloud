@@ -662,4 +662,4 @@ def test_claude_guidance_tracks_partial_forward_engineering_authority() -> None:
     assert "provider-neutral dry-run/preflight orchestration" in normalized
     assert "concrete sandbox and target credential providers" in normalized
     assert "It is not a production apply executor" in normalized
-    assert "Never describe this partial control plane as production apply readiness" in normalized
+    assert (\n        "Never describe this partial control plane as production apply readiness"\n        in normalized\n    )
