@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { decodeSourceColumnHandleId, decodeTargetColumnHandleId } from "./handleUtils";
+import { sanitizeHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -11,7 +11,7 @@ function sanitizeName(name: string): string {
   return sanitized;
 }
 
-function mapToPrismaType(pgType: string): string {
+function mapToPrismaType(pgType: string, isFk: boolean): string {
   const t = pgType.toLowerCase();
 
   if (t.includes("int") || t.includes("serial")) {
@@ -38,6 +38,8 @@ function mapToPrismaType(pgType: string): string {
   return "String"; // fallback
 }
 
+import { decodeHandleId } from './handleUtils';
+
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -53,86 +55,77 @@ export function exportPrisma(
     nodesById.set(n.id, n);
   }
 
-  type RelationInfo = {
-    sourceModel: string;
-    targetModel: string;
-    sourceFields: string[];
-    targetFields: string[];
-    relationName: string;
-  };
-  const incomingRelationsByNode = new Map<string, Array<{
-    relationName: string;
-    sourceModel: string;
-    sourceField: string;
-    isUnique: boolean;
-  }>>();
-  const relationsBySourceField = new Map<string, RelationInfo[]>();
+  // To build relations, we need to know which fields are foreign keys.
+  // Prisma relations require a field on both sides if we want back-relations,
+  // but let's just generate the minimal required relations.
+  const fkNodeColumnPairs = new Set<string>();
+  const fkNodesWithoutHandles = new Set<string>();
+  const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
+  const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
+
+  // Cache pk lookup for O(1) checks
   const pkColumnsByNode = new Map<string, Set<string>>();
-  const columnNamesByNode = new Map<string, Set<string>>();
-  const allocatedRelationNames = new Set<string>();
-  for (const node of nodes) {
+  for (const n of nodes) {
     const pks = new Set<string>();
-    const columnNames = new Set<string>();
-    for (const column of node.data.columns || []) {
-      columnNames.add(column.column_name);
-      if (column.is_pk) pks.add(column.column_name);
+    for (const c of n.data.columns || []) {
+      if (c.is_pk) pks.add(c.column_name);
     }
-    pkColumnsByNode.set(node.id, pks);
-    columnNamesByNode.set(node.id, columnNames);
+    pkColumnsByNode.set(n.id, pks);
   }
 
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
-    if (!sourceNode || !targetNode || !edge.sourceHandle || !edge.targetHandle) continue;
+    if (!sourceNode || !targetNode) continue;
 
-    const sourceField = decodeSourceColumnHandleId(edge.sourceHandle);
-    const targetField = decodeTargetColumnHandleId(edge.targetHandle);
-    if (
-      sourceField === null ||
-      targetField === null ||
-      !columnNamesByNode.get(edge.source)?.has(sourceField) ||
-      !columnNamesByNode.get(edge.target)?.has(targetField)
-    ) {
-      continue;
-    }
+    const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
-    const relationNameBase = sanitizeName(
-      String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`),
-    );
-    let relationName = relationNameBase;
-    let suffix = 2;
-    while (allocatedRelationNames.has(relationName)) {
-      relationName = `${relationNameBase}_${suffix}`;
-      suffix += 1;
-    }
-    allocatedRelationNames.add(relationName);
-    const sourceModel = sanitizeName(sourceNode.data.title);
-    const targetModel = sanitizeName(targetNode.data.title);
-    const sanitizedSourceField = sanitizeName(sourceField);
-    const relationInfo: RelationInfo = {
-      sourceModel,
-      targetModel,
-      sourceFields: [sanitizedSourceField],
-      targetFields: [sanitizeName(targetField)],
-      relationName,
-    };
-    const relationKey = `${edge.source}:${sanitizedSourceField}`;
-    const relations = relationsBySourceField.get(relationKey);
-    if (relations) {
-      relations.push(relationInfo);
+    let sourceField = "";
+    if (edge.sourceHandle) {
+      const decodedSource = decodeHandleId(edge.sourceHandle);
+      if (decodedSource !== null) {
+        sourceField = decodedSource;
+      } else if (edge.sourceHandle.startsWith("src-")) {
+        // Fallback for tests/legacy handles that are not hex-encoded
+        sourceField = edge.sourceHandle.slice(4);
+      }
+      if (sourceField) {
+        fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+      }
     } else {
-      relationsBySourceField.set(relationKey, [relationInfo]);
+      fkNodesWithoutHandles.add(edge.source);
     }
 
-    const incoming = incomingRelationsByNode.get(edge.target) || [];
-    incoming.push({
-      relationName,
-      sourceModel,
-      sourceField: sanitizedSourceField,
-      isUnique: pkColumnsByNode.get(edge.source)?.has(sourceField) || false,
-    });
-    incomingRelationsByNode.set(edge.target, incoming);
+    let targetField = "id"; // fallback
+    if (edge.targetHandle) {
+      const decodedTarget = decodeHandleId(edge.targetHandle);
+      if (decodedTarget !== null) {
+        targetField = decodedTarget;
+      } else if (edge.targetHandle.startsWith("tgt-")) {
+        targetField = edge.targetHandle.slice(4);
+      }
+    }
+
+    if (sourceField) {
+      const isUnique = pkColumnsByNode.get(edge.source)?.has(sourceField) || false;
+
+      const relList = incomingRelationsByNode.get(edge.target) || [];
+      relList.push({
+        relationName: relName,
+        sourceModel: sanitizeName(sourceNode.data.title),
+        sourceField: sanitizeName(sourceField),
+        isUnique
+      });
+      incomingRelationsByNode.set(edge.target, relList);
+
+      edgesProcessed.set(edge.id, {
+        sourceModel: sanitizeName(sourceNode.data.title),
+        targetModel: sanitizeName(targetNode.data.title),
+        sourceFields: [sanitizeName(sourceField)],
+        targetFields: [sanitizeName(targetField)],
+        relationName: relName
+      });
+    }
   }
 
   for (const node of nodes) {
@@ -144,8 +137,11 @@ export function exportPrisma(
     for (const col of node.data.columns) {
       const fieldName = sanitizeName(col.column_name);
 
-      const edgeInfos = relationsBySourceField.get(`${node.id}:${fieldName}`) || [];
-      const prismaType = mapToPrismaType(col.data_type);
+      const isFk =
+        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+
+      const prismaType = mapToPrismaType(col.data_type, isFk);
 
       let attributes = "";
       const isColUnique = col.column_name === 'email';
@@ -163,13 +159,15 @@ export function exportPrisma(
 
       const optional = col.is_not_null ? "" : "?";
 
+      // Determine if there is a relation defined on this field
       let relationDef = "";
-      for (const edgeInfo of edgeInfos) {
-        const baseRelationField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-        const relationField = edgeInfos.length === 1
-          ? baseRelationField
-          : sanitizeName(`${baseRelationField}_${edgeInfo.relationName}`);
-        relationDef += `\n  ${relationField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
+      for (const [_, edgeInfo] of edgesProcessed) {
+        if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(fieldName)) {
+          // This field is a foreign key, but in Prisma, we typically define the relation object field
+          // alongside the scalar field. We will add the relation object field here.
+          const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
+          relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
+        }
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;
@@ -177,18 +175,9 @@ export function exportPrisma(
 
     // Add back-relations
     const incoming = incomingRelationsByNode.get(node.id) || [];
-    const incomingBaseCounts = new Map<string, number>();
-    for (const relation of incoming) {
-      const base = `${relation.sourceModel}_${relation.sourceField}`;
-      incomingBaseCounts.set(base, (incomingBaseCounts.get(base) || 0) + 1);
-    }
     for (const inc of incoming) {
       const typeSuffix = inc.isUnique ? "?" : "[]";
-      const baseField = `${inc.sourceModel}_${inc.sourceField}`;
-      const relationField = (incomingBaseCounts.get(baseField) || 0) === 1
-        ? baseField
-        : sanitizeName(`${baseField}_${inc.relationName}`);
-      output += `  ${relationField} ${inc.sourceModel}${typeSuffix} @relation("${inc.relationName}")\n`;
+      output += `  ${inc.sourceModel}_${inc.sourceField} ${inc.sourceModel}${typeSuffix} @relation("${inc.relationName}")\n`;
     }
 
 

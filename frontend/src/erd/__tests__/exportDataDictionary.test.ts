@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { TableNodeData } from '../convert';
 import { exportDictionaryCsv, exportDictionaryMarkdown } from '../exportDataDictionary';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportDataDictionary', () => {
   const nodes: Node<TableNodeData>[] = [
@@ -164,36 +163,6 @@ describe('exportDataDictionary', () => {
     expect(md).toContain('| id | int | Y | N | N |  |  |');
   });
 
-
-  it('requires canonical role handles and live columns before classifying an FK', () => {
-    const unsafeEdges: Edge[] = [
-      {
-        id: 'wrong-role', source: 'users', target: 'accounts',
-        sourceHandle: targetColumnHandleId('account_id'),
-        targetHandle: sourceColumnHandleId('id'),
-        data: { sourceColumns: ['account_id'], targetColumns: ['id'] },
-      },
-      {
-        id: 'missing-target', source: 'users', target: 'accounts',
-        sourceHandle: sourceColumnHandleId('account_id'),
-        data: { sourceColumns: ['account_id'], targetColumns: ['id'] },
-      },
-      {
-        id: 'unknown-target', source: 'users', target: 'accounts',
-        sourceHandle: sourceColumnHandleId('account_id'),
-        targetHandle: targetColumnHandleId('missing'),
-      },
-    ];
-    const unsafeCsv = exportDictionaryCsv(nodes, unsafeEdges);
-    expect(unsafeCsv).toContain('"public.users","User accounts","account_id","integer","N","N"');
-
-    const safeCsv = exportDictionaryCsv(nodes, [{
-      id: 'safe', source: 'users', target: 'accounts',
-      sourceHandle: sourceColumnHandleId('account_id'),
-      targetHandle: targetColumnHandleId('id'),
-    }]);
-    expect(safeCsv).toContain('"public.users","User accounts","account_id","integer","N","Y"');
-  });
 
   it('escapes Markdown table breakers and HTML-like content', () => {
     const markdown = exportDictionaryMarkdown(

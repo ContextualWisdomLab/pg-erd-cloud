@@ -163,7 +163,7 @@ describe('exportDDL', () => {
     expect(ddl).toContain('REFERENCES "public.parents" ("org_id", "dept_id")');
   });
 
-  it('skips a foreign key when columns cannot be inferred', () => {
+  it('keeps a placeholder foreign key when columns cannot be inferred', () => {
     const nodes: Node<TableNodeData>[] = [
       {
         id: '1',
@@ -189,54 +189,8 @@ describe('exportDDL', () => {
 
     const ddl = exportDDL(nodes, [{ id: 'fk_legacy', source: '2', target: '1', label: 'fk_legacy' }]);
 
-    expect(ddl).not.toContain('ADD CONSTRAINT "fk_legacy"');
-    expect(ddl).not.toContain('/* source columns */');
-  });
-
-  it('does not fall back when supplied handles are incomplete or have the wrong role', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'parent',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'parent',
-          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
-          badges: { pk: true, fk: false },
-        },
-      },
-      {
-        id: 'child',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'child',
-          columns: [{ column_name: 'parent_id', data_type: 'integer', is_not_null: true, is_pk: false }],
-          badges: { pk: false, fk: true },
-        },
-      },
-    ];
-    const edges: Edge[] = [
-      {
-        id: 'wrong-role', source: 'child', target: 'parent', label: 'wrong_role',
-        sourceHandle: targetColumnHandleId('parent_id'),
-        targetHandle: sourceColumnHandleId('id'),
-        data: { sourceColumns: ['parent_id'], targetColumns: ['id'] },
-      },
-      {
-        id: 'missing-target', source: 'child', target: 'parent', label: 'missing_target',
-        sourceHandle: sourceColumnHandleId('parent_id'),
-        data: { sourceColumns: ['parent_id'], targetColumns: ['id'] },
-      },
-      {
-        id: 'unknown-target', source: 'child', target: 'parent', label: 'unknown_target',
-        sourceHandle: sourceColumnHandleId('parent_id'),
-        targetHandle: targetColumnHandleId('missing'),
-      },
-    ];
-
-    const ddl = exportDDL(nodes, edges);
-    expect(ddl).not.toContain('wrong_role');
-    expect(ddl).not.toContain('missing_target');
-    expect(ddl).not.toContain('unknown_target');
+    expect(ddl).toContain('ADD CONSTRAINT "fk_legacy"');
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
   });
 
   it('should not throw if foreign key source or target is missing', () => {

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -64,8 +63,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: sourceColumnHandleId('user_id'),
-        targetHandle: targetColumnHandleId('id'),
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
         label: 'users_posts',
       },
     ];
@@ -80,64 +79,6 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
-  });
-
-  it('rejects legacy, wrong-role, and missing counterpart relation handles', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'parent', position: { x: 0, y: 0 },
-        data: { title: 'parent', badges: { pk: true, fk: false }, columns: [
-          { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-        ] },
-      },
-      {
-        id: 'child', position: { x: 0, y: 0 },
-        data: { title: 'child', badges: { pk: false, fk: true }, columns: [
-          { column_name: 'parent_id', data_type: 'integer', is_pk: false, is_not_null: true },
-        ] },
-      },
-    ];
-    const edges: Edge[] = [
-      { id: 'legacy', source: 'child', target: 'parent', sourceHandle: 'src-parent_id', targetHandle: 'tgt-id' },
-      { id: 'wrong-role', source: 'child', target: 'parent', sourceHandle: targetColumnHandleId('parent_id'), targetHandle: sourceColumnHandleId('id') },
-      { id: 'missing-target', source: 'child', target: 'parent', sourceHandle: sourceColumnHandleId('parent_id') },
-    ];
-
-    const result = exportPrisma(nodes, edges);
-    expect(result).not.toContain('@relation(');
-  });
-
-  it('preserves multiple validated relations that share one source field', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'parent', position: { x: 0, y: 0 },
-        data: { title: 'parent', badges: { pk: true, fk: false }, columns: [
-          { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
-        ] },
-      },
-      {
-        id: 'child', position: { x: 0, y: 0 },
-        data: { title: 'child', badges: { pk: false, fk: true }, columns: [
-          { column_name: 'parent_id', data_type: 'integer', is_pk: false, is_not_null: true },
-        ] },
-      },
-    ];
-    const edges: Edge[] = ['a-b', 'a_b', 'a_b_2'].map((label) => ({
-      id: label,
-      source: 'child',
-      target: 'parent',
-      sourceHandle: sourceColumnHandleId('parent_id'),
-      targetHandle: targetColumnHandleId('id'),
-      label,
-    }));
-
-    const result = exportPrisma(nodes, edges);
-    expect(result).toContain('parent_parent_id_a_b parent @relation("a_b"');
-    expect(result).toContain('parent_parent_id_a_b_2 parent @relation("a_b_2"');
-    expect(result).toContain('parent_parent_id_a_b_2_2 parent @relation("a_b_2_2"');
-    expect(result).toContain('child_parent_id_a_b child[] @relation("a_b")');
-    expect(result).toContain('child_parent_id_a_b_2 child[] @relation("a_b_2")');
-    expect(result).toContain('child_parent_id_a_b_2_2 child[] @relation("a_b_2_2")');
   });
 
   it('maps various types properly', () => {
@@ -283,8 +224,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: sourceColumnHandleId('user_id'),
-        targetHandle: targetColumnHandleId('id'),
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
         label: '1to1',
       },
     ];

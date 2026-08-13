@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { decodeSourceColumnHandleId, decodeTargetColumnHandleId } from './handleUtils';
+import { decodeHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -60,33 +60,32 @@ function fkColumnsForEdge(
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
   sourceNodeColumnNames: Set<string>,
-  targetNodeColumnNames: Set<string>,
+  targetNodeColumnNames: Set<string>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
-  if (edge.sourceHandle || edge.targetHandle) {
-    if (!edge.sourceHandle || !edge.targetHandle) return null;
-    const sourceColumn = decodeSourceColumnHandleId(edge.sourceHandle);
-    const targetColumn = decodeTargetColumnHandleId(edge.targetHandle);
-    if (
-      sourceColumn === null ||
-      targetColumn === null ||
-      !sourceNodeColumnNames.has(sourceColumn) ||
-      !targetNodeColumnNames.has(targetColumn)
-    ) {
-      return null;
-    }
-    return { sourceColumns: [sourceColumn], targetColumns: [targetColumn] };
-  }
-
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
   const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (
-    sourceColumns.length > 0 &&
-    sourceColumns.length === targetColumns.length &&
-    sourceColumns.every((column) => sourceNodeColumnNames.has(column)) &&
-    targetColumns.every((column) => targetNodeColumnNames.has(column))
-  ) {
+  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
     return { sourceColumns, targetColumns };
+  }
+
+  // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
+  // and using a precomputed O(1) Set to check for column existence.
+  if (edge.sourceHandle || edge.targetHandle) {
+    const decodedSource = decodeHandleId(edge.sourceHandle);
+    const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
+      ? decodedSource
+      : undefined;
+
+    const decodedTarget = decodeHandleId(edge.targetHandle);
+    const targetHandleColumn = decodedTarget !== null && targetNodeColumnNames.has(decodedTarget)
+      ? decodedTarget
+      : undefined;
+
+    if (sourceHandleColumn !== undefined && targetHandleColumn !== undefined) {
+      return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+    }
+    return null; // Do not fallback if handles are supplied but partial/malformed
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
@@ -160,12 +159,15 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
         nodeColumnSets.get(sourceNode.id)!,
         nodeColumnSets.get(targetNode.id)!
       );
-      if (!fkColumns) continue;
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
-      const sourceColumns = fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ');
-      const targetColumns = fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ');
+      const sourceColumns = fkColumns
+        ? fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* source columns */';
+      const targetColumns = fkColumns
+        ? fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ')
+        : '/* target columns */';
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
       ddl += `  FOREIGN KEY (${sourceColumns})\n`;

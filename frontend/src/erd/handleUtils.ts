@@ -24,14 +24,6 @@ export function targetColumnHandleId(columnName: string): string {
 
 const HEX_CHUNK_RE = /^[0-9a-f]{4,6}$/
 
-function hasCanonicalRole(
-  handleId: string | null | undefined,
-  role: 'src' | 'tgt',
-): handleId is string {
-  return Boolean(handleId?.startsWith(`${role}-c-`));
-}
-
-
 /**
  * Reverses the encoding applied by sanitizeHandleId to retrieve the native column string.
  * This lookup strictly validates the structure and bounds lengths (max 10k items)
@@ -77,14 +69,4 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
   }
 
   return decoded;
-}
-
-/** Decodes a canonical source-column handle and rejects every other role. */
-export function decodeSourceColumnHandleId(handleId: string | null | undefined): string | null {
-  return hasCanonicalRole(handleId, 'src') ? decodeHandleId(handleId) : null;
-}
-
-/** Decodes a canonical target-column handle and rejects every other role. */
-export function decodeTargetColumnHandleId(handleId: string | null | undefined): string | null {
-  return hasCanonicalRole(handleId, 'tgt') ? decodeHandleId(handleId) : null;
 }
