@@ -28,6 +28,7 @@
 - [BE] 저장된 계획을 조회할 때 canonical plan digest를 재계산하고 별도 저장된 statement/compiler/base/target 결합값까지 대조하여 변조·불일치를 fail-closed `409`로 차단합니다.
 - [BE] 프로젝트 역할을 `viewer < editor < deployer < owner`로 확장하고, 기존 `apply-sql`의 실제 반영(`dry_run=false`)은 deployer 이상만 허용합니다.
 - [Docs] Forward Engineering의 현재 구현/계획 경계를 PRD·TRD·Architecture·ADR로 명문화했습니다.
+- [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
