@@ -57,8 +57,15 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags --prune origin "${branch}"
-          git rev-list --max-count="${count}" "origin/${branch}" \
+          if ! git check-ref-format --branch "${branch}" >/dev/null; then
+            echo "branch must be a valid Git branch name" >&2
+            exit 1
+          fi
+
+          source_ref="refs/heads/${branch}"
+          tracking_ref="refs/remotes/origin/${branch}"
+          git fetch --no-tags --prune origin -- "${source_ref}:${tracking_ref}"
+          git rev-list --max-count="${count}" "${tracking_ref}" \
             | jq -R -s -c 'split("\n")[:-1]' \
             | sed 's/^/commits=/' >> "${GITHUB_OUTPUT}"
 

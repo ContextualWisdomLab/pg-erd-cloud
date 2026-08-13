@@ -58,6 +58,31 @@ def main() -> int:
         'count="${{ inputs.commit_count }}"' not in text,
         "commit_count input must not be interpolated into run scripts",
     )
+    require(
+        'git check-ref-format --branch "${branch}"' in text,
+        "branch input must be validated as a Git branch name",
+    )
+    require(
+        'source_ref="refs/heads/${branch}"' in text,
+        "fetch source must be an explicit heads ref",
+    )
+    require(
+        'tracking_ref="refs/remotes/origin/${branch}"' in text,
+        "fetch destination must be an explicit remote-tracking ref",
+    )
+    require(
+        'git fetch --no-tags --prune origin -- "${source_ref}:${tracking_ref}"'
+        in text,
+        "fetch must terminate options before the validated refspec",
+    )
+    require(
+        'git fetch --no-tags --prune origin "${branch}"' not in text,
+        "branch input must not remain an option-capable fetch argument",
+    )
+    require(
+        '"origin/${branch}"' not in text,
+        "revision enumeration must use the explicit tracking ref",
+    )
 
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")
