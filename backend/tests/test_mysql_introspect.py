@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import app.mysql_introspect.introspect as mysql_introspect
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
 from app.mysql_introspect.introspect import (
@@ -146,8 +145,12 @@ def test_introspection_binds_every_schema_filter_parameter(
         queries.append((sql, params))
         return [{"v": "8.4.0"}] if sql == "SELECT VERSION() AS v" else []
 
-    monkeypatch.setattr(mysql_introspect, "_connect", lambda _config: connection)
-    monkeypatch.setattr(mysql_introspect, "_fetch_dicts", fake_fetch_dicts)
+    monkeypatch.setattr(
+        "app.mysql_introspect.introspect._connect", lambda _config: connection
+    )
+    monkeypatch.setattr(
+        "app.mysql_introspect.introspect._fetch_dicts", fake_fetch_dicts
+    )
 
     config = MysqlDsnConfig(
         host="127.0.0.1",
