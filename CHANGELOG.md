@@ -3,6 +3,7 @@
 ## Unreleased
 - [BE] 🔒 **SQL 요청 제어문자·검증 응답 하드닝**: 멀티라인 DDL의 탭·LF·CR 및 Unicode는 보존하면서 NUL, 기타 비텍스트 C0 제어문자와 DEL을 요청 스키마에서 거부합니다. 모든 422 요청 검증 응답에서 원문 입력을 제거해 SQL·자격 증명 값이 반사되지 않도록 합니다.
 - [BE] 🔒 **DBML 식별자→DDL 신뢰 경계**: DBML의 인용 식별자에서 PostgreSQL식 이중 따옴표 이스케이프를 손실 없이 해석하고, NUL·빈 값·63 UTF-8 바이트 초과·잘못된 인용·모호한 경로를 부분 변환 대신 422로 거부합니다. DDL·migration·index-design·Snowflake 경로는 하나의 검증/인용 함수로 수렴하며 세미콜론과 주석 표식은 인용 토큰 내부 데이터로 보존됩니다.
+- [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
