@@ -256,56 +256,38 @@ def _migration_models_with_precondition(
 
 
 async def _capture_filtered_snapshot(
-    connection: asyncpg.Connection[asyncpg.Record], schema_name: str
+    connection: asyncpg.Connection[asyncpg.Record],
+    schema_name: str,
+    *,
+    stage_evidence: list[str] | None = None,
 ) -> dict[str, object]:
     """Capture the strict capability rows from the owned sandbox connection."""
 
     include_system = False
+
+    def mark(stage: str) -> None:
+        if stage_evidence is not None:
+            stage_evidence.append(stage)
+
+    async def fetch_rows(label: str, query: str) -> list[dict[str, object]]:
+        mark(f"capture-{label}-started")
+        rows = await connection.fetch(query, schema_name, include_system)
+        mark(f"capture-{label}-completed")
+        return [dict(row) for row in rows]
+
+    mark("capture-version-started")
+    server_version = str(await connection.fetchval("SHOW server_version"))
+    mark("capture-version-completed")
     return {
         "snapshot_contract_version": CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
-        "server_version": str(await connection.fetchval("SHOW server_version")),
-        "schemas": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.SCHEMAS_SQL, schema_name, include_system
-            )
-        ],
-        "relations": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.RELATIONS_SQL, schema_name, include_system
-            )
-        ],
-        "columns": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.COLUMNS_SQL, schema_name, include_system
-            )
-        ],
-        "constraints": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.CONSTRAINTS_SQL, schema_name, include_system
-            )
-        ],
-        "indexes": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.INDEXES_SQL, schema_name, include_system
-            )
-        ],
-        "pk_columns": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.PK_COLUMNS_SQL, schema_name, include_system
-            )
-        ],
-        "fk_edges": [
-            dict(row)
-            for row in await connection.fetch(
-                queries.FK_EDGES_SQL, schema_name, include_system
-            )
-        ],
+        "server_version": server_version,
+        "schemas": await fetch_rows("schemas", queries.SCHEMAS_SQL),
+        "relations": await fetch_rows("relations", queries.RELATIONS_SQL),
+        "columns": await fetch_rows("columns", queries.COLUMNS_SQL),
+        "constraints": await fetch_rows("constraints", queries.CONSTRAINTS_SQL),
+        "indexes": await fetch_rows("indexes", queries.INDEXES_SQL),
+        "pk_columns": await fetch_rows("pk-columns", queries.PK_COLUMNS_SQL),
+        "fk_edges": await fetch_rows("fk-edges", queries.FK_EDGES_SQL),
     }
 
 
@@ -732,6 +714,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
             snapshot = await _capture_filtered_snapshot(
                 cast(asyncpg.Connection[asyncpg.Record], owned_connection),
                 schema_name,
+                stage_evidence=sandbox_stages,
             )
             sandbox_stages.append("capture-completed")
             return snapshot
