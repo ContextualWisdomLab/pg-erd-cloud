@@ -88,6 +88,7 @@ describe('RunCancellationControl', () => {
     expect(button).toBeDisabled()
     expect(fetch).toHaveBeenCalledTimes(1)
     csrf.resolve(response({ csrf_token: 'csrf' }))
+    await waitFor(() => expect(button).not.toBeDisabled())
   })
 
   it('keeps the single-flight guard when polling advances the non-terminal version', async () => {
@@ -95,8 +96,9 @@ describe('RunCancellationControl', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))
       .mockReturnValueOnce(cancellation.promise)
+    const onRefresh = vi.fn()
     const { rerender } = render(
-      <RunCancellationControl run={run} onRefresh={vi.fn()} />,
+      <RunCancellationControl run={run} onRefresh={onRefresh} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: '실행 취소 요청' }))
@@ -104,7 +106,7 @@ describe('RunCancellationControl', () => {
     rerender(
       <RunCancellationControl
         run={{ ...run, state_version: 4, state: 'live_preflight_running' }}
-        onRefresh={vi.fn()}
+        onRefresh={onRefresh}
       />,
     )
 
@@ -120,6 +122,7 @@ describe('RunCancellationControl', () => {
       cancellation_requested: true,
       reused: false,
     }, true, 202))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledOnce())
   })
 
   it('does not replay an ambiguous cancellation and offers status refresh only', async () => {
@@ -142,9 +145,9 @@ describe('RunCancellationControl', () => {
   })
 
   it.each([
-    [{ ...run, state: 'passed' as const }, 'terminal run'],
-    [{ ...run, cancellation_requested: true }, 'existing intent'],
-  ])('renders no mutation for %s', (candidate) => {
+    ['terminal run', { ...run, state: 'passed' as const }],
+    ['existing intent', { ...run, cancellation_requested: true }],
+  ])('renders no mutation for %s', (_label, candidate) => {
     const { container } = render(
       <RunCancellationControl run={candidate} onRefresh={vi.fn()} />,
     )
