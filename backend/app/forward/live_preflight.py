@@ -207,6 +207,32 @@ def compile_live_preflight_queries(
     return tuple(queries)
 
 
+async def _execute_live_preflight_query(
+    connection: asyncpg.Connection,
+    query: LivePreflightQuery,
+    *,
+    client_timeout: float,
+    data_failures_are_evidence: bool,
+) -> object:
+    """Execute one check and isolate bound cast-data failures."""
+
+    prepared = await asyncio.wait_for(
+        connection.prepare(query.sql), timeout=client_timeout
+    )
+    if query.kind != "castable_values" or not data_failures_are_evidence:
+        return await prepared.fetchval(timeout=client_timeout)
+
+    savepoint = connection.transaction()
+    await asyncio.wait_for(savepoint.start(), timeout=client_timeout)
+    try:
+        result = await prepared.fetchval(timeout=client_timeout)
+    except asyncpg.DataError:
+        await asyncio.wait_for(savepoint.rollback(), timeout=client_timeout)
+        return False
+    await asyncio.wait_for(savepoint.commit(), timeout=client_timeout)
+    return result
+
+
 async def _execute_live_preflight(
     connection: asyncpg.Connection,
     plan: Mapping[str, object],
@@ -259,10 +285,12 @@ async def _execute_live_preflight(
             snapshot_evidence = compare_live_preflight_snapshot(plan, snapshot)
         checks: list[dict[str, object]] = []
         for query in queries:
-            prepared = await asyncio.wait_for(
-                connection.prepare(query.sql), timeout=client_timeout
+            result = await _execute_live_preflight_query(
+                connection,
+                query,
+                client_timeout=client_timeout,
+                data_failures_are_evidence=snapshot_evidence is not None,
             )
-            result = await prepared.fetchval(timeout=client_timeout)
             if not isinstance(result, bool):
                 raise LivePreflightContractError(
                     "live preflight database result is not boolean"
