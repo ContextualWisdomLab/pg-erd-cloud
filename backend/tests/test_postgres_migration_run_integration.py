@@ -73,6 +73,7 @@ from app.jobs.migration_dry_run_worker import (
     IsolatedSandboxRequest,
     LivePreflightExecution,
     LivePreflightRequest,
+    MigrationDryRunWorkerError,
     make_durable_dry_run_attempt_handler,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
@@ -711,6 +712,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
     sandbox_requests: list[IsolatedSandboxRequest] = []
     live_requests: list[LivePreflightRequest] = []
     capability_order: list[str] = []
+    sandbox_stages: list[str] = []
     crash_before_first_live_read = True
 
     @asynccontextmanager
@@ -719,23 +721,31 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
     ) -> AsyncIterator[IsolatedSandboxExecution]:
         sandbox_requests.append(request)
         capability_order.append("sandbox-enter")
+        sandbox_stages.append("connect-started")
         connection = await asyncpg.connect(_sandbox_asyncpg_url())
+        sandbox_stages.append("connected")
 
         async def capture(
             owned_connection: IsolatedPostgresConnection,
         ) -> dict[str, object]:
-            return await _capture_filtered_snapshot(
+            sandbox_stages.append("capture-started")
+            snapshot = await _capture_filtered_snapshot(
                 cast(asyncpg.Connection[asyncpg.Record], owned_connection),
                 schema_name,
             )
+            sandbox_stages.append("capture-completed")
+            return snapshot
 
         try:
             yield IsolatedSandboxExecution(connection, capture)
+            sandbox_stages.append("execution-completed")
         finally:
+            sandbox_stages.append("cleanup-started")
             await connection.execute(
                 f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE"
             )
             await connection.close()
+            sandbox_stages.append("cleanup-completed")
             capability_order.append("sandbox-exit")
 
     @asynccontextmanager
@@ -878,13 +888,19 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
             preflight_statement_timeout_ms=2_000,
         )
         with pytest.raises(asyncio.CancelledError):
-            await handler(
-                sessions,
-                MigrationRunSignalClaim(
-                    created.migration_run_uuid, signal_token
-                ),
-                attempt_claim,
-            )
+            try:
+                await handler(
+                    sessions,
+                    MigrationRunSignalClaim(
+                        created.migration_run_uuid, signal_token
+                    ),
+                    attempt_claim,
+                )
+            except MigrationDryRunWorkerError as error:
+                pytest.fail(
+                    "durable sandbox stage failed after fixed evidence "
+                    f"{sandbox_stages!r}: {error}"
+                )
 
         recovery_token = uuid.uuid4()
         async with sessions() as recovery_claim_session:
