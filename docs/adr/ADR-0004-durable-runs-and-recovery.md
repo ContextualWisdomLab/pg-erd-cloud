@@ -211,8 +211,9 @@ Rules:
   locked, exact-version transition to terminal `cancelled` before signal
   acknowledgement. Queued cancellation does not set `started_at`. A redelivered
   terminal run is acknowledged without acquiring another attempt or replaying
-  sandbox/live-preflight work. This is metadata recovery, not deployed process
-  interruption or apply authority.
+  sandbox/live-preflight work; either path locks and abandons a surviving active
+  attempt before acknowledgement. This is metadata recovery, not deployed
+  process interruption or apply authority.
 - Event digest contract `migration-run-event/v1` covers run UUID, sequence,
   type, state, sanitized evidence, actor, normalized UTC time, and predecessor;
   the run CAS matches and advances `latest_event_digest`, and polling verifies

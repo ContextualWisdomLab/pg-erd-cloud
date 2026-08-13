@@ -25,7 +25,7 @@ from app.jobs.migration_run_consumer import (
     run_migration_run_consumer_forever,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
-from app.models import MigrationRun
+from app.models import MigrationRun, MigrationRunAttempt
 
 
 def _session_factory() -> AsyncSession:
@@ -139,12 +139,25 @@ async def test_attempt_bound_handler_acknowledges_persisted_cancellation_without
         started_at=now,
     )
     signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    attempt = MigrationRunAttempt(
+        migration_run_attempt_uuid=uuid.uuid4(),
+        migration_run_uuid=run_uuid,
+        attempt_number=1,
+        acquired_state_version=1,
+        status="active",
+        worker_identity_hash="e" * 64,
+        signal_lease_token_hash="f" * 64,
+        lease_expires_at=now + dt.timedelta(minutes=1),
+        acquired_at=now - dt.timedelta(minutes=1),
+        last_heartbeat_at=now,
+        finished_at=None,
+    )
     factory = _transactional_session_factory()
     executor = AsyncMock()
 
     def configure_session() -> MagicMock:
         session = factory()
-        session.scalar = AsyncMock(side_effect=[run, run])
+        session.scalar = AsyncMock(side_effect=[run, attempt, run])
         session.execute = AsyncMock(return_value=MagicMock(rowcount=1))
         session.add = Mock()
         return session
@@ -169,6 +182,8 @@ async def test_attempt_bound_handler_acknowledges_persisted_cancellation_without
     assert run.state_version == 4
     assert run.cancellation_requested is True
     assert run.finished_at is not None
+    assert attempt.status == "abandoned"
+    assert attempt.finished_at is not None
     executor.assert_not_awaited()
 
 
@@ -199,12 +214,25 @@ async def test_attempt_bound_handler_acks_terminal_redelivery_without_replay() -
         finished_at=now,
     )
     signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    attempt = MigrationRunAttempt(
+        migration_run_attempt_uuid=uuid.uuid4(),
+        migration_run_uuid=run_uuid,
+        attempt_number=1,
+        acquired_state_version=1,
+        status="active",
+        worker_identity_hash="e" * 64,
+        signal_lease_token_hash="f" * 64,
+        lease_expires_at=now + dt.timedelta(minutes=1),
+        acquired_at=now - dt.timedelta(minutes=1),
+        last_heartbeat_at=now,
+        finished_at=None,
+    )
     factory = _transactional_session_factory()
     executor = AsyncMock()
 
     def configure_session() -> MagicMock:
         session = factory()
-        session.scalar = AsyncMock(return_value=run)
+        session.scalar = AsyncMock(side_effect=[run, attempt])
         return session
 
     configured_factory = MagicMock(side_effect=configure_session)
@@ -225,6 +253,8 @@ async def test_attempt_bound_handler_acks_terminal_redelivery_without_replay() -
 
     assert run.state == "passed"
     assert run.state_version == 4
+    assert attempt.status == "abandoned"
+    assert attempt.finished_at is not None
     executor.assert_not_awaited()
 
 

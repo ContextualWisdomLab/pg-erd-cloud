@@ -191,7 +191,7 @@ and stale-token renewal plus stale acknowledgement, releases for retry,
 reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, heartbeat
 renewal, terminal cancellation acknowledgement, terminal redelivery without
-sandbox/preflight replay, handler cancellation and task retrieval on lease
+sandbox/preflight replay, active-attempt abandonment, handler cancellation and task retrieval on lease
 loss, bounded timing, and fixed non-secret lifecycle logs. The
 durable-attempt unit contract proves run-row serialization, one-active-owner
 uniqueness, monotonic numbering, expired-owner abandonment, hashed identity

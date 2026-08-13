@@ -84,7 +84,8 @@ executable SQL, safety classification, approval truth, or recovery state.
   signal acknowledgement. Acquisition rejection now locks and inspects the run:
   a persisted dry-run or queued-apply cancellation intent becomes terminal
   `cancelled`, while an already-terminal redelivery is acknowledged without
-  replay. Application startup wiring, credentials, and worker execution remain
+  replay; either path marks a surviving active attempt `abandoned` in the same
+  metadata transaction. Application startup wiring, credentials, and worker execution remain
   **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;

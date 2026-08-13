@@ -37,7 +37,7 @@ from app.jobs.valkey_queue import (
     release_migration_run_signal,
     renew_migration_run_signal,
 )
-from app.models import MigrationRun
+from app.models import MigrationRun, MigrationRunAttempt
 from app.settings import settings
 
 _logger = logging.getLogger(__name__)
@@ -137,12 +137,34 @@ async def _settle_non_executable_run(
                 if run.run_kind == "apply"
                 else frozenset()
             )
-            if run.state in states and run.state not in active_states:
+            is_terminal = run.state in states and run.state not in active_states
+            can_acknowledge_cancellation = (
+                run.cancellation_requested is True
+                and (
+                    run.run_kind == "dry_run"
+                    or (run.run_kind == "apply" and run.state == "queued")
+                )
+            )
+            if not is_terminal and not can_acknowledge_cancellation:
+                return False
+            active_attempt = await session.scalar(
+                select(MigrationRunAttempt)
+                .where(
+                    MigrationRunAttempt.migration_run_uuid
+                    == run.migration_run_uuid,
+                    MigrationRunAttempt.status == "active",
+                )
+                .with_for_update()
+                .limit(1)
+            )
+            if active_attempt is not None:
+                abandoned_at = dt.datetime.now(dt.timezone.utc)
+                active_attempt.status = "abandoned"
+                active_attempt.finished_at = max(
+                    abandoned_at, active_attempt.last_heartbeat_at
+                )
+            if is_terminal:
                 return True
-            if run.cancellation_requested is not True:
-                return False
-            if run.run_kind == "apply" and run.state != "queued":
-                return False
             await transition_migration_run(
                 session,
                 migration_run_uuid=run.migration_run_uuid,

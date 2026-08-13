@@ -197,7 +197,9 @@ If acquisition rejects a cancelled run, the adapter locks and reloads the row,
 records an empty-evidence `cancellation_acknowledged` transition to terminal
 `cancelled`, and only then permits exact signal acknowledgement. If the row is
 already terminal, redelivery is acknowledged without reacquiring an attempt or
-replaying sandbox/preflight execution.
+replaying sandbox/preflight execution. In either settlement path, a surviving
+active attempt is locked and marked `abandoned` before acknowledgement so crash
+recovery cannot leave a durable owner active forever.
 Application startup wiring, credentials, and worker execution remain
 **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
