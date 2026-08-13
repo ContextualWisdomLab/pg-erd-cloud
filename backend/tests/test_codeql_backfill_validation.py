@@ -53,7 +53,7 @@ def test_validator_rejects_unapproved_input_expression_use(
         1,
     )
 
-    with pytest.raises(AssertionError, match="workflow input expression"):
+    with pytest.raises(AssertionError, match="workflow expression"):
         _validate(unsafe)
 
 
@@ -67,12 +67,14 @@ def test_validator_rejects_unapproved_input_expression_use(
         "${{ github.event['inputs'].unreviewed_input }}",
         "${{ toJSON(inputs) }}",
         "${{ toJSON(github.event.inputs) }}",
+        "${{ format('{{{0}}}', inputs.unreviewed_input) }}",
+        "${{ github.sha }}",
     ),
 )
-def test_validator_rejects_unknown_direct_input_expression(
+def test_validator_rejects_unknown_workflow_expression(
     expression: str,
 ) -> None:
-    """Reject newly declared dispatch inputs outside the reviewed allowlist."""
+    """Reject every expression outside the reviewed expression allowlist."""
 
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     unsafe = workflow.replace(
@@ -82,7 +84,7 @@ def test_validator_rejects_unknown_direct_input_expression(
         1,
     )
 
-    with pytest.raises(AssertionError, match="workflow input expression"):
+    with pytest.raises(AssertionError, match="workflow expression"):
         _validate(unsafe)
 
 

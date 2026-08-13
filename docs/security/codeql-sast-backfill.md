@@ -52,7 +52,7 @@ python scripts\ci\validate_codeql_backfill.py
 The verifier checks that the workflow remains manually dispatched, keeps the
 expected inputs, requires read-only workflow and enumeration permissions, and
 grants `security-events: write` only to the CodeQL analysis job. It also keeps
-the expected language matrix, rejects every direct dispatch-input expression
-outside the reviewed `branch` and `commit_count` locations, rejects legacy
-`github.event.inputs.*` references, and requires the normalized-branch equality
-guard.
+the expected language matrix and exact-allowlists every workflow expression by
+expression body and line location. Unknown contexts, direct or indexed input
+access, function-wrapped input access, and relocated expressions are rejected.
+The verifier also requires the normalized-branch equality guard.

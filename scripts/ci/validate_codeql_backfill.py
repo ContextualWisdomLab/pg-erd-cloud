@@ -13,14 +13,29 @@ WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
 WORKFLOW_EXPRESSION = re.compile(
     r"\$\{\{\s*(?P<expression>[^}\r\n]+?)\s*\}\}"
 )
-INPUT_CONTEXT = re.compile(r"(?<![A-Za-z0-9_])inputs(?![A-Za-z0-9_])")
-ALLOWED_INPUT_EXPRESSION_LINES = {
+ALLOWED_EXPRESSION_LINES = {
+    "steps.commits.outputs.commits": {
+        "commits: ${{ steps.commits.outputs.commits }}",
+    },
     "inputs.branch": {
         "BRANCH_INPUT: ${{ inputs.branch }}",
         'ref: "refs/heads/${{ inputs.branch }}"',
     },
     "inputs.commit_count": {
         "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
+    },
+    "matrix.language": {
+        "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}",
+        "languages: ${{ matrix.language }}",
+        'category: "/language:${{ matrix.language }}/backfill"',
+    },
+    "matrix.commit": {
+        "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}",
+        "ref: ${{ matrix.commit }}",
+        "sha: ${{ matrix.commit }}",
+    },
+    "fromJson(needs.enumerate.outputs.commits)": {
+        "commit: ${{ fromJson(needs.enumerate.outputs.commits) }}",
     },
 }
 
@@ -30,33 +45,27 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def _validate_input_expressions(text: str) -> None:
-    """Allow workflow-dispatch inputs only at reviewed non-shell boundaries."""
+def _validate_workflow_expressions(text: str) -> None:
+    """Allow only reviewed workflow expressions at their exact boundaries."""
 
     observed: dict[str, set[str]] = {
-        expression: set() for expression in ALLOWED_INPUT_EXPRESSION_LINES
+        expression: set() for expression in ALLOWED_EXPRESSION_LINES
     }
     for line in text.splitlines():
         stripped = line.strip()
         for match in WORKFLOW_EXPRESSION.finditer(line):
             expression = match.group("expression")
-            if INPUT_CONTEXT.search(expression) is None:
-                continue
-            require(
-                not expression.startswith("github.event.inputs."),
-                "unapproved workflow input expression: github.event.inputs.*",
-            )
-            allowed_lines = ALLOWED_INPUT_EXPRESSION_LINES.get(expression, set())
+            allowed_lines = ALLOWED_EXPRESSION_LINES.get(expression, set())
             require(
                 stripped in allowed_lines,
-                f"unapproved workflow input expression: {expression}",
+                f"unapproved workflow expression: {expression}",
             )
             observed[expression].add(stripped)
 
-    for expression, allowed_lines in ALLOWED_INPUT_EXPRESSION_LINES.items():
+    for expression, allowed_lines in ALLOWED_EXPRESSION_LINES.items():
         require(
             observed[expression] == allowed_lines,
-            f"workflow input expression locations changed: {expression}",
+            f"workflow expression locations changed: {expression}",
         )
 
 
@@ -178,7 +187,7 @@ def validate_workflow(text: str) -> None:
         'count="${COMMIT_COUNT_INPUT}"' in text,
         "shell must read commit_count from its environment",
     )
-    _validate_input_expressions(text)
+    _validate_workflow_expressions(text)
     require(
         'normalized_branch="$(git check-ref-format --branch "${branch}")"'
         in text,
