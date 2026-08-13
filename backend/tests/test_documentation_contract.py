@@ -329,6 +329,13 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
         in normalized_contract
     )
     assert "creates no dispatch" in normalized_contract
+    assert (
+        "fe-ac-006 | apply cannot queue without editor-authored revision, "
+        "deployer role, exact passed dry run, exact digest, typed target, and "
+        "destructive acknowledgement when required. | role/tamper/race/api "
+        "tests | implemented control-plane boundary; live apply remains planned"
+        in normalized_contract
+    )
     assert "0012_apply_intent_confirmation" in data_model
     assert "stable sanitized run-action error envelope" in normalized_contract
     assert "migration_run_dispatch" in normalized_contract
