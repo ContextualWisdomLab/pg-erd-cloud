@@ -10,20 +10,10 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
-_INPUT_KEY = r"(?:\.[A-Za-z_][A-Za-z0-9_-]*|\s*\[[^]\r\n]+\])"
-_EVENT_SEGMENT = r"(?:\.event|\s*\[\s*['\"]event['\"]\s*\])"
-_INPUTS_SEGMENT = r"(?:\.inputs|\s*\[\s*['\"]inputs['\"]\s*\])"
-INPUT_EXPRESSION = re.compile(
-    r"\$\{\{\s*(?P<expression>"
-    r"(?:inputs"
-    + _INPUT_KEY
-    + r"|github"
-    + _EVENT_SEGMENT
-    + _INPUTS_SEGMENT
-    + _INPUT_KEY
-    + r")"
-    r")\s*\}\}"
+WORKFLOW_EXPRESSION = re.compile(
+    r"\$\{\{\s*(?P<expression>[^}\r\n]+?)\s*\}\}"
 )
+INPUT_CONTEXT = re.compile(r"(?<![A-Za-z0-9_])inputs(?![A-Za-z0-9_])")
 ALLOWED_INPUT_EXPRESSION_LINES = {
     "inputs.branch": {
         "BRANCH_INPUT: ${{ inputs.branch }}",
@@ -48,8 +38,10 @@ def _validate_input_expressions(text: str) -> None:
     }
     for line in text.splitlines():
         stripped = line.strip()
-        for match in INPUT_EXPRESSION.finditer(line):
+        for match in WORKFLOW_EXPRESSION.finditer(line):
             expression = match.group("expression")
+            if INPUT_CONTEXT.search(expression) is None:
+                continue
             require(
                 not expression.startswith("github.event.inputs."),
                 "unapproved workflow input expression: github.event.inputs.*",
