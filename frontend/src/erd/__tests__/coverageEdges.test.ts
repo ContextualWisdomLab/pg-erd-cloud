@@ -60,7 +60,7 @@ describe('coverage edge contracts', () => {
     expect(dbml).toContain('Ref: child.parent_id > sales.parent.')
   })
 
-  it('covers DDL defensive fallbacks and column inference without handles', () => {
+  it('covers DDL fail-closed behavior for unresolved relations', () => {
     const parent = node('parent', '', [
       { column_name: '', data_type: undefined as any, is_not_null: false, is_pk: true },
     ])
@@ -90,7 +90,7 @@ describe('coverage edge contracts', () => {
       [noColumns, { ...noColumns, id: 'other', data: { ...noColumns.data } }],
       [{ id: 'missing-columns', source: 'none', target: 'other' }],
     )
-    expect(missingColumnsDdl).toContain('/* source columns */')
+    expect(missingColumnsDdl).not.toContain('FOREIGN KEY')
   })
 
   it('covers nullable export metadata and snapshot index variants', () => {
@@ -125,7 +125,7 @@ describe('coverage edge contracts', () => {
     expect(exportDiagramSvg([withoutColumns, snapshotNode], [{ id: 'plain', source: 'empty', target: '7' }], snapshot as any)).toContain('<svg')
   })
 
-  it('covers dictionary edge aggregation, handle fallback, null values, and repeated sources', () => {
+  it('ignores dictionary relations whose target endpoint is absent', () => {
     const source = node('source', '', [
       { column_name: 'first_id', data_type: 'int', is_not_null: false, is_pk: false, example_value: null },
       { column_name: 'second_id', data_type: 'int', is_not_null: false, is_pk: false, example_value: undefined },
@@ -139,8 +139,8 @@ describe('coverage edge contracts', () => {
     const markdown = exportDictionaryMarkdown([source], edges)
     expect(csv).toContain('"first_id","int","N","Y"')
     expect(csv).toContain('"second_id","int","N","Y"')
-    expect(markdown).toContain('| first_id | int | N | Y |')
-    expect(markdown).toContain('| second_id | int | N | Y |')
+    expect(markdown).toContain('| first_id | int | N | N |')
+    expect(markdown).toContain('| second_id | int | N | N |')
   })
 
   it('covers search comment matches and direct empty term arrays', () => {
