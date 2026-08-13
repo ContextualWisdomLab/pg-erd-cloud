@@ -164,6 +164,69 @@ describe('ForwardEngineeringModal', () => {
       .toHaveLength(1)
   })
 
+  it('restores the supplied run when the same modal is closed and reopened', async () => {
+    const createdRun = {
+      ...run,
+      migration_run_uuid: 'run-created',
+      state: 'passed',
+      state_version: 4,
+      observed_base_digest: 'b'.repeat(64),
+      finished_at: '2026-08-12T05:01:00Z',
+      updated_at: '2026-08-12T05:01:00Z',
+    }
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input)
+      if (url === '/api/csrf-token') return Promise.resolve(response({ csrf_token: 'csrf' }))
+      if (url.endsWith('/dry-runs') && init?.method === 'POST') {
+        return Promise.resolve(response({
+          migration_run_uuid: 'run-created',
+          state: 'queued',
+          state_version: 1,
+          cancellation_requested: false,
+          reused: false,
+        }))
+      }
+      if (url.endsWith('/migration-runs/run-created')) {
+        return Promise.resolve(response(createdRun))
+      }
+      if (url.endsWith('/migration-runs/run-modal')) return Promise.resolve(response(run))
+      return Promise.resolve(response(plan))
+    })
+
+    const { rerender } = render(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    await screen.findByText('run-modal')
+    fireEvent.click(screen.getByRole('button', { name: '격리 dry-run 요청' }))
+    expect(await screen.findByText('run-created')).toBeInTheDocument()
+
+    rerender(
+      <ForwardEngineeringModal
+        isOpen={false}
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+    rerender(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('run-modal')).toBeInTheDocument()
+    expect(screen.queryByText('run-created')).not.toBeInTheDocument()
+  })
+
   it('closes with the explicit button or Escape', () => {
     const onClose = vi.fn()
     const { rerender } = render(

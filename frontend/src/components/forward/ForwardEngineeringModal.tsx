@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useDialogAccessibility } from '../modals/useDialogAccessibility'
 import { PlanReviewSurface } from './PlanReviewSurface'
@@ -22,6 +22,10 @@ export function ForwardEngineeringModal({
     scope: string
     runId: string
   } | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) setCreatedRun(null)
+  }, [isOpen])
 
   if (!isOpen) return null
 
