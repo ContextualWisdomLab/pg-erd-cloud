@@ -69,7 +69,7 @@ export function exportPrisma(
   const relationsBySourceField = new Map<string, RelationInfo[]>();
   const pkColumnsByNode = new Map<string, Set<string>>();
   const columnNamesByNode = new Map<string, Set<string>>();
-  const relationNameCounts = new Map<string, number>();
+  const allocatedRelationNames = new Set<string>();
   for (const node of nodes) {
     const pks = new Set<string>();
     const columnNames = new Set<string>();
@@ -100,11 +100,13 @@ export function exportPrisma(
     const relationNameBase = sanitizeName(
       String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`),
     );
-    const relationNameCount = (relationNameCounts.get(relationNameBase) || 0) + 1;
-    relationNameCounts.set(relationNameBase, relationNameCount);
-    const relationName = relationNameCount === 1
-      ? relationNameBase
-      : `${relationNameBase}_${relationNameCount}`;
+    let relationName = relationNameBase;
+    let suffix = 2;
+    while (allocatedRelationNames.has(relationName)) {
+      relationName = `${relationNameBase}_${suffix}`;
+      suffix += 1;
+    }
+    allocatedRelationNames.add(relationName);
     const sourceModel = sanitizeName(sourceNode.data.title);
     const targetModel = sanitizeName(targetNode.data.title);
     const sanitizedSourceField = sanitizeName(sourceField);
