@@ -194,6 +194,104 @@ def test_run_state_machine_separates_dry_run_and_apply_authority() -> None:
         validate_run_transition("preview", "queued", "passed")
 
 
+def test_run_state_machine_allows_only_pre_execution_cancellation_acknowledgement() -> None:
+    """Cancellation becomes terminal only before live apply authority begins."""
+
+    for dry_run_state in ("queued", "sandbox_running", "live_preflight_running"):
+        validate_run_transition("dry_run", dry_run_state, "cancelled")
+    validate_run_transition("apply", "queued", "cancelled")
+
+    for apply_state in ("applying", "reconciling", "verifying"):
+        with pytest.raises(MigrationRunContractError, match="invalid transition"):
+            validate_run_transition("apply", apply_state, "cancelled")
+    with pytest.raises(MigrationRunContractError, match="invalid transition"):
+        validate_run_transition("dry_run", "cancelled", "failed")
+
+
+def test_cancelled_state_is_enforced_by_run_and_event_storage_contracts() -> None:
+    """The durable checks admit terminal cancellation for either run kind."""
+
+    run_checks = {
+        constraint.name: str(constraint.sqltext)
+        for constraint in MigrationRun.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    event_checks = {
+        constraint.name: str(constraint.sqltext)
+        for constraint in MigrationRunEvent.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+
+    assert "'cancelled'" in run_checks["ck_migration_run__state"]
+    assert run_checks["ck_migration_run__kind_state"].count("'cancelled'") == 2
+    assert "'cancelled'" in event_checks["ck_migration_run_event__state_before"]
+    assert "'cancelled'" in event_checks["ck_migration_run_event__state_after"]
+
+
+@pytest.mark.asyncio
+async def test_cancellation_acknowledgement_requires_a_persisted_intent() -> None:
+    """A worker cannot invent terminal cancellation without the user's intent."""
+
+    now = datetime(2026, 8, 10, 4, tzinfo=timezone.utc)
+    run = _queued_migration_run(now=now)
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    with pytest.raises(MigrationRunContractError, match="cancellation intent"):
+        await transition_migration_run(
+            session,
+            migration_run_uuid=run.migration_run_uuid,
+            expected_state_version=1,
+            next_state="cancelled",
+            event_type="cancellation_acknowledged",
+            evidence={},
+            actor_user_uuid=None,
+            now=now,
+        )
+
+    session.execute.assert_not_awaited()
+    session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_queued_cancellation_finishes_without_claiming_execution_started() -> None:
+    """Acknowledging a queued intent records no worker start timestamp."""
+
+    now = datetime(2026, 8, 10, 4, tzinfo=timezone.utc)
+    run = _queued_migration_run(now=now)
+    run.state_version = 2
+    run.cancellation_requested = True
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)),
+        add=Mock(),
+    )
+
+    transition = await transition_migration_run(
+        session,
+        migration_run_uuid=run.migration_run_uuid,
+        expected_state_version=2,
+        next_state="cancelled",
+        event_type="cancellation_acknowledged",
+        evidence={},
+        actor_user_uuid=None,
+        now=now,
+    )
+
+    event = session.add.call_args.args[0]
+    assert transition.state == "cancelled"
+    assert transition.started_at is None
+    assert transition.finished_at == now
+    assert run.started_at is None
+    assert event.event_type == "cancellation_acknowledged"
+    assert event.state_before == "queued"
+    assert event.state_after == "cancelled"
+    assert event.evidence_json == {}
+
+
 def test_idempotency_key_is_bounded_and_stored_only_as_a_digest() -> None:
     """Opaque retry keys are bounded before only their SHA-256 digest persists."""
 

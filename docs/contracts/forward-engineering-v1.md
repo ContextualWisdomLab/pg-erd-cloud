@@ -48,6 +48,10 @@ Current code implements only the first control-plane slice:
   execution authority exists yet. The
   execution-neutral consumer contract is **Implemented**; consumer-to-attempt
   binding is **Implemented** without plan, credential, or SQL authority.
+  When attempt acquisition finds a persisted cancellation intent, the adapter
+  locks the run and records the terminal `cancelled` acknowledgement before the
+  exact signal is acknowledged. A redelivered already-terminal run is settled
+  without replaying sandbox or live-preflight work.
   Application startup wiring and worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
@@ -77,9 +81,8 @@ Current code implements only the first control-plane slice:
   authority.
 - **Planned:** deployed isolated sandbox lifecycle, credential binding,
   application worker execution, live apply dispatch/executor, apply-time
-  fingerprint revalidation, cancellation propagation, terminal transition and
-  recovery, post-apply convergence, and the complete browser apply/recovery
-  workflow.
+  fingerprint revalidation, deployed in-flight cancellation, apply recovery,
+  post-apply convergence, and the complete browser apply/recovery workflow.
 - **Rejected for v1:** browser-authored SQL in the graphical workflow,
   production DDL rollback as dry-run evidence, DML/backfills, heuristic rename
   inference, automatic rollback generation, scheduled apply, MySQL/Snowflake
@@ -135,7 +138,8 @@ have no durable `MigrationRun` history; plans with run evidence are retained.
 ### `migration_run`, dispatch, attempt, and event — Partially implemented
 
 The ORM classes and Alembic revisions `0010_migration_run`,
-`0011_migration_run_attempt`, and `0012_apply_intent_confirmation` persist an
+`0011_migration_run_attempt`, `0012_apply_intent_confirmation`, and
+`0013_migration_run_cancellation` persist an
 idempotent run identity, optional passed-dry-run/confirmation bindings, one
 identifier-only transactional outbox row for executable dry runs, and an
 append-only per-run event sequence. The implemented dry-run writer adds exactly
@@ -189,12 +193,17 @@ Consumer-to-attempt binding is **Implemented** by an execution-neutral adapter:
 it commits acquisition before invoking an injected handler, renews the exact
 attempt through fresh metadata transactions, cancels work on lease loss, and
 finishes the exact owner before the outer consumer may acknowledge the signal.
+If acquisition rejects a cancelled run, the adapter locks and reloads the row,
+records an empty-evidence `cancellation_acknowledged` transition to terminal
+`cancelled`, and only then permits exact signal acknowledgement. If the row is
+already terminal, redelivery is acknowledged without reacquiring an attempt or
+replaying sandbox/preflight execution.
 Application startup wiring, credentials, and worker execution remain
 **Planned**. The bounded
 one-attempt publisher is **Implemented**: it emits only `migration_run_uuid`
 to a dedicated Valkey sorted-set key, then acknowledges only the exact claimed
-attempt in the same caller-owned transaction. Cancellation
-propagation, sandbox/preflight workers, apply, reconciliation, and verification
+attempt in the same caller-owned transaction. Deployed sandbox/preflight worker
+startup, in-flight process cancellation, apply, reconciliation, and verification
 remain **Planned**.
 
 Each event stores `previous_event_digest` and `event_digest`; the run stores
@@ -250,6 +259,12 @@ updates `cancellation_requested` and `state_version` while matching the exact
 UUID, kind, state, prior version, and false cancellation flag, then appends a
 same-state event at the new sequence. Repeated intent is idempotent; terminal,
 missing, invalid, and stale runs fail closed.
+
+The attempt-bound consumer acknowledgement is also **Implemented** for dry-run
+states and queued apply intent. It requires the persisted intent, fixed
+`cancellation_acknowledged` event type, empty evidence, no actor, and the exact
+state-version/flag CAS. Cancelling from `queued` sets `finished_at` without
+claiming `started_at`; `cancelled` is terminal and makes no live-DDL claim.
 
 The public cancellation route requires a strict positive
 `expected_state_version`, editor authority, and the exact run UUID. It binds the
@@ -467,11 +482,14 @@ classified below without implying worker execution:
 
 Dry-run states:
 
-`queued -> sandbox_running -> live_preflight_running -> passed | drifted | failed`
+`queued -> sandbox_running -> live_preflight_running -> passed | drifted | failed`,
+with `queued | sandbox_running | live_preflight_running -> cancelled` after a
+persisted cancellation intent.
 
 Apply states:
 
-`queued -> applying -> reconciling -> verifying -> verified | drifted_no_apply | not_applied | verification_failed | failed_rolled_back | applied_with_drift | outcome_unknown`
+`queued -> applying -> reconciling -> verifying -> verified | drifted_no_apply | not_applied | verification_failed | failed_rolled_back | applied_with_drift | outcome_unknown`,
+with only `queued -> cancelled` before apply execution begins.
 
 Terminal semantics are exact:
 
@@ -480,6 +498,7 @@ Terminal semantics are exact:
 | `passed` | Sandbox execution converged and bounded live read-only preflight passed for an observed digest equal to the integrity-checked plan base; no live DDL ran. The CAS binding and reserved server-authored digest evidence field are Implemented; worker evidence production is Planned. |
 | `drifted` / `drifted_no_apply` | Target base mismatch was observed; no plan DDL ran. Dry-run mismatch classification/persistence is Implemented; worker capture and apply-time classification are Planned. |
 | `failed` | Dry-run stage failed; no live DDL ran. |
+| `cancelled` | A persisted cancellation intent was acknowledged before further execution authority was acquired. Queued cancellation leaves `started_at` unset; no live DDL completion or rollback claim is made. |
 | `failed_rolled_back` | Apply started; the transactional segment is proven rolled back. |
 | `not_applied` | Reconciliation proves the exact base digest still exists. |
 | `verified` | A persisted post-commit verification snapshot equals `target_digest`. |
@@ -497,7 +516,7 @@ Terminal semantics are exact:
 | Create/revise a model | no | yes | yes | yes | Implemented |
 | Compile a plan | no | yes | yes | yes | Implemented |
 | Request a dry-run intent | no | yes | yes | yes | Implemented; worker execution Planned |
-| Cancel a non-terminal run | no | yes | yes | yes | Implemented control-plane intent; worker propagation Planned |
+| Cancel a non-terminal run | no | yes | yes | yes | Intent and metadata-only worker acknowledgement Implemented; deployed in-flight process cancellation Planned |
 | Request live apply | no | no | yes | yes | Implemented as non-dispatched confirmed intent; executor Planned |
 | Manage membership | no | no | no | yes | Existing product contract |
 

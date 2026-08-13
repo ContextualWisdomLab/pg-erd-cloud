@@ -207,6 +207,12 @@ Rules:
 - Cancellation is a same-state, version-incrementing CAS event. A repeated
   request is idempotent, a terminal run rejects it, and a worker holding the old
   version must reload the intent before any further transition.
+- Attempt-bound signal handling now acknowledges that persisted intent with a
+  locked, exact-version transition to terminal `cancelled` before signal
+  acknowledgement. Queued cancellation does not set `started_at`. A redelivered
+  terminal run is acknowledged without acquiring another attempt or replaying
+  sandbox/live-preflight work. This is metadata recovery, not deployed process
+  interruption or apply authority.
 - Event digest contract `migration-run-event/v1` covers run UUID, sequence,
   type, state, sanitized evidence, actor, normalized UTC time, and predecessor;
   the run CAS matches and advances `latest_event_digest`, and polling verifies
@@ -215,8 +221,8 @@ Rules:
 ### Planned before production release
 
 - apply executor and apply-time drift/privilege/lock/precondition revalidation;
-- application startup wiring, cancellation-worker acknowledgement, and relay
-  deployment restart/failover evidence;
+- application startup wiring, deployed in-flight process cancellation, and
+  relay deployment restart/failover evidence;
 - reconciliation and post-commit verification workers;
 - operational metrics, alerts, retention, and recovery runbooks.
 

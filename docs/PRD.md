@@ -42,15 +42,18 @@ submits, and retains one bounded idempotency key across an ambiguous retry.
 Graph/model adapters, apply controls, and broader orchestration remain absent.
 The run status and audit
 panel is **Partially implemented** as an optional read-only exact-run view. It
-announces the bounded state meaning, cancellation intent, and sanitized error
+announces the bounded state meaning, pending cancellation intent, terminal
+`cancelled` acknowledgement, and sanitized error
 code, and renders hash-chain event metadata without exposing generic evidence
 payloads. Sequential terminal-aware polling is **Partially implemented**: a
 new request is scheduled only after the preceding response and stops at the
 first terminal state. The cancellation intent control is **Partially
 implemented**: it appears only before a terminal state and before a recorded
 intent, submits the exact current state version once, refreshes after acceptance,
-and never replays an ambiguous write automatically. Apply/recovery controls and
-browser E2E remain absent.
+and never replays an ambiguous write automatically. The durable dry-run
+consumer now persists terminal cancellation acknowledgement and settles
+already-terminal redelivery without replay. Apply/recovery controls and
+browser E2E remain absent; deployed in-flight process cancellation is Planned.
 
 ## Actors and authority
 
@@ -94,7 +97,7 @@ for server authorization.
 | FE-PRD-005 | Dry run executes exact stored-plan DDL only in an isolated compatible sandbox; production receives bounded reads only. | **Partially implemented:** execution core, dedicated ephemeral PostgreSQL 14–18 database round trip, and a test-owned durable-handler composition over separate sandbox and read-only target connections exist; an expired-attempt takeover resumes preflight after committed sandbox convergence without replay. Deployed provisioning, credential resolution, isolation/lifecycle, startup, process restart, and worker operation remain Planned | Network/egress-isolation, cleanup, deployment identity, and live no-DDL evidence |
 | FE-PRD-006 | Detect base drift before dry run and again under apply-time locks before DDL. | **Partially implemented:** the isolated dry-run core validates the materialized base digest before DDL; apply-time locked revalidation remains **Planned** | Injected-drift and concurrency tests |
 | FE-PRD-007 | Require deployer authority, exact current model revision, plan/dry-run digests, typed target confirmation, and destructive acknowledgement. | **Partially implemented**; the non-dispatched apply-intent route locks the model row, rejects `stale_revision`, and persists those exact bindings, while apply-time target revalidation/execution remain Planned | Role/tamper/race tests |
-| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Partially implemented**; dry-run and non-dispatched apply intents/resources/evidence, a PostgreSQL 14–18 same-key apply-intent race, DB-durable hashed attempt CAS, exact consumer-to-attempt binding, and pre-live-read attempt-expiry takeover without sandbox replay exist; application startup wiring, process/container recovery, commit-uncertainty reconciliation, and apply execution remain absent | Live-executor crash/no-replay, state-machine, and exact-owner lease tests |
+| FE-PRD-008 | Persist idempotent dry-run/apply resources and append-only evidence; never auto-replay an ambiguous apply. | **Partially implemented**; dry-run and non-dispatched apply intents/resources/evidence, a PostgreSQL 14–18 same-key apply-intent race, DB-durable hashed attempt CAS, exact consumer-to-attempt binding, terminal cancellation acknowledgement, terminal redelivery settlement without sandbox/preflight replay, and pre-live-read attempt-expiry takeover without sandbox replay exist; application startup wiring, process/container recovery, commit-uncertainty reconciliation, and apply execution remain absent | Live-executor crash/no-replay, state-machine, and exact-owner lease tests |
 | FE-PRD-009 | Re-introspect after known commit and compare a persisted verification snapshot to the desired digest. | **Planned** | End-to-end empty-residual-diff assertion |
 | FE-PRD-010 | Provide a keyboard-operable five-stage review/dry-run/apply/verification journey without reusing the export modal. | **Planned** | Accessibility, component, and browser E2E tests |
 
@@ -159,7 +162,7 @@ evidence exists.
 |---|---|---|
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
 | 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, and durable attempt ownership exist. Consumer-to-attempt binding is **Implemented**; sandbox lifecycle, application startup wiring, credential binding, and worker execution remain **Planned**. |
-| 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation CAS, exact-owner attempt leases, and an exact non-dispatched apply intent exist; live dispatch/execution/recovery remain Planned |
+| 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation intent and terminal acknowledgement, exact-owner attempt leases, terminal dry-run redelivery settlement, and an exact non-dispatched apply intent exist; live dispatch/execution/recovery remain Planned |
 | 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Partially implemented:** review, dry-run intent, run status/audit, polling, and cancellation surfaces exist; apply/recovery/convergence and composed E2E remain Planned |
 
 No phase may describe the end-to-end feature as production-ready before every

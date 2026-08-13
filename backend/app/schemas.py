@@ -293,6 +293,7 @@ MigrationRunState = Literal[
     "passed",
     "drifted",
     "failed",
+    "cancelled",
     "applying",
     "reconciling",
     "verifying",

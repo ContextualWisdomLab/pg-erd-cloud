@@ -4,6 +4,7 @@ export const TERMINAL_RUN_STATES: ReadonlySet<MigrationRunState> = new Set([
   'passed',
   'drifted',
   'failed',
+  'cancelled',
   'verified',
   'drifted_no_apply',
   'not_applied',

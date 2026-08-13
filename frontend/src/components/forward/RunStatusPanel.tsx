@@ -11,6 +11,7 @@ const STATE_LABELS: Record<MigrationRunState, string> = {
   passed: '격리 검증 및 읽기 전용 사전 점검 통과',
   drifted: '기준 스키마 변경 감지',
   failed: '드라이런 실패',
+  cancelled: '취소 완료',
   applying: '적용 중',
   reconciling: '적용 결과 조정 중',
   verifying: '적용 결과 검증 중',
@@ -27,6 +28,7 @@ const STATE_MEANINGS: Partial<Record<MigrationRunState, string>> = {
   passed: '라이브 대상에서 DDL을 실행했다는 의미가 아닙니다.',
   drifted: '기준 다이제스트가 달라 라이브 DDL을 실행하지 않았습니다.',
   failed: '드라이런 단계가 실패했으며 라이브 DDL을 실행하지 않았습니다.',
+  cancelled: '취소가 확인됐으며 라이브 DDL을 실행하지 않았습니다.',
   verified: '저장된 검증 스냅샷이 목표 다이제스트와 일치합니다.',
   drifted_no_apply: '적용 전 변경이 감지되어 DDL을 실행하지 않았습니다.',
   not_applied: '조정 결과 기존 기준 다이제스트가 유지된 것으로 확인됐습니다.',
@@ -59,8 +61,13 @@ export function RunStatusPanel({ run }: RunStatusPanelProps) {
       </header>
 
       {run.cancellation_requested ? (
-        <p role="alert" aria-label="취소 요청">
-          취소 요청이 기록됐습니다. 다음 상태 전환 전까지 완료로 간주하지 않습니다.
+        <p
+          role="alert"
+          aria-label={run.state === 'cancelled' ? '취소 완료' : '취소 요청'}
+        >
+          {run.state === 'cancelled'
+            ? '취소 요청이 작업자에 의해 확인됐습니다.'
+            : '취소 요청이 기록됐습니다. 다음 상태 전환 전까지 완료로 간주하지 않습니다.'}
         </p>
       ) : null}
 

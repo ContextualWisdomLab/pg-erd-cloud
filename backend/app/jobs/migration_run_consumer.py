@@ -16,14 +16,19 @@ from asyncio import FIRST_COMPLETED, create_task, gather, sleep, wait
 from collections.abc import Awaitable, Callable
 from typing import TypeAlias
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.forward.migration_run import (
+    APPLY_RUN_STATES,
+    DRY_RUN_STATES,
     MAX_MIGRATION_ATTEMPT_LEASE_SECONDS,
     MigrationRunAttemptClaim,
+    MigrationRunContractError,
     acquire_migration_run_attempt,
     finish_migration_run_attempt,
     renew_migration_run_attempt,
+    transition_migration_run,
 )
 from app.jobs.valkey_queue import (
     MigrationRunSignalClaim,
@@ -32,9 +37,17 @@ from app.jobs.valkey_queue import (
     release_migration_run_signal,
     renew_migration_run_signal,
 )
+from app.models import MigrationRun
 from app.settings import settings
 
 _logger = logging.getLogger(__name__)
+
+_ACTIVE_DRY_RUN_STATES = frozenset(
+    {"queued", "sandbox_running", "live_preflight_running"}
+)
+_ACTIVE_APPLY_RUN_STATES = frozenset(
+    {"queued", "applying", "reconciling", "verifying"}
+)
 
 MigrationRunHandler: TypeAlias = Callable[
     [Callable[[], AsyncSession], MigrationRunSignalClaim], Awaitable[None]
@@ -90,6 +103,56 @@ async def _acquire_attempt(
                 signal_lease_token=signal_claim.lease_token,
                 lease_seconds=lease_seconds,
             )
+
+
+async def _settle_non_executable_run(
+    session_factory: Callable[[], AsyncSession],
+    signal_claim: MigrationRunSignalClaim,
+) -> bool:
+    """Settle cancellation or terminal redelivery without replaying work."""
+
+    async with session_factory() as session:
+        async with session.begin():
+            run = await session.scalar(
+                select(MigrationRun)
+                .where(
+                    MigrationRun.migration_run_uuid
+                    == signal_claim.migration_run_uuid
+                )
+                .with_for_update()
+            )
+            if run is None:
+                return False
+            states = (
+                DRY_RUN_STATES
+                if run.run_kind == "dry_run"
+                else APPLY_RUN_STATES
+                if run.run_kind == "apply"
+                else frozenset()
+            )
+            active_states = (
+                _ACTIVE_DRY_RUN_STATES
+                if run.run_kind == "dry_run"
+                else _ACTIVE_APPLY_RUN_STATES
+                if run.run_kind == "apply"
+                else frozenset()
+            )
+            if run.state in states and run.state not in active_states:
+                return True
+            if run.cancellation_requested is not True:
+                return False
+            if run.run_kind == "apply" and run.state != "queued":
+                return False
+            await transition_migration_run(
+                session,
+                migration_run_uuid=run.migration_run_uuid,
+                expected_state_version=run.state_version,
+                next_state="cancelled",
+                event_type="cancellation_acknowledged",
+                evidence={},
+                actor_user_uuid=None,
+            )
+            return True
 
 
 async def _finish_attempt(
@@ -249,12 +312,19 @@ def make_attempt_bound_migration_run_handler(
         session_factory: Callable[[], AsyncSession],
         signal_claim: MigrationRunSignalClaim,
     ) -> None:
-        attempt_claim = await _acquire_attempt(
-            session_factory,
-            signal_claim,
-            worker_identity=worker_identity,
-            lease_seconds=attempt_lease_seconds,
-        )
+        try:
+            attempt_claim = await _acquire_attempt(
+                session_factory,
+                signal_claim,
+                worker_identity=worker_identity,
+                lease_seconds=attempt_lease_seconds,
+            )
+        except MigrationRunContractError:
+            if await _settle_non_executable_run(
+                session_factory, signal_claim
+            ):
+                return
+            raise
         try:
             succeeded = await _run_attempt_handler_under_exact_lease(
                 handler,

@@ -184,9 +184,10 @@ replaying: target digest means `verified`, unchanged base digest means
 ### Dry run
 
 **Status: Partially implemented.** Durable persistence, authorized creation,
-integrity-checked polling, cancellation intent, and bounded transition cores
-exist. Deployed sandbox/preflight worker execution, cancellation propagation,
-and terminal-state orchestration remain **Planned**.
+integrity-checked polling, cancellation intent, terminal `cancelled`
+acknowledgement, terminal redelivery without sandbox/preflight replay, and
+bounded transition cores exist. Deployed sandbox/preflight worker execution and
+in-flight process cancellation remain **Planned**.
 
 ```mermaid
 stateDiagram-v2

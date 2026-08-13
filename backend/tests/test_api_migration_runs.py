@@ -1142,6 +1142,7 @@ def test_migration_run_openapi_state_matches_database_contract() -> None:
         "passed",
         "drifted",
         "failed",
+        "cancelled",
         "applying",
         "reconciling",
         "verifying",

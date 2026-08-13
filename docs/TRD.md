@@ -81,8 +81,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   signal-token identities. Consumer-to-attempt binding is **Implemented**: an
   execution-neutral adapter commits acquisition, renews through fresh metadata
   transactions, cancels on ownership loss, and finishes the exact owner before
-  signal acknowledgement. Application startup wiring, credentials, and worker
-  execution remain **Planned**;
+  signal acknowledgement. Acquisition rejection now locks and inspects the run:
+  a persisted dry-run or queued-apply cancellation intent becomes terminal
+  `cancelled`, while an already-terminal redelivery is acknowledged without
+  replay. Application startup wiring, credentials, and worker execution remain
+  **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;
 - `complete_isolated_dry_run` revalidates an exact successful executor result
@@ -111,7 +114,7 @@ executable SQL, safety classification, approval truth, or recovery state.
 
 - queue consumption, worker execution, durable retry backoff/max-attempt
   policy, and dispatch retention;
-- cancellation propagation and worker acknowledgement;
+- deployed in-flight worker/process cancellation and apply cancellation;
 - isolated disposable PostgreSQL provisioning, complete dependency
   materialization, deployed isolation proof, cleanup, and worker binding (the
   signed-plan execution/convergence core is Partially implemented);
@@ -148,8 +151,8 @@ by the graphical target architecture.
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Partially implemented:** signed-plan/version/base/transaction/convergence execution core, `complete_isolated_dry_run` server-derived success CAS, PostgreSQL 14–18 round trip, and test-owned durable-handler binding over a separate sandbox connection exist; an expired successor attempt resumes live preflight without replaying committed sandbox DDL. Provisioning, materialization, deployed isolation/egress proof, cleanup, startup, process restart, and worker operation remain Planned |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean reads, strict snapshot comparison, and durable hashed attempt ownership exist; `execute_bound_live_preflight` binds capture/checks to one read-only repeatable-read transaction and completion matches every persisted precondition. PostgreSQL 14–18 acceptance composes the durable handler with a separately constrained test reader; deployed credential binding, target routing, startup/worker operation, and in-lock apply repetition remain Planned. |
 | FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
-| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, the execution-neutral consumer contract with automatic heartbeat, DB-durable hashed worker-attempt CAS, and exact consumer-to-attempt binding are **Implemented**. Application startup wiring, credential binding, and worker execution remain **Planned** |
-| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run and non-dispatched apply-intent creation HTTP, transition, cancellation CAS/HTTP, and real-PostgreSQL pre-live-read attempt takeover without sandbox replay exist; deployed queue consumption, process/container recovery, commit-uncertainty reconciliation, and apply execution remain Planned |
+| FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, the execution-neutral consumer contract with automatic heartbeat, DB-durable hashed worker-attempt CAS, exact consumer-to-attempt binding, and metadata-only cancellation/terminal-redelivery settlement are **Implemented**. Application startup wiring, credential binding, and worker execution remain **Planned** |
+| FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run and non-dispatched apply-intent creation HTTP, transition, cancellation CAS/HTTP, terminal cancellation acknowledgement, terminal redelivery without sandbox/preflight replay, and real-PostgreSQL pre-live-read attempt takeover without sandbox replay exist; deployed queue consumption, process/container recovery, commit-uncertainty reconciliation, and apply execution remain Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
 | FE-TRD-012 | Unknown versions/kinds, expired plans, incomplete evidence, and timeout are non-success states. | **Partially implemented:** internal run creation enforces expiry, 30-day cleanup excludes plans with run history, and the preflight primitive bounds query count/time and rejects unknown kinds/non-boolean evidence; worker lifecycle enforcement remains Planned |
 
@@ -163,11 +166,12 @@ by the graphical target architecture.
 | `SchemaModel` | Project-scoped desired-model identity/current revision pointer | Pointer and timestamps update |
 | `SchemaModelRevision` | Canonical desired JSON, digest, base snapshot, actor | Append-only through API |
 | `MigrationPlan` | Target-bound compiler output and expiry | No update route; immutable through API |
-| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation, current-revision-locked non-dispatched apply-intent confirmation, and polling exist; application startup wiring, credentials, and workers are absent |
+| `MigrationRun` / `MigrationRunDispatch` / `MigrationRunAttempt` / `MigrationRunEvent` | Durable run, identifier-only outbox, lease-bound hashed attempt ownership, and append-only evidence | **Partially implemented:** tables, hash-chain integrity, atomic creation/CAS writers, observed-base binding, dispatch/UUID-only signal/consumer contracts, exact-owner attempt acquire/renew/finish, consumer-to-attempt binding, dry-run creation/cancellation acknowledgement, terminal no-replay settlement, current-revision-locked non-dispatched apply-intent confirmation, and polling exist; application startup wiring, credentials, and workers are absent |
 
 Database schema truth is defined in `backend/app/models.py` and Alembic revisions
 `0008_schema_model_revision`, `0009_migration_plan`, `0010_migration_run`,
-`0011_migration_run_attempt`, and `0012_apply_intent_confirmation`. See
+`0011_migration_run_attempt`, `0012_apply_intent_confirmation`, and
+`0013_migration_run_cancellation`. See
 [DATA_MODEL.md](DATA_MODEL.md) for actual and planned ERDs.
 
 ## Current HTTP contract
@@ -190,7 +194,8 @@ and hands the durable run UUID to the read-only polling surface. It has no SQL,
 credential, target-selection, worker, or apply authority. The run
 status and audit panel is **Partially implemented** as an optional exact-run
 loader with fixed loading/error/retry behavior and stale-response suppression.
-It announces state, cancellation intent, and sanitized error codes, and shows
+It announces state, pending cancellation intent, terminal `cancelled`
+acknowledgement, and sanitized error codes, and shows
 only integrity-checked event-chain metadata; generic run/event evidence is not
 rendered. Sequential terminal-aware polling is **Partially implemented** with
 one outstanding request, cleanup on identity/unmount, and no polling after a

@@ -105,6 +105,7 @@ export type MigrationRunState =
   | 'passed'
   | 'drifted'
   | 'failed'
+  | 'cancelled'
   | 'applying'
   | 'reconciling'
   | 'verifying'

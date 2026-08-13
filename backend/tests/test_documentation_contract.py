@@ -134,6 +134,7 @@ def test_trd_tracks_current_apply_intent_and_migration_contract() -> None:
         "0010_migration_run",
         "0011_migration_run_attempt",
         "0012_apply_intent_confirmation",
+        "0013_migration_run_cancellation",
     ):
         assert revision in trd
 
@@ -337,6 +338,7 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
         in normalized_contract
     )
     assert "0012_apply_intent_confirmation" in data_model
+    assert "0013_migration_run_cancellation" in data_model
     assert "stable sanitized run-action error envelope" in normalized_contract
     assert "migration_run_dispatch" in normalized_contract
     assert "identifier-only transactional outbox" in normalized_contract
@@ -359,6 +361,30 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
     )
     assert "Startup fails closed when Valkey is unavailable" not in adr
     assert "Startup rejects an unconfigured Valkey backend" in adr
+
+
+def test_terminal_cancellation_maturity_is_canonical() -> None:
+    """Keep metadata acknowledgement distinct from deployed interruption."""
+
+    documents = (
+        _read(Path("ARCHITECTURE.md")),
+        _read(Path("docs/PRD.md")),
+        _read(Path("docs/TRD.md")),
+        _read(Path("docs/contracts/forward-engineering-v1.md")),
+        _read(Path("docs/adr/ADR-0004-durable-runs-and-recovery.md")),
+    )
+    normalized = tuple(
+        " ".join(document.lower().split()) for document in documents
+    )
+
+    assert all(
+        "terminal" in document and "cancelled" in document
+        for document in normalized
+    )
+    assert all(
+        "in-flight" in document and "planned" in document
+        for document in normalized
+    )
 
 
 def test_dispatch_relay_has_explicit_deployment_and_lifecycle_contract() -> None:

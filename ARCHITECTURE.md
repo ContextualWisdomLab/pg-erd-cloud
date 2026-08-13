@@ -33,7 +33,7 @@ support.
 | React/Vite ERD editor | Snapshot visualization, editing, export | **Implemented existing product**; typed browser transport is **Partially implemented** for immutable plan retrieval, exact dry-run/apply intent creation, run polling, and version-bound cancellation; the plan review panel is **Partially implemented** as a read-only provenance/risk/blocker/statement surface with no action authority; fixed loading/error/retry behavior and stale-response suppression is **Partially implemented** around exact plan retrieval; the Forward Engineering modal shell is **Partially implemented** with dialog focus/Escape/restoration behavior and one bounded dry-run intent action; the dry-run intent control is **Partially implemented** with server `can_dry_run`/blocker gating, exact plan digest submission, single-flight protection, and same-key ambiguous-failure retry, but it adds no browser SQL, target credential, worker, or apply authority; the run status and audit panel is **Partially implemented** as an optional read-only exact-run view that announces state and renders verified event-chain metadata without rendering generic evidence payloads; sequential terminal-aware polling is **Partially implemented** and stops after the first terminal response; the cancellation intent control is **Partially implemented** for non-terminal exact state versions with single-flight submission, accepted-state refresh, and refresh-only handling of ambiguous results; Forward UI remains **Planned** |
 | FastAPI control plane | Auth, tenancy, revisions, plan creation | **Partially implemented** |
 | Canonical model/compiler | Validate, hash, compile operations/blockers | **Implemented for narrow v1 subset** |
-| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event/outbox storage, verified polling, dry-run creation/cancellation, lease-bound hashed worker-attempt primitives, and the exact dual-lease adapter **Implemented**; application worker wiring **Planned** |
+| Metadata PostgreSQL | Snapshots, models, revisions, plans, jobs | Phase 1 entities, run/event/outbox storage, verified polling, dry-run creation/cancellation acknowledgement, terminal no-replay settlement, lease-bound hashed worker-attempt primitives, and the exact dual-lease adapter **Implemented**; application worker wiring **Planned** |
 | Isolated PostgreSQL validator | Exact-plan executable dry run | Signed-plan/version/base/transaction/convergence execution core and `complete_isolated_dry_run` server-derived success CAS **Partially implemented**; provisioning, dependency materialization, isolation proof, cleanup, and worker **Planned** |
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query, canonical snapshot/base-digest comparison, and DB-durable hashed attempt acquire/renew/finish primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification. Consumer-to-attempt binding is **Implemented** as an execution-neutral dual-lease adapter; application startup wiring, credential binding, worker execution, and apply remain **Planned**. |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
@@ -102,6 +102,10 @@ Implemented in the initial safe vertical slice:
   startup task, credential, sandbox, target, or DDL authority exists;
 - same-state, version-incrementing cancellation intent that forces a worker to
   observe cancellation before its next CAS transition can win;
+- metadata-only terminal cancellation acknowledgement after a failed attempt
+  acquisition locks and reloads the run, requires the persisted intent, and
+  records `cancelled` before exact signal acknowledgement; already-terminal
+  redelivery is settled without replaying sandbox or live preflight;
 - an editor-authorized `POST /api/migration-runs/{run_uuid}/cancel` boundary
   that binds the exact state version, actor, and request correlation identity
   to that cancellation event and returns only stable sanitized error codes;
@@ -136,7 +140,8 @@ partitions, extensions and distributed tables. This is a release blocker for
 general forward engineering, not a silent omission.
 
 Consumer-to-attempt binding is **Implemented** without execution authority.
-Planned: isolated sandbox lifecycle, application startup wiring and worker execution,
+Planned: isolated sandbox lifecycle, application startup wiring, deployed
+in-flight process cancellation, and worker execution,
 live-preflight credential binding around the durable attempt, plan approval,
 idempotent apply, post-commit re-introspection, and the complete accessible
 frontend apply/recovery flow. The caller-owned same-transaction snapshot

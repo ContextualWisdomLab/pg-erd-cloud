@@ -2,7 +2,7 @@
 
 - **Document status:** Current physical model plus accepted planned extension
 - **Runtime status:** Partially implemented; not production-ready
-- **Last reconciled with ORM and Alembic:** 2026-08-11
+- **Last reconciled with ORM and Alembic:** 2026-08-14
 
 Repository migrations, ORM definitions, and the Mermaid ERDs below are
 authoritative. The
@@ -251,8 +251,8 @@ execution input.
 
 `migration_run`, `migration_run_dispatch`, `migration_run_event`, and
 `migration_run_attempt` now exist in the ORM and Alembic revisions
-`0010_migration_run`, `0011_migration_run_attempt`, and
-`0012_apply_intent_confirmation` with the fields
+`0010_migration_run`, `0011_migration_run_attempt`,
+`0012_apply_intent_confirmation`, and `0013_migration_run_cancellation` with the fields
 shown in the implemented ERD
 above. Passed-dry-run, confirmation-digest, and destructive-confirmation
 bindings are physical and Implemented. The logical diagram below retains the

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { MigrationRun } from '../../types'
 import { RunStatusPanel } from './RunStatusPanel'
+import { isTerminalMigrationRunState } from './runStates'
 
 const run: MigrationRun = {
   migration_run_uuid: 'run-1',
@@ -92,5 +93,26 @@ describe('RunStatusPanel', () => {
       'commit_outcome_unknown',
     )
     expect(screen.getByText('결과가 불명확하며 자동 재실행이 금지됩니다.')).toBeInTheDocument()
+  })
+
+  it('announces acknowledged cancellation as terminal without implying live DDL', () => {
+    render(
+      <RunStatusPanel
+        run={{
+          ...run,
+          state: 'cancelled',
+          cancellation_requested: true,
+          error_code: null,
+        }}
+      />,
+    )
+
+    expect(isTerminalMigrationRunState('cancelled')).toBe(true)
+    expect(screen.getByRole('status', { name: '마이그레이션 실행 상태' })).toHaveTextContent(
+      '취소 완료',
+    )
+    expect(screen.getByText('취소가 확인됐으며 라이브 DDL을 실행하지 않았습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('alert', { name: '취소 완료' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert', { name: '취소 요청' })).not.toBeInTheDocument()
   })
 })

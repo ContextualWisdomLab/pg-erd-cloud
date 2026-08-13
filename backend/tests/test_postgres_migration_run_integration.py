@@ -123,6 +123,81 @@ def _preflight_asyncpg_url() -> str:
     )
 
 
+async def _delete_project_fixture(
+    session: AsyncSession, *, project_space_uuid: uuid.UUID
+) -> None:
+    """Delete one committed integration fixture in restrictive-FK order."""
+
+    parameters = {"project_space_uuid": project_space_uuid}
+    await session.execute(
+        text(
+            "DELETE FROM migration_run "
+            "WHERE project_space_uuid = :project_space_uuid"
+        ),
+        parameters,
+    )
+    await session.execute(
+        text(
+            "DELETE FROM migration_plan "
+            "WHERE project_space_uuid = :project_space_uuid"
+        ),
+        parameters,
+    )
+    await session.execute(
+        text(
+            "DELETE FROM schema_model_revision "
+            "WHERE schema_model_uuid IN ("
+            "SELECT schema_model_uuid FROM schema_model "
+            "WHERE project_space_uuid = :project_space_uuid"
+            ")"
+        ),
+        parameters,
+    )
+    await session.execute(
+        text(
+            "DELETE FROM project_space "
+            "WHERE project_space_uuid = :project_space_uuid"
+        ),
+        parameters,
+    )
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_persists_terminal_cancellation_state_contract() -> None:
+    """Verify migration checks admit cancellation in runs and event history."""
+
+    connection = await asyncpg.connect(_asyncpg_url())
+    try:
+        rows = await connection.fetch(
+            "SELECT conname, pg_get_constraintdef(oid) AS definition "
+            "FROM pg_catalog.pg_constraint "
+            "WHERE conname = ANY($1::text[]) ORDER BY conname",
+            [
+                "ck_migration_run__state",
+                "ck_migration_run__kind_state",
+                "ck_migration_run_event__state_before",
+                "ck_migration_run_event__state_after",
+            ],
+        )
+        definitions = {
+            str(row["conname"]): str(row["definition"]) for row in rows
+        }
+        assert set(definitions) == {
+            "ck_migration_run__state",
+            "ck_migration_run__kind_state",
+            "ck_migration_run_event__state_before",
+            "ck_migration_run_event__state_after",
+        }
+        assert all(
+            "cancelled" in definition for definition in definitions.values()
+        )
+        assert definitions["ck_migration_run__kind_state"].count(
+            "cancelled"
+        ) == 2
+    finally:
+        await connection.close()
+
+
 def _preflight_plan(*preconditions: dict[str, object]) -> dict[str, object]:
     return {
         "can_dry_run": True,
@@ -900,12 +975,8 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
         ]
     finally:
         async with sessions() as cleanup_session:
-            await cleanup_session.execute(
-                text(
-                    "DELETE FROM project_space "
-                    "WHERE project_space_uuid = :project_space_uuid"
-                ),
-                {"project_space_uuid": project_uuid},
+            await _delete_project_fixture(
+                cleanup_session, project_space_uuid=project_uuid
             )
             await cleanup_session.execute(
                 text(
@@ -1181,12 +1252,8 @@ async def test_real_postgres_concurrent_duplicate_apply_intents_choose_one_winne
             ) == 0
     finally:
         async with sessions() as cleanup_session:
-            await cleanup_session.execute(
-                text(
-                    "DELETE FROM project_space "
-                    "WHERE project_space_uuid = :project_space_uuid"
-                ),
-                {"project_space_uuid": project_uuid},
+            await _delete_project_fixture(
+                cleanup_session, project_space_uuid=project_uuid
             )
             await cleanup_session.execute(
                 text(

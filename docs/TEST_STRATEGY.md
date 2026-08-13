@@ -190,14 +190,16 @@ exact lease-token, performs monotonic exact lease renewal, rejects expired-owner
 and stale-token renewal plus stale acknowledgement, releases for retry,
 reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, heartbeat
-renewal, handler cancellation and task retrieval on lease loss, bounded
-timing, and fixed non-secret lifecycle logs. The
+renewal, terminal cancellation acknowledgement, terminal redelivery without
+sandbox/preflight replay, handler cancellation and task retrieval on lease
+loss, bounded timing, and fixed non-secret lifecycle logs. The
 durable-attempt unit contract proves run-row serialization, one-active-owner
 uniqueness, monotonic numbering, expired-owner abandonment, hashed identity
 storage, executable/cancellation checks, monotonic exact-owner renewal, and
 unexpired exact-owner finish. PostgreSQL 14–18 acceptance applies the attempt
 migration and proves stale-token rejection, terminal-run renewal denial,
-exact-owner completion, and rollback cleanup. The same matrix composes both
+exact-owner completion, migration `0013` cancellation-state checks, and
+restrictive-FK/rollback cleanup. The same matrix composes both
 stores at the consumer boundary: failure abandons the exact PostgreSQL attempt
 and reschedules the exact Valkey claim; retry creates the next monotonic
 attempt, completes it, acknowledges the signal, and leaves no ready,
@@ -295,8 +297,9 @@ and no-SQL submission, synchronous single-flight exclusion, fixed secret-safe
 errors, same-key ambiguous retry, reused-run reporting, and stale-response
 suppression after plan identity changes. The run status and audit panel is
 **Partially implemented** with exact-run loading, fixed error/retry,
-stale-response suppression, bounded terminal-state semantics, cancellation and
-sanitized error alerts, hostile event text rendering, digest-chain metadata,
+stale-response suppression, bounded terminal-state semantics, pending versus
+acknowledged cancellation and sanitized error alerts, hostile event text
+rendering, digest-chain metadata,
 and non-rendering of generic evidence payloads. Sequential terminal-aware
 polling is **Partially implemented** and tested to issue one request at a time
 and stop after the first terminal response. The cancellation intent control is

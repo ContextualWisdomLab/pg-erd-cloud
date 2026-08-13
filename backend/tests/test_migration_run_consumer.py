@@ -6,12 +6,15 @@ import asyncio
 import datetime as dt
 import uuid
 from collections.abc import Callable
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.forward.migration_run import MigrationRunAttemptClaim
+from app.forward.migration_run import (
+    MigrationRunAttemptClaim,
+    MigrationRunContractError,
+)
 from app.jobs.migration_run_consumer import (
     MigrationRunAttemptHandlerError,
     MigrationRunAttemptLeaseLost,
@@ -22,6 +25,7 @@ from app.jobs.migration_run_consumer import (
     run_migration_run_consumer_forever,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
+from app.models import MigrationRun
 
 
 def _session_factory() -> AsyncSession:
@@ -108,6 +112,120 @@ async def test_attempt_bound_handler_finishes_exact_success_before_signal_ack() 
     )
     assert factory.call_count == 2
     assert all(tx.__aexit__.await_count == 1 for tx in factory.transactions)
+
+
+@pytest.mark.asyncio
+async def test_attempt_bound_handler_acknowledges_persisted_cancellation_without_retry() -> None:
+    """A redelivered cancelled run terminates before acquiring execution authority."""
+
+    now = dt.datetime(2026, 8, 11, 7, tzinfo=dt.timezone.utc)
+    run_uuid = uuid.uuid4()
+    run = MigrationRun(
+        migration_run_uuid=run_uuid,
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="sandbox_running",
+        state_version=3,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=True,
+        evidence_json={},
+        created_at=now,
+        updated_at=now,
+        started_at=now,
+    )
+    signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    factory = _transactional_session_factory()
+    executor = AsyncMock()
+
+    def configure_session() -> MagicMock:
+        session = factory()
+        session.scalar = AsyncMock(side_effect=[run, run])
+        session.execute = AsyncMock(return_value=MagicMock(rowcount=1))
+        session.add = Mock()
+        return session
+
+    configured_factory = MagicMock(side_effect=configure_session)
+    with patch(
+        "app.jobs.migration_run_consumer.acquire_migration_run_attempt",
+        new=AsyncMock(
+            side_effect=MigrationRunContractError(
+                "migration run is not executable"
+            )
+        ),
+    ):
+        handler = make_attempt_bound_migration_run_handler(
+            executor,
+            worker_identity="forward-worker-1",
+            attempt_lease_seconds=60,
+        )
+        await handler(configured_factory, signal_claim)
+
+    assert run.state == "cancelled"
+    assert run.state_version == 4
+    assert run.cancellation_requested is True
+    assert run.finished_at is not None
+    executor.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_attempt_bound_handler_acks_terminal_redelivery_without_replay() -> None:
+    """A crash after terminal commit cannot replay sandbox or live preflight."""
+
+    now = dt.datetime(2026, 8, 11, 7, tzinfo=dt.timezone.utc)
+    run_uuid = uuid.uuid4()
+    run = MigrationRun(
+        migration_run_uuid=run_uuid,
+        project_space_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        run_kind="dry_run",
+        state="passed",
+        state_version=4,
+        idempotency_key_hash="a" * 64,
+        plan_digest="b" * 64,
+        request_digest="c" * 64,
+        latest_event_digest="d" * 64,
+        requested_by_user_uuid=uuid.uuid4(),
+        cancellation_requested=False,
+        observed_base_digest="e" * 64,
+        evidence_json={},
+        created_at=now,
+        updated_at=now,
+        started_at=now,
+        finished_at=now,
+    )
+    signal_claim = MigrationRunSignalClaim(run_uuid, uuid.uuid4())
+    factory = _transactional_session_factory()
+    executor = AsyncMock()
+
+    def configure_session() -> MagicMock:
+        session = factory()
+        session.scalar = AsyncMock(return_value=run)
+        return session
+
+    configured_factory = MagicMock(side_effect=configure_session)
+    with patch(
+        "app.jobs.migration_run_consumer.acquire_migration_run_attempt",
+        new=AsyncMock(
+            side_effect=MigrationRunContractError(
+                "migration run is not executable"
+            )
+        ),
+    ):
+        handler = make_attempt_bound_migration_run_handler(
+            executor,
+            worker_identity="forward-worker-1",
+            attempt_lease_seconds=60,
+        )
+        await handler(configured_factory, signal_claim)
+
+    assert run.state == "passed"
+    assert run.state_version == 4
+    executor.assert_not_awaited()
 
 
 @pytest.mark.asyncio

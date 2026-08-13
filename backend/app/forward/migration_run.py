@@ -57,6 +57,7 @@ DRY_RUN_STATES = frozenset(
         "passed",
         "drifted",
         "failed",
+        "cancelled",
     }
 )
 APPLY_RUN_STATES = frozenset(
@@ -72,17 +73,22 @@ APPLY_RUN_STATES = frozenset(
         "failed_rolled_back",
         "applied_with_drift",
         "outcome_unknown",
+        "cancelled",
     }
 )
 
 _TRANSITIONS = {
     "dry_run": {
-        "queued": frozenset({"sandbox_running", "failed"}),
-        "sandbox_running": frozenset({"live_preflight_running", "failed"}),
-        "live_preflight_running": frozenset({"passed", "drifted", "failed"}),
+        "queued": frozenset({"sandbox_running", "failed", "cancelled"}),
+        "sandbox_running": frozenset(
+            {"live_preflight_running", "failed", "cancelled"}
+        ),
+        "live_preflight_running": frozenset(
+            {"passed", "drifted", "failed", "cancelled"}
+        ),
     },
     "apply": {
-        "queued": frozenset({"applying", "drifted_no_apply"}),
+        "queued": frozenset({"applying", "drifted_no_apply", "cancelled"}),
         "applying": frozenset(
             {"reconciling", "verifying", "failed_rolled_back", "outcome_unknown"}
         ),
@@ -1002,6 +1008,20 @@ async def transition_migration_run(
 
     current_state = run.state
     validate_run_transition(run.run_kind, current_state, next_state)
+    acknowledges_cancellation = next_state == "cancelled"
+    if acknowledges_cancellation:
+        if not run.cancellation_requested:
+            raise MigrationRunContractError(
+                "migration run cancellation intent is required"
+            )
+        if (
+            event_type != "cancellation_acknowledged"
+            or canonical_evidence
+            or actor_user_uuid is not None
+        ):
+            raise MigrationRunContractError(
+                "migration run cancellation acknowledgement is invalid"
+            )
     binds_observed_base = (
         current_state == "live_preflight_running"
         and next_state in {"passed", "drifted"}
@@ -1069,7 +1089,11 @@ async def transition_migration_run(
         "latest_event_digest": event_digest,
         "updated_at": transition_time,
     }
-    if current_state == "queued" and started_at is None:
+    if (
+        current_state == "queued"
+        and next_state != "cancelled"
+        and started_at is None
+    ):
         started_at = transition_time
         values["started_at"] = started_at
     if not _TRANSITIONS[run.run_kind].get(next_state):
@@ -1088,6 +1112,11 @@ async def transition_migration_run(
                 MigrationRun.state == current_state,
                 MigrationRun.state_version == expected_state_version,
                 MigrationRun.latest_event_digest == previous_event_digest,
+                *(
+                    (MigrationRun.cancellation_requested.is_(True),)
+                    if acknowledges_cancellation
+                    else ()
+                ),
             )
             .values(**values)
             .execution_options(synchronize_session=False)

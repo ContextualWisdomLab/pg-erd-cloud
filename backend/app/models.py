@@ -357,16 +357,17 @@ class MigrationRun(Base):
             "'passed', 'drifted', 'failed', 'applying', 'reconciling', "
             "'verifying', 'verified', 'drifted_no_apply', 'not_applied', "
             "'verification_failed', 'failed_rolled_back', "
-            "'applied_with_drift', 'outcome_unknown')",
+            "'applied_with_drift', 'outcome_unknown', 'cancelled')",
             name="ck_migration_run__state",
         ),
         CheckConstraint(
             "(run_kind = 'dry_run' AND state IN ('queued', 'sandbox_running', "
-            "'live_preflight_running', 'passed', 'drifted', 'failed')) OR "
+            "'live_preflight_running', 'passed', 'drifted', 'failed', "
+            "'cancelled')) OR "
             "(run_kind = 'apply' AND state IN ('queued', 'applying', "
             "'reconciling', 'verifying', 'verified', 'drifted_no_apply', "
             "'not_applied', 'verification_failed', 'failed_rolled_back', "
-            "'applied_with_drift', 'outcome_unknown'))",
+            "'applied_with_drift', 'outcome_unknown', 'cancelled'))",
             name="ck_migration_run__kind_state",
         ),
         CheckConstraint(
@@ -595,11 +596,11 @@ class MigrationRunEvent(Base):
             name="ck_migration_run_event__event_type",
         ),
         CheckConstraint(
-            "state_before IS NULL OR state_before IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown')",
+            "state_before IS NULL OR state_before IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown', 'cancelled')",
             name="ck_migration_run_event__state_before",
         ),
         CheckConstraint(
-            "state_after IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown')",
+            "state_after IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown', 'cancelled')",
             name="ck_migration_run_event__state_after",
         ),
     )

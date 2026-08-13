@@ -26,7 +26,7 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Structured immutable plan compilation/persistence | Implemented bounded subset | May be reviewed; blocked plans are not executable. |
 | Real-target preflight and plan expiry enforcement | Partial | Structured bounded boolean reads, `execute_bound_live_preflight` same-transaction snapshot/check binding, `complete_live_preflight` server-derived terminal CAS, `complete_isolated_dry_run` sandbox result binding, DB-durable hashed attempt ownership, and execution-neutral consumer-to-attempt binding exist. PostgreSQL 14–18 CI uses a restricted ephemeral target login and proves DDL denial. Deployed credential isolation, application startup wiring, worker execution, and target audit evidence are absent, so no plan is production-authorized. |
 | Isolated disposable PostgreSQL dry run | Partially implemented | Exact signed-plan execution, rollback, version/base checks, target-digest convergence, and `complete_isolated_dry_run` server-derived success CAS have a PostgreSQL 14–18-tested core. Provisioning, dependency materialization, deployed isolation/egress proof, cleanup, and worker binding are Planned; no current result is release evidence. |
-| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent, an execution-neutral consumer contract, consumer-to-attempt binding, and an exact deployer-confirmed apply intent with no dispatch exist; no application startup wiring, sandbox lifecycle, apply executor, or recovery worker exists. |
+| Durable dry-run/apply states and events | Partially implemented | Storage, CAS/event integrity, polling, cancellation intent and terminal acknowledgement, terminal redelivery without sandbox/preflight replay, an execution-neutral consumer contract, consumer-to-attempt binding, and an exact deployer-confirmed apply intent with no dispatch exist; no application startup wiring, sandbox lifecycle, apply executor, or recovery worker exists. |
 | Stored-plan executor and in-lock revalidation | Planned | Do not enable structured live apply. |
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Partially implemented | Read-only plan review, bounded dry-run intent, verified run polling/audit, and exact-version cancellation are available. Apply/recovery and composed browser E2E remain Planned; do not simulate success. |
@@ -65,8 +65,9 @@ operational artifact is attached to the release record.
 - [ ] Target allowlist, DNS/IP pinning, TLS policy, certificate roots, firewall
   egress, and credential rotation are tested in the deployment environment.
 - [x] Run/event/outbox migrations, idempotency uniqueness, compare-and-swap
-  transitions, atomic identifier-only dispatch creation, cancellation intent,
-  and evidence redaction are verified by repository tests.
+  transitions, atomic identifier-only dispatch creation, cancellation intent
+  and terminal acknowledgement, terminal no-replay settlement, and evidence
+  redaction are verified by repository tests.
 - [x] Due dispatch claiming uses `FOR UPDATE SKIP LOCKED` and exact-attempt
   publish-state CAS in a caller-owned transaction.
 - [x] One bounded publisher emits only `migration_run_uuid` on a dedicated
