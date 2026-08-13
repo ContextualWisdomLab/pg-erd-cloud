@@ -193,6 +193,9 @@ submits only its UUID and exact digest, admits one request at a time, preserves
 the bounded idempotency key across ambiguous retry, ignores stale responses,
 and hands the durable run UUID to the read-only polling surface. It has no SQL,
 credential, target-selection, worker, or apply authority. The run
+identity is modal-session scoped: an accepted dry run replaces the supplied
+audit surface while open, and a close/reopen cycle restores the caller-supplied
+run so stale session state cannot restart an obsolete audit surface. The run
 status and audit panel is **Partially implemented** as an optional exact-run
 loader with fixed loading/error/retry behavior and stale-response suppression.
 It announces state, pending cancellation intent, terminal `cancelled`

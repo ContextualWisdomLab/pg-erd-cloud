@@ -38,6 +38,12 @@ support.
 | Live preflight/apply worker | Read-only evidence, locked execution, recovery | Bounded structured read-query, canonical snapshot/base-digest comparison, and DB-durable hashed attempt acquire/renew/finish primitives **Implemented**; `execute_bound_live_preflight` binds a caller-owned capture callback and checks to one read-only repeatable-read transaction, and `complete_live_preflight` derives the only valid terminal CAS classification. Consumer-to-attempt binding is **Implemented** as an execution-neutral dual-lease adapter; application startup wiring, credential binding, worker execution, and apply remain **Planned**. |
 | External target PostgreSQL | Reverse source and future apply target | Reverse **Implemented**; target apply workflow **Planned** |
 
+Modal orchestration keeps one active run audit identity: an accepted dry-run
+replaces the supplied run surface for that open session, while closing and
+reopening the modal discards the session-created identity and restores the
+caller-supplied run. This avoids duplicate polling/live regions without making
+the browser an execution authority.
+
 The browser is an intent and review surface, never a SQL authority. The API
 persists immutable model revisions. The compiler validates a deliberately small
 PostgreSQL 14–18 model, renders a structured transactional plan, associates

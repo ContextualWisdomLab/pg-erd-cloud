@@ -39,6 +39,9 @@ implemented** as a dedicated accessible container. The dry-run intent control
 is **Partially implemented**: it follows the server's `can_dry_run` and blocker
 decision, submits only the exact plan identity/digest, prevents concurrent
 submits, and retains one bounded idempotency key across an ambiguous retry.
+Within an open modal, an accepted dry run replaces any supplied audit run so
+only one status/polling surface remains active. Closing and reopening restores
+the caller-supplied run instead of reusing that modal-session override.
 Graph/model adapters, apply controls, and broader orchestration remain absent.
 The run status and audit
 panel is **Partially implemented** as an optional read-only exact-run view. It
