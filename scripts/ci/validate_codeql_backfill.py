@@ -12,7 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
 INPUT_EXPRESSION = re.compile(
     r"\$\{\{\s*(?P<expression>"
-    r"inputs\.[A-Za-z_][A-Za-z0-9_-]*|github\.event\.inputs\.[^}\s]+"
+    r"(?:inputs|github\.event\.inputs)"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_-]*|\s*\[[^]\r\n]+\])"
     r")\s*\}\}"
 )
 ALLOWED_INPUT_EXPRESSION_LINES = {
@@ -34,7 +35,9 @@ def require(condition: bool, message: str) -> None:
 def _validate_input_expressions(text: str) -> None:
     """Allow workflow-dispatch inputs only at reviewed non-shell boundaries."""
 
-    observed = {expression: set() for expression in ALLOWED_INPUT_EXPRESSION_LINES}
+    observed: dict[str, set[str]] = {
+        expression: set() for expression in ALLOWED_INPUT_EXPRESSION_LINES
+    }
     for line in text.splitlines():
         stripped = line.strip()
         for match in INPUT_EXPRESSION.finditer(line):
@@ -209,6 +212,7 @@ def validate_workflow(text: str) -> None:
 
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")
+    assert language_match is not None
     languages = {
         item.strip().strip('"').strip("'")
         for item in language_match.group("languages").split(",")

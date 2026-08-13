@@ -57,14 +57,24 @@ def test_validator_rejects_unapproved_input_expression_use(
         _validate(unsafe)
 
 
-def test_validator_rejects_unknown_direct_input_expression() -> None:
+@pytest.mark.parametrize(
+    "expression",
+    (
+        "${{ inputs.unreviewed_input }}",
+        "${{ inputs['unreviewed_input'] }}",
+        "${{ github.event.inputs['unreviewed_input'] }}",
+    ),
+)
+def test_validator_rejects_unknown_direct_input_expression(
+    expression: str,
+) -> None:
     """Reject newly declared dispatch inputs outside the reviewed allowlist."""
 
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     unsafe = workflow.replace(
         "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}",
         "          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}\n"
-        "          EXTRA_INPUT: ${{ inputs.unreviewed_input }}",
+        f"          EXTRA_INPUT: {expression}",
         1,
     )
 
