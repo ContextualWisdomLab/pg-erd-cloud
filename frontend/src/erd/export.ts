@@ -72,12 +72,12 @@ function fkColumnsForEdge(
   // ⚡ Bolt: Optimize handle lookup to O(1) by decoding the handle string directly
   // and using a precomputed O(1) Set to check for column existence.
   if (edge.sourceHandle || edge.targetHandle) {
-    const decodedSource = decodeHandleId(edge.sourceHandle);
+    const decodedSource = decodeHandleId(edge.sourceHandle, 'source');
     const sourceHandleColumn = decodedSource !== null && sourceNodeColumnNames.has(decodedSource)
       ? decodedSource
       : undefined;
 
-    const decodedTarget = decodeHandleId(edge.targetHandle);
+    const decodedTarget = decodeHandleId(edge.targetHandle, 'target');
     const targetHandleColumn = decodedTarget !== null && targetNodeColumnNames.has(decodedTarget)
       ? decodedTarget
       : undefined;

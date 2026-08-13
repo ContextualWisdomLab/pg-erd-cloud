@@ -45,6 +45,14 @@ describe('decodeHandleId', () => {
     expect(decodeHandleId('tgt-c-0069-0064')).toBe('id');
   });
 
+  it('should reject handles whose role does not match the caller', () => {
+    expect(decodeHandleId('src-c-0069-0064', 'source')).toBe('id');
+    expect(decodeHandleId('tgt-c-0069-0064', 'target')).toBe('id');
+    expect(decodeHandleId('src-c-0069-0064', 'target')).toBeNull();
+    expect(decodeHandleId('tgt-c-0069-0064', 'source')).toBeNull();
+    expect(decodeHandleId('c-0069-0064', 'source')).toBeNull();
+  });
+
   it('should decode tgt-c-empty correctly', () => {
     expect(decodeHandleId('tgt-c-empty')).toBe('');
   });

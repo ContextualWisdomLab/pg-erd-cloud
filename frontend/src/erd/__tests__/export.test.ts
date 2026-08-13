@@ -106,6 +106,13 @@ describe('exportDDL', () => {
     expect(ddl).toContain('REFERENCES "public.users" ("id")');
     expect(ddl).not.toContain('/* source columns */');
     expect(ddl).not.toContain('/* target columns */');
+
+    const swappedRoles = exportDDL(nodes, [{
+      ...edges[0],
+      sourceHandle: targetColumnHandleId('user_id'),
+      targetHandle: sourceColumnHandleId('id'),
+    }]);
+    expect(swappedRoles).not.toContain('ALTER TABLE');
   });
 
   it('exports composite foreign key columns from edge data in order', () => {

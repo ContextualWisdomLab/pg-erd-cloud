@@ -55,7 +55,7 @@ export function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNo
 
     if (edge.sourceHandle || edge.targetHandle) {
       if (edge.sourceHandle) {
-        const decodedSourceColumn = decodeHandleId(edge.sourceHandle);
+        const decodedSourceColumn = decodeHandleId(edge.sourceHandle, 'source');
         if (decodedSourceColumn !== null) {
           info.columns.add(decodedSourceColumn);
         }

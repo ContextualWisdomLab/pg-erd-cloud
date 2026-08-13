@@ -82,7 +82,7 @@ export function exportPrisma(
 
     let sourceField = "";
     if (edge.sourceHandle) {
-      const decodedSource = decodeHandleId(edge.sourceHandle);
+      const decodedSource = decodeHandleId(edge.sourceHandle, 'source');
       if (decodedSource !== null) {
         sourceField = decodedSource;
       } else if (edge.sourceHandle.startsWith("src-")) {
@@ -98,7 +98,7 @@ export function exportPrisma(
 
     let targetField = "id"; // fallback
     if (edge.targetHandle) {
-      const decodedTarget = decodeHandleId(edge.targetHandle);
+      const decodedTarget = decodeHandleId(edge.targetHandle, 'target');
       if (decodedTarget !== null) {
         targetField = decodedTarget;
       } else if (edge.targetHandle.startsWith("tgt-")) {
