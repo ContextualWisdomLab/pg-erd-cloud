@@ -107,6 +107,37 @@ describe('exportPrisma', () => {
     expect(result).not.toContain('@relation(');
   });
 
+  it('preserves multiple validated relations that share one source field', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'parent', position: { x: 0, y: 0 },
+        data: { title: 'parent', badges: { pk: true, fk: false }, columns: [
+          { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+        ] },
+      },
+      {
+        id: 'child', position: { x: 0, y: 0 },
+        data: { title: 'child', badges: { pk: false, fk: true }, columns: [
+          { column_name: 'parent_id', data_type: 'integer', is_pk: false, is_not_null: true },
+        ] },
+      },
+    ];
+    const edges: Edge[] = ['relation_one', 'relation_two'].map((label) => ({
+      id: label,
+      source: 'child',
+      target: 'parent',
+      sourceHandle: sourceColumnHandleId('parent_id'),
+      targetHandle: targetColumnHandleId('id'),
+      label,
+    }));
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('parent_parent_id_relation_one parent @relation("relation_one"');
+    expect(result).toContain('parent_parent_id_relation_two parent @relation("relation_two"');
+    expect(result).toContain('child_parent_id_relation_one child[] @relation("relation_one")');
+    expect(result).toContain('child_parent_id_relation_two child[] @relation("relation_two")');
+  });
+
   it('maps various types properly', () => {
     const nodes: Node<TableNodeData>[] = [
       {
