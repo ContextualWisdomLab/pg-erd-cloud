@@ -173,10 +173,11 @@ def _make_work(
         or required_state_version < 1
     ):
         raise _invalid_metadata()
+    statement_digest = getattr(plan, "statement_digest", None)
     try:
-        digest_valid = verify_migration_plan_digest(
-            plan_json, getattr(plan, "statement_digest", None)
-        )
+        digest_valid = isinstance(
+            statement_digest, str
+        ) and verify_migration_plan_digest(plan_json, statement_digest)
     except Exception:  # noqa: BLE001
         digest_valid = False
     expires_at = getattr(plan, "expires_at", None)
