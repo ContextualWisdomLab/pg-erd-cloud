@@ -193,11 +193,11 @@ async def test_scheduled_relay_rolls_back_failed_publish_and_logs_fixed_code(
 ) -> None:
     """Publication failure is rolled back without logging exception contents."""
 
-    secret = "forbidden-log-marker-7f42"
+    forbidden_log_marker = "forbidden-log-marker-7f42"
     factory = _session_factory()
     with patch(
         "app.jobs.migration_dispatch_relay.publish_one_migration_dispatch",
-        new=AsyncMock(side_effect=[RuntimeError(secret), None]),
+        new=AsyncMock(side_effect=[RuntimeError(forbidden_log_marker), None]),
     ), patch(
         "app.jobs.migration_dispatch_relay.asyncio.sleep",
         new=AsyncMock(side_effect=[None, asyncio.CancelledError]),
@@ -208,7 +208,7 @@ async def test_scheduled_relay_rolls_back_failed_publish_and_logs_fixed_code(
     first_exit_args = factory.transactions[0].__aexit__.await_args_list[0]
     assert first_exit_args.args[0] is RuntimeError
     assert "migration_dispatch_relay_iteration_failed" in caplog.text
-    assert secret not in caplog.text
+    assert forbidden_log_marker not in caplog.text
 
 
 @pytest.mark.asyncio
