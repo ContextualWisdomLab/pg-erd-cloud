@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { decodeHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -70,7 +70,7 @@ export function exportPrisma(
 
     let sourceField = "";
     if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
+      sourceField = decodeHandleId(edge.sourceHandle.slice(4));
       fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
@@ -78,7 +78,7 @@ export function exportPrisma(
 
     let targetField = "id"; // fallback
     if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+      targetField = decodeHandleId(edge.targetHandle.slice(4));
     }
 
     if (sourceField) {
@@ -113,7 +113,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);

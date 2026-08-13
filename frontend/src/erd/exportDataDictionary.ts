@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId } from './handleUtils';
+import { decodeSourceHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -59,7 +59,7 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
     }
 
     if (edge.sourceHandle) {
-      info.handles.add(edge.sourceHandle);
+      info.handles.add(decodeSourceHandleId(edge.sourceHandle));
     }
   }
 
@@ -78,8 +78,7 @@ function isForeignKeyColumn(
     return true;
   }
 
-  const handleId = sourceColumnHandleId(columnName);
-  return info.handles.has(handleId);
+  return info.handles.has(columnName);
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {

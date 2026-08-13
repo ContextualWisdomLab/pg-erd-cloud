@@ -14,3 +14,24 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function decodeHandleId(handleId: string): string {
+  if (handleId === 'c-empty') return '';
+  if (!handleId.startsWith('c-')) return handleId;
+
+  const encodedParts = handleId.slice(2).split('-');
+  return encodedParts.map((hex) => {
+    const codePoint = parseInt(hex, 16);
+    return isNaN(codePoint) ? '' : String.fromCodePoint(codePoint);
+  }).join('');
+}
+
+export function decodeSourceHandleId(sourceHandleId: string): string {
+  if (!sourceHandleId.startsWith('src-')) return sourceHandleId;
+  return decodeHandleId(sourceHandleId.slice(4));
+}
+
+export function decodeTargetHandleId(targetHandleId: string): string {
+  if (!targetHandleId.startsWith('tgt-')) return targetHandleId;
+  return decodeHandleId(targetHandleId.slice(4));
+}

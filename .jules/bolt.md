@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-08-13 - [O(1) 엣지 핸들 디코딩을 통한 O(N*C) 인코딩 병목 제거]
+**Learning:** ERD 내보내기 로직(Mermaid, Prisma, Data Dictionary 등)에서, 컬럼과 엣지의 연결 여부를 판단하기 위해 O(N * C) 루프 내부에서 `sanitizeHandleId`를 통해 매 컬럼명을 인코딩하여 검사하면 심각한 성능 저하와 불필요한 가비지 컬렉션을 유발합니다.
+**Action:** O(E) 루프에서 `sourceHandle` / `targetHandle`을 한 번만 `decodeHandleId`로 원본 문자열로 복원한 뒤 Set/Map에 저장하십시오. 이후 O(N * C) 루프에서는 인코딩 함수 호출 없이, 복원된 네이티브 문자열과 컬럼명을 직접 비교(O(1))하여 복잡도와 오버헤드를 대폭 줄여야 합니다.
