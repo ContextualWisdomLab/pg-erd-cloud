@@ -84,11 +84,12 @@ Three deployable pieces in one repo:
 
 ### Backend layout (backend/app/)
 
-- `api/` — FastAPI routers (projects, connections, snapshots, share, diagram_views, annotations, api_keys, auth_routes, me), all mounted in `main.py` under `/api`.
-- `jobs/` — Postgres-backed job queue (`JobQueue` table). Reverse engineering never blocks the request path: the API enqueues a `snapshot` job, and an in-process worker task (started in the FastAPI lifespan in `main.py`) claims and executes it. Optional Valkey/Redis (`valkey_queue.py`) is only a wake-up signal; Postgres remains the source of truth.
+- `api/` — FastAPI routers (projects, connections, snapshots, share, diagram_views, annotations, api_keys, auth_routes, me, schema_models, migration_plans, migration_runs), all mounted in `main.py` under `/api`.
+- `jobs/` — Postgres-backed job queue (`JobQueue` table). Reverse engineering never blocks the request path: the API enqueues a `snapshot` job, and an in-process worker task (started in the FastAPI lifespan in `main.py`) claims and executes it. Forward Engineering adds a UUID-only migration dispatch relay, durable attempt leases, and provider-neutral dry-run/preflight orchestration; concrete sandbox and target credential providers are intentionally not wired into application startup yet. Optional Valkey/Redis (`valkey_queue.py`) is only a wake-up signal; Postgres remains the source of truth.
 - `pg_introspect/` — pg_catalog-based introspection of the *target* PostgreSQL: schemas/tables/columns, PK/FK/UNIQUE/CHECK, indexes. Index access methods are discovered dynamically from `pg_am`/`pg_class.relam` and index DDL is preserved losslessly via `pg_get_indexdef()` — do not hardcode an index-type list (project principle, see README). Also synthesizes safe `example_value` column hints from name/type metadata only (never samples real table data).
 - `snowflake_introspect/` — optional Snowflake reverse engineering (INFORMATION_SCHEMA; requires the `snowflake` extra).
-- `ddl/` — forward engineering: snapshot → DDL export with dialect mapping, migration SQL, migration-safety checks.
+- `forward/` — partial Forward Engineering control plane: immutable schema-model revisions and structured plans, bounded isolated-dry-run/live-preflight execution cores, durable run/event state transitions, and fail-closed capability contracts. It is not a production apply executor.
+- `ddl/` — export-oriented snapshot → DDL helpers with dialect mapping and migration-safety checks; these exports do not grant execution authority.
 - `forward/` — server-authoritative canonical schema models, snapshot adapter, deterministic structured migration-plan compiler, risk/precondition metadata, and digests. Unsupported semantics fail closed.
 - `diff/` — snapshot-to-snapshot schema diff.
 - `spec/` — reversing-spec generation, naming lint, data dictionary, relationship inference, LLM integration.
