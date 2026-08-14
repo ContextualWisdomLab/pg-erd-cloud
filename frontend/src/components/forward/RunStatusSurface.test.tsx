@@ -92,6 +92,17 @@ describe('RunStatusSurface', () => {
     expect(screen.queryByText('run-1')).not.toBeInTheDocument()
   })
 
+  it('does not refetch a terminal run when only the observer identity changes', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...run, state: 'passed' }))
+    const { rerender } = render(
+      <RunStatusSurface runId="run-1" onRunLoaded={vi.fn()} />,
+    )
+
+    expect(await screen.findByText('run-1')).toBeInTheDocument()
+    rerender(<RunStatusSurface runId="run-1" onRunLoaded={vi.fn()} />)
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+  })
+
   it('polls one request at a time until the run reaches a terminal state', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(response(run))

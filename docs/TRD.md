@@ -208,7 +208,13 @@ implemented** for non-terminal runs without an existing intent. It submits one
 exact optimistic state version, refreshes the verified run after `202`, and on
 an ambiguous result exposes only a fixed error plus explicit status refresh;
 it never automatically repeats the mutation. Forward UI remains **Planned**, so these unit-tested
-components are not browser E2E or complete accessibility evidence.
+components are not browser E2E or complete accessibility evidence. The apply
+intent control is **Partially implemented** for an exact `passed` dry run whose
+plan/digest/observed base match the reviewed plan. It requires a typed target
+connection name and conditional destructive acknowledgement, freezes the first
+submitted confirmation across same-key ambiguous retries, and replaces the
+modal audit identity with the accepted non-dispatched apply intent. It does not
+dispatch a worker, resolve credentials, or execute DDL.
 
 | Method and route | Authority | Behavior | Status |
 |---|---|---|---|

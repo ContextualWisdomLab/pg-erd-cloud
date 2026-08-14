@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FE/UI] Exact `passed` dry-run의 plan UUID·digest·observed base가 현재 검토 계획과 모두 일치할 때만 Forward Engineering modal에 비실행 apply intent 확인 form을 표시합니다. 배포자는 대상 connection 이름을 직접 정확히 입력하고, destructive plan이면 별도 확인해야 합니다. 첫 제출 뒤에는 confirmation body와 idempotency key를 함께 고정해 모호한 응답을 다른 target/승인값으로 재사용하지 않으며, 브라우저는 SQL·DSN·credential을 전송하지 않습니다. 접수 결과는 dispatch가 없는 durable intent일 뿐이고 worker, live DDL, recovery, convergence 권한은 여전히 Planned입니다.
+
 - [FE/UI] Forward Engineering modal이 기존 실행을 표시하는 동안 새 dry-run 의도를 접수하면 단일 active run identity로 전환합니다. 독립 실행 가능한 plan review surface의 기본 polling 동작은 유지하면서 modal orchestration은 이전 run audit surface를 교체해 중복 live region, 상충하는 취소 control, 두 개의 polling loop를 만들지 않습니다. Modal을 닫았다 다시 열면 그 세션에서 생성된 실행 identity를 폐기하고 호출자가 제공한 현재 run으로 복원해 이전 실행 audit을 재사용하지 않습니다. Apply, credential, target 또는 SQL 권한은 추가하지 않습니다.
 
 - [BE/DB/UI/CI/Docs] Forward Engineering dry-run 취소 의도를 worker metadata 경계에서 terminal `cancelled`로 확인합니다. Attempt 획득이 취소 의도로 거부되면 run 행을 잠가 exact state-version/flag CAS와 빈 증거의 `cancellation_acknowledged` 이벤트를 영속화한 뒤에만 UUID signal을 확인합니다. 이미 terminal인 signal 재전달은 새 attempt, sandbox, live preflight 없이 정리하며, 두 경로 모두 남은 active attempt를 같은 transaction에서 `abandoned`로 기록합니다. Queued 취소는 실행을 시작했다는 `started_at`을 기록하지 않습니다. Alembic `0013_migration_run_cancellation`은 run/event 상태 check에 `cancelled`를 추가하고, UI는 대기 중인 취소 요청과 완료된 취소를 구분합니다. PostgreSQL 14–18 매트릭스는 새 check를 실제 catalog에서 검증하며 restrictive-FK 순서로 test fixture를 정리해 셀 내부 오염을 방지합니다. Deployed worker startup, in-flight process interruption, apply executor와 live DDL 권한은 여전히 Planned입니다.

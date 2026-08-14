@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getMigrationPlan } from '../../api'
 import type { MigrationPlan } from '../../types'
@@ -8,6 +8,7 @@ import { RunStatusSurface } from './RunStatusSurface'
 
 type PlanReviewSurfaceProps = {
   planId: string
+  onPlanLoaded?: (plan: MigrationPlan | null) => void
   onRunCreated?: (runId: string) => void
   renderCreatedRunStatus?: boolean
 }
@@ -19,21 +20,31 @@ type LoadState =
 
 export function PlanReviewSurface({
   planId,
+  onPlanLoaded,
   onRunCreated,
   renderCreatedRunStatus = true,
 }: PlanReviewSurfaceProps) {
   const [attempt, setAttempt] = useState(0)
   const [createdRunId, setCreatedRunId] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
+  const onPlanLoadedRef = useRef(onPlanLoaded)
+
+  useEffect(() => {
+    onPlanLoadedRef.current = onPlanLoaded
+  }, [onPlanLoaded])
 
   useEffect(() => {
     let active = true
     setCreatedRunId(null)
     setLoadState({ status: 'loading' })
+    onPlanLoadedRef.current?.(null)
 
     void getMigrationPlan(planId).then(
       (plan) => {
-        if (active) setLoadState({ status: 'ready', plan })
+        if (active) {
+          setLoadState({ status: 'ready', plan })
+          onPlanLoadedRef.current?.(plan)
+        }
       },
       () => {
         if (active) setLoadState({ status: 'error' })

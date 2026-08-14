@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getMigrationRun } from '../../api'
 import type { MigrationRun } from '../../types'
@@ -8,6 +8,7 @@ import { TERMINAL_RUN_STATES } from './runStates'
 
 type RunStatusSurfaceProps = {
   runId: string
+  onRunLoaded?: (run: MigrationRun | null) => void
   refreshIntervalMs?: number
 }
 
@@ -18,21 +19,29 @@ type LoadState =
 
 export function RunStatusSurface({
   runId,
+  onRunLoaded,
   refreshIntervalMs = 2_000,
 }: RunStatusSurfaceProps) {
   const [attempt, setAttempt] = useState(0)
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
+  const onRunLoadedRef = useRef(onRunLoaded)
+
+  useEffect(() => {
+    onRunLoadedRef.current = onRunLoaded
+  }, [onRunLoaded])
 
   useEffect(() => {
     let active = true
     let refreshTimer: ReturnType<typeof setTimeout> | undefined
     setLoadState({ status: 'loading' })
+    onRunLoadedRef.current?.(null)
 
     const load = async () => {
       try {
         const run = await getMigrationRun(runId)
         if (!active) return
         setLoadState({ status: 'ready', run })
+        onRunLoadedRef.current?.(run)
         if (!TERMINAL_RUN_STATES.has(run.state)) {
           refreshTimer = setTimeout(() => void load(), Math.max(1, refreshIntervalMs))
         }

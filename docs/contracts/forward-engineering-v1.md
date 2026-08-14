@@ -76,9 +76,12 @@ Current code implements only the first control-plane slice:
   observed base digest, confirmation digest, actor, and idempotency key without
   creating dispatch or DDL authority.
 - **Partially implemented:** browser plan review, dry-run submission, durable run
-  polling/status/audit, and exact-version cancellation intent surfaces exist.
-  They remain bounded intent/review surfaces and provide no credential or SQL
-  authority.
+  polling/status/audit, exact-version cancellation, and a non-dispatched apply
+  intent control exist. The apply control requires the exact passed dry-run,
+  plan digest, observed base, typed target name, and conditional destructive
+  acknowledgement; ambiguous retry preserves the first confirmation body and
+  idempotency key. These remain bounded intent/review surfaces and provide no
+  credential, dispatch, or SQL authority.
 - **Planned:** deployed isolated sandbox lifecycle, credential binding,
   application worker execution, live apply dispatch/executor, apply-time
   fingerprint revalidation, deployed in-flight cancellation, apply recovery,

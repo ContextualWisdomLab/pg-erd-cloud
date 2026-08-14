@@ -291,8 +291,8 @@ blocked plan. Fixed loading/error/retry states and stale-response suppression
 is **Partially implemented** and covered for both late success and late failure.
 The Forward Engineering modal shell is **Partially implemented** with closed
 no-fetch, labelled dialog, focus entry/trap/restoration, Escape, explicit close,
-absence of an apply control, one active run surface after dry-run acceptance,
-and restoration of the supplied run after close/reopen. The dry-run intent
+no apply intent before an exact passed dry run, one active run surface after
+dry-run acceptance, and restoration of the supplied run after close/reopen. The dry-run intent
 control is **Partially implemented** with component coverage for server blocker gating, exact-digest
 and no-SQL submission, synchronous single-flight exclusion, fixed secret-safe
 errors, same-key ambiguous retry, reused-run reporting, and stale-response
@@ -309,6 +309,12 @@ suppression, exact optimistic state-version submission, synchronous
 single-flight exclusion, accepted-state refresh, fixed secret-safe ambiguous
 errors, refresh-only recovery without mutation replay, and retention of the
 single-flight guard while polling advances a non-terminal state version.
+The apply intent control is **Partially implemented** with component coverage
+for exact passed-dry-run/plan/digest/observed-base gating, typed target
+confirmation, conditional destructive acknowledgement, no-SQL request shape,
+synchronous single-flight submission, fixed secret-safe errors, and immutable
+confirmation plus same-key ambiguous retry. Its accepted result remains a
+non-dispatched intent and is not apply execution evidence.
 Forward UI remains **Planned**.
 These unit tests are not browser E2E or complete accessibility evidence. Tests
 must cover the complete user-observable state model, not only a happy-path

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
+import type { MigrationPlan, MigrationRun } from '../../types'
 import { useDialogAccessibility } from '../modals/useDialogAccessibility'
+import { ApplyIntentPanel } from './ApplyIntentPanel'
 import { PlanReviewSurface } from './PlanReviewSurface'
 import { RunStatusSurface } from './RunStatusSurface'
 
@@ -22,9 +24,15 @@ export function ForwardEngineeringModal({
     scope: string
     runId: string
   } | null>(null)
+  const [reviewedPlan, setReviewedPlan] = useState<MigrationPlan | null>(null)
+  const [observedRun, setObservedRun] = useState<MigrationRun | null>(null)
 
   useEffect(() => {
-    if (!isOpen) setCreatedRun(null)
+    if (!isOpen) {
+      setCreatedRun(null)
+      setReviewedPlan(null)
+      setObservedRun(null)
+    }
   }, [isOpen])
 
   if (!isOpen) return null
@@ -51,13 +59,29 @@ export function ForwardEngineeringModal({
         <div className="forwardEngineeringModal__body">
           <PlanReviewSurface
             planId={planId}
+            onPlanLoaded={setReviewedPlan}
             onRunCreated={(newRunId) => setCreatedRun({
               scope: runScope,
               runId: newRunId,
             })}
             renderCreatedRunStatus={false}
           />
-          {activeRunId ? <RunStatusSurface runId={activeRunId} /> : null}
+          {activeRunId ? (
+            <RunStatusSurface runId={activeRunId} onRunLoaded={setObservedRun} />
+          ) : null}
+          {reviewedPlan
+            && observedRun
+            && reviewedPlan.migration_plan_uuid === planId
+            && observedRun.migration_run_uuid === activeRunId ? (
+              <ApplyIntentPanel
+                plan={reviewedPlan}
+                passedDryRun={observedRun}
+                onRunCreated={(newRunId) => setCreatedRun({
+                  scope: runScope,
+                  runId: newRunId,
+                })}
+              />
+            ) : null}
         </div>
       </div>
     </div>

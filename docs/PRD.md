@@ -42,7 +42,13 @@ submits, and retains one bounded idempotency key across an ambiguous retry.
 Within an open modal, an accepted dry run replaces any supplied audit run so
 only one status/polling surface remains active. Closing and reopening restores
 the caller-supplied run instead of reusing that modal-session override.
-Graph/model adapters, apply controls, and broader orchestration remain absent.
+The apply intent control is **Partially implemented**: only an exact passed
+dry-run for the reviewed plan/digest/base enables a deployer confirmation form;
+the operator must type the exact target connection name and acknowledge any
+destructive plan, and ambiguous retries preserve both one idempotency key and
+the first submitted confirmation. The accepted result is a non-dispatched
+intent, not live DDL authority. Graph/model adapters, apply execution controls,
+and broader orchestration remain absent.
 The run status and audit
 panel is **Partially implemented** as an optional read-only exact-run view. It
 announces the bounded state meaning, pending cancellation intent, terminal
@@ -166,7 +172,7 @@ evidence exists.
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
 | 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, and durable attempt ownership exist. Consumer-to-attempt binding is **Implemented**; sandbox lifecycle, application startup wiring, credential binding, and worker execution remain **Planned**. |
 | 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation intent and terminal acknowledgement, exact-owner attempt leases, terminal dry-run redelivery settlement, and an exact non-dispatched apply intent exist; live dispatch/execution/recovery remain Planned |
-| 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Partially implemented:** review, dry-run intent, run status/audit, polling, and cancellation surfaces exist; apply/recovery/convergence and composed E2E remain Planned |
+| 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Partially implemented:** review, dry-run intent, non-dispatched apply intent, run status/audit, polling, and cancellation surfaces exist; apply execution/recovery/convergence and composed E2E remain Planned |
 
 No phase may describe the end-to-end feature as production-ready before every
 release gate for phases 1–4 is satisfied.

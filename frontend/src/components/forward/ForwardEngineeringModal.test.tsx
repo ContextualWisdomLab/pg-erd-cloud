@@ -159,6 +159,8 @@ describe('ForwardEngineeringModal', () => {
     fireEvent.click(screen.getByRole('button', { name: '격리 dry-run 요청' }))
 
     expect(await screen.findByText('run-created')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '비실행 apply 의도 등록' }))
+      .toBeDisabled()
     await waitFor(() => expect(screen.queryByText('run-modal')).not.toBeInTheDocument())
     expect(screen.getAllByRole('status', { name: '마이그레이션 실행 상태' }))
       .toHaveLength(1)

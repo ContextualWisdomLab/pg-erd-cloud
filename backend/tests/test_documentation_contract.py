@@ -161,6 +161,9 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
     dry_run_intent = _read(
         Path("frontend/src/components/forward/DryRunIntentPanel.tsx")
     )
+    apply_intent = _read(
+        Path("frontend/src/components/forward/ApplyIntentPanel.tsx")
+    )
     cancellation_control = _read(
         Path("frontend/src/components/forward/RunCancellationControl.tsx")
     )
@@ -200,6 +203,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         'aria-modal="true"',
         "PlanReviewSurface",
         "RunStatusSurface",
+        "ApplyIntentPanel",
     ):
         assert symbol in modal
     for symbol in (
@@ -236,6 +240,16 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         "실행 상태 새로고침",
     ):
         assert symbol in cancellation_control
+    for symbol in (
+        "createApplyRun",
+        "isExactPassedDryRun",
+        "run.observed_base_digest === plan.base_digest",
+        "target_connection_name",
+        "web-apply-intent-",
+        "submittedTargetNameRef",
+        "실제 DDL을 디스패치하거나 실행하지 않습니다",
+    ):
+        assert symbol in apply_intent
     for document in documents:
         normalized = " ".join(document.lower().split())
         assert "typed browser transport is **partially implemented**" in normalized
@@ -246,6 +260,7 @@ def test_forward_browser_transport_is_partial_without_execution_authority() -> N
         assert "terminal-aware polling is **partially implemented**" in normalized
         assert "dry-run intent control is **partially implemented**" in normalized
         assert "cancellation intent control is **partially implemented**" in normalized
+        assert "apply intent control is **partially implemented**" in normalized
         assert "forward ui remains **planned**" in normalized
 
 

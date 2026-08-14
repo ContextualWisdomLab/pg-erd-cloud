@@ -110,6 +110,17 @@ describe('PlanReviewSurface', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 
+  it('does not refetch the same plan when only the observer identity changes', async () => {
+    vi.mocked(fetch).mockResolvedValue(response(plan('plan-stable')))
+    const { rerender } = render(
+      <PlanReviewSurface planId="plan-stable" onPlanLoaded={vi.fn()} />,
+    )
+
+    expect(await screen.findByText('plan-stable')).toBeInTheDocument()
+    rerender(<PlanReviewSurface planId="plan-stable" onPlanLoaded={vi.fn()} />)
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+  })
+
   it('hands an accepted exact-digest intent to terminal-aware run polling', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(response(plan('plan-run')))
