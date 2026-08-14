@@ -425,7 +425,10 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
     assert [query.kind for query in manifest.precondition_queries] == [
         "table_is_empty"
     ]
-    privilege_queries = compile_apply_privilege_queries(manifest)
+    privilege_queries = compile_apply_privilege_queries(
+        plan,
+        expected_plan_digest=plan["plan_digest"],
+    )
     assert [query.scope for query in privilege_queries] == ["table"]
 
     lock_connection = await asyncpg.connect(_target_asyncpg_url())

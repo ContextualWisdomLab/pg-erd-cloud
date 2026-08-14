@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- [BE/PostgreSQL/Security/Docs] Added target-free compilation of manifest privilege requirements into fixed parameterized PostgreSQL catalog reads. Database/schema `CREATE` and ordinary-table `OWNER` scopes fail closed on forged or reordered requirements; identifiers remain query data. The PostgreSQL 14–18 matrix proves table-owner success and independently constrained read-only-role denial. No production connection, credential binding, query execution, lock proof, or apply authority is added.
+- [BE/PostgreSQL/Security/Docs] Added target-free compilation of exact signed-plan privilege requirements into fixed parameterized PostgreSQL catalog reads. The public compiler re-derives the manifest from the exact signed plan and expected digest, so a caller-built manifest cannot redirect an otherwise valid database/schema `CREATE` or ordinary-table `OWNER` probe; identifiers remain query data. The PostgreSQL 14–18 matrix proves table-owner success and independently constrained read-only-role denial. No production connection, credential binding, query execution, lock proof, or apply authority is added.
 
 - [BE/Security/Docs] Added a pure manifest-bound pre-apply observation assessment. It accepts only the exact plan digest and one complete ordered row per structured privilege requirement and precondition, rejects missing/extra/renamed/mismatched/non-boolean evidence, and derives explicit base-match, privilege, and precondition facts. It opens no connection, captures no target state, proves no lock or freshness, and grants no apply authority.
 

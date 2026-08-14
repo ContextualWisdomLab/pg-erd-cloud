@@ -5,7 +5,9 @@ existing structured table-lock and live-precondition compilers.  It also proves
 that every data precondition names its statement's table and that the table is
 present in the deterministic lock set.  Its pure observation assessment rejects
 missing, extra, or positionally mismatched caller evidence and derives only
-non-authorizing booleans.  A future executor must acquire those locks and then
+non-authorizing booleans.  The public compiler re-derives the manifest from the
+exact signed plan rather than trusting a caller-built dataclass.  A future
+executor must acquire those locks and then
 perform fresh snapshot comparison and these checks on the same connection
 before DDL.
 
@@ -380,19 +382,11 @@ def _require_privilege_identifier(value: object) -> str:
     return value
 
 
-def compile_apply_privilege_queries(
+def _compile_apply_privilege_queries_from_manifest(
     manifest: PreApplyRevalidationManifest,
 ) -> tuple[ApplyPrivilegeQuery, ...]:
-    """Compile manifest requirements into bounded parameterized catalog reads.
+    """Compile already-validated manifest requirements into catalog reads."""
 
-    This function does not execute the probes or establish which role,
-    connection, target, transaction, or lock context produced a result.
-    """
-
-    if not isinstance(manifest, PreApplyRevalidationManifest):
-        raise PreApplyRevalidationContractError(
-            "pre-apply revalidation manifest is invalid"
-        )
     queries: list[ApplyPrivilegeQuery] = []
     for position, requirement in enumerate(manifest.privilege_requirements):
         if (
@@ -447,6 +441,28 @@ def compile_apply_privilege_queries(
             )
         )
     return tuple(queries)
+
+
+def compile_apply_privilege_queries(
+    plan: Mapping[str, object],
+    *,
+    expected_plan_digest: object,
+) -> tuple[ApplyPrivilegeQuery, ...]:
+    """Compile exact signed-plan requirements into parameterized catalog reads.
+
+    The manifest is re-derived from the exact signed plan at this public trust
+    boundary.  Callers therefore cannot redirect a valid-looking requirement
+    to a different database object by replacing a manifest dataclass field.
+
+    This function does not execute the probes or establish which role,
+    connection, target, transaction, or lock context produced a result.
+    """
+
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan,
+        expected_plan_digest=expected_plan_digest,
+    )
+    return _compile_apply_privilege_queries_from_manifest(manifest)
 
 
 def assess_pre_apply_revalidation_observation(

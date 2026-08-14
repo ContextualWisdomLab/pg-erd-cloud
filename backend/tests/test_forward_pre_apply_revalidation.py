@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import replace
 
 import pytest
 
 from app.forward.migration_plan import COMPILER_VERSION
 from app.forward.pre_apply_revalidation import (
-    ApplyPrivilegeRequirement,
     PreApplyRevalidationContractError,
     PreApplyRevalidationManifest,
     assess_pre_apply_revalidation_observation,
@@ -356,11 +354,9 @@ def test_compiles_parameterized_privilege_probes_without_target_access() -> None
         ),
         _statement(schema_name="분석 영역", table_name='Event "Log"'),
     )
-    manifest = compile_pre_apply_revalidation_manifest(
+    queries = compile_apply_privilege_queries(
         plan, expected_plan_digest=plan["plan_digest"]
     )
-
-    queries = compile_apply_privilege_queries(manifest)
 
     assert [
         (query.statement_index, query.privilege, query.scope, query.parameters)
@@ -381,27 +377,26 @@ def test_compiles_parameterized_privilege_probes_without_target_access() -> None
     assert "$1::text" in queries[2].sql and "$2::text" in queries[2].sql
 
 
-@pytest.mark.parametrize(
-    "requirement",
-    [
-        ApplyPrivilegeRequirement(1, "OWNER", "table", "public", "orders"),
-        ApplyPrivilegeRequirement(0, "ALTER", "table", "public", "orders"),
-        ApplyPrivilegeRequirement(0, "OWNER", "table", "public", "a" * 64),
-    ],
-)
-def test_privilege_probe_compiler_rejects_forged_manifest_requirements(
-    requirement: ApplyPrivilegeRequirement,
-) -> None:
-    """A manually constructed manifest cannot widen privilege semantics."""
+def test_privilege_probe_compiler_rejects_redirected_signed_plan_target() -> None:
+    """A stale signature cannot redirect a valid probe to another object."""
 
     plan = _signed_plan(_statement(schema_name="public", table_name="orders"))
-    manifest = compile_pre_apply_revalidation_manifest(
-        plan, expected_plan_digest=plan["plan_digest"]
-    )
-    forged = replace(manifest, privilege_requirements=(requirement,))
+    expected_plan_digest = plan["plan_digest"]
+    statements = plan["statements"]
+    assert isinstance(statements, list)
+    statement = statements[0]
+    assert isinstance(statement, dict)
+    object_ref = statement["object_ref"]
+    assert isinstance(object_ref, dict)
+    object_ref["schema_name"] = "other_schema"
+    object_ref["table_name"] = "other_table"
 
-    with pytest.raises(PreApplyRevalidationContractError):
-        compile_apply_privilege_queries(forged)
+    with pytest.raises(
+        PreApplyRevalidationContractError, match="plan digest is invalid"
+    ):
+        compile_apply_privilege_queries(
+            plan, expected_plan_digest=expected_plan_digest
+        )
 
 
 def test_compiles_no_transaction_segment_for_a_noop_plan() -> None:

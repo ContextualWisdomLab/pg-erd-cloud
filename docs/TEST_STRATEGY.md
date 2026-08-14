@@ -149,7 +149,8 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   than execution authority.
 - Parameterized privilege-probe tests require exact ordered database `CREATE`,
   schema `CREATE`, and table `OWNER` scopes, keep identifiers in data parameters,
-  and reject forged requirements. The PostgreSQL 14–18 matrix executes the
+  re-derive them from the exact signed plan, and reject a redirected target under
+  its stale digest. The PostgreSQL 14–18 matrix executes the
   table-owner probe as the owner and the independently constrained read-only
   role, proving `true`/`false` semantics without a production worker.
 - Least-privilege roles demonstrate required privilege success and predictable

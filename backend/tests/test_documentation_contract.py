@@ -821,6 +821,8 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "manifest-bound observation assessment" in contract
     assert "cannot prove observation freshness or lock ownership" in contract
     assert "parameterized privilege-probe compilation" in contract
+    assert "re-derives" in contract
+    assert "exact signed plan" in contract
     invariant = next(
         line for line in contract.splitlines() if "| FE-INV-007 |" in line
     )
@@ -845,6 +847,8 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "ApplyPrivilegeRequirement" in implementation
     assert "ApplyPrivilegeQuery" in implementation
     assert "does not execute the probes" in implementation
+    assert "re-derives the manifest from the" in implementation
+    assert "exact signed plan rather than trusting" in implementation
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
     assert (
