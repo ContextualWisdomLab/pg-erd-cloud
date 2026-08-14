@@ -217,6 +217,53 @@ describe('ForwardEngineeringModal', () => {
       .not.toBeInTheDocument()
   })
 
+  it('retires prior passed evidence when a successor dry run is requested', async () => {
+    const passedRun = {
+      ...run,
+      state: 'passed',
+      state_version: 4,
+      observed_base_digest: 'b'.repeat(64),
+    }
+    const successorRun = {
+      ...run,
+      migration_run_uuid: 'dry-run-successor',
+      state: 'queued',
+    }
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input)
+      if (url === '/api/csrf-token') return Promise.resolve(response({ csrf_token: 'csrf' }))
+      if (url.endsWith('/dry-runs') && init?.method === 'POST') {
+        return Promise.resolve(response({
+          migration_run_uuid: 'dry-run-successor',
+          state: 'queued',
+          state_version: 1,
+          cancellation_requested: false,
+          reused: false,
+        }))
+      }
+      if (url.endsWith('/migration-runs/run-modal')) return Promise.resolve(response(passedRun))
+      if (url.endsWith('/migration-runs/dry-run-successor')) {
+        return Promise.resolve(response(successorRun))
+      }
+      return Promise.resolve(response(plan))
+    })
+
+    render(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByLabelText('대상 연결 이름 확인')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '격리 dry-run 요청' }))
+
+    expect(await screen.findByText('dry-run-successor')).toBeInTheDocument()
+    expect(screen.queryByLabelText('대상 연결 이름 확인')).not.toBeInTheDocument()
+  })
+
   it('restores the supplied run when the same modal is closed and reopened', async () => {
     const createdRun = {
       ...run,

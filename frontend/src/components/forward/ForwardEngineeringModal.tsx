@@ -76,10 +76,13 @@ export function ForwardEngineeringModal({
           <PlanReviewSurface
             planId={planId}
             onPlanLoaded={setReviewedPlan}
-            onRunCreated={(newRunId) => setCreatedRun({
-              scope: runScope,
-              runId: newRunId,
-            })}
+            onRunCreated={(newRunId) => {
+              setPassedDryRun(null)
+              setCreatedRun({
+                scope: runScope,
+                runId: newRunId,
+              })
+            }}
             renderCreatedRunStatus={false}
           />
           {activeRunId ? (
