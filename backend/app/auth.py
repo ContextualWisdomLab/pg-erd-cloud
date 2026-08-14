@@ -272,6 +272,10 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
 
+    jwk_algorithm = jwk.get("alg", header_alg)
+    if not isinstance(jwk_algorithm, str) or jwk_algorithm != header_alg:
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+
     kty = jwk.get("kty")
     if not isinstance(kty, str):
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
