@@ -15,23 +15,40 @@ export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
 
-export function parseColumnNameFromHandle(handle: string | null | undefined): string | null {
-  if (!handle) return null;
-  let encoded = handle;
-  if (encoded.startsWith('src-')) {
-    encoded = encoded.slice(4);
-  } else if (encoded.startsWith('tgt-')) {
-    encoded = encoded.slice(4);
-  }
+function parseStrictColumnName(handle: string, prefix: string): string | null {
+  if (!handle || !handle.startsWith(prefix)) return null;
+  const encoded = handle.slice(prefix.length);
 
   if (!encoded.startsWith('c-')) return null;
-  encoded = encoded.slice(2);
+  const segments = encoded.slice(2);
 
-  if (encoded === 'empty') return '';
+  if (segments === 'empty') return '';
 
-  try {
-    return encoded.split('-').map(hex => String.fromCodePoint(parseInt(hex, 16))).join('');
-  } catch (e) {
-    return null;
+  const hexParts = segments.split('-');
+  let decoded = '';
+
+  for (const hex of hexParts) {
+    if (!/^[0-9a-f]{4,}$/.test(hex)) return null; // strictly lowercase hex
+    const codePoint = Number.parseInt(hex, 16);
+    if (Number.isNaN(codePoint) || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
+
+    // Ensure canonical form (lowercase, padded, no extra zeroes unless needed for >0xffff)
+    const canonicalHex = codePoint.toString(16).padStart(4, '0');
+    if (hex !== canonicalHex) return null;
+
+    try {
+      decoded += String.fromCodePoint(codePoint);
+    } catch {
+      return null;
+    }
   }
+  return decoded;
+}
+
+export function parseSourceColumnNameFromHandle(handle: string | null | undefined): string | null {
+  return handle ? parseStrictColumnName(handle, 'src-') : null;
+}
+
+export function parseTargetColumnNameFromHandle(handle: string | null | undefined): string | null {
+  return handle ? parseStrictColumnName(handle, 'tgt-') : null;
 }

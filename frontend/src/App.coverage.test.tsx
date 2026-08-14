@@ -528,7 +528,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(await screen.findAllByRole('button', { name: '열기' }).then(res => res[0]))
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '편집기로 이동' }))
@@ -541,7 +541,8 @@ describe('App orchestration coverage', () => {
     fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: 'Roadmap' } })
     fireEvent.click(screen.getByRole('button', { name: '새 프로젝트' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    const openButtons = await screen.findAllByRole('button', { name: '열기' });
+    fireEvent.click(openButtons[0]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '목록 보기' }))

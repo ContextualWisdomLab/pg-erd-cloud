@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { parseColumnNameFromHandle } from './handleUtils';
+import { parseSourceColumnNameFromHandle, parseTargetColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -69,8 +69,8 @@ function fkColumnsForEdge(
 
   // ⚡ Bolt: Parse handle ID strings directly instead of repeatedly encoding each column name
   // to avoid O(N^2) complexity and repeated expensive string formatting for unresolved edges.
-  const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
-  const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+  const parsedSource = parseSourceColumnNameFromHandle(edge.sourceHandle);
+  const parsedTarget = parseTargetColumnNameFromHandle(edge.targetHandle);
 
   let validSource = undefined;
   let validTarget = undefined;
