@@ -198,12 +198,15 @@ async def test_live_preflight_handoff_guard_rejects_invalid_or_stale_input() -> 
             request,
             now=now.replace(tzinfo=None),
         )
-    with pytest.raises(MigrationDryRunWorkerError, match="handoff is invalid"):
-        await guard_live_preflight_handoff(
-            invalid_session,
-            request,
-            now=True,  # type: ignore[arg-type]
-        )
+    for invalid_now in (True, False):
+        with pytest.raises(
+            MigrationDryRunWorkerError, match="handoff is invalid"
+        ):
+            await guard_live_preflight_handoff(
+                invalid_session,
+                request,
+                now=invalid_now,  # type: ignore[arg-type]
+            )
     invalid_session.scalar.assert_not_awaited()
 
     secret = "postgresql://reader:secret@target/database"

@@ -77,7 +77,7 @@ async def guard_live_preflight_handoff(
     does not eliminate the gap between this observation and provider access.
     """
 
-    checked_at = now or dt.datetime.now(dt.timezone.utc)
+    checked_at = now if now is not None else dt.datetime.now(dt.timezone.utc)
     uuids = (
         getattr(request, "migration_run_uuid", None),
         getattr(request, "migration_plan_uuid", None),
