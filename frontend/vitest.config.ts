@@ -6,7 +6,13 @@ export default mergeConfig(viteConfig, defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html'],
-      reportsDirectory: './coverage'
+      reportsDirectory: './coverage',
+      thresholds: {
+        statements: 99,
+        branches: 99,
+        functions: 99,
+        lines: 99
+      }
     }
   }
 }))

@@ -231,31 +231,21 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="invalid token header")
 
-    if "crit" in header:
-        crit = header["crit"]
+    crit = header.get('crit')
+    if crit is not None:
         if not isinstance(crit, list):
-            raise HTTPException(
-                status_code=401, detail="critical header must be a list"
-            )
-        if not crit:
-            raise HTTPException(
-                status_code=401, detail="critical header must not be empty"
-            )
+            raise HTTPException(status_code=401, detail="critical header must be a list")
         if len(crit) > 10:
             raise HTTPException(status_code=401, detail="too many critical headers")
 
+        understood = {'typ', 'alg', 'cty', 'kid', 'crit'}
         for crit_header in crit:
             if not isinstance(crit_header, str):
-                raise HTTPException(
-                    status_code=401, detail="critical header must be a string"
-                )
+                raise HTTPException(status_code=401, detail="critical header must be a string")
             if len(crit_header) > 50:
-                raise HTTPException(
-                    status_code=401, detail="critical header name too long"
-                )
-
-        # This verifier implements no JWS extension Header Parameters.
-        raise HTTPException(status_code=401, detail="critical header not understood")
+                raise HTTPException(status_code=401, detail="critical header name too long")
+            if crit_header not in understood:
+                raise HTTPException(status_code=401, detail="critical header not understood")
 
     header_alg = _validate_jwt_header(header)
     if header_alg not in OIDC_ALLOWED_ALGORITHMS:
