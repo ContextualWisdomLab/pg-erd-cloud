@@ -949,6 +949,8 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
                 )
         assert guarded_target.dsn_ciphertext == b"not-used"
         assert guarded_target.dsn_nonce == b"twelve-byte!"
+        assert guarded_target.base_schema_snapshot_uuid == snapshot_uuid
+        assert guarded_target.schema_filter is None
         capability_order.append("live-guard")
         if crash_before_first_live_read:
             crash_before_first_live_read = False

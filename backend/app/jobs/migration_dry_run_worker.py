@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import math
+import re
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
@@ -54,6 +55,7 @@ from app.models import (
     MigrationPlan,
     MigrationRun,
     MigrationRunAttempt,
+    SchemaSnapshot,
 )
 
 __all__ = [
@@ -70,14 +72,17 @@ __all__ = [
 
 MAX_SANDBOX_STAGE_TIMEOUT_SECONDS = 900.0
 MAX_PREFLIGHT_STAGE_TIMEOUT_SECONDS = 60.0
+_SCHEMA_FILTER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_$]{0,62}")
 
 
 @dataclass(frozen=True)
 class GuardedLivePreflightTarget:
-    """Encrypted stored-target material released after one exact guard query."""
+    """Encrypted target material and snapshot scope from one exact guard."""
 
     dsn_ciphertext: bytes = field(repr=False)
     dsn_nonce: bytes = field(repr=False)
+    base_schema_snapshot_uuid: uuid.UUID
+    schema_filter: str | None = field(repr=False)
 
 
 def _validated_live_preflight_time(
@@ -200,7 +205,12 @@ async def load_guarded_live_preflight_target(
     )
     try:
         result = await session.execute(
-            select(DbConnection.dsn_ciphertext, DbConnection.dsn_nonce)
+            select(
+                DbConnection.dsn_ciphertext,
+                DbConnection.dsn_nonce,
+                SchemaSnapshot.schema_snapshot_uuid,
+                SchemaSnapshot.schema_filter,
+            )
             .select_from(MigrationRunAttempt)
             .join(
                 MigrationRun,
@@ -217,10 +227,21 @@ async def load_guarded_live_preflight_target(
                 DbConnection.db_connection_uuid
                 == MigrationPlan.db_connection_uuid,
             )
+            .join(
+                SchemaSnapshot,
+                SchemaSnapshot.schema_snapshot_uuid
+                == MigrationPlan.base_schema_snapshot_uuid,
+            )
             .where(
                 *_live_preflight_handoff_conditions(request, checked_at),
                 DbConnection.db_connection_uuid == request.db_connection_uuid,
                 DbConnection.project_space_uuid == request.project_space_uuid,
+                SchemaSnapshot.project_space_uuid
+                == request.project_space_uuid,
+                SchemaSnapshot.db_connection_uuid
+                == request.db_connection_uuid,
+                SchemaSnapshot.status == "succeeded",
+                SchemaSnapshot.finished_at.is_not(None),
             )
         )
         row = result.one_or_none()
@@ -230,15 +251,28 @@ async def load_guarded_live_preflight_target(
         raise MigrationDryRunWorkerError(error_message) from None
     if row is None:
         raise MigrationDryRunWorkerError(error_message)
-    ciphertext, nonce = row
+    ciphertext, nonce, snapshot_uuid, schema_filter = row
     if (
         not isinstance(ciphertext, bytes)
         or not ciphertext
         or not isinstance(nonce, bytes)
         or len(nonce) != 12
+        or not isinstance(snapshot_uuid, uuid.UUID)
+        or (
+            schema_filter is not None
+            and (
+                not isinstance(schema_filter, str)
+                or _SCHEMA_FILTER_RE.fullmatch(schema_filter) is None
+            )
+        )
     ):
         raise MigrationDryRunWorkerError(error_message)
-    return GuardedLivePreflightTarget(bytes(ciphertext), bytes(nonce))
+    return GuardedLivePreflightTarget(
+        bytes(ciphertext),
+        bytes(nonce),
+        snapshot_uuid,
+        schema_filter,
+    )
 
 
 async def _load_and_begin(

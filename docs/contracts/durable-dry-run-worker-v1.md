@@ -67,13 +67,17 @@ It returns no credential, route, connection, plan JSON or SQL. Driver/query
 failures and non-matches expose only the fixed handoff error.
 
 `load_guarded_live_preflight_target` applies that same canonical predicate and
-joins the exact project-owned `db_connection` in one fresh database statement.
-Only an exact active, unexpired, uncancelled attempt can receive the stored
-encrypted DSN ciphertext and nonce. `GuardedLivePreflightTarget` excludes both
-secret-bearing byte strings from its representation, malformed stored material
-fails with one fixed non-reflecting error, and cancellation still propagates.
-This lookup performs no decryption and opens no route or target connection;
-decryption, target connection, provider composition and startup wiring remain Planned.
+joins the exact project-owned `db_connection` and exact succeeded base snapshot
+in one fresh database statement. The snapshot must belong to the same project
+and connection and have a non-null completion time. Only an exact active,
+unexpired, uncancelled attempt can receive the stored encrypted DSN ciphertext
+and nonce together with its `base_schema_snapshot_uuid` and validated optional
+`schema_filter`. `GuardedLivePreflightTarget` excludes the secret-bearing byte
+strings and schema filter from its representation, malformed stored material or
+snapshot scope fails with one fixed non-reflecting error, and cancellation still
+propagates. This lookup performs no decryption and opens no route or target
+connection; decryption, target connection, provider composition and startup
+wiring remain Planned.
 
 The PostgreSQL 14–18 matrix exercises this statement through the test-owned
 provider before its target connection, proves the exact lease-expiry boundary
@@ -114,8 +118,8 @@ plan digest verifier remains authoritative.
    A concrete provider can call `guard_live_preflight_handoff` immediately
    before target access, or use `load_guarded_live_preflight_target` to combine
    the same full identifier/state/lease check with release of the exact stored
-   encrypted target material in one fresh database statement. The live
-   capability is then entered and the existing
+   encrypted target material and succeeded base snapshot scope in one fresh
+   database statement. The live capability is then entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
    A separate whole-stage cancellation deadline covers reader acquisition,
    capture and checks, then requests cancellation and awaits cleanup.

@@ -37,6 +37,9 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "guard_live_preflight_handoff",
         "load_guarded_live_preflight_target",
         "encrypted DSN ciphertext and nonce",
+        "base_schema_snapshot_uuid",
+        "schema_filter",
+        "exact succeeded base snapshot",
         "execute_isolated_dry_run",
         "execute_bound_live_preflight",
         "complete_isolated_dry_run",
@@ -66,6 +69,8 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     assert "guard_live_preflight_handoff" in implementation
     assert "load_guarded_live_preflight_target" in implementation
     assert "class GuardedLivePreflightTarget" in implementation
+    assert "base_schema_snapshot_uuid" in implementation
+    assert "schema_filter" in implementation
     assert "_refresh_live_stage" in implementation
     assert "class IsolatedSandboxRequest" in authority
     assert "class LivePreflightRequest" in authority

@@ -237,17 +237,29 @@ async def test_guarded_live_target_uses_one_exact_secret_safe_query() -> None:
     )
     ciphertext = b"encrypted-target-dsn"
     nonce = b"twelve-bytes"
+    snapshot_uuid = uuid.uuid4()
     result = MagicMock()
-    result.one_or_none.return_value = (ciphertext, nonce)
+    result.one_or_none.return_value = (
+        ciphertext,
+        nonce,
+        snapshot_uuid,
+        "tenant$scope",
+    )
     session = SimpleNamespace(execute=AsyncMock(return_value=result))
 
     target = await load_guarded_live_preflight_target(
         session, request, now=now
     )
 
-    assert target == GuardedLivePreflightTarget(ciphertext, nonce)
+    assert target == GuardedLivePreflightTarget(
+        ciphertext,
+        nonce,
+        snapshot_uuid,
+        "tenant$scope",
+    )
     assert "encrypted-target-dsn" not in repr(target)
     assert "twelve-bytes" not in repr(target)
+    assert "tenant$scope" not in repr(target)
     session.execute.assert_awaited_once()
     statement = str(
         session.execute.await_args.args[0].compile(
@@ -271,6 +283,11 @@ async def test_guarded_live_target_uses_one_exact_secret_safe_query() -> None:
         "migration_plan.expires_at >",
         "migration_plan.statement_digest = migration_run.plan_digest",
         "db_connection.project_space_uuid",
+        "schema_snapshot.status = 'succeeded'",
+        "schema_snapshot.finished_at IS NOT NULL",
+        "schema_snapshot.project_space_uuid",
+        "schema_snapshot.db_connection_uuid",
+        "schema_snapshot.schema_snapshot_uuid = migration_plan.base_schema_snapshot_uuid",
     ):
         assert expected in statement
     assert "FOR UPDATE" not in statement
@@ -290,7 +307,21 @@ async def test_guarded_live_target_fails_closed_without_secret_reflection() -> N
         attempt_number=1,
         expected_state_version=4,
     )
-    for row in (None, (b"", b"twelve-bytes"), (b"ciphertext", b"short")):
+    valid_snapshot_uuid = uuid.uuid4()
+    for row in (
+        None,
+        (b"", b"twelve-bytes", valid_snapshot_uuid, None),
+        (b"ciphertext", b"short", valid_snapshot_uuid, None),
+        (b"ciphertext", b"twelve-bytes", None, None),
+        (b"ciphertext", b"twelve-bytes", valid_snapshot_uuid, "bad\x00scope"),
+        (b"ciphertext", b"twelve-bytes", valid_snapshot_uuid, "bad scope"),
+        (
+            b"ciphertext",
+            b"twelve-bytes",
+            valid_snapshot_uuid,
+            "s" * 64,
+        ),
+    ):
         result = MagicMock()
         result.one_or_none.return_value = row
         session = SimpleNamespace(execute=AsyncMock(return_value=result))
