@@ -4,9 +4,9 @@
 - **Capability status:** Partial
 - **Implemented boundary:** deterministic attempt orchestration, a
   provider-callable metadata handoff guard, and an exact encrypted stored-target
-  lookup
-- **Not implemented:** concrete sandbox/credential providers, decryption,
-  deployment wiring, live apply or production readiness
+  lookup plus a concrete guarded PostgreSQL live-preflight factory
+- **Not implemented:** concrete sandbox provider, deployed credential/network
+  isolation, application wiring, live apply or production readiness
 
 ## Purpose
 
@@ -75,9 +75,20 @@ and nonce together with its `base_schema_snapshot_uuid` and validated optional
 `schema_filter`. `GuardedLivePreflightTarget` excludes the secret-bearing byte
 strings and schema filter from its representation, malformed stored material or
 snapshot scope fails with one fixed non-reflecting error, and cancellation still
-propagates. This lookup performs no decryption and opens no route or target
-connection; decryption, target connection, provider composition and startup
-wiring remain Planned.
+propagates. The lookup itself performs no decryption and opens no route or
+target connection.
+
+`make_stored_postgres_live_preflight_factory` composes that lookup with
+in-memory AES-GCM decryption and the existing guarded DNS/SSRF/TLS connection.
+The returned capture callback rejects any connection other than the same
+acquired connection, applies the validated snapshot `schema_filter`, and the
+provider always closes the acquired connection. Acquisition, decryption,
+connection, and cleanup failures expose fixed non-reflecting errors while
+cancellation and process-control exceptions propagate. Only the durable
+handler receives this capability, and that handler calls the structured
+bounded read-only preflight core; the provider accepts no SQL and grants no
+apply authority. Application startup wiring and deployed credential/network
+isolation remain Planned.
 
 The PostgreSQL 14–18 matrix exercises this statement through the test-owned
 provider before its target connection, proves the exact lease-expiry boundary
@@ -151,12 +162,13 @@ plan digest verifier remains authoritative.
   and its identifier-only request now carries the exact expected run state
   version. The provider-callable guard and guarded encrypted-target lookup share
   one canonical predicate that atomically revalidates cancellation, that state
-  version, stored identities and the exact active attempt lease. No concrete
-  provider is wired to either boundary, and even when composed the lookup does
-  not eliminate the gap between that metadata observation and target capability
-  opening. Decryption, target connection, provider composition and startup wiring remain Planned;
-  credential/route constraints and cancellation after the observation are also
-  release-blocking.
+  version, stored identities and the exact active attempt lease. No provider is
+  wired into application startup. The stored PostgreSQL factory now composes
+  the lookup, in-memory decryption, guarded connection, same-connection snapshot
+  scope, and cleanup, but it does not eliminate the gap between that metadata
+  observation and target capability opening. Deployed least-privilege
+  credentials, network isolation, startup wiring, and cancellation after that
+  observation are still release-blocking.
 
 ## Failure and evidence policy
 
@@ -178,8 +190,8 @@ This contract does not implement or prove:
 
 - disposable sandbox provisioning, dependency materialization or egress
   isolation;
-- target credential resolution, network route isolation or least-privilege
-  deployment identity;
+- deployed network route isolation or independently managed least-privilege
+  credential identity;
 - application startup, queue registration or production worker operation;
 - forcible termination of a provider that suppresses cancellation, or the
   deployed process-supervisor kill boundary;
@@ -199,10 +211,12 @@ Repository tests must cover:
 - sandbox/live whole-stage timeout cancellation and capability cleanup for
   cooperative providers;
 - cancellation/state-version recheck before target access;
+- guarded stored-target decryption, connection/capture identity, fixed failures,
+  cancellation and cleanup;
 - bounded configuration rejection;
 - rejection of non-contract terminal states.
 
 Real deployment readiness additionally requires supported PostgreSQL-version
-integration with concrete providers, network and credential isolation proof,
+integration with deployed providers, network and credential isolation proof,
 fault/restart recovery, operational telemetry and browser E2E. None is claimed
 by this Partial contract.

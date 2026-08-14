@@ -55,6 +55,13 @@ flowchart TB
 | Browser E2E/accessibility | Prove editor-to-verified workflow, tamper resistance, state recovery, focus, keyboard, names, and live regions. | Existing ERD UI tests do not implement the forward workflow. | Composed backend/frontend/worker/sandbox/target E2E, automated accessibility checks, and manual keyboard/screen-reader evidence. |
 | Operational/fault injection | Prove no-replay recovery, kill switch, alerts, runbook, retention, backup/restore, and uncertain commit handling. | No forward run worker or drills exist. | Controlled crash/network/lock/commit-acknowledgement tests and a recorded non-production game day. |
 
+The concrete stored-PostgreSQL preflight provider has focused unit evidence for
+exact guarded lookup, in-memory decryption, guarded connector invocation,
+same-acquired-connection capture, fixed non-reflecting failures, cancellation,
+and cleanup. The PostgreSQL 14–18 matrix still uses a separately constrained
+test provider, so provider-backed supported-version acceptance, deployed
+least-privilege credentials, and network identity remain Planned.
+
 ## Current repository evidence
 
 | Area | Source/tests in the working tree | What they demonstrate | Status / limitation |

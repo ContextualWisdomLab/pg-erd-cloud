@@ -144,13 +144,18 @@ locks on the execution connection.
   base capture, terminal `passed`, and four durable events. This is integration
   evidence for provider-neutral orchestration only; it is not deployed
   provisioning, credential resolution, route isolation, or worker operation.
+- The unwired stored-PostgreSQL provider has unit evidence for exact guarded
+  lookup, in-memory decryption, DNS/SSRF/TLS-pinned connection, same-connection
+  capture, fixed failure handling, cancellation, and cleanup. The version matrix
+  does not yet compose it.
 
 ### Planned before production release
 
 - isolated sandbox provisioning, complete base dependency materialization,
   cleanup, capacity controls, and egress enforcement;
-- concrete target credential resolution, guarded connection lifecycle and
-  separately constrained network identity;
+- provider-backed PostgreSQL-version acceptance plus deployed least-privilege
+  credentials, guarded network identity, and route isolation (the unwired
+  provider factory covers only repository-level lookup/decrypt/connect/cleanup);
 - application startup and queue registration for the injected worker handler;
 - real provider-backed PostgreSQL/Valkey restart, cancellation, network-loss and
   cleanup acceptance;

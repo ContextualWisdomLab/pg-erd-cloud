@@ -62,15 +62,20 @@ Current authority boundaries:
 
 Components deliberately absent from this current diagram are **Planned**:
 isolated sandbox provisioning/materialization/cleanup, durable live-preflight
-worker/attempt/credential binding, live plan execution, reconciliation, and
-post-apply convergence verification. `execute_bound_live_preflight` binds a
+worker/attempt binding and startup wiring, live plan execution, reconciliation,
+and post-apply convergence verification. A repository-level stored-target
+provider now loads the plan-bound succeeded snapshot and exact connection,
+decrypts only that guarded credential, opens the target through the DNS/SSRF/TLS
+guard, and scopes capture to the same acquired connection. It is not deployed
+worker authority and has no apply path. `execute_bound_live_preflight` binds a
 caller-owned fresh-capture callback and checks to one read-only repeatable-read
 transaction; `complete_live_preflight` strictly derives its terminal durable
 CAS classification. `complete_isolated_dry_run` similarly revalidates exact
 sandbox success against the stored plan and derives only the fixed next CAS.
 The metadata layer now provides hashed, lease-bound durable attempt ownership.
 Consumer-to-attempt binding is **Implemented** by an execution-neutral adapter,
-but application startup wiring, credentials, and worker execution remain
+but application startup wiring, attempt-to-provider composition, deployed
+least-privilege credentials/network identity, and worker execution remain
 **Planned**.
 Durable `migration_run`/event/outbox persistence and this execution-neutral,
 bounded read-only primitive are **Partially implemented**; neither constitutes
@@ -119,9 +124,13 @@ authoritative; joined target/dependency labels are display-only.
 durable run/event/dispatch storage, exact signal and attempt leases, and
 provider-neutral durable worker orchestration are Implemented. The exact-plan
 sandbox executor and same-transaction read-only live-preflight cores are
-Partially implemented. Concrete sandbox provisioning and cleanup, target
-credential binding, application startup wiring, and deployed worker isolation
-remain **Planned**. A successful dry run requires two separately identified
+Partially implemented. The stored-target live-preflight provider factory is
+Implemented at the repository boundary; it binds the exact plan snapshot,
+guarded credential, connection, and schema scope through the DNS/SSRF/TLS guard
+without wiring a worker.
+Concrete sandbox provisioning and cleanup, attempt-to-provider composition,
+application startup wiring, deployed least-privilege target identity, and
+deployed worker isolation remain **Planned**. A successful dry run requires two separately identified
 evidence classes: the sandbox executes the exact stored plan, while the live
 target receives read-only introspection and bounded precondition queries only.
 

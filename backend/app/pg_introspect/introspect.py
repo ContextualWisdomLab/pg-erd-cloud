@@ -64,9 +64,11 @@ def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     return context
 
 
-async def _connect_guarded_postgres(
+async def connect_guarded_postgres(
     dsn: str, *, timeout: float
 ) -> asyncpg.Connection:
+    """Open one PostgreSQL connection after DNS/SSRF/TLS target validation."""
+
     target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
@@ -98,7 +100,7 @@ async def _connect_guarded_postgres(
 async def probe_postgres(dsn: str) -> str:
     """SSRF-guarded connectivity check: connect and return the server version."""
 
-    conn = await _connect_guarded_postgres(dsn, timeout=10)
+    conn = await connect_guarded_postgres(dsn, timeout=10)
     try:
         await conn.fetchval("SELECT 1")
         return str(await conn.fetchval("SHOW server_version"))
@@ -117,7 +119,7 @@ async def apply_postgres_ddl(
     TLS hostname handling.
     """
 
-    conn = await _connect_guarded_postgres(dsn, timeout=15)
+    conn = await connect_guarded_postgres(dsn, timeout=15)
     try:
         tx = conn.transaction()
         await tx.start()
@@ -224,7 +226,7 @@ async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
     # Note: avoid logging DSN.
-    conn = await _connect_guarded_postgres(dsn, timeout=10)
+    conn = await connect_guarded_postgres(dsn, timeout=10)
     try:
         tx = conn.transaction(isolation="repeatable_read", readonly=True)
         await tx.start()

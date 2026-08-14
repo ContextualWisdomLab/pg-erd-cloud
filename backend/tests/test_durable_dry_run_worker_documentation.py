@@ -36,6 +36,9 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "LivePreflightRequest",
         "guard_live_preflight_handoff",
         "load_guarded_live_preflight_target",
+        "make_stored_postgres_live_preflight_factory",
+        "guarded DNS/SSRF/TLS connection",
+        "same acquired connection",
         "encrypted DSN ciphertext and nonce",
         "base_schema_snapshot_uuid",
         "schema_filter",
@@ -49,7 +52,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "PostgreSQL 14–18 matrix exercises",
         "does not eliminate the gap",
         "does not implement or prove",
-        "decryption, target connection, provider composition and startup wiring remain Planned",
+        "Application startup wiring and deployed credential/network isolation remain Planned",
         "live apply",
         "production readiness",
     )
@@ -61,6 +64,7 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     """Bind published contract names to the implementation modules."""
 
     implementation = _read(Path("backend/app/jobs/migration_dry_run_worker.py"))
+    provider = _read(Path("backend/app/jobs/live_preflight_provider.py"))
     authority = _read(
         Path("backend/app/jobs/migration_dry_run_worker_contract.py")
     )
@@ -71,6 +75,9 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     assert "class GuardedLivePreflightTarget" in implementation
     assert "base_schema_snapshot_uuid" in implementation
     assert "schema_filter" in implementation
+    assert "make_stored_postgres_live_preflight_factory" in provider
+    assert "connect_guarded_postgres" in provider
+    assert "capture_postgres_snapshot" in provider
     assert "_refresh_live_stage" in implementation
     assert "class IsolatedSandboxRequest" in authority
     assert "class LivePreflightRequest" in authority
@@ -88,7 +95,9 @@ def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() ->
     assert "**Status: Partially implemented.**" in normalized
     assert "provider-neutral durable worker orchestration" in normalized
     assert "sandbox provisioning" in normalized
-    assert "target credential binding" in normalized
+    assert "stored-target live-preflight provider factory" in normalized
+    assert "DNS/SSRF/TLS guard" in normalized
+    assert "attempt-to-provider composition" in normalized
     assert "application startup wiring" in normalized
     assert "**Planned**" in normalized
 
