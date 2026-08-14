@@ -2,21 +2,21 @@ import type { Node } from "@xyflow/react";
 
 import type { TableNodeData } from "./convert";
 
-function fieldIncludes(value: string | null | undefined, term: string): boolean {
-  return Boolean(value && value.toLocaleLowerCase().includes(term));
-}
+const searchableTextCache = new WeakMap<TableNodeData, string>();
 
-function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
-  if (fieldIncludes(node.data.title, term)) return true;
-  if (fieldIncludes(node.data.comment, term)) return true;
+function getSearchableText(data: TableNodeData): string {
+  let text = searchableTextCache.get(data);
+  if (text !== undefined) return text;
 
-  for (const column of node.data.columns) {
-    if (fieldIncludes(column.column_name, term)) return true;
-    if (fieldIncludes(column.data_type, term)) return true;
-    if (fieldIncludes(column.column_comment, term)) return true;
+  text = (data.title || "") + " " + (data.comment || "");
+  for (let i = 0; i < data.columns.length; i++) {
+    const col = data.columns[i];
+    text += " " + col.column_name + " " + col.data_type + " " + (col.column_comment || "");
   }
 
-  return false;
+  text = text.toLocaleLowerCase();
+  searchableTextCache.set(data, text);
+  return text;
 }
 
 export function tableNodeMatchesSearch(
@@ -29,7 +29,12 @@ export function tableNodeMatchesSearch(
         new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
       );
   if (terms.length === 0) return false;
-  return terms.every((term) => nodeIncludesTerm(node, term));
+
+  const text = getSearchableText(node.data);
+  for (let i = 0; i < terms.length; i++) {
+    if (!text.includes(terms[i])) return false;
+  }
+  return true;
 }
 
 export function findSearchMatchedNodeIds(
@@ -44,7 +49,8 @@ export function findSearchMatchedNodeIds(
   );
   if (terms.length === 0) return matches;
 
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     if (tableNodeMatchesSearch(node, terms)) {
       matches.add(node.id);
     }
