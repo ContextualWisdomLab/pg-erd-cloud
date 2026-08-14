@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- [BE/PostgreSQL/Security/Docs] 인증된 DBML 변환 경로가 quoted identifier를 한 번만 decode하고 PostgreSQL dialect renderer에서 다시 인용합니다. doubled quote, Unicode, 예약어, 공백, 점, 세미콜론과 comment marker는 식별자 데이터로 보존하면서 NUL, 닫히지 않은 quote, 빈/과다 path segment, 63 UTF-8 byte 초과, 4,096자 초과 line을 고정 비반사 `422`로 fail-closed 처리합니다. 파생 PK/FK 이름도 SHA-256 suffix로 63 byte 안에 결정적으로 제한합니다. PostgreSQL 14–18 acceptance는 공격처럼 보이는 quoted name으로 생성 DDL을 실제 실행하고 의도한 relation 하나만 생성되는지 검증하며, 이는 export 안전 경계이지 live apply 권한이나 production readiness 주장이 아닙니다.
+
+- [BE/Performance/Security] DBML parser 직접 호출도 인증 route와 같은 총 524,288자 및 10,000-line resource limit을 fail-closed로 적용합니다. relation별 증분 counter가 `column_position`을 O(N)으로 계산해 1,000-column/multi-relation 입력에서 growing-list 재순회를 제거합니다.
+
 - [BE/Security/Docs] `ApplySqlIn.sql` now rejects NUL, DEL, and non-text C0 controls at the request-schema boundary while preserving tab, LF, CR, Unicode text, and the 262,144-character limit. Validation failures on the sensitive legacy route return a fixed `422` without reflecting SQL or secret-like literals; the conservative DDL parser remains the authorization boundary, so this is transport/log-integrity hardening rather than an SQL-injection claim.
 
 - [BE/Security/Docs] Legacy `apply-sql` now defaults persistent `dry_run=false` requests to a fixed `403` before stored-target credential access. Operators must explicitly set `LEGACY_PERSISTENT_APPLY_ENABLED=true` in addition to deployer authorization to retain the transitional compatibility path; rollback-only validation and the endpoint shape remain available. This switch is containment for new requests, not structured apply readiness or proof about in-flight database outcome.

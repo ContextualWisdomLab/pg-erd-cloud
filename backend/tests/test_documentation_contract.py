@@ -65,6 +65,17 @@ def _read(relative_path: Path) -> str:
     return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def test_tm05_requires_role_and_operator_opt_in_for_legacy_apply() -> None:
+    """Keep the threat model aligned with both persistent-apply controls."""
+
+    threat_model = _read(
+        Path("docs/security/forward-engineering-threat-model.md")
+    )
+    tm05 = next(line for line in threat_model.splitlines() if "| TM-05 |" in line)
+
+    assert "persistent legacy apply requires deployer plus explicit operator opt-in" in tm05
+
+
 def test_canonical_forward_engineering_documents_exist_and_are_nonempty() -> None:
     """Require every canonical forward-engineering document to contain text."""
 

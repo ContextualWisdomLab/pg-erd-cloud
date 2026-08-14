@@ -21,21 +21,17 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.ddl.export import quote_identifier, snapshot_json_to_sql
 from app.forward.isolated_dry_run import (
     IsolatedPostgresConnection,
     execute_isolated_dry_run,
-)
-from app.forward.migration_plan import compile_migration_plan
-from app.forward.pre_apply_revalidation import (
-    capture_pre_apply_revalidation_observation,
-    compile_apply_privilege_queries,
-    compile_pre_apply_revalidation_manifest,
 )
 from app.forward.live_preflight import (
     LivePreflightContractError,
     execute_bound_live_preflight,
     execute_live_preflight,
 )
+from app.forward.migration_plan import compile_migration_plan
 from app.forward.migration_run import (
     MigrationRunAttemptClaim,
     acquire_migration_run_attempt,
@@ -48,22 +44,10 @@ from app.forward.migration_run import (
     renew_migration_run_attempt,
     transition_migration_run,
 )
-from app.models import (
-    DbConnection,
-    MigrationPlan,
-    MigrationRun,
-    MigrationRunAttempt,
-    MigrationRunDispatch,
-    MigrationRunEvent,
-    ProjectSpace,
-    SchemaModel,
-    SchemaModelRevision,
-    SchemaSnapshot,
-    UserAccount,
-)
-from app.pg_introspect import queries
-from app.pg_introspect.snapshot_contract import (
-    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+from app.forward.pre_apply_revalidation import (
+    capture_pre_apply_revalidation_observation,
+    compile_apply_privilege_queries,
+    compile_pre_apply_revalidation_manifest,
 )
 from app.forward.schema_model import schema_model_digest
 from app.forward.snapshot_adapter import snapshot_to_schema_model
@@ -83,7 +67,25 @@ from app.jobs.migration_dry_run_worker import (
     make_durable_dry_run_attempt_handler,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
+from app.models import (
+    DbConnection,
+    MigrationPlan,
+    MigrationRun,
+    MigrationRunAttempt,
+    MigrationRunDispatch,
+    MigrationRunEvent,
+    ProjectSpace,
+    SchemaModel,
+    SchemaModelRevision,
+    SchemaSnapshot,
+    UserAccount,
+)
+from app.pg_introspect import queries
+from app.pg_introspect.snapshot_contract import (
+    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+)
 from app.settings import settings
+from app.spec.dbml_import import parse_dbml
 
 _POSTGRES_URL = os.getenv("POSTGRES_INTEGRATION_URL")
 _POSTGRES_SANDBOX_URL = os.getenv("POSTGRES_SANDBOX_INTEGRATION_URL")
@@ -128,6 +130,43 @@ def _preflight_asyncpg_url() -> str:
     return _POSTGRES_PREFLIGHT_URL.replace(
         "postgresql+asyncpg://", "postgresql://", 1
     )
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_executes_dbml_with_hostile_quoted_identifiers() -> None:
+    """Prove DBML names remain one intended PostgreSQL schema/table definition."""
+    schema_name = f'dbml; -- {uuid.uuid4().hex}'
+    table_name = 'orders"; CREATE TABLE escaped_attempt(id int); --'
+    column_name = 'value"; DROP SCHEMA public CASCADE; --'
+    encoded_schema = schema_name.replace('"', '""')
+    encoded_table = table_name.replace('"', '""')
+    encoded_column = column_name.replace('"', '""')
+    snapshot = parse_dbml(
+        f'Table "{encoded_schema}"."{encoded_table}" {{\n'
+        f'  "{encoded_column}" integer [pk]\n'
+        "}"
+    )
+    ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
+    connection = await asyncpg.connect(_sandbox_asyncpg_url())
+
+    try:
+        await connection.execute(ddl)
+        relation_names = await connection.fetch(
+            "SELECT c.relname FROM pg_catalog.pg_class AS c "
+            "JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')",
+            schema_name,
+        )
+        assert [str(row["relname"]) for row in relation_names] == [table_name]
+        assert await connection.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE relname = $1)",
+            "escaped_attempt",
+        ) is False
+    finally:
+        await connection.execute(
+            f"DROP SCHEMA IF EXISTS {quote_identifier(schema_name)} CASCADE"
+        )
+        await connection.close()
 
 
 async def _delete_project_fixture(

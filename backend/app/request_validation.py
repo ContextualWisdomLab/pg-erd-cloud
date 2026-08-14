@@ -14,13 +14,19 @@ def _is_legacy_apply_path(path: str) -> bool:
     return path.startswith("/api/connections/") and path.endswith("/apply-sql")
 
 
+def _is_sensitive_body_path(path: str) -> bool:
+    """Recognize endpoints whose rejected bodies must never be reflected."""
+
+    return _is_legacy_apply_path(path) or path == "/api/dbml/convert"
+
+
 async def request_validation_exception_handler(
     request: Request,
     error: Exception,
 ) -> Response:
-    """Avoid reflecting legacy SQL while retaining normal validation elsewhere."""
+    """Avoid reflecting SQL/DBML while retaining normal validation elsewhere."""
 
-    if _is_legacy_apply_path(request.url.path):
+    if _is_sensitive_body_path(request.url.path):
         return JSONResponse(
             status_code=422,
             content={"detail": "request validation failed"},

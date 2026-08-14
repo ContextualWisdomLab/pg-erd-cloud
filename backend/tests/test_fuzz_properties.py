@@ -23,9 +23,10 @@ hypothesis = pytest.importorskip("hypothesis")
 from hypothesis import HealthCheck, given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
 
-from app.ddl.export import snapshot_json_to_sql  # noqa: E402
+from app.ddl.export import quote_identifier, snapshot_json_to_sql  # noqa: E402
 from app.dsn_redaction import redact_dsn_error_message  # noqa: E402
 from app.sanitize import sanitize_for_storage, strip_nul  # noqa: E402
+from app.spec.dbml_import import parse_dbml  # noqa: E402
 from app.spec.index_design import generate_index_design_spec  # noqa: E402
 from app.spec.naming_lint import lint_naming  # noqa: E402
 from app.spec.reversing import generate_reversing_spec  # noqa: E402
@@ -190,6 +191,28 @@ def test_ddl_export_total_and_deterministic(snapshot: dict, dialect: str) -> Non
     out = snapshot_json_to_sql(snapshot, dialect)
     assert isinstance(out, str)
     assert out == snapshot_json_to_sql(snapshot, dialect)
+
+
+_DBML_IDENTIFIER_TEXT = st.text(
+    alphabet=st.characters(
+        blacklist_categories=("Cs",),
+        blacklist_characters=("\x00", "\n", "\r"),
+    ),
+    min_size=1,
+    max_size=20,
+).filter(lambda value: len(value.encode("utf-8")) <= 63)
+
+
+@_SETTINGS
+@given(_DBML_IDENTIFIER_TEXT)
+def test_dbml_identifier_parse_render_round_trip(identifier: str) -> None:
+    """Quoted identifiers round-trip from DBML text to dialect rendering."""
+    encoded = identifier.replace('"', '""')
+    snapshot = parse_dbml(f'Table "{encoded}" {{\n  id integer\n}}')
+    ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
+
+    assert snapshot["relations"][0]["relation_name"] == identifier
+    assert quote_identifier(identifier) in ddl
 
 
 @_SETTINGS

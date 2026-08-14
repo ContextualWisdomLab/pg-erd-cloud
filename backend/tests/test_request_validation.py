@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
 from app.request_validation import request_validation_exception_handler
-from app.schemas import ApplySqlIn
+from app.schemas import ApplySqlIn, DbmlConvertIn
 
 
 def _validation_app() -> FastAPI:
@@ -20,6 +20,10 @@ def _validation_app() -> FastAPI:
         "/api/connections/00000000-0000-4000-8000-000000000001/apply-sql"
     )
     async def accept_sql(_: ApplySqlIn) -> dict[str, bool]:
+        return {"ok": True}
+
+    @app.post("/api/dbml/convert")
+    async def accept_dbml(_: DbmlConvertIn) -> dict[str, bool]:
         return {"ok": True}
 
     return app
@@ -52,3 +56,20 @@ def test_production_app_registers_secret_safe_validation_handler() -> None:
         production_app.exception_handlers[RequestValidationError]
         is request_validation_exception_handler
     )
+
+
+def test_validation_response_omits_oversized_dbml_input(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Never echo rejected DBML from the bounded conversion endpoint."""
+
+    secret = "dbml-secret-do-not-reflect"
+    response = TestClient(_validation_app()).post(
+        "/api/dbml/convert",
+        json={"dbml": secret + ("x" * 524_288)},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "request validation failed"}
+    assert secret not in response.text
+    assert secret not in caplog.text
