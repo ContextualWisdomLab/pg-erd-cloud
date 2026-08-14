@@ -104,6 +104,11 @@ single-transaction claim of v1.
 - The pure observation assessor rejects incomplete or positionally mismatched
   privilege/precondition rows and derives only non-authorizing booleans. It
   does not prove target identity, freshness, held locks, or connection binding.
+- The bounded caller-owned capture primitive re-derives the manifest from the
+  exact signed plan and observes one strict snapshot plus every privilege and
+  precondition position in one read-only repeatable-read transaction. It owns
+  no credential/attempt binding, acquires no advisory/object lock, and grants no
+  apply authority; the future executor must repeat the observations in-lock.
 
 ### Planned before production release
 

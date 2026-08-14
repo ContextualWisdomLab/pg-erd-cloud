@@ -147,6 +147,14 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   missing, extra, renamed, differently targeted, and non-boolean privilege or
   precondition rows and prove negative results remain explicit facts rather
   than execution authority.
+- Same-connection capture tests require exact signed-plan re-derivation, one
+  caller-owned read-only repeatable-read transaction, strict snapshot digest
+  capture, ordered privilege/precondition observations, explicit negative
+  facts, fixed secret-safe failure, rollback cleanup, and timeout rejection
+  before target access. PostgreSQL 14–18 acceptance executes the primitive as
+  the fixture owner and observes a matching base, satisfied owner privilege,
+  and failed table-empty precondition. It proves no stored-target/attempt
+  binding, advisory/object lock, in-lock repetition, or apply authority.
 - Parameterized privilege-probe tests require exact ordered database `CREATE`,
   schema `CREATE`, and table `OWNER` scopes, keep identifiers in data parameters,
   re-derive them from the exact signed plan, and reject a redirected target under

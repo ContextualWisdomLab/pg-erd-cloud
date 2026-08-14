@@ -136,11 +136,14 @@ executable SQL, safety classification, approval truth, or recovery state.
   checks, structured database `CREATE`/schema `CREATE`/table `OWNER`
   requirements, and zero/no-op or one ordered all-transactional segment. Its
   fixed parameterized privilege probes that re-derive their manifest from the
-  exact signed plan, plus complete positional observation
-  assessor fail closed on scope/evidence drift and derive only non-authorizing
-  inputs or booleans. These boundaries perform no target I/O; stored-plan
-  dispatch, executor, target lock acquisition,
-  target privilege observation, transaction execution/rollback proof, timeouts, apply-time approval
+  exact signed plan, plus complete positional observation assessor fail closed
+  on scope/evidence drift and derive only non-authorizing inputs or booleans.
+  A bounded caller-owned capture primitive re-derives those inputs and observes
+  a strict snapshot, role privileges, and data preconditions on one read-only
+  repeatable-read connection. It owns no credential/attempt binding and acquires
+  no advisory/object lock. Stored-plan dispatch, executor, target identity
+  binding, target lock acquisition, in-lock repetition, transaction
+  execution/rollback proof, timeouts, apply-time approval
   revalidation, cancellation propagation, reconciliation, and post-apply
   verification remain **Planned**;
 - frontend graph/model adapters and `ForwardEngineeringModal` workflow

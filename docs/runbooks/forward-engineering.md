@@ -213,6 +213,15 @@ manifest. Its base-match and aggregate booleans are untrusted input assessment,
 not proof of freshness, target identity, held locks, same-connection capture,
 or permission to continue to DDL.
 
+The bounded capture primitive may run those exact observations on a
+caller-owned connection. It re-derives the signed manifest, starts one
+read-only repeatable-read transaction, captures the strict snapshot, executes
+the fixed privilege probes and structured preconditions in order, commits only
+the read transaction, and returns the pure assessment. A fixed failure means no
+assessment. This does not bind the connection to the stored target or durable
+attempt, acquire advisory/object locks, or permit DDL. Do not reuse its result
+as apply authority; apply must repeat revalidation after locks are held.
+
 ### 4. Execute and verify
 
 1. Worker reloads the run, plan, revision, target, and evidence from metadata;

@@ -118,6 +118,15 @@ Current code implements only the first control-plane slice:
   privilege, and precondition booleans. It cannot prove observation freshness or lock ownership,
   bind a target connection, or authorize apply; those runtime controls remain
   Planned.
+- **Partially implemented runtime primitive:**
+  `capture_pre_apply_revalidation_observation` re-derives the manifest from the
+  exact signed plan, starts one bounded read-only repeatable-read transaction on
+  a caller-owned connection, captures one strict snapshot, executes every fixed
+  parameterized privilege probe and structured precondition in manifest order,
+  and returns the pure assessment. Driver/callback failures are fixed and
+  secret-safe. It does not own credentials, prove the stored target or durable
+  attempt identity, acquire advisory/object locks, execute DDL, or authorize
+  apply. Apply must repeat these checks after locks are held.
 - **Partially implemented:** browser plan review, dry-run submission, durable run
   polling/status/audit, exact-version cancellation, and a non-dispatched apply
   intent control exist. The apply control requires the exact passed dry-run,
@@ -144,7 +153,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-004 | Every admitted semantic difference becomes an operation or blocker; blockers suppress executable statements while supported independent deltas remain reviewable as proposals. | Implemented for the current admitted subset |
 | FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: isolated execution core plus `complete_isolated_dry_run` success-result CAS and bounded live-read primitive; deployed isolation, sandbox lifecycle, and workers Planned |
 | FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Partially implemented for the isolated execution core; durable worker binding and apply remain Planned |
-| FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Partially implemented input boundary: deterministic existing-table lock targets and a signed-plan manifest bind only statement-matching lock-covered checks; target access, lock acquisition, same-connection fresh observation/check execution, and concurrency proof remain Planned |
+| FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Partially implemented: deterministic existing-table lock targets and a signed-plan manifest bind statement-matching lock-covered checks; a caller-owned primitive captures a strict snapshot and all privilege/precondition observations with same-connection read-only repeatable-read semantics. Stored-target/attempt binding, lock acquisition, in-lock repetition, and concurrency proof remain Planned |
 | FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Partially implemented input boundary: non-empty manifest work has exactly one ordered all-transactional segment and no-op work has none; target transaction execution, timeout enforcement, rollback proof, and recovery remain Planned |
 | FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Partially implemented |
 | FE-INV-010 | Live apply requires `deployer`, exact-plan confirmation, a matching passed dry run, and separate destructive acknowledgement when applicable. | Partially implemented |
@@ -152,7 +161,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-012 | Only a persisted verification snapshot matching `target_digest` may produce `verified`. | Planned |
 | FE-INV-013 | Cross-project resource identities are uniformly masked as not found. | Partially implemented |
 | FE-INV-014 | Unknown fields, object kinds, operation kinds, and compiler versions fail closed. | Partially implemented |
-| FE-INV-015 | Apply rechecks the exact compiler-bound PostgreSQL privilege scope before DDL. | Partially implemented input boundary: the manifest maps compiler-v1 operations to structured database `CREATE`, schema `CREATE`, or table `OWNER` requirements and rejects label drift; target role binding and same-connection privilege observation remain Planned |
+| FE-INV-015 | Apply rechecks the exact compiler-bound PostgreSQL privilege scope before DDL. | Partially implemented: the manifest maps compiler-v1 operations to structured database `CREATE`, schema `CREATE`, or table `OWNER` requirements and rejects label drift; fixed probes execute in the caller-owned same-connection capture primitive. Stored-target/attempt role binding and in-lock repetition remain Planned |
 
 No production-readiness claim is permitted while any FE-INV requirement is
 Partially implemented or Planned.

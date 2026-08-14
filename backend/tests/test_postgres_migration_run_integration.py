@@ -27,6 +27,7 @@ from app.forward.isolated_dry_run import (
 )
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.pre_apply_revalidation import (
+    capture_pre_apply_revalidation_observation,
     compile_apply_privilege_queries,
     compile_pre_apply_revalidation_manifest,
 )
@@ -451,6 +452,26 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
         assert await denied_role.fetchval(
             privilege_query.sql, *privilege_query.parameters
         ) is False
+
+        async def capture(
+            owned_connection: asyncpg.Connection[asyncpg.Record],
+        ) -> dict[str, object]:
+            return await _capture_filtered_snapshot(
+                owned_connection,
+                schema_name,
+            )
+
+        assessment = await capture_pre_apply_revalidation_observation(
+            lock_connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture,  # type: ignore[arg-type]
+            statement_timeout_ms=2_000,
+        )
+        assert assessment.base_matches is True
+        assert assessment.privileges_satisfied is True
+        assert assessment.preconditions_satisfied is False
+
         await transaction.start()
         transaction_started = True
         await lock_connection.execute(manifest.lock_targets[0].sql)

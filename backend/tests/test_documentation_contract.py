@@ -840,7 +840,7 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "a no-op plan has no segment" in runbook
     assert "start that transaction" in runbook
     assert "observe a target role's privileges" in runbook
-    assert "checks no target privilege" in architecture
+    assert "capture owns no target credential" in architecture
     assert "privilege-label drift" in prd
     assert "privilege observation occurred" in strategy
     assert "complete positional observation" in strategy
@@ -851,10 +851,16 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "exact signed plan rather than trusting" in implementation
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
+    assert "Same-connection capture tests" in strategy
     assert (
         "test_real_postgres_manifest_lock_covers_bound_precondition"
         in integration
     )
-    assert "opens no target connection" in implementation
-    assert "acquires no lock" in implementation
+    assert "open no target connection" in implementation
+    assert "acquires no advisory/object lock" in implementation
     assert "cannot establish those facts or grant apply authority" in implementation
+    assert "capture_pre_apply_revalidation_observation" in implementation
+    assert "read-only repeatable-read transaction" in implementation
+    assert "acquires no advisory/object lock" in implementation
+    assert "caller-owned same-connection" in architecture
+    assert "caller-owned connection" in contract

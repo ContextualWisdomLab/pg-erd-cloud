@@ -1,4 +1,4 @@
-"""Compile an immutable plan into target-free apply revalidation inputs.
+"""Compile and capture bounded pre-apply revalidation facts.
 
 This module binds the persisted plan digest and compatibility metadata to the
 existing structured table-lock and live-precondition compilers.  It also proves
@@ -6,21 +6,25 @@ that every data precondition names its statement's table and that the table is
 present in the deterministic lock set.  Its pure observation assessment rejects
 missing, extra, or positionally mismatched caller evidence and derives only
 non-authorizing booleans.  The public compiler re-derives the manifest from the
-exact signed plan rather than trusting a caller-built dataclass.  A future
-executor must acquire those locks and then
-perform fresh snapshot comparison and these checks on the same connection
-before DDL.
-
-The boundary opens no target connection, acquires no lock, captures no
-snapshot, checks no privilege, dispatches no work, and executes no SQL or DDL.
+exact signed plan rather than trusting a caller-built dataclass. The manifest,
+probe compiler, and pure assessor open no target connection. The optional
+capture primitive accepts a caller-owned connection and performs only fixed
+reads in one read-only repeatable-read transaction, producing non-authorizing
+facts. It acquires no advisory/object lock, owns no credential or durable
+attempt binding, dispatches no work, and executes no DDL. A future executor must
+repeat these checks after acquiring its locks on the bound execution connection.
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
+
+import asyncpg
+from asyncpg.transaction import Transaction
 
 from app.forward.apply_lock_plan import (
     ApplyLockPlanContractError,
@@ -30,6 +34,8 @@ from app.forward.apply_lock_plan import (
 from app.forward.live_preflight import (
     LivePreflightContractError,
     LivePreflightQuery,
+    SnapshotCapture,
+    compare_live_preflight_snapshot,
     compile_live_preflight_queries,
 )
 from app.forward.migration_plan import COMPILER_VERSION, verify_migration_plan_digest
@@ -85,10 +91,15 @@ _PRIVILEGE_OBSERVATION_FIELDS = frozenset(
 _PRECONDITION_OBSERVATION_FIELDS = frozenset(
     {"statement_index", "precondition_index", "kind", "passed"}
 )
+MAX_PRE_APPLY_REVALIDATION_STATEMENT_TIMEOUT_MS = 60_000
 
 
 class PreApplyRevalidationContractError(ValueError):
     """Reject input that cannot safely enter future in-lock revalidation."""
+
+
+class _PreApplyRevalidationCaptureFailure(Exception):
+    """Separate target/callback failures from fixed public diagnostics."""
 
 
 @dataclass(frozen=True)
@@ -463,6 +474,197 @@ def compile_apply_privilege_queries(
         expected_plan_digest=expected_plan_digest,
     )
     return _compile_apply_privilege_queries_from_manifest(manifest)
+
+
+async def _fetch_pre_apply_precondition(
+    connection: asyncpg.Connection,
+    query: LivePreflightQuery,
+    *,
+    client_timeout: float,
+) -> object:
+    """Fetch one boolean while containing expected cast-data failure."""
+
+    if query.kind != "castable_values":
+        return await connection.fetchval(
+            query.sql,
+            timeout=client_timeout,
+        )
+
+    savepoint = connection.transaction()
+    await asyncio.wait_for(savepoint.start(), timeout=client_timeout)
+    try:
+        result = await connection.fetchval(
+            query.sql,
+            timeout=client_timeout,
+        )
+    except asyncpg.DataError:
+        await asyncio.wait_for(savepoint.rollback(), timeout=client_timeout)
+        return False
+    await asyncio.wait_for(savepoint.commit(), timeout=client_timeout)
+    return result
+
+
+async def capture_pre_apply_revalidation_observation(
+    connection: asyncpg.Connection,
+    plan: Mapping[str, object],
+    *,
+    expected_plan_digest: object,
+    capture_snapshot: SnapshotCapture,
+    statement_timeout_ms: int = 5_000,
+) -> PreApplyRevalidationAssessment:
+    """Capture and assess fresh read-only facts in one target snapshot.
+
+    The caller owns the connection and target routing. This bounded primitive
+    re-derives the manifest from the signed plan, begins one read-only
+    repeatable-read transaction, captures the strict snapshot, and observes all
+    exact privilege and data-precondition positions on that same connection.
+    It acquires no advisory/object lock and returns only non-authorizing facts;
+    a future apply executor must repeat the checks after acquiring its locks.
+    """
+
+    if (
+        not isinstance(statement_timeout_ms, int)
+        or isinstance(statement_timeout_ms, bool)
+        or not 1
+        <= statement_timeout_ms
+        <= MAX_PRE_APPLY_REVALIDATION_STATEMENT_TIMEOUT_MS
+    ):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation statement timeout is invalid"
+        )
+    if not callable(capture_snapshot):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation snapshot capture is invalid"
+        )
+
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan,
+        expected_plan_digest=expected_plan_digest,
+    )
+    privilege_queries = _compile_apply_privilege_queries_from_manifest(manifest)
+    client_timeout = statement_timeout_ms / 1000 + 1
+    transaction: Transaction | None = None
+    transaction_started = False
+    try:
+        transaction = connection.transaction(
+            isolation="repeatable_read",
+            readonly=True,
+        )
+        await asyncio.wait_for(transaction.start(), timeout=client_timeout)
+        transaction_started = True
+        await asyncio.wait_for(
+            connection.execute(
+                "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+                str(statement_timeout_ms),
+            ),
+            timeout=client_timeout,
+        )
+        try:
+            snapshot = await asyncio.wait_for(
+                capture_snapshot(connection),
+                timeout=client_timeout,
+            )
+        except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            raise _PreApplyRevalidationCaptureFailure from None
+        if not isinstance(snapshot, Mapping):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation snapshot capture is invalid"
+            )
+        try:
+            snapshot_evidence = compare_live_preflight_snapshot(plan, snapshot)
+        except LivePreflightContractError as err:
+            raise PreApplyRevalidationContractError(str(err)) from None
+
+        privilege_rows: list[dict[str, object]] = []
+        for requirement, query in zip(
+            manifest.privilege_requirements,
+            privilege_queries,
+        ):
+            allowed = await asyncio.wait_for(
+                connection.fetchval(
+                    query.sql,
+                    *query.parameters,
+                    timeout=client_timeout,
+                ),
+                timeout=client_timeout,
+            )
+            if not isinstance(allowed, bool):
+                raise PreApplyRevalidationContractError(
+                    "pre-apply revalidation privilege result is invalid"
+                )
+            privilege_rows.append(
+                {
+                    "statement_index": requirement.statement_index,
+                    "privilege": requirement.privilege,
+                    "scope": requirement.scope,
+                    "schema_name": requirement.schema_name,
+                    "table_name": requirement.table_name,
+                    "allowed": allowed,
+                }
+            )
+
+        precondition_rows: list[dict[str, object]] = []
+        for query in manifest.precondition_queries:
+            passed = await asyncio.wait_for(
+                _fetch_pre_apply_precondition(
+                    connection,
+                    query,
+                    client_timeout=client_timeout,
+                ),
+                timeout=client_timeout,
+            )
+            if not isinstance(passed, bool):
+                raise PreApplyRevalidationContractError(
+                    "pre-apply revalidation precondition result is invalid"
+                )
+            precondition_rows.append(
+                {
+                    "statement_index": query.statement_index,
+                    "precondition_index": query.precondition_index,
+                    "kind": query.kind,
+                    "passed": passed,
+                }
+            )
+
+        observed_base_digest = snapshot_evidence.get("observed_base_digest")
+        observation: dict[str, object] = {
+            "plan_digest": manifest.plan_digest,
+            "observed_base_digest": observed_base_digest,
+            "privileges": privilege_rows,
+            "preconditions": precondition_rows,
+        }
+        assessment = assess_pre_apply_revalidation_observation(
+            manifest,
+            observation,
+        )
+        await asyncio.wait_for(transaction.commit(), timeout=client_timeout)
+        return assessment
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        if transaction_started and transaction is not None:
+            try:
+                await asyncio.wait_for(
+                    transaction.rollback(),
+                    timeout=client_timeout,
+                )
+            except Exception:
+                pass
+        raise
+    except Exception as err:
+        if transaction_started and transaction is not None:
+            try:
+                await asyncio.wait_for(
+                    transaction.rollback(),
+                    timeout=client_timeout,
+                )
+            except Exception:
+                pass
+        if isinstance(err, PreApplyRevalidationContractError):
+            raise
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation capture failed"
+        ) from None
 
 
 def assess_pre_apply_revalidation_observation(

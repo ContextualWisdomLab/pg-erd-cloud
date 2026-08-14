@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+from collections.abc import Mapping
+from typing import Any
 
+import asyncpg
 import pytest
 
 from app.forward.migration_plan import COMPILER_VERSION
@@ -12,9 +16,12 @@ from app.forward.pre_apply_revalidation import (
     PreApplyRevalidationContractError,
     PreApplyRevalidationManifest,
     assess_pre_apply_revalidation_observation,
+    capture_pre_apply_revalidation_observation,
     compile_apply_privilege_queries,
     compile_pre_apply_revalidation_manifest,
 )
+from app.forward.schema_model import schema_model_digest
+from app.forward.snapshot_adapter import snapshot_to_schema_model
 
 
 def _statement(
@@ -167,6 +174,308 @@ def _observation(
             for query in manifest.precondition_queries
         ],
     }
+
+
+def _strict_snapshot() -> dict[str, Any]:
+    """Build one strict PostgreSQL snapshot for capture-bound revalidation."""
+
+    return {
+        "snapshot_contract_version": 1,
+        "server_version_num": 180002,
+        "schemas": [{"schema_oid": 11, "schema_name": "Sales Data"}],
+        "relations": [
+            {
+                "relation_oid": 42,
+                "schema_name": "Sales Data",
+                "relation_name": 'Order "Item"',
+                "relation_kind": "r",
+            }
+        ],
+        "columns": [
+            {
+                "relation_oid": 42,
+                "column_name": "amount",
+                "data_type": "bigint",
+                "is_not_null": True,
+                "column_position": 1,
+            }
+        ],
+        "pk_columns": [],
+        "constraints": [],
+        "fk_edges": [],
+        "indexes": [],
+    }
+
+
+class _CaptureTransaction:
+    """Record the bounded transaction lifecycle used by the capture primitive."""
+
+    def __init__(self, connection: "_CaptureConnection") -> None:
+        self.connection = connection
+        self.started = False
+        self.committed = False
+        self.rolled_back = False
+
+    async def start(self) -> None:
+        self.started = True
+        self.connection.started = True
+
+    async def commit(self) -> None:
+        self.committed = True
+        self.connection.committed = True
+
+    async def rollback(self) -> None:
+        self.rolled_back = True
+        self.connection.rolled_back = True
+
+
+class _CaptureConnection:
+    """Minimal asyncpg-shaped connection with ordered boolean observations."""
+
+    def __init__(self, results: list[object]) -> None:
+        self.results = iter(results)
+        self.transaction_options: dict[str, object] | None = None
+        self.started = False
+        self.committed = False
+        self.rolled_back = False
+        self.transactions: list[_CaptureTransaction] = []
+        self.executed: list[tuple[str, tuple[object, ...]]] = []
+        self.queries: list[tuple[str, tuple[object, ...], float | None]] = []
+
+    def transaction(self, **kwargs: object) -> _CaptureTransaction:
+        if kwargs:
+            self.transaction_options = kwargs
+        transaction = _CaptureTransaction(self)
+        self.transactions.append(transaction)
+        return transaction
+
+    async def execute(self, sql: str, *args: object) -> None:
+        self.executed.append((sql, args))
+
+    async def fetchval(
+        self,
+        sql: str,
+        *args: object,
+        timeout: float | None = None,
+    ) -> object:
+        self.queries.append((sql, args, timeout))
+        result = next(self.results)
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+
+class _FailingCaptureConnection(_CaptureConnection):
+    """Raise one credential-bearing target error for redaction assertions."""
+
+    async def fetchval(
+        self,
+        sql: str,
+        *args: object,
+        timeout: float | None = None,
+    ) -> object:
+        self.queries.append((sql, args, timeout))
+        raise RuntimeError("postgresql://user:secret@target/private-row")
+
+
+@pytest.mark.asyncio
+async def test_captures_complete_observation_in_one_read_only_target_snapshot() -> None:
+    """Fresh digest, privilege, and precondition facts share one connection."""
+
+    snapshot = _strict_snapshot()
+    base_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan = _signed_plan(_statement())
+    plan["base_digest"] = base_digest
+    _resign(plan)
+    connection = _CaptureConnection([True, True])
+    captured_connections: list[object] = []
+
+    async def capture_snapshot(candidate: object) -> Mapping[str, object]:
+        assert connection.started is True
+        captured_connections.append(candidate)
+        return snapshot
+
+    assessment = await capture_pre_apply_revalidation_observation(
+        connection,
+        plan,
+        expected_plan_digest=plan["plan_digest"],
+        capture_snapshot=capture_snapshot,
+        statement_timeout_ms=750,
+    )
+
+    assert captured_connections == [connection]
+    assert connection.transaction_options == {
+        "isolation": "repeatable_read",
+        "readonly": True,
+    }
+    assert connection.executed == [
+        (
+            "SELECT pg_catalog.set_config('statement_timeout', $1, true)",
+            ("750",),
+        )
+    ]
+    assert [args for _sql, args, _timeout in connection.queries] == [
+        ("Sales Data", 'Order "Item"'),
+        (),
+    ]
+    assert assessment.observed_base_digest == base_digest
+    assert assessment.base_matches is True
+    assert assessment.privileges_satisfied is True
+    assert assessment.preconditions_satisfied is True
+    assert connection.committed is True
+    assert connection.rolled_back is False
+
+
+@pytest.mark.asyncio
+async def test_capture_preserves_negative_facts_without_apply_authority() -> None:
+    """Drift, privilege denial, and failed checks remain explicit booleans."""
+
+    snapshot = _strict_snapshot()
+    plan = _signed_plan(_statement())
+    connection = _CaptureConnection([False, False])
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        return snapshot
+
+    assessment = await capture_pre_apply_revalidation_observation(
+        connection,
+        plan,
+        expected_plan_digest=plan["plan_digest"],
+        capture_snapshot=capture_snapshot,
+    )
+
+    assert assessment.base_matches is False
+    assert assessment.privileges_satisfied is False
+    assert assessment.preconditions_satisfied is False
+    assert connection.committed is True
+
+
+@pytest.mark.asyncio
+async def test_capture_rolls_back_and_sanitizes_target_failure() -> None:
+    """Driver and callback detail never escapes the capture boundary."""
+
+    snapshot = _strict_snapshot()
+    base_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan = _signed_plan(_statement())
+    plan["base_digest"] = base_digest
+    _resign(plan)
+    connection = _FailingCaptureConnection([])
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        return snapshot
+
+    with pytest.raises(
+        PreApplyRevalidationContractError,
+        match="^pre-apply revalidation capture failed$",
+    ) as failure:
+        await capture_pre_apply_revalidation_observation(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture_snapshot,
+        )
+
+    assert "secret" not in str(failure.value)
+    assert "private-row" not in str(failure.value)
+    assert connection.rolled_back is True
+    assert connection.committed is False
+
+
+@pytest.mark.asyncio
+async def test_capture_records_cast_data_failure_as_negative_evidence() -> None:
+    """A cast failure rolls back its savepoint and remains a false fact."""
+
+    snapshot = _strict_snapshot()
+    base_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan = _signed_plan(_statement())
+    plan["base_digest"] = base_digest
+    statements = plan["statements"]
+    assert isinstance(statements, list)
+    statement = statements[0]
+    assert isinstance(statement, dict)
+    statement["preconditions"] = [
+        {
+            "kind": "castable_values",
+            "schema_name": "Sales Data",
+            "table_name": 'Order "Item"',
+            "column_name": "amount",
+            "target_data_type": "integer",
+        }
+    ]
+    _resign(plan)
+    connection = _CaptureConnection(
+        [True, asyncpg.DataError("invalid input value")]
+    )
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        return snapshot
+
+    assessment = await capture_pre_apply_revalidation_observation(
+        connection,
+        plan,
+        expected_plan_digest=plan["plan_digest"],
+        capture_snapshot=capture_snapshot,
+    )
+
+    assert assessment.base_matches is True
+    assert assessment.privileges_satisfied is True
+    assert assessment.preconditions_satisfied is False
+    outer_transaction, savepoint = connection.transactions
+    assert outer_transaction.committed is True
+    assert outer_transaction.rolled_back is False
+    assert savepoint.committed is False
+    assert savepoint.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_capture_preserves_cancellation_after_best_effort_rollback() -> None:
+    """Cancellation is not converted into a contract or target failure."""
+
+    plan = _signed_plan(_statement())
+    connection = _CaptureConnection([])
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        await capture_pre_apply_revalidation_observation(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture_snapshot,
+        )
+
+    assert len(connection.transactions) == 1
+    assert connection.transactions[0].rolled_back is True
+    assert connection.transactions[0].committed is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("statement_timeout_ms", [True, 0, 60_001, "5000"])
+async def test_capture_rejects_invalid_timeout_before_target_access(
+    statement_timeout_ms: object,
+) -> None:
+    """Malformed timeout input cannot open a target transaction."""
+
+    plan = _signed_plan(_statement())
+    connection = _CaptureConnection([])
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        return _strict_snapshot()
+
+    with pytest.raises(
+        PreApplyRevalidationContractError,
+        match="statement timeout is invalid",
+    ):
+        await capture_pre_apply_revalidation_observation(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture_snapshot,
+            statement_timeout_ms=statement_timeout_ms,  # type: ignore[arg-type]
+        )
+
+    assert connection.transaction_options is None
 
 
 def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
