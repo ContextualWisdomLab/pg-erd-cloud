@@ -27,7 +27,8 @@ The handler accepts only:
 3. an exact `MigrationRunAttemptClaim` containing the durable attempt UUID,
    run UUID, attempt number and acquired state version;
 4. injected `IsolatedSandboxFactory` and `LivePreflightFactory` capabilities;
-5. bounded lock, sandbox-statement and preflight-statement timeouts.
+5. bounded lock and statement timeouts plus whole-stage sandbox and preflight
+   deadlines.
 
 A signal/run UUID mismatch fails before metadata or provider access.
 
@@ -75,7 +76,9 @@ plan digest verifier remains authoritative.
    durable attempt UUID.
 2. The isolated capability is entered and the existing
    `execute_isolated_dry_run` core receives the verified plan directly from the
-   handler, never through the provider request.
+   handler, never through the provider request. One bounded whole-stage
+   deadline covers provider acquisition, execution, snapshot capture and
+   capability cleanup.
 3. The existing `complete_isolated_dry_run` boundary verifies the result and
    derives only `live_preflight_running`.
 4. Immediately before target access, the handler locks and reloads the run and
@@ -83,6 +86,8 @@ plan digest verifier remains authoritative.
    failure prevents opening the live capability.
 5. The live read-only capability is entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
+   A separate bounded whole-stage deadline covers reader acquisition, capture,
+   checks and cleanup.
 6. The existing `complete_live_preflight` boundary derives only `passed`,
    `drifted` or `failed`.
 
@@ -107,7 +112,9 @@ plan digest verifier remains authoritative.
 
 Provider exceptions are replaced with fixed worker-boundary errors using
 `from None`. Provider diagnostics, DSNs, credentials, SQL and row data are not
-persisted or returned. This includes durable-attempt and signal-heartbeat
+persisted or returned. Whole-stage deadline expiry cancels the in-flight
+capability coroutine, awaits async-context cleanup and emits the same fixed
+stage failure. This includes durable-attempt and signal-heartbeat
 renewal failures; both cancel and retrieve in-flight work before exposing only
 their fixed lease-loss error. Durable evidence continues to be canonicalized
 by the existing migration-run transition functions.
@@ -134,6 +141,7 @@ Repository tests must cover:
 - metadata integrity and queued CAS event evidence;
 - claim mismatch before metadata access;
 - cancellation propagation and provider-error redaction;
+- sandbox/live whole-stage timeout cancellation and capability cleanup;
 - cancellation/state-version recheck before target access;
 - bounded configuration rejection;
 - rejection of non-contract terminal states.

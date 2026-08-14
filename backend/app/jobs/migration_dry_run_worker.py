@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import math
 from collections.abc import Mapping
 from dataclasses import replace
 
@@ -55,6 +56,9 @@ __all__ = [
     "MigrationDryRunWorkerError",
     "make_durable_dry_run_attempt_handler",
 ]
+
+MAX_SANDBOX_STAGE_TIMEOUT_SECONDS = 900.0
+MAX_PREFLIGHT_STAGE_TIMEOUT_SECONDS = 60.0
 
 
 async def _load_and_begin(
@@ -224,6 +228,21 @@ def _require_timeout(value: int, *, maximum: int, label: str) -> None:
         raise ValueError(f"{label} is outside the allowed range")
 
 
+def _require_stage_timeout(
+    value: float,
+    *,
+    maximum: float,
+    label: str,
+) -> None:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not 0 < value <= maximum
+    ):
+        raise ValueError(f"{label} is outside the allowed range")
+
+
 def make_durable_dry_run_attempt_handler(
     sandbox_factory: IsolatedSandboxFactory,
     live_preflight_factory: LivePreflightFactory,
@@ -231,6 +250,8 @@ def make_durable_dry_run_attempt_handler(
     lock_timeout_ms: int = 1_000,
     sandbox_statement_timeout_ms: int = 30_000,
     preflight_statement_timeout_ms: int = 5_000,
+    sandbox_stage_timeout_seconds: float = 300.0,
+    preflight_stage_timeout_seconds: float = 30.0,
 ) -> MigrationRunAttemptHandler:
     """Compose one attempt-bound dry run without concrete credential authority.
 
@@ -257,6 +278,16 @@ def make_durable_dry_run_attempt_handler(
         maximum=MAX_PREFLIGHT_STATEMENT_TIMEOUT_MS,
         label="migration live-preflight statement timeout",
     )
+    _require_stage_timeout(
+        sandbox_stage_timeout_seconds,
+        maximum=MAX_SANDBOX_STAGE_TIMEOUT_SECONDS,
+        label="migration sandbox stage timeout",
+    )
+    _require_stage_timeout(
+        preflight_stage_timeout_seconds,
+        maximum=MAX_PREFLIGHT_STAGE_TIMEOUT_SECONDS,
+        label="migration preflight stage timeout",
+    )
 
     async def handle_attempt(
         session_factory: SessionFactory,
@@ -270,7 +301,7 @@ def make_durable_dry_run_attempt_handler(
         work = await _load_and_begin(session_factory, attempt_claim)
 
         if work.state == "sandbox_running":
-            try:
+            async def execute_sandbox_stage() -> Mapping[str, object]:
                 async with sandbox_factory(work.sandbox_request()) as sandbox:
                     if (
                         not isinstance(sandbox, IsolatedSandboxExecution)
@@ -279,7 +310,7 @@ def make_durable_dry_run_attempt_handler(
                         raise MigrationDryRunWorkerError(
                             "isolated dry-run capability is invalid"
                         )
-                    isolated_result = await execute_isolated_dry_run(
+                    return await execute_isolated_dry_run(
                         sandbox.connection,
                         work.plan_json,
                         expected_plan_digest=work.plan_digest,
@@ -287,6 +318,12 @@ def make_durable_dry_run_attempt_handler(
                         lock_timeout_ms=lock_timeout_ms,
                         statement_timeout_ms=sandbox_statement_timeout_ms,
                     )
+
+            try:
+                isolated_result = await asyncio.wait_for(
+                    execute_sandbox_stage(),
+                    timeout=sandbox_stage_timeout_seconds,
+                )
             except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
                 raise
             except Exception:  # noqa: BLE001
@@ -320,22 +357,29 @@ def make_durable_dry_run_attempt_handler(
         work = await _refresh_live_stage(
             session_factory, attempt_claim, work
         )
-        try:
+
+        async def execute_live_stage() -> Mapping[str, object]:
             async with live_preflight_factory(
                 work.live_preflight_request()
             ) as live_target:
-                if not isinstance(live_target, LivePreflightExecution) or not callable(
-                    live_target.capture_snapshot
-                ):
+                if not isinstance(
+                    live_target, LivePreflightExecution
+                ) or not callable(live_target.capture_snapshot):
                     raise MigrationDryRunWorkerError(
                         "live preflight capability is invalid"
                     )
-                preflight_result = await execute_bound_live_preflight(
+                return await execute_bound_live_preflight(
                     live_target.connection,
                     work.plan_json,
                     capture_snapshot=live_target.capture_snapshot,
                     statement_timeout_ms=preflight_statement_timeout_ms,
                 )
+
+        try:
+            preflight_result = await asyncio.wait_for(
+                execute_live_stage(),
+                timeout=preflight_stage_timeout_seconds,
+            )
         except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
             raise
         except Exception:  # noqa: BLE001

@@ -75,3 +75,11 @@ def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() ->
     assert "target credential binding" in normalized
     assert "application startup wiring" in normalized
     assert "**Planned**" in normalized
+
+
+def test_worker_contract_bounds_whole_capability_stages() -> None:
+    """Keep provider/executor hangs distinct from SQL statement timeouts."""
+
+    contract = " ".join(_read(WORKER_CONTRACT).split()).lower()
+    assert "whole-stage sandbox and preflight deadlines" in contract
+    assert "timeout cancellation and capability cleanup" in contract

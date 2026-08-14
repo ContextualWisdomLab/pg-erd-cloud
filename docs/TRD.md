@@ -85,7 +85,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   a persisted dry-run or queued-apply cancellation intent becomes terminal
   `cancelled`, while an already-terminal redelivery is acknowledged without
   replay; either path marks a surviving active attempt `abandoned` in the same
-  metadata transaction. Application startup wiring, credentials, and worker execution remain
+  metadata transaction. The provider-neutral durable handler binds the exact
+  attempt to injected sandbox and read-only capabilities in deterministic
+  order; bounded whole-stage deadlines cancel and close hung capability
+  contexts with fixed non-secret errors. Application startup wiring,
+  credentials, concrete providers, and deployed worker execution remain
   **Planned**;
 - idempotent cancellation intent that increments the shared state version and
   appends a same-state event, preventing a stale worker transition from winning;

@@ -74,6 +74,51 @@ async def test_handler_propagates_cancellation_and_closes_sandbox_lease() -> Non
 
 
 @pytest.mark.asyncio
+async def test_sandbox_stage_timeout_is_sanitized_and_closes_capability() -> None:
+    """Bound provider/executor hangs without leaking capability details."""
+
+    work = _work()
+    cleaned = False
+
+    @asynccontextmanager
+    async def sandbox_factory(_request):
+        nonlocal cleaned
+        try:
+            yield IsolatedSandboxExecution(object(), AsyncMock())
+        finally:
+            cleaned = True
+
+    async def hang(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    handler = make_durable_dry_run_attempt_handler(
+        sandbox_factory,
+        MagicMock(),
+        sandbox_stage_timeout_seconds=0.01,
+    )
+    signal_claim = SimpleNamespace(migration_run_uuid=work.migration_run_uuid)
+    attempt_claim = SimpleNamespace(
+        migration_run_attempt_uuid=work.migration_run_attempt_uuid,
+        migration_run_uuid=work.migration_run_uuid,
+        attempt_number=work.attempt_number,
+        acquired_state_version=work.state_version,
+    )
+    with patch(
+        "app.jobs.migration_dry_run_worker._load_and_begin",
+        new=AsyncMock(return_value=work),
+    ), patch(
+        "app.jobs.migration_dry_run_worker.execute_isolated_dry_run",
+        new=AsyncMock(side_effect=hang),
+    ):
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            await handler(MagicMock(), signal_claim, attempt_claim)
+
+    assert str(caught.value) == "isolated dry-run stage failed"
+    assert caught.value.__cause__ is None
+    assert cleaned
+
+
+@pytest.mark.asyncio
 async def test_live_preflight_failure_is_sanitized_and_closes_reader() -> None:
     """Close the target reader and discard read-only provider details."""
 
@@ -114,6 +159,57 @@ async def test_live_preflight_failure_is_sanitized_and_closes_reader() -> None:
             await handler(MagicMock(), signal_claim, attempt_claim)
     assert str(caught.value) == "live preflight stage failed"
     assert secret not in repr(caught.value)
+    assert caught.value.__cause__ is None
+    assert cleaned
+
+
+@pytest.mark.asyncio
+async def test_live_stage_timeout_is_sanitized_and_closes_capability() -> None:
+    """Bound live-reader hangs and close the read-only capability on timeout."""
+
+    work = _work(state="live_preflight_running", state_version=9)
+    cleaned = False
+
+    def sandbox_factory(_request):
+        raise AssertionError("sandbox must not run")
+
+    @asynccontextmanager
+    async def live_factory(_request):
+        nonlocal cleaned
+        try:
+            yield LivePreflightExecution(object(), AsyncMock())
+        finally:
+            cleaned = True
+
+    async def hang(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    handler = make_durable_dry_run_attempt_handler(
+        sandbox_factory,
+        live_factory,
+        preflight_stage_timeout_seconds=0.01,
+    )
+    signal_claim = SimpleNamespace(migration_run_uuid=work.migration_run_uuid)
+    attempt_claim = SimpleNamespace(
+        migration_run_attempt_uuid=work.migration_run_attempt_uuid,
+        migration_run_uuid=work.migration_run_uuid,
+        attempt_number=work.attempt_number,
+        acquired_state_version=work.state_version,
+    )
+    with patch(
+        "app.jobs.migration_dry_run_worker._load_and_begin",
+        new=AsyncMock(return_value=work),
+    ), patch(
+        "app.jobs.migration_dry_run_worker._refresh_live_stage",
+        new=AsyncMock(return_value=work),
+    ), patch(
+        "app.jobs.migration_dry_run_worker.execute_bound_live_preflight",
+        new=AsyncMock(side_effect=hang),
+    ):
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            await handler(MagicMock(), signal_claim, attempt_claim)
+
+    assert str(caught.value) == "live preflight stage failed"
     assert caught.value.__cause__ is None
     assert cleaned
 
@@ -178,6 +274,8 @@ def test_handler_rejects_unsafe_configuration_before_factory_use() -> None:
         ({"lock_timeout_ms": 0}, "lock timeout"),
         ({"sandbox_statement_timeout_ms": 0}, "statement timeout"),
         ({"preflight_statement_timeout_ms": 0}, "live-preflight"),
+        ({"sandbox_stage_timeout_seconds": 0}, "sandbox stage timeout"),
+        ({"preflight_stage_timeout_seconds": 0}, "preflight stage timeout"),
     ):
         with pytest.raises(ValueError, match=label):
             make_durable_dry_run_attempt_handler(

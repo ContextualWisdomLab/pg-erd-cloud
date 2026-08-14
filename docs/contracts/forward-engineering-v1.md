@@ -44,15 +44,19 @@ Current code implements only the first control-plane slice:
   digest, revalidates plan integrity, and enforces exact `passed` match versus
   `drifted` mismatch semantics. `complete_live_preflight` validates the exact
   bounded executor-result shape and server-derives `passed`, `drifted`, or
-  `failed`; a caller cannot select the state, event type, or digest. No worker
-  execution authority exists yet. The
+  `failed`; a caller cannot select the state, event type, or digest. A
+  provider-neutral durable attempt handler owns the verified
+  sandbox-then-preflight sequence through injected capability contexts;
+  bounded whole-stage deadlines cancel and close a hung sandbox or reader
+  while exposing only fixed errors. It grants no concrete credential, network,
+  provisioning, or startup authority. The
   execution-neutral consumer contract is **Implemented**; consumer-to-attempt
   binding is **Implemented** without plan, credential, or SQL authority.
   When attempt acquisition finds a persisted cancellation intent, the adapter
   locks the run and records the terminal `cancelled` acknowledgement before the
   exact signal is acknowledged. A redelivered already-terminal run is settled
   without replaying sandbox or live-preflight work.
-  Application startup wiring and worker execution remain **Planned**.
+  Application startup wiring and deployed worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes
   them in one timed read-only transaction. `execute_bound_live_preflight`
