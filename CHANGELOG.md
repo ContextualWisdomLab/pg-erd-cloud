@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/Security] 데이터베이스 connection 생성 시 PostgreSQL·MySQL/MariaDB·Snowflake별 기존 SSRF guard를 연결 전에 한 번 더 실행합니다. 제한된 loopback/private/link-local/reserved 주소, 허용되지 않은 hostname, DSN scheme·host 형식 오류는 credential 암호화나 metadata 영속화 전에 고정된 `422` 오류로 거부하며, 실제 probe/introspection/apply 경계의 DNS 재검증과 IP pinning도 그대로 유지합니다. 이는 application 방어를 보강하지만 배포 egress policy 증거를 대신하지 않습니다.
+
 - [FE/UI] Exact `passed` dry-run의 plan UUID·digest·observed base가 현재 검토 계획과 모두 일치할 때만 Forward Engineering modal에 비실행 apply intent 확인 form을 표시합니다. 배포자는 대상 connection 이름을 직접 정확히 입력하고, destructive plan이면 별도 확인해야 합니다. 첫 제출 뒤에는 confirmation body와 idempotency key를 함께 고정해 모호한 응답을 다른 target/승인값으로 재사용하지 않으며, 브라우저는 SQL·DSN·credential을 전송하지 않습니다. 접수 결과는 dispatch가 없는 durable intent일 뿐이고 worker, live DDL, recovery, convergence 권한은 여전히 Planned입니다.
 
 - [FE/UI] Forward Engineering modal이 기존 실행을 표시하는 동안 새 dry-run 의도를 접수하면 단일 active run identity로 전환합니다. 독립 실행 가능한 plan review surface의 기본 polling 동작은 유지하면서 modal orchestration은 이전 run audit surface를 교체해 중복 live region, 상충하는 취소 control, 두 개의 polling loop를 만들지 않습니다. Modal을 닫았다 다시 열면 그 세션에서 생성된 실행 identity를 폐기하고 호출자가 제공한 현재 run으로 복원해 이전 실행 audit을 재사용하지 않습니다. Apply, credential, target 또는 SQL 권한은 추가하지 않습니다.

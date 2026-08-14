@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.db_introspect import apply_database_sql, probe_database
+from app.db_introspect import (
+    apply_database_sql,
+    probe_database,
+    validate_database_dsn_target,
+)
 from app.models import DbConnection
 from app.permissions import require_project_member
 from app.schemas import (
@@ -56,6 +60,12 @@ async def create_connection(
     await require_project_member(
         session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
+    try:
+        await validate_database_dsn_target(body.dsn)
+    except Exception:  # noqa: BLE001 - expose no host, DNS, or credential detail
+        raise HTTPException(
+            status_code=422, detail="database DSN target is not allowed"
+        ) from None
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
         db_connection_uuid=uuid.uuid4(),

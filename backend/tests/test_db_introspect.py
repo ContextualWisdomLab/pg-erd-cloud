@@ -130,6 +130,47 @@ async def test_probe_database_dispatches_by_dialect(
 
 
 @pytest.mark.asyncio
+async def test_validate_database_dsn_target_dispatches_without_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Validate every supported target through its non-connecting SSRF guard."""
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_postgres(dsn: str) -> object:
+        calls.append(("postgresql", dsn))
+        return object()
+
+    async def fake_snowflake(dsn: str) -> object:
+        calls.append(("snowflake", dsn))
+        return object()
+
+    async def fake_mysql(dsn: str) -> object:
+        calls.append(("mysql", dsn))
+        return object()
+
+    monkeypatch.setattr(
+        db_introspect, "validate_postgres_dsn_target", fake_postgres
+    )
+    monkeypatch.setattr(db_introspect, "_parse_snowflake_dsn", fake_snowflake)
+    monkeypatch.setattr(db_introspect, "_parse_mysql_dsn", fake_mysql)
+
+    await db_introspect.validate_database_dsn_target(
+        "postgresql://u:p@db/app"
+    )
+    await db_introspect.validate_database_dsn_target(
+        "snowflake://u:p@acct/APP"
+    )
+    await db_introspect.validate_database_dsn_target("mysql://u:p@db/app")
+
+    assert calls == [
+        ("postgresql", "postgresql://u:p@db/app"),
+        ("snowflake", "snowflake://u:p@acct/APP"),
+        ("mysql", "mysql://u:p@db/app"),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_introspect_database_redacts_password_on_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

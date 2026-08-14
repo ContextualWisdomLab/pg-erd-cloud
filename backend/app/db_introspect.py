@@ -5,14 +5,19 @@ from urllib.parse import urlparse
 
 from app.dsn_redaction import redact_dsn_error_message
 from app.mysql_introspect import introspect_mysql, probe_mysql
+from app.mysql_introspect.introspect import _parse_mysql_dsn
 from app.pg_introspect.forward_ddl import validate_forward_ddl
+from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.pg_introspect.introspect import (
     apply_postgres_ddl,
     introspect_postgres,
     probe_postgres,
 )
 from app.snowflake_introspect import introspect_snowflake
-from app.snowflake_introspect.introspect import probe_snowflake
+from app.snowflake_introspect.introspect import (
+    _parse_snowflake_dsn,
+    probe_snowflake,
+)
 
 DatabaseDialect = Literal["postgresql", "snowflake", "mysql"]
 
@@ -28,6 +33,19 @@ def detect_dsn_dialect(dsn: str) -> DatabaseDialect:
     if scheme in ("mysql", "mariadb"):
         return "mysql"
     raise ValueError(f"unsupported database DSN scheme: {scheme or '<empty>'}")
+
+
+async def validate_database_dsn_target(dsn: str) -> None:
+    """Reject unsafe supported-database targets without opening a connection."""
+
+    dialect = detect_dsn_dialect(dsn)
+    if dialect == "snowflake":
+        await _parse_snowflake_dsn(dsn)
+        return
+    if dialect == "mysql":
+        await _parse_mysql_dsn(dsn)
+        return
+    await validate_postgres_dsn_target(dsn)
 
 
 async def introspect_database(dsn: str, schema_filter: str | None) -> dict:

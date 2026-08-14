@@ -110,6 +110,10 @@
 - ✅ 민감정보를 URL로 받지 않음(권장: Authorization header)
 - ✅ 문자열 입력에서 NUL(0x00) 제거(특히 PostgreSQL text/json 방어)
   - 근거: `backend/app/sanitize.py`
+- ✅ PostgreSQL·MySQL/MariaDB·Snowflake connection DSN은 암호화·영속화 전에
+  dialect별 SSRF guard로 검증하고, 실제 연결 시 다시 DNS 검증·IP pinning 적용
+  - 근거: `backend/app/api/connections.py`, `backend/app/db_introspect.py`,
+    각 dialect introspector의 DSN guard
 - 🟡 스키마명 등 일부 입력은 제한(예: PostgreSQL identifier)
   - 근거: `backend/app/schemas.py` (패턴/길이 제한)
 
