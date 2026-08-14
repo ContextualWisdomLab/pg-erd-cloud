@@ -641,7 +641,6 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -669,13 +668,7 @@ describe('App orchestration coverage', () => {
       rejectSnapshots(new Error('stale snapshots'))
       await Promise.resolve()
     })
-    // Ignore stale errors specifically since we changed project
-    const errorAlert = screen.queryByRole('alert')
-    if (errorAlert) {
-      expect(errorAlert.textContent).not.toMatch(/stale (connections|snapshots)/)
-    } else {
-      expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
-    }
+    expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
   })
 
   it('renders snapshot failures and polls without a selected project', async () => {
