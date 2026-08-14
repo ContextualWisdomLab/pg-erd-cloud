@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 import ssl
 from urllib.parse import parse_qsl, urlparse
 
@@ -24,7 +25,7 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
         return context
 
     def __init__(self, server_hostname: str) -> None:
-        return None
+        super().__init__()
 
     def wrap_bio(
         self,
@@ -48,21 +49,43 @@ def _requires_verified_tls_hostname(dsn: str) -> bool:
     return query.get("sslmode", "").lower() == "verify-full"
 
 
+def _validate_tls_file_path(path_str: str) -> str:
+    path = Path(path_str).resolve()
+    allowed_bases = [
+        Path("/etc/ssl").resolve(),
+        Path("/etc/pki").resolve(),
+        Path("/run/secrets").resolve(),
+    ]
+    if not any(path.is_relative_to(base) for base in allowed_bases):
+        raise ValueError("TLS certificate path is not in an allowed directory")
+    if not path.is_file():
+        raise ValueError("TLS certificate path does not exist or is not a file")
+    return str(path)
+
+
 def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
     context = _ServerHostnameSSLContext(server_hostname)
     if query.get("sslrootcert"):
-        context.load_verify_locations(cafile=query["sslrootcert"])
+        context.load_verify_locations(cafile=_validate_tls_file_path(query["sslrootcert"]))
     else:
         context.load_default_certs()
     if query.get("sslcert") and query.get("sslkey"):
-        context.load_cert_chain(query["sslcert"], query["sslkey"])
+        context.load_cert_chain(
+            _validate_tls_file_path(query["sslcert"]),
+            _validate_tls_file_path(query["sslkey"])
+        )
     return context
 
 
 async def _connect_guarded_postgres(
     dsn: str, *, timeout: float
 ) -> asyncpg.Connection:
+    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
+    for key in ("sslrootcert", "sslcert", "sslkey", "sslcrl", "passfile"):
+        if query.get(key):
+            _validate_tls_file_path(query[key])
+
     target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
