@@ -41,6 +41,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "complete_live_preflight",
         "exact expected run state version",
         "one fresh database statement",
+        "PostgreSQL 14–18 matrix exercises",
         "does not eliminate the gap",
         "does not implement or prove",
         "live apply",

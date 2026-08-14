@@ -79,6 +79,7 @@ from app.jobs.migration_dry_run_worker import (
     LivePreflightExecution,
     LivePreflightRequest,
     MigrationDryRunWorkerError,
+    guard_live_preflight_handoff,
     make_durable_dry_run_attempt_handler,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
@@ -898,6 +899,15 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
     ) -> AsyncIterator[LivePreflightExecution]:
         nonlocal crash_before_first_live_read
         live_requests.append(request)
+        guard_now = now + dt.timedelta(
+            seconds=1.5 if request.attempt_number == 1 else 3.5
+        )
+        async with sessions() as guard_session:
+            async with guard_session.begin():
+                await guard_live_preflight_handoff(
+                    guard_session, request, now=guard_now
+                )
+        capability_order.append("live-guard")
         if crash_before_first_live_read:
             crash_before_first_live_read = False
             capability_order.append("live-crash")
@@ -1046,6 +1056,18 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
                     f"{sandbox_stages!r}: {error}"
                 )
 
+        async with sessions() as expired_guard_session:
+            async with expired_guard_session.begin():
+                with pytest.raises(
+                    MigrationDryRunWorkerError,
+                    match="handoff is invalid",
+                ):
+                    await guard_live_preflight_handoff(
+                        expired_guard_session,
+                        live_requests[0],
+                        now=now + dt.timedelta(seconds=2),
+                    )
+
         recovery_token = uuid.uuid4()
         async with sessions() as recovery_claim_session:
             async with recovery_claim_session.begin():
@@ -1133,7 +1155,9 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
         assert capability_order == [
             "sandbox-enter",
             "sandbox-exit",
+            "live-guard",
             "live-crash",
+            "live-guard",
             "live-enter",
             "live-exit",
         ]

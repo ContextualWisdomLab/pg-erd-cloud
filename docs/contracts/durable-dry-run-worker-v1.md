@@ -65,6 +65,12 @@ statement requires an active unexpired attempt, uncancelled
 It returns no credential, route, connection, plan JSON or SQL. Driver/query
 failures and non-matches expose only the fixed handoff error.
 
+The PostgreSQL 14–18 matrix exercises this statement through the test-owned
+provider before its target connection, proves the exact lease-expiry boundary
+fails closed after an interrupted first attempt, and then accepts the exact
+successor attempt. This is ephemeral database evidence, not deployed provider
+composition.
+
 ## Server-authoritative metadata checks
 
 Before external I/O, the handler locks and reloads the exact run and immutable
