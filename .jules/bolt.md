@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-15 - Optimize ERD Column Resolution by decoding instead of encoding handles
+**Learning:** When resolving column names from edge handles in ERD exports (e.g. DBML, Dictionary, Mermaid), iterating through node columns and re-encoding names with \`sourceColumnHandleId\` creates significant O(C) overhead per edge/column check.
+**Action:** Provide and use a \`parseColumnNameFromHandle\` utility to directly parse the string handle in O(1) instead of repeatedly iterating through node columns and re-encoding strings.
