@@ -35,6 +35,8 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "IsolatedSandboxRequest",
         "LivePreflightRequest",
         "guard_live_preflight_handoff",
+        "load_guarded_live_preflight_target",
+        "encrypted DSN ciphertext and nonce",
         "execute_isolated_dry_run",
         "execute_bound_live_preflight",
         "complete_isolated_dry_run",
@@ -44,6 +46,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "PostgreSQL 14–18 matrix exercises",
         "does not eliminate the gap",
         "does not implement or prove",
+        "decryption, target connection, provider composition and startup wiring remain Planned",
         "live apply",
         "production readiness",
     )
@@ -61,6 +64,8 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
 
     assert "make_durable_dry_run_attempt_handler" in implementation
     assert "guard_live_preflight_handoff" in implementation
+    assert "load_guarded_live_preflight_target" in implementation
+    assert "class GuardedLivePreflightTarget" in implementation
     assert "_refresh_live_stage" in implementation
     assert "class IsolatedSandboxRequest" in authority
     assert "class LivePreflightRequest" in authority

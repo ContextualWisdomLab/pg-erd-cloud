@@ -12,10 +12,11 @@ import datetime as dt
 import math
 import uuid
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.forward.isolated_dry_run import (
     MAX_LOCK_TIMEOUT_MS,
@@ -48,15 +49,22 @@ from app.jobs.migration_dry_run_worker_contract import (
 )
 from app.jobs.migration_run_consumer import MigrationRunAttemptHandler
 from app.jobs.valkey_queue import MigrationRunSignalClaim
-from app.models import MigrationPlan, MigrationRun, MigrationRunAttempt
+from app.models import (
+    DbConnection,
+    MigrationPlan,
+    MigrationRun,
+    MigrationRunAttempt,
+)
 
 __all__ = [
     "IsolatedSandboxExecution",
     "IsolatedSandboxRequest",
+    "GuardedLivePreflightTarget",
     "LivePreflightExecution",
     "LivePreflightRequest",
     "MigrationDryRunWorkerError",
     "guard_live_preflight_handoff",
+    "load_guarded_live_preflight_target",
     "make_durable_dry_run_attempt_handler",
 ]
 
@@ -64,18 +72,21 @@ MAX_SANDBOX_STAGE_TIMEOUT_SECONDS = 900.0
 MAX_PREFLIGHT_STAGE_TIMEOUT_SECONDS = 60.0
 
 
-async def guard_live_preflight_handoff(
-    session: AsyncSession,
-    request: LivePreflightRequest,
-    *,
-    now: dt.datetime | None = None,
-) -> None:
-    """Fail closed unless one fresh query matches the exact live-reader lease.
+@dataclass(frozen=True)
+class GuardedLivePreflightTarget:
+    """Encrypted stored-target material released after one exact guard query."""
 
-    Concrete providers can call this server-owned guard immediately before
-    resolving the stored target. It returns no credential or connection and
-    does not eliminate the gap between this observation and provider access.
-    """
+    dsn_ciphertext: bytes = field(repr=False)
+    dsn_nonce: bytes = field(repr=False)
+
+
+def _validated_live_preflight_time(
+    request: LivePreflightRequest,
+    now: dt.datetime | None,
+    *,
+    error_message: str,
+) -> dt.datetime:
+    """Validate exact handoff metadata before any database I/O."""
 
     checked_at = now if now is not None else dt.datetime.now(dt.timezone.utc)
     uuids = (
@@ -98,9 +109,55 @@ async def guard_live_preflight_handoff(
         or not isinstance(request.expected_state_version, int)
         or request.expected_state_version < 1
     ):
-        raise MigrationDryRunWorkerError(
-            "migration live-preflight handoff is invalid"
-        )
+        raise MigrationDryRunWorkerError(error_message)
+    return checked_at
+
+
+def _live_preflight_handoff_conditions(
+    request: LivePreflightRequest,
+    checked_at: dt.datetime,
+) -> tuple[ColumnElement[bool], ...]:
+    """Return the single canonical exact-attempt live-reader predicate."""
+
+    return (
+        MigrationRunAttempt.migration_run_attempt_uuid
+        == request.migration_run_attempt_uuid,
+        MigrationRunAttempt.migration_run_uuid == request.migration_run_uuid,
+        MigrationRunAttempt.attempt_number == request.attempt_number,
+        MigrationRunAttempt.status == "active",
+        MigrationRunAttempt.lease_expires_at > checked_at,
+        MigrationRun.migration_run_uuid == request.migration_run_uuid,
+        MigrationRun.migration_plan_uuid == request.migration_plan_uuid,
+        MigrationRun.project_space_uuid == request.project_space_uuid,
+        MigrationRun.run_kind == "dry_run",
+        MigrationRun.state == "live_preflight_running",
+        MigrationRun.state_version == request.expected_state_version,
+        MigrationRun.cancellation_requested.is_(False),
+        MigrationPlan.migration_plan_uuid == request.migration_plan_uuid,
+        MigrationPlan.project_space_uuid == request.project_space_uuid,
+        MigrationPlan.db_connection_uuid == request.db_connection_uuid,
+        MigrationPlan.statement_digest == MigrationRun.plan_digest,
+        MigrationPlan.expires_at > checked_at,
+    )
+
+
+async def guard_live_preflight_handoff(
+    session: AsyncSession,
+    request: LivePreflightRequest,
+    *,
+    now: dt.datetime | None = None,
+) -> None:
+    """Fail closed unless one fresh query matches the exact live-reader lease.
+
+    Concrete providers can call this server-owned guard immediately before
+    resolving the stored target. It returns no credential or connection and
+    does not eliminate the gap between this observation and provider access.
+    """
+
+    error_message = "migration live-preflight handoff is invalid"
+    checked_at = _validated_live_preflight_time(
+        request, now, error_message=error_message
+    )
     try:
         matched_attempt_uuid = await session.scalar(
             select(MigrationRunAttempt.migration_run_attempt_uuid)
@@ -115,39 +172,73 @@ async def guard_live_preflight_handoff(
                 MigrationPlan.migration_plan_uuid
                 == MigrationRun.migration_plan_uuid,
             )
-            .where(
-                MigrationRunAttempt.migration_run_attempt_uuid
-                == request.migration_run_attempt_uuid,
-                MigrationRunAttempt.migration_run_uuid
-                == request.migration_run_uuid,
-                MigrationRunAttempt.attempt_number == request.attempt_number,
-                MigrationRunAttempt.status == "active",
-                MigrationRunAttempt.lease_expires_at > checked_at,
-                MigrationRun.migration_run_uuid == request.migration_run_uuid,
-                MigrationRun.migration_plan_uuid == request.migration_plan_uuid,
-                MigrationRun.project_space_uuid == request.project_space_uuid,
-                MigrationRun.run_kind == "dry_run",
-                MigrationRun.state == "live_preflight_running",
-                MigrationRun.state_version == request.expected_state_version,
-                MigrationRun.cancellation_requested.is_(False),
-                MigrationPlan.migration_plan_uuid
-                == request.migration_plan_uuid,
-                MigrationPlan.project_space_uuid == request.project_space_uuid,
-                MigrationPlan.db_connection_uuid == request.db_connection_uuid,
-                MigrationPlan.statement_digest == MigrationRun.plan_digest,
-                MigrationPlan.expires_at > checked_at,
-            )
+            .where(*_live_preflight_handoff_conditions(request, checked_at))
         )
     except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
         raise
     except Exception:  # noqa: BLE001
-        raise MigrationDryRunWorkerError(
-            "migration live-preflight handoff is invalid"
-        ) from None
+        raise MigrationDryRunWorkerError(error_message) from None
     if matched_attempt_uuid != request.migration_run_attempt_uuid:
-        raise MigrationDryRunWorkerError(
-            "migration live-preflight handoff is invalid"
+        raise MigrationDryRunWorkerError(error_message)
+
+
+async def load_guarded_live_preflight_target(
+    session: AsyncSession,
+    request: LivePreflightRequest,
+    *,
+    now: dt.datetime | None = None,
+) -> GuardedLivePreflightTarget:
+    """Release encrypted target material for one exact active live attempt.
+
+    This performs one metadata statement and deliberately does not decrypt the
+    DSN, open a target connection, or grant SQL execution authority.
+    """
+
+    error_message = "migration live-preflight target is invalid"
+    checked_at = _validated_live_preflight_time(
+        request, now, error_message=error_message
+    )
+    try:
+        result = await session.execute(
+            select(DbConnection.dsn_ciphertext, DbConnection.dsn_nonce)
+            .select_from(MigrationRunAttempt)
+            .join(
+                MigrationRun,
+                MigrationRun.migration_run_uuid
+                == MigrationRunAttempt.migration_run_uuid,
+            )
+            .join(
+                MigrationPlan,
+                MigrationPlan.migration_plan_uuid
+                == MigrationRun.migration_plan_uuid,
+            )
+            .join(
+                DbConnection,
+                DbConnection.db_connection_uuid
+                == MigrationPlan.db_connection_uuid,
+            )
+            .where(
+                *_live_preflight_handoff_conditions(request, checked_at),
+                DbConnection.db_connection_uuid == request.db_connection_uuid,
+                DbConnection.project_space_uuid == request.project_space_uuid,
+            )
         )
+        row = result.one_or_none()
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:  # noqa: BLE001
+        raise MigrationDryRunWorkerError(error_message) from None
+    if row is None:
+        raise MigrationDryRunWorkerError(error_message)
+    ciphertext, nonce = row
+    if (
+        not isinstance(ciphertext, bytes)
+        or not ciphertext
+        or not isinstance(nonce, bytes)
+        or len(nonce) != 12
+    ):
+        raise MigrationDryRunWorkerError(error_message)
+    return GuardedLivePreflightTarget(bytes(ciphertext), bytes(nonce))
 
 
 async def _load_and_begin(

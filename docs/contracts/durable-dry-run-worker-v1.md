@@ -2,10 +2,11 @@
 
 - **Contract version:** `durable-dry-run-worker/v1`
 - **Capability status:** Partial
-- **Implemented boundary:** deterministic attempt orchestration and a
-  provider-callable metadata handoff guard
-- **Not implemented:** concrete sandbox/credential providers, deployment wiring,
-  live apply or production readiness
+- **Implemented boundary:** deterministic attempt orchestration, a
+  provider-callable metadata handoff guard, and an exact encrypted stored-target
+  lookup
+- **Not implemented:** concrete sandbox/credential providers, decryption,
+  deployment wiring, live apply or production readiness
 
 ## Purpose
 
@@ -65,6 +66,15 @@ statement requires an active unexpired attempt, uncancelled
 It returns no credential, route, connection, plan JSON or SQL. Driver/query
 failures and non-matches expose only the fixed handoff error.
 
+`load_guarded_live_preflight_target` applies that same canonical predicate and
+joins the exact project-owned `db_connection` in one fresh database statement.
+Only an exact active, unexpired, uncancelled attempt can receive the stored
+encrypted DSN ciphertext and nonce. `GuardedLivePreflightTarget` excludes both
+secret-bearing byte strings from its representation, malformed stored material
+fails with one fixed non-reflecting error, and cancellation still propagates.
+This lookup performs no decryption and opens no route or target connection;
+decryption, target connection, provider composition and startup wiring remain Planned.
+
 The PostgreSQL 14–18 matrix exercises this statement through the test-owned
 provider before its target connection, proves the exact lease-expiry boundary
 fails closed after an interrupted first attempt, and then accepts the exact
@@ -102,9 +112,10 @@ plan digest verifier remains authoritative.
    failure prevents opening the live capability.
 5. The live read-only request carries the exact refreshed run state version.
    A concrete provider can call `guard_live_preflight_handoff` immediately
-   before resolving the stored target to recheck the full identifier/state/
-   lease tuple in one fresh database statement. The live capability is then
-   entered and the existing
+   before target access, or use `load_guarded_live_preflight_target` to combine
+   the same full identifier/state/lease check with release of the exact stored
+   encrypted target material in one fresh database statement. The live
+   capability is then entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
    A separate whole-stage cancellation deadline covers reader acquisition,
    capture and checks, then requests cancellation and awaits cleanup.
@@ -134,12 +145,14 @@ plan digest verifier remains authoritative.
   owner still fails closed and cannot authorize acknowledgement.
 - The current post-sandbox reload narrows the cancellation/lease-loss window,
   and its identifier-only request now carries the exact expected run state
-  version. The provider-callable guard atomically revalidates cancellation,
-  that state version, stored identities and the exact active attempt lease in
-  one database statement. No concrete provider is wired to it, and even when
-  composed it does not eliminate the gap between that metadata observation and
-  target capability opening. Provider composition, credential/route binding
-  and cancellation after the observation remain Planned and release-blocking.
+  version. The provider-callable guard and guarded encrypted-target lookup share
+  one canonical predicate that atomically revalidates cancellation, that state
+  version, stored identities and the exact active attempt lease. No concrete
+  provider is wired to either boundary, and even when composed the lookup does
+  not eliminate the gap between that metadata observation and target capability
+  opening. Decryption, target connection, provider composition and startup wiring remain Planned;
+  credential/route constraints and cancellation after the observation are also
+  release-blocking.
 
 ## Failure and evidence policy
 

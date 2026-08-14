@@ -63,7 +63,7 @@ from app.jobs.migration_dry_run_worker import (
     LivePreflightExecution,
     LivePreflightRequest,
     MigrationDryRunWorkerError,
-    guard_live_preflight_handoff,
+    load_guarded_live_preflight_target,
     make_durable_dry_run_attempt_handler,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
@@ -944,9 +944,11 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
         )
         async with sessions() as guard_session:
             async with guard_session.begin():
-                await guard_live_preflight_handoff(
+                guarded_target = await load_guarded_live_preflight_target(
                     guard_session, request, now=guard_now
                 )
+        assert guarded_target.dsn_ciphertext == b"not-used"
+        assert guarded_target.dsn_nonce == b"twelve-byte!"
         capability_order.append("live-guard")
         if crash_before_first_live_read:
             crash_before_first_live_read = False
@@ -995,7 +997,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
                         project_space_uuid=project_uuid,
                         conn_name="durable worker target",
                         dsn_ciphertext=b"not-used",
-                        dsn_nonce=b"not-used",
+                        dsn_nonce=b"twelve-byte!",
                         created_at=now,
                         updated_at=now,
                     ),
@@ -1100,9 +1102,9 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
             async with expired_guard_session.begin():
                 with pytest.raises(
                     MigrationDryRunWorkerError,
-                    match="handoff is invalid",
+                    match="target is invalid",
                 ):
-                    await guard_live_preflight_handoff(
+                    await load_guarded_live_preflight_target(
                         expired_guard_session,
                         live_requests[0],
                         now=now + dt.timedelta(seconds=2),

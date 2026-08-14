@@ -11,11 +11,13 @@ import pytest
 from sqlalchemy.dialects import postgresql
 
 from app.jobs.migration_dry_run_worker import (
+    GuardedLivePreflightTarget,
     LivePreflightRequest,
     MigrationDryRunWorkerError,
     _MigrationDryRunWork,
     _make_work,
     guard_live_preflight_handoff,
+    load_guarded_live_preflight_target,
 )
 
 
@@ -217,6 +219,105 @@ async def test_live_preflight_handoff_guard_rejects_invalid_or_stale_input() -> 
         await guard_live_preflight_handoff(failed_session, request, now=now)
     assert str(caught.value) == "migration live-preflight handoff is invalid"
     assert secret not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_guarded_live_target_uses_one_exact_secret_safe_query() -> None:
+    """Release encrypted target material only for the exact live attempt."""
+
+    now = dt.datetime(2026, 8, 15, 1, tzinfo=dt.timezone.utc)
+    request = LivePreflightRequest(
+        migration_run_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        migration_run_attempt_uuid=uuid.uuid4(),
+        attempt_number=2,
+        expected_state_version=7,
+    )
+    ciphertext = b"encrypted-target-dsn"
+    nonce = b"twelve-bytes"
+    result = MagicMock()
+    result.one_or_none.return_value = (ciphertext, nonce)
+    session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+    target = await load_guarded_live_preflight_target(
+        session, request, now=now
+    )
+
+    assert target == GuardedLivePreflightTarget(ciphertext, nonce)
+    assert "encrypted-target-dsn" not in repr(target)
+    assert "twelve-bytes" not in repr(target)
+    session.execute.assert_awaited_once()
+    statement = str(
+        session.execute.await_args.args[0].compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    for expected in (
+        str(request.migration_run_uuid),
+        str(request.migration_plan_uuid),
+        str(request.project_space_uuid),
+        str(request.db_connection_uuid),
+        str(request.migration_run_attempt_uuid),
+        "migration_run.run_kind = 'dry_run'",
+        "migration_run.state = 'live_preflight_running'",
+        "migration_run.state_version = 7",
+        "migration_run.cancellation_requested IS false",
+        "migration_run_attempt.attempt_number = 2",
+        "migration_run_attempt.status = 'active'",
+        "migration_run_attempt.lease_expires_at >",
+        "migration_plan.expires_at >",
+        "migration_plan.statement_digest = migration_run.plan_digest",
+        "db_connection.project_space_uuid",
+    ):
+        assert expected in statement
+    assert "FOR UPDATE" not in statement
+
+
+@pytest.mark.asyncio
+async def test_guarded_live_target_fails_closed_without_secret_reflection() -> None:
+    """Reject stale, malformed, or failed target resolution with one error."""
+
+    now = dt.datetime(2026, 8, 15, 1, tzinfo=dt.timezone.utc)
+    request = LivePreflightRequest(
+        migration_run_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        migration_run_attempt_uuid=uuid.uuid4(),
+        attempt_number=1,
+        expected_state_version=4,
+    )
+    for row in (None, (b"", b"twelve-bytes"), (b"ciphertext", b"short")):
+        result = MagicMock()
+        result.one_or_none.return_value = row
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            await load_guarded_live_preflight_target(session, request, now=now)
+        assert str(caught.value) == "migration live-preflight target is invalid"
+
+    secret = "postgresql://reader:secret@target/database"
+    failed_session = SimpleNamespace(
+        execute=AsyncMock(side_effect=RuntimeError(secret))
+    )
+    with pytest.raises(MigrationDryRunWorkerError) as caught:
+        await load_guarded_live_preflight_target(
+            failed_session, request, now=now
+        )
+    assert str(caught.value) == "migration live-preflight target is invalid"
+    assert secret not in str(caught.value)
+
+    invalid_session = SimpleNamespace(execute=AsyncMock())
+    invalid_request = LivePreflightRequest(
+        **{**request.__dict__, "expected_state_version": True}
+    )
+    with pytest.raises(MigrationDryRunWorkerError, match="target is invalid"):
+        await load_guarded_live_preflight_target(
+            invalid_session, invalid_request, now=now
+        )
+    invalid_session.execute.assert_not_awaited()
 
 
 @pytest.mark.asyncio

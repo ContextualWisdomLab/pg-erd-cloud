@@ -134,8 +134,9 @@ Current code implements only the first control-plane slice:
   acknowledgement; ambiguous retry preserves the first confirmation body and
   idempotency key. These remain bounded intent/review surfaces and provide no
   credential, dispatch, or SQL authority.
-- **Planned:** deployed isolated sandbox lifecycle, concrete composition of the
-  implemented provider-callable metadata/lease handoff guard, credential binding,
+- **Planned:** deployed isolated sandbox lifecycle, decryption and concrete
+  target-connection composition around the implemented provider-callable
+  metadata/lease guard and guarded encrypted-target lookup, credential constraints,
   application worker execution, live apply dispatch/executor, apply-time
   fingerprint revalidation, deployed in-flight cancellation, apply recovery,
   post-apply convergence, and the complete browser apply/recovery workflow.
