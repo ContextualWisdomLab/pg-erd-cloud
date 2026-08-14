@@ -810,7 +810,11 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     architecture = _read(Path("ARCHITECTURE.md"))
     prd = _read(Path("docs/PRD.md"))
     runbook = _read(Path("docs/runbooks/forward-engineering.md"))
+    strategy = _read(Path("docs/TEST_STRATEGY.md"))
     implementation = _read(Path("backend/app/forward/pre_apply_revalidation.py"))
+    integration = _read(
+        Path("backend/tests/test_postgres_migration_run_integration.py")
+    )
 
     assert "target-free pre-apply revalidation-manifest" in contract
     invariant = next(
@@ -821,5 +825,11 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "revalidation manifest" in architecture
     assert "target-free manifest" in prd
     assert "does not acquire a target connection" in runbook
+    assert "test-only PostgreSQL 14–18 acceptance" in strategy
+    assert "Production target connection/lock orchestration" in strategy
+    assert (
+        "test_real_postgres_manifest_lock_covers_bound_precondition"
+        in integration
+    )
     assert "opens no target connection" in implementation
     assert "acquires no lock" in implementation

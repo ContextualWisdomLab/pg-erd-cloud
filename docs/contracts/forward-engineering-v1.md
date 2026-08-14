@@ -97,7 +97,9 @@ Current code implements only the first control-plane slice:
   preconditions. It does not open a connection, acquire a lock, capture a
   snapshot, check privileges, dispatch work, or execute SQL/DDL. Holding locks
   and repeating fresh observation/checks on the execution connection remain
-  Planned.
+  Planned. Test-only PostgreSQL 14–18 acceptance composes the emitted lock and
+  check against an ephemeral fixture and proves a concurrent insert is blocked
+  until rollback; this is database-semantics evidence, not a deployed executor.
 - **Partially implemented:** browser plan review, dry-run submission, durable run
   polling/status/audit, exact-version cancellation, and a non-dispatched apply
   intent control exist. The apply control requires the exact passed dry-run,

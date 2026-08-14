@@ -125,8 +125,11 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   and rejects missing/unknown compiler versions, unknown kinds,
   non-transactional statements, lock-mode tampering,
   invalid identifiers, blockers, and oversized statement sets. This is compiler
-  evidence only; real target lock acquisition and in-lock revalidation remain
-  Planned acceptance families.
+  evidence only. A test-only PostgreSQL 14–18 acceptance acquires the compiled
+  quoted table lock, observes a concurrent insert time out, runs the bound
+  table-empty check while holding the lock, rolls back, and then observes the
+  insert succeed. Production target connection/lock orchestration and complete
+  in-lock revalidation remain Planned acceptance families.
 - Pre-apply revalidation-manifest tests bind the exact persisted plan digest,
   PostgreSQL major, base/target digests, deterministic lock targets, and
   structured read checks. They reject contract drift, tampering, unsupported
