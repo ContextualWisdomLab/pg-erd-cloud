@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [CI/Frontend] App orchestration coverage now waits for diagram rows and the successor project's metadata effects before driving terminal-poll and stale-request assertions, removing runner-speed races without weakening either behavior check.
+
 - [CI/PostgreSQL] PostgreSQL 14–18 acceptance startup now waits for the official image's init-complete marker before probing readiness. This prevents a transient `pg_isready` success against the temporary initialization server from racing the entrypoint restart between fixture-creation commands.
 
 - [FE/Worker] Provider-neutral durable dry-run handler에 sandbox와 live-preflight 전체 stage cancellation deadline을 추가했습니다. provider 획득·실행·snapshot capture가 제한을 넘으면 in-flight coroutine에 취소를 요청하고 cooperative capability context cleanup을 기다린 뒤 고정된 비밀 비포함 오류만 반환합니다. Python 프로세스 내부 timeout은 취소를 무시하는 provider를 강제 종료하지 못하므로, 구체 provider의 cancellation conformance, process isolation/외부 kill, credential, network isolation, startup wiring 및 배포 worker operation은 여전히 Planned입니다.
