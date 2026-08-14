@@ -4,9 +4,14 @@ import type { TableNodeData } from "./convert";
 
 const searchableTextCache = new WeakMap<TableNodeData, string>();
 
+/** Test boundary seam: exposing cache miss count for deterministic test assertions. */
+export const _searchCacheMetrics = { misses: 0 };
+
 function getSearchableText(data: TableNodeData): string {
   let text = searchableTextCache.get(data);
   if (text !== undefined) return text;
+
+  _searchCacheMetrics.misses++;
 
   text = (data.title || "") + " " + (data.comment || "");
   for (let i = 0; i < data.columns.length; i++) {
