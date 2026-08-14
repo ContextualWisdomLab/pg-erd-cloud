@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import ssl
 from urllib.parse import parse_qsl, urlparse
@@ -143,6 +144,19 @@ async def capture_postgres_snapshot(
     function lets live preflight bind snapshot evidence and bounded checks to
     one already-authorized repeatable-read transaction.
     """
+
+    try:
+        transaction_active = conn.is_in_transaction()
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:  # noqa: BLE001
+        raise RuntimeError(
+            "postgres snapshot capture transaction is missing"
+        ) from None
+    if transaction_active is not True:
+        raise RuntimeError(
+            "postgres snapshot capture transaction is missing"
+        )
 
     version = await conn.fetchval("SHOW server_version")
     schema_name = schema_filter

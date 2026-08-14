@@ -18,13 +18,19 @@ def fake_addrinfo(*ips: str) -> list[tuple[int, int, int, str, tuple[str, int]]]
 class FakeConnection:
     def __init__(self) -> None:
         self.transaction_options: dict[str, object] | None = None
+        self.transaction_calls = 0
+        self.transaction_depth = 0
         self.transaction_started = False
         self.transaction_committed = False
         self.transaction_rolled_back = False
 
     def transaction(self, **kwargs: object) -> "FakeTransaction":
+        self.transaction_calls += 1
         self.transaction_options = kwargs
         return FakeTransaction(self)
+
+    def is_in_transaction(self) -> bool:
+        return self.transaction_depth > 0
 
     async def fetchval(self, *_args: object) -> bool | str:
         if _args and "SELECT EXISTS" in str(_args[0]):
@@ -43,12 +49,15 @@ class FakeTransaction:
         self.connection = connection
 
     async def start(self) -> None:
+        self.connection.transaction_depth += 1
         self.connection.transaction_started = True
 
     async def commit(self) -> None:
+        self.connection.transaction_depth -= 1
         self.connection.transaction_committed = True
 
     async def rollback(self) -> None:
+        self.connection.transaction_depth -= 1
         self.connection.transaction_rolled_back = True
 
 
@@ -164,16 +173,40 @@ async def test_snapshot_capture_reuses_caller_owned_connection() -> None:
     """Capture live-preflight evidence without opening or closing a connection."""
 
     connection = FakeConnection()
+    connection.transaction_depth = 1
 
     snapshot = await introspect.capture_postgres_snapshot(
         connection, schema_filter=None
     )
 
+    assert connection.transaction_calls == 0
     assert connection.transaction_options is None
     assert connection.transaction_started is False
     assert connection.transaction_committed is False
     assert connection.transaction_rolled_back is False
+    assert connection.transaction_depth == 1
     assert snapshot["snapshot_contract_version"] == 1
+
+
+@pytest.mark.asyncio
+async def test_snapshot_capture_requires_caller_transaction_before_citus() -> None:
+    """Reject absent outer ownership before optional Citus transaction access."""
+
+    connection = OptionalCitusFailureConnection(
+        asyncpg.InsufficientPrivilegeError
+    )
+
+    with pytest.raises(
+        RuntimeError, match="postgres snapshot capture transaction is missing"
+    ):
+        await introspect.capture_postgres_snapshot(
+            connection, schema_filter=None
+        )
+
+    assert connection.transaction_calls == 0
+    assert connection.transaction_started is False
+    assert connection.transaction_committed is False
+    assert connection.transaction_rolled_back is False
 
 
 @pytest.mark.parametrize(

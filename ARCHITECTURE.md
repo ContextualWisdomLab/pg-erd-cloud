@@ -127,7 +127,9 @@ Implemented in the initial safe vertical slice:
   transaction, returning the canonical observed digest and plan-base match;
   `capture_postgres_snapshot` is the reusable query-only callback for an
   already-authorized PostgreSQL connection and deliberately owns no
-  transaction, commit, rollback, connection open, or connection close;
+  transaction, commit, rollback, connection open, or connection close; it
+  rejects a missing caller transaction before any catalog query or optional
+  Citus savepoint;
   `complete_live_preflight` accepts only that exact bounded result shape and
   derives `drifted`, `failed`, or `passed` plus bounded aggregate evidence for
   the existing durable CAS; neither function owns credentials, application
