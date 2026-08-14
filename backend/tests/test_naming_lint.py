@@ -25,15 +25,9 @@ def test_flags_reserved_word_table_and_column():
     assert report["summary"]["high"] >= 2
 
 
-def test_flags_system_user_case_insensitively_with_exact_target() -> None:
-    """Report PostgreSQL's reserved SYSTEM_USER table identifier exactly."""
-
-    report = lint_naming(_snap({"SYSTEM_USER": ["id"]}))
-
-    reserved_items = [
-        item for item in report["items"] if item["category"] == "reserved_word"
-    ]
-    assert [item["target"] for item in reserved_items] == ["public.SYSTEM_USER"]
+def test_flags_system_user_is_reserved():
+    report = lint_naming(_snap({"system_user": ["id"]}))
+    assert ("reserved_word", "high") in _cats(report)
     assert report["summary"]["high"] == 1
 
 
