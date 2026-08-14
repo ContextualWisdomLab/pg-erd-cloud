@@ -8,6 +8,10 @@
   factory; a divergent consumer factory fails before metadata or target I/O.
   Sandbox lifecycle and application startup remain injected and Planned, and
   this adds no SQL or apply authority.
+- PostgreSQL 14–18 recovery acceptance now enters through that production
+  composition entry point. Its existing test-only wrapper still injects the
+  predecessor crash, while successor recovery uses the concrete guarded
+  provider without replaying committed sandbox DDL.
 
 - Revalidate the exact guarded live-preflight target metadata after connection
   acquisition and close the connection without target reads when the stored

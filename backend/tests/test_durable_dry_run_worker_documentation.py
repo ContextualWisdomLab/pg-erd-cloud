@@ -98,6 +98,9 @@ def test_postgres_matrix_composes_the_stored_target_provider() -> None:
     )
 
     assert "make_stored_postgres_live_preflight_factory" in integration
+    assert (
+        "make_stored_postgres_durable_dry_run_attempt_handler" in integration
+    )
     assert "encrypt_text(_preflight_asyncpg_url())" in integration
     assert "provider_factory(request)" in integration
     assert "test-only loopback connector" in integration

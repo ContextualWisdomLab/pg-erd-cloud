@@ -138,6 +138,8 @@ connection without capture authority when exact guarded metadata changes.
 The repository composition binds the durable handler and stored-target
 provider to the same metadata session factory and rejects a divergent consumer
 factory before metadata or target I/O; sandbox lifecycle remains injected.
+PostgreSQL 14–18 recovery acceptance enters through this production
+composition while retaining explicit test-only crash and loopback seams.
 Concrete sandbox provisioning and cleanup, unmodified guarded-route
 composition, application startup wiring, deployed least-privilege target
 identity, and deployed worker isolation remain **Planned**. A successful dry run

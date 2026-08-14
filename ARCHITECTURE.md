@@ -52,6 +52,8 @@ to the durable attempt handler with one session-factory identity for both run
 metadata and credential-bearing target lookup. A divergent consumer factory
 fails before either authority is used. Sandbox lifecycle remains injected;
 application startup/consumer registration and apply remain Planned.
+The PostgreSQL 14–18 recovery matrix enters through this composition; only its
+predecessor-crash wrapper and private-CI loopback connector remain test seams.
 
 The pre-apply observation capture owns no target credential or durable attempt
 binding and acquires no advisory/object lock. The separately scoped live-

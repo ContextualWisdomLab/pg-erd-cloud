@@ -105,8 +105,10 @@ injected, and the returned handler is not registered with application startup
 or granted apply authority.
 
 The PostgreSQL 14–18 matrix stores an encrypted restricted-target DSN and
-composes `make_stored_postgres_live_preflight_factory` for the successor
-attempt. It therefore exercises the exact stored metadata/snapshot guard,
+enters through `make_stored_postgres_durable_dry_run_attempt_handler`, with a
+test-only crash wrapper around `make_stored_postgres_live_preflight_factory`
+for the interrupted predecessor and the concrete provider for the successor.
+It therefore exercises the exact same-session-factory composition, stored metadata/snapshot guard,
 in-memory decryption, same-acquired-connection capture, cleanup, and supported
 server versions after proving that the interrupted predecessor fails closed at
 the exact lease-expiry boundary. The matrix substitutes an explicit test-only

@@ -66,9 +66,9 @@ from app.jobs.migration_dry_run_worker import (
     LivePreflightRequest,
     MigrationDryRunWorkerError,
     load_guarded_live_preflight_target,
-    make_durable_dry_run_attempt_handler,
 )
 from app.jobs.live_preflight_provider import (
+    make_stored_postgres_durable_dry_run_attempt_handler,
     make_stored_postgres_live_preflight_factory,
 )
 from app.jobs.valkey_queue import MigrationRunSignalClaim
@@ -997,6 +997,16 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
             finally:
                 capability_order.append("live-exit")
 
+    def make_crash_injected_provider(actual_sessions):
+        assert actual_sessions is sessions
+        return live_factory
+
+    monkeypatch.setattr(
+        "app.jobs.live_preflight_provider."
+        "make_stored_postgres_live_preflight_factory",
+        make_crash_injected_provider,
+    )
+
     try:
         async with sessions() as setup_session:
             setup_session.add(
@@ -1103,9 +1113,9 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
                     now=now + dt.timedelta(seconds=1),
                 )
 
-        handler = make_durable_dry_run_attempt_handler(
+        handler = make_stored_postgres_durable_dry_run_attempt_handler(
+            sessions,
             sandbox_factory,
-            live_factory,
             lock_timeout_ms=2_000,
             sandbox_statement_timeout_ms=5_000,
             preflight_statement_timeout_ms=2_000,
