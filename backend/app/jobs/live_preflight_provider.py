@@ -67,8 +67,6 @@ def make_stored_postgres_live_preflight_factory(
             )
         except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
             raise
-        except MigrationDryRunWorkerError:
-            raise
         except Exception:  # noqa: BLE001
             raise _provider_error() from None
 

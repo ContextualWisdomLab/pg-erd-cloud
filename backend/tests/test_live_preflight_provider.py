@@ -135,6 +135,40 @@ async def test_provider_sanitizes_decrypt_and_connect_failures() -> None:
 
 
 @pytest.mark.asyncio
+async def test_provider_sanitizes_metadata_context_failures() -> None:
+    """Do not reflect a metadata context failure that reuses worker errors."""
+
+    request = _request()
+    target = GuardedLivePreflightTarget(
+        b"encrypted-target",
+        b"twelve-bytes",
+        uuid.uuid4(),
+        None,
+    )
+    session_context = AsyncMock()
+    session_context.__aenter__.return_value = object()
+    session_context.__aexit__.side_effect = MigrationDryRunWorkerError(
+        "postgresql://user:secret@metadata.example/app"
+    )
+    session_factory = MagicMock(return_value=session_context)
+
+    with patch(
+        "app.jobs.live_preflight_provider.load_guarded_live_preflight_target",
+        new=AsyncMock(return_value=target),
+    ), patch(
+        "app.jobs.live_preflight_provider.decrypt_text"
+    ) as decrypt:
+        factory = make_stored_postgres_live_preflight_factory(session_factory)
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            async with factory(request):
+                raise AssertionError("provider must not yield")
+
+    assert str(caught.value) == "migration live-preflight provider failed"
+    assert "secret" not in str(caught.value)
+    decrypt.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_provider_propagates_cancellation_and_closes_target() -> None:
     """Preserve process control while closing an acquired target connection."""
 
