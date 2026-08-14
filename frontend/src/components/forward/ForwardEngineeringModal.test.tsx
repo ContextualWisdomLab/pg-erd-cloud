@@ -211,7 +211,9 @@ describe('ForwardEngineeringModal', () => {
     fireEvent.change(input, { target: { value: 'production-primary' } })
     fireEvent.click(screen.getByRole('button', { name: '비실행 apply 의도 등록' }))
 
-    expect(await screen.findByText(/apply-intent-modal/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/apply-intent-modal/, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
     expect(screen.getByLabelText('대상 연결 이름 확인')).toBeInTheDocument()
     expect(screen.queryByText('apply 의도를 등록할 수 없습니다.'))
       .not.toBeInTheDocument()

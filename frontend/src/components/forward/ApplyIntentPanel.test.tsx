@@ -278,8 +278,8 @@ describe('ApplyIntentPanel', () => {
         reused: false,
       }, true, 202))
     vi.mocked(crypto.randomUUID)
-      .mockReturnValueOnce('request-uuid-1')
-      .mockReturnValueOnce('request-uuid-2')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000001')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000002')
 
     render(<ApplyIntentPanel plan={plan} passedDryRun={passedRun} onRunCreated={vi.fn()} />)
     const input = screen.getByLabelText('대상 연결 이름 확인')
@@ -296,8 +296,10 @@ describe('ApplyIntentPanel', () => {
     await screen.findByRole('status')
     const firstHeaders = vi.mocked(fetch).mock.calls[1]?.[1]?.headers as Record<string, string>
     const secondHeaders = vi.mocked(fetch).mock.calls[3]?.[1]?.headers as Record<string, string>
-    expect(firstHeaders['Idempotency-Key']).toBe('web-apply-intent-request-uuid-1')
-    expect(secondHeaders['Idempotency-Key']).toBe('web-apply-intent-request-uuid-2')
+    expect(firstHeaders['Idempotency-Key'])
+      .toBe('web-apply-intent-00000000-0000-4000-8000-000000000001')
+    expect(secondHeaders['Idempotency-Key'])
+      .toBe('web-apply-intent-00000000-0000-4000-8000-000000000002')
     expect(vi.mocked(fetch).mock.calls[3]?.[1]?.body).toContain('production-secondary')
   })
 

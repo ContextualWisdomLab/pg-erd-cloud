@@ -607,11 +607,11 @@ async def capture_pre_apply_revalidation_observation(
             )
 
         precondition_rows: list[dict[str, object]] = []
-        for query in manifest.precondition_queries:
+        for precondition_query in manifest.precondition_queries:
             passed = await asyncio.wait_for(
                 _fetch_pre_apply_precondition(
                     connection,
-                    query,
+                    precondition_query,
                     client_timeout=client_timeout,
                 ),
                 timeout=client_timeout,
@@ -622,9 +622,9 @@ async def capture_pre_apply_revalidation_observation(
                 )
             precondition_rows.append(
                 {
-                    "statement_index": query.statement_index,
-                    "precondition_index": query.precondition_index,
-                    "kind": query.kind,
+                    "statement_index": precondition_query.statement_index,
+                    "precondition_index": precondition_query.precondition_index,
+                    "kind": precondition_query.kind,
                     "passed": passed,
                 }
             )

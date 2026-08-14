@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [CI] Restored current mypy and TypeScript compatibility without changing runtime behavior: pre-apply privilege and precondition loops now use distinct typed locals, live-preflight stage coverage asserts the refreshed durable state version, apply-intent UUID mocks satisfy the browser UUID contract, and asynchronous diagram/apply-intent UI coverage waits for its observable server state before asserting filter and orchestration outcomes.
+
 - [FE/Worker/Security/CI/Docs] Added a provider-callable, execution-neutral live-preflight handoff guard. One fresh metadata statement fails closed unless the exact run, plan, project, stored target, active unexpired attempt UUID/number, uncancelled `live_preflight_running` state/version, plan digest, and expiry all still match. The guard returns no credential, route, connection, plan JSON, or SQL and sanitizes query failures. PostgreSQL 14–18 acceptance invokes it before the test provider opens its constrained target, rejects the interrupted first attempt at the exact lease-expiry boundary, and accepts the exact successor attempt. Concrete provider composition, credential/route binding, the remaining observation-to-target-open gap, startup wiring, and target access remain Planned.
 
 - [FE/Worker/Security/Docs] Live-preflight capability requests now bind the stored target and exact durable attempt UUID to the server-refreshed expected run state version. This remains identifier-only and enables a future provider to reject a stale handoff without receiving plan JSON, SQL, DSN, credential, PostgreSQL major, or digest data. Atomic provider-side state/attempt validation, credential resolution, target routing, startup wiring, and apply remain Planned.

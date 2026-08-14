@@ -176,7 +176,7 @@ async def test_handler_runs_both_stages_through_capability_leases() -> None:
     assert sandbox_requests[0].base_digest == work.base_digest
     live_fields = live_requests[0].__dataclass_fields__
     assert live_requests[0].db_connection_uuid == work.db_connection_uuid
-    assert live_requests[0].expected_state_version == work.state_version
+    assert live_requests[0].expected_state_version == 3
     assert "postgresql_major" not in live_fields
     assert "base_digest" not in live_fields
     assert "plan_json" not in live_fields
