@@ -1,7 +1,7 @@
 # ADR-0003: Explicit plan execution segmentation
 
 - **Decision status:** Accepted
-- **Implementation status:** Planned
+- **Implementation status:** Partially implemented
 - **Date:** 2026-08-09
 - **Owners:** pg-erd-cloud maintainers and database operators
 - **Supersedes:** none
@@ -91,10 +91,15 @@ single-transaction claim of v1.
   fields.
 - Compiler v1 emits only `transactional: true` statements and suppresses all
   statements when it records a blocker.
+- The signed-plan pre-apply manifest emits zero segments for a no-op plan or one
+  ordered all-transactional segment for non-empty work. It also maps known
+  operations to structured database `CREATE`, schema `CREATE`, or table
+  `OWNER` requirements and rejects compiler-v1 privilege-label drift. This is
+  target-free input evidence, not privilege observation or execution proof.
 
 ### Planned before production release
 
-- explicit persisted segment metadata and postconditions;
+- explicit persisted postconditions;
 - versioned executor dispatch over stored statement objects;
 - deterministic advisory/object locking and apply-time revalidation;
 - timeout configuration and classified, redacted failures;

@@ -817,6 +817,7 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     )
 
     assert "target-free pre-apply revalidation-manifest" in contract
+    assert "database `CREATE`/schema `CREATE`/table `OWNER`" in contract
     invariant = next(
         line for line in contract.splitlines() if "| FE-INV-007 |" in line
     )
@@ -832,6 +833,11 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "does not acquire a target connection" in runbook
     assert "a no-op plan has no segment" in runbook
     assert "start that transaction" in runbook
+    assert "observe a target role's privileges" in runbook
+    assert "checks no target privilege" in architecture
+    assert "privilege-label drift" in prd
+    assert "privilege observation occurred" in strategy
+    assert "ApplyPrivilegeRequirement" in implementation
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
     assert (

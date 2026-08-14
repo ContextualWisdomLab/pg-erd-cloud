@@ -133,9 +133,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   existing-table lock-plan compilation, and signed-plan revalidation-manifest
   compilation are **Implemented** as execution-free boundaries. The manifest
   binds exact plan/base/target/version metadata to lock-covered structured
-  checks and zero/no-op or one ordered all-transactional segment but performs no
+  checks, structured database `CREATE`/schema `CREATE`/table `OWNER`
+  requirements, and zero/no-op or one ordered all-transactional segment but performs no
   target I/O; stored-plan dispatch, executor, target lock acquisition,
-  transaction execution/rollback proof, timeouts, apply-time approval
+  target privilege observation, transaction execution/rollback proof, timeouts, apply-time approval
   revalidation, cancellation propagation, reconciliation, and post-apply
   verification remain **Planned**;
 - frontend graph/model adapters and `ForwardEngineeringModal` workflow

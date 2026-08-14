@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/Docs] Extended the target-free signed pre-apply manifest with structured compiler-v1 privilege requirements. `CREATE SCHEMA` binds database `CREATE`, `CREATE TABLE` binds schema `CREATE`, and existing-table changes bind table `OWNER`; weaker, unknown, reordered, or duplicated labels fail closed. This opens no target connection and performs no role or privilege observation, credential access, dispatch, SQL, or DDL.
+
 - [BE/CI/PostgreSQL] Added test-only PostgreSQL 14–18 acceptance for the pre-apply manifest. Against a uniquely quoted Unicode fixture, it acquires the compiled `ACCESS EXCLUSIVE` table lock, observes a concurrent insert terminate at a bounded server timeout, executes the bound table-empty check while the lock is held, rolls back, and then observes the insert succeed. This is ephemeral compiler/database-semantics evidence; it adds no production target connection, credential, lock service, executor, or DDL authority.
 
 - [BE/Security] Added an execution-neutral pre-apply revalidation manifest. It verifies the exact stored plan digest and strict v1 contract, binds supported PostgreSQL major plus base/target digests to deterministic existing-table lock targets, structured boolean data checks, and zero segments for no-op work or one ordered all-transactional segment for non-empty v1 work. It rejects tampering, contract drift, unsupported versions, review-only proposals, cross-table preconditions, or any precondition not covered by its statement lock. It opens no target connection, acquires no lock, starts no transaction, observes no target state, checks no privilege, dispatches no work, and executes no SQL/DDL; same-connection in-lock revalidation, transaction/rollback execution, and apply remain Planned.

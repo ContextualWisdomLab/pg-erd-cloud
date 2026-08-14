@@ -21,6 +21,7 @@ def _statement(
     table_name: str = 'Order "Item"',
     precondition_schema: str | None = None,
     precondition_table: str | None = None,
+    required_privileges: list[str] | None = None,
 ) -> dict[str, object]:
     """Build one exact compiler-v1 statement with a data precondition."""
 
@@ -45,7 +46,9 @@ def _statement(
             "data_loss": False,
             "detail": "bounded test fixture",
         },
-        "required_privileges": ["ALTER"],
+        "required_privileges": (
+            required_privileges if required_privileges is not None else ["OWNER"]
+        ),
         "preconditions": [
             {
                 "kind": "no_null_values",
@@ -83,6 +86,40 @@ def _signed_plan(*statements: dict[str, object]) -> dict[str, object]:
     return plan
 
 
+def _new_object_statement(
+    *, kind: str, schema_name: str, table_name: str | None = None
+) -> dict[str, object]:
+    """Build one exact compiler-v1 CREATE statement without target access."""
+
+    object_ref = {"schema_name": schema_name}
+    lock_mode = "none"
+    target = schema_name
+    if table_name is not None:
+        object_ref["table_name"] = table_name
+        lock_mode = "ACCESS EXCLUSIVE"
+        target = f"{schema_name}.{table_name}"
+    return {
+        "kind": kind,
+        "target": target,
+        "object_ref": object_ref,
+        "sql": "server-owned and never parsed by this boundary",
+        "transactional": True,
+        "dependencies": [],
+        "dependency_refs": [],
+        "reversible": True,
+        "risk": {
+            "severity": "safe",
+            "lock_mode": lock_mode,
+            "possible_rewrite": False,
+            "table_scan": False,
+            "data_loss": False,
+            "detail": "bounded test fixture",
+        },
+        "required_privileges": ["CREATE"],
+        "preconditions": [],
+    }
+
+
 def _resign(plan: dict[str, object]) -> None:
     """Replace the claimed digest after an intentional fixture mutation."""
 
@@ -115,6 +152,16 @@ def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
     assert manifest.transaction_segments[0].segment_index == 0
     assert manifest.transaction_segments[0].statement_indexes == (0,)
     assert manifest.transaction_segments[0].transactional is True
+    assert [
+        (
+            requirement.statement_index,
+            requirement.privilege,
+            requirement.scope,
+            requirement.schema_name,
+            requirement.table_name,
+        )
+        for requirement in manifest.privilege_requirements
+    ] == [(0, "OWNER", "table", "Sales Data", 'Order "Item"')]
     assert [target.sql for target in manifest.lock_targets] == [
         'LOCK TABLE "Sales Data"."Order ""Item""" IN ACCESS EXCLUSIVE MODE'
     ]
@@ -140,6 +187,37 @@ def test_compiles_one_ordered_segment_for_multiple_statements() -> None:
     assert manifest.transaction_segments[0].statement_indexes == (0, 1)
 
 
+def test_maps_create_privileges_to_database_and_schema_scopes() -> None:
+    """CREATE labels retain their distinct PostgreSQL authority scopes."""
+
+    plan = _signed_plan(
+        _new_object_statement(kind="create_schema", schema_name="분석 영역"),
+        _new_object_statement(
+            kind="create_table",
+            schema_name="분석 영역",
+            table_name='Event "Log"',
+        ),
+    )
+
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+
+    assert [
+        (
+            requirement.statement_index,
+            requirement.privilege,
+            requirement.scope,
+            requirement.schema_name,
+            requirement.table_name,
+        )
+        for requirement in manifest.privilege_requirements
+    ] == [
+        (0, "CREATE", "database", None, None),
+        (1, "CREATE", "schema", "분석 영역", None),
+    ]
+
+
 def test_compiles_no_transaction_segment_for_a_noop_plan() -> None:
     """A converged no-op plan contains no synthetic executable segment."""
 
@@ -150,8 +228,22 @@ def test_compiles_no_transaction_segment_for_a_noop_plan() -> None:
     )
 
     assert manifest.transaction_segments == ()
+    assert manifest.privilege_requirements == ()
     assert manifest.lock_targets == ()
     assert manifest.precondition_queries == ()
+
+
+def test_rejects_required_privileges_outside_compiler_v1_semantics() -> None:
+    """Signed metadata cannot make a weaker or unknown privilege executable."""
+
+    plan = _signed_plan(_statement(required_privileges=["ALTER"]))
+
+    with pytest.raises(
+        PreApplyRevalidationContractError, match="required privileges are invalid"
+    ):
+        compile_pre_apply_revalidation_manifest(
+            plan, expected_plan_digest=plan["plan_digest"]
+        )
 
 
 def test_rejects_content_that_no_longer_matches_the_stored_digest() -> None:

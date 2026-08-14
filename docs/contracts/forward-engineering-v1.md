@@ -93,9 +93,10 @@ Current code implements only the first control-plane slice:
 - **Implemented boundary:** target-free pre-apply revalidation-manifest
   compilation verifies the exact persisted plan digest and v1 shape, binds the
   supported PostgreSQL major and base/target digests to the deterministic lock
-  targets, structured boolean checks, and zero segments for a no-op plan or one
+  targets, structured database `CREATE`/schema `CREATE`/table `OWNER`
+  requirements, structured boolean checks, and zero segments for a no-op plan or one
   ordered all-transactional segment for non-empty compiler-v1 work. It rejects
-  cross-table or unlocked preconditions. It does not open a connection, acquire a lock, capture a
+  compiler-v1 privilege-label drift and cross-table or unlocked preconditions. It does not open a connection, acquire a lock, capture a
   snapshot, check privileges, dispatch work, or execute SQL/DDL. Holding locks
   and repeating fresh observation/checks on the execution connection remain
   Planned. Test-only PostgreSQL 14–18 acceptance composes the emitted lock and
@@ -135,6 +136,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-012 | Only a persisted verification snapshot matching `target_digest` may produce `verified`. | Planned |
 | FE-INV-013 | Cross-project resource identities are uniformly masked as not found. | Partially implemented |
 | FE-INV-014 | Unknown fields, object kinds, operation kinds, and compiler versions fail closed. | Partially implemented |
+| FE-INV-015 | Apply rechecks the exact compiler-bound PostgreSQL privilege scope before DDL. | Partially implemented input boundary: the manifest maps compiler-v1 operations to structured database `CREATE`, schema `CREATE`, or table `OWNER` requirements and rejects label drift; target role binding and same-connection privilege observation remain Planned |
 
 No production-readiness claim is permitted while any FE-INV requirement is
 Partially implemented or Planned.

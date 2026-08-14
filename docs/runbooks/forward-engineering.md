@@ -191,11 +191,14 @@ DDL execution. Every operation in section 4 remains Planned.
 
 The current execution-neutral revalidation manifest may be compiled for review
 from the exact stored plan digest. It binds PostgreSQL compatibility and
-base/target digests to deterministic object-lock targets and structured data
-checks, and rejects a check whose table is not covered by its statement lock.
+base/target digests to deterministic object-lock targets, structured database
+`CREATE`/schema `CREATE`/table `OWNER` requirements, and structured data checks.
+It rejects compiler-v1 privilege-label drift and a check whose table is not
+covered by its statement lock.
 For a non-empty v1 plan it also describes exactly one ordered all-transactional
 segment; a no-op plan has no segment. It does not acquire a target connection,
-start that transaction, prove rollback, or make step 2 below true.
+observe a target role's privileges, start that transaction, prove rollback, or
+make step 2 below true.
 
 ### 4. Execute and verify
 

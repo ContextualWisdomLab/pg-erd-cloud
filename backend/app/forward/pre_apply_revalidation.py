@@ -81,6 +81,17 @@ class ApplyTransactionSegment:
 
 
 @dataclass(frozen=True)
+class ApplyPrivilegeRequirement:
+    """One compiler-v1 privilege requirement without target access."""
+
+    statement_index: int
+    privilege: str
+    scope: str
+    schema_name: str | None
+    table_name: str | None
+
+
+@dataclass(frozen=True)
 class PreApplyRevalidationManifest:
     """Immutable inputs a future executor must revalidate after locking."""
 
@@ -91,6 +102,7 @@ class PreApplyRevalidationManifest:
     base_digest: str
     target_digest: str
     transaction_segments: tuple[ApplyTransactionSegment, ...]
+    privilege_requirements: tuple[ApplyPrivilegeRequirement, ...]
     lock_targets: tuple[ApplyLockTarget, ...]
     precondition_queries: tuple[LivePreflightQuery, ...]
 
@@ -198,6 +210,58 @@ def _compile_transaction_segments(
     )
 
 
+def _compile_privilege_requirements(
+    statements: list[object],
+) -> tuple[ApplyPrivilegeRequirement, ...]:
+    """Bind compiler-v1 privilege labels to structured PostgreSQL scopes."""
+
+    requirements: list[ApplyPrivilegeRequirement] = []
+    for statement_index, statement in enumerate(statements):
+        if not isinstance(statement, Mapping):  # guarded by _validate_plan_shape
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation statement contract is invalid"
+            )
+        kind = statement.get("kind")
+        object_ref = statement.get("object_ref")
+        if not isinstance(object_ref, Mapping):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation statement contract is invalid"
+            )
+        if kind == "create_schema":
+            expected_privileges = ["CREATE"]
+            requirement = ApplyPrivilegeRequirement(
+                statement_index=statement_index,
+                privilege="CREATE",
+                scope="database",
+                schema_name=None,
+                table_name=None,
+            )
+        elif kind == "create_table":
+            expected_privileges = ["CREATE"]
+            requirement = ApplyPrivilegeRequirement(
+                statement_index=statement_index,
+                privilege="CREATE",
+                scope="schema",
+                schema_name=cast(str, object_ref.get("schema_name")),
+                table_name=None,
+            )
+        else:
+            expected_privileges = ["OWNER"]
+            requirement = ApplyPrivilegeRequirement(
+                statement_index=statement_index,
+                privilege="OWNER",
+                scope="table",
+                schema_name=cast(str, object_ref.get("schema_name")),
+                table_name=cast(str, object_ref.get("table_name")),
+            )
+        if statement.get("required_privileges") != expected_privileges:
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation required privileges are invalid"
+            )
+        requirements.append(requirement)
+    return tuple(requirements)
+
+
 def compile_pre_apply_revalidation_manifest(
     plan: Mapping[str, object],
     *,
@@ -246,6 +310,7 @@ def compile_pre_apply_revalidation_manifest(
         raise PreApplyRevalidationContractError(str(err)) from None
     _validate_locked_preconditions(statements, lock_targets)
     transaction_segments = _compile_transaction_segments(statements)
+    privilege_requirements = _compile_privilege_requirements(statements)
 
     return PreApplyRevalidationManifest(
         plan_digest=expected_digest,
@@ -255,6 +320,7 @@ def compile_pre_apply_revalidation_manifest(
         base_digest=base_digest,
         target_digest=target_digest,
         transaction_segments=transaction_segments,
+        privilege_requirements=privilege_requirements,
         lock_targets=lock_targets,
         precondition_queries=precondition_queries,
     )

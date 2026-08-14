@@ -136,9 +136,13 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   versions, review-only proposals, cross-table preconditions, and any
   precondition without an existing table lock. They also require zero segments
   for a no-op plan and exactly one ordered all-transactional segment for
-  non-empty compiler-v1 work. This remains target-free compiler evidence; it
+  non-empty compiler-v1 work. They map compiler-v1 operations to exact
+  database `CREATE`, schema `CREATE`, or table `OWNER` requirements and reject
+  weaker, unknown, reordered, or duplicated privilege labels. This remains
+  target-free compiler evidence; it
   does not prove that locks are held, that same-connection revalidation
-  occurred, or that a target transaction rolled back after failure.
+  or privilege observation occurred, or that a target transaction rolled back
+  after failure.
 - Least-privilege roles demonstrate required privilege success and predictable
   denial; live preflight credentials cannot execute DDL.
 - Large tables exercise scan/rewrite warnings and timeout behavior without
