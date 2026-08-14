@@ -49,7 +49,8 @@ compiler-owned SQL, DSN or credential.
 `LivePreflightRequest` contains only:
 
 - run, plan, project, stored target-connection and exact attempt UUIDs;
-- attempt number.
+- attempt number and the exact expected run state version refreshed immediately
+  before provider access.
 
 It does not contain plan JSON, compiler-owned SQL, PostgreSQL major, base
 digest, DSN or credential. The injected provider resolves and constrains the
@@ -84,7 +85,9 @@ plan digest verifier remains authoritative.
 4. Immediately before target access, the handler locks and reloads the run and
    plan again. Cancellation, version loss, identity drift, expiry or integrity
    failure prevents opening the live capability.
-5. The live read-only capability is entered and the existing
+5. The live read-only request carries the exact refreshed run state version so
+   a future provider-bound guarded handoff can compare the state it is asked to
+   honor. The live capability is then entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
    A separate whole-stage cancellation deadline covers reader acquisition,
    capture and checks, then requests cancellation and awaits cleanup.
@@ -113,9 +116,11 @@ plan digest verifier remains authoritative.
   operations remain authoritative: an expired, replaced or otherwise lost
   owner still fails closed and cannot authorize acknowledgement.
 - The current post-sandbox reload narrows the cancellation/lease-loss window,
-  but it is not atomic with target capability opening. A provider-bound guarded
-  handoff that revalidates cancellation and the exact attempt lease immediately
-  before target access remains Planned and release-blocking.
+  and its identifier-only request now carries the exact expected run state
+  version. It is still not atomic with target capability opening. A
+  provider-bound guarded handoff that revalidates cancellation, that state
+  version, and the exact attempt lease immediately before target access remains
+  Planned and release-blocking.
 
 ## Failure and evidence policy
 

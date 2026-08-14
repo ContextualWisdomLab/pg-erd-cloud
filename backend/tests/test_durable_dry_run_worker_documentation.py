@@ -40,6 +40,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "complete_live_preflight",
         "not atomic with target capability opening",
         "provider-bound guarded handoff",
+        "exact expected run state version",
         "does not implement or prove",
         "live apply",
         "production readiness",

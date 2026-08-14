@@ -1126,6 +1126,10 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
             request.db_connection_uuid == connection_uuid
             for request in live_requests
         )
+        assert [request.expected_state_version for request in live_requests] == [
+            3,
+            3,
+        ]
         assert capability_order == [
             "sandbox-enter",
             "sandbox-exit",

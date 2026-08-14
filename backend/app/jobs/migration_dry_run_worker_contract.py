@@ -52,6 +52,7 @@ class LivePreflightRequest:
     db_connection_uuid: uuid.UUID
     migration_run_attempt_uuid: uuid.UUID
     attempt_number: int
+    expected_state_version: int
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ class _MigrationDryRunWork:
             db_connection_uuid=self.db_connection_uuid,
             migration_run_attempt_uuid=self.migration_run_attempt_uuid,
             attempt_number=self.attempt_number,
+            expected_state_version=self.state_version,
         )
 
 
