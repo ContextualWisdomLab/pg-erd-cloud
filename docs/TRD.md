@@ -87,8 +87,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   replay; either path marks a surviving active attempt `abandoned` in the same
   metadata transaction. The provider-neutral durable handler binds the exact
   attempt to injected sandbox and read-only capabilities in deterministic
-  order; bounded whole-stage deadlines cancel and close hung capability
-  contexts with fixed non-secret errors. Application startup wiring,
+  order; whole-stage deadlines request cancellation, await cooperative
+  capability cleanup, and expose fixed non-secret errors. The in-process
+  boundary cannot forcibly terminate a provider that suppresses cancellation;
+  process isolation and an external kill boundary remain Planned. Application startup wiring,
   credentials, concrete providers, and deployed worker execution remain
   **Planned**;
 - idempotent cancellation intent that increments the shared state version and

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- [FE/Worker] Provider-neutral durable dry-run handler에 sandbox와 live-preflight 전체 stage deadline을 추가했습니다. provider 획득·실행·snapshot capture가 멈추면 in-flight coroutine을 취소하고 capability context cleanup을 기다린 뒤 고정된 비밀 비포함 오류만 반환합니다. 구체 provider, credential, network isolation, startup wiring 및 배포 worker operation은 여전히 Planned입니다.
+- [FE/Worker] Provider-neutral durable dry-run handler에 sandbox와 live-preflight 전체 stage cancellation deadline을 추가했습니다. provider 획득·실행·snapshot capture가 제한을 넘으면 in-flight coroutine에 취소를 요청하고 cooperative capability context cleanup을 기다린 뒤 고정된 비밀 비포함 오류만 반환합니다. Python 프로세스 내부 timeout은 취소를 무시하는 provider를 강제 종료하지 못하므로, 구체 provider의 cancellation conformance, process isolation/외부 kill, credential, network isolation, startup wiring 및 배포 worker operation은 여전히 Planned입니다.
 
 - [BE/Security] 데이터베이스 connection 생성 시 PostgreSQL·MySQL/MariaDB·Snowflake별 기존 SSRF guard를 연결 전에 한 번 더 실행합니다. 제한된 loopback/private/link-local/reserved 주소, 허용되지 않은 hostname, DSN scheme·host 형식 오류는 credential 암호화나 metadata 영속화 전에 고정된 `422` 오류로 거부하며, 실제 probe/introspection/apply 경계의 DNS 재검증과 IP pinning도 그대로 유지합니다. 이는 application 방어를 보강하지만 배포 egress policy 증거를 대신하지 않습니다.
 

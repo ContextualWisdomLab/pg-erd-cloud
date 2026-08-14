@@ -78,8 +78,10 @@ def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() ->
 
 
 def test_worker_contract_bounds_whole_capability_stages() -> None:
-    """Keep provider/executor hangs distinct from SQL statement timeouts."""
+    """Keep cancellation deadlines distinct from proven provider termination."""
 
     contract = " ".join(_read(WORKER_CONTRACT).split()).lower()
-    assert "whole-stage sandbox and preflight deadlines" in contract
+    assert "whole-stage sandbox and preflight cancellation deadlines" in contract
     assert "timeout cancellation and capability cleanup" in contract
+    assert "cooperative cancellation" in contract
+    assert "does not prove a hard wall-clock termination bound" in contract

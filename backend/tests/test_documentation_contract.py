@@ -374,7 +374,8 @@ def test_docs_track_the_persisted_migration_run_foundation_without_overclaim() -
         "application startup wiring and deployed worker execution remain **planned**"
         in normalized_contract
     )
-    assert "bounded whole-stage deadlines" in normalized_contract
+    assert "whole-stage deadlines request cancellation" in normalized_contract
+    assert "does not forcibly terminate" in normalized_contract
     assert "Startup fails closed when Valkey is unavailable" not in adr
     assert "Startup rejects an unconfigured Valkey backend" in adr
 

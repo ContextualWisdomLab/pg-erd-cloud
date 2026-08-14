@@ -47,8 +47,10 @@ Current code implements only the first control-plane slice:
   `failed`; a caller cannot select the state, event type, or digest. A
   provider-neutral durable attempt handler owns the verified
   sandbox-then-preflight sequence through injected capability contexts;
-  bounded whole-stage deadlines cancel and close a hung sandbox or reader
-  while exposing only fixed errors. It grants no concrete credential, network,
+  whole-stage deadlines request cancellation and await cooperative context
+  cleanup while exposing only fixed errors. This in-process boundary does not
+  forcibly terminate a provider that suppresses cancellation, so deployed
+  process isolation and an external kill boundary remain Planned. It grants no concrete credential, network,
   provisioning, or startup authority. The
   execution-neutral consumer contract is **Implemented**; consumer-to-attempt
   binding is **Implemented** without plan, credential, or SQL authority.

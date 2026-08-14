@@ -257,8 +257,10 @@ def make_durable_dry_run_attempt_handler(
 
     The returned handler is compatible with
     ``make_attempt_bound_migration_run_handler``. Concrete sandbox lifecycle,
-    target credential resolution, route isolation, and application startup
-    remain injected deployment responsibilities.
+    target credential resolution, route isolation, process-level termination,
+    and application startup remain injected deployment responsibilities.
+    Stage timeouts request cooperative task cancellation; they cannot forcibly
+    terminate a provider that suppresses cancellation inside this process.
     """
 
     if not callable(sandbox_factory) or not callable(live_preflight_factory):

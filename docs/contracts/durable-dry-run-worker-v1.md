@@ -28,7 +28,7 @@ The handler accepts only:
    run UUID, attempt number and acquired state version;
 4. injected `IsolatedSandboxFactory` and `LivePreflightFactory` capabilities;
 5. bounded lock and statement timeouts plus whole-stage sandbox and preflight
-   deadlines.
+   cancellation deadlines.
 
 A signal/run UUID mismatch fails before metadata or provider access.
 
@@ -76,9 +76,9 @@ plan digest verifier remains authoritative.
    durable attempt UUID.
 2. The isolated capability is entered and the existing
    `execute_isolated_dry_run` core receives the verified plan directly from the
-   handler, never through the provider request. One bounded whole-stage
-   deadline covers provider acquisition, execution, snapshot capture and
-   capability cleanup.
+   handler, never through the provider request. One whole-stage cancellation
+   deadline covers provider acquisition, execution and snapshot capture, then
+   requests task cancellation and awaits capability cleanup.
 3. The existing `complete_isolated_dry_run` boundary verifies the result and
    derives only `live_preflight_running`.
 4. Immediately before target access, the handler locks and reloads the run and
@@ -86,8 +86,8 @@ plan digest verifier remains authoritative.
    failure prevents opening the live capability.
 5. The live read-only capability is entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
-   A separate bounded whole-stage deadline covers reader acquisition, capture,
-   checks and cleanup.
+   A separate whole-stage cancellation deadline covers reader acquisition,
+   capture and checks, then requests cancellation and awaits cleanup.
 6. The existing `complete_live_preflight` boundary derives only `passed`,
    `drifted` or `failed`.
 
@@ -100,6 +100,13 @@ plan digest verifier remains authoritative.
 - `asyncio.CancelledError`, `KeyboardInterrupt` and `SystemExit` propagate.
 - Both injected async context managers must close on success, failure and
   cancellation.
+- Provider acquisition, snapshot callbacks and async-context cleanup must use
+  cooperative cancellation: they must not suppress `CancelledError` or block
+  indefinitely after cancellation is requested. The in-process
+  `asyncio.wait_for` boundary does not prove a hard wall-clock termination
+  bound for a non-conforming provider. Process isolation and an external kill
+  boundary remain deployment requirements before worker operation can be
+  considered bounded against a hung provider.
 - If handler completion and heartbeat termination become observable in the
   same scheduler turn, the handler result proceeds first to the exact-attempt
   completion CAS and then to exact signal acknowledgement. Those CAS
@@ -112,9 +119,12 @@ plan digest verifier remains authoritative.
 
 Provider exceptions are replaced with fixed worker-boundary errors using
 `from None`. Provider diagnostics, DSNs, credentials, SQL and row data are not
-persisted or returned. Whole-stage deadline expiry cancels the in-flight
-capability coroutine, awaits async-context cleanup and emits the same fixed
-stage failure. This includes durable-attempt and signal-heartbeat
+persisted or returned. Whole-stage deadline expiry requests cancellation of
+the in-flight capability coroutine, awaits async-context cleanup and emits the
+same fixed stage failure when cooperative cancellation completes. This is
+timeout cancellation and capability cleanup evidence for conforming test
+providers only; it does not prove a hard wall-clock termination bound. This
+includes durable-attempt and signal-heartbeat
 renewal failures; both cancel and retrieve in-flight work before exposing only
 their fixed lease-loss error. Durable evidence continues to be canonicalized
 by the existing migration-run transition functions.
@@ -128,6 +138,8 @@ This contract does not implement or prove:
 - target credential resolution, network route isolation or least-privilege
   deployment identity;
 - application startup, queue registration or production worker operation;
+- forcible termination of a provider that suppresses cancellation, or the
+  deployed process-supervisor kill boundary;
 - apply dispatch, DDL execution, apply-time drift/CAS, recovery or convergence;
 - PostgreSQL/Valkey deployment acceptance or accessible browser E2E.
 
@@ -141,7 +153,8 @@ Repository tests must cover:
 - metadata integrity and queued CAS event evidence;
 - claim mismatch before metadata access;
 - cancellation propagation and provider-error redaction;
-- sandbox/live whole-stage timeout cancellation and capability cleanup;
+- sandbox/live whole-stage timeout cancellation and capability cleanup for
+  cooperative providers;
 - cancellation/state-version recheck before target access;
 - bounded configuration rejection;
 - rejection of non-contract terminal states.
