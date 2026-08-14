@@ -133,9 +133,12 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
 - Pre-apply revalidation-manifest tests bind the exact persisted plan digest,
   PostgreSQL major, base/target digests, deterministic lock targets, and
   structured read checks. They reject contract drift, tampering, unsupported
-  versions, cross-table preconditions, and any precondition without an existing
-  table lock. This remains target-free compiler evidence; it does not prove that
-  locks are held or that same-connection revalidation occurred.
+  versions, review-only proposals, cross-table preconditions, and any
+  precondition without an existing table lock. They also require zero segments
+  for a no-op plan and exactly one ordered all-transactional segment for
+  non-empty compiler-v1 work. This remains target-free compiler evidence; it
+  does not prove that locks are held, that same-connection revalidation
+  occurred, or that a target transaction rolled back after failure.
 - Least-privilege roles demonstrate required privilege success and predictable
   denial; live preflight credentials cannot execute DDL.
 - Large tables exercise scan/rewrite warnings and timeout behavior without

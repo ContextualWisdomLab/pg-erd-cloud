@@ -822,9 +822,16 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     )
     assert "signed-plan manifest" in invariant
     assert "same-connection" in invariant
+    segment_invariant = next(
+        line for line in contract.splitlines() if "| FE-INV-008 |" in line
+    )
+    assert "exactly one ordered all-transactional segment" in segment_invariant
+    assert "rollback proof" in segment_invariant
     assert "revalidation manifest" in architecture
     assert "target-free manifest" in prd
     assert "does not acquire a target connection" in runbook
+    assert "a no-op plan has no segment" in runbook
+    assert "start that transaction" in runbook
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
     assert (

@@ -193,7 +193,9 @@ The current execution-neutral revalidation manifest may be compiled for review
 from the exact stored plan digest. It binds PostgreSQL compatibility and
 base/target digests to deterministic object-lock targets and structured data
 checks, and rejects a check whose table is not covered by its statement lock.
-It does not acquire a target connection or make step 2 below true.
+For a non-empty v1 plan it also describes exactly one ordered all-transactional
+segment; a no-op plan has no segment. It does not acquire a target connection,
+start that transaction, prove rollback, or make step 2 below true.
 
 ### 4. Execute and verify
 

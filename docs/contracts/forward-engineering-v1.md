@@ -93,8 +93,9 @@ Current code implements only the first control-plane slice:
 - **Implemented boundary:** target-free pre-apply revalidation-manifest
   compilation verifies the exact persisted plan digest and v1 shape, binds the
   supported PostgreSQL major and base/target digests to the deterministic lock
-  targets and structured boolean checks, and rejects cross-table or unlocked
-  preconditions. It does not open a connection, acquire a lock, capture a
+  targets, structured boolean checks, and zero segments for a no-op plan or one
+  ordered all-transactional segment for non-empty compiler-v1 work. It rejects
+  cross-table or unlocked preconditions. It does not open a connection, acquire a lock, capture a
   snapshot, check privileges, dispatch work, or execute SQL/DDL. Holding locks
   and repeating fresh observation/checks on the execution connection remain
   Planned. Test-only PostgreSQL 14–18 acceptance composes the emitted lock and
@@ -127,7 +128,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: isolated execution core plus `complete_isolated_dry_run` success-result CAS and bounded live-read primitive; deployed isolation, sandbox lifecycle, and workers Planned |
 | FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Partially implemented for the isolated execution core; durable worker binding and apply remain Planned |
 | FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Partially implemented input boundary: deterministic existing-table lock targets and a signed-plan manifest bind only statement-matching lock-covered checks; target access, lock acquisition, same-connection fresh observation/check execution, and concurrency proof remain Planned |
-| FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Planned |
+| FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Partially implemented input boundary: non-empty manifest work has exactly one ordered all-transactional segment and no-op work has none; target transaction execution, timeout enforcement, rollback proof, and recovery remain Planned |
 | FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Partially implemented |
 | FE-INV-010 | Live apply requires `deployer`, exact-plan confirmation, a matching passed dry run, and separate destructive acknowledgement when applicable. | Partially implemented |
 | FE-INV-011 | Queue/event/browser payloads never contain a DSN, decrypted secret, or raw client SQL. | Partially implemented |

@@ -72,6 +72,15 @@ class PreApplyRevalidationContractError(ValueError):
 
 
 @dataclass(frozen=True)
+class ApplyTransactionSegment:
+    """One ordered compiler-v1 all-transactional apply segment input."""
+
+    segment_index: int
+    statement_indexes: tuple[int, ...]
+    transactional: bool
+
+
+@dataclass(frozen=True)
 class PreApplyRevalidationManifest:
     """Immutable inputs a future executor must revalidate after locking."""
 
@@ -81,6 +90,7 @@ class PreApplyRevalidationManifest:
     postgresql_major: int
     base_digest: str
     target_digest: str
+    transaction_segments: tuple[ApplyTransactionSegment, ...]
     lock_targets: tuple[ApplyLockTarget, ...]
     precondition_queries: tuple[LivePreflightQuery, ...]
 
@@ -172,6 +182,22 @@ def _validate_locked_preconditions(
                 )
 
 
+def _compile_transaction_segments(
+    statements: list[object],
+) -> tuple[ApplyTransactionSegment, ...]:
+    """Represent compiler-v1 work as zero or one ordered transaction segment."""
+
+    if not statements:
+        return ()
+    return (
+        ApplyTransactionSegment(
+            segment_index=0,
+            statement_indexes=tuple(range(len(statements))),
+            transactional=True,
+        ),
+    )
+
+
 def compile_pre_apply_revalidation_manifest(
     plan: Mapping[str, object],
     *,
@@ -219,6 +245,7 @@ def compile_pre_apply_revalidation_manifest(
     except (ApplyLockPlanContractError, LivePreflightContractError) as err:
         raise PreApplyRevalidationContractError(str(err)) from None
     _validate_locked_preconditions(statements, lock_targets)
+    transaction_segments = _compile_transaction_segments(statements)
 
     return PreApplyRevalidationManifest(
         plan_digest=expected_digest,
@@ -227,6 +254,7 @@ def compile_pre_apply_revalidation_manifest(
         postgresql_major=postgresql_major,
         base_digest=base_digest,
         target_digest=target_digest,
+        transaction_segments=transaction_segments,
         lock_targets=lock_targets,
         precondition_queries=precondition_queries,
     )

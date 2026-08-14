@@ -111,6 +111,10 @@ def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
     assert manifest.postgresql_major == 18
     assert manifest.base_digest == "a" * 64
     assert manifest.target_digest == "b" * 64
+    assert len(manifest.transaction_segments) == 1
+    assert manifest.transaction_segments[0].segment_index == 0
+    assert manifest.transaction_segments[0].statement_indexes == (0,)
+    assert manifest.transaction_segments[0].transactional is True
     assert [target.sql for target in manifest.lock_targets] == [
         'LOCK TABLE "Sales Data"."Order ""Item""" IN ACCESS EXCLUSIVE MODE'
     ]
@@ -118,6 +122,36 @@ def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
         'SELECT NOT EXISTS (SELECT 1 FROM "Sales Data"."Order ""Item""" '
         'WHERE "amount" IS NULL LIMIT 1)'
     ]
+
+
+def test_compiles_one_ordered_segment_for_multiple_statements() -> None:
+    """Compiler-v1 never splits admitted apply work into implicit segments."""
+
+    plan = _signed_plan(
+        _statement(schema_name="alpha", table_name="first"),
+        _statement(schema_name="zeta", table_name="second"),
+    )
+
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+
+    assert len(manifest.transaction_segments) == 1
+    assert manifest.transaction_segments[0].statement_indexes == (0, 1)
+
+
+def test_compiles_no_transaction_segment_for_a_noop_plan() -> None:
+    """A converged no-op plan contains no synthetic executable segment."""
+
+    plan = _signed_plan()
+
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+
+    assert manifest.transaction_segments == ()
+    assert manifest.lock_targets == ()
+    assert manifest.precondition_queries == ()
 
 
 def test_rejects_content_that_no_longer_matches_the_stored_digest() -> None:
