@@ -154,7 +154,14 @@ def _parse_index_line(
     """Parse only simple DBML index tuples; hostile/expressive lines are skipped."""
     if not line.startswith("("):
         return None
-    closing = line.find(")")
+    quoted = False
+    closing = -1
+    for position, char in enumerate(line[1:], start=1):
+        if char == '"':
+            quoted = not quoted
+        elif char == ")" and not quoted:
+            closing = position
+            break
     if closing <= 1:
         return None
     columns = _split_csv(line[1:closing])
@@ -269,6 +276,17 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 next_oid += 1
             continue
 
+        if current is not None and in_indexes:
+            if line.startswith("}"):
+                in_indexes = False
+                continue
+            parsed_index = _parse_index_line(line)
+            if parsed_index is not None:
+                ordinal = index_ordinals.get(current, 0) + 1
+                index_ordinals[current] = ordinal
+                index_specs.append((current, *parsed_index, ordinal))
+            continue
+
         if line.startswith("}"):
             current = None
             in_indexes = False
@@ -290,16 +308,6 @@ def parse_dbml(text: str) -> dict[str, Any]:
             continue
         if re.match(r"^indexes\s*\{", line, re.IGNORECASE):
             in_indexes = True
-            continue
-        if in_indexes:
-            if "}" in line:
-                in_indexes = False
-                continue
-            parsed_index = _parse_index_line(line)
-            if parsed_index is not None:
-                ordinal = index_ordinals.get(current, 0) + 1
-                index_ordinals[current] = ordinal
-                index_specs.append((current, *parsed_index, ordinal))
             continue
 
         cm = _COLUMN_RE.match(line)
@@ -357,12 +365,15 @@ def parse_dbml(text: str) -> dict[str, Any]:
             }
         )
 
-    constraints = _build_constraints(relations, columns, pk_columns, fk_edges)
-
     columns_by_oid: dict[int, set[str]] = {}
     for column in columns:
         columns_by_oid.setdefault(column["relation_oid"], set()).add(
             column["column_name"]
+        )
+    used_names_by_schema: dict[str, set[str]] = {}
+    for relation in relations:
+        used_names_by_schema.setdefault(relation["schema_name"], set()).add(
+            relation["relation_name"]
         )
     indexes: list[dict[str, Any]] = []
     for (
@@ -374,15 +385,37 @@ def parse_dbml(text: str) -> dict[str, Any]:
             columns_by_oid.get(relation_oid, set())
         ):
             continue
+        if primary:
+            existing_pk = [
+                pk
+                for pk in pk_columns
+                if pk["relation_oid"] == relation_oid
+            ]
+            if not existing_pk:
+                for position, column_name in enumerate(index_columns, start=1):
+                    pk_columns.append(
+                        {
+                            "relation_oid": relation_oid,
+                            "column_name": column_name,
+                            "column_ordinal": position,
+                        }
+                    )
+                    for column in columns:
+                        if (
+                            column["relation_oid"] == relation_oid
+                            and column["column_name"] == column_name
+                        ):
+                            column["is_not_null"] = True
+                            break
+            continue
         base_name = explicit_name or f"ix_{table}_{'_'.join(index_columns)}"
         name = _index_name(base_name, ordinal, preserve=explicit_name is not None)
-        existing_names = {
-            index["index_name"]
-            for index in indexes
-            if index["relation_oid"] == relation_oid
-        }
-        if name in existing_names:
-            name = _index_name(name, ordinal)
+        used_names = used_names_by_schema.setdefault(schema, set())
+        suffix_ordinal = ordinal
+        while name in used_names:
+            name = _index_name(base_name, suffix_ordinal)
+            suffix_ordinal += 1
+        used_names.add(name)
         quoted_columns = ", ".join(
             _quote_identifier(column) for column in index_columns
         )
@@ -406,6 +439,8 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 ),
             }
         )
+
+    constraints = _build_constraints(relations, columns, pk_columns, fk_edges)
 
     return {
         "source": "dbml",

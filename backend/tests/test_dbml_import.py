@@ -125,6 +125,87 @@ Table public.lineage {
     assert 'CREATE INDEX CONCURRENTLY "ix_lineage_created"' in ddl
 
 
+def test_index_tuple_closes_only_outside_quoted_identifier():
+    snap = parse_dbml(
+        '''
+Table public.metrics {
+  "sales)region" varchar
+  indexes {
+    ("sales)region") [unique]
+  }
+}
+'''
+    )
+
+    assert len(snap["indexes"]) == 1
+    assert '"sales)region"' in snap["indexes"][0]["index_def"]
+
+
+def test_column_after_indexes_block_remains_in_current_table():
+    snap = parse_dbml(
+        """
+Table public.events {
+  id integer
+  indexes {
+    (id)
+  }
+  created_at timestamptz
+}
+"""
+    )
+
+    assert {column["column_name"] for column in snap["columns"]} == {
+        "id",
+        "created_at",
+    }
+
+
+def test_index_names_are_unique_in_schema_and_do_not_collide_with_relations():
+    snap = parse_dbml(
+        """
+Table public.shared_name {
+  id integer
+  indexes {
+    (id) [name: 'shared_name']
+  }
+}
+Table public.second {
+  id integer
+  indexes {
+    (id) [name: 'shared_name']
+  }
+}
+"""
+    )
+
+    names = [index["index_name"] for index in snap["indexes"]]
+    assert len(names) == len(set(names)) == 2
+    assert "shared_name" not in names
+
+
+def test_primary_index_becomes_constraint_without_duplicate_index():
+    snap = parse_dbml(
+        """
+Table public.accounts {
+  tenant_id integer
+  account_id integer
+  indexes {
+    (tenant_id, account_id) [pk]
+  }
+}
+"""
+    )
+
+    assert snap["indexes"] == []
+    assert [column["column_name"] for column in snap["pk_columns"]] == [
+        "tenant_id",
+        "account_id",
+    ]
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert 'PRIMARY KEY ("tenant_id", "account_id")' in ddl
+    assert "CREATE UNIQUE INDEX" not in ddl
+
+
 def test_pathological_long_line_is_skipped_fast():
     import time
 
