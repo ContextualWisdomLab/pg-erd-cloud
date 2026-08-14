@@ -129,7 +129,8 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   quoted table lock, observes a concurrent insert time out, runs the bound
   table-empty check while holding the lock, rolls back, and then observes the
   insert succeed. Production target connection/lock orchestration and complete
-  in-lock revalidation remain Planned acceptance families.
+  in-lock revalidation remain Planned acceptance families. In particular, the
+  real target lock acquisition by a production worker remains unimplemented.
 - Pre-apply revalidation-manifest tests bind the exact persisted plan digest,
   PostgreSQL major, base/target digests, deterministic lock targets, and
   structured read checks. They reject contract drift, tampering, unsupported
