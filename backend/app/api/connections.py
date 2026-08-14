@@ -16,6 +16,7 @@ from app.db_introspect import (
 )
 from app.models import DbConnection
 from app.permissions import require_project_member
+from app.request_validation import SecretSafeLegacyApplyRoute
 from app.schemas import (
     ApplySqlIn,
     ApplySqlOut,
@@ -27,7 +28,11 @@ from app.security import decrypt_text, encrypt_text
 from app.sanitize import sanitize_for_storage
 from app.settings import settings
 
-router = APIRouter(prefix="/api/connections", tags=["connections"])
+router = APIRouter(
+    prefix="/api/connections",
+    tags=["connections"],
+    route_class=SecretSafeLegacyApplyRoute,
+)
 
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[ConnectionOut])

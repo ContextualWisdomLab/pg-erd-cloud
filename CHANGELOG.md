@@ -10,7 +10,7 @@
 
 - [BE/Performance/Security] DBML parser 직접 호출도 인증 route와 같은 총 524,288자 및 10,000-line resource limit을 fail-closed로 적용합니다. relation별 증분 counter가 `column_position`을 O(N)으로 계산해 1,000-column/multi-relation 입력에서 growing-list 재순회를 제거합니다.
 
-- [BE/Security/Docs] `ApplySqlIn.sql` now rejects NUL, DEL, and non-text C0 controls at the request-schema boundary while preserving tab, LF, CR, Unicode text, and the 262,144-character limit. Validation failures on the sensitive legacy route return a fixed `422` without reflecting SQL or secret-like literals; the conservative DDL parser remains the authorization boundary, so this is transport/log-integrity hardening rather than an SQL-injection claim.
+- [BE/Security/Docs] `ApplySqlIn.sql` now rejects NUL, DEL, and non-text C0 controls at a route-owned request boundary before authentication or metadata-session dependencies while preserving tab, LF, CR, Unicode text, and the 262,144-character limit. Validation failures on the sensitive legacy route return a fixed `422` without reflecting SQL, `RequestValidationError.body`, or secret-like literals; the conservative DDL parser remains the authorization boundary, so this is transport/log-integrity hardening rather than an SQL-injection claim.
 
 - [BE/Security/Docs] Legacy `apply-sql` now defaults persistent `dry_run=false` requests to a fixed `403` before stored-target credential access. Operators must explicitly set `LEGACY_PERSISTENT_APPLY_ENABLED=true` in addition to deployer authorization to retain the transitional compatibility path; rollback-only validation and the endpoint shape remain available. This switch is containment for new requests, not structured apply readiness or proof about in-flight database outcome.
 
