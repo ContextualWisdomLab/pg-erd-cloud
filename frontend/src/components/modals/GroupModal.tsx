@@ -55,10 +55,15 @@ export function GroupModal({
     const radioGroup = event.currentTarget.closest<HTMLElement>(
       '[role="radiogroup"]',
     );
-    const radioButtons = radioGroup?.querySelectorAll<HTMLButtonElement>(
-      '[role="radio"]',
-    );
-    radioButtons?.[nextIndex]?.focus();
+    // Defer the focus shifting logic using setTimeout to ensure
+    // the React state update cycle has completed. jsdom requestAnimationFrame
+    // doesn't reliably let state settle before execution.
+    setTimeout(() => {
+      const radioButtons = radioGroup?.querySelectorAll<HTMLButtonElement>(
+        '[role="radio"]',
+      );
+      radioButtons?.[nextIndex]?.focus();
+    }, 0);
   }
 
   if (!isOpen) return null;
