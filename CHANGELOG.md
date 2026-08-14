@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/Security/Docs] `ApplySqlIn.sql` now rejects NUL, DEL, and non-text C0 controls at the request-schema boundary while preserving tab, LF, CR, Unicode text, and the 262,144-character limit. Validation failures on the sensitive legacy route return a fixed `422` without reflecting SQL or secret-like literals; the conservative DDL parser remains the authorization boundary, so this is transport/log-integrity hardening rather than an SQL-injection claim.
+
 - [BE/Security/Docs] Legacy `apply-sql` now defaults persistent `dry_run=false` requests to a fixed `403` before stored-target credential access. Operators must explicitly set `LEGACY_PERSISTENT_APPLY_ENABLED=true` in addition to deployer authorization to retain the transitional compatibility path; rollback-only validation and the endpoint shape remain available. This switch is containment for new requests, not structured apply readiness or proof about in-flight database outcome.
 
 - [CI] Restored current mypy and TypeScript compatibility without changing runtime behavior: pre-apply privilege and precondition loops now use distinct typed locals, live-preflight stage coverage asserts the refreshed durable state version, apply-intent UUID mocks satisfy the browser UUID contract, and asynchronous diagram/apply-intent UI coverage waits for its observable server state before asserting filter and orchestration outcomes.

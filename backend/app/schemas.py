@@ -73,9 +73,11 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]*$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
-            "identifiers. Arbitrary SQL is rejected."
+            "identifiers. Arbitrary SQL is rejected; non-text controls are "
+            "rejected while tab, LF, and CR remain valid transport text."
         ),
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.

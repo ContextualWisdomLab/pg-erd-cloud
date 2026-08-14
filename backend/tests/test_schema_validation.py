@@ -6,12 +6,22 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas import (
+    ApplySqlIn,
     ConnectionCreateIn,
     MigrationApplyRunCreateIn,
     MigrationRunCancelIn,
     MigrationRunCreateIn,
     ProjectCreateIn,
     ProjectMemberAddIn,
+)
+
+
+_DISALLOWED_MULTILINE_TEXT_CODE_POINTS = (
+    *range(0x00, 0x09),
+    0x0B,
+    0x0C,
+    *range(0x0E, 0x20),
+    0x7F,
 )
 
 
@@ -53,6 +63,43 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+@pytest.mark.parametrize("code_point", _DISALLOWED_MULTILINE_TEXT_CODE_POINTS)
+@pytest.mark.parametrize("position", ["beginning", "middle", "end"])
+def test_apply_sql_rejects_non_text_controls_at_every_position(
+    code_point: int, position: str
+) -> None:
+    """Reject every disallowed C0 and DEL transport control position."""
+
+    ddl = "CREATE TABLE \"고객\" (note text DEFAULT 'safe');\n"
+    control = chr(code_point)
+    hostile = {
+        "beginning": control + ddl,
+        "middle": ddl[:12] + control + ddl[12:],
+        "end": ddl + control,
+    }[position]
+
+    with pytest.raises(ValidationError) as exc_info:
+        ApplySqlIn(sql=hostile)
+
+    assert exc_info.value.errors()[0]["type"] == "string_pattern_mismatch"
+
+
+@pytest.mark.parametrize("allowed", ["\t", "\n", "\r", " ", "\u0080", "한"])
+def test_apply_sql_preserves_multiline_text_boundaries(allowed: str) -> None:
+    """Preserve text whitespace and Unicode at the transport boundary."""
+
+    sql = f"CREATE TABLE \"고객\" ({allowed}note text);\r\n-- 설명"
+    assert ApplySqlIn(sql=sql).sql == sql
+
+
+def test_apply_sql_preserves_existing_length_limit() -> None:
+    """Keep the accepted 256-KiB character boundary exact."""
+
+    assert len(ApplySqlIn(sql="x" * 262_144).sql) == 262_144
+    with pytest.raises(ValidationError):
+        ApplySqlIn(sql="x" * 262_145)
 
 
 @pytest.mark.parametrize("version", [True, 0, -1, 1.5, "1"])

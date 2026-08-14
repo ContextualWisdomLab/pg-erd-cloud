@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.annotations import router as annotations_router
@@ -34,6 +35,7 @@ from app.rate_limit import (
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
+from app.request_validation import request_validation_exception_handler
 from app.security_headers import make_security_headers_middleware
 from app.settings import settings
 
@@ -89,6 +91,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="pg-erd-cloud backend", lifespan=lifespan)
+app.add_exception_handler(
+    RequestValidationError,
+    request_validation_exception_handler,
+)
 
 CORS_ALLOW_HEADERS = [
     "Authorization",
