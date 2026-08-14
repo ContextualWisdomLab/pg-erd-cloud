@@ -26,6 +26,9 @@ from app.forward.isolated_dry_run import (
     execute_isolated_dry_run,
 )
 from app.forward.migration_plan import compile_migration_plan
+from app.forward.pre_apply_revalidation import (
+    compile_pre_apply_revalidation_manifest,
+)
 from app.forward.live_preflight import (
     LivePreflightContractError,
     execute_bound_live_preflight,
@@ -361,6 +364,106 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
     finally:
         await connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
         await connection.close()
+
+
+@pytest.mark.asyncio
+async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
+    """Prove compiler-v1 lock/check inputs compose on PostgreSQL 14–18."""
+
+    assert _EXPECTED_MAJOR is not None
+    major = int(_EXPECTED_MAJOR)
+    schema_name = f"Apply Lock {uuid.uuid4().hex}"
+    table_name = '주문 "항목"'
+    quoted_schema = '"' + schema_name.replace('"', '""') + '"'
+    quoted_table = '"' + table_name.replace('"', '""') + '"'
+    quoted_id = '"ID 값"'
+    qualified = f"{quoted_schema}.{quoted_table}"
+    base_model: dict[str, object] = {
+        "format_version": 1,
+        "postgresql_major": major,
+        "schemas": [
+            {
+                "schema_name": schema_name,
+                "tables": [
+                    {
+                        "table_name": table_name,
+                        "columns": [
+                            {
+                                "column_name": "ID 값",
+                                "data_type": "bigint",
+                                "nullable": False,
+                                "ordinal_position": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    target_model = copy.deepcopy(base_model)
+    target_schemas = target_model["schemas"]
+    assert isinstance(target_schemas, list)
+    target_schemas[0]["tables"][0]["columns"].append(
+        {
+            "column_name": "tenant ID",
+            "data_type": "bigint",
+            "nullable": False,
+            "ordinal_position": 2,
+        }
+    )
+    plan = compile_migration_plan(base_model, target_model)
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan,
+        expected_plan_digest=plan["plan_digest"],
+    )
+    assert manifest.postgresql_major == major
+    assert [
+        (target.schema_name, target.table_name)
+        for target in manifest.lock_targets
+    ] == [(schema_name, table_name)]
+    assert [query.kind for query in manifest.precondition_queries] == [
+        "table_is_empty"
+    ]
+
+    lock_connection = await asyncpg.connect(_target_asyncpg_url())
+    contender = await asyncpg.connect(_target_asyncpg_url())
+    transaction = lock_connection.transaction()
+    transaction_started = False
+    try:
+        await lock_connection.execute(f"CREATE SCHEMA {quoted_schema}")
+        await lock_connection.execute(
+            f"CREATE TABLE {qualified} ({quoted_id} bigint NOT NULL)"
+        )
+        await lock_connection.execute(
+            f"INSERT INTO {qualified} ({quoted_id}) VALUES (1)"
+        )
+        await transaction.start()
+        transaction_started = True
+        await lock_connection.execute(manifest.lock_targets[0].sql)
+
+        await contender.execute("SET statement_timeout = '150ms'")
+        with pytest.raises(asyncpg.QueryCanceledError):
+            await contender.execute(
+                f"INSERT INTO {qualified} ({quoted_id}) VALUES (2)"
+            )
+        await contender.execute("SET statement_timeout = 0")
+
+        check = manifest.precondition_queries[0]
+        assert await lock_connection.fetchval(check.sql) is False
+        await transaction.rollback()
+        transaction_started = False
+
+        await contender.execute(
+            f"INSERT INTO {qualified} ({quoted_id}) VALUES (2)"
+        )
+        assert await contender.fetchval(f"SELECT count(*) FROM {qualified}") == 2
+    finally:
+        if transaction_started:
+            await transaction.rollback()
+        await contender.execute("SET statement_timeout = 0")
+        await lock_connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await contender.close()
+        await lock_connection.close()
 
 
 @pytest.mark.asyncio
