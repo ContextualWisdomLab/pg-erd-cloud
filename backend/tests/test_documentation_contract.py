@@ -801,3 +801,25 @@ def test_apply_lock_compiler_is_documented_without_apply_authority() -> None:
     assert "real target lock acquisition" in strategy
     assert "does not connect to PostgreSQL" in implementation
     assert "acquire locks" in implementation
+
+
+def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
+    """Keep manifest compilation distinct from holding locks or target reads."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    architecture = _read(Path("ARCHITECTURE.md"))
+    prd = _read(Path("docs/PRD.md"))
+    runbook = _read(Path("docs/runbooks/forward-engineering.md"))
+    implementation = _read(Path("backend/app/forward/pre_apply_revalidation.py"))
+
+    assert "target-free pre-apply revalidation-manifest" in contract
+    invariant = next(
+        line for line in contract.splitlines() if "| FE-INV-007 |" in line
+    )
+    assert "signed-plan manifest" in invariant
+    assert "same-connection" in invariant
+    assert "revalidation manifest" in architecture
+    assert "target-free manifest" in prd
+    assert "does not acquire a target connection" in runbook
+    assert "opens no target connection" in implementation
+    assert "acquires no lock" in implementation

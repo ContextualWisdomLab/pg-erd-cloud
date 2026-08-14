@@ -129,9 +129,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
-- exact deployer-confirmed apply-intent creation and deterministic structured
-  existing-table lock-plan compilation are **Implemented** as execution-free
-  boundaries; stored-plan dispatch, executor, target lock acquisition,
+- exact deployer-confirmed apply-intent creation, deterministic structured
+  existing-table lock-plan compilation, and signed-plan revalidation-manifest
+  compilation are **Implemented** as execution-free boundaries. The manifest
+  binds exact plan/base/target/version metadata to lock-covered structured
+  checks but performs no target I/O; stored-plan dispatch, executor, target lock acquisition,
   transaction segmentation, timeouts, apply-time approval
   revalidation, cancellation propagation, reconciliation, and post-apply
   verification remain **Planned**;

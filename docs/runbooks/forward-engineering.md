@@ -189,6 +189,12 @@ DDL execution. Every operation in section 4 remains Planned.
 6. Verify the returned intent has no dispatch. Stop here until the separately
    reviewed executor, apply-time revalidation, and recovery gates are enabled.
 
+The current execution-neutral revalidation manifest may be compiled for review
+from the exact stored plan digest. It binds PostgreSQL compatibility and
+base/target digests to deterministic object-lock targets and structured data
+checks, and rejects a check whose table is not covered by its statement lock.
+It does not acquire a target connection or make step 2 below true.
+
 ### 4. Execute and verify
 
 1. Worker reloads the run, plan, revision, target, and evidence from metadata;

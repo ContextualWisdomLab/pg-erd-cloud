@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/Security] Added an execution-neutral pre-apply revalidation manifest. It verifies the exact stored plan digest and strict v1 contract, binds supported PostgreSQL major plus base/target digests to deterministic existing-table lock targets and structured boolean data checks, and rejects tampering, contract drift, unsupported versions, cross-table preconditions, or any precondition not covered by its statement lock. It opens no target connection, acquires no lock, observes no target state, checks no privilege, dispatches no work, and executes no SQL/DDL; same-connection in-lock revalidation and apply remain Planned.
+
 - [BE/FE] Added an execution-neutral pre-apply lock-plan compiler. It consumes only immutable structured statement kinds, object references, transaction flags, and reviewed risk metadata; deterministically sorts and deduplicates existing-table `ACCESS EXCLUSIVE` targets; preserves quoted mixed-case/Unicode identifiers; and fails closed for missing/unknown compiler versions, blockers, unknown/non-transactional operations, tampered lock modes, invalid identifiers, and oversized plans. It does not connect to a target, acquire locks, dispatch work, execute SQL/DDL, or grant apply authority; those stages remain Planned.
 
 - [CI/PostgreSQL] PostgreSQL 14–18 live-preflight lock-wait acceptance now clears the lock-holder transaction's cached statistics snapshot before each `pg_stat_activity` observation. This preserves the real lock/timeout/disconnect proof while preventing an early PostgreSQL statistics view from remaining stale for the entire polling loop.
