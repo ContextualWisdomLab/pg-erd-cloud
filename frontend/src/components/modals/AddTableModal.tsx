@@ -78,24 +78,15 @@ export function AddTableModal({
           <button type="button" onClick={onAddTableCancel}>취소</button>
           <button
             type="submit"
-            aria-disabled={!newTableName.trim()}
-            aria-describedby={!newTableName.trim() ? "add-table-disabled-reason" : undefined}
-            onClick={(e) => {
-              if (!newTableName.trim()) {
-                e.preventDefault();
-              }
-            }}
+            disabled={!newTableName.trim()}
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }
-                : { opacity: 0.5, cursor: "not-allowed" }
+                : undefined
             }
           >
             저장
           </button>
-          {!newTableName.trim() && (
-            <span id="add-table-disabled-reason" className="srOnly">테이블 이름을 입력하세요</span>
-          )}
         </div>
       </form>
     </div>

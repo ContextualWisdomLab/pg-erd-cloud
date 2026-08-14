@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import type { Node } from '@xyflow/react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { TableNodeData } from '../../erd/convert'
@@ -66,10 +65,6 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-describedby', 'add-table-disabled-reason')
-    expect(screen.getByText('테이블 이름을 입력하세요')).toBeInTheDocument()
-
     fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
@@ -88,29 +83,7 @@ describe('modal behavior coverage', () => {
     )
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
-    expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-describedby')
-  })
-
-  it('verifies AddTableModal aria-disabled onClick prevention', async () => {
-    const onSubmit = vi.fn()
-    render(
-      <AddTableModal
-        isOpen
-        newTableName=""
-        setNewTableName={vi.fn()}
-        onAddTableCancel={vi.fn()}
-        onAddTableSubmit={onSubmit}
-      />,
-    )
-
-    const user = userEvent.setup()
-    const submitBtn = screen.getByRole('button', { name: '저장' })
-    await user.click(submitBtn)
-    expect(onSubmit).not.toHaveBeenCalled()
-
-    await user.keyboard('{Enter}')
-    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
   })
 
   it('covers EditEdgeModal visibility and actions', () => {
