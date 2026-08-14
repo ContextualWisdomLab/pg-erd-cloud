@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [CI/PostgreSQL] PostgreSQL 14–18 live-preflight lock-wait acceptance now clears the lock-holder transaction's cached statistics snapshot before each `pg_stat_activity` observation. This preserves the real lock/timeout/disconnect proof while preventing an early PostgreSQL statistics view from remaining stale for the entire polling loop.
+
 - [CI/Frontend] App orchestration coverage now waits for diagram rows and the successor project's metadata effects before driving terminal-poll and stale-request assertions, removing runner-speed races without weakening either behavior check.
 
 - [CI/PostgreSQL] PostgreSQL 14–18 acceptance startup now waits for the official image's init-complete marker before probing readiness. This prevents a transient `pg_isready` success against the temporary initialization server from racing the entrypoint restart between fixture-creation commands.

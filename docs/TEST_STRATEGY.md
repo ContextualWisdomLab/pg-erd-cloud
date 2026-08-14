@@ -241,7 +241,8 @@ exact digest match, explicit drift, invalid capture rejection, fixed non-secret
 capture failure, rollback, and cancellation propagation. PostgreSQL 14–18
 acceptance invokes that primitive through the restricted preflight login,
 proves an ungranted-table SELECT failure, forces a real relation-lock wait past
-its bounded statement timeout, terminates the backend during another wait, and
+its bounded statement timeout, clears any transaction-cached statistics
+snapshot before observing each lock wait, terminates the backend during another wait, and
 verifies sanitized failures plus the appropriate reusable-or-closed connection
 state. It also re-captures the catalog on the same connection/transaction as
 data checks.

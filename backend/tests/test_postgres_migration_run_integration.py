@@ -585,6 +585,9 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
                     )
                 )
                 for _ in range(100):
+                    await admin_connection.execute(
+                        "SELECT pg_catalog.pg_stat_clear_snapshot()"
+                    )
                     if await admin_connection.fetchval(
                         """
                         SELECT EXISTS (

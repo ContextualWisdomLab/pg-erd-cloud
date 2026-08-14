@@ -516,6 +516,10 @@ def test_bound_live_preflight_maturity_is_canonical() -> None:
     assert "LOCK TABLE {qualified} IN ACCESS EXCLUSIVE MODE" in integration_test
     assert "connection.is_in_transaction() is False" in integration_test
     assert "denied_table_name" in integration_test
+    assert "pg_catalog.pg_stat_clear_snapshot()" in integration_test
+    assert integration_test.index("pg_catalog.pg_stat_clear_snapshot()") < (
+        integration_test.index("FROM pg_catalog.pg_stat_activity")
+    )
     assert "pg_catalog.pg_stat_activity" in integration_test
     assert "wait_event_type = 'Lock'" in integration_test
     assert "pg_catalog.pg_terminate_backend" in integration_test
