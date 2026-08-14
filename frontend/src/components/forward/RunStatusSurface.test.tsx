@@ -77,6 +77,25 @@ describe('RunStatusSurface', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('invalidates the last observed run when a polling request fails', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response(run))
+      .mockResolvedValueOnce({ ok: false, status: 503 } as Response)
+    const onRunLoaded = vi.fn()
+
+    render(
+      <RunStatusSurface
+        runId="run-1"
+        onRunLoaded={onRunLoaded}
+        refreshIntervalMs={5}
+      />,
+    )
+
+    await waitFor(() => expect(onRunLoaded).toHaveBeenCalledWith(run))
+    await screen.findByRole('alert')
+    expect(onRunLoaded).toHaveBeenLastCalledWith(null)
+  })
+
   it('ignores a late predecessor response when the run identity changes', async () => {
     const first = deferred<Response>()
     vi.mocked(fetch)

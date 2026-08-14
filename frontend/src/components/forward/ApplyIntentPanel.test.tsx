@@ -119,6 +119,32 @@ describe('ApplyIntentPanel', () => {
     expect(screen.getByRole('status')).toHaveTextContent('apply-intent-1')
   })
 
+  it('trims the target name and rejects a whitespace-only confirmation', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf' }))
+      .mockResolvedValueOnce(response({
+        migration_run_uuid: 'apply-intent-trimmed',
+        state: 'queued',
+        state_version: 1,
+        cancellation_requested: false,
+        reused: false,
+      }, true, 202))
+
+    render(<ApplyIntentPanel plan={plan} passedDryRun={passedRun} onRunCreated={vi.fn()} />)
+    const input = screen.getByLabelText('대상 연결 이름 확인')
+    const submit = screen.getByRole('button', { name: '비실행 apply 의도 등록' })
+    fireEvent.change(input, { target: { value: '   ' } })
+    expect(submit).toBeDisabled()
+
+    fireEvent.change(input, { target: { value: '  production-primary  ' } })
+    fireEvent.click(submit)
+
+    await screen.findByRole('status')
+    expect(vi.mocked(fetch).mock.calls[1]?.[1]?.body).toContain(
+      '"target_connection_name":"production-primary"',
+    )
+  })
+
   it('requires an explicit destructive acknowledgement only for destructive plans', () => {
     render(
       <ApplyIntentPanel
@@ -237,6 +263,42 @@ describe('ApplyIntentPanel', () => {
     expect(retryKey).toBe(firstKey)
     expect(vi.mocked(fetch).mock.calls[3]?.[1]?.body)
       .toBe(vi.mocked(fetch).mock.calls[1]?.[1]?.body)
+  })
+
+  it('unlocks an ambiguous intent only through an explicit new registration', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf-1' }))
+      .mockResolvedValueOnce(response({}, false, 503))
+      .mockResolvedValueOnce(response({ csrf_token: 'csrf-2' }))
+      .mockResolvedValueOnce(response({
+        migration_run_uuid: 'apply-intent-new',
+        state: 'queued',
+        state_version: 1,
+        cancellation_requested: false,
+        reused: false,
+      }, true, 202))
+    vi.mocked(crypto.randomUUID)
+      .mockReturnValueOnce('request-uuid-1')
+      .mockReturnValueOnce('request-uuid-2')
+
+    render(<ApplyIntentPanel plan={plan} passedDryRun={passedRun} onRunCreated={vi.fn()} />)
+    const input = screen.getByLabelText('대상 연결 이름 확인')
+    fireEvent.change(input, { target: { value: 'production-primary' } })
+    fireEvent.click(screen.getByRole('button', { name: '비실행 apply 의도 등록' }))
+
+    await screen.findByRole('alert')
+    expect(input).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '새 등록 시작' }))
+    expect(input).toBeEnabled()
+    fireEvent.change(input, { target: { value: 'production-secondary' } })
+    fireEvent.click(screen.getByRole('button', { name: '비실행 apply 의도 등록' }))
+
+    await screen.findByRole('status')
+    const firstHeaders = vi.mocked(fetch).mock.calls[1]?.[1]?.headers as Record<string, string>
+    const secondHeaders = vi.mocked(fetch).mock.calls[3]?.[1]?.headers as Record<string, string>
+    expect(firstHeaders['Idempotency-Key']).toBe('web-apply-intent-request-uuid-1')
+    expect(secondHeaders['Idempotency-Key']).toBe('web-apply-intent-request-uuid-2')
+    expect(vi.mocked(fetch).mock.calls[3]?.[1]?.body).toContain('production-secondary')
   })
 
   it('ignores an obsolete accepted response after the reviewed identities change', async () => {

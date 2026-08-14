@@ -116,6 +116,23 @@ executable SQL, safety classification, approval truth, or recovery state.
   replaces transaction creation/start, query, commit, and rollback-cleanup
   failures with fixed diagnostics, and rolls back only after transaction startup
   succeeds while preserving cancellation and process-exit signals.
+- exact deployer-confirmed apply-intent creation, deterministic structured
+  existing-table lock-plan compilation, and signed-plan revalidation-manifest
+  compilation are **Implemented** as execution-free boundaries. The manifest
+  binds exact plan/base/target/version metadata to lock-covered structured
+  checks, structured database `CREATE`/schema `CREATE`/table `OWNER`
+  requirements, and zero/no-op or one ordered all-transactional segment. Its
+  fixed parameterized privilege probes re-derive their manifest from the exact
+  signed plan, while the positional assessor fails closed on scope/evidence
+  drift and derives only non-authorizing facts. A bounded caller-owned capture
+  primitive observes a strict snapshot, role privileges, and data preconditions
+  on one read-only repeatable-read connection. It owns no credential/attempt
+  binding and acquires no advisory/object lock;
+- frontend graph/model adapters and `ForwardEngineeringModal` workflow
+  orchestration are **Partially implemented** through the accessible modal,
+  read-only plan review, exact-digest dry-run intent, verified run status/audit,
+  polling, exact-version cancellation, and execution-free apply-intent controls.
+  Apply/recovery authority and composed browser E2E remain absent.
 
 ### Planned and release-blocking
 
@@ -129,28 +146,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
-- exact deployer-confirmed apply-intent creation, deterministic structured
-  existing-table lock-plan compilation, and signed-plan revalidation-manifest
-  compilation are **Implemented** as execution-free boundaries. The manifest
-  binds exact plan/base/target/version metadata to lock-covered structured
-  checks, structured database `CREATE`/schema `CREATE`/table `OWNER`
-  requirements, and zero/no-op or one ordered all-transactional segment. Its
-  fixed parameterized privilege probes that re-derive their manifest from the
-  exact signed plan, plus complete positional observation assessor fail closed
-  on scope/evidence drift and derive only non-authorizing inputs or booleans.
-  A bounded caller-owned capture primitive re-derives those inputs and observes
-  a strict snapshot, role privileges, and data preconditions on one read-only
-  repeatable-read connection. It owns no credential/attempt binding and acquires
-  no advisory/object lock. Stored-plan dispatch, executor, target identity
-  binding, target lock acquisition, in-lock repetition, transaction
-  execution/rollback proof, timeouts, apply-time approval
-  revalidation, cancellation propagation, reconciliation, and post-apply
-  verification remain **Planned**;
-- frontend graph/model adapters and `ForwardEngineeringModal` workflow
-  orchestration are **Partially implemented** through the accessible modal,
-  read-only plan review, exact-digest dry-run intent, verified run status/audit,
-  polling, and exact-version cancellation controls; apply/recovery controls and
-  composed browser E2E remain absent;
+- stored-plan apply dispatch/executor, target identity binding, target lock
+  acquisition, in-lock repetition, transaction execution/rollback proof,
+  apply-time approval revalidation, cancellation propagation, reconciliation,
+  and post-apply verification;
 - real PostgreSQL integration, fault-injection, accessibility, and browser E2E.
 
 The legacy `POST /api/connections/{db_connection_uuid}/apply-sql` remains a
@@ -331,7 +330,7 @@ See the [threat model](security/forward-engineering-threat-model.md) and
 |---|---|---|---|
 | FE-TRD-001–004 | `app/forward/*`, schema-model/plan APIs, models, migrations | `test_forward_*`, `test_api_schema_models.py`, `test_api_migration_plans.py` | Real PostgreSQL round trip |
 | FE-TRD-005 | Uniform masking in schema-model/plan routes; project roles | API/permission tests | Full HTTP IDOR matrix |
-| FE-TRD-006–008 | Isolated dry-run execution/convergence core and bound read-only live preflight | `test_forward_isolated_dry_run.py`, `test_forward_live_preflight.py`, and PostgreSQL 14–18 acceptance | Sandbox provisioning/materialization/isolation/cleanup, credential-bound worker execution, apply-time revalidation, and live apply |
+| FE-TRD-006–008 | Isolated dry-run execution/convergence core and bound read-only live preflight | `test_forward_isolated_dry_run.py`, `test_forward_live_preflight.py`, `test_forward_apply_lock_plan.py`, `test_forward_pre_apply_revalidation.py`, and PostgreSQL 14–18 acceptance | Sandbox provisioning/materialization/isolation/cleanup, credential-bound worker execution, apply-time revalidation, and live apply |
 | FE-TRD-009–012 | Durable run/event/outbox/attempt persistence, UUID-only dispatch, exact signal/attempt leases, and dry-run/apply-intent/cancellation APIs | `test_migration_run_consumer.py`, `test_postgres_migration_run_integration.py`, and run/API contract suites | Application startup/credentials/deployed worker, crash recovery/no-replay reconciliation, and live apply/convergence |
 | FE-NFR-006 | Existing modal accessibility utilities only | Existing dialog tests | Forward workflow accessibility/E2E |
 

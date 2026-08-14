@@ -68,9 +68,10 @@ export function ApplyIntentPanel({
   }
 
   const submit = async () => {
+    const trimmedTargetConnectionName = targetConnectionName.trim()
     if (
       inFlightRef.current
-      || targetConnectionName.length === 0
+      || trimmedTargetConnectionName.length === 0
       || (plan.requires_destructive_confirmation && !destructiveAcknowledged)
     ) return
 
@@ -82,7 +83,7 @@ export function ApplyIntentPanel({
       const requestKey = requestKeyRef.current
         ?? `web-apply-intent-${globalThis.crypto.randomUUID()}`
       requestKeyRef.current = requestKey
-      submittedTargetNameRef.current ??= targetConnectionName
+      submittedTargetNameRef.current ??= trimmedTargetConnectionName
       submittedAcknowledgementRef.current ??= plan.requires_destructive_confirmation
         ? destructiveAcknowledged
         : false
@@ -111,8 +112,17 @@ export function ApplyIntentPanel({
     void submit()
   }
 
+  const startNewRegistration = () => {
+    generationRef.current += 1
+    requestKeyRef.current = null
+    submittedTargetNameRef.current = null
+    submittedAcknowledgementRef.current = null
+    inFlightRef.current = false
+    setRequestState({ status: 'idle' })
+  }
+
   const submitDisabled = requestState.status === 'requesting'
-    || targetConnectionName.length === 0
+    || targetConnectionName.trim().length === 0
     || (plan.requires_destructive_confirmation && !destructiveAcknowledged)
   const confirmationLocked = requestKeyRef.current !== null
 
@@ -159,6 +169,9 @@ export function ApplyIntentPanel({
             <p>등록 결과를 확인하지 못했습니다. 같은 등록을 안전하게 다시 확인할 수 있습니다.</p>
             <button type="button" onClick={() => void submit()}>
               같은 등록 다시 시도
+            </button>
+            <button type="button" onClick={startNewRegistration}>
+              새 등록 시작
             </button>
           </div>
         ) : null}

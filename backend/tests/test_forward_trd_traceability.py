@@ -31,6 +31,8 @@ def test_trd_traceability_records_current_forward_foundations() -> None:
     assert "bound read-only live preflight" in dry_run
     assert "test_forward_isolated_dry_run.py" in dry_run
     assert "test_forward_live_preflight" in dry_run
+    assert "test_forward_apply_lock_plan.py" in dry_run
+    assert "test_forward_pre_apply_revalidation.py" in dry_run
     assert "sandbox provisioning/materialization/isolation/cleanup" in dry_run
     assert "credential-bound worker execution" in dry_run
     assert "live apply" in dry_run

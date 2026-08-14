@@ -581,6 +581,7 @@ async def capture_pre_apply_revalidation_observation(
         for requirement, query in zip(
             manifest.privilege_requirements,
             privilege_queries,
+            strict=True,
         ):
             allowed = await asyncio.wait_for(
                 connection.fetchval(
@@ -705,7 +706,11 @@ def assess_pre_apply_revalidation_observation(
             "pre-apply revalidation privilege observations are incomplete"
         )
     privilege_results: list[bool] = []
-    for requirement, row in zip(manifest.privilege_requirements, privilege_rows):
+    for requirement, row in zip(
+        manifest.privilege_requirements,
+        privilege_rows,
+        strict=True,
+    ):
         if not isinstance(row, Mapping) or set(row) != _PRIVILEGE_OBSERVATION_FIELDS:
             raise PreApplyRevalidationContractError(
                 "pre-apply revalidation privilege observation is invalid"
@@ -736,7 +741,11 @@ def assess_pre_apply_revalidation_observation(
             "pre-apply revalidation precondition observations are incomplete"
         )
     precondition_results: list[bool] = []
-    for query, row in zip(manifest.precondition_queries, precondition_rows):
+    for query, row in zip(
+        manifest.precondition_queries,
+        precondition_rows,
+        strict=True,
+    ):
         if not isinstance(row, Mapping) or set(row) != _PRECONDITION_OBSERVATION_FIELDS:
             raise PreApplyRevalidationContractError(
                 "pre-apply revalidation precondition observation is invalid"

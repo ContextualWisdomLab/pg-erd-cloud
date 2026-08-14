@@ -138,6 +138,14 @@ async def _delete_project_fixture(
     await session.execute(
         text(
             "DELETE FROM migration_run "
+            "WHERE project_space_uuid = :project_space_uuid "
+            "AND passed_dry_run_uuid IS NOT NULL"
+        ),
+        parameters,
+    )
+    await session.execute(
+        text(
+            "DELETE FROM migration_run "
             "WHERE project_space_uuid = :project_space_uuid"
         ),
         parameters,
@@ -370,7 +378,7 @@ async def test_real_postgres_executes_exact_isolated_plan_and_converges() -> Non
 
 @pytest.mark.asyncio
 async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
-    """Prove compiler-v1 lock/check inputs compose on PostgreSQL 14–18."""
+    """Prove compiler-v1 lock/check inputs compose on PostgreSQL 14 through 18."""
 
     assert _EXPECTED_MAJOR is not None
     major = int(_EXPECTED_MAJOR)
@@ -432,12 +440,16 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
     )
     assert [query.scope for query in privilege_queries] == ["table"]
 
-    lock_connection = await asyncpg.connect(_target_asyncpg_url())
-    contender = await asyncpg.connect(_target_asyncpg_url())
-    denied_role = await asyncpg.connect(_preflight_asyncpg_url())
-    transaction = lock_connection.transaction()
+    lock_connection: asyncpg.Connection[asyncpg.Record] | None = None
+    contender: asyncpg.Connection[asyncpg.Record] | None = None
+    denied_role: asyncpg.Connection[asyncpg.Record] | None = None
+    transaction: asyncpg.Transaction | None = None
     transaction_started = False
     try:
+        lock_connection = await asyncpg.connect(_target_asyncpg_url())
+        contender = await asyncpg.connect(_target_asyncpg_url())
+        denied_role = await asyncpg.connect(_preflight_asyncpg_url())
+        transaction = lock_connection.transaction()
         await lock_connection.execute(f"CREATE SCHEMA {quoted_schema}")
         await lock_connection.execute(
             f"CREATE TABLE {qualified} ({quoted_id} bigint NOT NULL)"
@@ -493,13 +505,20 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
         )
         assert await contender.fetchval(f"SELECT count(*) FROM {qualified}") == 2
     finally:
-        if transaction_started:
+        if transaction_started and transaction is not None:
             await transaction.rollback()
-        await contender.execute("SET statement_timeout = 0")
-        await lock_connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
-        await denied_role.close()
-        await contender.close()
-        await lock_connection.close()
+        if contender is not None:
+            await contender.execute("SET statement_timeout = 0")
+        if lock_connection is not None:
+            await lock_connection.execute(
+                f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE"
+            )
+        if denied_role is not None:
+            await denied_role.close()
+        if contender is not None:
+            await contender.close()
+        if lock_connection is not None:
+            await lock_connection.close()
 
 
 @pytest.mark.asyncio

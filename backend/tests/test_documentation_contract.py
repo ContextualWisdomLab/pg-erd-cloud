@@ -750,9 +750,11 @@ def test_forward_contract_tracks_concurrent_apply_intent_evidence() -> None:
     """Keep FE-AC-007 aligned with exact real-PostgreSQL concurrency evidence."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
-    acceptance_row = next(
+    acceptance_rows = [
         line for line in contract.splitlines() if "| FE-AC-007 |" in line
-    )
+    ]
+    assert acceptance_rows, "forward contract is missing FE-AC-007"
+    acceptance_row = acceptance_rows[0]
 
     assert "PostgreSQL 14–18" in acceptance_row
     assert "same-key apply" in acceptance_row
@@ -764,9 +766,11 @@ def test_forward_contract_tracks_real_durable_worker_postgres_evidence() -> None
     """Keep worker evidence distinct from deployed provider readiness."""
 
     contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
-    acceptance_row = next(
+    acceptance_rows = [
         line for line in contract.splitlines() if "| FE-AC-003 |" in line
-    )
+    ]
+    assert acceptance_rows, "forward contract is missing FE-AC-003"
+    acceptance_row = acceptance_rows[0]
 
     assert (
         "test_real_postgres_durable_worker_recovers_without_sandbox_replay"
@@ -861,6 +865,5 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "cannot establish those facts or grant apply authority" in implementation
     assert "capture_pre_apply_revalidation_observation" in implementation
     assert "read-only repeatable-read transaction" in implementation
-    assert "acquires no advisory/object lock" in implementation
     assert "caller-owned same-connection" in architecture
     assert "caller-owned connection" in contract

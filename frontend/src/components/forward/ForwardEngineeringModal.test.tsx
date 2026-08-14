@@ -166,6 +166,57 @@ describe('ForwardEngineeringModal', () => {
       .toHaveLength(1)
   })
 
+  it('preserves exact passed dry-run evidence after creating an apply intent', async () => {
+    const passedRun = {
+      ...run,
+      state: 'passed',
+      state_version: 4,
+      observed_base_digest: 'b'.repeat(64),
+    }
+    const applyRun = {
+      ...run,
+      migration_run_uuid: 'apply-intent-modal',
+      run_kind: 'apply',
+      state: 'queued',
+    }
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input)
+      if (url === '/api/csrf-token') return Promise.resolve(response({ csrf_token: 'csrf' }))
+      if (url.endsWith('/apply-runs') && init?.method === 'POST') {
+        return Promise.resolve(response({
+          migration_run_uuid: 'apply-intent-modal',
+          state: 'queued',
+          state_version: 1,
+          cancellation_requested: false,
+          reused: false,
+        }))
+      }
+      if (url.endsWith('/migration-runs/run-modal')) return Promise.resolve(response(passedRun))
+      if (url.endsWith('/migration-runs/apply-intent-modal')) {
+        return Promise.resolve(response(applyRun))
+      }
+      return Promise.resolve(response(plan))
+    })
+
+    render(
+      <ForwardEngineeringModal
+        isOpen
+        planId="plan-modal"
+        runId="run-modal"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const input = await screen.findByLabelText('대상 연결 이름 확인')
+    fireEvent.change(input, { target: { value: 'production-primary' } })
+    fireEvent.click(screen.getByRole('button', { name: '비실행 apply 의도 등록' }))
+
+    expect(await screen.findByText(/apply-intent-modal/)).toBeInTheDocument()
+    expect(screen.getByLabelText('대상 연결 이름 확인')).toBeInTheDocument()
+    expect(screen.queryByText('apply 의도를 등록할 수 없습니다.'))
+      .not.toBeInTheDocument()
+  })
+
   it('restores the supplied run when the same modal is closed and reopened', async () => {
     const createdRun = {
       ...run,

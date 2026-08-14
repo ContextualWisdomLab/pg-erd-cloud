@@ -138,6 +138,26 @@ def test_preserves_mixed_case_and_unicode_identifiers() -> None:
             _plan(_statement("drop_table", "public", "x" * 64)),
             "identifier is too large",
         ),
+        (
+            {**_plan(), "statements": "not-a-list"},
+            "statements must be a list",
+        ),
+        (
+            {**_plan(), "statements": ["not-an-object"]},
+            "statement must be an object",
+        ),
+        (
+            {
+                **_plan(),
+                "statements": [
+                    {
+                        **_statement("drop_table", "public", "orders"),
+                        "object_ref": "not-an-object",
+                    }
+                ],
+            },
+            "object reference is invalid",
+        ),
     ],
 )
 def test_fails_closed_for_non_executable_or_tampered_lock_inputs(

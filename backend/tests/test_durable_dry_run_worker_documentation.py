@@ -28,6 +28,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
     """Prevent orchestration from being documented as provider or apply authority."""
 
     contract = _read(WORKER_CONTRACT)
+    normalized = " ".join(contract.split())
     required = (
         "make_durable_dry_run_attempt_handler",
         "MigrationRunAttemptClaim",
@@ -37,13 +38,14 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "execute_bound_live_preflight",
         "complete_isolated_dry_run",
         "complete_live_preflight",
-        "cancellation or CAS loss",
+        "not atomic with target capability opening",
+        "provider-bound guarded handoff",
         "does not implement or prove",
         "live apply",
         "production readiness",
     )
 
-    assert [term for term in required if term not in contract] == []
+    assert [term for term in required if term not in normalized] == []
 
 
 def test_worker_contract_names_are_present_in_production_source() -> None:

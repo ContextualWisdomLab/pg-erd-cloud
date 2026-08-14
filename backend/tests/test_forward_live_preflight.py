@@ -67,7 +67,7 @@ def _snapshot() -> dict[str, Any]:
 
 
 def test_compares_strict_snapshot_digest_without_execution_authority() -> None:
-    """Verify compares strict snapshot digest without execution authority."""
+    """Snapshot comparison reports exact base match or drift without writing."""
     snapshot = _snapshot()
     observed_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
     plan = _plan()
@@ -88,7 +88,7 @@ def test_compares_strict_snapshot_digest_without_execution_authority() -> None:
 
 @pytest.mark.parametrize("base_digest", [None, True, "A" * 64, "a" * 63])
 def test_rejects_invalid_planned_base_digest(base_digest: object) -> None:
-    """Verify rejects invalid planned base digest."""
+    """Malformed planned base digests fail closed before snapshot comparison."""
     plan = _plan()
     plan["base_digest"] = base_digest
 
@@ -97,7 +97,7 @@ def test_rejects_invalid_planned_base_digest(base_digest: object) -> None:
 
 
 def test_snapshot_comparison_fails_closed_for_unsupported_target_semantics() -> None:
-    """Verify snapshot comparison fails closed for unsupported target semantics."""
+    """Unsupported relation semantics cannot be accepted as matching evidence."""
     snapshot = _snapshot()
     snapshot["relations"][0]["relation_kind"] = "v"
     plan = _plan()
@@ -108,7 +108,7 @@ def test_snapshot_comparison_fails_closed_for_unsupported_target_semantics() -> 
 
 
 def test_compiles_bounded_preconditions_with_postgresql_identifier_quoting() -> None:
-    """Verify compiles bounded preconditions with postgresql identifier quoting."""
+    """Known preconditions compile to bounded reads with exact quoted identifiers."""
     queries = compile_live_preflight_queries(
         _plan(
             {

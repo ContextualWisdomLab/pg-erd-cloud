@@ -112,8 +112,10 @@ plan digest verifier remains authoritative.
   completion CAS and then to exact signal acknowledgement. Those CAS
   operations remain authoritative: an expired, replaced or otherwise lost
   owner still fails closed and cannot authorize acknowledgement.
-- A cancellation or CAS loss between sandbox completion and target access must
-  prevent the target capability from opening.
+- The current post-sandbox reload narrows the cancellation/lease-loss window,
+  but it is not atomic with target capability opening. A provider-bound guarded
+  handoff that revalidates cancellation and the exact attempt lease immediately
+  before target access remains Planned and release-blocking.
 
 ## Failure and evidence policy
 

@@ -366,7 +366,7 @@ async def test_capture_rolls_back_and_sanitizes_target_failure() -> None:
 
     with pytest.raises(
         PreApplyRevalidationContractError,
-        match="^pre-apply revalidation capture failed$",
+        match=r"^pre-apply revalidation capture failed$",
     ) as failure:
         await capture_pre_apply_revalidation_observation(
             connection,
@@ -377,6 +377,35 @@ async def test_capture_rolls_back_and_sanitizes_target_failure() -> None:
 
     assert "secret" not in str(failure.value)
     assert "private-row" not in str(failure.value)
+    assert connection.rolled_back is True
+    assert connection.committed is False
+
+
+@pytest.mark.asyncio
+async def test_capture_rejects_non_boolean_privilege_result() -> None:
+    """A non-boolean catalog result fails closed and rolls back the capture."""
+
+    snapshot = _strict_snapshot()
+    base_digest = schema_model_digest(snapshot_to_schema_model(snapshot))
+    plan = _signed_plan(_statement())
+    plan["base_digest"] = base_digest
+    _resign(plan)
+    connection = _CaptureConnection([1, True])
+
+    async def capture_snapshot(_candidate: object) -> Mapping[str, object]:
+        return snapshot
+
+    with pytest.raises(
+        PreApplyRevalidationContractError,
+        match="privilege result is invalid",
+    ):
+        await capture_pre_apply_revalidation_observation(
+            connection,
+            plan,
+            expected_plan_digest=plan["plan_digest"],
+            capture_snapshot=capture_snapshot,
+        )
+
     assert connection.rolled_back is True
     assert connection.committed is False
 

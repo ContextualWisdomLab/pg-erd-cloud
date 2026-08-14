@@ -46,7 +46,10 @@ export function RunStatusSurface({
           refreshTimer = setTimeout(() => void load(), Math.max(1, refreshIntervalMs))
         }
       } catch {
-        if (active) setLoadState({ status: 'error' })
+        if (active) {
+          setLoadState({ status: 'error' })
+          onRunLoadedRef.current?.(null)
+        }
       }
     }
 

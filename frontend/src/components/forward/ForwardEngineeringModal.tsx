@@ -25,20 +25,36 @@ export function ForwardEngineeringModal({
     runId: string
   } | null>(null)
   const [reviewedPlan, setReviewedPlan] = useState<MigrationPlan | null>(null)
-  const [observedRun, setObservedRun] = useState<MigrationRun | null>(null)
+  const [passedDryRun, setPassedDryRun] = useState<{
+    scope: string
+    run: MigrationRun
+  } | null>(null)
+  const runScope = `${planId}\u0000${runId ?? ''}`
 
   useEffect(() => {
     if (!isOpen) {
       setCreatedRun(null)
       setReviewedPlan(null)
-      setObservedRun(null)
+      setPassedDryRun(null)
     }
   }, [isOpen])
 
+  useEffect(() => {
+    setPassedDryRun(null)
+  }, [runScope])
+
   if (!isOpen) return null
 
-  const runScope = `${planId}\u0000${runId ?? ''}`
   const activeRunId = createdRun?.scope === runScope ? createdRun.runId : runId
+  const handleRunLoaded = (loadedRun: MigrationRun | null) => {
+    if (
+      loadedRun?.run_kind === 'dry_run'
+      && loadedRun.state === 'passed'
+      && loadedRun.migration_plan_uuid === planId
+    ) {
+      setPassedDryRun({ scope: runScope, run: loadedRun })
+    }
+  }
 
   return (
     <div className="forwardEngineeringModalOverlay">
@@ -67,15 +83,14 @@ export function ForwardEngineeringModal({
             renderCreatedRunStatus={false}
           />
           {activeRunId ? (
-            <RunStatusSurface runId={activeRunId} onRunLoaded={setObservedRun} />
+            <RunStatusSurface runId={activeRunId} onRunLoaded={handleRunLoaded} />
           ) : null}
           {reviewedPlan
-            && observedRun
-            && reviewedPlan.migration_plan_uuid === planId
-            && observedRun.migration_run_uuid === activeRunId ? (
+            && passedDryRun?.scope === runScope
+            && reviewedPlan.migration_plan_uuid === planId ? (
               <ApplyIntentPanel
                 plan={reviewedPlan}
-                passedDryRun={observedRun}
+                passedDryRun={passedDryRun.run}
                 onRunCreated={(newRunId) => setCreatedRun({
                   scope: runScope,
                   runId: newRunId,
