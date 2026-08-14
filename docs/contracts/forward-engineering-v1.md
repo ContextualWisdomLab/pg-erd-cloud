@@ -102,6 +102,13 @@ Current code implements only the first control-plane slice:
   Planned. Test-only PostgreSQL 14–18 acceptance composes the emitted lock and
   check against an ephemeral fixture and proves a concurrent insert is blocked
   until rollback; this is database-semantics evidence, not a deployed executor.
+- **Implemented boundary:** manifest-bound observation assessment accepts only
+  the exact plan digest plus a complete, ordered row for every structured
+  privilege requirement and precondition. It rejects missing, extra, renamed,
+  reordered, non-boolean, or differently targeted rows and derives base-match,
+  privilege, and precondition booleans. It cannot prove observation freshness or lock ownership,
+  bind a target connection, or authorize apply; those runtime controls remain
+  Planned.
 - **Partially implemented:** browser plan review, dry-run submission, durable run
   polling/status/audit, exact-version cancellation, and a non-dispatched apply
   intent control exist. The apply control requires the exact passed dry-run,

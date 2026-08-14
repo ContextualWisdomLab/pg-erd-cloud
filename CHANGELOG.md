@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/Security/Docs] Added a pure manifest-bound pre-apply observation assessment. It accepts only the exact plan digest and one complete ordered row per structured privilege requirement and precondition, rejects missing/extra/renamed/mismatched/non-boolean evidence, and derives explicit base-match, privilege, and precondition facts. It opens no connection, captures no target state, proves no lock or freshness, and grants no apply authority.
+
 - [BE/Docs] Extended the target-free signed pre-apply manifest with structured compiler-v1 privilege requirements. `CREATE SCHEMA` binds database `CREATE`, `CREATE TABLE` binds schema `CREATE`, and existing-table changes bind table `OWNER`; weaker, unknown, reordered, or duplicated labels fail closed. This opens no target connection and performs no role or privilege observation, credential access, dispatch, SQL, or DDL.
 
 - [BE/CI/PostgreSQL] Added test-only PostgreSQL 14–18 acceptance for the pre-apply manifest. Against a uniquely quoted Unicode fixture, it acquires the compiled `ACCESS EXCLUSIVE` table lock, observes a concurrent insert terminate at a bounded server timeout, executes the bound table-empty check while the lock is held, rolls back, and then observes the insert succeed. This is ephemeral compiler/database-semantics evidence; it adds no production target connection, credential, lock service, executor, or DDL authority.

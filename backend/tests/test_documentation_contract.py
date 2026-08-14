@@ -818,6 +818,8 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
 
     assert "target-free pre-apply revalidation-manifest" in contract
     assert "database `CREATE`/schema `CREATE`/table `OWNER`" in contract
+    assert "manifest-bound observation assessment" in contract
+    assert "cannot prove observation freshness or lock ownership" in contract
     invariant = next(
         line for line in contract.splitlines() if "| FE-INV-007 |" in line
     )
@@ -829,6 +831,7 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "exactly one ordered all-transactional segment" in segment_invariant
     assert "rollback proof" in segment_invariant
     assert "revalidation manifest" in architecture
+    assert "observation assessment" in architecture
     assert "target-free manifest" in prd
     assert "does not acquire a target connection" in runbook
     assert "a no-op plan has no segment" in runbook
@@ -837,6 +840,7 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "checks no target privilege" in architecture
     assert "privilege-label drift" in prd
     assert "privilege observation occurred" in strategy
+    assert "complete positional observation" in strategy
     assert "ApplyPrivilegeRequirement" in implementation
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
@@ -846,3 +850,4 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     )
     assert "opens no target connection" in implementation
     assert "acquires no lock" in implementation
+    assert "cannot establish those facts or grant apply authority" in implementation

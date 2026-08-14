@@ -10,6 +10,8 @@ import pytest
 from app.forward.migration_plan import COMPILER_VERSION
 from app.forward.pre_apply_revalidation import (
     PreApplyRevalidationContractError,
+    PreApplyRevalidationManifest,
+    assess_pre_apply_revalidation_observation,
     compile_pre_apply_revalidation_manifest,
 )
 
@@ -133,6 +135,39 @@ def _resign(plan: dict[str, object]) -> None:
     plan["plan_digest"] = hashlib.sha256(encoded).hexdigest()
 
 
+def _observation(
+    manifest: PreApplyRevalidationManifest,
+    *,
+    observed_base_digest: str | None = None,
+) -> dict[str, object]:
+    """Build complete positional evidence for one compiled manifest."""
+
+    return {
+        "plan_digest": manifest.plan_digest,
+        "observed_base_digest": observed_base_digest or manifest.base_digest,
+        "privileges": [
+            {
+                "statement_index": requirement.statement_index,
+                "privilege": requirement.privilege,
+                "scope": requirement.scope,
+                "schema_name": requirement.schema_name,
+                "table_name": requirement.table_name,
+                "allowed": True,
+            }
+            for requirement in manifest.privilege_requirements
+        ],
+        "preconditions": [
+            {
+                "statement_index": query.statement_index,
+                "precondition_index": query.precondition_index,
+                "kind": query.kind,
+                "passed": True,
+            }
+            for query in manifest.precondition_queries
+        ],
+    }
+
+
 def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
     """Manifest preserves exact authority inputs and deterministic ordering."""
 
@@ -169,6 +204,94 @@ def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
         'SELECT NOT EXISTS (SELECT 1 FROM "Sales Data"."Order ""Item""" '
         'WHERE "amount" IS NULL LIMIT 1)'
     ]
+
+
+def test_assesses_complete_bound_observation_without_granting_apply_authority() -> None:
+    """Pure assessment derives only evidence booleans from exact manifest rows."""
+
+    plan = _signed_plan(_statement())
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+
+    assessment = assess_pre_apply_revalidation_observation(
+        manifest,
+        _observation(manifest),
+    )
+
+    assert assessment.observed_base_digest == "a" * 64
+    assert assessment.base_matches is True
+    assert assessment.privileges_satisfied is True
+    assert assessment.preconditions_satisfied is True
+
+
+def test_assessment_preserves_negative_observations_as_non_authorizing_facts() -> None:
+    """Drift, privilege denial, and failed checks remain explicit evidence."""
+
+    plan = _signed_plan(_statement())
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+    observation = _observation(manifest, observed_base_digest="c" * 64)
+    privileges = observation["privileges"]
+    preconditions = observation["preconditions"]
+    assert isinstance(privileges, list) and isinstance(preconditions, list)
+    privileges[0]["allowed"] = False
+    preconditions[0]["passed"] = False
+
+    assessment = assess_pre_apply_revalidation_observation(manifest, observation)
+
+    assert assessment.base_matches is False
+    assert assessment.privileges_satisfied is False
+    assert assessment.preconditions_satisfied is False
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("unknown_field", "observation contract is invalid"),
+        ("wrong_plan", "plan digest does not match"),
+        ("missing_privilege", "privilege observations are incomplete"),
+        ("wrong_privilege_target", "privilege observation does not match"),
+        ("non_boolean_privilege", "privilege result is invalid"),
+        ("missing_precondition", "precondition observations are incomplete"),
+        ("wrong_precondition_kind", "precondition observation does not match"),
+        ("non_boolean_precondition", "precondition result is invalid"),
+    ],
+)
+def test_assessment_rejects_incomplete_or_unbound_observations(
+    mutation: str, message: str
+) -> None:
+    """Untrusted caller evidence must match every manifest position exactly."""
+
+    plan = _signed_plan(_statement())
+    manifest = compile_pre_apply_revalidation_manifest(
+        plan, expected_plan_digest=plan["plan_digest"]
+    )
+    observation = _observation(manifest)
+    privileges = observation["privileges"]
+    preconditions = observation["preconditions"]
+    assert isinstance(privileges, list) and isinstance(preconditions, list)
+
+    if mutation == "unknown_field":
+        observation["connection_id"] = "not-authority"
+    elif mutation == "wrong_plan":
+        observation["plan_digest"] = "d" * 64
+    elif mutation == "missing_privilege":
+        privileges.clear()
+    elif mutation == "wrong_privilege_target":
+        privileges[0]["table_name"] = "other"
+    elif mutation == "non_boolean_privilege":
+        privileges[0]["allowed"] = 1
+    elif mutation == "missing_precondition":
+        preconditions.clear()
+    elif mutation == "wrong_precondition_kind":
+        preconditions[0]["kind"] = "table_is_empty"
+    else:
+        preconditions[0]["passed"] = "yes"
+
+    with pytest.raises(PreApplyRevalidationContractError, match=message):
+        assess_pre_apply_revalidation_observation(manifest, observation)
 
 
 def test_compiles_one_ordered_segment_for_multiple_statements() -> None:

@@ -200,6 +200,12 @@ segment; a no-op plan has no segment. It does not acquire a target connection,
 observe a target role's privileges, start that transaction, prove rollback, or
 make step 2 below true.
 
+The pure observation assessor may validate that caller-supplied digest,
+privilege, and precondition rows are complete and positionally identical to the
+manifest. Its base-match and aggregate booleans are untrusted input assessment,
+not proof of freshness, target identity, held locks, same-connection capture,
+or permission to continue to DDL.
+
 ### 4. Execute and verify
 
 1. Worker reloads the run, plan, revision, target, and evidence from metadata;

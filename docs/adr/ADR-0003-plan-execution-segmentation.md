@@ -96,6 +96,9 @@ single-transaction claim of v1.
   operations to structured database `CREATE`, schema `CREATE`, or table
   `OWNER` requirements and rejects compiler-v1 privilege-label drift. This is
   target-free input evidence, not privilege observation or execution proof.
+- The pure observation assessor rejects incomplete or positionally mismatched
+  privilege/precondition rows and derives only non-authorizing booleans. It
+  does not prove target identity, freshness, held locks, or connection binding.
 
 ### Planned before production release
 

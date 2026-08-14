@@ -3,9 +3,11 @@
 This module binds the persisted plan digest and compatibility metadata to the
 existing structured table-lock and live-precondition compilers.  It also proves
 that every data precondition names its statement's table and that the table is
-present in the deterministic lock set.  A future executor must acquire those
-locks and then perform fresh snapshot comparison and these checks on the same
-connection before DDL.
+present in the deterministic lock set.  Its pure observation assessment rejects
+missing, extra, or positionally mismatched caller evidence and derives only
+non-authorizing booleans.  A future executor must acquire those locks and then
+perform fresh snapshot comparison and these checks on the same connection
+before DDL.
 
 The boundary opens no target connection, acquires no lock, captures no
 snapshot, checks no privilege, dispatches no work, and executes no SQL or DDL.
@@ -65,6 +67,22 @@ _STATEMENT_FIELDS = frozenset(
         "preconditions",
     }
 )
+_OBSERVATION_FIELDS = frozenset(
+    {"plan_digest", "observed_base_digest", "privileges", "preconditions"}
+)
+_PRIVILEGE_OBSERVATION_FIELDS = frozenset(
+    {
+        "statement_index",
+        "privilege",
+        "scope",
+        "schema_name",
+        "table_name",
+        "allowed",
+    }
+)
+_PRECONDITION_OBSERVATION_FIELDS = frozenset(
+    {"statement_index", "precondition_index", "kind", "passed"}
+)
 
 
 class PreApplyRevalidationContractError(ValueError):
@@ -105,6 +123,16 @@ class PreApplyRevalidationManifest:
     privilege_requirements: tuple[ApplyPrivilegeRequirement, ...]
     lock_targets: tuple[ApplyLockTarget, ...]
     precondition_queries: tuple[LivePreflightQuery, ...]
+
+
+@dataclass(frozen=True)
+class PreApplyRevalidationAssessment:
+    """Execution-neutral assessment of complete, manifest-bound observations."""
+
+    observed_base_digest: str
+    base_matches: bool
+    privileges_satisfied: bool
+    preconditions_satisfied: bool
 
 
 def _require_digest(value: object, *, name: str) -> str:
@@ -323,4 +351,103 @@ def compile_pre_apply_revalidation_manifest(
         privilege_requirements=privilege_requirements,
         lock_targets=lock_targets,
         precondition_queries=precondition_queries,
+    )
+
+
+def assess_pre_apply_revalidation_observation(
+    manifest: PreApplyRevalidationManifest,
+    observation: Mapping[str, object],
+) -> PreApplyRevalidationAssessment:
+    """Validate complete positional evidence and derive non-authorizing facts.
+
+    The caller remains responsible for proving that observations were captured
+    freshly while holding the manifest locks on the intended target connection.
+    This pure function cannot establish those facts or grant apply authority.
+    """
+
+    if not isinstance(manifest, PreApplyRevalidationManifest):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation manifest is invalid"
+        )
+    if not isinstance(observation, Mapping) or set(observation) != _OBSERVATION_FIELDS:
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation observation contract is invalid"
+        )
+    plan_digest = _require_digest(
+        observation.get("plan_digest"), name="observation plan digest"
+    )
+    if plan_digest != manifest.plan_digest:
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation observation plan digest does not match"
+        )
+    observed_base_digest = _require_digest(
+        observation.get("observed_base_digest"), name="observed base digest"
+    )
+
+    privilege_rows = observation.get("privileges")
+    if not isinstance(privilege_rows, list) or len(privilege_rows) != len(
+        manifest.privilege_requirements
+    ):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation privilege observations are incomplete"
+        )
+    privilege_results: list[bool] = []
+    for requirement, row in zip(manifest.privilege_requirements, privilege_rows):
+        if not isinstance(row, Mapping) or set(row) != _PRIVILEGE_OBSERVATION_FIELDS:
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation privilege observation is invalid"
+            )
+        expected = {
+            "statement_index": requirement.statement_index,
+            "privilege": requirement.privilege,
+            "scope": requirement.scope,
+            "schema_name": requirement.schema_name,
+            "table_name": requirement.table_name,
+        }
+        if any(row.get(field) != value for field, value in expected.items()):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation privilege observation does not match manifest"
+            )
+        allowed = row.get("allowed")
+        if not isinstance(allowed, bool):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation privilege result is invalid"
+            )
+        privilege_results.append(allowed)
+
+    precondition_rows = observation.get("preconditions")
+    if not isinstance(precondition_rows, list) or len(precondition_rows) != len(
+        manifest.precondition_queries
+    ):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation precondition observations are incomplete"
+        )
+    precondition_results: list[bool] = []
+    for query, row in zip(manifest.precondition_queries, precondition_rows):
+        if not isinstance(row, Mapping) or set(row) != _PRECONDITION_OBSERVATION_FIELDS:
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation precondition observation is invalid"
+            )
+        expected = {
+            "statement_index": query.statement_index,
+            "precondition_index": query.precondition_index,
+            "kind": query.kind,
+        }
+        if any(row.get(field) != value for field, value in expected.items()):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation precondition observation "
+                "does not match manifest"
+            )
+        passed = row.get("passed")
+        if not isinstance(passed, bool):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation precondition result is invalid"
+            )
+        precondition_results.append(passed)
+
+    return PreApplyRevalidationAssessment(
+        observed_base_digest=observed_base_digest,
+        base_matches=observed_base_digest == manifest.base_digest,
+        privileges_satisfied=all(privilege_results),
+        preconditions_satisfied=all(precondition_results),
     )

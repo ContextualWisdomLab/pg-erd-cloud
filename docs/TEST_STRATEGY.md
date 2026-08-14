@@ -143,7 +143,10 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   target-free compiler evidence; it
   does not prove that locks are held, that same-connection revalidation
   or privilege observation occurred, or that a target transaction rolled back
-  after failure.
+  after failure. The complete positional observation-assessment tests reject
+  missing, extra, renamed, differently targeted, and non-boolean privilege or
+  precondition rows and prove negative results remain explicit facts rather
+  than execution authority.
 - Least-privilege roles demonstrate required privilege success and predictable
   denial; live preflight credentials cannot execute DDL.
 - Large tables exercise scan/rewrite warnings and timeout behavior without
