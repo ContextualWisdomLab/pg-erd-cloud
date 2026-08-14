@@ -67,6 +67,9 @@ describe('modal behavior coverage', () => {
       />,
     )
     expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-describedby', 'add-table-disabled-reason')
+    expect(screen.getByText('테이블 이름을 입력하세요')).toBeInTheDocument()
+
     fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
@@ -86,6 +89,7 @@ describe('modal behavior coverage', () => {
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
+    expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-describedby')
   })
 
   it('verifies AddTableModal aria-disabled onClick prevention', async () => {
