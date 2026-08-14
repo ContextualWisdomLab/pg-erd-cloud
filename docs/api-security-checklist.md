@@ -46,6 +46,15 @@
   - 근거: `backend/app/auth.py`, `backend/app/settings.py`
 - 🟡 토큰 TTL/Refresh 정책(권장: 짧게) — IdP 설정에 의존(운영 가이드 필요)
 
+### Configuration secrets
+
+- ✅ `APP_SECRET_FILE`은 `/run/secrets`의 regular, non-symlink direct child만
+  허용한다. 백엔드는 secrets 디렉터리를 descriptor로 고정한 뒤 leaf를
+  `O_NOFOLLOW`로 열고, 같은 descriptor를 `fstat`과 읽기에 사용하여 path
+  검증과 읽기 사이의 symlink 교체 경쟁을 차단한다.
+  - 근거: `backend/app/settings.py`,
+    `backend/tests/test_settings_secret_file.py`
+
 ### Authorization
 
 - ✅ 프로젝트 리소스 접근은 멤버십 기반으로 제한
