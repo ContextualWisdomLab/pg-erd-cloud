@@ -34,13 +34,14 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "MigrationRunAttemptClaim",
         "IsolatedSandboxRequest",
         "LivePreflightRequest",
+        "guard_live_preflight_handoff",
         "execute_isolated_dry_run",
         "execute_bound_live_preflight",
         "complete_isolated_dry_run",
         "complete_live_preflight",
-        "not atomic with target capability opening",
-        "provider-bound guarded handoff",
         "exact expected run state version",
+        "one fresh database statement",
+        "does not eliminate the gap",
         "does not implement or prove",
         "live apply",
         "production readiness",
@@ -58,6 +59,7 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     )
 
     assert "make_durable_dry_run_attempt_handler" in implementation
+    assert "guard_live_preflight_handoff" in implementation
     assert "_refresh_live_stage" in implementation
     assert "class IsolatedSandboxRequest" in authority
     assert "class LivePreflightRequest" in authority

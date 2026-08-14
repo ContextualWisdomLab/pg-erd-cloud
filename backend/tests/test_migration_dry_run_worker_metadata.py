@@ -8,11 +8,14 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from app.jobs.migration_dry_run_worker import (
+    LivePreflightRequest,
     MigrationDryRunWorkerError,
     _MigrationDryRunWork,
     _make_work,
+    guard_live_preflight_handoff,
 )
 
 
@@ -109,6 +112,108 @@ def _transactional_session_factory(*scalar_values: object) -> MagicMock:
     factory.session = session
     factory.transaction = transaction
     return factory
+
+
+@pytest.mark.asyncio
+async def test_live_preflight_handoff_guard_is_one_exact_fail_closed_query() -> None:
+    """Bind provider access to one fresh exact run/plan/attempt observation."""
+
+    now = dt.datetime(2026, 8, 14, 12, tzinfo=dt.timezone.utc)
+    request = LivePreflightRequest(
+        migration_run_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        migration_run_attempt_uuid=uuid.uuid4(),
+        attempt_number=3,
+        expected_state_version=9,
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=request.migration_run_attempt_uuid)
+    )
+
+    await guard_live_preflight_handoff(session, request, now=now)
+
+    session.scalar.assert_awaited_once()
+    statement = str(
+        session.scalar.await_args.args[0].compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    for expected in (
+        str(request.migration_run_uuid),
+        str(request.migration_plan_uuid),
+        str(request.project_space_uuid),
+        str(request.db_connection_uuid),
+        str(request.migration_run_attempt_uuid),
+        "migration_run.run_kind = 'dry_run'",
+        "migration_run.state = 'live_preflight_running'",
+        "migration_run.state_version = 9",
+        "migration_run.cancellation_requested IS false",
+        "migration_run_attempt.attempt_number = 3",
+        "migration_run_attempt.status = 'active'",
+        "migration_run_attempt.lease_expires_at >",
+        "migration_plan.expires_at >",
+        "migration_plan.statement_digest = migration_run.plan_digest",
+    ):
+        assert expected in statement
+    assert "FOR UPDATE" not in statement
+
+
+@pytest.mark.asyncio
+async def test_live_preflight_handoff_guard_rejects_invalid_or_stale_input() -> None:
+    """Reject malformed input before I/O and any non-matching fresh query."""
+
+    now = dt.datetime(2026, 8, 14, 12, tzinfo=dt.timezone.utc)
+    request = LivePreflightRequest(
+        migration_run_uuid=uuid.uuid4(),
+        migration_plan_uuid=uuid.uuid4(),
+        project_space_uuid=uuid.uuid4(),
+        db_connection_uuid=uuid.uuid4(),
+        migration_run_attempt_uuid=uuid.uuid4(),
+        attempt_number=1,
+        expected_state_version=4,
+    )
+    stale_session = SimpleNamespace(scalar=AsyncMock(return_value=None))
+
+    with pytest.raises(MigrationDryRunWorkerError, match="handoff is invalid"):
+        await guard_live_preflight_handoff(stale_session, request, now=now)
+    stale_session.scalar.assert_awaited_once()
+
+    invalid_session = SimpleNamespace(scalar=AsyncMock())
+    invalid_request = LivePreflightRequest(
+        **{
+            **request.__dict__,
+            "expected_state_version": True,
+        }
+    )
+    with pytest.raises(MigrationDryRunWorkerError, match="handoff is invalid"):
+        await guard_live_preflight_handoff(
+            invalid_session, invalid_request, now=now
+        )
+    with pytest.raises(MigrationDryRunWorkerError, match="handoff is invalid"):
+        await guard_live_preflight_handoff(
+            invalid_session,
+            request,
+            now=now.replace(tzinfo=None),
+        )
+    with pytest.raises(MigrationDryRunWorkerError, match="handoff is invalid"):
+        await guard_live_preflight_handoff(
+            invalid_session,
+            request,
+            now=True,  # type: ignore[arg-type]
+        )
+    invalid_session.scalar.assert_not_awaited()
+
+    secret = "postgresql://reader:secret@target/database"
+    failed_session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=RuntimeError(secret))
+    )
+    with pytest.raises(MigrationDryRunWorkerError) as caught:
+        await guard_live_preflight_handoff(failed_session, request, now=now)
+    assert str(caught.value) == "migration live-preflight handoff is invalid"
+    assert secret not in str(caught.value)
 
 
 @pytest.mark.asyncio

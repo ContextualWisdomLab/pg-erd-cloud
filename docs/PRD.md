@@ -170,7 +170,7 @@ evidence exists.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
-| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, and durable attempt ownership exist. Consumer-to-attempt binding is **Implemented**; sandbox lifecycle, application startup wiring, credential binding, and worker execution remain **Planned**. |
+| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, durable attempt ownership, consumer-to-attempt binding, and a provider-callable exact metadata/lease handoff guard exist. Concrete provider composition, sandbox lifecycle, application startup wiring, credential/route binding, and worker execution remain **Planned**. |
 | 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation intent and terminal acknowledgement, exact-owner attempt leases, terminal dry-run redelivery settlement, and an exact non-dispatched apply intent exist; live dispatch/execution/recovery remain Planned |
 | 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Partially implemented:** review, dry-run intent, non-dispatched apply intent, run status/audit, polling, and cancellation surfaces exist; apply execution/recovery/convergence and composed E2E remain Planned |
 

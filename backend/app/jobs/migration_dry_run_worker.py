@@ -10,10 +10,12 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import math
+import uuid
 from collections.abc import Mapping
 from dataclasses import replace
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.forward.isolated_dry_run import (
     MAX_LOCK_TIMEOUT_MS,
@@ -46,7 +48,7 @@ from app.jobs.migration_dry_run_worker_contract import (
 )
 from app.jobs.migration_run_consumer import MigrationRunAttemptHandler
 from app.jobs.valkey_queue import MigrationRunSignalClaim
-from app.models import MigrationPlan, MigrationRun
+from app.models import MigrationPlan, MigrationRun, MigrationRunAttempt
 
 __all__ = [
     "IsolatedSandboxExecution",
@@ -54,11 +56,98 @@ __all__ = [
     "LivePreflightExecution",
     "LivePreflightRequest",
     "MigrationDryRunWorkerError",
+    "guard_live_preflight_handoff",
     "make_durable_dry_run_attempt_handler",
 ]
 
 MAX_SANDBOX_STAGE_TIMEOUT_SECONDS = 900.0
 MAX_PREFLIGHT_STAGE_TIMEOUT_SECONDS = 60.0
+
+
+async def guard_live_preflight_handoff(
+    session: AsyncSession,
+    request: LivePreflightRequest,
+    *,
+    now: dt.datetime | None = None,
+) -> None:
+    """Fail closed unless one fresh query matches the exact live-reader lease.
+
+    Concrete providers can call this server-owned guard immediately before
+    resolving the stored target. It returns no credential or connection and
+    does not eliminate the gap between this observation and provider access.
+    """
+
+    checked_at = now or dt.datetime.now(dt.timezone.utc)
+    uuids = (
+        getattr(request, "migration_run_uuid", None),
+        getattr(request, "migration_plan_uuid", None),
+        getattr(request, "project_space_uuid", None),
+        getattr(request, "db_connection_uuid", None),
+        getattr(request, "migration_run_attempt_uuid", None),
+    )
+    if (
+        not isinstance(request, LivePreflightRequest)
+        or not isinstance(checked_at, dt.datetime)
+        or checked_at.tzinfo is None
+        or checked_at.utcoffset() is None
+        or not all(isinstance(value, uuid.UUID) for value in uuids)
+        or isinstance(request.attempt_number, bool)
+        or not isinstance(request.attempt_number, int)
+        or request.attempt_number < 1
+        or isinstance(request.expected_state_version, bool)
+        or not isinstance(request.expected_state_version, int)
+        or request.expected_state_version < 1
+    ):
+        raise MigrationDryRunWorkerError(
+            "migration live-preflight handoff is invalid"
+        )
+    try:
+        matched_attempt_uuid = await session.scalar(
+            select(MigrationRunAttempt.migration_run_attempt_uuid)
+            .select_from(MigrationRunAttempt)
+            .join(
+                MigrationRun,
+                MigrationRun.migration_run_uuid
+                == MigrationRunAttempt.migration_run_uuid,
+            )
+            .join(
+                MigrationPlan,
+                MigrationPlan.migration_plan_uuid
+                == MigrationRun.migration_plan_uuid,
+            )
+            .where(
+                MigrationRunAttempt.migration_run_attempt_uuid
+                == request.migration_run_attempt_uuid,
+                MigrationRunAttempt.migration_run_uuid
+                == request.migration_run_uuid,
+                MigrationRunAttempt.attempt_number == request.attempt_number,
+                MigrationRunAttempt.status == "active",
+                MigrationRunAttempt.lease_expires_at > checked_at,
+                MigrationRun.migration_run_uuid == request.migration_run_uuid,
+                MigrationRun.migration_plan_uuid == request.migration_plan_uuid,
+                MigrationRun.project_space_uuid == request.project_space_uuid,
+                MigrationRun.run_kind == "dry_run",
+                MigrationRun.state == "live_preflight_running",
+                MigrationRun.state_version == request.expected_state_version,
+                MigrationRun.cancellation_requested.is_(False),
+                MigrationPlan.migration_plan_uuid
+                == request.migration_plan_uuid,
+                MigrationPlan.project_space_uuid == request.project_space_uuid,
+                MigrationPlan.db_connection_uuid == request.db_connection_uuid,
+                MigrationPlan.statement_digest == MigrationRun.plan_digest,
+                MigrationPlan.expires_at > checked_at,
+            )
+        )
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:  # noqa: BLE001
+        raise MigrationDryRunWorkerError(
+            "migration live-preflight handoff is invalid"
+        ) from None
+    if matched_attempt_uuid != request.migration_run_attempt_uuid:
+        raise MigrationDryRunWorkerError(
+            "migration live-preflight handoff is invalid"
+        )
 
 
 async def _load_and_begin(

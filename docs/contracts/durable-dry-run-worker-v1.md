@@ -2,7 +2,8 @@
 
 - **Contract version:** `durable-dry-run-worker/v1`
 - **Capability status:** Partial
-- **Implemented boundary:** deterministic attempt orchestration
+- **Implemented boundary:** deterministic attempt orchestration and a
+  provider-callable metadata handoff guard
 - **Not implemented:** concrete sandbox/credential providers, deployment wiring,
   live apply or production readiness
 
@@ -56,6 +57,14 @@ It does not contain plan JSON, compiler-owned SQL, PostgreSQL major, base
 digest, DSN or credential. The injected provider resolves and constrains the
 stored connection identity outside this contract.
 
+`guard_live_preflight_handoff` is a server-owned, provider-callable check. In
+one fresh database statement it matches the exact run, plan, project, stored
+target, attempt UUID, attempt number and expected run state version. The same
+statement requires an active unexpired attempt, uncancelled
+`live_preflight_running` state, matching run/plan digest and an unexpired plan.
+It returns no credential, route, connection, plan JSON or SQL. Driver/query
+failures and non-matches expose only the fixed handoff error.
+
 ## Server-authoritative metadata checks
 
 Before external I/O, the handler locks and reloads the exact run and immutable
@@ -85,9 +94,11 @@ plan digest verifier remains authoritative.
 4. Immediately before target access, the handler locks and reloads the run and
    plan again. Cancellation, version loss, identity drift, expiry or integrity
    failure prevents opening the live capability.
-5. The live read-only request carries the exact refreshed run state version so
-   a future provider-bound guarded handoff can compare the state it is asked to
-   honor. The live capability is then entered and the existing
+5. The live read-only request carries the exact refreshed run state version.
+   A concrete provider can call `guard_live_preflight_handoff` immediately
+   before resolving the stored target to recheck the full identifier/state/
+   lease tuple in one fresh database statement. The live capability is then
+   entered and the existing
    `execute_bound_live_preflight` core receives the verified plan directly.
    A separate whole-stage cancellation deadline covers reader acquisition,
    capture and checks, then requests cancellation and awaits cleanup.
@@ -117,10 +128,12 @@ plan digest verifier remains authoritative.
   owner still fails closed and cannot authorize acknowledgement.
 - The current post-sandbox reload narrows the cancellation/lease-loss window,
   and its identifier-only request now carries the exact expected run state
-  version. It is still not atomic with target capability opening. A
-  provider-bound guarded handoff that revalidates cancellation, that state
-  version, and the exact attempt lease immediately before target access remains
-  Planned and release-blocking.
+  version. The provider-callable guard atomically revalidates cancellation,
+  that state version, stored identities and the exact active attempt lease in
+  one database statement. No concrete provider is wired to it, and even when
+  composed it does not eliminate the gap between that metadata observation and
+  target capability opening. Provider composition, credential/route binding
+  and cancellation after the observation remain Planned and release-blocking.
 
 ## Failure and evidence policy
 
