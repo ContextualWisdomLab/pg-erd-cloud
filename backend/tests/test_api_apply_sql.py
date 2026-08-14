@@ -94,6 +94,35 @@ async def test_apply_sql_reports_ok_true_on_success():
 
 
 @pytest.mark.asyncio
+async def test_persistent_legacy_apply_is_disabled_before_target_access():
+    """Default-deny persistent compatibility apply before credential access."""
+
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    session.get = AsyncMock(return_value=_conn())
+    with patch(
+        "app.api.connections.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.connections.decrypt_text"
+    ) as decrypt_mock, patch(
+        "app.api.connections.apply_database_sql", new_callable=AsyncMock
+    ) as apply_mock:
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_sql(
+                db_connection_uuid=uuid.uuid4(),
+                body=_body(dry_run=False),
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "persistent legacy apply is disabled"
+    session.get.assert_not_awaited()
+    decrypt_mock.assert_not_called()
+    apply_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_live_apply_requires_deployer_role_while_dry_run_requires_editor():
     session = AsyncMock()
     project_uuid = uuid.uuid4()
@@ -102,6 +131,8 @@ async def test_live_apply_requires_deployer_role_while_dry_run_requires_editor()
     with patch(
         "app.api.connections.require_project_member", new_callable=AsyncMock
     ) as membership, patch(
+        "app.api.connections.settings.legacy_persistent_apply_enabled", True
+    ), patch(
         "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
     ), patch(
         "app.api.connections.apply_database_sql", new_callable=AsyncMock
@@ -132,6 +163,8 @@ async def test_apply_sql_reports_ok_false_on_error():
     session.get = AsyncMock(return_value=_conn())
     with patch(
         "app.api.connections.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.connections.settings.legacy_persistent_apply_enabled", True
     ), patch(
         "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
     ), patch(

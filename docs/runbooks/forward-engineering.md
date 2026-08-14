@@ -121,8 +121,8 @@ operational artifact is attached to the release record.
   `outcome_unknown` without high-cardinality or secret labels.
 - [ ] Application apply kill switch and a separately tested ingress/database
   containment procedure are available.
-- [ ] Legacy persistent `apply-sql` is disabled or retired for the product
-  workflow.
+- [x] Legacy persistent `apply-sql` is disabled by default for the product
+  workflow; retirement remains a separate release decision.
 
 ## Normal planned procedure
 
@@ -293,11 +293,14 @@ and deployment manifests. Disabling it must:
 
 ### Current emergency containment
 
-There is no built-in forward-apply kill switch. If the transitional live route
-must be contained now, operators must coordinate all of these external actions:
+`LEGACY_PERSISTENT_APPLY_ENABLED=false` is the built-in default and rejects new
+persistent compatibility requests before credential access. If an operator had
+explicitly enabled the route, restore the setting to `false` and restart/roll
+the backend, then coordinate these external controls for in-flight or uncertain
+work:
 
-1. Block `POST /api/connections/*/apply-sql` at the ingress/API policy layer or
-   stop the backend service.
+1. Block `POST /api/connections/*/apply-sql` at the ingress/API policy layer if
+   rollout of the disabled setting is not yet complete.
 2. Revoke the target database role's DDL privileges or rotate/disable the
    affected connection credential.
 3. Preserve metadata and application logs; do not delete plan/revision records.

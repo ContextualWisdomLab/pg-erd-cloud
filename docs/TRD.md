@@ -37,7 +37,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 - `MigrationPlan`: immutable plan JSON bound to project, revision, connection,
   succeeded base snapshot, actor, compiler version, and 24-hour expiry.
 - Role order `viewer < editor < deployer < owner`; persistent legacy
-  `apply-sql` requires deployer authority.
+  `apply-sql` requires deployer authority and an explicit operator opt-in that
+  defaults to disabled.
 
 ### Partially implemented foundation
 
@@ -155,7 +156,8 @@ executable SQL, safety classification, approval truth, or recovery state.
 The legacy `POST /api/connections/{db_connection_uuid}/apply-sql` remains a
 transitional compatibility surface. Its `dry_run=true` runs DDL on the live
 target and rolls it back; it is not the planned isolated dry run and is not used
-by the graphical target architecture.
+by the graphical target architecture. Persistent `dry_run=false` requests fail
+closed unless `LEGACY_PERSISTENT_APPLY_ENABLED=true` is explicitly configured.
 
 ## Required invariants
 

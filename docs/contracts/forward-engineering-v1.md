@@ -30,8 +30,8 @@ Current code implements only the first control-plane slice:
 - **Implemented:** canonical model validation/digest; persisted model identities
   and immutable revisions; optimistic revision API; deterministic structured
   plan compilation/persistence and authenticated immutable-plan retrieval;
-  project `deployer` role; deployer gating on the legacy persistent `apply-sql`
-  path.
+  project `deployer` role; default-deny operator switch plus deployer gating on
+  the legacy persistent `apply-sql` path.
 - **Partially implemented:** fail-closed snapshot-to-model conversion and the
   supported compiler subset. Known gaps are listed in section 6.
 - **Partially implemented:** durable run/event persistence, exact state
@@ -411,7 +411,7 @@ mutations currently return `200`, not `201`.
 | `PUT /api/schema-models/{schema_model_uuid}` | `SchemaModelReviseIn`; required `If-Match` | successor `SchemaModelDetailOut`, `200` | editor+ | Implemented |
 | `POST /api/schema-model-revisions/{schema_model_revision_uuid}/migration-plans` | `MigrationPlanCreateIn` | `MigrationPlanOut`, `200` | editor+ | Implemented |
 | `GET /api/migration-plans/{migration_plan_uuid}` | none | current `MigrationPlanOut`, `200` | member | Implemented |
-| `POST /api/connections/{db_connection_uuid}/apply-sql` | legacy `ApplySqlIn` | `ApplySqlOut`, `200` | editor for rollback-only; deployer for persistent apply | Implemented legacy compatibility only |
+| `POST /api/connections/{db_connection_uuid}/apply-sql` | legacy `ApplySqlIn` | `ApplySqlOut`, `200`; persistent disabled `403` | editor for rollback-only; deployer plus explicit operator opt-in for persistent apply | Implemented default-deny legacy compatibility only |
 
 `SchemaModelCreateIn` contains `model_name`, `model_json`, and optional
 `base_schema_snapshot_uuid`. `SchemaModelReviseIn` contains `model_json` and

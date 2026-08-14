@@ -122,6 +122,10 @@ class Settings(BaseSettings):
         1.0, gt=0.0, le=60.0
     )
 
+    # Transitional compatibility only. Persistent browser-authored DDL stays
+    # fail-closed unless an operator explicitly enables the legacy route.
+    legacy_persistent_apply_enabled: bool = False
+
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None

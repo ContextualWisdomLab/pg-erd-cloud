@@ -25,6 +25,7 @@ from app.schemas import (
 )
 from app.security import decrypt_text, encrypt_text
 from app.sanitize import sanitize_for_storage
+from app.settings import settings
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
@@ -92,7 +93,8 @@ async def apply_sql(
 
     SECURITY-SENSITIVE (writes to a live database):
     * Requires **editor** for rollback-only compatibility validation and the
-      stronger **deployer** role for a persistent live apply.
+      stronger **deployer** role for a persistent live apply. Persistent apply
+      is disabled by default and requires an explicit operator opt-in.
     * Authorization and connection lookup use the primary session so replica
       lag cannot revive a revoked deployer role.
     * IDOR-safe: non-members get a uniform 404 (no enumeration); members
@@ -126,6 +128,10 @@ async def apply_sql(
     await require_project_member(
         session, project_space_uuid, user.user_account_uuid, minimum_role=required_role
     )
+    if not body.dry_run and not settings.legacy_persistent_apply_enabled:
+        raise HTTPException(
+            status_code=403, detail="persistent legacy apply is disabled"
+        )
 
     conn = await session.get(DbConnection, db_connection_uuid)
     if conn is None:

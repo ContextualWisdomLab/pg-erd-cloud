@@ -112,7 +112,7 @@ future hardening opportunity, not an implemented guarantee.
 | Queue dry-run intent | Editor | Unexpired plan, exact digest, bounded idempotency key | Implemented; no worker authority |
 | Execute isolated dry run | Worker identity | Queued intent, governed sandbox, compatible PostgreSQL version | Partial execution core only; worker-governed invocation Planned |
 | Create non-dispatched live-apply intent | Deployer | Matching passed dry run/base observation, exact plan/digest, typed connection name, destructive acknowledgement equal to the plan requirement, and bounded idempotency key | Implemented intent boundary; independent approval/executor Planned |
-| Persistent legacy `apply-sql` | Deployer | Conservative SQL parser only | Implemented transitional; not accepted target authority |
+| Persistent legacy `apply-sql` | Deployer plus explicit operator opt-in | Conservative SQL parser only | Implemented default-deny transitional path; not accepted target authority |
 
 The security-sensitive legacy apply endpoint resolves connection membership and
 role from the primary metadata session; a lagging read replica is never an
@@ -139,8 +139,8 @@ Production enablement remains denied until all of the following are evidenced:
 - Operational limits, alerts, kill switch, evidence retention, and the
   [forward-engineering runbook](../runbooks/forward-engineering.md) are exercised
   in a non-production environment.
-- The legacy persistent apply route is disabled for the product workflow and
-  has an explicit retirement decision.
+- The legacy persistent apply route remains disabled by default for the product
+  workflow, and its explicit retirement decision is completed.
 
 ## Residual risk ownership
 
