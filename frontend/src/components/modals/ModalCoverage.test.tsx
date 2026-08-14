@@ -66,7 +66,13 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'true')
+    const unavailableSave = screen.getByRole('button', { name: '저장' })
+    expect(unavailableSave).toHaveAttribute('aria-disabled', 'true')
+    expect(unavailableSave).toHaveAttribute('aria-describedby', 'add-table-name-required-hint')
+    expect(screen.getByText('테이블 이름을 입력하세요')).toHaveAttribute(
+      'id',
+      'add-table-name-required-hint',
+    )
     fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
@@ -85,7 +91,10 @@ describe('modal behavior coverage', () => {
     )
     fireEvent.submit(screen.getByRole('dialog'))
     expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
+    const availableSave = screen.getByRole('button', { name: '저장' })
+    expect(availableSave).toHaveAttribute('aria-disabled', 'false')
+    expect(availableSave).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByText('테이블 이름을 입력하세요')).not.toBeInTheDocument()
   })
 
   it('verifies AddTableModal aria-disabled onClick prevention', async () => {
