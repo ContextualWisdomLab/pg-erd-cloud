@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
+from pydantic import field_validator
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -115,6 +116,17 @@ class Settings(BaseSettings):
     # carry the exact opaque ``org`` claim; the deployment database is the
     # tenant boundary for every project lookup.
     oidc_organization: str | None = None
+
+    @field_validator("oidc_organization")
+    @classmethod
+    def _validate_oidc_organization(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.strip() or value != value.strip():
+            raise ValueError(
+                "OIDC_ORGANIZATION must be non-empty and have no surrounding whitespace"
+            )
+        return value
 
     # Optional allowlist for reverse-engineering database targets.
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.

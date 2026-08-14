@@ -42,6 +42,7 @@
 - 🟡 Keyverse tenant profile은 `OIDC_ORGANIZATION`을 설정해야 활성화되며,
   검증된 토큰의 정확한 `org` claim이 배포 tenant와 일치하지 않으면 거부한다.
   이 모드에서는 OIDC audience도 필수이며 `pgerd_` API key 우회를 허용하지 않는다.
+  빈 값 또는 앞뒤 공백이 있는 tenant 값은 설정 로드에서 fail-fast 한다.
   - 근거: `backend/app/auth.py`, `backend/app/settings.py`
 - 🟡 토큰 TTL/Refresh 정책(권장: 짧게) — IdP 설정에 의존(운영 가이드 필요)
 

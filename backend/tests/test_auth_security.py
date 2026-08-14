@@ -5,10 +5,12 @@ import uuid
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from starlette.requests import Request
 
 from app import auth
 from app.settings import settings
+from app.settings import Settings
 
 
 @pytest.mark.parametrize(
@@ -508,6 +510,23 @@ async def test_keyverse_organization_claim_is_required_and_exact(
         claims, verify_revocation=False
     )
     assert verified.subject == "user-1"
+
+
+@pytest.mark.parametrize("organization", ["", " \t", " cwl-org", "cwl-org "])
+def test_keyverse_organization_rejects_unsafe_configuration(
+    organization: str,
+) -> None:
+    """Fail startup instead of weakening or breaking auth at request time."""
+
+    with pytest.raises(
+        ValidationError,
+        match="OIDC_ORGANIZATION must be non-empty and have no surrounding whitespace",
+    ):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@db/app",
+            app_secret="test-secret",
+            oidc_organization=organization,
+        )
 
 
 @pytest.mark.asyncio
