@@ -110,6 +110,17 @@ class ApplyPrivilegeRequirement:
 
 
 @dataclass(frozen=True)
+class ApplyPrivilegeQuery:
+    """One parameterized read-only PostgreSQL privilege probe."""
+
+    statement_index: int
+    privilege: str
+    scope: str
+    sql: str
+    parameters: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class PreApplyRevalidationManifest:
     """Immutable inputs a future executor must revalidate after locking."""
 
@@ -352,6 +363,90 @@ def compile_pre_apply_revalidation_manifest(
         lock_targets=lock_targets,
         precondition_queries=precondition_queries,
     )
+
+
+def _require_privilege_identifier(value: object) -> str:
+    """Validate one identifier passed as query data rather than SQL text."""
+
+    if (
+        not isinstance(value, str)
+        or not value
+        or "\x00" in value
+        or len(value.encode("utf-8")) > 63
+    ):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation privilege identifier is invalid"
+        )
+    return value
+
+
+def compile_apply_privilege_queries(
+    manifest: PreApplyRevalidationManifest,
+) -> tuple[ApplyPrivilegeQuery, ...]:
+    """Compile manifest requirements into bounded parameterized catalog reads.
+
+    This function does not execute the probes or establish which role,
+    connection, target, transaction, or lock context produced a result.
+    """
+
+    if not isinstance(manifest, PreApplyRevalidationManifest):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation manifest is invalid"
+        )
+    queries: list[ApplyPrivilegeQuery] = []
+    for position, requirement in enumerate(manifest.privilege_requirements):
+        if (
+            not isinstance(requirement, ApplyPrivilegeRequirement)
+            or requirement.statement_index != position
+        ):
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation privilege requirement order is invalid"
+            )
+        if (
+            requirement.privilege == "CREATE"
+            and requirement.scope == "database"
+            and requirement.schema_name is None
+            and requirement.table_name is None
+        ):
+            sql = (
+                "SELECT pg_catalog.has_database_privilege("
+                "pg_catalog.current_database(), 'CREATE')"
+            )
+            parameters: tuple[str, ...] = ()
+        elif (
+            requirement.privilege == "CREATE"
+            and requirement.scope == "schema"
+            and requirement.table_name is None
+        ):
+            schema_name = _require_privilege_identifier(requirement.schema_name)
+            sql = "SELECT pg_catalog.has_schema_privilege($1::text, 'CREATE')"
+            parameters = (schema_name,)
+        elif requirement.privilege == "OWNER" and requirement.scope == "table":
+            schema_name = _require_privilege_identifier(requirement.schema_name)
+            table_name = _require_privilege_identifier(requirement.table_name)
+            sql = (
+                "SELECT COALESCE((SELECT pg_catalog.pg_has_role("
+                "c.relowner, 'USAGE') FROM pg_catalog.pg_class AS c "
+                "JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace "
+                "WHERE n.nspname::text = $1::text "
+                "AND c.relname::text = $2::text "
+                "AND c.relkind = 'r'), FALSE)"
+            )
+            parameters = (schema_name, table_name)
+        else:
+            raise PreApplyRevalidationContractError(
+                "pre-apply revalidation privilege requirement is invalid"
+            )
+        queries.append(
+            ApplyPrivilegeQuery(
+                statement_index=requirement.statement_index,
+                privilege=requirement.privilege,
+                scope=requirement.scope,
+                sql=sql,
+                parameters=parameters,
+            )
+        )
+    return tuple(queries)
 
 
 def assess_pre_apply_revalidation_observation(

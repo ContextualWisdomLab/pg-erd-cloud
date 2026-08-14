@@ -102,6 +102,14 @@ Current code implements only the first control-plane slice:
   Planned. Test-only PostgreSQL 14–18 acceptance composes the emitted lock and
   check against an ephemeral fixture and proves a concurrent insert is blocked
   until rollback; this is database-semantics evidence, not a deployed executor.
+- **Implemented boundary:** parameterized privilege-probe compilation maps only
+  the manifest's exact database `CREATE`, schema `CREATE`, and ordinary-table
+  `OWNER` scopes to fixed PostgreSQL catalog reads. Schema and table identifiers
+  remain query parameters, and forged/reordered/oversized requirements fail
+  closed. The compiler does not connect, execute the probes, observe a role, or
+  bind results to a target/lock context. Test-only PostgreSQL 14–18 acceptance
+  proves owner success and denial for the independently constrained read-only
+  role; production capture and connection binding remain Planned.
 - **Implemented boundary:** manifest-bound observation assessment accepts only
   the exact plan digest plus a complete, ordered row for every structured
   privilege requirement and precondition. It rejects missing, extra, renamed,

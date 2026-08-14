@@ -27,6 +27,7 @@ from app.forward.isolated_dry_run import (
 )
 from app.forward.migration_plan import compile_migration_plan
 from app.forward.pre_apply_revalidation import (
+    compile_apply_privilege_queries,
     compile_pre_apply_revalidation_manifest,
 )
 from app.forward.live_preflight import (
@@ -424,9 +425,12 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
     assert [query.kind for query in manifest.precondition_queries] == [
         "table_is_empty"
     ]
+    privilege_queries = compile_apply_privilege_queries(manifest)
+    assert [query.scope for query in privilege_queries] == ["table"]
 
     lock_connection = await asyncpg.connect(_target_asyncpg_url())
     contender = await asyncpg.connect(_target_asyncpg_url())
+    denied_role = await asyncpg.connect(_preflight_asyncpg_url())
     transaction = lock_connection.transaction()
     transaction_started = False
     try:
@@ -437,6 +441,13 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
         await lock_connection.execute(
             f"INSERT INTO {qualified} ({quoted_id}) VALUES (1)"
         )
+        privilege_query = privilege_queries[0]
+        assert await lock_connection.fetchval(
+            privilege_query.sql, *privilege_query.parameters
+        ) is True
+        assert await denied_role.fetchval(
+            privilege_query.sql, *privilege_query.parameters
+        ) is False
         await transaction.start()
         transaction_started = True
         await lock_connection.execute(manifest.lock_targets[0].sql)
@@ -462,6 +473,7 @@ async def test_real_postgres_manifest_lock_covers_bound_precondition() -> None:
             await transaction.rollback()
         await contender.execute("SET statement_timeout = 0")
         await lock_connection.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await denied_role.close()
         await contender.close()
         await lock_connection.close()
 

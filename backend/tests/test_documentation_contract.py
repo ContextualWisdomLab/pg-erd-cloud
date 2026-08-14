@@ -820,6 +820,7 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "database `CREATE`/schema `CREATE`/table `OWNER`" in contract
     assert "manifest-bound observation assessment" in contract
     assert "cannot prove observation freshness or lock ownership" in contract
+    assert "parameterized privilege-probe compilation" in contract
     invariant = next(
         line for line in contract.splitlines() if "| FE-INV-007 |" in line
     )
@@ -842,6 +843,8 @@ def test_pre_apply_revalidation_manifest_has_no_target_authority() -> None:
     assert "privilege observation occurred" in strategy
     assert "complete positional observation" in strategy
     assert "ApplyPrivilegeRequirement" in implementation
+    assert "ApplyPrivilegeQuery" in implementation
+    assert "does not execute the probes" in implementation
     assert "test-only PostgreSQL 14–18 acceptance" in strategy
     assert "Production target connection/lock orchestration" in strategy
     assert (

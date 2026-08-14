@@ -200,6 +200,12 @@ segment; a no-op plan has no segment. It does not acquire a target connection,
 observe a target role's privileges, start that transaction, prove rollback, or
 make step 2 below true.
 
+The privilege-probe compiler maps only those exact structured requirements to
+fixed read queries. Schema/table names are parameters, not rendered SQL. The
+compiled probes are reviewable inputs; compiling them does not execute a query,
+identify the target role, or prove that a result came from the locked execution
+connection.
+
 The pure observation assessor may validate that caller-supplied digest,
 privilege, and precondition rows are complete and positionally identical to the
 manifest. Its base-match and aggregate booleans are untrusted input assessment,

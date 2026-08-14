@@ -135,9 +135,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   binds exact plan/base/target/version metadata to lock-covered structured
   checks, structured database `CREATE`/schema `CREATE`/table `OWNER`
   requirements, and zero/no-op or one ordered all-transactional segment. Its
-  complete positional observation assessor fails closed on evidence drift and
-  derives only non-authorizing booleans. These boundaries perform no target
-  I/O; stored-plan dispatch, executor, target lock acquisition,
+  fixed parameterized privilege probes and complete positional observation
+  assessor fail closed on scope/evidence drift and derive only non-authorizing
+  inputs or booleans. These boundaries perform no target I/O; stored-plan
+  dispatch, executor, target lock acquisition,
   target privilege observation, transaction execution/rollback proof, timeouts, apply-time approval
   revalidation, cancellation propagation, reconciliation, and post-apply
   verification remain **Planned**;

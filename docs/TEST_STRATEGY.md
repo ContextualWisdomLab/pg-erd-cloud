@@ -147,6 +147,11 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   missing, extra, renamed, differently targeted, and non-boolean privilege or
   precondition rows and prove negative results remain explicit facts rather
   than execution authority.
+- Parameterized privilege-probe tests require exact ordered database `CREATE`,
+  schema `CREATE`, and table `OWNER` scopes, keep identifiers in data parameters,
+  and reject forged requirements. The PostgreSQL 14–18 matrix executes the
+  table-owner probe as the owner and the independently constrained read-only
+  role, proving `true`/`false` semantics without a production worker.
 - Least-privilege roles demonstrate required privilege success and predictable
   denial; live preflight credentials cannot execute DDL.
 - Large tables exercise scan/rewrite warnings and timeout behavior without
