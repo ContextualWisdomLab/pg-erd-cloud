@@ -17,7 +17,6 @@ export function AddTableModal({
   onAddTableSubmit,
 }: AddTableModalProps) {
   const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
-  const isNameMissing = !newTableName.trim();
 
   if (!isOpen) return null;
 
@@ -71,11 +70,6 @@ export function AddTableModal({
             autoFocus
             required
           />
-          {isNameMissing ? (
-            <div id="add-table-name-required-hint" className="field-hint">
-              테이블 이름을 입력하세요
-            </div>
-          ) : null}
         </div>
         <div
           className="row"
@@ -84,17 +78,17 @@ export function AddTableModal({
           <button type="button" onClick={onAddTableCancel}>취소</button>
           <button
             type="submit"
-            aria-disabled={isNameMissing}
-            aria-describedby={isNameMissing ? "add-table-name-required-hint" : undefined}
+            aria-disabled={!newTableName.trim()}
             onClick={(e) => {
-              if (isNameMissing) {
+              if (!newTableName.trim()) {
                 e.preventDefault();
               }
             }}
+            title={!newTableName.trim() ? "테이블 이름을 입력하세요" : undefined}
             style={
-              isNameMissing
-                ? { opacity: 0.5, cursor: "not-allowed" }
-                : { background: "#034ea2", color: "#fff" }
+              newTableName.trim()
+                ? { background: "#034ea2", color: "#fff" }
+                : { opacity: 0.5, cursor: "not-allowed" }
             }
           >
             저장
