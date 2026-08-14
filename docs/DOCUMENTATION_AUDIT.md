@@ -174,6 +174,11 @@ The invariant IDs come from the
 means the runtime artifact does not yet exist; a design document is not counted
 as code or test evidence.
 
+The concrete live-preflight provider now has machine-tested post-connect exact
+metadata revalidation before any target read. A changed second lookup closes
+the guarded connection without capture authority; exact attempt leasing still
+bounds concurrent change after that check.
+
 | Invariant | Current code | Current tests | Authoritative documents | Status / unresolved proof |
 |---|---|---|---|---|
 | FE-INV-001: browser intent; server SQL authority | `backend/app/forward/schema_model.py`; `backend/app/forward/migration_plan.py`; schema-model/plan APIs | `test_forward_schema_model.py`; `test_forward_migration_plan.py`; forward API tests | [ADR-0001](adr/ADR-0001-server-authoritative-planning.md), [TRD](TRD.md) | **Partially implemented:** plan path is server-owned; executor/UI absent and legacy browser SQL endpoint remains transitional. |

@@ -66,7 +66,8 @@ worker/attempt binding and startup wiring, live plan execution, reconciliation,
 and post-apply convergence verification. A repository-level stored-target
 provider now loads the plan-bound succeeded snapshot and exact connection,
 decrypts only that guarded credential, opens the target through the DNS/SSRF/TLS
-guard, and scopes capture to the same acquired connection. It is not deployed
+guard, repeats the exact guarded lookup after connection acquisition and before
+any target read, and scopes capture to the same acquired connection. It is not deployed
 worker authority and has no apply path. `execute_bound_live_preflight` binds a
 caller-owned fresh-capture callback and checks to one read-only repeatable-read
 transaction; `complete_live_preflight` strictly derives its terminal durable
@@ -132,6 +133,8 @@ without wiring a worker. PostgreSQL 14–18 acceptance composes its stored
 metadata, decryption, same-connection capture, and cleanup using an explicit
 test-only loopback connector because the production guard correctly rejects the
 private CI target.
+Focused unit evidence also proves post-connect revalidation closes the acquired
+connection without capture authority when exact guarded metadata changes.
 Concrete sandbox provisioning and cleanup, unmodified guarded-route
 composition, application startup wiring, deployed least-privilege target
 identity, and deployed worker isolation remain **Planned**. A successful dry run

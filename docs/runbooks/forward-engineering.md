@@ -31,6 +31,13 @@ role but lacks plan, approval, drift, event, and convergence binding.
 | Post-apply re-introspection and convergence | Planned | No current API may claim verified convergence. |
 | Browser forward-engineering workflow | Partially implemented | Read-only plan review, bounded dry-run intent, exact passed-evidence/typed-target non-dispatched apply intent, verified run polling/audit, and exact-version cancellation are available. The apply intent control is **Partially implemented** and does not dispatch or execute. Apply execution/recovery and composed browser E2E remain Planned; do not simulate success. |
 
+The stored-PostgreSQL provider repeats its exact encrypted
+target/snapshot/attempt lookup after guarded connection acquisition and before
+any target read. A mismatch closes the connection without granting capture
+authority. This post-connect revalidation narrows but cannot eliminate a
+concurrent metadata change after the second check; the exact attempt lease and
+fresh worker-state checks remain mandatory.
+
 The PostgreSQL 14–18 CI matrix composes each metadata server with a
 digest-pinned ephemeral Valkey 8 service. It verifies that a sanitized handler
 failure abandons the exact durable attempt and releases the exact signal, then

@@ -92,7 +92,11 @@ executable SQL, safety classification, approval truth, or recovery state.
   capability cleanup, and expose fixed non-secret errors. The in-process
   boundary cannot forcibly terminate a provider that suppresses cancellation;
   process isolation and an external kill boundary remain Planned. A concrete
-  stored-PostgreSQL live-preflight provider is implemented but unwired. The
+  stored-PostgreSQL live-preflight provider is implemented but unwired. It
+  repeats the exact guarded metadata lookup after connection acquisition and
+  before any target read; concurrent change after that post-connect
+  revalidation remains bounded by the attempt lease rather than claimed
+  impossible. The
   PostgreSQL 14–18 matrix now composes its guarded metadata lookup, encrypted
   target decryption, same-connection capture, and cleanup while substituting an
   explicit test-only loopback connector for the correctly rejecting production

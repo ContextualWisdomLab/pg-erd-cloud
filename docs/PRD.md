@@ -27,7 +27,8 @@ preflight cores, durable run/event/outbox identity, and hashed lease-bound
 worker-attempt ownership. Consumer-to-attempt binding is **Implemented** as an
 execution-neutral dual-lease adapter. A concrete stored-PostgreSQL preflight
 provider is **Partially implemented** for guarded lookup, in-memory decryption,
-DNS/SSRF/TLS-pinned connection, same-connection capture, fixed failures, and
+DNS/SSRF/TLS-pinned connection, post-connect revalidation before any target
+read, same-connection capture, fixed failures, and
 cleanup. Application startup wiring, deployed credential/network isolation,
 sandbox lifecycle, worker execution, durable apply, post-apply convergence,
 and the frontend workflow are **Planned** release blockers. Typed browser
@@ -173,7 +174,7 @@ evidence exists.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Plan authority | Model revisions, canonical digest, snapshot adapter, structured plan persistence, deployer role | **Partially implemented in this branch** |
-| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, durable attempt ownership, consumer-to-attempt binding, an exact metadata/lease target lookup, and a concrete guarded stored-PostgreSQL provider exist. Provider-backed PostgreSQL-version acceptance, sandbox lifecycle, application startup wiring, deployed credential/network isolation, and worker execution remain **Planned**. |
+| 2. Validation | Plan retrieval, isolated sandbox, live read-only preflight, drift evidence | **Partial:** plan retrieval, signed-plan sandbox execution core, strict convergence, bounded live-read primitive, durable attempt ownership, consumer-to-attempt binding, an exact metadata/lease target lookup, and a concrete guarded stored-PostgreSQL provider with post-connect revalidation before any target read exist. Provider-backed PostgreSQL-version acceptance exists through a test-only loopback connector; sandbox lifecycle, application startup wiring, deployed credential/network isolation, and worker execution remain **Planned**. |
 | 3. Apply/recovery | Durable runs/events, approval, locks/timeouts, idempotency, reconciliation | **Partial foundation:** run/event/outbox identity, cancellation intent and terminal acknowledgement, exact-owner attempt leases, terminal dry-run redelivery settlement, and an exact non-dispatched apply intent exist; live dispatch/execution/recovery remain Planned |
 | 4. Convergence UI | Post-apply snapshot/diff plus accessible frontend workflow | **Partially implemented:** review, dry-run intent, non-dispatched apply intent, run status/audit, polling, and cancellation surfaces exist; apply execution/recovery/convergence and composed E2E remain Planned |
 

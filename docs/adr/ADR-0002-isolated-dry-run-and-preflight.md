@@ -141,7 +141,8 @@ locks on the execution connection.
 - The same matrix composes the durable handler with a test-owned sandbox and the
   concrete stored-PostgreSQL live-reader provider. It stores an encrypted target
   DSN, resolves the exact active attempt and succeeded snapshot scope, decrypts
-  only after that guard, captures through the same acquired connection, and
+  only after that guard, repeats the exact lookup after connection acquisition
+  and before any target read, captures through the same acquired connection, and
   proves sandbox DDL/convergence, no sandbox replay after takeover, terminal
   `passed`, and four durable events on PostgreSQL 14–18.
 - The matrix substitutes only the provider's connector with an explicit

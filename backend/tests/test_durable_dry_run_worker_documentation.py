@@ -39,6 +39,8 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "make_stored_postgres_live_preflight_factory",
         "guarded DNS/SSRF/TLS connection",
         "same acquired connection",
+        "post-connect revalidation",
+        "before any target read",
         "encrypted DSN ciphertext and nonce",
         "base_schema_snapshot_uuid",
         "schema_filter",

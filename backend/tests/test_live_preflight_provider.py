@@ -77,12 +77,65 @@ async def test_provider_binds_guarded_target_to_same_connection_capture() -> Non
             ):
                 await execution.capture_snapshot(object())
 
-    load_target.assert_awaited_once_with(metadata_session, request)
+    assert load_target.await_count == 2
+    load_target.assert_has_awaits(
+        [
+            ((metadata_session, request),),
+            ((metadata_session, request),),
+        ]
+    )
     decrypt.assert_called_once_with(b"encrypted-target", b"twelve-bytes")
     connect.assert_awaited_once_with(
         "postgresql://user:secret@db.example.test/app", timeout=10.0
     )
     capture.assert_awaited_once_with(connection, "tenant$scope")
+    connection.close.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_provider_revalidates_exact_target_after_connection_open() -> None:
+    """Close before reads when guarded metadata changes during acquisition."""
+
+    request = _request()
+    snapshot_uuid = uuid.uuid4()
+    initial = GuardedLivePreflightTarget(
+        b"encrypted-target",
+        b"twelve-bytes",
+        snapshot_uuid,
+        "tenant$scope",
+    )
+    changed = GuardedLivePreflightTarget(
+        b"changed-encrypted-target",
+        b"twelve-bytes",
+        snapshot_uuid,
+        "tenant$scope",
+    )
+    session_context = AsyncMock()
+    session_context.__aenter__.return_value = object()
+    session_factory = MagicMock(return_value=session_context)
+    connection = SimpleNamespace(close=AsyncMock())
+
+    with patch(
+        "app.jobs.live_preflight_provider.load_guarded_live_preflight_target",
+        new=AsyncMock(side_effect=(initial, changed)),
+    ) as load_target, patch(
+        "app.jobs.live_preflight_provider.decrypt_text",
+        return_value="postgresql://user:secret@db.example.test/app",
+    ), patch(
+        "app.jobs.live_preflight_provider.connect_guarded_postgres",
+        new=AsyncMock(return_value=connection),
+    ), patch(
+        "app.jobs.live_preflight_provider.capture_postgres_snapshot",
+        new=AsyncMock(),
+    ) as capture:
+        factory = make_stored_postgres_live_preflight_factory(session_factory)
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            async with factory(request):
+                raise AssertionError("changed target must not be yielded")
+
+    assert str(caught.value) == "migration live-preflight provider failed"
+    assert load_target.await_count == 2
+    capture.assert_not_awaited()
     connection.close.assert_awaited_once_with()
 
 

@@ -136,7 +136,8 @@ Current code implements only the first control-plane slice:
   credential, dispatch, or SQL authority.
 - **Planned:** deployed isolated sandbox lifecycle, unmodified guarded-route
   integration around the implemented and version-matrix-composed lookup/
-  decrypt/connect/cleanup factory, deployed credential/network constraints,
+  decrypt/connect/post-connect exact metadata revalidation/cleanup factory,
+  deployed credential/network constraints,
   application worker execution, live apply dispatch/executor, apply-time
   fingerprint revalidation, deployed in-flight cancellation, apply recovery,
   post-apply convergence, and the complete browser apply/recovery workflow.

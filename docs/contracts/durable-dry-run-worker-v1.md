@@ -80,6 +80,12 @@ target connection.
 
 `make_stored_postgres_live_preflight_factory` composes that lookup with
 in-memory AES-GCM decryption and the existing guarded DNS/SSRF/TLS connection.
+After the guarded connection opens, the provider repeats the exact encrypted
+target/snapshot lookup and requires an identical result before any target read.
+This post-connect revalidation closes an acquisition-window authorization
+change before capability release; it does not eliminate a concurrent metadata
+change after the second check, so exact attempt leasing and the worker's fresh
+state checks remain required.
 The returned capture callback rejects any connection other than the same
 acquired connection, applies the validated snapshot `schema_filter`, and the
 provider always closes the acquired connection. Acquisition, decryption,

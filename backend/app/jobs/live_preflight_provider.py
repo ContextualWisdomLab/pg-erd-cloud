@@ -44,9 +44,10 @@ def make_stored_postgres_live_preflight_factory(
 
     The returned capability decrypts only after the single-query live-attempt
     guard succeeds, pins the connection through the existing DNS/SSRF/TLS
-    boundary, scopes snapshot capture to that exact connection, and always
-    closes it. It grants no arbitrary-SQL or apply authority and is not wired
-    into application startup.
+    boundary, repeats the exact guarded-target lookup after connection open,
+    scopes snapshot capture to that exact connection, and always closes it.
+    It grants no arbitrary-SQL or apply authority and is not wired into
+    application startup.
     """
 
     if not callable(session_factory):
@@ -83,6 +84,20 @@ def make_stored_postgres_live_preflight_factory(
 
         body_failed = False
         try:
+            try:
+                async with session_factory() as session:
+                    revalidated_target = (
+                        await load_guarded_live_preflight_target(
+                            session, request
+                        )
+                    )
+                if revalidated_target != target:
+                    raise _provider_error()
+            except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:  # noqa: BLE001
+                raise _provider_error() from None
+
             yield LivePreflightExecution(
                 connection=connection,
                 capture_snapshot=capture_exact_connection,

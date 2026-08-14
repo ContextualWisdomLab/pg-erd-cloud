@@ -57,8 +57,10 @@ flowchart TB
 
 The concrete stored-PostgreSQL preflight provider has focused unit evidence for
 exact guarded lookup, in-memory decryption, guarded connector invocation,
-same-acquired-connection capture, fixed non-reflecting failures, cancellation,
-and cleanup. The PostgreSQL 14–18 matrix now composes the stored metadata,
+post-connect revalidation before any target read, same-acquired-connection
+capture, fixed non-reflecting failures, cancellation, and cleanup. A changed
+second lookup closes the acquired connection without capture authority. The
+PostgreSQL 14–18 matrix now composes the stored metadata,
 decryption, same-connection capture, and cleanup path. It substitutes an
 explicit test-only loopback connector because the production DNS/SSRF guard
 correctly rejects the private CI target. Unmodified guarded-route integration,

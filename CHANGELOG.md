@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Revalidate the exact guarded live-preflight target metadata after connection
+  acquisition and close the connection without target reads when the stored
+  target, snapshot scope, run state, cancellation, or attempt lease changed.
+
 - [FE/Worker/PostgreSQL/Security/CI/Docs] PostgreSQL 14–18 recovery acceptance now stores the restricted target as real encrypted metadata and composes the concrete stored-target provider for exact active-attempt/succeeded-snapshot lookup, in-memory decryption, same-acquired-connection capture, cleanup, and successor takeover without sandbox replay. The matrix replaces only the provider connector with an explicit test-only loopback seam because the production DNS/SSRF guard correctly rejects the private CI target; unmodified guarded-route integration, deployed credential/network isolation, startup wiring, process recovery, SQL apply, and readiness remain Planned.
 - [FE/Worker/Security/Docs] Added an unwired concrete stored-PostgreSQL live-preflight provider. It releases and decrypts target material only after the exact active-attempt/succeeded-snapshot guard, opens through the existing DNS/SSRF/TLS-pinned connector, restricts snapshot capture to that same acquired connection and validated schema scope, sanitizes acquisition failures, propagates cancellation/process control, and always closes the target. The durable handler remains its only intended consumer and executes only the structured read-only preflight core. Deployed least-privilege credentials/network isolation, unmodified guarded-route integration, startup wiring, worker operation, SQL apply, and readiness remain Planned.
 - [FE/Worker/Security/Docs] The guarded live-target lookup now binds encrypted target material to the exact succeeded, completed base snapshot from the same project and connection and returns its validated optional schema filter. Missing, cross-scope, unfinished, malformed, or non-succeeded snapshot scope fails with the same fixed non-reflecting error before decryption or target access. The representation hides credential bytes and the schema filter; this lookup itself performs no decryption or target access.
