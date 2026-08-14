@@ -3,7 +3,9 @@ from __future__ import annotations
 from app.spec.data_dictionary import col_or_q, snapshot_to_data_dictionary_md
 
 
-def test_col_or_q():
+def test_col_or_q_preserves_values_and_marks_missing() -> None:
+    """Render ordinary values while marking a missing column with a question mark."""
+
     assert col_or_q("value") == "value"
     assert col_or_q(123) == "123"
     assert col_or_q(True) == "True"
