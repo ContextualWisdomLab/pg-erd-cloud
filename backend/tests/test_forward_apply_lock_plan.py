@@ -8,6 +8,7 @@ from app.forward.apply_lock_plan import (
     ApplyLockPlanContractError,
     compile_apply_lock_targets,
 )
+from app.forward.migration_plan import COMPILER_VERSION
 
 
 def _statement(
@@ -35,6 +36,7 @@ def _plan(*statements: dict[str, object]) -> dict[str, object]:
     """Build one executable single-segment plan."""
 
     return {
+        "compiler_version": COMPILER_VERSION,
         "blockers": [],
         "can_dry_run": True,
         "statements": list(statements),
@@ -92,6 +94,24 @@ def test_preserves_mixed_case_and_unicode_identifiers() -> None:
     [
         (
             {
+                "compiler_version": "future",
+                "blockers": [],
+                "can_dry_run": True,
+                "statements": [],
+            },
+            "compiler is unsupported",
+        ),
+        (
+            {
+                "blockers": [],
+                "can_dry_run": True,
+                "statements": [],
+            },
+            "compiler is unsupported",
+        ),
+        (
+            {
+                "compiler_version": COMPILER_VERSION,
                 "blockers": [{"code": "blocked"}],
                 "can_dry_run": False,
                 "statements": [],

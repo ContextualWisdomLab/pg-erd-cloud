@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
 
+from app.forward.migration_plan import COMPILER_VERSION
+
 MAX_APPLY_LOCK_STATEMENTS = 1000
 MAX_APPLY_LOCK_TARGETS = 1000
 
@@ -88,6 +90,10 @@ def compile_apply_lock_targets(
     closed so a future compiler capability cannot silently bypass lock planning.
     """
 
+    if plan.get("compiler_version") != COMPILER_VERSION:
+        raise ApplyLockPlanContractError(
+            "apply lock plan compiler is unsupported"
+        )
     if plan.get("can_dry_run") is not True or plan.get("blockers") != []:
         raise ApplyLockPlanContractError(
             "migration plan cannot enter apply lock planning"

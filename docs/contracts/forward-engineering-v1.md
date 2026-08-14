@@ -83,7 +83,8 @@ Current code implements only the first control-plane slice:
   creating dispatch or DDL authority.
 - **Implemented boundary:** deterministic pre-apply lock-target compilation
   consumes only structured known statement kinds, object references,
-  transaction flags, and reviewed risk metadata. It sorts and deduplicates
+  transaction flags, and reviewed risk metadata. It requires the exact
+  supported compiler version, sorts and deduplicates
   existing tables, preserves PostgreSQL delimited identifiers, skips new
   objects that do not yet exist, and fails closed for blockers, unknown or
   non-transactional operations, tampered lock modes, invalid identifiers, and
