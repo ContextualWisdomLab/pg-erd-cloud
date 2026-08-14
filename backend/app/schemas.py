@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectCreateIn(BaseModel):
@@ -78,6 +78,20 @@ class ApplySqlIn(BaseModel):
             "identifiers. Arbitrary SQL is rejected."
         ),
     )
+
+    @field_validator("sql", mode="before")
+    @classmethod
+    def _reject_non_text_controls(cls, value: object) -> object:
+        if isinstance(value, str) and any(
+            (ord(char) < 0x20 and char not in "\t\n\r") or ord(char) == 0x7F
+            for char in value
+        ):
+            # Returning a fixed invalid value lets the existing length bound
+            # reject the request without placing the original SQL in Pydantic's
+            # validation error input, which FastAPI serializes in 422 responses.
+            return ""
+        return value
+
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
 

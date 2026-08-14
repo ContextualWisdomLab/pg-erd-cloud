@@ -180,3 +180,20 @@ def test_create_connection_invalid_payload() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_apply_sql_validation_response_does_not_echo_secret_sql() -> None:
+    """Return a fixed validation error without reflecting rejected SQL."""
+    secret = "never-return-this-token"
+    client = TestClient(app)
+
+    response = client.post(
+        f"/api/connections/{uuid.uuid4()}/apply-sql",
+        json={
+            "sql": f"CREATE TABLE safe_table (value text DEFAULT '{secret}\u0000');",
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert secret not in response.text
