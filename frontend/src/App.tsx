@@ -1205,7 +1205,7 @@ export default function App() {
 
         {error ? (
           <div className="error" role="alert" style={{ marginTop: 10 }}>
-            {error}
+            {String(error)}
           </div>
         ) : null}
           </>

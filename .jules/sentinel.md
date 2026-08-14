@@ -12,3 +12,8 @@
 **Vulnerability:** Even if we explicitly initialize and pass an `ssl.SSLContext` for `verify-full`, `asyncpg.connect` still parses the raw DSN string. It accepts file paths for `sslrootcert`, `sslcert`, `sslkey`, `sslcrl`, and `passfile`. By supplying these parameters alongside other `sslmode` values, an attacker could trigger arbitrary file reads or presence probes during `asyncpg`'s connection setup before our explicit checks could run, bypassing the security controls.
 **Learning:** If a third-party library parses connection strings directly, any injected parameters in that string will be processed according to the library's internal logic, regardless of higher-level wrapper settings like overriding the SSL context.
 **Prevention:** Intercept and parse the connection string (e.g. `urllib.parse`) to validate or sanitize all sensitive file-path parameters *before* passing the string down to the underlying database driver. Ensure validation fails closed with non-reflecting error messages to prevent leakage.
+
+## 2025-03-08 - React error message rendering
+**Vulnerability:** A static security scanner flagged a potential XSS vulnerability because `{error}` was being rendered directly in JSX.
+**Learning:** In React, string interpolation using `{}` is automatically escaped, preventing XSS, so this is typically a false positive. However, if the error happens to be a complex object or if it's evaluated insecurely, problems can occur. Strix is prone to false positives on standard React rendering patterns.
+**Prevention:** Wrap string states in `String(error)` or perform strict typing / logging before passing error objects to React elements to appease scanners and add robustness against accidental object injection.
