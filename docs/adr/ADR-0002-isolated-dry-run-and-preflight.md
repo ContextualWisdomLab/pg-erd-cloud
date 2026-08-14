@@ -138,24 +138,26 @@ locks on the execution connection.
   CREATE/TEMP, sets a default read-only policy, and proves both admitted reads
   and DDL denial. This is test-environment privilege evidence, not deployed
   credential, routing, audit, or worker-attempt evidence.
-- The same matrix composes the durable handler with test-owned injected
-  sandbox and live-reader capabilities. It proves sandbox DDL/convergence,
-  sandbox cleanup before live-reader entry, exact attempt binding, read-only
-  base capture, terminal `passed`, and four durable events. This is integration
-  evidence for provider-neutral orchestration only; it is not deployed
-  provisioning, credential resolution, route isolation, or worker operation.
-- The unwired stored-PostgreSQL provider has unit evidence for exact guarded
-  lookup, in-memory decryption, DNS/SSRF/TLS-pinned connection, same-connection
-  capture, fixed failure handling, cancellation, and cleanup. The version matrix
-  does not yet compose it.
+- The same matrix composes the durable handler with a test-owned sandbox and the
+  concrete stored-PostgreSQL live-reader provider. It stores an encrypted target
+  DSN, resolves the exact active attempt and succeeded snapshot scope, decrypts
+  only after that guard, captures through the same acquired connection, and
+  proves sandbox DDL/convergence, no sandbox replay after takeover, terminal
+  `passed`, and four durable events on PostgreSQL 14–18.
+- The matrix substitutes only the provider's connector with an explicit
+  test-only loopback connector because the production DNS/SSRF guard correctly
+  rejects the CI runner's private target. Production route validation retains
+  separate unit evidence. This is provider composition and version evidence,
+  not deployed provisioning, guarded-route-to-private-target evidence,
+  credential/network isolation, startup wiring, or worker operation.
 
 ### Planned before production release
 
 - isolated sandbox provisioning, complete base dependency materialization,
   cleanup, capacity controls, and egress enforcement;
-- provider-backed PostgreSQL-version acceptance plus deployed least-privilege
-  credentials, guarded network identity, and route isolation (the unwired
-  provider factory covers only repository-level lookup/decrypt/connect/cleanup);
+- deployed least-privilege credentials, guarded network identity, and route
+  isolation through the unmodified production connector (the version matrix
+  uses an explicit test-only loopback connector seam);
 - application startup and queue registration for the injected worker handler;
 - real provider-backed PostgreSQL/Valkey restart, cancellation, network-loss and
   cleanup acceptance;

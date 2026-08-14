@@ -134,9 +134,9 @@ Current code implements only the first control-plane slice:
   acknowledgement; ambiguous retry preserves the first confirmation body and
   idempotency key. These remain bounded intent/review surfaces and provide no
   credential, dispatch, or SQL authority.
-- **Planned:** deployed isolated sandbox lifecycle, provider-backed
-  supported-version acceptance around the implemented guarded lookup/decrypt/
-  connect/cleanup factory, deployed credential/network constraints,
+- **Planned:** deployed isolated sandbox lifecycle, unmodified guarded-route
+  integration around the implemented and version-matrix-composed lookup/
+  decrypt/connect/cleanup factory, deployed credential/network constraints,
   application worker execution, live apply dispatch/executor, apply-time
   fingerprint revalidation, deployed in-flight cancellation, apply recovery,
   post-apply convergence, and the complete browser apply/recovery workflow.
@@ -638,7 +638,7 @@ errors, logs, events, metrics, or queue payloads.
 |---|---|---|---|
 | FE-AC-001 | Save and reopen an edited canvas as an immutable successor revision. | API + frontend adapter/E2E tests | Partially implemented |
 | FE-AC-002 | Every supported change appears in the plan; every unsupported difference blocks without partial statements. | mutation/contract tests across every canonical field | Partially implemented |
-| FE-AC-003 | Exact stored plan executes successfully in an isolated compatible PostgreSQL sandbox and reaches `target_digest`. | dedicated ephemeral PostgreSQL 14–18 integration database, separate from metadata and target databases; `test_real_postgres_durable_worker_recovers_without_sandbox_replay` drives the durable handler through test-owned injected capabilities, interrupts the first attempt after committed sandbox convergence, expires its lease, and proves a successor resumes the separately constrained live reader without sandbox replay | Partially implemented core, test-owned worker orchestration, and pre-live-read takeover evidence; deployed provisioning, dependency materialization, isolation/egress proof, provider-backed credential acceptance, cleanup, startup, process/container restart, and worker operation remain Planned |
+| FE-AC-003 | Exact stored plan executes successfully in an isolated compatible PostgreSQL sandbox and reaches `target_digest`. | dedicated ephemeral PostgreSQL 14–18 integration database, separate from metadata and target databases; `test_real_postgres_durable_worker_recovers_without_sandbox_replay` drives the durable handler through a test-owned sandbox, interrupts the first attempt after committed convergence, expires its lease, and composes the concrete stored-target provider for successor metadata/decryption/same-connection capture without sandbox replay. Its connector is an explicit test-only loopback seam because the production guard rejects the private CI target | Partially implemented core, provider composition, and pre-live-read takeover evidence; deployed provisioning, dependency materialization, isolation/egress proof, unmodified guarded-route integration, cleanup, startup, process/container restart, and worker operation remain Planned |
 | FE-AC-004 | Dry run performs no DDL on the live target and returns bounded preflight evidence. | **Partial:** PostgreSQL 14–18 CI runs bounded preflight through a fixture-scoped USAGE/SELECT login with database CREATE/TEMP removed; proves DDL denial and SELECT denial on an ungranted table; forces a real relation-lock wait through the bounded statement timeout; terminates the restricted backend during another lock wait; requires fixed non-secret failures; and verifies reusable transaction cleanup or a closed connection as appropriate. Deployed network/credential isolation and database audit assertions remain Planned. | Partial |
 | FE-AC-005 | Live drift before dry run or apply results in no DDL. | injected-drift E2E tests | Planned |
 | FE-AC-006 | Apply cannot queue without editor-authored revision, deployer role, exact passed dry run, exact digest, typed target, and destructive acknowledgement when required. | role/tamper/race/API tests | Implemented control-plane boundary; live apply remains Planned |

@@ -49,7 +49,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "complete_live_preflight",
         "exact expected run state version",
         "one fresh database statement",
-        "PostgreSQL 14–18 matrix exercises",
+        "PostgreSQL 14–18 matrix stores",
         "does not eliminate the gap",
         "does not implement or prove",
         "Application startup wiring and deployed credential/network isolation remain Planned",
@@ -83,8 +83,21 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     assert "class LivePreflightRequest" in authority
 
 
-def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() -> None:
-    """Keep the sequence maturity aligned with orchestration and provider gaps."""
+def test_postgres_matrix_composes_the_stored_target_provider() -> None:
+    """Require version acceptance to exercise stored metadata and decryption."""
+
+    integration = _read(
+        Path("backend/tests/test_postgres_migration_run_integration.py")
+    )
+
+    assert "make_stored_postgres_live_preflight_factory" in integration
+    assert "encrypt_text(_preflight_asyncpg_url())" in integration
+    assert "provider_factory(request)" in integration
+    assert "test-only loopback connector" in integration
+
+
+def test_uml_marks_durable_dry_run_sequence_partial_without_deployment_claims() -> None:
+    """Keep the sequence maturity aligned with composition and deployment gaps."""
 
     uml = _read(Path("docs/UML.md"))
     dry_run_section = uml.split("## Target dry-run sequence", 1)[1].split(
@@ -97,7 +110,8 @@ def test_uml_marks_durable_dry_run_sequence_partial_without_provider_claims() ->
     assert "sandbox provisioning" in normalized
     assert "stored-target live-preflight provider factory" in normalized
     assert "DNS/SSRF/TLS guard" in normalized
-    assert "attempt-to-provider composition" in normalized
+    assert "test-only loopback connector" in normalized
+    assert "unmodified guarded-route composition" in normalized
     assert "application startup wiring" in normalized
     assert "**Planned**" in normalized
 

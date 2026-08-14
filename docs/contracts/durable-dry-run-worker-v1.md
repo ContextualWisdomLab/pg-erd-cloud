@@ -90,11 +90,16 @@ bounded read-only preflight core; the provider accepts no SQL and grants no
 apply authority. Application startup wiring and deployed credential/network
 isolation remain Planned.
 
-The PostgreSQL 14–18 matrix exercises this statement through the test-owned
-provider before its target connection, proves the exact lease-expiry boundary
-fails closed after an interrupted first attempt, and then accepts the exact
-successor attempt. This is ephemeral database evidence, not deployed provider
-composition.
+The PostgreSQL 14–18 matrix stores an encrypted restricted-target DSN and
+composes `make_stored_postgres_live_preflight_factory` for the successor
+attempt. It therefore exercises the exact stored metadata/snapshot guard,
+in-memory decryption, same-acquired-connection capture, cleanup, and supported
+server versions after proving that the interrupted predecessor fails closed at
+the exact lease-expiry boundary. The matrix substitutes an explicit test-only
+loopback connector because the production DNS/SSRF guard correctly rejects the
+private CI target. This is ephemeral provider-composition evidence, not
+unmodified guarded-route, deployed credential/network, startup, or worker
+evidence.
 
 ## Server-authoritative metadata checks
 

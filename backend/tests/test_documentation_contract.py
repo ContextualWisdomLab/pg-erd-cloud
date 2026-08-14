@@ -794,7 +794,9 @@ def test_forward_contract_tracks_real_durable_worker_postgres_evidence() -> None
         "test_real_postgres_durable_worker_recovers_without_sandbox_replay"
         in integration
     )
-    assert "test-owned injected capabilities" in acceptance_row
+    assert "concrete stored-target provider" in acceptance_row
+    assert "test-only loopback seam" in acceptance_row
+    assert "unmodified guarded-route integration" in acceptance_row
     assert "deployed provisioning" in acceptance_row
     assert "Planned" in acceptance_row
 

@@ -74,9 +74,10 @@ CAS classification. `complete_isolated_dry_run` similarly revalidates exact
 sandbox success against the stored plan and derives only the fixed next CAS.
 The metadata layer now provides hashed, lease-bound durable attempt ownership.
 Consumer-to-attempt binding is **Implemented** by an execution-neutral adapter,
-but application startup wiring, attempt-to-provider composition, deployed
-least-privilege credentials/network identity, and worker execution remain
-**Planned**.
+and PostgreSQL 14–18 acceptance composes the stored-target provider behind an
+explicit test-only loopback connector. Application startup wiring, unmodified
+guarded-route composition, deployed least-privilege credentials/network
+identity, and worker execution remain **Planned**.
 Durable `migration_run`/event/outbox persistence and this execution-neutral,
 bounded read-only primitive are **Partially implemented**; neither constitutes
 worker execution or dry-run success evidence.
@@ -127,10 +128,14 @@ sandbox executor and same-transaction read-only live-preflight cores are
 Partially implemented. The stored-target live-preflight provider factory is
 Implemented at the repository boundary; it binds the exact plan snapshot,
 guarded credential, connection, and schema scope through the DNS/SSRF/TLS guard
-without wiring a worker.
-Concrete sandbox provisioning and cleanup, attempt-to-provider composition,
-application startup wiring, deployed least-privilege target identity, and
-deployed worker isolation remain **Planned**. A successful dry run requires two separately identified
+without wiring a worker. PostgreSQL 14–18 acceptance composes its stored
+metadata, decryption, same-connection capture, and cleanup using an explicit
+test-only loopback connector because the production guard correctly rejects the
+private CI target.
+Concrete sandbox provisioning and cleanup, unmodified guarded-route
+composition, application startup wiring, deployed least-privilege target
+identity, and deployed worker isolation remain **Planned**. A successful dry run
+requires two separately identified
 evidence classes: the sandbox executes the exact stored plan, while the live
 target receives read-only introspection and bounded precondition queries only.
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import copy
 import datetime as dt
+import hashlib
+import hmac
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -66,6 +68,9 @@ from app.jobs.migration_dry_run_worker import (
     load_guarded_live_preflight_target,
     make_durable_dry_run_attempt_handler,
 )
+from app.jobs.live_preflight_provider import (
+    make_stored_postgres_live_preflight_factory,
+)
 from app.jobs.valkey_queue import MigrationRunSignalClaim
 from app.models import (
     DbConnection,
@@ -85,6 +90,7 @@ from app.pg_introspect.introspect import capture_postgres_snapshot
 from app.pg_introspect.snapshot_contract import (
     CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
 )
+from app.security import encrypt_text
 from app.settings import settings
 from app.spec.dbml_import import parse_dbml
 
@@ -836,7 +842,9 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() -> None:
+async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Resume a crashed durable dry run without replaying committed sandbox DDL."""
 
     assert _POSTGRES_URL is not None
@@ -898,6 +906,30 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
     capability_order: list[str] = []
     sandbox_stages: list[str] = []
     crash_before_first_live_read = True
+    encrypted_preflight_dsn = encrypt_text(_preflight_asyncpg_url())
+    expected_preflight_dsn_digest = hashlib.sha256(
+        _preflight_asyncpg_url().encode("utf-8")
+    ).digest()
+
+    async def connect_test_loopback_target(
+        dsn: str, *, timeout: float
+    ) -> asyncpg.Connection[asyncpg.Record]:
+        # This test-only loopback connector is necessary because the production
+        # DNS/SSRF guard correctly rejects the private CI target. Separate guard
+        # tests retain production route validation authority.
+        if not hmac.compare_digest(
+            hashlib.sha256(dsn.encode("utf-8")).digest(),
+            expected_preflight_dsn_digest,
+        ):
+            raise RuntimeError("integration provider target mismatch")
+        capability_order.append("live-guard")
+        return await asyncpg.connect(dsn, timeout=timeout)
+
+    monkeypatch.setattr(
+        "app.jobs.live_preflight_provider.connect_guarded_postgres",
+        connect_test_loopback_target,
+    )
+    provider_factory = make_stored_postgres_live_preflight_factory(sessions)
 
     @asynccontextmanager
     async def sandbox_factory(
@@ -939,38 +971,30 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
     ) -> AsyncIterator[LivePreflightExecution]:
         nonlocal crash_before_first_live_read
         live_requests.append(request)
-        guard_now = now + dt.timedelta(
-            seconds=1.5 if request.attempt_number == 1 else 3.5
-        )
-        async with sessions() as guard_session:
-            async with guard_session.begin():
-                guarded_target = await load_guarded_live_preflight_target(
-                    guard_session, request, now=guard_now
-                )
-        assert guarded_target.dsn_ciphertext == b"not-used"
-        assert guarded_target.dsn_nonce == b"twelve-byte!"
-        assert guarded_target.base_schema_snapshot_uuid == snapshot_uuid
-        assert guarded_target.schema_filter is None
-        capability_order.append("live-guard")
         if crash_before_first_live_read:
+            async with sessions() as guard_session:
+                async with guard_session.begin():
+                    guarded_target = await load_guarded_live_preflight_target(
+                        guard_session,
+                        request,
+                        now=now + dt.timedelta(seconds=1.5),
+                    )
+            assert guarded_target.dsn_ciphertext == (
+                encrypted_preflight_dsn.ciphertext
+            )
+            assert guarded_target.dsn_nonce == encrypted_preflight_dsn.nonce
+            assert guarded_target.base_schema_snapshot_uuid == snapshot_uuid
+            assert guarded_target.schema_filter == schema_name
+            capability_order.append("live-guard")
             crash_before_first_live_read = False
             capability_order.append("live-crash")
             raise asyncio.CancelledError
-        capability_order.append("live-enter")
-        connection = await asyncpg.connect(_preflight_asyncpg_url())
-
-        async def capture(
-            owned_connection: asyncpg.Connection[asyncpg.Record],
-        ) -> dict[str, object]:
-            return await capture_postgres_snapshot(
-                owned_connection, schema_name
-            )
-
-        try:
-            yield LivePreflightExecution(connection, capture)
-        finally:
-            await connection.close()
-            capability_order.append("live-exit")
+        async with provider_factory(request) as execution:
+            capability_order.append("live-enter")
+            try:
+                yield execution
+            finally:
+                capability_order.append("live-exit")
 
     try:
         async with sessions() as setup_session:
@@ -998,8 +1022,8 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
                         db_connection_uuid=connection_uuid,
                         project_space_uuid=project_uuid,
                         conn_name="durable worker target",
-                        dsn_ciphertext=b"not-used",
-                        dsn_nonce=b"twelve-byte!",
+                        dsn_ciphertext=encrypted_preflight_dsn.ciphertext,
+                        dsn_nonce=encrypted_preflight_dsn.nonce,
                         created_at=now,
                         updated_at=now,
                     ),
@@ -1008,7 +1032,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
                         project_space_uuid=project_uuid,
                         db_connection_uuid=connection_uuid,
                         status="succeeded",
-                        schema_filter=None,
+                        schema_filter=schema_name,
                         started_at=now,
                         finished_at=now,
                         error_message=None,
