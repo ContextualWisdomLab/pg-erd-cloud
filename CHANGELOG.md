@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE/FE] Added an execution-neutral pre-apply lock-plan compiler. It consumes only immutable structured statement kinds, object references, transaction flags, and reviewed risk metadata; deterministically sorts and deduplicates existing-table `ACCESS EXCLUSIVE` targets; preserves quoted mixed-case/Unicode identifiers; and fails closed for blockers, unknown/non-transactional operations, tampered lock modes, invalid identifiers, and oversized plans. It does not connect to a target, acquire locks, dispatch work, execute SQL/DDL, or grant apply authority; those stages remain Planned.
+
 - [CI/PostgreSQL] PostgreSQL 14–18 live-preflight lock-wait acceptance now clears the lock-holder transaction's cached statistics snapshot before each `pg_stat_activity` observation. This preserves the real lock/timeout/disconnect proof while preventing an early PostgreSQL statistics view from remaining stale for the entire polling loop.
 
 - [CI/Frontend] App orchestration coverage now waits for diagram rows and the successor project's metadata effects before driving terminal-poll and stale-request assertions, removing runner-speed races without weakening either behavior check.

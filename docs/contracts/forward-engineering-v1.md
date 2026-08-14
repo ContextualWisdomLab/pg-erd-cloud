@@ -81,6 +81,14 @@ Current code implements only the first control-plane slice:
   creation binds the current model revision, immutable plan, passed dry run,
   observed base digest, confirmation digest, actor, and idempotency key without
   creating dispatch or DDL authority.
+- **Implemented boundary:** deterministic pre-apply lock-target compilation
+  consumes only structured known statement kinds, object references,
+  transaction flags, and reviewed risk metadata. It sorts and deduplicates
+  existing tables, preserves PostgreSQL delimited identifiers, skips new
+  objects that do not yet exist, and fails closed for blockers, unknown or
+  non-transactional operations, tampered lock modes, invalid identifiers, and
+  oversized statement sets. It parses no SQL, opens no target connection, and
+  acquires no lock.
 - **Partially implemented:** browser plan review, dry-run submission, durable run
   polling/status/audit, exact-version cancellation, and a non-dispatched apply
   intent control exist. The apply control requires the exact passed dry-run,
@@ -107,7 +115,7 @@ Current code implements only the first control-plane slice:
 | FE-INV-004 | Every admitted semantic difference becomes an operation or blocker; blockers suppress executable statements while supported independent deltas remain reviewable as proposals. | Implemented for the current admitted subset |
 | FE-INV-005 | Dry run executes DDL only in an isolated sandbox; the live dry-run phase is read-only. | Partially implemented: isolated execution core plus `complete_isolated_dry_run` success-result CAS and bounded live-read primitive; deployed isolation, sandbox lifecycle, and workers Planned |
 | FE-INV-006 | Dry run and apply re-introspect the target and require the bound base fingerprint before DDL. | Partially implemented for the isolated execution core; durable worker binding and apply remain Planned |
-| FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Planned |
+| FE-INV-007 | Apply repeats data preconditions after deterministic locks are held on the execution connection. | Planned execution; deterministic structured existing-table lock-target compilation is Implemented without target access or lock acquisition |
 | FE-INV-008 | V1 applies exactly one all-transactional segment; a failure rolls it back. | Planned |
 | FE-INV-009 | A run is durable and idempotent; an apply is never automatically replayed after `applying` begins. | Partially implemented |
 | FE-INV-010 | Live apply requires `deployer`, exact-plan confirmation, a matching passed dry run, and separate destructive acknowledgement when applicable. | Partially implemented |

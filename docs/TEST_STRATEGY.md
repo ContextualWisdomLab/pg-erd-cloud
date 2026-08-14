@@ -119,6 +119,13 @@ Run the same accepted contract against ephemeral PostgreSQL majors 14, 15, 16,
   castability preconditions between the in-lock check and commit.
 - External DDL drift before dry run, before queue, before lock, and after dry
   run causes no plan DDL.
+- Pre-apply lock planning consumes structured object references rather than
+  rendered SQL, sorts and deduplicates existing tables, preserves quoted
+  mixed-case/Unicode identifiers, skips not-yet-existing schema/table targets,
+  and rejects unknown kinds, non-transactional statements, lock-mode tampering,
+  invalid identifiers, blockers, and oversized statement sets. This is compiler
+  evidence only; real target lock acquisition and in-lock revalidation remain
+  Planned acceptance families.
 - Least-privilege roles demonstrate required privilege success and predictable
   denial; live preflight credentials cannot execute DDL.
 - Large tables exercise scan/rewrite warnings and timeout behavior without

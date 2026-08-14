@@ -782,3 +782,21 @@ def test_forward_contract_tracks_real_durable_worker_postgres_evidence() -> None
     assert "test-owned injected capabilities" in acceptance_row
     assert "deployed provisioning" in acceptance_row
     assert "Planned" in acceptance_row
+
+
+def test_apply_lock_compiler_is_documented_without_apply_authority() -> None:
+    """Keep the lock-plan compiler distinct from target lock acquisition."""
+
+    contract = _read(Path("docs/contracts/forward-engineering-v1.md"))
+    architecture = _read(Path("ARCHITECTURE.md"))
+    runbook = _read(Path("docs/runbooks/forward-engineering.md"))
+    strategy = _read(Path("docs/TEST_STRATEGY.md"))
+    implementation = _read(Path("backend/app/forward/apply_lock_plan.py"))
+
+    assert "deterministic pre-apply lock-target compilation" in contract
+    assert "acquires no lock" in contract
+    assert "lock-plan compilation" in architecture
+    assert "parses no rendered SQL" in runbook
+    assert "real target lock acquisition" in strategy
+    assert "does not connect to PostgreSQL" in implementation
+    assert "acquire locks" in implementation

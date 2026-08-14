@@ -129,9 +129,10 @@ executable SQL, safety classification, approval truth, or recovery state.
   credential binding around the durable attempt and implemented caller-owned
   `execute_bound_live_preflight` same-transaction capture/check primitive, and
   apply-time drift revalidation;
-- exact deployer-confirmed apply-intent creation is **Implemented** as an
-  execution-free, non-dispatched control-plane boundary; stored-plan dispatch,
-  executor, transaction segmentation, locks, timeouts, apply-time approval
+- exact deployer-confirmed apply-intent creation and deterministic structured
+  existing-table lock-plan compilation are **Implemented** as execution-free
+  boundaries; stored-plan dispatch, executor, target lock acquisition,
+  transaction segmentation, timeouts, apply-time approval
   revalidation, cancellation propagation, reconciliation, and post-apply
   verification remain **Planned**;
 - frontend graph/model adapters and `ForwardEngineeringModal` workflow
@@ -157,7 +158,7 @@ by the graphical target architecture.
 | FE-TRD-005 | Cross-project/missing/unauthorized identities do not reveal another tenant's resource existence. | **Partially implemented; full matrix gate remains** |
 | FE-TRD-006 | Dry-run DDL executes only in a disposable isolated PostgreSQL environment; the metadata DB is never a sandbox. | **Partially implemented:** signed-plan/version/base/transaction/convergence execution core, `complete_isolated_dry_run` server-derived success CAS, PostgreSQL 14–18 round trip, and test-owned durable-handler binding over a separate sandbox connection exist; an expired successor attempt resumes live preflight without replaying committed sandbox DDL. Provisioning, materialization, deployed isolation/egress proof, cleanup, startup, process restart, and worker operation remain Planned |
 | FE-TRD-007 | Live preflight is read-only evidence; apply repeats fingerprint/data preconditions after locks on the execution connection. | **Partially implemented:** bounded structured boolean reads, strict snapshot comparison, and durable hashed attempt ownership exist; `execute_bound_live_preflight` binds capture/checks to one read-only repeatable-read transaction and completion matches every persisted precondition. PostgreSQL 14–18 acceptance composes the durable handler with a separately constrained test reader; deployed credential binding, target routing, startup/worker operation, and in-lock apply repetition remain Planned. |
-| FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Plan subset and isolated-dry-run transaction core implemented; live apply executor Planned** |
+| FE-TRD-008 | V1 apply contains one transaction-capable segment; non-transactional operations block the whole plan. | **Partially implemented:** the plan subset, isolated-dry-run transaction core, and deterministic structured lock-target compiler enforce transactional known kinds and exact risk metadata. Target lock acquisition and the live apply executor remain Planned |
 | FE-TRD-009 | Queue payload contains only `migration_run_uuid`; secrets, DSNs, SQL batches, and row values are excluded. | **Partially implemented:** identifier-only `migration_run_dispatch`, due-order `SKIP LOCKED` publication, exact lease-token claim/renew/ack/release primitives, exact signal claim, exact lease renewal, the execution-neutral consumer contract with automatic heartbeat, DB-durable hashed worker-attempt CAS, exact consumer-to-attempt binding, and metadata-only cancellation/terminal-redelivery settlement are **Implemented**. Application startup wiring, credential binding, and worker execution remain **Planned** |
 | FE-TRD-010 | Idempotency and compare-and-swap select one run; apply is never automatically replayed after an ambiguous boundary. | **Partially implemented:** dry-run and non-dispatched apply-intent creation HTTP, transition, cancellation CAS/HTTP, terminal cancellation acknowledgement, terminal redelivery without sandbox/preflight replay, and real-PostgreSQL pre-live-read attempt takeover without sandbox replay exist; deployed queue consumption, process/container recovery, commit-uncertainty reconciliation, and apply execution remain Planned |
 | FE-TRD-011 | Known commit is followed by re-introspection; only exact target digest becomes `verified`. | **Planned** |
