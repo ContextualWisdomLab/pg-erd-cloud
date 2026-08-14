@@ -83,6 +83,19 @@ def _signed_plan(*statements: dict[str, object]) -> dict[str, object]:
     return plan
 
 
+def _resign(plan: dict[str, object]) -> None:
+    """Replace the claimed digest after an intentional fixture mutation."""
+
+    plan.pop("plan_digest", None)
+    encoded = json.dumps(
+        plan,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    plan["plan_digest"] = hashlib.sha256(encoded).hexdigest()
+
+
 def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
     """Manifest preserves exact authority inputs and deterministic ordering."""
 
@@ -93,6 +106,8 @@ def test_binds_signed_plan_locks_and_checks_without_target_access() -> None:
     )
 
     assert manifest.plan_digest == plan["plan_digest"]
+    assert manifest.compiler_version == COMPILER_VERSION
+    assert manifest.snapshot_contract_version == 1
     assert manifest.postgresql_major == 18
     assert manifest.base_digest == "a" * 64
     assert manifest.target_digest == "b" * 64
@@ -153,14 +168,7 @@ def test_rejects_unknown_plan_fields_even_when_the_content_is_signed() -> None:
 
     plan = _signed_plan(_statement())
     plan["future_authority"] = True
-    plan.pop("plan_digest")
-    encoded = json.dumps(
-        plan,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    plan["plan_digest"] = hashlib.sha256(encoded).hexdigest()
+    _resign(plan)
 
     with pytest.raises(
         PreApplyRevalidationContractError, match="plan contract is invalid"
@@ -199,20 +207,40 @@ def test_rejects_preconditions_without_an_existing_table_lock() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("compiler_version", "future", "compiler is unsupported"),
+        (
+            "snapshot_contract_version",
+            2,
+            "snapshot contract is unsupported",
+        ),
+        ("proposed_statements", [{}], "proposals are not executable"),
+    ],
+)
+def test_rejects_incompatible_or_review_only_plan_contracts(
+    field: str, value: object, message: str
+) -> None:
+    """Only exact executable compiler-v1 plans can produce a manifest."""
+
+    plan = _signed_plan(_statement())
+    plan[field] = value
+    _resign(plan)
+
+    with pytest.raises(PreApplyRevalidationContractError, match=message):
+        compile_pre_apply_revalidation_manifest(
+            plan, expected_plan_digest=plan["plan_digest"]
+        )
+
+
 @pytest.mark.parametrize("postgresql_major", [True, 13, 19, "18"])
 def test_rejects_unsupported_postgresql_major(postgresql_major: object) -> None:
     """Manifest compatibility remains bounded to supported PostgreSQL majors."""
 
     plan = _signed_plan(_statement())
     plan["postgresql_major"] = postgresql_major
-    plan.pop("plan_digest")
-    encoded = json.dumps(
-        plan,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    plan["plan_digest"] = hashlib.sha256(encoded).hexdigest()
+    _resign(plan)
 
     with pytest.raises(
         PreApplyRevalidationContractError, match="PostgreSQL major is invalid"

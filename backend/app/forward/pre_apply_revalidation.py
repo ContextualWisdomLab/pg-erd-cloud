@@ -28,7 +28,10 @@ from app.forward.live_preflight import (
     LivePreflightQuery,
     compile_live_preflight_queries,
 )
-from app.forward.migration_plan import verify_migration_plan_digest
+from app.forward.migration_plan import COMPILER_VERSION, verify_migration_plan_digest
+from app.pg_introspect.snapshot_contract import (
+    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+)
 
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
 _PLAN_FIELDS = frozenset(
@@ -73,6 +76,8 @@ class PreApplyRevalidationManifest:
     """Immutable inputs a future executor must revalidate after locking."""
 
     plan_digest: str
+    compiler_version: str
+    snapshot_contract_version: int
     postgresql_major: int
     base_digest: str
     target_digest: str
@@ -105,6 +110,21 @@ def _validate_plan_shape(plan: Mapping[str, object]) -> list[object]:
             raise PreApplyRevalidationContractError(
                 "pre-apply revalidation statement contract is invalid"
             )
+    if plan.get("compiler_version") != COMPILER_VERSION:
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation compiler is unsupported"
+        )
+    if (
+        plan.get("snapshot_contract_version")
+        != CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION
+    ):
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation snapshot contract is unsupported"
+        )
+    if plan.get("proposed_statements") != []:
+        raise PreApplyRevalidationContractError(
+            "pre-apply revalidation proposals are not executable"
+        )
     return cast(list[object], statements)
 
 
@@ -170,7 +190,7 @@ def compile_pre_apply_revalidation_manifest(
         digest_is_valid = isinstance(plan, Mapping) and verify_migration_plan_digest(
             plan, expected_digest
         )
-    except (TypeError, ValueError, OverflowError):
+    except (TypeError, ValueError, OverflowError, RecursionError):
         digest_is_valid = False
     if not digest_is_valid:
         raise PreApplyRevalidationContractError(
@@ -202,6 +222,8 @@ def compile_pre_apply_revalidation_manifest(
 
     return PreApplyRevalidationManifest(
         plan_digest=expected_digest,
+        compiler_version=COMPILER_VERSION,
+        snapshot_contract_version=CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
         postgresql_major=postgresql_major,
         base_digest=base_digest,
         target_digest=target_digest,
