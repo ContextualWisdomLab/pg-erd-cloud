@@ -25,7 +25,7 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
         return context
 
     def __init__(self, server_hostname: str) -> None:
-        super().__init__()
+        return None
 
     def wrap_bio(
         self,
