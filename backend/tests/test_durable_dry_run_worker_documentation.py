@@ -37,6 +37,8 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "guard_live_preflight_handoff",
         "load_guarded_live_preflight_target",
         "make_stored_postgres_live_preflight_factory",
+        "make_stored_postgres_durable_dry_run_attempt_handler",
+        "same session factory",
         "guarded DNS/SSRF/TLS connection",
         "same acquired connection",
         "post-connect revalidation",
@@ -78,6 +80,9 @@ def test_worker_contract_names_are_present_in_production_source() -> None:
     assert "base_schema_snapshot_uuid" in implementation
     assert "schema_filter" in implementation
     assert "make_stored_postgres_live_preflight_factory" in provider
+    assert (
+        "make_stored_postgres_durable_dry_run_attempt_handler" in provider
+    )
     assert "connect_guarded_postgres" in provider
     assert "capture_postgres_snapshot" in provider
     assert "_refresh_live_stage" in implementation

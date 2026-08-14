@@ -113,6 +113,10 @@ operational artifact is attached to the release record.
   dual-lease adapter that commits acquire/renew/finish in fresh transactions
   and cancels injected work on durable ownership loss. Application startup
   wiring, credentials, and worker execution remain **Planned**.
+- [x] The stored-PostgreSQL provider/durable-handler composition requires the
+  same session factory for run metadata and credential-bearing target lookup.
+  A divergent consumer factory fails before metadata or target I/O. Sandbox
+  provisioning and application startup registration remain **Planned**.
 - [ ] Relay deployment restart/failover, application startup wiring, worker execution,
   recovery, retry exhaustion, and retention are verified in the deployment
   environment.

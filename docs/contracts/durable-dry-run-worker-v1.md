@@ -96,6 +96,14 @@ bounded read-only preflight core; the provider accepts no SQL and grants no
 apply authority. Application startup wiring and deployed credential/network
 isolation remain Planned.
 
+`make_stored_postgres_durable_dry_run_attempt_handler` is the bounded
+repository composition for that provider and the durable attempt handler. It
+binds both metadata orchestration and credential-bearing target lookup to the
+same session factory and fails closed before metadata or target I/O if a
+consumer supplies a different factory. The isolated sandbox factory remains
+injected, and the returned handler is not registered with application startup
+or granted apply authority.
+
 The PostgreSQL 14–18 matrix stores an encrypted restricted-target DSN and
 composes `make_stored_postgres_live_preflight_factory` for the successor
 attempt. It therefore exercises the exact stored metadata/snapshot guard,
@@ -224,6 +232,8 @@ Repository tests must cover:
 - cancellation/state-version recheck before target access;
 - guarded stored-target decryption, connection/capture identity, fixed failures,
   cancellation and cleanup;
+- same-session-factory durable/provider composition and divergent-factory
+  rejection before metadata or target access;
 - bounded configuration rejection;
 - rejection of non-contract terminal states.
 

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.jobs.live_preflight_provider import (
+    make_stored_postgres_durable_dry_run_attempt_handler,
     make_stored_postgres_live_preflight_factory,
 )
 from app.jobs.migration_dry_run_worker import (
@@ -31,6 +32,54 @@ def _request() -> LivePreflightRequest:
         migration_run_attempt_uuid=uuid.uuid4(),
         attempt_number=2,
         expected_state_version=7,
+    )
+
+
+@pytest.mark.asyncio
+async def test_composition_binds_one_metadata_factory_to_provider_and_attempt() -> None:
+    """Prevent durable metadata and live-target authority from diverging."""
+
+    session_factory = MagicMock()
+    sandbox_factory = MagicMock()
+    live_factory = MagicMock()
+    delegate = AsyncMock()
+    signal_claim = MagicMock()
+    attempt_claim = MagicMock()
+
+    with patch(
+        "app.jobs.live_preflight_provider."
+        "make_stored_postgres_live_preflight_factory",
+        return_value=live_factory,
+    ) as make_provider, patch(
+        "app.jobs.live_preflight_provider."
+        "make_durable_dry_run_attempt_handler",
+        return_value=delegate,
+    ) as make_delegate:
+        handler = make_stored_postgres_durable_dry_run_attempt_handler(
+            session_factory,
+            sandbox_factory,
+            preflight_stage_timeout_seconds=12.0,
+        )
+        await handler(session_factory, signal_claim, attempt_claim)
+
+        with pytest.raises(
+            MigrationDryRunWorkerError,
+            match="migration dry-run composition is invalid",
+        ):
+            await handler(MagicMock(), signal_claim, attempt_claim)
+
+    make_provider.assert_called_once_with(session_factory)
+    make_delegate.assert_called_once_with(
+        sandbox_factory,
+        live_factory,
+        lock_timeout_ms=1_000,
+        sandbox_statement_timeout_ms=30_000,
+        preflight_statement_timeout_ms=5_000,
+        sandbox_stage_timeout_seconds=300.0,
+        preflight_stage_timeout_seconds=12.0,
+    )
+    delegate.assert_awaited_once_with(
+        session_factory, signal_claim, attempt_claim
     )
 
 

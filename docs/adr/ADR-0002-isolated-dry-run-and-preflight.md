@@ -145,6 +145,10 @@ locks on the execution connection.
   and before any target read, captures through the same acquired connection, and
   proves sandbox DDL/convergence, no sandbox replay after takeover, terminal
   `passed`, and four durable events on PostgreSQL 14–18.
+- Repository composition now requires the durable handler and concrete
+  stored-target provider to use the same metadata session factory. A divergent
+  consumer factory fails before metadata or target I/O; sandbox lifecycle and
+  startup registration remain injected deployment responsibilities.
 - The matrix substitutes only the provider's connector with an explicit
   test-only loopback connector because the production DNS/SSRF guard correctly
   rejects the CI runner's private target. Production route validation retains

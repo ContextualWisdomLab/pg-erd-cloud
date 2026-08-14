@@ -135,6 +135,9 @@ test-only loopback connector because the production guard correctly rejects the
 private CI target.
 Focused unit evidence also proves post-connect revalidation closes the acquired
 connection without capture authority when exact guarded metadata changes.
+The repository composition binds the durable handler and stored-target
+provider to the same metadata session factory and rejects a divergent consumer
+factory before metadata or target I/O; sandbox lifecycle remains injected.
 Concrete sandbox provisioning and cleanup, unmodified guarded-route
 composition, application startup wiring, deployed least-privilege target
 identity, and deployed worker isolation remain **Planned**. A successful dry run

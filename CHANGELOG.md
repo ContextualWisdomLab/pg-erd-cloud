@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Bind the concrete stored-PostgreSQL live-preflight provider to the durable
+  dry-run attempt handler through one explicit repository composition. Durable
+  run metadata and credential-bearing target lookup must use the same session
+  factory; a divergent consumer factory fails before metadata or target I/O.
+  Sandbox lifecycle and application startup remain injected and Planned, and
+  this adds no SQL or apply authority.
+
 - Revalidate the exact guarded live-preflight target metadata after connection
   acquisition and close the connection without target reads when the stored
   target, snapshot scope, run state, cancellation, or attempt lease changed.

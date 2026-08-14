@@ -58,6 +58,10 @@ Current code implements only the first control-plane slice:
   locks the run and records the terminal `cancelled` acknowledgement before the
   exact signal is acknowledged. A redelivered already-terminal run is settled
   without replaying sandbox or live-preflight work.
+  The repository composition binds the durable handler and concrete
+  stored-target provider to the same session factory and rejects a divergent
+  consumer factory before metadata or target I/O. Sandbox lifecycle remains
+  injected.
   Application startup wiring and deployed worker execution remain **Planned**.
 - **Partially implemented:** the live-preflight primitive compiles the current
   structured data preconditions into bounded boolean-only reads and executes

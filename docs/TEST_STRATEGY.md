@@ -318,7 +318,10 @@ the caller-owned same-transaction primitive remain release blockers. The
 execution-neutral consumer contract is **Implemented** and consumer-to-attempt
 binding is **Implemented** with success, sanitized failure, heartbeat-loss
 cancellation, and unsafe-timing tests. Application startup wiring and worker
-execution remain **Planned**. Deployment consumer lifecycle,
+execution remain **Planned**. A focused composition contract requires the
+durable handler and credential-bearing stored-target provider to share the
+same session factory, rejects a divergent consumer factory before I/O, and
+keeps sandbox provisioning injected. Deployment consumer lifecycle,
 crash/restart orchestration, and worker execution remain release blockers.
 
 ## Fault-injection and recovery matrix

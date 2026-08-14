@@ -47,6 +47,12 @@ capture authority. A concurrent change after that second check remains
 possible and is bounded by the exact attempt lease; this is not a live-apply
 or production-readiness claim.
 
+`make_stored_postgres_durable_dry_run_attempt_handler` now binds this provider
+to the durable attempt handler with one session-factory identity for both run
+metadata and credential-bearing target lookup. A divergent consumer factory
+fails before either authority is used. Sandbox lifecycle remains injected;
+application startup/consumer registration and apply remain Planned.
+
 The pre-apply observation capture owns no target credential or durable attempt
 binding and acquires no advisory/object lock. The separately scoped live-
 preflight provider does not change that apply-time authority boundary.

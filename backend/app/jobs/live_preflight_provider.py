@@ -8,23 +8,31 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 
+from app.forward.migration_run import MigrationRunAttemptClaim
 from app.jobs.migration_dry_run_worker import (
     LivePreflightExecution,
     LivePreflightRequest,
     MigrationDryRunWorkerError,
     load_guarded_live_preflight_target,
+    make_durable_dry_run_attempt_handler,
 )
 from app.jobs.migration_dry_run_worker_contract import (
+    IsolatedSandboxFactory,
     LivePreflightFactory,
     SessionFactory,
 )
+from app.jobs.migration_run_consumer import MigrationRunAttemptHandler
+from app.jobs.valkey_queue import MigrationRunSignalClaim
 from app.pg_introspect.introspect import (
     capture_postgres_snapshot,
     connect_guarded_postgres,
 )
 from app.security import decrypt_text
 
-__all__ = ["make_stored_postgres_live_preflight_factory"]
+__all__ = [
+    "make_stored_postgres_durable_dry_run_attempt_handler",
+    "make_stored_postgres_live_preflight_factory",
+]
 
 _CONNECT_TIMEOUT_SECONDS = 10.0
 
@@ -115,3 +123,51 @@ def make_stored_postgres_live_preflight_factory(
                     raise _provider_error() from None
 
     return stored_postgres_live_preflight
+
+
+def make_stored_postgres_durable_dry_run_attempt_handler(
+    session_factory: SessionFactory,
+    sandbox_factory: IsolatedSandboxFactory,
+    *,
+    lock_timeout_ms: int = 1_000,
+    sandbox_statement_timeout_ms: int = 30_000,
+    preflight_statement_timeout_ms: int = 5_000,
+    sandbox_stage_timeout_seconds: float = 300.0,
+    preflight_stage_timeout_seconds: float = 30.0,
+) -> MigrationRunAttemptHandler:
+    """Bind the stored-target provider to one durable metadata authority.
+
+    The caller still injects isolated sandbox lifecycle and must explicitly
+    wire the returned attempt handler into a consumer.  The identity check
+    prevents that consumer from supplying a different session factory for run
+    state while the live provider resolves credential-bearing target metadata.
+    This composition grants no startup, arbitrary-SQL, or apply authority.
+    """
+
+    live_preflight_factory = make_stored_postgres_live_preflight_factory(
+        session_factory
+    )
+    durable_handler = make_durable_dry_run_attempt_handler(
+        sandbox_factory,
+        live_preflight_factory,
+        lock_timeout_ms=lock_timeout_ms,
+        sandbox_statement_timeout_ms=sandbox_statement_timeout_ms,
+        preflight_statement_timeout_ms=preflight_statement_timeout_ms,
+        sandbox_stage_timeout_seconds=sandbox_stage_timeout_seconds,
+        preflight_stage_timeout_seconds=preflight_stage_timeout_seconds,
+    )
+
+    async def handle_stored_postgres_attempt(
+        attempt_session_factory: SessionFactory,
+        signal_claim: MigrationRunSignalClaim,
+        attempt_claim: MigrationRunAttemptClaim,
+    ) -> None:
+        if attempt_session_factory is not session_factory:
+            raise MigrationDryRunWorkerError(
+                "migration dry-run composition is invalid"
+            )
+        await durable_handler(
+            attempt_session_factory, signal_claim, attempt_claim
+        )
+
+    return handle_stored_postgres_attempt
