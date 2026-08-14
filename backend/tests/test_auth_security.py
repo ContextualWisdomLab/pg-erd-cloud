@@ -303,6 +303,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
             "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
     }
+    assert auth.OIDC_JWT_LEEWAY_SECONDS == 30
 
 
 @pytest.mark.parametrize(

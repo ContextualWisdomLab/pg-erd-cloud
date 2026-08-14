@@ -77,7 +77,7 @@ OIDC_JWKS_CACHE_TTL = dt.timedelta(minutes=5)
 OIDC_JWKS_MIN_REFRESH_INTERVAL = dt.timedelta(seconds=60)
 _last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
 _jwks_lock = asyncio.Lock()
-OIDC_JWT_LEEWAY_SECONDS = 60
+OIDC_JWT_LEEWAY_SECONDS = 30
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 
 
