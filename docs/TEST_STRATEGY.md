@@ -192,7 +192,11 @@ reclaims with a new token, and acknowledges cleanly. Focused consumer tests
 prove handler-before-ack ordering, exact-lease retry release, heartbeat
 renewal, terminal cancellation acknowledgement, terminal redelivery without
 sandbox/preflight replay, active-attempt abandonment, handler cancellation and task retrieval on lease
-loss, bounded timing, and fixed non-secret lifecycle logs. The
+loss, bounded timing, and fixed non-secret lifecycle logs. A deterministic
+non-cooperative-provider test proves that the in-process stage deadline requests
+cancellation but leaves the handler and capability open until a provider that
+suppresses cancellation returns; deployed process isolation or an external kill
+boundary remains required evidence. The
 durable-attempt unit contract proves run-row serialization, one-active-owner
 uniqueness, monotonic numbering, expired-owner abandonment, hashed identity
 storage, executable/cancellation checks, monotonic exact-owner renewal, and

@@ -119,6 +119,66 @@ async def test_sandbox_stage_timeout_is_sanitized_and_closes_capability() -> Non
 
 
 @pytest.mark.asyncio
+async def test_non_cooperative_sandbox_outlives_cancellation_deadline() -> None:
+    """Prove an in-process deadline cannot forcibly stop a provider task."""
+
+    work = _work()
+    cancellation_requested = asyncio.Event()
+    release_provider = asyncio.Event()
+    cleaned = False
+
+    @asynccontextmanager
+    async def sandbox_factory(_request):
+        nonlocal cleaned
+        try:
+            yield IsolatedSandboxExecution(object(), AsyncMock())
+        finally:
+            cleaned = True
+
+    async def suppress_cancellation(*_args, **_kwargs):
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancellation_requested.set()
+            await release_provider.wait()
+            raise RuntimeError("non-cooperative provider released") from None
+
+    handler = make_durable_dry_run_attempt_handler(
+        sandbox_factory,
+        MagicMock(),
+        sandbox_stage_timeout_seconds=0.01,
+    )
+    signal_claim = SimpleNamespace(migration_run_uuid=work.migration_run_uuid)
+    attempt_claim = SimpleNamespace(
+        migration_run_attempt_uuid=work.migration_run_attempt_uuid,
+        migration_run_uuid=work.migration_run_uuid,
+        attempt_number=work.attempt_number,
+        acquired_state_version=work.state_version,
+    )
+    with patch(
+        "app.jobs.migration_dry_run_worker._load_and_begin",
+        new=AsyncMock(return_value=work),
+    ), patch(
+        "app.jobs.migration_dry_run_worker.execute_isolated_dry_run",
+        new=AsyncMock(side_effect=suppress_cancellation),
+    ):
+        handler_task = asyncio.create_task(
+            handler(MagicMock(), signal_claim, attempt_claim)
+        )
+        await asyncio.wait_for(cancellation_requested.wait(), timeout=1)
+        assert not handler_task.done()
+        assert not cleaned
+
+        release_provider.set()
+        with pytest.raises(MigrationDryRunWorkerError) as caught:
+            await handler_task
+
+    assert str(caught.value) == "isolated dry-run stage failed"
+    assert caught.value.__cause__ is None
+    assert cleaned
+
+
+@pytest.mark.asyncio
 async def test_live_preflight_failure_is_sanitized_and_closes_reader() -> None:
     """Close the target reader and discard read-only provider details."""
 
