@@ -796,6 +796,7 @@ def test_apply_lock_compiler_is_documented_without_apply_authority() -> None:
     assert "deterministic pre-apply lock-target compilation" in contract
     assert "acquires no lock" in contract
     assert "lock-plan compilation" in architecture
+    assert "missing/unknown compiler versions" in runbook
     assert "parses no rendered SQL" in runbook
     assert "real target lock acquisition" in strategy
     assert "does not connect to PostgreSQL" in implementation
