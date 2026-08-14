@@ -475,6 +475,16 @@ def test_ci_runs_real_supported_postgresql_migration_acceptance() -> None:
     assert "migration-run/outbox" in strategy
 
 
+def test_ci_waits_for_final_postgresql_server_after_image_initialization() -> None:
+    """Do not accept the temporary init server as integration readiness."""
+
+    workflow = _read(Path(".github/workflows/ci.yml"))
+    init_complete = "PostgreSQL init process complete; ready for start up."
+
+    assert init_complete in workflow
+    assert workflow.index(init_complete) < workflow.index("pg_isready")
+
+
 def test_bound_live_preflight_maturity_is_canonical() -> None:
     """Keep same-snapshot capture binding distinct from worker authority."""
 

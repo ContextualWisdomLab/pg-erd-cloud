@@ -122,6 +122,23 @@ jobs:
             echo "POSTGRES_INTEGRATION_URL=$database_url"
           } >> "$GITHUB_ENV"
 
+          # The official image briefly starts a temporary server while it
+          # initializes a new PGDATA directory. A readiness probe can succeed
+          # against that server immediately before the entrypoint restarts it.
+          # Wait for the stable image marker before probing the final server.
+          init_complete="PostgreSQL init process complete; ready for start up."
+          for attempt in {1..20}; do
+            postgres_logs="$(docker logs pg-erd-cloud-postgres 2>&1 || true)"
+            if [[ "$postgres_logs" == *"$init_complete"* ]]; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              printf '%s\n' "$postgres_logs"
+              exit 1
+            fi
+            sleep 2
+          done
+
           for attempt in {1..20}; do
             if docker exec pg-erd-cloud-postgres \
               pg_isready -U postgres -d pg_erd_cloud_test; then
