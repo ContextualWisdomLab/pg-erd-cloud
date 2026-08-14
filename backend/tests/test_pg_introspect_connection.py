@@ -159,6 +159,23 @@ async def test_introspection_uses_one_read_only_repeatable_read_snapshot(
     assert snapshot["snapshot_contract_version"] == 1
 
 
+@pytest.mark.asyncio
+async def test_snapshot_capture_reuses_caller_owned_connection() -> None:
+    """Capture live-preflight evidence without opening or closing a connection."""
+
+    connection = FakeConnection()
+
+    snapshot = await introspect.capture_postgres_snapshot(
+        connection, schema_filter=None
+    )
+
+    assert connection.transaction_options is None
+    assert connection.transaction_started is False
+    assert connection.transaction_committed is False
+    assert connection.transaction_rolled_back is False
+    assert snapshot["snapshot_contract_version"] == 1
+
+
 @pytest.mark.parametrize(
     "failure",
     [

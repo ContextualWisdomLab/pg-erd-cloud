@@ -125,6 +125,9 @@ Implemented in the initial safe vertical slice:
   `execute_bound_live_preflight` additionally runs a caller-owned fresh
   snapshot callback and those checks in the same read-only repeatable-read
   transaction, returning the canonical observed digest and plan-base match;
+  `capture_postgres_snapshot` is the reusable query-only callback for an
+  already-authorized PostgreSQL connection and deliberately owns no
+  transaction, commit, rollback, connection open, or connection close;
   `complete_live_preflight` accepts only that exact bounded result shape and
   derives `drifted`, `failed`, or `passed` plus bounded aggregate evidence for
   the existing durable CAS; neither function owns credentials, application

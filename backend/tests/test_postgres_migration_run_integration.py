@@ -81,6 +81,7 @@ from app.models import (
     UserAccount,
 )
 from app.pg_introspect import queries
+from app.pg_introspect.introspect import capture_postgres_snapshot
 from app.pg_introspect.snapshot_contract import (
     CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
 )
@@ -659,7 +660,7 @@ async def test_real_postgres_executes_only_bounded_preflight_reads() -> None:
             async def capture(
                 owned_connection: asyncpg.Connection[asyncpg.Record],
             ) -> dict[str, object]:
-                return await _capture_filtered_snapshot(
+                return await capture_postgres_snapshot(
                     owned_connection, schema_name
                 )
 
@@ -957,7 +958,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay() ->
         async def capture(
             owned_connection: asyncpg.Connection[asyncpg.Record],
         ) -> dict[str, object]:
-            return await _capture_filtered_snapshot(
+            return await capture_postgres_snapshot(
                 owned_connection, schema_name
             )
 
