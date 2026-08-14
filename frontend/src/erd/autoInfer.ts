@@ -1,7 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
-import { sanitizeTableName } from "./securityUtils";
 
 /**
  * 인자로 받은 노드 목록을 바탕으로 관계(Edge)를 추론하여 반환합니다.
@@ -48,9 +47,10 @@ export function inferRelationships(
 
         // 자기 참조는 일단 제외
         if (targetTableName && targetTableName !== srcTableName) {
-          // ⚡ Bolt: O(1) lookup instead of O(N) string splitting array scan
-          const safeTargetTableName = sanitizeTableName(targetTableName);
-          const targetNode = nodesByTableName.get(safeTargetTableName);
+          // The value is an exact key already discovered in nodesByTableName.
+          // Rewriting it would break valid quoted, mixed-case, or Unicode
+          // PostgreSQL identifiers without adding a security boundary.
+          const targetNode = nodesByTableName.get(targetTableName);
 
           if (targetNode) {
             // 대상 테이블에 'id' 필드가 있는지, 혹은 PK 컬럼이 하나인지 확인
