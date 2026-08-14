@@ -650,6 +650,7 @@ async def capture_pre_apply_revalidation_observation(
                     timeout=client_timeout,
                 )
             except Exception:
+                # Best-effort cleanup must not mask cancellation or shutdown.
                 pass
         raise
     except Exception as err:
@@ -660,6 +661,7 @@ async def capture_pre_apply_revalidation_observation(
                     timeout=client_timeout,
                 )
             except Exception:
+                # Best-effort cleanup must not mask the original target failure.
                 pass
         if isinstance(err, PreApplyRevalidationContractError):
             raise
