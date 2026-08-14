@@ -860,6 +860,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
     assert len(database_paths) == 3
     major = int(_EXPECTED_MAJOR)
     schema_name = f"Worker Dry Run {uuid.uuid4().hex}"
+    preflight_schema_filter = f"worker_preflight_{uuid.uuid4().hex}"
     table_name = '검증 "테이블"'
     quoted_schema = '"' + schema_name.replace('"', '""') + '"'
     base_model: dict[str, object] = {
@@ -984,7 +985,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
             )
             assert guarded_target.dsn_nonce == encrypted_preflight_dsn.nonce
             assert guarded_target.base_schema_snapshot_uuid == snapshot_uuid
-            assert guarded_target.schema_filter == schema_name
+            assert guarded_target.schema_filter == preflight_schema_filter
             capability_order.append("live-guard")
             crash_before_first_live_read = False
             capability_order.append("live-crash")
@@ -1032,7 +1033,7 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
                         project_space_uuid=project_uuid,
                         db_connection_uuid=connection_uuid,
                         status="succeeded",
-                        schema_filter=schema_name,
+                        schema_filter=preflight_schema_filter,
                         started_at=now,
                         finished_at=now,
                         error_message=None,
