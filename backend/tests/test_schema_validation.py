@@ -58,7 +58,11 @@ def test_conn_name_rejects_control_characters() -> None:
     ],
 )
 def test_hardened_pydantic_strings_accept_valid_input(valid_input: str) -> None:
+    """Accept realistic printable names in every hardened request schema."""
     DiagramViewCreateIn(name=valid_input, layout_json={})
+    TableAnnotationUpsertIn(
+        schema_name=valid_input, relation_name=valid_input, body="body"
+    )
     ApiKeyCreateIn(key_name=valid_input)
 
 
@@ -70,42 +74,24 @@ def test_hardened_pydantic_strings_accept_valid_input(valid_input: str) -> None:
 def test_hardened_pydantic_strings_reject_control_characters(
     control_char: str, position_fmt: str
 ) -> None:
+    """Reject ASCII controls and DEL at every position in hardened names."""
     test_str = position_fmt.format(control_char)
 
     with pytest.raises(ValidationError):
         DiagramViewCreateIn(name=test_str, layout_json={})
 
     with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name=test_str, relation_name="valid", body="body"
+        )
+
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name="valid", relation_name=test_str, body="body"
+        )
+
+    with pytest.raises(ValidationError):
         ApiKeyCreateIn(key_name=test_str)
-
-
-def test_table_annotation_identifiers_allow_complex_names() -> None:
-    """PostgreSQL quoted identifiers can contain spaces, newlines, tabs, emojis, and quotes."""
-    valid_pg_names = [
-        "MixedCase",
-        "name with space",
-        "name\nwith\nnewline",
-        "name\twith\ttab",
-        'name"with"quote',
-        "🚀 Emoji",
-        "A" * 63,  # 63 UTF-8 bytes max (63 ASCII characters)
-    ]
-    for valid_name in valid_pg_names:
-        TableAnnotationUpsertIn(
-            schema_name=valid_name, relation_name=valid_name, body="body"
-        )
-
-
-def test_table_annotation_identifiers_reject_null_byte() -> None:
-    """PostgreSQL identifiers cannot contain the NUL byte."""
-    with pytest.raises(ValidationError):
-        TableAnnotationUpsertIn(
-            schema_name="name\x00withnull", relation_name="valid", body="body"
-        )
-    with pytest.raises(ValidationError):
-        TableAnnotationUpsertIn(
-            schema_name="valid", relation_name="name\x00withnull", body="body"
-        )
 
 
 def test_table_annotation_body_allows_multiline() -> None:
