@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -33,6 +33,30 @@ describe('handleUtils', () => {
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('parseColumnNameFromHandle', () => {
+    it('should parse src handle correctly', () => {
+      expect(parseColumnNameFromHandle('src-c-0069-0064')).toBe('id');
+    });
+
+    it('should parse tgt handle correctly', () => {
+      expect(parseColumnNameFromHandle('tgt-c-0069-0064')).toBe('id');
+    });
+
+    it('should parse raw handle correctly', () => {
+      expect(parseColumnNameFromHandle('c-0075-0073-0065-0072-005f-0069-0064')).toBe('user_id');
+    });
+
+    it('should handle empty string correctly', () => {
+      expect(parseColumnNameFromHandle('src-c-empty')).toBe('');
+    });
+
+    it('should return null for invalid handles', () => {
+      expect(parseColumnNameFromHandle(null)).toBe(null);
+      expect(parseColumnNameFromHandle(undefined)).toBe(null);
+      expect(parseColumnNameFromHandle('invalid-handle')).toBe(null);
     });
   });
 });

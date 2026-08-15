@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { parseColumnNameFromHandle, sanitizeHandleId } from "./handleUtils";
 
 function sanitizeString(str: string): string {
   if (!str) return "";
@@ -30,13 +30,30 @@ export function exportMermaid(
 
   for (const edge of edges) {
     if (edge.sourceHandle?.startsWith("src-")) {
-      fkNodeColumnPairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
+      const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+      if (parsedSource) {
+        // Sanitize the parsed name exactly as the table column loop will do
+        const sourceNode = nodesById.get(edge.source);
+        if (sourceNode && (sourceNode.data.columns || []).some(c => c.column_name === parsedSource)) {
+          fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(parsedSource)}`);
+        }
+      } else {
+        fkNodeColumnPairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
+      }
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     if (edge.targetHandle?.startsWith("tgt-")) {
-      fkNodeColumnPairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
+      const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+      if (parsedTarget) {
+        const targetNode = nodesById.get(edge.target);
+        if (targetNode && (targetNode.data.columns || []).some(c => c.column_name === parsedTarget)) {
+          fkNodeColumnPairs.add(`${edge.target}:${sanitizeHandleId(parsedTarget)}`);
+        }
+      } else {
+        fkNodeColumnPairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
+      }
     }
   }
 
