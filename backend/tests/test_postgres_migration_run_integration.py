@@ -71,6 +71,10 @@ from app.jobs.live_preflight_provider import (
     make_stored_postgres_durable_dry_run_attempt_handler,
     make_stored_postgres_live_preflight_factory,
 )
+from app.jobs.migration_dry_run_worker_contract import (
+    LivePreflightFactory,
+    SessionFactory,
+)
 from app.jobs.valkey_queue import MigrationRunSignalClaim
 from app.models import (
     DbConnection,
@@ -997,8 +1001,13 @@ async def test_real_postgres_durable_worker_recovers_without_sandbox_replay(
             finally:
                 capability_order.append("live-exit")
 
-    def make_crash_injected_provider(actual_sessions):
+    def make_crash_injected_provider(
+        actual_sessions: SessionFactory,
+        *,
+        connect_timeout_seconds: float = 10.0,
+    ) -> LivePreflightFactory:
         assert actual_sessions is sessions
+        assert connect_timeout_seconds == 10.0
         return live_factory
 
     monkeypatch.setattr(
