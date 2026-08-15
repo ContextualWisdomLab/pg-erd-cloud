@@ -21,7 +21,11 @@ from app.jobs.migration_dry_run_worker_contract import (
     LivePreflightFactory,
     SessionFactory,
 )
-from app.jobs.migration_run_consumer import MigrationRunAttemptHandler
+from app.jobs.migration_run_consumer import (
+    MigrationRunAttemptHandler,
+    MigrationRunHandler,
+    make_attempt_bound_migration_run_handler,
+)
 from app.jobs.valkey_queue import MigrationRunSignalClaim
 from app.pg_introspect.introspect import (
     capture_postgres_snapshot,
@@ -32,6 +36,7 @@ from app.security import decrypt_text
 __all__ = [
     "make_stored_postgres_durable_dry_run_attempt_handler",
     "make_stored_postgres_live_preflight_factory",
+    "make_stored_postgres_migration_run_handler",
 ]
 
 _CONNECT_TIMEOUT_SECONDS = 10.0
@@ -171,3 +176,40 @@ def make_stored_postgres_durable_dry_run_attempt_handler(
         )
 
     return handle_stored_postgres_attempt
+
+
+def make_stored_postgres_migration_run_handler(
+    session_factory: SessionFactory,
+    sandbox_factory: IsolatedSandboxFactory,
+    *,
+    worker_identity: str,
+    attempt_lease_seconds: int = 60,
+    heartbeat_interval_s: float | None = None,
+    lock_timeout_ms: int = 1_000,
+    sandbox_statement_timeout_ms: int = 30_000,
+    preflight_statement_timeout_ms: int = 5_000,
+    sandbox_stage_timeout_seconds: float = 300.0,
+    preflight_stage_timeout_seconds: float = 30.0,
+) -> MigrationRunHandler:
+    """Bind the stored dry-run capability to durable attempt leasing.
+
+    The returned execution-neutral handler can be injected into the existing
+    UUID-only signal consumer.  This composition does not start that consumer,
+    provision a sandbox, accept SQL, or grant apply authority.
+    """
+
+    attempt_handler = make_stored_postgres_durable_dry_run_attempt_handler(
+        session_factory,
+        sandbox_factory,
+        lock_timeout_ms=lock_timeout_ms,
+        sandbox_statement_timeout_ms=sandbox_statement_timeout_ms,
+        preflight_statement_timeout_ms=preflight_statement_timeout_ms,
+        sandbox_stage_timeout_seconds=sandbox_stage_timeout_seconds,
+        preflight_stage_timeout_seconds=preflight_stage_timeout_seconds,
+    )
+    return make_attempt_bound_migration_run_handler(
+        attempt_handler,
+        worker_identity=worker_identity,
+        attempt_lease_seconds=attempt_lease_seconds,
+        heartbeat_interval_s=heartbeat_interval_s,
+    )

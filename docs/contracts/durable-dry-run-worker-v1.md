@@ -4,7 +4,8 @@
 - **Capability status:** Partial
 - **Implemented boundary:** deterministic attempt orchestration, a
   provider-callable metadata handoff guard, and an exact encrypted stored-target
-  lookup plus a concrete guarded PostgreSQL live-preflight factory
+  lookup plus concrete guarded PostgreSQL live-preflight and lease-bound
+  migration-run handler factories
 - **Not implemented:** concrete sandbox provider, deployed credential/network
   isolation, application wiring, live apply or production readiness
 
@@ -103,6 +104,13 @@ same session factory and fails closed before metadata or target I/O if a
 consumer supplies a different factory. The isolated sandbox factory remains
 injected, and the returned handler is not registered with application startup
 or granted apply authority.
+
+`make_stored_postgres_migration_run_handler` composes that exact
+same-session attempt handler with `make_attempt_bound_migration_run_handler`.
+The resulting execution-neutral handler is compatible with the UUID-only
+signal consumer and delegates worker identity, attempt lease, and heartbeat
+validation to the durable leasing boundary. It does not start the consumer,
+provision or register a sandbox, accept SQL, or grant apply authority.
 
 The PostgreSQL 14–18 matrix stores an encrypted restricted-target DSN and
 enters through `make_stored_postgres_durable_dry_run_attempt_handler`, with a

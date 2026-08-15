@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add one explicit stored-PostgreSQL migration-run composition that binds the
+  durable dry-run attempt capability to exact worker-attempt leasing before it
+  can be injected into the UUID-only signal consumer. The caller still supplies
+  sandbox lifecycle and startup registration; no SQL or apply authority is
+  added.
+
 - Bind the concrete stored-PostgreSQL live-preflight provider to the durable
   dry-run attempt handler through one explicit repository composition. Durable
   run metadata and credential-bearing target lookup must use the same session
