@@ -131,7 +131,7 @@ def test_validation_response_omits_oversized_dbml_input(
     sensitive_marker = "dbml-secret-do-not-reflect"
     response = TestClient(_validation_app()).post(
         "/api/dbml/convert",
-        json={"dbml": secret + ("x" * 524_288)},
+        json={"dbml": sensitive_marker + ("x" * 524_288)},
     )
 
     assert response.status_code == 422
