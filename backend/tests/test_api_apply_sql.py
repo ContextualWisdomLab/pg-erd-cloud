@@ -20,7 +20,7 @@ def _conn():
 
 
 def _body(dry_run=True):
-    return ApplySqlIn(sql="CREATE TABLE safe_table (id bigint);", dry_run=dry_run)
+    return ApplySqlIn(sql="CREATE TABLE safe_table (id bigint)", dry_run=dry_run)
 
 
 @pytest.mark.asyncio
@@ -150,7 +150,7 @@ async def test_apply_database_sql_routes_postgres_and_redacts():
             "table identifier must be unquoted snake_case",
         ),
         (
-            "CREATE TABLE safe_table (id bigint); -- comment",
+            "CREATE TABLE safe_table (id bigint) -- comment",
             "comments are not allowed",
         ),
     ],
