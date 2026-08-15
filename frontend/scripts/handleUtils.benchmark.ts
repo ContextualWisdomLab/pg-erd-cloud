@@ -1,4 +1,11 @@
-import { sanitizeHandleId } from '../src/erd/handleUtils';
+import { sanitizeHandleId } from '../src/erd/handleUtils.js';
+import { performance } from 'node:perf_hooks';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function sanitizeHandleIdOriginal(columnName: string): string {
   const encoded = Array.from(columnName, (char) => {
@@ -20,13 +27,20 @@ const testCases = [
 ];
 
 const iterationsPerSample = 10000;
-const numSamples = 50;
+const numSamples = 50; // Use an even number for perfectly balanced A/B vs B/A runs
+
+function failClosed(msg: string) {
+  console.error(`Benchmark failed: ${msg}`);
+  process.exit(1);
+}
+
+if (!global.gc) {
+  failClosed('--expose-gc is required but global.gc is unavailable. Run via: pnpm run benchmark:handleUtils');
+}
 
 function runSample(fn: (str: string) => string) {
-  if (global.gc) {
-    global.gc();
-  }
-  const startMem = process.memoryUsage().heapUsed;
+  global.gc!();
+  const startHeap = process.memoryUsage().heapUsed;
   const start = performance.now();
   for (let i = 0; i < iterationsPerSample; i++) {
     for (const tc of testCases) {
@@ -34,8 +48,12 @@ function runSample(fn: (str: string) => string) {
     }
   }
   const end = performance.now();
-  const endMem = process.memoryUsage().heapUsed;
-  return { time: end - start, memoryAllocated: Math.max(0, endMem - startMem) };
+  // We record the raw heap delta without clamping to 0.
+  // For precise allocation profiling, Node's built-in hooks or V8 isolate snapshots
+  // are necessary, but forcing a full GC immediately prior helps stabilize transient heap deltas.
+  const endHeap = process.memoryUsage().heapUsed;
+
+  return { time: end - start, heapDelta: endHeap - startHeap };
 }
 
 function calculateStats(samples: number[]) {
@@ -68,24 +86,24 @@ function runBenchmark() {
   const originalSamplesMem: number[] = [];
   const optimizedSamplesMem: number[] = [];
 
-  // Randomize order
+  // Deterministic Counterbalanced Ordering (A B, B A)
   for (let s = 0; s < numSamples; s++) {
-    const runOptimizedFirst = Math.random() > 0.5;
+    const runOptimizedFirst = (s % 2 === 0);
 
     if (runOptimizedFirst) {
       const optResult = runSample(sanitizeHandleId);
       const origResult = runSample(sanitizeHandleIdOriginal);
       optimizedSamplesTime.push(optResult.time);
-      optimizedSamplesMem.push(optResult.memoryAllocated);
+      optimizedSamplesMem.push(optResult.heapDelta);
       originalSamplesTime.push(origResult.time);
-      originalSamplesMem.push(origResult.memoryAllocated);
+      originalSamplesMem.push(origResult.heapDelta);
     } else {
       const origResult = runSample(sanitizeHandleIdOriginal);
       const optResult = runSample(sanitizeHandleId);
       originalSamplesTime.push(origResult.time);
-      originalSamplesMem.push(origResult.memoryAllocated);
+      originalSamplesMem.push(origResult.heapDelta);
       optimizedSamplesTime.push(optResult.time);
-      optimizedSamplesMem.push(optResult.memoryAllocated);
+      optimizedSamplesMem.push(optResult.heapDelta);
     }
   }
 
@@ -100,11 +118,35 @@ function runBenchmark() {
   console.log(`Optimized Time (mean): ${optTimeStats.mean.toFixed(2)}ms`);
   console.log(`Optimized Time (median): ${optTimeStats.median.toFixed(2)}ms`);
   console.log('---');
-  console.log(`Original Memory Allocated (mean): ${(origMemStats.mean / 1024).toFixed(2)} KB`);
-  console.log(`Optimized Memory Allocated (mean): ${(optMemStats.mean / 1024).toFixed(2)} KB`);
+  console.log(`Original Heap Delta (mean): ${(origMemStats.mean / 1024).toFixed(2)} KB`);
+  console.log(`Optimized Heap Delta (mean): ${(optMemStats.mean / 1024).toFixed(2)} KB`);
   console.log('---');
   console.log(`Time Improvement (median): ${(((origTimeStats.median - optTimeStats.median) / origTimeStats.median) * 100).toFixed(2)}%`);
-  console.log(`Memory Improvement (mean): ${(((origMemStats.mean - optMemStats.mean) / origMemStats.mean) * 100).toFixed(2)}%`);
+  console.log(`Heap Delta Reduction (mean): ${(((origMemStats.mean - optMemStats.mean) / origMemStats.mean) * 100).toFixed(2)}%`);
+
+  // Save exact raw output
+  const resultsObj = {
+      metadata: {
+          platform: `${process.platform} ${process.arch}`,
+          node: process.version,
+          v8: process.versions?.v8 || 'unknown',
+          iterationsPerSample,
+          numSamples
+      },
+      timeStats: {
+          original: origTimeStats,
+          optimized: optTimeStats
+      },
+      heapDeltaStats: {
+          original: origMemStats,
+          optimized: optMemStats
+      }
+  };
+
+  const resultsPath = path.join(__dirname, '..', 'docs', 'benchmark_results', 'handleUtils.json');
+  fs.mkdirSync(path.dirname(resultsPath), { recursive: true });
+  fs.writeFileSync(resultsPath, JSON.stringify(resultsObj, null, 2), 'utf-8');
+  console.log(`\nRaw paired samples and statistics written to ${resultsPath}`);
 }
 
 runBenchmark();
