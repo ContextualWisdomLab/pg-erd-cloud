@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-01 - [radiogroup Role Constraints]
+**Learning:** `role="radiogroup"`가 부여된 부모 요소 내에서 자식 버튼들이 단순히 `aria-pressed`를 사용하는 것은 올바른 ARIA 패턴이 아닙니다. `radiogroup` 내부의 요소들은 반드시 `role="radio"`를 가져야 하며, 선택 상태는 `aria-pressed`가 아닌 `aria-checked`로 나타내야 스크린 리더에서 올바르게 읽힙니다.
+**Action:** 커스텀 라디오 그룹 뷰(색상 스와치 등)를 구축할 때, 자식 요소들에 명시적으로 `role="radio"` 및 `aria-checked` 속성을 사용하도록 구현하고, 테스트 시에도 "button"이 아닌 "radio" 역할(role)로 쿼리하도록 주의합니다.
