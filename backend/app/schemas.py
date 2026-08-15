@@ -86,6 +86,10 @@ class ApplySqlIn(BaseModel):
     @field_validator("sql")
     @classmethod
     def validate_sql_ddl(cls, v: str) -> str:
+        import unicodedata
+        v = unicodedata.normalize("NFKC", v)
+        import re
+        v = re.sub(r"\s+", " ", v)
         s = v.strip()
         if not s:
             raise ValueError("SQL cannot be empty or just whitespace")
