@@ -733,3 +733,41 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+def test_validate_jwt_header_crit_validates_list() -> None:
+    # Test valid header with no crit
+    auth._validate_jwt_header({"alg": "RS256"})
+
+    # Test invalid crit type (not list)
+    with pytest.raises(HTTPException) as excinfo:
+        auth._validate_jwt_header({"alg": "RS256", "crit": "not-a-list"})
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid crit header"
+
+    # Test invalid crit type (list too long)
+    with pytest.raises(HTTPException) as excinfo:
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["a"] * 11})
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid crit header"
+
+    # Test invalid crit list element (not string)
+    with pytest.raises(HTTPException) as excinfo:
+        auth._validate_jwt_header({"alg": "RS256", "crit": [1]})
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid crit header"
+
+
+def test_validate_jwt_header_crit_rejects_unsupported() -> None:
+    # Test crit with unsupported parameter
+    with pytest.raises(HTTPException) as excinfo:
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["unsupported"]})
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "unsupported critical parameter"
+
+
+def test_validate_jwt_header_crit_rejects_empty_list() -> None:
+    # Test crit with empty list
+    with pytest.raises(HTTPException) as excinfo:
+        auth._validate_jwt_header({"alg": "RS256", "crit": []})
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid crit header"
