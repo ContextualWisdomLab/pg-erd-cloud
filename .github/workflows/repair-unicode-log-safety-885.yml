@@ -1,0 +1,273 @@
+name: repair Unicode log safety for PR 885
+
+on:
+  push:
+    branches:
+      - sentinel/fix-log-injection-in-identifiers-544663154951066997
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-unicode-log-safety-885
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.repository == 'ContextualWisdomLab/pg-erd-cloud' &&
+      github.ref == 'refs/heads/sentinel/fix-log-injection-in-identifiers-544663154951066997'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPECTED_PARENT_HEAD: 6af7c0c907f875ddb9d6ece3c6eea324aea35c0b
+      EXPECTED_MAIN_HEAD: ac3bd20f14b3e169e1f53239e47bd2d410c2cbab
+      TARGET_BRANCH: sentinel/fix-log-injection-in-identifiers-544663154951066997
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact repair trigger
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify lease and integrate the live protected base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_HEAD"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_HEAD"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit "$EXPECTED_MAIN_HEAD"
+
+      - name: Keep only the bounded security lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git cat-file -e "$EXPECTED_MAIN_HEAD:backend/tests/test_api_endpoints.py" 2>/dev/null; then
+            git checkout "$EXPECTED_MAIN_HEAD" -- backend/tests/test_api_endpoints.py
+          else
+            git rm -f backend/tests/test_api_endpoints.py
+          fi
+          git checkout "$EXPECTED_MAIN_HEAD" -- frontend/src/App.coverage.test.tsx
+
+      - name: Implement the Unicode-aware production boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/app/schemas.py")
+          text = path.read_text(encoding="utf-8")
+
+          old_imports = """import datetime as dt
+          import uuid
+          from typing import Literal
+
+          from pydantic import BaseModel, Field
+          """.replace("          ", "")
+          new_imports = """import datetime as dt
+          import unicodedata
+          import uuid
+          from typing import Annotated, Literal
+
+          from pydantic import AfterValidator, BaseModel, Field
+
+
+          def _reject_log_breaking_characters(value: str) -> str:
+              \"\"\"Reject Unicode characters that can forge or split log records.\"\"\"
+
+              if any(
+                  unicodedata.category(character) in {\"Cc\", \"Zl\", \"Zp\"}
+                  for character in value
+              ):
+                  raise ValueError(
+                      \"label must not contain control or line-separator characters\"
+                  )
+              return value
+
+
+          _LogSafeLabel = Annotated[str, AfterValidator(_reject_log_breaking_characters)]
+          """.replace("          ", "")
+          if text.count(old_imports) != 1:
+              raise SystemExit("unexpected schemas import block")
+          text = text.replace(old_imports, new_imports, 1)
+
+          replacements = {
+              """    project_name: str = Field(
+                  min_length=1,
+                  max_length=255,
+                  pattern=r\"^[^\\x00-\\x1F\\x7F]+$\",
+              )
+              """.replace("              ", ""): """    project_name: _LogSafeLabel = Field(
+                  min_length=1,
+                  max_length=255,
+              )
+              """.replace("              ", ""),
+              """    conn_name: str = Field(
+                  min_length=1,
+                  max_length=128,
+                  pattern=r\"^[^\\x00-\\x1F\\x7F]+$\",
+              )
+              """.replace("              ", ""): """    conn_name: _LogSafeLabel = Field(
+                  min_length=1,
+                  max_length=128,
+              )
+              """.replace("              ", ""),
+              """    name: str = Field(
+                  min_length=1,
+                  max_length=200,
+                  pattern=r\"^[^\\x00-\\x1F\\x7F]+$\",
+              )
+              """.replace("              ", ""): """    name: _LogSafeLabel = Field(
+                  min_length=1,
+                  max_length=200,
+              )
+              """.replace("              ", ""),
+              """    key_name: str = Field(
+                  min_length=1,
+                  max_length=128,
+                  pattern=r\"^[^\\x00-\\x1F\\x7F]+$\",
+              )
+              """.replace("              ", ""): """    key_name: _LogSafeLabel = Field(
+                  min_length=1,
+                  max_length=128,
+              )
+              """.replace("              ", ""),
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f"unexpected field block: {old.splitlines()[0]!r}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+
+          test_path = Path("backend/tests/test_schema_validation.py")
+          tests = test_path.read_text(encoding="utf-8")
+          old_assertions = """    with pytest.raises(ValidationError):
+                  DiagramViewCreateIn(name=f\"diagram{code_point}name\", layout_json={})
+              with pytest.raises(ValidationError):
+                  ApiKeyCreateIn(key_name=f\"api{code_point}key\")
+          """.replace("          ", "")
+          new_assertions = """    with pytest.raises(ValidationError):
+                  ProjectCreateIn(project_name=f\"project{code_point}name\")
+              with pytest.raises(ValidationError):
+                  ConnectionCreateIn(
+                      conn_name=f\"connection{code_point}name\",
+                      dsn=\"postgresql://localhost/database\",
+                  )
+              with pytest.raises(ValidationError):
+                  DiagramViewCreateIn(name=f\"diagram{code_point}name\", layout_json={})
+              with pytest.raises(ValidationError):
+                  ApiKeyCreateIn(key_name=f\"api{code_point}key\")
+          """.replace("          ", "")
+          if tests.count(old_assertions) != 1:
+              raise SystemExit("unexpected Unicode regression assertion block")
+          test_path.write_text(
+              tests.replace(old_assertions, new_assertions, 1), encoding="utf-8"
+          )
+
+          changelog_path = Path("CHANGELOG.md")
+          changelog = changelog_path.read_text(encoding="utf-8")
+          marker = "## Unreleased\n"
+          entry = (
+              "- [BE] 🔒 **Unicode 로그 경계 강화**: 프로젝트·연결·다이어그램·API 키의 "
+              "사용자 표시 이름에서 C0/C1 제어문자와 Unicode 줄·문단 구분자를 거부하여 "
+              "로그 레코드 분할과 터미널 제어 시퀀스 주입을 차단하고, PostgreSQL 식별자 "
+              "의미론은 별도 계약으로 보존합니다.\n"
+          )
+          if entry not in changelog:
+              if marker not in changelog:
+                  raise SystemExit("Unreleased changelog section is missing")
+              changelog_path.write_text(
+                  changelog.replace(marker, marker + entry, 1), encoding="utf-8"
+              )
+          PY
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Verify focused RED-to-GREEN and full backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --require-hashes -r backend/requirements-dev.lock
+          python -m pip check
+          cd backend
+          PYTHONPATH=. pytest -q tests/test_schema_validation.py
+          PYTHONPATH=. mypy app
+          PYTHONPATH=. pytest -q
+          python -m compileall -q app
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify unchanged frontend baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          npm run typecheck
+          npm run test
+          npm run build
+
+      - name: Bound the final comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only "$EXPECTED_MAIN_HEAD" | sort)"
+          unexpected="$(
+            printf '%s\n' "$changed" |
+              grep -Ev '^(CHANGELOG\.md|backend/app/schemas\.py|backend/tests/test_schema_validation\.py|\.github/workflows/repair-unicode-log-safety-885\.yml)$' || true
+          )"
+          if [[ -n "$unexpected" ]]; then
+            printf 'unexpected comparison paths:\n%s\n' "$unexpected" >&2
+            exit 1
+          fi
+          printf '%s\n' "$changed" | grep -Fx backend/app/schemas.py
+          printf '%s\n' "$changed" | grep -Fx backend/tests/test_schema_validation.py
+          printf '%s\n' "$changed" | grep -Fx CHANGELOG.md
+
+      - name: Commit verified repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+          remote_head="$(
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
+              ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
+          )"
+          test "$remote_head" = "$GITHUB_SHA"
+
+          git rm .github/workflows/repair-unicode-log-safety-885.yml
+          git add -A
+          final_changed="$(git diff --cached --name-only "$EXPECTED_MAIN_HEAD" | sort)"
+          unexpected="$(
+            printf '%s\n' "$final_changed" |
+              grep -Ev '^(CHANGELOG\.md|backend/app/schemas\.py|backend/tests/test_schema_validation\.py)$' || true
+          )"
+          if [[ -n "$unexpected" ]]; then
+            printf 'unexpected final paths:\n%s\n' "$unexpected" >&2
+            exit 1
+          fi
+
+          git commit -m "fix(security): reject Unicode log-breaking labels"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
+            push origin "HEAD:refs/heads/$TARGET_BRANCH"
