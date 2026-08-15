@@ -30,8 +30,9 @@ The handler accepts only:
 3. an exact `MigrationRunAttemptClaim` containing the durable attempt UUID,
    run UUID, attempt number and acquired state version;
 4. injected `IsolatedSandboxFactory` and `LivePreflightFactory` capabilities;
-5. bounded lock and statement timeouts plus whole-stage sandbox and preflight
-   cancellation deadlines.
+5. bounded lock and statement timeouts, a finite guarded-connection
+   acquisition timeout in `(0, 60]` seconds, plus whole-stage sandbox and
+   preflight cancellation deadlines.
 
 A signal/run UUID mismatch fails before metadata or provider access.
 
@@ -197,7 +198,10 @@ plan digest verifier remains authoritative.
   scope, and cleanup, but it does not eliminate the gap between that metadata
   observation and target capability opening. Deployed least-privilege
   credentials, network isolation, startup wiring, and cancellation after that
-  observation are still release-blocking.
+  observation are still release-blocking. The stored-provider connection timeout
+  is injected through both repository composition factories, rejects non-finite,
+  non-positive, or greater-than-60-second values before metadata or target I/O,
+  and is passed unchanged to the guarded connector.
 
 ## Failure and evidence policy
 
