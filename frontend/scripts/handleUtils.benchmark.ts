@@ -27,7 +27,6 @@ interface PairedSample {
 interface SummaryStatistics {
   mean: number;
   median: number;
-  raw: number[];
 }
 
 function sanitizeHandleIdOriginal(columnName: string): string {
@@ -105,7 +104,6 @@ function summarize(values: readonly number[]): SummaryStatistics {
   return {
     mean: values.reduce((total, value) => total + value, 0) / values.length,
     median: median(values),
-    raw: [...values],
   };
 }
 
@@ -145,22 +143,6 @@ function runBenchmark(): void {
     });
   }
 
-  const originalElapsed = samples.map(
-    (sample) => sample.original.elapsedMilliseconds,
-  );
-  const optimizedElapsed = samples.map(
-    (sample) => sample.optimized.elapsedMilliseconds,
-  );
-  const originalHeapDeltas = samples.map(
-    (sample) => sample.original.heapUsedDeltaBytes,
-  );
-  const optimizedHeapDeltas = samples.map(
-    (sample) => sample.optimized.heapUsedDeltaBytes,
-  );
-  const pairedElapsedImprovements = samples.map(
-    (sample) => sample.elapsedImprovementPercent,
-  );
-
   const result = {
     metadata: {
       platform: `${process.platform} ${process.arch}`,
@@ -170,18 +152,29 @@ function runBenchmark(): void {
       numberOfPairs,
       corpusSize: testCases.length,
       ordering: 'deterministic counterbalanced AB/BA',
+      rawEvidence: 'samples preserve pair and execution order',
       heapMetric:
         'heapUsed after minus heapUsed before each timed sample; diagnostic only, not allocated bytes',
     },
     samples,
     elapsedMilliseconds: {
-      original: summarize(originalElapsed),
-      optimized: summarize(optimizedElapsed),
-      pairedImprovementPercent: summarize(pairedElapsedImprovements),
+      original: summarize(
+        samples.map((sample) => sample.original.elapsedMilliseconds),
+      ),
+      optimized: summarize(
+        samples.map((sample) => sample.optimized.elapsedMilliseconds),
+      ),
+      pairedImprovementPercent: summarize(
+        samples.map((sample) => sample.elapsedImprovementPercent),
+      ),
     },
     heapUsedDeltaBytes: {
-      original: summarize(originalHeapDeltas),
-      optimized: summarize(optimizedHeapDeltas),
+      original: summarize(
+        samples.map((sample) => sample.original.heapUsedDeltaBytes),
+      ),
+      optimized: summarize(
+        samples.map((sample) => sample.optimized.heapUsedDeltaBytes),
+      ),
     },
   };
 
