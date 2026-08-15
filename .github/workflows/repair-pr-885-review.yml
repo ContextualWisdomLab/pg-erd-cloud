@@ -1,0 +1,601 @@
+---
+name: repair PR 885 review findings
+
+"on":
+  push:
+    branches:
+      - sentinel/fix-log-injection-in-identifiers-544663154951066997
+    paths:
+      - .github/workflows/repair-pr-885-review.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-pr-885-review
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EXPECTED_PARENT_HEAD: 947e4b6c8d6470f1c825a0ef23276f517b885ad4
+      TARGET_BRANCH: sentinel/fix-log-injection-in-identifiers-544663154951066997
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact trigger
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify lease and reconcile protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_HEAD"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin main "$TARGET_BRANCH"
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$GITHUB_SHA"
+          MAIN_HEAD="$(git rev-parse origin/main)"
+          echo "MAIN_HEAD=$MAIN_HEAD" >> "$GITHUB_ENV"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit "$MAIN_HEAD"
+
+      - name: Keep only the bounded security lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout "$MAIN_HEAD" -- \
+            .github/workflows/ci.yml \
+            CHANGELOG.md \
+            backend/pyproject.toml \
+            backend/requirements-dev.lock \
+            backend/requirements.lock \
+            backend/tests/test_api_apply_sql.py \
+            frontend/src/App.coverage.test.tsx
+          git rm -f .github/workflows/scorecard.yml
+
+      - name: Implement shared validation and regression contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          schema_path = Path("backend/app/schemas.py")
+          text = schema_path.read_text(encoding="utf-8")
+
+          old_import = "from pydantic import BaseModel, Field\n"
+          new_import = """from pydantic import BaseModel, Field, field_validator
+
+          from app.pg_introspect.forward_ddl import validate_forward_ddl
+
+
+          _LOG_SAFE_TEXT_PATTERN = (
+              r"^[^\\x00-\\x1F\\x7F-\\x9F\\u2028\\u2029]+$"
+          )
+          _LOG_SAFE_SUBJECT_PATTERN = (
+              r"^[^\\s\\x00-\\x1F\\x7F-\\x9F\\u2028\\u2029]+$"
+          )
+          """
+          if text.count(old_import) != 1:
+              raise SystemExit("unexpected pydantic import shape")
+          text = text.replace(old_import, new_import, 1)
+          text = text.replace(
+              "\n\nfrom pydantic import field_validator\n\nclass ApplySqlIn",
+              "\n\nclass ApplySqlIn",
+              1,
+          )
+
+          old_label_pattern = 'pattern=r"^[^\\x00-\\x1F\\x7F]+$",'
+          if text.count(old_label_pattern) != 4:
+              raise SystemExit("unexpected display-label pattern count")
+          text = text.replace(
+              old_label_pattern,
+              "pattern=_LOG_SAFE_TEXT_PATTERN,",
+          )
+
+          old_subject_pattern = 'pattern=r"^[^\\s\\x00-\\x1F\\x7F]+$",'
+          if text.count(old_subject_pattern) != 1:
+              raise SystemExit("unexpected member-subject pattern count")
+          text = text.replace(
+              old_subject_pattern,
+              "pattern=_LOG_SAFE_SUBJECT_PATTERN,",
+          )
+
+          old_validator = (
+              '    @field_validator("sql")\n'
+              '    @classmethod\n'
+              '    def validate_sql_ddl(cls, v: str) -> str:\n'
+              '        s = v.strip()\n'
+              '        if not s:\n'
+              '            raise ValueError("SQL cannot be empty or just whitespace")\n'
+              '        if ";" in s:\n'
+              '            raise ValueError("Multiple statements not allowed")\n'
+              '        if "--" in s or "/*" in s or "*/" in s:\n'
+              '            raise ValueError("Comments not allowed")\n'
+              '        upper_s = s.upper()\n'
+              '        allowed = ("CREATE ", "ALTER ", "DROP ", "TRUNCATE ", "COMMENT ")\n'
+              '        if not upper_s.startswith(allowed):\n'
+              '            raise ValueError("Only DDL commands allowed")\n'
+              '        return v\n'
+          )
+          new_validator = (
+              '    @field_validator("sql")\n'
+              '    @classmethod\n'
+              '    def validate_sql_ddl(cls, value: str) -> str:\n'
+              '        """Validate the shared safe DDL subset and preserve the input text."""\n'
+              '\n'
+              '        validate_forward_ddl(value)\n'
+              '        return value\n'
+          )
+          if text.count(old_validator) != 1:
+              raise SystemExit("unexpected ApplySqlIn validator shape")
+          text = text.replace(old_validator, new_validator, 1)
+
+          old_annotations = (
+              "    schema_name: str = Field(min_length=1, max_length=255)\n"
+              "    relation_name: str = Field(min_length=1, max_length=255)\n"
+              "    body: str = Field(min_length=1, max_length=10_000)\n"
+          )
+          new_annotations = (
+              "    schema_name: str = Field(\n"
+              "        min_length=1,\n"
+              "        max_length=255,\n"
+              "        pattern=_LOG_SAFE_TEXT_PATTERN,\n"
+              "    )\n"
+              "    relation_name: str = Field(\n"
+              "        min_length=1,\n"
+              "        max_length=255,\n"
+              "        pattern=_LOG_SAFE_TEXT_PATTERN,\n"
+              "    )\n"
+              "    body: str = Field(min_length=1, max_length=10_000)\n"
+          )
+          if text.count(old_annotations) != 1:
+              raise SystemExit("unexpected annotation identifier shape")
+          text = text.replace(old_annotations, new_annotations, 1)
+
+          schema_path.write_text(text, encoding="utf-8")
+
+          changelog_path = Path("CHANGELOG.md")
+          changelog = changelog_path.read_text(encoding="utf-8")
+          marker = "## Unreleased\n"
+          entry = (
+              "- [BE] 🔒 **로그 안전 식별자·DDL 입력 경계 통합**: 표시용 식별자에서 "
+              "C0·DEL·C1 및 Unicode 줄 구분자를 거부하고, 요청 모델과 실행 경로가 "
+              "동일한 보수적 forward-DDL 검증기를 사용하도록 정합화했습니다.\n"
+          )
+          if marker not in changelog:
+              raise SystemExit("missing changelog Unreleased section")
+          if entry not in changelog:
+              changelog = changelog.replace(marker, marker + entry, 1)
+          changelog_path.write_text(changelog, encoding="utf-8")
+          PY
+
+          cat > backend/tests/test_apply_sql_in.py <<'PY'
+          """Request-model tests for the conservative forward-DDL boundary."""
+
+          from __future__ import annotations
+
+          import pytest
+          from pydantic import ValidationError
+
+          from app.schemas import ApplySqlIn
+
+
+          @pytest.mark.parametrize(
+              "sql",
+              [
+                  "CREATE TABLE safe_table (id bigint);",
+                  "ALTER TABLE safe_table ADD COLUMN display_name text;",
+                  "CREATE INDEX safe_table_id_index ON safe_table (id);",
+                  (
+                      "CREATE TABLE safe_table (id bigint); "
+                      "CREATE INDEX safe_table_id_index ON safe_table (id);"
+                  ),
+              ],
+          )
+          def test_apply_sql_in_accepts_and_preserves_safe_ddl(sql: str) -> None:
+              """Accept the execution validator's subset without rewriting the request."""
+
+              body = ApplySqlIn(sql=sql)
+              assert body.sql == sql
+
+
+          @pytest.mark.parametrize(
+              "sql",
+              [
+                  "",
+                  " ",
+                  "SELECT 1;",
+                  "INSERT INTO safe_table (id) VALUES (1);",
+                  "UPDATE safe_table SET id = 1;",
+                  "DELETE FROM safe_table;",
+                  'CREATE TABLE "BadTable" (id bigint);',
+                  "CREATE TABLE BadTable (id bigint);",
+                  "CREATE EXTENSION pgcrypto;",
+                  "DROP TABLE safe_table;",
+                  "TRUNCATE TABLE safe_table;",
+                  "COMMENT ON TABLE safe_table IS 'comment';",
+                  "CREATE TABLE safe_table (id bigint); -- forged log line",
+                  "CREATE TABLE safe_table (id bigint) /* hidden */;",
+              ],
+          )
+          def test_apply_sql_in_rejects_unsupported_or_unsafe_sql(sql: str) -> None:
+              """Reject every request the execution validator cannot authorize."""
+
+              with pytest.raises(ValidationError):
+                  ApplySqlIn(sql=sql)
+          PY
+
+          cat > backend/tests/test_api_endpoints.py <<'PY'
+          """HTTP regressions for log-safe identifier validation."""
+
+          from __future__ import annotations
+
+          from collections.abc import Iterator
+          import uuid
+          from unittest.mock import AsyncMock, patch
+
+          from httpx import ASGITransport, AsyncClient
+          import pytest
+
+          from app.auth import CurrentUser, get_current_user
+          from app.main import app
+
+
+          @pytest.fixture
+          def current_user_override() -> Iterator[None]:
+              """Install and exactly restore the prior authentication override."""
+
+              had_previous = get_current_user in app.dependency_overrides
+              previous = app.dependency_overrides.get(get_current_user)
+
+              def mock_get_current_user() -> CurrentUser:
+                  """Return a deterministic authenticated test principal."""
+
+                  return CurrentUser(
+                      user_account_uuid=uuid.uuid4(),
+                      subject="test",
+                      display_name="Test",
+                  )
+
+              app.dependency_overrides[get_current_user] = mock_get_current_user
+              try:
+                  yield
+              finally:
+                  if had_previous:
+                      assert previous is not None
+                      app.dependency_overrides[get_current_user] = previous
+                  else:
+                      app.dependency_overrides.pop(get_current_user, None)
+
+
+          def _csrf_headers(token: str) -> dict[str, str]:
+              """Return the same-origin CSRF headers required by mutation routes."""
+
+              return {
+                  "X-CSRF-Token": token,
+                  "Origin": "http://test",
+                  "Referer": "http://test/",
+              }
+
+
+          @pytest.mark.asyncio
+          async def test_create_view_rejects_log_breaking_name(
+              current_user_override: None,
+          ) -> None:
+              """Return 422 before persistence for a line-breaking view name."""
+
+              del current_user_override
+              transport = ASGITransport(app=app)
+              async with AsyncClient(
+                  transport=transport,
+                  base_url="http://test",
+              ) as client:
+                  csrf_response = await client.get("/api/csrf-token")
+                  token = csrf_response.json()["csrf_token"]
+                  with patch(
+                      "app.api.diagram_views.require_project_member",
+                      new_callable=AsyncMock,
+                  ):
+                      response = await client.post(
+                          f"/api/diagram-views/by-project/{uuid.uuid4()}",
+                          json={"name": "invalid\u2028name", "layout_json": {}},
+                          headers=_csrf_headers(token),
+                      )
+
+              assert response.status_code == 422
+              assert "string_pattern_mismatch" in response.text
+
+
+          @pytest.mark.asyncio
+          async def test_create_api_key_rejects_log_breaking_name(
+              current_user_override: None,
+          ) -> None:
+              """Return 422 before key creation for a C1-breaking key name."""
+
+              del current_user_override
+              transport = ASGITransport(app=app)
+              async with AsyncClient(
+                  transport=transport,
+                  base_url="http://test",
+              ) as client:
+                  csrf_response = await client.get("/api/csrf-token")
+                  token = csrf_response.json()["csrf_token"]
+                  response = await client.post(
+                      "/api/api-keys",
+                      json={"key_name": "invalid\u0085key"},
+                      headers=_csrf_headers(token),
+                  )
+
+              assert response.status_code == 422
+              assert "string_pattern_mismatch" in response.text
+          PY
+
+          cat > backend/tests/test_schema_validation.py <<'PY'
+          """Boundary tests for user-controlled display identifiers."""
+
+          from __future__ import annotations
+
+          from collections.abc import Callable
+
+          import pytest
+          from pydantic import BaseModel, ValidationError
+
+          from app.schemas import (
+              ApiKeyCreateIn,
+              ConnectionCreateIn,
+              DiagramViewCreateIn,
+              ProjectCreateIn,
+              ProjectMemberAddIn,
+              TableAnnotationUpsertIn,
+          )
+
+
+          _LOG_BREAKING_CHARACTERS = (
+              tuple(chr(code_point) for code_point in range(0x20))
+              + tuple(chr(code_point) for code_point in range(0x7F, 0xA0))
+              + ("\u2028", "\u2029")
+          )
+
+
+          def _place_character(code_point: str, position: str) -> str:
+              """Place a candidate character at a representative label boundary."""
+
+              if position == "prefix":
+                  return f"{code_point}label"
+              if position == "middle":
+                  return f"la{code_point}bel"
+              if position == "suffix":
+                  return f"label{code_point}"
+              raise AssertionError(f"unexpected position: {position}")
+
+
+          def _display_model_builders(value: str) -> tuple[Callable[[], BaseModel], ...]:
+              """Return constructors for every log-sensitive display identifier."""
+
+              return (
+                  lambda: ProjectCreateIn(project_name=value),
+                  lambda: ConnectionCreateIn(
+                      conn_name=value,
+                      dsn="postgresql://localhost/database_name",
+                  ),
+                  lambda: DiagramViewCreateIn(name=value, layout_json={}),
+                  lambda: TableAnnotationUpsertIn(
+                      schema_name=value,
+                      relation_name="safe_relation",
+                      body="annotation",
+                  ),
+                  lambda: TableAnnotationUpsertIn(
+                      schema_name="safe_schema",
+                      relation_name=value,
+                      body="annotation",
+                  ),
+                  lambda: ApiKeyCreateIn(key_name=value),
+              )
+
+
+          @pytest.mark.parametrize("code_point", _LOG_BREAKING_CHARACTERS)
+          @pytest.mark.parametrize("position", ["prefix", "middle", "suffix"])
+          def test_display_identifiers_reject_log_breaking_characters(
+              code_point: str,
+              position: str,
+          ) -> None:
+              """Reject C0, DEL, C1, and Unicode line/paragraph separators."""
+
+              value = _place_character(code_point, position)
+              for build_model in _display_model_builders(value):
+                  with pytest.raises(ValidationError):
+                      build_model()
+
+
+          @pytest.mark.parametrize("code_point", _LOG_BREAKING_CHARACTERS)
+          def test_member_subject_rejects_log_breaking_characters(
+              code_point: str,
+          ) -> None:
+              """Reject hidden line boundaries in immutable member subjects."""
+
+              with pytest.raises(ValidationError):
+                  ProjectMemberAddIn(
+                      member_subject=f"dev:user{code_point}name",
+                      project_role="viewer",
+                  )
+
+
+          def test_member_subject_rejects_visible_whitespace() -> None:
+              """Keep the subject contract free of ordinary whitespace."""
+
+              with pytest.raises(ValidationError):
+                  ProjectMemberAddIn(
+                      member_subject="dev:bad user",
+                      project_role="viewer",
+                  )
+
+
+          def test_display_identifiers_accept_valid_unicode_and_bounds() -> None:
+              """Preserve legitimate spaces, Unicode, emoji, and length boundaries."""
+
+              ProjectCreateIn(project_name="고객 프로젝트 🚀")
+              ConnectionCreateIn(
+                  conn_name="분석 연결 🚀",
+                  dsn="postgresql://localhost/database_name",
+              )
+              DiagramViewCreateIn(name="운영 ERD 🚀", layout_json={})
+              TableAnnotationUpsertIn(
+                  schema_name="운영 스키마",
+                  relation_name="고객 주문",
+                  body="여러 줄\n설명은 본문에서 허용합니다.",
+              )
+              ApiKeyCreateIn(key_name="운영 키 🚀")
+              ProjectMemberAddIn(
+                  member_subject="dev:사용자",
+                  project_role="editor",
+              )
+
+              DiagramViewCreateIn(name="a", layout_json={})
+              DiagramViewCreateIn(name="a" * 200, layout_json={})
+              ApiKeyCreateIn(key_name="a")
+              ApiKeyCreateIn(key_name="a" * 128)
+
+              with pytest.raises(ValidationError):
+                  DiagramViewCreateIn(name="", layout_json={})
+              with pytest.raises(ValidationError):
+                  DiagramViewCreateIn(name="a" * 201, layout_json={})
+              with pytest.raises(ValidationError):
+                  ApiKeyCreateIn(key_name="")
+              with pytest.raises(ValidationError):
+                  ApiKeyCreateIn(key_name="a" * 129)
+          PY
+
+          mkdir -p docs/doctoring
+          cat > docs/doctoring/log-safe-identifier-validation.md <<'MD'
+          # Log-safe identifier validation
+
+          ## Status
+
+          Implemented for user-controlled display identifiers and request-time
+          forward-DDL validation.
+
+          ## Decision
+
+          Display labels remain multilingual and may contain ordinary spaces and
+          emoji, but they fail closed when they contain:
+
+          - C0 controls (`U+0000`–`U+001F`);
+          - `DEL` and C1 controls (`U+007F`–`U+009F`);
+          - Unicode line separator (`U+2028`);
+          - Unicode paragraph separator (`U+2029`).
+
+          The boundary covers project names, connection names, saved-view names,
+          annotation schema/relation labels, API-key names, and member subjects.
+          Annotation body text remains intentionally multiline.
+
+          `ApplySqlIn` does not maintain a second keyword allowlist. It delegates
+          to the same `validate_forward_ddl` function used immediately before
+          execution, while preserving the caller's exact accepted request text.
+          The shared validator accepts only the repository's bounded
+          `CREATE TABLE`, `ALTER TABLE`, and `CREATE INDEX` subset with unquoted
+          `snake_case` identifiers.
+
+          ## Security rationale
+
+          External text that creates a new logical line can forge or corrupt audit
+          records when it later reaches a line-oriented logger. CWE-117 recommends
+          strict input validation over partial malicious-pattern matching. Unicode
+          also identifies pattern whitespace and line-breaking characters beyond
+          ASCII CR/LF, so the boundary explicitly includes C1 and Unicode
+          line/paragraph separators rather than relying on an ASCII-only regex.
+
+          ## Verification
+
+          - exhaustive prefix/middle/suffix tests for every C0, DEL, and C1 code
+            point plus `U+2028` and `U+2029`;
+          - HTTP 422 regressions for representative C1 and Unicode separators;
+          - positive multilingual, space, emoji, and length-boundary cases;
+          - request-model parity tests for every supported and rejected
+            forward-DDL family;
+          - exact-head backend type checking and complete test execution.
+
+          ## Monitoring and rollback
+
+          Monitor validation-error counts by route and field without recording the
+          rejected value. A rollback must restore the previous release as a whole;
+          do not weaken only the Unicode boundary or create another request-only SQL
+          allowlist.
+
+          ## References
+
+          MITRE Corporation. (2026, April 30). *CWE-117: Improper output
+          neutralization for logs (Version 4.20).* Common Weakness Enumeration.
+          https://cwe.mitre.org/data/definitions/117.html
+
+          The Unicode Consortium. (2025, August 20). *Unicode Standard Annex #31:
+          Unicode identifiers and syntax* (Unicode 17.0.0, Revision 43).
+          https://www.unicode.org/reports/tr31/tr31-43.html
+          MD
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Verify focused and complete backend contracts
+        shell: bash
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python -m pip install --require-hashes -r requirements-dev.lock
+          mypy app
+          pytest -q \
+            tests/test_apply_sql_in.py \
+            tests/test_api_endpoints.py \
+            tests/test_schema_validation.py
+          pytest -q
+          python -m compileall -q app tests
+
+      - name: Bound the final comparison and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-pr-885-review.yml
+
+          cat > /tmp/expected-paths <<'EOF'
+          CHANGELOG.md
+          backend/app/schemas.py
+          backend/tests/test_api_endpoints.py
+          backend/tests/test_apply_sql_in.py
+          backend/tests/test_schema_validation.py
+          docs/doctoring/log-safe-identifier-validation.md
+          EOF
+          git diff --name-only "$MAIN_HEAD" | sort > /tmp/actual-paths
+          sort -o /tmp/expected-paths /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+          git diff --check
+
+          git add \
+            CHANGELOG.md \
+            backend/app/schemas.py \
+            backend/tests/test_api_endpoints.py \
+            backend/tests/test_apply_sql_in.py \
+            backend/tests/test_schema_validation.py \
+            docs/doctoring/log-safe-identifier-validation.md
+          git commit -m "fix(security): align log-safe validation boundaries"
+
+          git fetch --no-tags origin main "$TARGET_BRANCH"
+          test "$(git rev-parse origin/main)" = "$MAIN_HEAD"
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$GITHUB_SHA"
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)" \
+            push origin "HEAD:refs/heads/$TARGET_BRANCH"
