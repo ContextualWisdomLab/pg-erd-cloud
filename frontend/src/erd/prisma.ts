@@ -2,10 +2,16 @@ import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sanitizeHandleId } from "./handleUtils";
 
+const PRISMA_RESERVED_WORDS = ["datasource", "generator", "model", "enum"];
+
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
   if (!/^[a-zA-Z]/.test(sanitized)) {
+    sanitized = "M_" + sanitized;
+  }
+
+  if (PRISMA_RESERVED_WORDS.includes(sanitized.toLowerCase())) {
     sanitized = "M_" + sanitized;
   }
   return sanitized;
