@@ -133,6 +133,21 @@ def test_consumer_composition_binds_attempt_leases_to_stored_provider() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "connect_timeout_seconds",
+    [0.0, -1.0, float("inf"), float("-inf"), float("nan"), 60.0001],
+)
+def test_provider_rejects_unbounded_connect_timeout(
+    connect_timeout_seconds: float,
+) -> None:
+    """Keep connection acquisition finite, positive, and operationally bounded."""
+
+    with pytest.raises(ValueError, match="connect timeout"):
+        make_stored_postgres_live_preflight_factory(
+            MagicMock(), connect_timeout_seconds=connect_timeout_seconds
+        )
+
+
 @pytest.mark.asyncio
 async def test_provider_binds_guarded_target_to_same_connection_capture() -> None:
     """Decrypt only guarded material and scope capture to its exact connection."""
