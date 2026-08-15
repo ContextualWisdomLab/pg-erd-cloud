@@ -60,6 +60,7 @@ async def test_composition_binds_one_metadata_factory_to_provider_and_attempt() 
             session_factory,
             sandbox_factory,
             preflight_stage_timeout_seconds=12.0,
+            connect_timeout_seconds=2.5,
         )
         await handler(session_factory, signal_claim, attempt_claim)
 
@@ -69,7 +70,9 @@ async def test_composition_binds_one_metadata_factory_to_provider_and_attempt() 
         ):
             await handler(MagicMock(), signal_claim, attempt_claim)
 
-    make_provider.assert_called_once_with(session_factory)
+    make_provider.assert_called_once_with(
+        session_factory, connect_timeout_seconds=2.5
+    )
     make_delegate.assert_called_once_with(
         sandbox_factory,
         live_factory,
@@ -108,6 +111,7 @@ def test_consumer_composition_binds_attempt_leases_to_stored_provider() -> None:
             attempt_lease_seconds=45,
             heartbeat_interval_s=10.0,
             preflight_stage_timeout_seconds=12.0,
+            connect_timeout_seconds=2.5,
         )
 
     assert handler is consumer_handler
@@ -119,6 +123,7 @@ def test_consumer_composition_binds_attempt_leases_to_stored_provider() -> None:
         preflight_statement_timeout_ms=5_000,
         sandbox_stage_timeout_seconds=300.0,
         preflight_stage_timeout_seconds=12.0,
+        connect_timeout_seconds=2.5,
     )
     make_consumer_handler.assert_called_once_with(
         attempt_handler,
@@ -160,7 +165,9 @@ async def test_provider_binds_guarded_target_to_same_connection_capture() -> Non
         "app.jobs.live_preflight_provider.capture_postgres_snapshot",
         new=AsyncMock(return_value=captured),
     ) as capture:
-        factory = make_stored_postgres_live_preflight_factory(session_factory)
+        factory = make_stored_postgres_live_preflight_factory(
+            session_factory, connect_timeout_seconds=2.5
+        )
         async with factory(request) as execution:
             assert isinstance(execution, LivePreflightExecution)
             assert execution.connection is connection
@@ -180,7 +187,7 @@ async def test_provider_binds_guarded_target_to_same_connection_capture() -> Non
     )
     decrypt.assert_called_once_with(b"encrypted-target", b"twelve-bytes")
     connect.assert_awaited_once_with(
-        "postgresql://user:secret@db.example.test/app", timeout=10.0
+        "postgresql://user:secret@db.example.test/app", timeout=2.5
     )
     capture.assert_awaited_once_with(connection, "tenant$scope")
     connection.close.assert_awaited_once_with()
