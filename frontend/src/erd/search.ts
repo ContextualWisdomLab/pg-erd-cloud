@@ -4,7 +4,7 @@ import type { TableNodeData } from "./convert";
 
 const searchableTextCache = new WeakMap<TableNodeData, string>();
 
-/** Test boundary seam: exposing cache miss count for deterministic test assertions. */
+/** @internal Test boundary seam: exposing cache miss count for deterministic test assertions. */
 export const _searchCacheMetrics = { misses: 0 };
 
 function getSearchableText(data: TableNodeData): string {
