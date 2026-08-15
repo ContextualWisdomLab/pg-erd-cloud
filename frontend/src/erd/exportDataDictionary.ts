@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { parseSourceColumnNameFromHandle, parseTargetColumnNameFromHandle } from './handleUtils';
+import { parseSourceColumnNameFromHandle } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
