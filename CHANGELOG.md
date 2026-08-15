@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bound guarded PostgreSQL live-preflight connection acquisition to an
+  injected finite timeout in `(0, 60]` seconds and propagate it through the
+  durable-attempt and UUID-only consumer composition. Invalid values fail while
+  constructing the capability, before metadata lookup, decryption, target I/O,
+  or SQL authority.
+
 - Add one explicit stored-PostgreSQL migration-run composition that binds the
   durable dry-run attempt capability to exact worker-attempt leasing before it
   can be injected into the UUID-only signal consumer. The caller still supplies
