@@ -12,6 +12,7 @@ import pytest
 from app.jobs.live_preflight_provider import (
     make_stored_postgres_durable_dry_run_attempt_handler,
     make_stored_postgres_live_preflight_factory,
+    make_stored_postgres_migration_run_handler,
 )
 from app.jobs.migration_dry_run_worker import (
     GuardedLivePreflightTarget,
@@ -80,6 +81,50 @@ async def test_composition_binds_one_metadata_factory_to_provider_and_attempt() 
     )
     delegate.assert_awaited_once_with(
         session_factory, signal_claim, attempt_claim
+    )
+
+
+def test_consumer_composition_binds_attempt_leases_to_stored_provider() -> None:
+    """Expose one bounded handler without granting startup or apply authority."""
+
+    session_factory = MagicMock()
+    sandbox_factory = MagicMock()
+    attempt_handler = MagicMock()
+    consumer_handler = MagicMock()
+
+    with patch(
+        "app.jobs.live_preflight_provider."
+        "make_stored_postgres_durable_dry_run_attempt_handler",
+        return_value=attempt_handler,
+    ) as make_attempt_handler, patch(
+        "app.jobs.live_preflight_provider."
+        "make_attempt_bound_migration_run_handler",
+        return_value=consumer_handler,
+    ) as make_consumer_handler:
+        handler = make_stored_postgres_migration_run_handler(
+            session_factory,
+            sandbox_factory,
+            worker_identity="worker-a",
+            attempt_lease_seconds=45,
+            heartbeat_interval_s=10.0,
+            preflight_stage_timeout_seconds=12.0,
+        )
+
+    assert handler is consumer_handler
+    make_attempt_handler.assert_called_once_with(
+        session_factory,
+        sandbox_factory,
+        lock_timeout_ms=1_000,
+        sandbox_statement_timeout_ms=30_000,
+        preflight_statement_timeout_ms=5_000,
+        sandbox_stage_timeout_seconds=300.0,
+        preflight_stage_timeout_seconds=12.0,
+    )
+    make_consumer_handler.assert_called_once_with(
+        attempt_handler,
+        worker_identity="worker-a",
+        attempt_lease_seconds=45,
+        heartbeat_interval_s=10.0,
     )
 
 
