@@ -67,6 +67,8 @@ class ConnectionOut(BaseModel):
     conn_name: str
 
 
+from pydantic import field_validator
+
 class ApplySqlIn(BaseModel):
     """Request body for forward-engineering DDL against a connection."""
 
@@ -80,6 +82,22 @@ class ApplySqlIn(BaseModel):
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql_ddl(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("SQL cannot be empty or just whitespace")
+        if ";" in s:
+            raise ValueError("Multiple statements not allowed")
+        if "--" in s or "/*" in s or "*/" in s:
+            raise ValueError("Comments not allowed")
+        upper_s = s.upper()
+        allowed = ("CREATE ", "ALTER ", "DROP ", "TRUNCATE ", "COMMENT ")
+        if not upper_s.startswith(allowed):
+            raise ValueError("Only DDL commands allowed")
+        return v
 
 
 class ApplySqlOut(BaseModel):
