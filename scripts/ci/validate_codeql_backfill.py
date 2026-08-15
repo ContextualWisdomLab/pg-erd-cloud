@@ -10,6 +10,34 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "codeql-backfill.yml"
+WORKFLOW_EXPRESSION = re.compile(
+    r"\$\{\{\s*(?P<expression>[^}\r\n]+?)\s*\}\}"
+)
+ALLOWED_EXPRESSION_LOCATIONS = {
+    "steps.commits.outputs.commits": {
+        (30, "commits: ${{ steps.commits.outputs.commits }}"),
+    },
+    "inputs.branch": {
+        (42, "BRANCH_INPUT: ${{ inputs.branch }}"),
+        (110, 'ref: "refs/heads/${{ inputs.branch }}"'),
+    },
+    "inputs.commit_count": {
+        (43, "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}"),
+    },
+    "matrix.language": {
+        (78, "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}"),
+        (101, "languages: ${{ matrix.language }}"),
+        (109, 'category: "/language:${{ matrix.language }}/backfill"'),
+    },
+    "matrix.commit": {
+        (78, "name: Analyze ${{ matrix.language }} at ${{ matrix.commit }}"),
+        (94, "ref: ${{ matrix.commit }}"),
+        (111, "sha: ${{ matrix.commit }}"),
+    },
+    "fromJson(needs.enumerate.outputs.commits)": {
+        (88, "commit: ${{ fromJson(needs.enumerate.outputs.commits) }}"),
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -17,15 +45,134 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def main() -> int:
-    text = WORKFLOW.read_text(encoding="utf-8")
+def _validate_workflow_expressions(text: str) -> None:
+    """Allow only reviewed workflow expressions at their exact boundaries."""
+
+    observed: dict[str, set[tuple[int, str]]] = {
+        expression: set() for expression in ALLOWED_EXPRESSION_LOCATIONS
+    }
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        matches = list(WORKFLOW_EXPRESSION.finditer(line))
+        require(
+            line.count("${{") == len(matches),
+            "unparseable multiline workflow expression",
+        )
+        require(
+            line.count("}}") == len(matches),
+            "unparseable multiline workflow expression",
+        )
+        for match in matches:
+            expression = match.group("expression")
+            location = (line_number, stripped)
+            allowed_locations = ALLOWED_EXPRESSION_LOCATIONS.get(expression, set())
+            require(
+                location in allowed_locations,
+                f"unapproved workflow expression: {expression}",
+            )
+            observed[expression].add(location)
+
+    for expression, allowed_locations in ALLOWED_EXPRESSION_LOCATIONS.items():
+        require(
+            observed[expression] == allowed_locations,
+            f"workflow expression locations changed: {expression}",
+        )
+
+
+def _permission_mapping(text: str, *, job: str | None) -> dict[str, str]:
+    """Return one exact workflow or job permission mapping."""
+
+    lines = text.splitlines()
+    if job is None:
+        header = "permissions:"
+        header_index = next(
+            (index for index, line in enumerate(lines) if line == header),
+            None,
+        )
+    else:
+        job_header = f"  {job}:"
+        job_index = next(
+            (index for index, line in enumerate(lines) if line == job_header),
+            None,
+        )
+        require(job_index is not None, f"missing workflow job: {job}")
+        assert job_index is not None
+        next_job_index = next(
+            (
+                index
+                for index in range(job_index + 1, len(lines))
+                if re.fullmatch(r"  [A-Za-z0-9_-]+:", lines[index])
+            ),
+            len(lines),
+        )
+        header = "    permissions:"
+        header_index = next(
+            (
+                index
+                for index in range(job_index + 1, next_job_index)
+                if lines[index] == header
+            ),
+            None,
+        )
+    require(
+        header_index is not None,
+        "missing workflow permissions"
+        if job is None
+        else f"missing permissions for job: {job}",
+    )
+    assert header_index is not None
+    header_indent = len(header) - len(header.lstrip())
+    expected_indent = header_indent + 2
+    permissions: dict[str, str] = {}
+    for line in lines[header_index + 1 :]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent <= header_indent:
+            break
+        match = re.fullmatch(
+            rf" {{{expected_indent}}}(?P<name>[A-Za-z-]+):\s*(?P<value>\S+)",
+            line,
+        )
+        require(match is not None, "workflow permission mapping is invalid")
+        assert match is not None
+        name = match.group("name")
+        require(name not in permissions, f"duplicate workflow permission: {name}")
+        permissions[name] = match.group("value")
+    return permissions
+
+
+def _validate_permissions(text: str) -> None:
+    """Keep CodeQL upload authority confined to the analysis job."""
+
+    require(
+        _permission_mapping(text, job=None) == {"contents": "read"},
+        "workflow security-events: write permission is invalid",
+    )
+    require(
+        _permission_mapping(text, job="enumerate") == {"contents": "read"},
+        "enumerate security-events: write permission is invalid",
+    )
+    require(
+        _permission_mapping(text, job="analyze")
+        == {
+            "actions": "read",
+            "contents": "read",
+            "security-events": "write",
+        },
+        "analysis security-events: write permission is invalid",
+    )
+
+
+def validate_workflow(text: str) -> None:
+    """Validate one complete CodeQL backfill workflow document."""
 
     require("workflow_dispatch:" in text, "workflow must be manual-only")
     require("branch:" in text, "branch input is required")
     require("commit_count:" in text, "commit_count input is required")
     require('default: "main"' in text, "branch default must remain main")
     require('default: "30"' in text, "commit_count default must remain 30")
-    require("security-events: write" in text, "CodeQL upload permission is required")
+    _validate_permissions(text)
     require("persist-credentials: false" in text, "checkout credentials must not persist")
     require("git rev-list --max-count" in text, "must enumerate recent commits")
     require("--first-parent" not in text, "must not skip non-first-parent commits")
@@ -34,9 +181,57 @@ def main() -> int:
     require("github/codeql-action/analyze@" in text, "must upload CodeQL analysis")
     require('ref: "refs/heads/${{ inputs.branch }}"' in text, "analysis ref must target the requested branch")
     require("sha: ${{ matrix.commit }}" in text, "analysis SHA must use the selected commit")
+    require(
+        "BRANCH_INPUT: ${{ inputs.branch }}" in text,
+        "branch input must enter the shell through env",
+    )
+    require(
+        "COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}" in text,
+        "commit_count input must enter the shell through env",
+    )
+    require(
+        'branch="${BRANCH_INPUT}"' in text,
+        "shell must read the branch from its environment",
+    )
+    require(
+        'count="${COMMIT_COUNT_INPUT}"' in text,
+        "shell must read commit_count from its environment",
+    )
+    require(
+        'normalized_branch="$(git check-ref-format --branch "${branch}")"'
+        in text,
+        "branch input must produce a normalized branch name",
+    )
+    require(
+        'if [[ "${normalized_branch}" != "${branch}" ]]' in text,
+        "normalized branch must equal the original input",
+    )
+    require(
+        'source_ref="refs/heads/${branch}"' in text,
+        "fetch source must be an explicit heads ref",
+    )
+    require(
+        'tracking_ref="refs/remotes/origin/${branch}"' in text,
+        "fetch destination must be an explicit remote-tracking ref",
+    )
+    require(
+        'git fetch --no-tags --prune origin -- "${source_ref}:${tracking_ref}"'
+        in text,
+        "fetch must terminate options before the validated refspec",
+    )
+    require(
+        'git fetch --no-tags --prune origin "${branch}"' not in text,
+        "branch input must not remain an option-capable fetch argument",
+    )
+    require(
+        '"origin/${branch}"' not in text,
+        "revision enumeration must use the explicit tracking ref",
+    )
+    _validate_workflow_expressions(text)
 
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")
+    assert language_match is not None
     languages = {
         item.strip().strip('"').strip("'")
         for item in language_match.group("languages").split(",")
@@ -45,6 +240,10 @@ def main() -> int:
         languages == {"javascript-typescript", "python"},
         f"unexpected language matrix: {sorted(languages)}",
     )
+
+
+def main() -> int:
+    validate_workflow(WORKFLOW.read_text(encoding="utf-8"))
 
     return 0
 
