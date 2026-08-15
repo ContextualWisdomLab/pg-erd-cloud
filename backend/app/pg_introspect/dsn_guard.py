@@ -1,3 +1,5 @@
+"""Validate PostgreSQL DSN network and server-local resource boundaries."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,10 +11,13 @@ from urllib.parse import parse_qsl, urlparse
 from app.settings import settings
 
 POSTGRES_SCHEMES = {"postgres", "postgresql"}
+SERVER_LOCAL_FILE_QUERY_PARAMETERS = frozenset(
+    {"passfile", "sslcert", "sslcrl", "sslkey", "sslrootcert"}
+)
 
 
 class DsnTargetError(ValueError):
-    """Raised when a PostgreSQL DSN points at a disallowed network target."""
+    """Raised when a PostgreSQL DSN points at a disallowed target or resource."""
 
 
 @dataclass(frozen=True)
@@ -176,7 +181,7 @@ async def _validated_ip_hosts(
 
 
 async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
-    """Reject PostgreSQL DSNs that could target internal network resources."""
+    """Reject PostgreSQL DSNs targeting internal networks or host-local files."""
 
     parsed = urlparse(dsn)
     if parsed.scheme.lower() not in POSTGRES_SCHEMES:
@@ -191,6 +196,8 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     except ValueError as err:
         raise DsnTargetError("database DSN port is invalid") from err
     query = _parse_query_params(parsed.query)
+    if SERVER_LOCAL_FILE_QUERY_PARAMETERS.intersection(query):
+        raise DsnTargetError("database DSN must not reference server-local files")
 
     port_override = _validate_query_ports(query.get("port", []))
     if port_override is not None:
