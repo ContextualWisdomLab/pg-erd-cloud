@@ -12,6 +12,13 @@ from app.schemas import (
 )
 
 
+_LOG_BREAKING_CHARACTERS = (
+    [chr(code_point) for code_point in range(0x00, 0x20)]
+    + [chr(code_point) for code_point in range(0x7F, 0xA0)]
+    + ["\u2028", "\u2029"]
+)
+
+
 def test_project_name_length_is_bounded() -> None:
     with pytest.raises(ValidationError):
         ProjectCreateIn(project_name="x" * 256)
@@ -45,46 +52,46 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
 
 
+@pytest.mark.parametrize("code_point", _LOG_BREAKING_CHARACTERS)
+def test_display_labels_reject_log_breaking_characters(code_point: str) -> None:
+    """Reject C0, C1, DEL, and Unicode line separators in display labels."""
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name=f"diagram{code_point}name", layout_json={})
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name=f"api{code_point}key")
+
+
 @pytest.mark.parametrize(
-    "code_point",
-    [chr(i) for i in range(32)] + ["\x7f"],
+    "model_input",
+    [
+        {"name": "\u0085diagram", "layout_json": {}},
+        {"name": "diagram\u2028name", "layout_json": {}},
+        {"name": "diagram\u2029", "layout_json": {}},
+    ],
 )
-def test_identifier_rejects_all_control_characters(code_point: str) -> None:
-    # Test DiagramViewCreateIn.name at start, middle, and end
+def test_diagram_label_rejects_log_breaks_at_boundaries(model_input: dict) -> None:
+    """Reject representative Unicode log breaks at each label position."""
     with pytest.raises(ValidationError):
-        DiagramViewCreateIn(name=f"{code_point}test", layout_json={})
-    with pytest.raises(ValidationError):
-        DiagramViewCreateIn(name=f"te{code_point}st", layout_json={})
-    with pytest.raises(ValidationError):
-        DiagramViewCreateIn(name=f"test{code_point}", layout_json={})
-
-    # Test ApiKeyCreateIn.key_name at start, middle, and end
-    with pytest.raises(ValidationError):
-        ApiKeyCreateIn(key_name=f"{code_point}test")
-    with pytest.raises(ValidationError):
-        ApiKeyCreateIn(key_name=f"te{code_point}st")
-    with pytest.raises(ValidationError):
-        ApiKeyCreateIn(key_name=f"test{code_point}")
+        DiagramViewCreateIn(**model_input)
 
 
-def test_identifier_accepts_valid_characters_and_bounds() -> None:
-    # Valid DiagramViewCreateIn.name
+def test_display_labels_accept_valid_unicode_and_bounds() -> None:
+    """Preserve ordinary Unicode, spaces, emoji sequences, and length bounds."""
     DiagramViewCreateIn(name="valid space name", layout_json={})
-    DiagramViewCreateIn(name="emoji 🚀", layout_json={})
+    DiagramViewCreateIn(name="family 👨‍👩‍👧‍👦", layout_json={})
     DiagramViewCreateIn(name="unicode ë", layout_json={})
-    DiagramViewCreateIn(name="a", layout_json={})  # Min length
-    DiagramViewCreateIn(name="a" * 200, layout_json={})  # Max length
+    DiagramViewCreateIn(name="a", layout_json={})
+    DiagramViewCreateIn(name="a" * 200, layout_json={})
     with pytest.raises(ValidationError):
         DiagramViewCreateIn(name="", layout_json={})
     with pytest.raises(ValidationError):
         DiagramViewCreateIn(name="a" * 201, layout_json={})
 
-    # Valid ApiKeyCreateIn.key_name
     ApiKeyCreateIn(key_name="valid space key")
-    ApiKeyCreateIn(key_name="emoji 🚀 key")
+    ApiKeyCreateIn(key_name="family 👨‍👩‍👧‍👦 key")
     ApiKeyCreateIn(key_name="unicode ë key")
-    ApiKeyCreateIn(key_name="a")  # Min length
-    ApiKeyCreateIn(key_name="a" * 128)  # Max length
+    ApiKeyCreateIn(key_name="a")
+    ApiKeyCreateIn(key_name="a" * 128)
     with pytest.raises(ValidationError):
         ApiKeyCreateIn(key_name="")
     with pytest.raises(ValidationError):
