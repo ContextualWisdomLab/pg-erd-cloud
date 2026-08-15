@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pytest
+import uuid
+from unittest.mock import AsyncMock, patch
 from httpx import ASGITransport, AsyncClient
 from app.main import app
-import uuid
 
 @pytest.mark.asyncio
 async def test_create_view_returns_422_when_name_has_control_characters():
@@ -16,15 +17,16 @@ async def test_create_view_returns_422_when_name_has_control_characters():
         csrf_res = await ac.get("/api/csrf-token")
         token = csrf_res.json()["csrf_token"]
 
-        response = await ac.post(
-            f"/api/diagram-views/by-project/{uuid.uuid4()}",
-            json={"name": "invalid\nname", "layout_json": {}},
-            headers={
-                "X-CSRF-Token": token,
-                "Origin": "http://test",
-                "Referer": "http://test/"
-            }
-        )
+        with patch("app.api.diagram_views.require_project_member", new_callable=AsyncMock):
+            response = await ac.post(
+                f"/api/diagram-views/by-project/{uuid.uuid4()}",
+                json={"name": "invalid\nname", "layout_json": {}},
+                headers={
+                    "X-CSRF-Token": token,
+                    "Origin": "http://test",
+                    "Referer": "http://test/",
+                }
+            )
     assert response.status_code == 422
     assert "string_pattern_mismatch" in response.text
 
@@ -45,7 +47,7 @@ async def test_create_api_key_returns_422_when_key_name_has_control_characters()
             headers={
                 "X-CSRF-Token": token,
                 "Origin": "http://test",
-                "Referer": "http://test/"
+                "Referer": "http://test/",
             }
         )
     assert response.status_code == 422
