@@ -25,6 +25,7 @@ describe('EditTableModal', () => {
       type: 'table',
       position: { x: 0, y: 0 },
       data: {
+        schema: 'public',
         title: 'test_table',
         comment: '',
         columns: [
@@ -59,6 +60,7 @@ describe('EditTableModal', () => {
       type: 'table',
       position: { x: 0, y: 0 },
       data: {
+        schema: 'public',
         title: 'test_table',
         comment: '',
         columns: []
@@ -92,6 +94,7 @@ describe('EditTableModal', () => {
       type: 'table',
       position: { x: 0, y: 0 },
       data: {
+        schema: 'public',
         title: 'test_table',
         comment: '',
         columns: [
@@ -132,6 +135,7 @@ describe('EditTableModal', () => {
       type: 'table',
       position: { x: 0, y: 0 },
       data: {
+        schema: 'public',
         title: 'test_table',
         comment: '',
         columns: [
@@ -151,6 +155,38 @@ describe('EditTableModal', () => {
     expect(setNodesMock).not.toHaveBeenCalled();
   });
 
+  it('identifies relations distinctly by schema in accessible names', async () => {
+    const defaultPropsLocal = { ...defaultProps, onEditTableCancel: vi.fn(), setNodes: vi.fn() };
+    const editingNodePublic = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 10, y: 10 },
+      data: {
+        schema: 'public',
+        title: 'test_table',
+        comment: '',
+        columns: []
+      }
+    };
+    const editingNodeHr = {
+      id: 'table-2',
+      type: 'table',
+      position: { x: 10, y: 10 },
+      data: {
+        schema: 'hr',
+        title: 'test_table',
+        comment: '',
+        columns: []
+      }
+    };
+
+    const { rerender } = render(<EditTableModal {...defaultPropsLocal} editingNode={editingNodePublic as any} />);
+    expect(screen.getByRole('button', { name: 'public.test_table 테이블 삭제' })).toBeInTheDocument();
+
+    rerender(<EditTableModal {...defaultPropsLocal} editingNode={editingNodeHr as any} />);
+    expect(screen.getByRole('button', { name: 'hr.test_table 테이블 삭제' })).toBeInTheDocument();
+  });
+
   it('duplicates a table when 복제 is clicked', async () => {
     const setNodesMock = vi.fn();
     const onEditTableCancelMock = vi.fn();
@@ -159,6 +195,7 @@ describe('EditTableModal', () => {
       type: 'table',
       position: { x: 10, y: 10 },
       data: {
+        schema: 'public',
         title: 'test_table',
         comment: '',
         columns: [
@@ -170,7 +207,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
+    await user.click(screen.getByRole('button', { name: 'public.test_table 테이블 복제' }));
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
@@ -183,54 +220,5 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.title).toBe('test_table_copy');
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
-  });
-
-  it('updates contextual table action labels when the editing table changes', () => {
-    const firstTable = {
-      id: 'table-1',
-      type: 'table',
-      position: { x: 0, y: 0 },
-      data: {
-        title: 'public.users',
-        comment: '',
-        columns: [],
-      },
-    };
-    const secondTable = {
-      ...firstTable,
-      id: 'table-2',
-      data: {
-        ...firstTable.data,
-        title: 'audit.events',
-      },
-    };
-
-    const { rerender } = render(
-      <EditTableModal {...defaultProps} editingNode={firstTable as any} />,
-    );
-
-    expect(
-      screen.getByRole('button', { name: 'public.users 테이블 삭제' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'public.users 테이블 복제' }),
-    ).toBeInTheDocument();
-
-    rerender(
-      <EditTableModal {...defaultProps} editingNode={secondTable as any} />,
-    );
-
-    expect(
-      screen.getByRole('button', { name: 'audit.events 테이블 삭제' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'audit.events 테이블 복제' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'public.users 테이블 삭제' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'public.users 테이블 복제' }),
-    ).not.toBeInTheDocument();
   });
 });

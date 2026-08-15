@@ -7,6 +7,7 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 import type { SnapshotJson } from '../types'
 
 export type TableNodeData = {
+  schema?: string
   title: string
   comment?: string | null
   columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
@@ -133,6 +134,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       type: 'tableNode',
       position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
       data: {
+        schema: t.schema_name,
         title: `${t.schema_name}.${t.relation_name}`,
         comment: t.relation_comment,
         columns: cols,
