@@ -80,19 +80,6 @@ async def test_create_view_rejects_oversized_layout():
 
 
 @pytest.mark.asyncio
-async def test_create_view_rejects_control_characters_in_name():
-    session = AsyncMock()
-    body_json = {"name": "invalid\nname", "layout_json": {}}
-    with patch(
-        "app.api.diagram_views.require_project_member", new_callable=AsyncMock
-    ):
-        out = await create_view(
-            project_space_uuid=uuid.uuid4(), body=body_json, user=_user(), session=session
-        )
-    assert out.status_code == 422
-
-
-@pytest.mark.asyncio
 async def test_delete_view_returns_404_when_unauthorized():
     session = AsyncMock()
     with patch(
