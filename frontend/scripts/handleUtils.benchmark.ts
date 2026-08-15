@@ -29,6 +29,7 @@ interface SummaryStatistics {
   median: number;
 }
 
+/** Reproduce the predecessor implementation as the paired benchmark control. */
 function sanitizeHandleIdOriginal(columnName: string): string {
   const encoded = Array.from(columnName, (char) =>
     char.codePointAt(0)!.toString(16).padStart(4, '0'),
@@ -51,10 +52,12 @@ const testCases = [
 const iterationsPerSample = 10_000;
 const numberOfPairs = 50;
 
+/** Stop the benchmark rather than publishing incomplete or misleading evidence. */
 function failClosed(message: string): never {
   throw new Error(`Benchmark failed: ${message}`);
 }
 
+/** Require an explicit garbage-collection boundary before each timed sample. */
 function forceGarbageCollection(): void {
   if (!global.gc) {
     failClosed(
@@ -64,6 +67,7 @@ function forceGarbageCollection(): void {
   global.gc();
 }
 
+/** Measure elapsed time and the diagnostic V8 heap-use delta for one sample. */
 function runMeasurement(fn: BenchmarkFunction): Measurement {
   forceGarbageCollection();
   const heapUsedBefore = process.memoryUsage().heapUsed;
@@ -83,6 +87,7 @@ function runMeasurement(fn: BenchmarkFunction): Measurement {
   };
 }
 
+/** Return the conventional median, averaging both middle values when even. */
 function median(values: readonly number[]): number {
   if (values.length === 0) {
     failClosed('cannot summarize an empty sample');
@@ -96,6 +101,7 @@ function median(values: readonly number[]): number {
   return (sorted[upperIndex - 1] + sorted[upperIndex]) / 2;
 }
 
+/** Summarize a non-empty sequence without replacing its ordered raw evidence. */
 function summarize(values: readonly number[]): SummaryStatistics {
   if (values.length === 0) {
     failClosed('cannot summarize an empty sample');
@@ -107,6 +113,7 @@ function summarize(values: readonly number[]): SummaryStatistics {
   };
 }
 
+/** Execute the deterministic paired benchmark and publish its evidence artifact. */
 function runBenchmark(): void {
   for (let iteration = 0; iteration < 1_000; iteration += 1) {
     for (const testCase of testCases) {
