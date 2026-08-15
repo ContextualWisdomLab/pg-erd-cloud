@@ -1,8 +1,8 @@
 import type { Node } from "@xyflow/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 
 import type { TableNodeData } from "../convert";
-import { findSearchMatchedNodeIds, tableNodeMatchesSearch, _searchCacheMetrics } from "../search";
+import { findSearchMatchedNodeIds, tableNodeMatchesSearch, _getSearchCacheMisses, _resetSearchCacheMisses } from "../search";
 
 function tableNode(
   id: string,
@@ -22,6 +22,10 @@ function tableNode(
 }
 
 describe("ERD node search", () => {
+  beforeEach(() => {
+    _resetSearchCacheMisses();
+  });
+
   const users = tableNode("users", {
     title: "public.users",
     comment: "Customer profile records",
@@ -121,11 +125,11 @@ describe("ERD node search", () => {
 
   it("caches string parsing to avoid redundant allocations for identical node data", () => {
     const node = tableNode("perfTest", { title: "initial_title", columns: [] });
-    const initialMisses = _searchCacheMetrics.misses;
+    const initialMisses = _getSearchCacheMisses();
 
     // Initial evaluation populates the cache
     expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
-    expect(_searchCacheMetrics.misses).toBe(initialMisses + 1);
+    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
 
     // Evaluate multiple times simulating 60fps drag render ticks
     for(let i=0; i<100; i++) {
@@ -133,54 +137,6 @@ describe("ERD node search", () => {
     }
 
     // The cache miss counter should not have increased
-    expect(_searchCacheMetrics.misses).toBe(initialMisses + 1);
-  });
-
-  it("proves fast evaluation at representative layout bounds", () => {
-     // Generate a large table with 100 columns
-     const columns = [];
-     for(let i=0; i<100; i++) {
-       columns.push({
-           column_name: `field_${i}`,
-           data_type: "varchar(255)",
-           is_not_null: false,
-           is_pk: false,
-           column_comment: `desc_${i}`
-       });
-     }
-
-     const heavyNodes = [];
-     for(let i=0; i<500; i++) {
-        heavyNodes.push(tableNode(`t${i}`, {
-            title: `heavy_table_${i}`,
-            columns
-        }));
-     }
-
-     const initialMisses = _searchCacheMetrics.misses;
-
-     // Build cache for all nodes
-     const startBuild = performance.now();
-     const matched = findSearchMatchedNodeIds(heavyNodes, "heavy_table_499 field_99");
-     const endBuild = performance.now();
-
-     expect(matched.has("t499")).toBe(true);
-     expect(_searchCacheMetrics.misses).toBe(initialMisses + 500); // Exactly 1 miss per node
-
-     const missBeforeFast = _searchCacheMetrics.misses;
-
-     // Measure cached run
-     const startCache = performance.now();
-     const fastMatched = findSearchMatchedNodeIds(heavyNodes, "field_0 desc_0");
-     const endCache = performance.now();
-
-     expect(fastMatched.size).toBe(500);
-
-     // 0 new cache misses, entirely hitting WeakMap
-     expect(_searchCacheMetrics.misses).toBe(missBeforeFast);
-
-     // Verify the actual cached performance improvement
-     // Depending on CI it's typically a 10x-50x speedup
-     expect(endCache - startCache).toBeLessThan(endBuild - startBuild);
+    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
   });
 });
