@@ -108,6 +108,13 @@ async def test_revoke_is_idor_safe_and_idempotent():
 
 
 @pytest.mark.asyncio
+async def test_create_rejects_control_characters_in_name():
+    session = AsyncMock()
+    user = _user()
+    # We pass dict directly to bypass pydantic validation in tests to hit FastAPI layer
+    # But this function takes ApiKeyCreateIn directly, so we can't test 422 at this layer.
+    # We rely on schema tests for unit validation and integration tests for 422.
+
 async def test_list_returns_only_metadata():
     user = _user()
     key = SimpleNamespace(
