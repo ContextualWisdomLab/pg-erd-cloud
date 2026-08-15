@@ -134,3 +134,32 @@ def test_worker_contract_bounds_whole_capability_stages() -> None:
     assert "timeout cancellation and capability cleanup" in contract
     assert "cooperative cancellation" in contract
     assert "does not prove a hard wall-clock termination bound" in contract
+
+
+def test_doctoring_evidence_paths_are_repository_root_relative() -> None:
+    """Keep published test evidence clickable from the repository root."""
+
+    documents = (
+        _read(Path("docs/doctoring/dbml-identifier-ddl-boundary.md")),
+        _read(Path("docs/doctoring/multiline-sql-request-controls.md")),
+    )
+    expected_paths = (
+        Path("backend/tests/test_dbml_import.py"),
+        Path("backend/tests/test_api_dbml.py"),
+        Path("backend/tests/test_fuzz_properties.py"),
+        Path("backend/tests/test_postgres_migration_run_integration.py"),
+        Path("backend/tests/test_schema_validation.py"),
+        Path("backend/tests/test_request_validation.py"),
+        Path("backend/tests/test_api_apply_sql.py"),
+    )
+
+    assert all("`tests/" not in document for document in documents)
+    assert all((REPOSITORY_ROOT / path).is_file() for path in expected_paths)
+
+
+def test_uml_does_not_mark_implemented_attempt_binding_as_planned() -> None:
+    """Keep the component and sequence maturity statements consistent."""
+
+    uml = _read(Path("docs/UML.md"))
+
+    assert "worker/attempt binding" not in uml
