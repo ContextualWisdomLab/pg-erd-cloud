@@ -170,7 +170,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '복제' }));
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
@@ -183,5 +183,33 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.title).toBe('test_table_copy');
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
+  });
+
+  it('calls onDeleteTable when 테이블 삭제 is clicked', async () => {
+    const onDeleteTableMock = vi.fn();
+    const editingNodeLocal = {
+      id: 'table-1',
+      type: 'tableNode',
+      position: { x: 0, y: 0 },
+      data: {
+        id: 'table-1',
+        schema: 'public',
+        title: 'test_table',
+        comment: 'test comment',
+        columns: [
+          {
+            column_name: 'test_col',
+            data_type: 'int',
+          },
+        ],
+      },
+    };
+
+    render(<EditTableModal {...defaultProps} editingNode={editingNodeLocal as any} setEditingNode={vi.fn()} setNodes={vi.fn()} onDeleteTable={onDeleteTableMock} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 삭제' }));
+
+    expect(onDeleteTableMock).toHaveBeenCalled();
   });
 });
