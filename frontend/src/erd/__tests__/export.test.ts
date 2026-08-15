@@ -663,6 +663,65 @@ describe('xml and plantuml escaping', () => {
 });
 
 describe('exportDiagramSvg bounds computation', () => {
+  it('should prevent XSS and normalize invalid coordinates in SVG exports', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: '" onload="alert(\'XSS\')" ' as any, y: '100' as any },
+        data: {
+          title: 'public.users',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: NaN, y: Infinity },
+        data: {
+          title: 'public.nan_inf',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      },
+      {
+        id: '3',
+        type: 'tableNode',
+        position: { x: 1e10, y: -1e10 },
+        data: {
+          title: 'public.extreme_coords',
+          columns: [],
+          badges: { pk: false, fk: false },
+        },
+      }
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'fk1',
+        source: '2',
+        target: '1',
+        label: 'fk_xss'
+      }
+    ];
+
+    const svg = exportDiagramSvg(nodes, edges);
+
+    // Verify explicit payload rejection / normalization
+    expect(svg).not.toContain('onload="alert');
+    expect(svg).not.toContain('NaN');
+    expect(svg).not.toContain('Infinity');
+
+    // Ensure the output contains only finite numbers for width/height/viewbox
+    expect(svg).toMatch(/viewBox="0 0 \d+ \d+"/);
+    expect(svg).toMatch(/width="\d+"/);
+    expect(svg).toMatch(/height="\d+"/);
+
+    // Assert all injected values are resolved to safe finite fallbacks (0)
+    expect(svg).not.toMatch(/\bNaN\b/);
+  });
+
   it('should compute bounding box properly with multiple nodes', () => {
     const nodes: Node<TableNodeData>[] = [
       {
