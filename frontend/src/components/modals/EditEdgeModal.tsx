@@ -23,6 +23,8 @@ export function EditEdgeModal({
 
   if (!editingEdge) return null;
 
+  const relationshipActionLabel = relLabel.trim() || editingEdge.id;
+
   return (
     <div
       className="modalOverlay"
@@ -81,7 +83,7 @@ export function EditEdgeModal({
         >
           <button
             type="button"
-            aria-label={`${relLabel || editingEdge.id} 관계 삭제`}
+            aria-label={`${relationshipActionLabel} 관계 삭제`}
             onClick={() => {
               if (!window.confirm("이 관계를 삭제하시겠습니까?")) return;
               onRelDelete();
