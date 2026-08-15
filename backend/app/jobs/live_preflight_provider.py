@@ -177,7 +177,6 @@ def make_stored_postgres_durable_dry_run_attempt_handler(
         preflight_statement_timeout_ms=preflight_statement_timeout_ms,
         sandbox_stage_timeout_seconds=sandbox_stage_timeout_seconds,
         preflight_stage_timeout_seconds=preflight_stage_timeout_seconds,
-        connect_timeout_seconds=connect_timeout_seconds,
     )
 
     async def handle_stored_postgres_attempt(
@@ -225,6 +224,7 @@ def make_stored_postgres_migration_run_handler(
         preflight_statement_timeout_ms=preflight_statement_timeout_ms,
         sandbox_stage_timeout_seconds=sandbox_stage_timeout_seconds,
         preflight_stage_timeout_seconds=preflight_stage_timeout_seconds,
+        connect_timeout_seconds=connect_timeout_seconds,
     )
     return make_attempt_bound_migration_run_handler(
         attempt_handler,
