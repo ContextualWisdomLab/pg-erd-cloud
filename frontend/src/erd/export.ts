@@ -322,8 +322,8 @@ export function exportDiagramSvg(
 
   // Keep this iterative; JS engines cap variadic argument counts for large SVG exports.
   for (const n of nodes) {
-    const x = n.position.x;
-    const y = n.position.y;
+    const x = Number(n.position.x);
+    const y = Number(n.position.y);
     const h = heights.get(n.id)!;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
@@ -344,10 +344,10 @@ export function exportDiagramSvg(
     const source = nodesById.get(edge.source);
     const target = nodesById.get(edge.target);
     if (!source || !target) continue;
-    const sx = source.position.x + offsetX + width;
-    const sy = source.position.y + offsetY + heights.get(source.id)! / 2;
-    const tx = target.position.x + offsetX;
-    const ty = target.position.y + offsetY + heights.get(target.id)! / 2;
+    const sx = Number(source.position.x) + offsetX + width;
+    const sy = Number(source.position.y) + offsetY + heights.get(source.id)! / 2;
+    const tx = Number(target.position.x) + offsetX;
+    const ty = Number(target.position.y) + offsetY + heights.get(target.id)! / 2;
     const mx = (sx + tx) / 2;
     parts.push(`<path d="M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>`);
     if (edge.label) {
@@ -356,8 +356,8 @@ export function exportDiagramSvg(
   }
 
   for (const node of nodes) {
-    const x = node.position.x + offsetX;
-    const y = node.position.y + offsetY;
+    const x = Number(node.position.x) + offsetX;
+    const y = Number(node.position.y) + offsetY;
     const height = heights.get(node.id)!;
     const groupColor = node.data.businessGroup
       ? normalizeBusinessGroupColor(node.data.businessGroup.color)
