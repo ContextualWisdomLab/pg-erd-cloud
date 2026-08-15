@@ -22,12 +22,12 @@ def _user() -> CurrentUser:
 @pytest.mark.asyncio
 async def test_dbml_identifier_error_returns_fixed_non_reflecting_422() -> None:
     """Malformed identifiers fail as fixed client errors without echoing input."""
-    secret = "sensitive-identifier-value"
-    body = DbmlConvertIn(dbml=f'Table "{secret}\x00" {{\n  id integer\n}}')
+    sensitive_marker = "sensitive-identifier-value"
+    body = DbmlConvertIn(dbml=f'Table "{sensitive_marker}\x00" {{\n  id integer\n}}')
 
     with pytest.raises(HTTPException) as exc_info:
         await convert_dbml(body=body, user=_user())
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == "invalid DBML identifier"
-    assert secret not in str(exc_info.value.detail)
+    assert sensitive_marker not in str(exc_info.value.detail)

@@ -61,8 +61,8 @@ Current authority boundaries:
   accepted production workflow.
 
 Components deliberately absent from this current diagram are **Planned**:
-isolated sandbox provisioning/materialization/cleanup, durable live-preflight
-worker/attempt binding and startup wiring, live plan execution, reconciliation,
+isolated sandbox provisioning/materialization/cleanup, deployed live-preflight
+worker execution and application startup wiring, live plan execution, reconciliation,
 and post-apply convergence verification. A repository-level stored-target
 provider now loads the plan-bound succeeded snapshot and exact connection,
 decrypts only that guarded credential, opens the target through the DNS/SSRF/TLS

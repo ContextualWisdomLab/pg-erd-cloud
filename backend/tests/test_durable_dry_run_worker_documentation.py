@@ -53,7 +53,7 @@ def test_worker_contract_preserves_authority_and_maturity_boundaries() -> None:
         "complete_live_preflight",
         "exact expected run state version",
         "one fresh database statement",
-        "PostgreSQL 14–18 matrix stores",
+        "PostgreSQL 14–18 matrix stores",  # noqa: RUF001 - contract uses en dash
         "does not eliminate the gap",
         "does not implement or prove",
         "Application startup wiring and deployed credential/network isolation remain Planned",

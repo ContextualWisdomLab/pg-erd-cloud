@@ -33,14 +33,14 @@ parses the SQL authorization grammar; character acceptance does not authorize SQ
 
 ## Evidence
 
-- `tests/test_schema_validation.py` exhaustively covers every rejected code
+- `backend/tests/test_schema_validation.py` exhaustively covers every rejected code
   point at the beginning, middle, and end of a realistic multiline value, the
   accepted whitespace/Unicode boundaries, and the exact length limit.
-- `tests/test_request_validation.py` proves the fixed response does not reflect
+- `backend/tests/test_request_validation.py` proves the fixed response does not reflect
   hostile SQL or a secret-like literal, that production wiring registers the
   handler, and that invalid legacy-apply input stops before authentication or
   metadata-session dependencies.
-- `tests/test_api_apply_sql.py` keeps the conservative parser, authorization,
+- `backend/tests/test_api_apply_sql.py` keeps the conservative parser, authorization,
   default-deny persistent path, and DSN-redacted execution failure contracts
   separate from character validation.
 

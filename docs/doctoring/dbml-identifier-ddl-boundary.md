@@ -40,13 +40,13 @@ DDL, so identifiers use the renderer instead.
 
 ## Acceptance evidence
 
-- `tests/test_dbml_import.py` covers ordinary, Unicode, reserved-word,
+- `backend/tests/test_dbml_import.py` covers ordinary, Unicode, reserved-word,
   whitespace, embedded-quote, dot, semicolon, comment-marker, NUL, malformed,
   overlength, multi-segment, resource-bound, and derived-name cases.
-- `tests/test_api_dbml.py` proves a fixed non-reflecting `422` response.
-- `tests/test_fuzz_properties.py` provides an optional Hypothesis
+- `backend/tests/test_api_dbml.py` proves a fixed non-reflecting `422` response.
+- `backend/tests/test_fuzz_properties.py` provides an optional Hypothesis
   parse/decode/render round trip when Hypothesis is installed.
-- `tests/test_postgres_migration_run_integration.py` executes hostile-looking
+- `backend/tests/test_postgres_migration_run_integration.py` executes hostile-looking
   quoted names on each ephemeral PostgreSQL 14–18 matrix target and verifies
   that only the intended relation exists.
 

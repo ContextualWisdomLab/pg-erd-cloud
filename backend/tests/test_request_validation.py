@@ -46,17 +46,17 @@ def test_validation_response_omits_hostile_sql_input(
 ) -> None:
     """Never echo rejected SQL or secret-like literals in a 422 response."""
 
-    secret = "password=do-not-reflect"
+    sensitive_marker = "password=do-not-reflect"
     response = TestClient(_validation_app()).post(
         "/api/connections/00000000-0000-4000-8000-000000000001/apply-sql",
-        json={"sql": f"CREATE\x00TABLE sample (note text DEFAULT '{secret}')"},
+        json={"sql": f"CREATE\x00TABLE sample (note text DEFAULT '{sensitive_marker}')"},
     )
 
     assert response.status_code == 422
     assert response.json() == {"detail": "request validation failed"}
-    assert secret not in response.text
+    assert sensitive_marker not in response.text
     assert "CREATE" not in response.text
-    assert secret not in caplog.text
+    assert sensitive_marker not in caplog.text
 
 
 def test_invalid_legacy_apply_body_stops_before_auth_or_session() -> None:
@@ -128,7 +128,7 @@ def test_validation_response_omits_oversized_dbml_input(
 ) -> None:
     """Never echo rejected DBML from the bounded conversion endpoint."""
 
-    secret = "dbml-secret-do-not-reflect"
+    sensitive_marker = "dbml-secret-do-not-reflect"
     response = TestClient(_validation_app()).post(
         "/api/dbml/convert",
         json={"dbml": secret + ("x" * 524_288)},
@@ -136,5 +136,5 @@ def test_validation_response_omits_oversized_dbml_input(
 
     assert response.status_code == 422
     assert response.json() == {"detail": "request validation failed"}
-    assert secret not in response.text
-    assert secret not in caplog.text
+    assert sensitive_marker not in response.text
+    assert sensitive_marker not in caplog.text
