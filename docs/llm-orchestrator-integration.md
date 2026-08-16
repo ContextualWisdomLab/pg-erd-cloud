@@ -7,7 +7,13 @@ Bearer`, `{model, messages}`). [contextual-orchestrator](https://github.com/Cont
 exposes exactly that interface (`/v1/chat/completions`) while routing,
 delegating, verifying, and synthesizing across a pool of model agents.
 
-So the integration is **configuration only — no code change**.
+When `LLM_MODEL=contextual-orchestrator`, pg-erd-cloud explicitly includes
+`orchestration_mode: auto`. The orchestration plane therefore owns model/provider
+selection, workflow depth, verification, fallback, and known-price optimization.
+Quality sufficiency is the first constraint; cost is minimized among
+quality-sufficient execution paths. Missing price metadata is classified as
+unpriced rather than free. Other OpenAI-compatible model identifiers retain the
+generic provider payload and receive no orchestration-only field.
 
 ## Point pg-erd-cloud at the orchestrator
 
