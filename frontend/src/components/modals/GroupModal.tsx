@@ -3,6 +3,7 @@ import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
 import { useDialogAccessibility } from './useDialogAccessibility';
+import './GroupModal.css';
 
 interface GroupModalProps {
   isOpen: boolean;
