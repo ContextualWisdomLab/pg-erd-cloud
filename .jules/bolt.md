@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## $(date +%Y-%m-%d) - Optimize sanitizeHandleId to reduce GC overhead
+**Learning:** `Array.from(string).join('-')` inside a hot path (like computing handle IDs for thousands of ERD columns) allocates intermediate arrays unnecessarily, creating garbage collection pressure.
+**Action:** Replaced `Array.from` with a `for...of` loop over the string, which iterates Unicode scalars safely without allocating an array, and constructed the output via string concatenation. Included an explicit optimization comment as required by Bolt's philosophy.
