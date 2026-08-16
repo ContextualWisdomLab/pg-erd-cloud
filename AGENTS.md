@@ -97,5 +97,12 @@ behind Traefik (`deploy/traefik/`).
   only when redistribution is permissible; otherwise cite + link + summarize.
 - For this repo (ERD / schema design), ground substantive work in the relevant
   literature — e.g. data modeling, ER theory, schema normalization, or
-  graph/layout algorithms for diagram rendering.
+    graph/layout algorithms for diagram rendering.
 <!-- END cwl-agent-guidance -->
+
+## Local product contracts
+
+- Prisma export identifiers: `docs/adr/0011-prisma-identifier-allocation.md`
+  and `docs/doctoring/prisma-identifier-allocation.md`. Do not reintroduce a
+  one-pass character sanitizer.
+- Architecture overview: `ARCHITECTURE.md`.

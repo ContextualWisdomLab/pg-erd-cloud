@@ -21,6 +21,8 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadPrismaManifest?: () => void;
+  prismaExportError?: string | null;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -54,6 +56,8 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadPrismaManifest,
+  prismaExportError = null,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -113,7 +117,11 @@ export function ExportModal({
     },
     {
       label: 'Prisma Schema',
-      description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
+      description: prismaExportError
+        ? prismaExportError
+        : hasDiagramExport
+          ? '텍스트 포맷'
+          : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
@@ -237,6 +245,15 @@ export function ExportModal({
                   >
                     {artifact.buttonLabel}
                   </button>
+                  {artifact.label === 'Prisma Schema' && prismaExportError && onDownloadPrismaManifest ? (
+                    <button
+                      type="button"
+                      onClick={onDownloadPrismaManifest}
+                      aria-label="Prisma 진단 매니페스트 받기"
+                    >
+                      진단 받기
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
+
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
+import {
+  PRISMA_EXPORT_FAILURE_MESSAGE,
+  PRISMA_EXPORT_FAILURE_SCHEMA,
+  exportPrisma,
+  exportPrismaDocument,
+} from '../prisma';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -151,8 +158,9 @@ describe('exportPrisma', () => {
 
     const result = exportPrisma(nodes, []);
     expect(result).toContain('model M_123invalid');
-    expect(result).toContain('M_123col Int @id');
-    expect(result).toContain('a_b_c String');
+    expect(result).toContain('M_123col Int @id @map("123col")');
+    expect(result).toContain('a_b_c String @map("a b c")');
+    expect(result).toContain('@@map("123invalid")');
   });
 
   it('handles edge cases for edges without handles or invalid ids', () => {
@@ -233,5 +241,230 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
+  });
+
+  it('resolves hex-encoded handles from reverse-engineered snapshots', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'users_posts',
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('users_user_id users @relation("users_posts", fields: [user_id], references: [id])');
+  });
+
+  it('uses explicit sourceColumns from edge data when present', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+            { column_name: 'author_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        data: { sourceColumns: ['author_id'], targetColumns: ['id'] },
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('fields: [author_id], references: [id]');
+  });
+
+  it('preserves reserved and colliding table names through @@map', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'a',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'model',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'b',
+        position: { x: 1, y: 0 },
+        data: {
+          title: 'M_model',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'c',
+        position: { x: 2, y: 0 },
+        data: {
+          title: 'order-item',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'd',
+        position: { x: 3, y: 0 },
+        data: {
+          title: 'order item',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+    ];
+
+    const document = exportPrismaDocument(nodes, []);
+    expect(document.ok).toBe(true);
+    expect(document.schema).toContain('model model_');
+    expect(document.schema).toContain('model M_model');
+    expect(document.schema).toContain('@@map("model")');
+    expect(document.schema).toContain('@@map("order-item")');
+    expect(document.schema).toContain('@@map("order item")');
+    expect(document.manifest.mappings.some((row) => row.source === 'model' && row.generated === 'model_')).toBe(true);
+  });
+
+  it('returns a fixed failure schema when model allocation is exhausted', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 1, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+    ];
+    const document = exportPrismaDocument(nodes, [], { maxAttempts: 0 });
+    expect(document.ok).toBe(false);
+    expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
+    expect(document.schema).not.toContain('users');
+    expect(PRISMA_EXPORT_FAILURE_MESSAGE).not.toMatch(/users|secret/i);
+  });
+
+  it('returns a fixed failure schema when field allocation is exhausted', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+            { column_name: 'id', data_type: 'int', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+    ];
+    const document = exportPrismaDocument(nodes, [], { maxAttempts: 0 });
+    expect(document.ok).toBe(false);
+    expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
+  });
+
+  it('returns a fixed failure schema when relation allocation is exhausted', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 1, y: 0 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'int', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
+        label: 'rel',
+      },
+      {
+        id: 'e2',
+        source: '2',
+        target: '1',
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
+        label: 'rel',
+      },
+    ];
+    const document = exportPrismaDocument(nodes, edges, { maxAttempts: 0 });
+    expect(document.ok).toBe(false);
+    expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
   });
 });
