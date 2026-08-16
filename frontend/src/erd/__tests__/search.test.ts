@@ -151,21 +151,30 @@ describe("ERD node search", () => {
     const node = tableNode("perfTest", { title: "initial_title", columns: [] });
     const initialMisses = _getSearchCacheMisses();
 
-    // Initial evaluation populates the cache
+    // Initial evaluation populates the cache for the data object.
     expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
 
-    // Evaluate multiple times simulating 60fps drag render ticks
+    // React Flow may replace the wrapper during position-only updates while
+    // retaining the same immutable data object. That must remain a cache hit.
+    const nodeWithSameData: Node<TableNodeData> = {
+      ...node,
+      position: { x: 1, y: 1 },
+      data: node.data,
+    };
+    expect(tableNodeMatchesSearch(nodeWithSameData, "initial")).toBe(true);
+    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
+
+    // Evaluate multiple times simulating drag render ticks.
     for(let i=0; i<100; i++) {
         expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
     }
 
-    // The cache miss counter should not have increased
+    // The cache miss counter should not have increased.
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
   });
 
-  it("reuses cached text across 1,000 fixed-shape nodes", () => {
-     // Generate a large table with 100 columns
+  it("reuses cached text across 500 fixed-shape nodes with 100 columns each", () => {
      const columns = [];
      for(let i=0; i<100; i++) {
        columns.push({
@@ -195,12 +204,12 @@ describe("ERD node search", () => {
 
      const missBeforeFast = _getSearchCacheMisses();
 
-     // Measure cached run
+     // Re-run a different query over the same immutable node-data identities.
      const fastMatched = findSearchMatchedNodeIds(heavyNodes, "field_0 desc_0");
 
      expect(fastMatched.size).toBe(500);
 
-     // 0 new cache misses, entirely hitting WeakMap
+     // 0 new cache misses, entirely hitting WeakMap.
      expect(_getSearchCacheMisses()).toBe(missBeforeFast);
   });
 });
