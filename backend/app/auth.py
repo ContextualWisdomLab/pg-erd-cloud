@@ -188,18 +188,6 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
 def _validate_jwt_header(header: dict[str, Any]) -> str:
     """Validate JOSE header fields before signature verification."""
 
-    token_type = header.get("typ")
-    if token_type is not None:
-        if (
-            not isinstance(token_type, str)
-            or token_type.strip().lower() not in OIDC_ALLOWED_TOKEN_TYPES
-        ):
-            raise HTTPException(status_code=401, detail="unsupported token type")
-
-    content_type = header.get("cty")
-    if content_type is not None:
-        raise HTTPException(status_code=401, detail="unsupported token content type")
-
     if "crit" in header:
         critical_names = header["crit"]
         if (
@@ -223,6 +211,18 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
         raise HTTPException(
             status_code=401, detail="unsupported critical parameter"
         )
+
+    token_type = header.get("typ")
+    if token_type is not None:
+        if (
+            not isinstance(token_type, str)
+            or token_type.strip().lower() not in OIDC_ALLOWED_TOKEN_TYPES
+        ):
+            raise HTTPException(status_code=401, detail="unsupported token type")
+
+    content_type = header.get("cty")
+    if content_type is not None:
+        raise HTTPException(status_code=401, detail="unsupported token content type")
 
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
