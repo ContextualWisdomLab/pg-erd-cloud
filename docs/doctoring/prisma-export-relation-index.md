@@ -15,7 +15,7 @@ sanitized source model + sanitized source field
 → target model + target field + relation name
 ```
 
-Each rendered field performs one `Map.get` rather than iterating the complete relationship collection. The exporter phase is therefore bounded by the existing model/column traversal plus edge indexing: `O(N + C + E)` under the platform's average sublinear `Map` access contract. No additional full edge scan occurs inside the column loop.
+Each rendered field performs one `Map.get` rather than iterating the complete relationship collection. The implementation therefore removes the full `E`-element scan from the `C`-column loop. Under the hash-table strategy used by mainstream ECMAScript engines this produces the conventional `O(N + C + E)` average path; the normative claim retained by this project is narrower: ECMA-262 guarantees only average access time sublinear in the number of map entries.
 
 ## Correctness invariants
 
@@ -29,9 +29,9 @@ A realistic regression constructs 96 valid outgoing relations and 384 unrelated 
 
 ## Standards traceability
 
-ECMA-262 requires `Map` implementations to use hash tables or another mechanism whose average access time is sublinear in collection size. The optimization depends only on that standardized access property, not on engine-specific constant-time guarantees.
+ECMA-262 requires `Map` implementations to use hash tables or another mechanism whose average access time is sublinear in collection size. The product claim is therefore “no complete edge scan per field,” not an engine-independent constant-time guarantee.
 
-Prisma's current schema reference requires model and field identifiers to match `[A-Za-z][A-Za-z0-9_]*` and documents `@map` and `@@map` for preserving database names. This PR intentionally does not expand identifier rewriting. A separate product slice must own reserved-name completeness, deterministic collision allocation, name mapping, and parser-backed schema validation.
+Prisma's current schema reference requires model and field identifiers to match `[A-Za-z][A-Za-z0-9_]*` and documents `@map` and `@@map` for preserving database names. This PR intentionally does not expand identifier rewriting. A separate product slice, issue #898, owns reserved-name completeness, deterministic collision allocation, name mapping, and parser-backed schema validation.
 
 ## Monitoring and rollback
 
