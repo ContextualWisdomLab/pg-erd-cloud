@@ -11,6 +11,8 @@ So the integration is **configuration only — no code change**.
 
 ## Point pg-erd-cloud at the orchestrator
 
+The production request also sends `orchestration_mode: "auto"`. This delegates route, independent verification, conducted workflow, provider choice, and known-cost tie-breaking to contextual-orchestrator instead of forcing a single worker in pg-erd-cloud.
+
 ```bash
 LLM_API_BASE_URL=https://<orchestrator-host>/v1
 LLM_API_KEY=<orchestrator inference bearer token>   # NOT the OpenAI key

@@ -83,7 +83,8 @@ async def _generate_llm_draft(
     api_key = _required_setting(settings.llm_api_key, "LLM_API_KEY")
     model = _required_setting(settings.llm_model, "LLM_MODEL")
     request_json = {
-        "model": model,
+        "model":model,
+        "orchestration_mode": "auto",
         "messages": [
             {"role": "system", "content": system_content},
             {"role": "user", "content": prompt},
