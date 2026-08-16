@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: bootstrap-quality-cost-auto-default-pg-erd-cloud
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   red-green-publish:
