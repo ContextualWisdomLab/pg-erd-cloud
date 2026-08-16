@@ -23,7 +23,12 @@ def replace_once(path: Path, old: str, new: str) -> None:
 
 
 def write_test() -> None:
-    """Add only the adaptive request assertion for the RED commit."""
+    """Add the adaptive gateway contract and generic-provider compatibility test."""
+    replace_once(
+        TEST_PATH,
+        '    monkeypatch.setattr(settings, "llm_model", "test-model")\n    seen: dict[str, object] = {}',
+        '    monkeypatch.setattr(settings, "llm_model", "contextual-orchestrator")\n    seen: dict[str, object] = {}',
+    )
     replace_once(
         TEST_PATH,
         '        seen["model"] = body["model"]\n        seen["messages"] = body["messages"]',
@@ -32,28 +37,56 @@ def write_test() -> None:
     replace_once(
         TEST_PATH,
         '    assert seen["model"] == "test-model"\n    messages = seen["messages"]',
-        '    assert seen["model"] == "test-model"\n    assert seen["orchestration_mode"] == "auto"\n    messages = seen["messages"]',
+        '    assert seen["model"] == "contextual-orchestrator"\n    assert seen["orchestration_mode"] == "auto"\n    messages = seen["messages"]',
     )
+    marker = '\n\n@pytest.mark.asyncio\nasync def test_generate_reversing_llm_draft_requires_configuration('
+    compatibility_test = '''
+
+@pytest.mark.asyncio
+async def test_generate_reversing_llm_draft_keeps_generic_provider_payload_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "llm_api_base_url", "https://llm.example/v1")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "generic-model")
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen["body"] = body
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "Draft"}}]},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await generate_reversing_llm_draft(_snapshot(), client=client) == "Draft"
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert "orchestration_mode" not in body
+'''
+    replace_once(TEST_PATH, marker, compatibility_test + marker)
 
 
 def implement() -> None:
-    """Delegate live draft execution topology to adaptive orchestration."""
+    """Delegate contextual-orchestrator topology without breaking generic providers."""
     replace_once(
         SOURCE_PATH,
         '    request_json = {\n        "model": model,\n        "messages": [',
-        '    request_json = {\n        "model": model,\n        "orchestration_mode": "auto",\n        "messages": [',
+        '    request_json = {\n        "model": model,\n        **({"orchestration_mode": "auto"} if model == "contextual-orchestrator" else {}),\n        "messages": [',
     )
 
     replace_once(
         DOC_PATH,
         'exposes exactly that interface (`/v1/chat/completions`) while routing,\ndelegating, verifying, and synthesizing across a pool of model agents.\n\nSo the integration is **configuration only — no code change**.',
-        'exposes exactly that interface (`/v1/chat/completions`) while routing,\ndelegating, verifying, and synthesizing across a pool of model agents.\n\nEvery pg-erd-cloud draft request explicitly includes `orchestration_mode: auto`.\nThe orchestration plane therefore owns model/provider selection, workflow depth,\nverification, fallback, and known-price optimization. Quality sufficiency is the\nfirst constraint; cost is minimized among quality-sufficient execution paths.\nMissing price metadata is classified as unpriced rather than free.',
+        'exposes exactly that interface (`/v1/chat/completions`) while routing,\ndelegating, verifying, and synthesizing across a pool of model agents.\n\nWhen `LLM_MODEL=contextual-orchestrator`, pg-erd-cloud explicitly includes\n`orchestration_mode: auto`. The orchestration plane therefore owns model/provider\nselection, workflow depth, verification, fallback, and known-price optimization.\nQuality sufficiency is the first constraint; cost is minimized among\nquality-sufficient execution paths. Missing price metadata is classified as\nunpriced rather than free. Other OpenAI-compatible model identifiers retain the\ngeneric provider payload and receive no orchestration-only field.',
     )
 
     replace_once(
         CHANGELOG_PATH,
         '# Changelog\n',
-        '# Changelog\n\n## Unreleased\n\n### Changed\n\n- Live reverse-engineering and index-design drafts now explicitly request contextual-orchestrator `auto` mode, allowing the orchestration plane to satisfy quality requirements and then minimize known cost instead of relying on an implicit or single-model default.\n',
+        '# Changelog\n\n## Unreleased\n\n### Changed\n\n- Live drafts configured with `LLM_MODEL=contextual-orchestrator` now explicitly request adaptive `auto` mode, while generic OpenAI-compatible providers retain their original payload contract.\n',
     )
 
     ADR_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -67,19 +100,19 @@ def implement() -> None:
 
 ## Context
 
-pg-erd-cloud delegated live reverse-engineering and index-design drafts to an OpenAI-compatible endpoint but omitted an explicit orchestration mode. Contextual-orchestrator currently interprets omission as adaptive behavior, yet the consumer contract did not make that requirement reviewable or prevent future drift to fixed single-model routing.
+pg-erd-cloud can call either contextual-orchestrator or another OpenAI-compatible provider. It omitted an explicit orchestration mode, so the contextual gateway's adaptive requirement was not reviewable. Sending an orchestration-only field to every provider would, however, violate the generic compatibility contract.
 
 ## Decision
 
-Every live LLM-draft request includes `orchestration_mode: "auto"`.
+When and only when `LLM_MODEL` is exactly `contextual-orchestrator`, every live LLM-draft request includes `orchestration_mode: "auto"`.
 
 Contextual-orchestrator owns model/provider selection, test-time compute, workflow depth, verification, fallback, and known-price optimization. Quality sufficiency is the first constraint; cost is minimized among execution paths that satisfy it. Missing or untrusted price metadata is classified as unpriced, not free.
 
-pg-erd-cloud continues to own schema evidence, prompt construction, credential boundaries, response parsing, and fail-closed API errors. Explicit route or conduct modes are reserved for controlled ablation or a documented incident override and are not product defaults.
+Other model identifiers receive the unchanged generic OpenAI-compatible request. pg-erd-cloud continues to own schema evidence, prompt construction, credential boundaries, response parsing, and fail-closed API errors. Explicit route or conduct modes are reserved for controlled ablation or a documented incident override and are not product defaults.
 
 ## Consequences
 
-Simple drafts may still use one worker when adaptive policy finds that sufficient. Complex or high-risk database guidance may use deeper orchestration without changing pg-erd-cloud's API.
+Contextual-orchestrator deployments obtain an explicit adaptive default without breaking direct providers that reject unknown fields. Simple drafts may still use one worker when adaptive policy finds that sufficient; complex or high-risk database guidance may use deeper orchestration.
 
 ## References
 
