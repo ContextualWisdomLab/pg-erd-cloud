@@ -266,7 +266,7 @@ describe('modal behavior coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
+    expect(window.confirm).toHaveBeenCalledWith("'" + 'Billing' + "' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: '업무 그룹 닫기' }))
     expect(setName).toHaveBeenCalledWith('New')
