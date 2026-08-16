@@ -87,3 +87,34 @@ def test_jwt_header_rejects_structurally_valid_unsupported_extension() -> None:
 
     assert error.value.status_code == 401
     assert error.value.detail == "unsupported critical parameter"
+
+
+@pytest.mark.asyncio
+async def test_critical_extension_rejection_precedes_jwks_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject an unsupported critical extension before any signing-key I/O."""
+
+    critical_name = "https://example.invalid/jose/extension"
+    monkeypatch.setattr(
+        auth.jwt,
+        "get_unverified_header",
+        lambda _token: {
+            "alg": "RS256",
+            "crit": [critical_name],
+            critical_name: True,
+        },
+    )
+
+    async def fail_jwks(*_args: object, **_kwargs: object) -> dict[str, object]:
+        """Fail if the rejected token crosses the pre-key validation boundary."""
+
+        raise AssertionError("JWKS must not load for unsupported critical headers")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException) as error:
+        await auth._decode_verified_oidc_token("header.payload.signature")
+
+    assert error.value.status_code == 401
+    assert error.value.detail == "unsupported critical parameter"
