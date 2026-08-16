@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] ♿ **발견 가능한 비활성 툴바 액션**: 정렬·되돌리기·관계 추론·노드 지우기·업무 그룹·카디널리티·내보내기 액션이 일시적으로 사용할 수 없을 때도 키보드 포커스와 설명을 유지하고, 포인터·Enter·Space 활성화는 동일한 상태 가드에서 차단합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
