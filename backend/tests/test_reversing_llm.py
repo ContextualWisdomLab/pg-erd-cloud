@@ -48,7 +48,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
 ) -> None:
     monkeypatch.setattr(settings, "llm_api_base_url", "https://llm.example/v1")
     monkeypatch.setattr(settings, "llm_api_key", "test-key")
-    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(settings, "llm_model", "contextual-orchestrator")
     seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -56,6 +56,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
         seen["authorization"] = request.headers.get("authorization")
         body = json.loads(request.content)
         seen["model"] = body["model"]
+        seen["orchestration_mode"] = body["orchestration_mode"]
         seen["messages"] = body["messages"]
         return httpx.Response(
             200,
@@ -73,12 +74,38 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
     assert draft == "# DB Reversing Specification\n\nDraft"
     assert seen["url"] == "https://llm.example/v1/chat/completions"
     assert seen["authorization"] == "Bearer test-key"
-    assert seen["model"] == "test-model"
+    assert seen["model"] == "contextual-orchestrator"
+    assert seen["orchestration_mode"] == "auto"
     messages = seen["messages"]
     assert isinstance(messages, list)
     assert messages[0]["role"] == "system"
     assert "Do not invent facts" in messages[1]["content"]
     assert "user@example.com" in messages[1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_generate_reversing_llm_draft_keeps_generic_provider_payload_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "llm_api_base_url", "https://llm.example/v1")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "generic-model")
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen["body"] = body
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "Draft"}}]},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await generate_reversing_llm_draft(_snapshot(), client=client) == "Draft"
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert "orchestration_mode" not in body
 
 
 @pytest.mark.asyncio
