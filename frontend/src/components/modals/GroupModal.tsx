@@ -2,7 +2,6 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
-import { useRef } from 'react';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface GroupModalProps {
@@ -33,36 +32,8 @@ export function GroupModal({
   onAssignBusinessGroup,
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
-  const swatchesRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
-
-  const handleSwatchKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, color: string, index: number) => {
-    let nextIndex = index;
-
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      nextIndex = (index + 1) % BUSINESS_GROUP_COLORS.length;
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      nextIndex = (index - 1 + BUSINESS_GROUP_COLORS.length) % BUSINESS_GROUP_COLORS.length;
-    } else if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      setNewGroupColor(color);
-      return;
-    }
-
-    if (nextIndex !== index) {
-      const nextColor = BUSINESS_GROUP_COLORS[nextIndex];
-      if (nextColor) {
-        setNewGroupColor(nextColor);
-        if (swatchesRef.current) {
-          const swatches = Array.from(swatchesRef.current.querySelectorAll<HTMLButtonElement>('[role="radio"]'));
-          swatches[nextIndex]?.focus();
-        }
-      }
-    }
-  };
 
   return (
     <div className="modalOverlay">
@@ -100,28 +71,18 @@ export function GroupModal({
             className="groupManager__swatches"
             role="radiogroup"
             aria-label="그룹 색상"
-            ref={swatchesRef}
           >
-            {BUSINESS_GROUP_COLORS.map((color, index) => {
-              const isChecked = newGroupColor === color;
-              const hasChecked = BUSINESS_GROUP_COLORS.includes(newGroupColor as typeof BUSINESS_GROUP_COLORS[number]);
-              const isFocusable = isChecked || (!hasChecked && index === 0);
-
-              return (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-label={`색상 ${color}`}
-                  aria-checked={isChecked}
-                  tabIndex={isFocusable ? 0 : -1}
-                  className="groupManager__swatch"
-                  key={color}
-                  onClick={() => setNewGroupColor(color)}
-                  onKeyDown={(e) => handleSwatchKeyDown(e, color, index)}
-                  style={{ background: color }}
-                />
-              );
-            })}
+            {BUSINESS_GROUP_COLORS.map((color) => (
+              <button
+                type="button"
+                aria-label={`색상 ${color}`}
+                aria-pressed={newGroupColor === color}
+                className="groupManager__swatch"
+                key={color}
+                onClick={() => setNewGroupColor(color)}
+                style={{ background: color }}
+              />
+            ))}
           </div>
           <button
             type="submit"
@@ -148,7 +109,7 @@ export function GroupModal({
                     type="button"
                     aria-label={`${group.name} 그룹 삭제`}
                     onClick={() => {
-                      if (!window.confirm("'" + group.name + "' 그룹을 삭제하시겠습니까?")) return;
+                      if (!window.confirm(`'${group.name}' 그룹을 삭제하시겠습니까?`)) return;
                       onDeleteBusinessGroup(group.id);
                     }}
                   >
