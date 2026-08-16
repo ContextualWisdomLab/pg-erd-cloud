@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- [FE] 🎨 **WAI-ARIA 라디오 그룹 키보드 내비게이션 구현**: 그룹 관리 모달의 색상 스와치가 WAI-ARIA Radio Group Pattern(Roving tabindex 및 화살표 방향키 순환 탐색)을 완전하게 준수하도록 구현했습니다. 이 변경 사항은 W3C WAI-ARIA Authoring Practices 'Radio Group Pattern' 및 'Radio Group Example Using Roving tabindex'를 참조하여 작성되었으며, APG 예제 자체만으로는 전체 제품의 접근성 규정 준수를 보장하지 않습니다.
+- [FE] ♿ **업무 그룹 색상 라디오 그룹 완결**: 색상 스와치에 일관된 `radio`/`aria-checked` 의미를 적용하고, 선택된 항목 하나만 Tab 순서에 두며, 방향키 이동·선택·순환을 동일 상태 전이로 처리합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
