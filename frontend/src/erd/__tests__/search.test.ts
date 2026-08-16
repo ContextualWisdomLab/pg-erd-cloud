@@ -1,8 +1,8 @@
 import type { Node } from "@xyflow/react";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { TableNodeData } from "../convert";
-import { findSearchMatchedNodeIds, tableNodeMatchesSearch, _getSearchCacheMisses, _resetSearchCacheMisses } from "../search";
+import { findSearchMatchedNodeIds, tableNodeMatchesSearch } from "../search";
 
 function tableNode(
   id: string,
@@ -21,11 +21,44 @@ function tableNode(
   };
 }
 
-describe("ERD node search", () => {
-  beforeEach(() => {
-    _resetSearchCacheMisses();
+function trackedTableNode(
+  id: string,
+  columnCount: number,
+): { node: Node<TableNodeData>; searchableFieldReads: () => number } {
+  let reads = 0;
+  const target: TableNodeData = {
+    title: `shared_marker_table_${id}`,
+    comment: "tracked search cache fixture",
+    badges: { pk: false, fk: false },
+    columns: Array.from({ length: columnCount }, (_, index) => ({
+      column_name: `column_${index}`,
+      data_type: "text",
+      is_not_null: true,
+      is_pk: index === 0,
+      column_comment: `column comment ${index}`,
+    })),
+  };
+  const data = new Proxy(target, {
+    get(currentTarget, property, receiver) {
+      if (property === "title" || property === "comment" || property === "columns") {
+        reads += 1;
+      }
+      return Reflect.get(currentTarget, property, receiver);
+    },
   });
 
+  return {
+    node: {
+      id,
+      type: "tableNode",
+      position: { x: 0, y: 0 },
+      data,
+    },
+    searchableFieldReads: () => reads,
+  };
+}
+
+describe("ERD node search", () => {
   const users = tableNode("users", {
     title: "public.users",
     comment: "Customer profile records",
@@ -62,7 +95,7 @@ describe("ERD node search", () => {
     expect([...findSearchMatchedNodeIds([users, audit], "   ")]).toEqual([]);
   });
 
-  it("matches table and column fields by caching a unified searchable haystack string", () => {
+  it("matches table and column fields through one searchable text value", () => {
     expect([...findSearchMatchedNodeIds([users, audit], "PUBLIC uuid")]).toEqual([
       "users",
     ]);
@@ -79,64 +112,107 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
 
-  it("re-evaluates search results if node data identity changes (cache invalidation contract)", () => {
-    const node1 = tableNode("n1", {
-      title: "order",
-      comment: "order details",
+  it("rebuilds cached text for immutable replacements of every searchable field", () => {
+    const original = tableNode("order", {
+      title: "order_title",
+      comment: "order_details",
       columns: [
-        { column_name: "id", data_type: "uuid", is_not_null: true, is_pk: true, column_comment: "order id" }
-      ]
+        {
+          column_name: "order_id",
+          data_type: "uuid",
+          is_not_null: true,
+          is_pk: true,
+          column_comment: "order_identifier",
+        },
+      ],
     });
+    expect(tableNodeMatchesSearch(original, "order_title order_details order_id uuid order_identifier")).toBe(true);
 
-    // Baseline expectations
-    expect(tableNodeMatchesSearch(node1, "order")).toBe(true);
-    expect(tableNodeMatchesSearch(node1, "customer")).toBe(false);
-
-    // The cache is keyed by node.data. The contract requires immutable updates.
-    // Verify each searchable field triggers a re-evaluation when part of a new data object reference.
-
-    // 1. Title change
-    let node2 = { ...node1, data: { ...node1.data, title: "customer_order" } };
-    expect(tableNodeMatchesSearch(node2, "customer")).toBe(true);
-    // Old node1 should remain unaffected
-    expect(tableNodeMatchesSearch(node1, "customer")).toBe(false);
-
-    // 2. Comment change
-    let node3 = { ...node1, data: { ...node1.data, comment: "now includes billing" } };
-    expect(tableNodeMatchesSearch(node3, "billing")).toBe(true);
-    expect(tableNodeMatchesSearch(node3, "details")).toBe(false); // Overwritten comment
-
-    // 3. Columns change (name, type, and comment)
-    let node4 = {
-      ...node1,
-      data: {
-        ...node1.data,
-        columns: [
-          { column_name: "tracking_code", data_type: "varchar", is_not_null: true, is_pk: true, column_comment: "shipping tracking" }
-        ]
-      }
+    const titleChanged = {
+      ...original,
+      data: { ...original.data, title: "customer_title" },
     };
-    expect(tableNodeMatchesSearch(node4, "tracking")).toBe(true);
-    expect(tableNodeMatchesSearch(node4, "varchar")).toBe(true);
-    expect(tableNodeMatchesSearch(node4, "shipping")).toBe(true);
-    // Old column fields are no longer matched
-    expect(tableNodeMatchesSearch(node4, "uuid")).toBe(false);
+    expect(tableNodeMatchesSearch(titleChanged, "customer_title")).toBe(true);
+    expect(tableNodeMatchesSearch(titleChanged, "order_title")).toBe(false);
+
+    const commentChanged = {
+      ...original,
+      data: { ...original.data, comment: "billing_details" },
+    };
+    expect(tableNodeMatchesSearch(commentChanged, "billing_details")).toBe(true);
+    expect(tableNodeMatchesSearch(commentChanged, "order_details")).toBe(false);
+
+    const columnNameChanged = {
+      ...original,
+      data: {
+        ...original.data,
+        columns: [{ ...original.data.columns[0]!, column_name: "tracking_code" }],
+      },
+    };
+    expect(tableNodeMatchesSearch(columnNameChanged, "tracking_code")).toBe(true);
+    expect(tableNodeMatchesSearch(columnNameChanged, "order_id")).toBe(false);
+
+    const dataTypeChanged = {
+      ...original,
+      data: {
+        ...original.data,
+        columns: [{ ...original.data.columns[0]!, data_type: "varchar" }],
+      },
+    };
+    expect(tableNodeMatchesSearch(dataTypeChanged, "varchar")).toBe(true);
+    expect(tableNodeMatchesSearch(dataTypeChanged, "uuid")).toBe(false);
+
+    const columnCommentChanged = {
+      ...original,
+      data: {
+        ...original.data,
+        columns: [
+          { ...original.data.columns[0]!, column_comment: "shipping_reference" },
+        ],
+      },
+    };
+    expect(tableNodeMatchesSearch(columnCommentChanged, "shipping_reference")).toBe(true);
+    expect(tableNodeMatchesSearch(columnCommentChanged, "order_identifier")).toBe(false);
+    expect(tableNodeMatchesSearch(original, "customer_title billing_details tracking_code varchar shipping_reference")).toBe(false);
   });
 
-  it("caches string parsing to avoid redundant allocations for identical node data", () => {
-    const node = tableNode("perfTest", { title: "initial_title", columns: [] });
-    const initialMisses = _getSearchCacheMisses();
+  it("does not reread searchable fields for the same node-data identity", () => {
+    const tracked = trackedTableNode("identity", 20);
 
-    // Initial evaluation populates the cache
-    expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
-    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
+    expect(tableNodeMatchesSearch(tracked.node, "shared_marker column_19")).toBe(true);
+    const readsAfterBuild = tracked.searchableFieldReads();
+    expect(readsAfterBuild).toBeGreaterThan(0);
 
-    // Evaluate multiple times simulating 60fps drag render ticks
-    for(let i=0; i<100; i++) {
-        expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
+    for (let index = 0; index < 100; index += 1) {
+      expect(tableNodeMatchesSearch(tracked.node, "shared_marker column_19")).toBe(true);
     }
+    expect(tracked.searchableFieldReads()).toBe(readsAfterBuild);
 
-    // The cache miss counter should not have increased
-    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
+    const replacement = trackedTableNode("identity", 20);
+    expect(tableNodeMatchesSearch(replacement.node, "shared_marker column_19")).toBe(true);
+    expect(replacement.searchableFieldReads()).toBeGreaterThan(0);
+    expect(tracked.searchableFieldReads()).toBe(readsAfterBuild);
+  });
+
+  it("reuses cached text across 1,000 fixed-shape nodes", () => {
+    const trackedNodes = Array.from({ length: 1_000 }, (_, index) =>
+      trackedTableNode(`node_${index}`, 20),
+    );
+    const nodes = trackedNodes.map(({ node }) => node);
+
+    expect(findSearchMatchedNodeIds(nodes, "shared_marker column_19").size).toBe(1_000);
+    const readsAfterBuild = trackedNodes.reduce(
+      (total, tracked) => total + tracked.searchableFieldReads(),
+      0,
+    );
+    expect(readsAfterBuild).toBeGreaterThan(0);
+
+    expect(findSearchMatchedNodeIds(nodes, "shared_marker column_19").size).toBe(1_000);
+    expect(
+      trackedNodes.reduce(
+        (total, tracked) => total + tracked.searchableFieldReads(),
+        0,
+      ),
+    ).toBe(readsAfterBuild);
   });
 });
