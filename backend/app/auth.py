@@ -10,7 +10,7 @@ from typing import Any, cast
 import httpx
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from sqlalchemy import delete, select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -79,6 +79,21 @@ _last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone
 _jwks_lock = asyncio.Lock()
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
+JWS_REGISTERED_HEADER_PARAMETERS = frozenset(
+    {
+        "alg",
+        "jku",
+        "jwk",
+        "kid",
+        "x5u",
+        "x5c",
+        "x5t",
+        "x5t#S256",
+        "typ",
+        "cty",
+        "crit",
+    }
+)
 
 
 async def _get_oidc_config() -> dict:
@@ -185,17 +200,29 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if content_type is not None:
         raise HTTPException(status_code=401, detail="unsupported token content type")
 
-    crit = header.get("crit")
-    if crit is not None:
-        if not isinstance(crit, list) or not crit or len(crit) > 10:
-            raise HTTPException(status_code=401, detail="invalid crit header")
-        for item in crit:
-            if not isinstance(item, str):
-                raise HTTPException(status_code=401, detail="invalid crit header")
-            # We currently do not support any critical parameters.
-            raise HTTPException(
-                status_code=401, detail="unsupported critical parameter"
+    if "crit" in header:
+        critical_names = header["crit"]
+        if (
+            not isinstance(critical_names, list)
+            or not critical_names
+            or any(
+                not isinstance(name, str) or not name
+                for name in critical_names
             )
+            or len(set(critical_names)) != len(critical_names)
+            or any(name not in header for name in critical_names)
+            or any(
+                name in JWS_REGISTERED_HEADER_PARAMETERS
+                for name in critical_names
+            )
+        ):
+            raise HTTPException(status_code=401, detail="invalid crit header")
+
+        # This deployment profile supports no critical JOSE extensions. A
+        # structurally valid `crit` list therefore still fails closed.
+        raise HTTPException(
+            status_code=401, detail="unsupported critical parameter"
+        )
 
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
@@ -206,8 +233,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.db import SessionLocal
     from app.models import RevokedToken
+    from app.db import SessionLocal
 
     if not jwt_id:
         return
@@ -225,8 +252,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.db import SessionLocal
     from app.models import RevokedToken
+    from app.db import SessionLocal
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
@@ -476,7 +503,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
+        return await _user_from_api_key(session, auth_header[len("Bearer "):])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
