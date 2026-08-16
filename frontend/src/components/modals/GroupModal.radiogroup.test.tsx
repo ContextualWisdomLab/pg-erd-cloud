@@ -76,4 +76,36 @@ describe('GroupModal color radiogroup', () => {
     expect(radios[0]).toHaveAttribute('aria-checked', 'true')
     expect(radios[0]).toHaveAttribute('tabindex', '0')
   })
+
+  it('keeps an unsupported stored color unchanged until the user selects a palette value', () => {
+    render(<RadiogroupHarness initialColor="not-in-palette" />)
+
+    const radios = screen.getAllByRole('radio', { name: /^색상 / })
+    expect(radios[0]).toHaveAttribute('tabindex', '0')
+    radios.forEach((radio) => {
+      expect(radio).toHaveAttribute('aria-checked', 'false')
+    })
+
+    radios[0]?.focus()
+    fireEvent.keyDown(radios[0]!, { key: 'ArrowRight' })
+
+    expect(radios[1]).toHaveFocus()
+    expect(radios[1]).toHaveAttribute('aria-checked', 'true')
+    expect(radios[1]).toHaveAttribute('tabindex', '0')
+  })
+
+  it('preserves native pointer activation and ignores unrelated keys', () => {
+    render(<RadiogroupHarness />)
+
+    const radios = screen.getAllByRole('radio', { name: /^색상 / })
+    radios[0]?.focus()
+    fireEvent.keyDown(radios[0]!, { key: 'Home' })
+
+    expect(radios[0]).toHaveFocus()
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(radios[2]!)
+    expect(radios[2]).toHaveAttribute('aria-checked', 'true')
+    expect(radios[2]).toHaveAttribute('tabindex', '0')
+  })
 })
