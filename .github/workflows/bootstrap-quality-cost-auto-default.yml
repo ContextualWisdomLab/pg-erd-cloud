@@ -1,0 +1,85 @@
+name: Bootstrap adaptive contextual-orchestrator draft default
+
+on:
+  push:
+    branches:
+      - agent/bootstrap-quality-cost-auto-default-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-quality-cost-auto-default-pg-erd-cloud
+  cancel-in-progress: false
+
+jobs:
+  red-green-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: agent/quality-cost-auto-default
+    steps:
+      - name: Checkout bootstrap revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Preserve bounded bootstrap script
+        run: cp scripts/bootstrap_quality_cost_auto_default.py /tmp/bootstrap_quality_cost_auto_default.py
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # actions/setup-python@v6
+        with:
+          python-version: "3.10"
+
+      - name: Install locked backend dependencies
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Create clean test-first product branch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git switch --force-create "$TARGET_BRANCH" origin/main
+          python /tmp/bootstrap_quality_cost_auto_default.py test
+          git add backend/tests/test_reversing_llm.py
+          git commit -m "test(ai): require adaptive database-draft orchestration"
+
+      - name: Prove the regression contract is red
+        shell: bash
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          set -Eeuo pipefail
+          if pytest -q tests/test_reversing_llm.py::test_generate_reversing_llm_draft_posts_chat_completion; then
+            echo "Adaptive-default regression unexpectedly passed before implementation." >&2
+            exit 1
+          fi
+
+      - name: Implement adaptive quality-cost default
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python /tmp/bootstrap_quality_cost_auto_default.py implement
+          git add backend/app/spec/llm.py backend/tests/test_reversing_llm.py docs/llm-orchestrator-integration.md docs/adr/0001-adaptive-contextual-orchestrator-default.md CHANGELOG.md
+          git commit -m "fix(ai): use adaptive orchestration for database drafts"
+
+      - name: Verify backend contract
+        shell: bash
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          set -Eeuo pipefail
+          mypy app
+          pytest -q
+          python -m compileall -q app tests
+          git diff --check origin/main...HEAD
+
+      - name: Publish clean product branch
+        run: git push origin "HEAD:refs/heads/$TARGET_BRANCH"
