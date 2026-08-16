@@ -16,7 +16,7 @@ Monitor browser memory growth, search-result correctness after schema refreshes,
 
 ## References
 
-Ecma International. (2025). *ECMAScript® 2025 language specification* (16th ed.). https://262.ecma-international.org/16.0/
+Ecma International. (2026). *ECMAScript® 2026 language specification* (17th ed.). https://262.ecma-international.org/
 
 Michie, D. (1968). “Memo” functions and machine learning. *Nature, 218*, 19–22. https://doi.org/10.1038/218019a0
 
