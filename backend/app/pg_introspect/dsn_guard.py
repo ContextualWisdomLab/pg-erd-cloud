@@ -9,6 +9,9 @@ from urllib.parse import parse_qsl, urlparse
 from app.settings import settings
 
 POSTGRES_SCHEMES = {"postgres", "postgresql"}
+SERVER_LOCAL_FILE_QUERY_PARAMETERS = frozenset(
+    {"passfile", "sslcert", "sslcrl", "sslkey", "sslrootcert"}
+)
 
 
 class DsnTargetError(ValueError):
@@ -191,6 +194,8 @@ async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
     except ValueError as err:
         raise DsnTargetError("database DSN port is invalid") from err
     query = _parse_query_params(parsed.query)
+    if SERVER_LOCAL_FILE_QUERY_PARAMETERS.intersection(query):
+        raise DsnTargetError("database DSN must not reference server-local files")
 
     port_override = _validate_query_ports(query.get("port", []))
     if port_override is not None:
