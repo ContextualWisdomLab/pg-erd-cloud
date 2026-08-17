@@ -60,3 +60,6 @@
 ## 2024-08-17 - Contextual ARIA labels for generic action buttons
 **Learning:** Generic action buttons like "테이블 삭제" (Delete Table) inside modals lack sufficient context for screen reader users when multiple modals or nested actions might exist.
 **Action:** Always provide an explicit `aria-label` directly on generic action buttons (e.g., `aria-label={`${editingNode.data.title} 테이블 삭제`}`) to give screen readers full context about the specific entity being acted upon.
+## 2026-08-17 - Ambiguous Generic Action Buttons (열기)
+**Learning:** Having multiple elements with the generic "열기" (Open) label in the same interface (like "Open Editor" vs "Open Diagram") without unique accessible names causes screen reader ambiguity, and breaks accessibility test suites that search by role and name (e.g. `getByRole('button', { name: '열기' })`). This specific issue triggered a CI failure because `App.coverage.test.tsx` couldn't uniquely identify the correct snapshot "열기" button among project "열기" buttons.
+**Action:** When a screen has multiple generic action buttons (e.g., in a data table), always apply a contextual `aria-label` (e.g., `aria-label={`${item.name} 다이어그램 열기`}`) so that assistive tech and test queries can precisely target the correct element.

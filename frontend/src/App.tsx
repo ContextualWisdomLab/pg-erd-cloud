@@ -1375,6 +1375,7 @@ export default function App() {
                         setSelectedProjectId(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
+                      aria-label={`${project.project_name} 다이어그램 보기`}
                     >
                       열기
                     </button>
@@ -1780,6 +1781,7 @@ export function DiagramTable({
             <button
               type="button"
               onClick={() => onOpenEditor(item.schema_snapshot_uuid)}
+              aria-label={`${item.schema_snapshot_uuid} 다이어그램 열기`}
             >
               열기
             </button>
