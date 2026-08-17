@@ -219,7 +219,7 @@ describe('ExportModal', () => {
       await user.keyboard(' ');
     }
 
-    expect(descriptionIds).toHaveLength(8);
+    expect(descriptionIds.size).toBe(8);
     expect(onCopyExportDdl).not.toHaveBeenCalled();
     expect(onDownloadSvg).not.toHaveBeenCalled();
     expect(onDownloadUml).not.toHaveBeenCalled();
