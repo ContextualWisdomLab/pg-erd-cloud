@@ -28,8 +28,14 @@ Monitor keyboard-only completion, support requests about unavailable exports, ac
 
 WAI-ARIA 1.2 is the published normative baseline used here. WAI-ARIA 1.3 describes the same perceivable-but-inoperable state and is monitored as a 2026 working draft, not treated as a final standard.
 
+The user-study evidence below supports the broader product rationale for making an unavailable or inaccessible action and its reason discoverable. It does not by itself validate this specific `aria-disabled` implementation; the normative state semantics remain governed by WAI-ARIA and the repository's executable component tests.
+
 ## References
 
 World Wide Web Consortium. (2023). *Accessible Rich Internet Applications (WAI-ARIA) 1.2*. https://www.w3.org/TR/wai-aria-1.2/
 
 World Wide Web Consortium. (2026). *Accessible Rich Internet Applications (WAI-ARIA) 1.3* (Working Draft). https://www.w3.org/TR/wai-aria-1.3/
+
+Bigham, J. P., Lin, I., & Savage, S. (2017). The effects of “not knowing what you don’t know” on web accessibility for blind web users. In *Proceedings of the 19th International ACM SIGACCESS Conference on Computers and Accessibility* (pp. 101–109). Association for Computing Machinery. https://doi.org/10.1145/3132525.3132533
+
+Research relevance: In a study of 30 blind and 30 sighted web users, uncertainty about whether task-relevant information was absent, inaccessible, or merely difficult to locate caused frustration and wasted time. That finding supports exposing an unavailable action together with an explicit prerequisite or recovery explanation instead of making the action silently undiscoverable.
