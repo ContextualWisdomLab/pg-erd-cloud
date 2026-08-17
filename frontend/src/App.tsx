@@ -198,20 +198,30 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
+  const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
+
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let cachedData = searchCache.get(node.data);
+      if (!cachedData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        cachedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchCache.set(node.data, cachedData);
+      }
+      return {
+        ...node,
+        data: cachedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
@@ -309,22 +319,46 @@ export default function App() {
 
   useEffect(() => {
     if (!snapshotId) return;
-    const timer = setInterval(() => {
-      getSnapshot(snapshotId)
-        .then((s) => {
-          setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-            clearInterval(timer);
-            if (selectedProjectId) {
-              listSnapshots(selectedProjectId)
-                .then(setSnapshots)
-                .catch((e) => setError(String(e)));
+    let isCurrent = true;
+    let timer: number | null = null;
+
+    async function poll() {
+      try {
+        const s = await getSnapshot(snapshotId as string);
+        if (!isCurrent) return;
+        setSnapshot(s);
+
+        if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+          if (selectedProjectId) {
+            try {
+              const snaps = await listSnapshots(selectedProjectId);
+              if (isCurrent) setSnapshots(snaps);
+            } catch (e) {
+              if (isCurrent) setError(String(e));
             }
           }
-        })
-        .catch((e) => setError(String(e)));
-    }, 1000);
-    return () => clearInterval(timer);
+          return;
+        }
+
+        if (isCurrent) {
+          timer = window.setTimeout(poll, 1000);
+        }
+      } catch (e) {
+        if (isCurrent) {
+          setError(String(e));
+          timer = window.setTimeout(poll, 1000);
+        }
+      }
+    }
+
+    poll();
+
+    return () => {
+      isCurrent = false;
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
   }, [selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {
@@ -1411,33 +1445,13 @@ export default function App() {
                 onAutoLayout();
               }}
               aria-disabled={nodes.length === 0 || isLayouting}
-              aria-describedby={
-                isLayouting
-                  ? "auto-layout-busy-reason"
-                  : nodes.length === 0
-                    ? "auto-layout-disabled-reason"
-                    : undefined
-              }
               aria-label="ERD 자동 정렬"
               aria-busy={isLayouting}
               title={
-                isLayouting
-                  ? "정렬이 진행 중입니다"
-                  : nodes.length === 0
-                    ? "정렬할 항목이 없습니다"
-                    : "자동 정렬"
+                nodes.length === 0 ? "정렬할 항목이 없습니다" : "자동 정렬"
               }
             >
               {isLayouting ? "…" : "↔"}
-              {isLayouting ? (
-                <span id="auto-layout-busy-reason" className="canvasToolbar__reason" role="tooltip">
-                  정렬이 진행 중입니다
-                </span>
-              ) : nodes.length === 0 ? (
-                <span id="auto-layout-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  정렬할 항목이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1449,32 +1463,12 @@ export default function App() {
                 onUndoLayout();
               }}
               aria-disabled={!undoPositions || isLayouting}
-              aria-describedby={
-                isLayouting
-                  ? "undo-layout-busy-reason"
-                  : !undoPositions
-                    ? "undo-layout-disabled-reason"
-                    : undefined
-              }
               title={
-                isLayouting
-                  ? "정렬이 진행 중입니다"
-                  : !undoPositions
-                    ? "되돌릴 작업이 없습니다"
-                    : "정렬 되돌리기"
+                !undoPositions ? "되돌릴 작업이 없습니다" : "정렬 되돌리기"
               }
               aria-label="정렬 되돌리기"
             >
               ↶
-              {isLayouting ? (
-                <span id="undo-layout-busy-reason" className="canvasToolbar__reason" role="tooltip">
-                  정렬이 진행 중입니다
-                </span>
-              ) : !undoPositions ? (
-                <span id="undo-layout-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  되돌릴 작업이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1486,20 +1480,12 @@ export default function App() {
                 onAutoInferRelationships();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "infer-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0 ? "추론할 테이블이 없습니다" : "관계 자동 추론"
               }
               aria-label="관계 자동 추론"
             >
               🪄
-              {nodes.length === 0 ? (
-                <span id="infer-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  추론할 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1511,20 +1497,12 @@ export default function App() {
                 onClearCanvas();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "clear-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0 ? "지울 노드가 없습니다" : "모든 노드 지우기"
               }
               aria-label="모든 노드 지우기"
             >
               🗑️
-              {nodes.length === 0 ? (
-                <span id="clear-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  지울 노드가 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1544,20 +1522,12 @@ export default function App() {
                 onOpenGroupManager();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "group-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0 ? "묶을 테이블이 없습니다" : "업무 그룹"
               }
               aria-label="업무 그룹"
             >
               ◇
-              {nodes.length === 0 ? (
-                <span id="group-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  묶을 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1569,9 +1539,6 @@ export default function App() {
                 onOpenCardinalityWizard();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "cardinality-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0
                   ? "계산할 테이블이 없습니다"
@@ -1580,11 +1547,6 @@ export default function App() {
               aria-label="인덱스 카디널리티 계산"
             >
               #
-              {nodes.length === 0 ? (
-                <span id="cardinality-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  계산할 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1596,20 +1558,12 @@ export default function App() {
                 onOpenExport();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "ddl-export-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DDL 내보내기"
               }
               aria-label="DDL 내보내기"
             >
               SQL
-              {nodes.length === 0 ? (
-                <span id="ddl-export-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  내보낼 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1621,9 +1575,6 @@ export default function App() {
                 onOpenExport();
               }}
               aria-disabled={!selectedProjectId}
-              aria-describedby={
-                !selectedProjectId ? "share-disabled-reason" : undefined
-              }
               title={
                 !selectedProjectId
                   ? "공유할 프로젝트를 먼저 선택하세요"
@@ -1632,11 +1583,6 @@ export default function App() {
               aria-label="공유 및 내보내기"
             >
               ↗
-              {!selectedProjectId ? (
-                <span id="share-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  공유할 프로젝트를 먼저 선택하세요
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1648,9 +1594,6 @@ export default function App() {
                 onOpenExport();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "image-export-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
@@ -1659,11 +1602,6 @@ export default function App() {
               aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               IMG
-              {nodes.length === 0 ? (
-                <span id="image-export-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  내보낼 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1675,20 +1613,12 @@ export default function App() {
                 onOpenExport();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "uml-export-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
               aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               UML
-              {nodes.length === 0 ? (
-                <span id="uml-export-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  내보낼 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1700,9 +1630,6 @@ export default function App() {
                 onOpenExport();
               }}
               aria-disabled={nodes.length === 0}
-              aria-describedby={
-                nodes.length === 0 ? "object-export-disabled-reason" : undefined
-              }
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
@@ -1711,11 +1638,6 @@ export default function App() {
               aria-label="이미지/텍스트 내보내기 모달 열기"
             >
               {"{}"}
-              {nodes.length === 0 ? (
-                <span id="object-export-disabled-reason" className="canvasToolbar__reason" role="tooltip">
-                  내보낼 테이블이 없습니다
-                </span>
-              ) : null}
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}
