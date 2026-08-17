@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-08-17 - Contextual ARIA labels for generic action buttons
+**Learning:** Generic action buttons like "테이블 삭제" (Delete Table) inside modals lack sufficient context for screen reader users when multiple modals or nested actions might exist.
+**Action:** Always provide an explicit `aria-label` directly on generic action buttons (e.g., `aria-label={`${editingNode.data.title} 테이블 삭제`}`) to give screen readers full context about the specific entity being acted upon.
