@@ -161,6 +161,14 @@ describe('ExportModal', () => {
   });
 
   it('explains when exports cannot be generated yet', async () => {
+    const onCopyExportDdl = vi.fn();
+    const onDownloadSvg = vi.fn();
+    const onDownloadUml = vi.fn();
+    const onDownloadMermaid = vi.fn();
+    const onExportDictionaryCsv = vi.fn();
+    const onExportDictionaryMarkdown = vi.fn();
+    const onDownloadDbml = vi.fn();
+    const onDownloadPrisma = vi.fn();
     const user = userEvent.setup();
     render(
       <ExportModal
@@ -168,6 +176,14 @@ describe('ExportModal', () => {
         hasDdlExport={false}
         hasDictionaryExport={false}
         hasDiagramExport={false}
+        onCopyExportDdl={onCopyExportDdl}
+        onDownloadSvg={onDownloadSvg}
+        onDownloadUml={onDownloadUml}
+        onDownloadMermaid={onDownloadMermaid}
+        onExportDictionaryCsv={onExportDictionaryCsv}
+        onExportDictionaryMarkdown={onExportDictionaryMarkdown}
+        onDownloadDbml={onDownloadDbml}
+        onDownloadPrisma={onDownloadPrisma}
       />,
     );
 
@@ -188,19 +204,20 @@ describe('ExportModal', () => {
       await user.keyboard(' ');
     }
 
-    expect(baseProps.onCopyExportDdl).not.toHaveBeenCalled();
-    expect(baseProps.onDownloadSvg).not.toHaveBeenCalled();
-    expect(baseProps.onDownloadUml).not.toHaveBeenCalled();
-    expect(baseProps.onDownloadMermaid).not.toHaveBeenCalled();
-    expect(baseProps.onDownloadDbml).not.toHaveBeenCalled();
-    expect(baseProps.onDownloadPrisma).not.toHaveBeenCalled();
-    expect(baseProps.onExportDictionaryCsv).not.toHaveBeenCalled();
-    expect(baseProps.onExportDictionaryMarkdown).not.toHaveBeenCalled();
+    expect(onCopyExportDdl).not.toHaveBeenCalled();
+    expect(onDownloadSvg).not.toHaveBeenCalled();
+    expect(onDownloadUml).not.toHaveBeenCalled();
+    expect(onDownloadMermaid).not.toHaveBeenCalled();
+    expect(onDownloadDbml).not.toHaveBeenCalled();
+    expect(onDownloadPrisma).not.toHaveBeenCalled();
+    expect(onExportDictionaryCsv).not.toHaveBeenCalled();
+    expect(onExportDictionaryMarkdown).not.toHaveBeenCalled();
   });
 
   it('exposes access-control guidance for disabled button', async () => {
     const user = userEvent.setup();
-    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
+    const onCloseExport = vi.fn();
+    render(<ExportModal {...baseProps} canCreateShareLink={false} onCloseExport={onCloseExport} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
@@ -214,6 +231,6 @@ describe('ExportModal', () => {
     await user.keyboard('{Enter}');
     await user.keyboard(' ');
 
-    expect(baseProps.onCloseExport).not.toHaveBeenCalled();
+    expect(onCloseExport).not.toHaveBeenCalled();
   });
 });
