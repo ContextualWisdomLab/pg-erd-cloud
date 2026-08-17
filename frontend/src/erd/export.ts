@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,14 +67,16 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
-  if (sourceHandleColumn && targetHandleColumn) {
-    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+  // ⚡ Bolt: Fast parsing of column name from handle instead of O(C) array .find
+  const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+  const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+
+  // To prevent regressions where dangling edges resolve to deleted columns,
+  // we ensure the parsed column actually exists in the source node.
+  if (parsedSource && parsedTarget) {
+    const hasSource = (sourceNode.data.columns || []).some(c => c.column_name === parsedSource);
+    const hasTarget = (targetNode.data.columns || []).some(c => c.column_name === parsedTarget);
+    if (hasSource && hasTarget) return { sourceColumns: [parsedSource], targetColumns: [parsedTarget] };
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
