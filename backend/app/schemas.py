@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectCreateIn(BaseModel):
@@ -78,6 +78,18 @@ class ApplySqlIn(BaseModel):
             "identifiers. Arbitrary SQL is rejected."
         ),
     )
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql(cls, v: str) -> str:
+        from app.pg_introspect.forward_ddl import validate_forward_ddl, ForwardDdlValidationError
+        # The parser validates the structure to be a conservative DDL subset.
+        try:
+            validate_forward_ddl(v)
+        except ForwardDdlValidationError as exc:
+            raise ValueError(str(exc)) from None
+        return v
+
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
 
