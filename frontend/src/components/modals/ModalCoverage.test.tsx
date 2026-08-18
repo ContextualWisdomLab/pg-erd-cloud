@@ -117,7 +117,7 @@ describe('modal behavior coverage', () => {
       target: { value: 'fk_changed' },
     })
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: '관계 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
     fireEvent.click(screen.getByRole('button', { name: '저장' }))

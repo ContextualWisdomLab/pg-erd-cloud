@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-20 - 관계 편집 모달의 삭제 버튼 접근성 개선
+**Learning:** 여러 모달이나 항목이 존재하는 UI에서 "삭제"와 같은 포괄적인 라벨을 가진 버튼은 스크린 리더 사용자에게 문맥을 파악하기 어렵게 만들 수 있습니다.
+**Action:** 특정한 컨텍스트(예: 관계 편집 모달) 내의 삭제 버튼에는 반드시 명시적인 `aria-label`(예: `aria-label="관계 삭제"`)을 추가하여 명확한 의미를 전달해야 합니다.

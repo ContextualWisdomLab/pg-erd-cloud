@@ -1,6 +1,6 @@
-import React from 'react';
+import React from "react";
 import type { Edge } from "@xyflow/react";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { useDialogAccessibility } from "./useDialogAccessibility";
 
 interface EditEdgeModalProps {
   editingEdge: Edge | null;
@@ -19,7 +19,10 @@ export function EditEdgeModal({
   onRelCancel,
   onRelSubmit,
 }: EditEdgeModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(Boolean(editingEdge), onRelCancel);
+  const dialogRef = useDialogAccessibility<HTMLFormElement>(
+    Boolean(editingEdge),
+    onRelCancel,
+  );
 
   if (!editingEdge) return null;
 
@@ -81,6 +84,7 @@ export function EditEdgeModal({
         >
           <button
             type="button"
+            aria-label="관계 삭제"
             onClick={() => {
               if (!window.confirm("이 관계를 삭제하시겠습니까?")) return;
               onRelDelete();
@@ -90,7 +94,9 @@ export function EditEdgeModal({
             삭제
           </button>
           <div className="row">
-            <button type="button" onClick={onRelCancel}>취소</button>
+            <button type="button" onClick={onRelCancel}>
+              취소
+            </button>
             <button
               type="submit"
               style={{ background: "#034ea2", color: "#fff" }}
