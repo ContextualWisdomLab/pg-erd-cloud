@@ -26,7 +26,7 @@ describe('contextual modal action labels', () => {
       );
 
       expect(
-        screen.getByRole('button', { name: 'edge-1 관계 삭제' }),
+        screen.getByRole('button', { name: 'source-1에서 target-1으로의 관계 삭제' }),
       ).toBeInTheDocument();
     },
   );

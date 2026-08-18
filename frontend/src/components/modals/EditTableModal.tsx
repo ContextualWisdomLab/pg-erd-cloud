@@ -26,7 +26,7 @@ export function EditTableModal({
 
   if (!isOpen || !editingNode) return null;
 
-  const tableActionLabel = editingNode.data.title.trim() || editingNode.id;
+  const tableIdentity = (editingNode.data.schema ? `${editingNode.data.schema}.${editingNode.data.title}` : editingNode.data.title).trim() || editingNode.id;
 
   return (
     <div className="modalOverlay">
@@ -193,13 +193,13 @@ export function EditTableModal({
               type="button"
               onClick={onDeleteTable}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-              aria-label={`${tableActionLabel} 테이블 삭제`}
+              aria-label={`${tableIdentity} 테이블 삭제`}
             >
               테이블 삭제
             </button>
             <button
               type="button"
-              aria-label={`${tableActionLabel} 테이블 복제`}
+              aria-label={`${tableIdentity} 테이블 복제`}
               onClick={() => {
                 const dupId = `${editingNode.id}_copy_${Date.now()}`;
                 setNodes((nds) => [

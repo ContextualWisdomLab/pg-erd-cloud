@@ -8,7 +8,7 @@ describe('EditTableModal', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
-  });
+
 
   const defaultProps = {
     isOpen: true,
@@ -44,12 +44,12 @@ describe('EditTableModal', () => {
     expect(screen.getByRole('textbox', { name: 'test_col 데이터 타입' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col PK 설정' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col NN 설정' })).toBeInTheDocument();
-  });
+
 
   it('returns null if not open or no editingNode', () => {
     const { container } = render(<EditTableModal {...defaultProps} isOpen={false} editingNode={null} />);
     expect(container.firstChild).toBeNull();
-  });
+
 
   it('adds a column when 컬럼 추가 is clicked', async () => {
     const setNodesMock = vi.fn();
@@ -82,7 +82,7 @@ describe('EditTableModal', () => {
     const updateEditingNodeFn = setEditingNodeMock.mock.calls[0][0];
     const newEditingNode = updateEditingNodeFn(editingNode);
     expect(newEditingNode.data.columns.length).toBe(1);
-  });
+
 
   it('deletes a column when 삭제 is clicked and confirmed', async () => {
     const setNodesMock = vi.fn();
@@ -123,7 +123,7 @@ describe('EditTableModal', () => {
     const updateEditingNodeFn = setEditingNodeMock.mock.calls[0][0];
     const newEditingNode = updateEditingNodeFn(editingNode);
     expect(newEditingNode.data.columns.length).toBe(0);
-  });
+
 
   it('does not delete a column when 삭제 is clicked and canceled', async () => {
     const setNodesMock = vi.fn();
@@ -149,7 +149,7 @@ describe('EditTableModal', () => {
 
     expect(window.confirm).toHaveBeenCalled();
     expect(setNodesMock).not.toHaveBeenCalled();
-  });
+
 
   it('duplicates a table when 복제 is clicked', async () => {
     const setNodesMock = vi.fn();
@@ -170,7 +170,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' })); // Without schema it's test_table
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
@@ -183,7 +183,7 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.title).toBe('test_table_copy');
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
-  });
+
 
   it('calls onDeleteTable when 테이블 삭제 is clicked', async () => {
     const onDeleteTableMock = vi.fn();
@@ -208,8 +208,27 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNodeLocal as any} setEditingNode={vi.fn()} setNodes={vi.fn()} onDeleteTable={onDeleteTableMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_table 테이블 삭제' }));
+    await user.click(screen.getByRole('button', { name: 'public.test_table 테이블 삭제' })); // With schema it's public.test_table
 
     expect(onDeleteTableMock).toHaveBeenCalled();
+  });
+
+
+  it('uses stable table identity for labels across schemas', async () => {
+    const schemaNode = {
+      id: 'table-2',
+      type: 'tableNode',
+      position: { x: 0, y: 0 },
+      data: {
+        id: 'table-2',
+        schema: 'auth',
+        title: 'users',
+        comment: '',
+        columns: [],
+      },
+    };
+    render(<EditTableModal isOpen={true} setEditingNode={vi.fn()} setNodes={vi.fn()} onEditTableCancel={vi.fn()} onEditTableSubmit={vi.fn()} onDeleteTable={vi.fn()} editingNode={schemaNode as any} />);
+    expect(screen.getByRole('button', { name: 'auth.users 테이블 삭제' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'auth.users 테이블 복제' })).toBeInTheDocument();
   });
 });
