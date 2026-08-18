@@ -26,7 +26,8 @@ export function EditTableModal({
 
   if (!isOpen || !editingNode) return null;
 
-  const tableIdentity = (editingNode.data.schema ? `${editingNode.data.schema}.${editingNode.data.title}` : editingNode.data.title).trim() || editingNode.id;
+  const schema = (editingNode.data as any).schema;
+  const tableIdentity = (schema ? `${schema}.${editingNode.data.title}` : editingNode.data.title).trim() || editingNode.id;
 
   return (
     <div className="modalOverlay">

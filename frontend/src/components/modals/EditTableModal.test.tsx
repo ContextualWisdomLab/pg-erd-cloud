@@ -8,7 +8,7 @@ describe('EditTableModal', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
-
+  });
 
   const defaultProps = {
     isOpen: true,
@@ -44,12 +44,12 @@ describe('EditTableModal', () => {
     expect(screen.getByRole('textbox', { name: 'test_col 데이터 타입' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col PK 설정' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col NN 설정' })).toBeInTheDocument();
-
+  });
 
   it('returns null if not open or no editingNode', () => {
     const { container } = render(<EditTableModal {...defaultProps} isOpen={false} editingNode={null} />);
     expect(container.firstChild).toBeNull();
-
+  });
 
   it('adds a column when 컬럼 추가 is clicked', async () => {
     const setNodesMock = vi.fn();
@@ -82,7 +82,7 @@ describe('EditTableModal', () => {
     const updateEditingNodeFn = setEditingNodeMock.mock.calls[0][0];
     const newEditingNode = updateEditingNodeFn(editingNode);
     expect(newEditingNode.data.columns.length).toBe(1);
-
+  });
 
   it('deletes a column when 삭제 is clicked and confirmed', async () => {
     const setNodesMock = vi.fn();
@@ -123,7 +123,7 @@ describe('EditTableModal', () => {
     const updateEditingNodeFn = setEditingNodeMock.mock.calls[0][0];
     const newEditingNode = updateEditingNodeFn(editingNode);
     expect(newEditingNode.data.columns.length).toBe(0);
-
+  });
 
   it('does not delete a column when 삭제 is clicked and canceled', async () => {
     const setNodesMock = vi.fn();
@@ -149,7 +149,7 @@ describe('EditTableModal', () => {
 
     expect(window.confirm).toHaveBeenCalled();
     expect(setNodesMock).not.toHaveBeenCalled();
-
+  });
 
   it('duplicates a table when 복제 is clicked', async () => {
     const setNodesMock = vi.fn();
@@ -183,7 +183,7 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.title).toBe('test_table_copy');
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
-
+  });
 
   it('calls onDeleteTable when 테이블 삭제 is clicked', async () => {
     const onDeleteTableMock = vi.fn();
