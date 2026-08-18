@@ -73,6 +73,7 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
             "identifiers. Arbitrary SQL is rejected."
@@ -190,7 +191,7 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00-\x1F\x7F]+$")
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -214,9 +215,15 @@ class DiagramViewDetailOut(DiagramViewOut):
 class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
-    schema_name: str = Field(min_length=1, max_length=255)
-    relation_name: str = Field(min_length=1, max_length=255)
-    body: str = Field(min_length=1, max_length=10_000)
+    schema_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+    )
+    relation_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+    )
+    body: str = Field(
+        min_length=1, max_length=10_000, pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+$"
+    )
 
 
 class TableAnnotationOut(BaseModel):
@@ -285,7 +292,11 @@ class NamingLintOut(BaseModel):
 class DbmlConvertIn(BaseModel):
     """Request body for converting DBML text into a snapshot."""
 
-    dbml: str = Field(min_length=1, max_length=524_288)
+    dbml: str = Field(
+        min_length=1,
+        max_length=524_288,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+$",
+    )
     include_ddl: bool = True
     dialect: Literal["postgresql", "snowflake"] = "postgresql"
 
@@ -302,7 +313,7 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128)
+    key_name: str = Field(min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F]+$")
 
 
 class ApiKeyOut(BaseModel):
