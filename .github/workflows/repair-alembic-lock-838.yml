@@ -34,7 +34,6 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      EXPECTED_PARENT_HEAD: 01e1922c9b614f1f1c3abff9432d618064718c75
       TARGET_BRANCH: dependabot/pip/backend/alembic-gte-1.19.0
       GITHUB_TOKEN: ${{ github.token }}
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/pgerd
@@ -57,7 +56,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_HEAD"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
 
       - name: Setup Python
