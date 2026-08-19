@@ -78,5 +78,5 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
 ## 2024-07-25 - Avoid Array.from for String Processing in Hot Paths
-**Learning:** Using `Array.from(string)` creates an intermediate array of tuples and generates unnecessary garbage collection pressure for short strings. In hot paths like frontend ERD graph processing (`sanitizeHandleId`), this overhead is measurable and degrades performance.
+**Learning:** Using `Array.from(string)` creates an intermediate array of strings, one per Unicode code point, and generates unnecessary garbage collection pressure for short strings. In hot paths like frontend ERD graph processing (`sanitizeHandleId`), this overhead is measurable and degrades performance.
 **Action:** Replace `Array.from(string)` with a `for...of` loop to iterate over characters and manually concatenate strings, removing intermediate array allocations entirely.
