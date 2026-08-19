@@ -12,6 +12,15 @@ def test_col_or_q() -> None:
     assert col_or_q(None) == "?"
 
 
+def test_col_or_q() -> None:
+    """Render missing values explicitly and preserve deterministic scalar text."""
+
+    assert col_or_q("value") == "value"
+    assert col_or_q(123) == "123"
+    assert col_or_q(True) == "True"
+    assert col_or_q(None) == "?"
+
+
 def _snapshot() -> dict[str, object]:
     """Return one representative PostgreSQL snapshot for dictionary tests."""
 
