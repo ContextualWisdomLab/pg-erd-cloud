@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-05-30 - [Performance] O(N^2) avoidance in frontend array scanning via column handle resolution
+**Learning:** React flow components use encoded connection handles (src-c-XXX, tgt-c-XXX) derived from column names. Previously, resolving the column name required scanning arrays (like `node.data.columns.find(...)`) repeatedly in export routines, generating O(N^2) behavior or worse as N scales. This was a codebase-specific architectural pattern causing repeated array allocations and scans over UI edges and columns just to recover the source column name string.
+**Action:** Implemented a single `parseColumnNameFromHandle` O(1) string decoder utility in `handleUtils.ts` to decode the handle string and directly return the column name without needing to iterate `node.data.columns` to find a match. I applied it across ERD export functions (`exportDataDictionary.ts`, `export.ts`, `prisma.ts`) to immediately compute O(1) lookups and significantly boost performance, substituting `node.data.columns.find(...)` scanning with handle parsing.

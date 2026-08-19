@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { parseColumnNameFromHandle } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -69,20 +69,33 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+    if (edge.sourceHandle) {
+      const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+      if (parsedSource) {
+        sourceField = parsedSource;
+      } else if (edge.sourceHandle.startsWith('src-')) {
+        // Fallback for tests or old handle format
+        sourceField = edge.sourceHandle.slice(4);
+      }
+      if (sourceField) {
+        fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+      }
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+    if (edge.targetHandle) {
+      const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+      if (parsedTarget) {
+        targetField = parsedTarget;
+      } else if (edge.targetHandle.startsWith('tgt-')) {
+        targetField = edge.targetHandle.slice(4);
+      }
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      const isUnique = sourceNode.data.columns.some(c => c.column_name === sourceField && c.is_pk);
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
@@ -113,7 +126,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);
