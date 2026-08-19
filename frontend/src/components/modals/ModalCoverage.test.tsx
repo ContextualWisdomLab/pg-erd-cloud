@@ -262,7 +262,29 @@ describe('modal behavior coverage', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
-    fireEvent.click(screen.getAllByRole('radio', { name: /^색상 / })[1]!)
+    const colorRadios = screen.getAllByRole('radio', { name: /^색상 / })
+    fireEvent.click(colorRadios[1]!)
+    rerender(
+      <GroupModal
+        isOpen
+        businessGroups={[group]}
+        newGroupName="New"
+        setNewGroupName={setName}
+        newGroupColor="#2563eb"
+        setNewGroupColor={setColor}
+        nodes={[groupedNode]}
+        onCloseGroupManager={onClose}
+        onCreateBusinessGroup={onCreate}
+        onDeleteBusinessGroup={onDelete}
+        onAssignBusinessGroup={onAssign}
+      />,
+    )
+    const selectedColorRadios = screen.getAllByRole('radio', { name: /^색상 / })
+    expect(selectedColorRadios[1]).toHaveAttribute('aria-checked', 'true')
+    expect(selectedColorRadios.filter((radio) => radio.getAttribute('aria-checked') === 'true')).toHaveLength(1)
+    fireEvent.keyDown(selectedColorRadios[1]!, { key: 'ArrowRight' })
+    expect(setColor).toHaveBeenLastCalledWith('#b45309')
+    expect(document.activeElement).toBe(selectedColorRadios[2])
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))

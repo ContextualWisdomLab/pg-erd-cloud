@@ -61,3 +61,8 @@
 ## 2024-08-14 - Custom Radio Group Accessibility
 **Learning:** 커스텀 `role="radiogroup"`을 만들 때, 하위 요소가 일반 버튼이라도 `aria-pressed` 대신 명시적으로 `role="radio"`와 `aria-checked`를 사용해야 구조적 불일치로 인한 접근성 오류를 방지할 수 있습니다.
 **Action:** 색상 선택기와 같은 커스텀 라디오 그룹 컴포넌트를 개발하거나 수정할 때, 하위 버튼의 역할을 반드시 `radio`로 지정하고 상태를 `aria-checked`로 표시하도록 합니다. 관련된 테스트 코드 역시 `role="button"` 대신 `role="radio"`를 찾도록 수정해야 합니다.
+## 2026-08-19 - Keyboard-operable custom color radio
+**Learning:** A custom `radiogroup` needs one tab stop, an explicit checked state, and arrow-key movement so keyboard users can inspect and change the same selection that pointer users see.
+**Action:** Keep the selected swatch at `tabIndex=0`, move focus and selection with the four arrow keys, and keep the visual selector on `aria-checked`. Do not add a parallel keyboard-only state.
+**Evidence:** The modal test asserts that a click leaves exactly one radio checked; the implementation also exercises the fixed six-color set with roving focus and cyclic arrow movement. WAI-ARIA Authoring Practices defines the radio-group keyboard interaction and roving focus model; the test preserves the visible selection and callback contract.
+**References:** W3C, *ARIA Authoring Practices Guide: Radio Group Pattern*, https://www.w3.org/WAI/ARIA/apg/patterns/radio/; W3C, *Web Content Accessibility Guidelines (WCAG) 2.2*, Success Criterion 2.1.1 Keyboard, https://www.w3.org/TR/WCAG22/#keyboard. These sources support the keyboard interaction and state semantics used here.

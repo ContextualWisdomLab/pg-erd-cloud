@@ -35,6 +35,11 @@ export function GroupModal({
 
   if (!isOpen) return null;
 
+  const selectedColorIndex = BUSINESS_GROUP_COLORS.indexOf(
+    newGroupColor as (typeof BUSINESS_GROUP_COLORS)[number],
+  );
+  const colorFocusIndex = selectedColorIndex >= 0 ? selectedColorIndex : 0;
+
   return (
     <div className="modalOverlay">
       <div
@@ -72,15 +77,33 @@ export function GroupModal({
             role="radiogroup"
             aria-label="그룹 색상"
           >
-            {BUSINESS_GROUP_COLORS.map((color) => (
+            {BUSINESS_GROUP_COLORS.map((color, index) => (
               <button
                 type="button"
                 role="radio"
                 aria-label={`색상 ${color}`}
-                aria-checked={newGroupColor === color}
+                aria-checked={selectedColorIndex === index}
+                tabIndex={colorFocusIndex === index ? 0 : -1}
                 className="groupManager__swatch"
                 key={color}
                 onClick={() => setNewGroupColor(color)}
+                onKeyDown={(event) => {
+                  const direction =
+                    event.key === "ArrowRight" || event.key === "ArrowDown"
+                      ? 1
+                      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                        ? -1
+                        : 0;
+                  if (direction === 0) return;
+                  event.preventDefault();
+                  const nextIndex =
+                    (index + direction + BUSINESS_GROUP_COLORS.length) %
+                    BUSINESS_GROUP_COLORS.length;
+                  setNewGroupColor(BUSINESS_GROUP_COLORS[nextIndex]);
+                  event.currentTarget.parentElement
+                    ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+                    [nextIndex]?.focus();
+                }}
                 style={{ background: color }}
               />
             ))}
