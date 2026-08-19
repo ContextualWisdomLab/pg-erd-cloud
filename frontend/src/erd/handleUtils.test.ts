@@ -67,5 +67,11 @@ describe('handleUtils', () => {
       expect(parseColumnNameFromHandle('')).toBeNull();
       expect(parseColumnNameFromHandle('random')).toBeNull();
     });
+
+    it('should reject malformed hexadecimal tokens', () => {
+      expect(parseColumnNameFromHandle('src-c-')).toBeNull();
+      expect(parseColumnNameFromHandle('src-c-zz')).toBeNull();
+      expect(parseColumnNameFromHandle('src-c-0069junk')).toBeNull();
+    });
   });
 });

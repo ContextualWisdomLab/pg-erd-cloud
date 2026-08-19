@@ -79,4 +79,8 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
 ## 2025-02-17 - Optimize column name parsing in ERD exports
 **Learning:** O(N) array search inside O(E) edge iteration for every column handle lookup causes noticeable GC overhead and performance degradation on large ERDs.
-**Action:** Created `parseColumnNameFromHandle` helper to parse the name directly from the ID in O(1) time without searching the columns array.
+**Action:** Created `parseColumnNameFromHandle` helper to parse the name directly from the ID in O(1) time, and pre-indexed each node's column names in a `Set` so dangling-column validation is also O(1). The export path is O(N * C + E) overall, with fewer repeated allocations than scanning columns for every edge.
+
+**Research reference:** Fredman, M. L., Komlós, J., & Szemerédi, E. (1984). “Storing a Sparse Table with O(1) Worst Case Access Time.” *Journal of the ACM*, 31(3), 538–544. https://doi.org/10.1145/828.1884
+
+**Summary:** The paper establishes constant-time access for a static dictionary. This PR applies the same pre-index-then-direct-lookup principle (an engineering inference, not the paper's exact algorithm) to column validation while keeping preprocessing linear.

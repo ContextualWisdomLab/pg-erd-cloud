@@ -59,6 +59,7 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  columnNamesByNodeId: Map<string, Set<string>>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -74,8 +75,8 @@ function fkColumnsForEdge(
   // To prevent regressions where dangling edges resolve to deleted columns,
   // we ensure the parsed column actually exists in the source node.
   if (parsedSource && parsedTarget) {
-    const hasSource = (sourceNode.data.columns || []).some(c => c.column_name === parsedSource);
-    const hasTarget = (targetNode.data.columns || []).some(c => c.column_name === parsedTarget);
+    const hasSource = columnNamesByNodeId.get(sourceNode.id)?.has(parsedSource) ?? false;
+    const hasTarget = columnNamesByNodeId.get(targetNode.id)?.has(parsedTarget) ?? false;
     if (hasSource && hasTarget) return { sourceColumns: [parsedSource], targetColumns: [parsedTarget] };
   }
 
@@ -100,6 +101,15 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   const nodesById = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+  }
+
+  const columnNamesByNodeId = new Map<string, Set<string>>();
+  for (const node of nodes) {
+    const columnNames = new Set<string>();
+    for (const column of node.data.columns || []) {
+      columnNames.add(column.column_name);
+    }
+    columnNamesByNodeId.set(node.id, columnNames);
   }
 
   // Export tables
@@ -135,7 +145,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, columnNamesByNodeId);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
