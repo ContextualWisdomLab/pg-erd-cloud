@@ -13,7 +13,8 @@ Supported subset (the parts real DBML files actually use):
 * quoted identifiers ``"My Table"``; comments ``//``; multi-word types
 
 Ignored (parsed over, not errors): ``Project``/``Enum``/``TableGroup``/``Note``
-blocks, ``indexes`` blocks, header colors. ponytail: line-oriented parser, not a
+blocks and header colors. Index blocks preserve simple identifier indexes and
+skip expression indexes unless their identifiers are unambiguous. ponytail: line-oriented parser, not a
 grammar — good for the 95% of DBML in the wild; a hostile file degrades to
 skipped lines, never an exception.
 """
@@ -37,6 +38,100 @@ _REF_RE = re.compile(
 )
 _INLINE_REF_RE = re.compile(rf"ref:\s*(?P<op>[<>-])\s*(?P<to>{_PATH})", re.IGNORECASE)
 _PATH_SEGMENT_RE = re.compile(r'"[^"]+"|[^.]+')
+_SAFE_INDEX_IDENTIFIER_RE = re.compile(r'^(?:"[^"]+"|[A-Za-z_]\w*)$')
+
+
+def _split_top_level(value: str) -> list[str]:
+    """Split comma-separated DBML values without splitting nested expressions."""
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    quote: str | None = None
+    for index, character in enumerate(value):
+        if quote:
+            if character == quote and (index == 0 or value[index - 1] != "\\"):
+                quote = None
+            continue
+        if character in "'\"":
+            quote = character
+        elif character == "(":
+            depth += 1
+        elif character == ")" and depth:
+            depth -= 1
+        elif character == "," and depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+    parts.append(value[start:].strip())
+    return [part for part in parts if part]
+
+
+def _setting_value(settings: str, key: str) -> str | None:
+    for part in _split_top_level(settings):
+        name, separator, value = part.partition(":")
+        if separator and name.strip().lower() == key:
+            return value.strip() or None
+    return None
+
+
+def _parenthesized_body(line: str) -> tuple[str, str] | None:
+    if not line.startswith("("):
+        return None
+    depth = 0
+    quote: str | None = None
+    for index, character in enumerate(line):
+        if quote:
+            if character == quote and (index == 0 or line[index - 1] != "\\"):
+                quote = None
+            continue
+        if character in "'\"":
+            quote = character
+        elif character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth == 0:
+                return line[1:index], line[index + 1 :].strip()
+    return None
+
+
+def _quote_index_identifier(value: str) -> str | None:
+    value = value.strip()
+    if not _SAFE_INDEX_IDENTIFIER_RE.fullmatch(value):
+        return None
+    return f'"{value.strip(chr(34))}"'
+
+
+def _index_row(
+    schema: str,
+    table: str,
+    relation_oid: int,
+    index_columns: str,
+    settings: str,
+    ordinal: int,
+) -> dict[str, Any] | None:
+    columns = [_quote_index_identifier(value) for value in _split_top_level(index_columns)]
+    if not columns or any(column is None for column in columns):
+        return None
+    unique = any(part.strip().lower() == "unique" for part in _split_top_level(settings))
+    raw_name = _setting_value(settings, "name")
+    index_name = (raw_name or f"idx_{table}_{ordinal}").strip("'\"")
+    if not _SAFE_INDEX_IDENTIFIER_RE.fullmatch(index_name):
+        index_name = f"idx_{table}_{ordinal}"
+    quoted_table = f'"{schema}"."{table}"'
+    quoted_name = f'"{index_name}"'
+    index_def = (
+        f'CREATE {"UNIQUE " if unique else ""}INDEX {quoted_name} '
+        f"ON {quoted_table} ({', '.join(columns)})"
+    )
+    return {
+        "relation_oid": relation_oid,
+        "index_name": index_name,
+        "is_unique": unique,
+        "is_primary": False,
+        "is_valid": True,
+        "predicate_expr": None,
+        "index_def": index_def,
+    }
 
 
 def _consume_table_name(line: str, start: int) -> tuple[str, int] | None:
@@ -128,6 +223,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
     relations: list[dict[str, Any]] = []
     columns: list[dict[str, Any]] = []
     pk_columns: list[dict[str, Any]] = []
+    indexes: list[dict[str, Any]] = []
     fk_specs: list[tuple[str, str, str, str, str, str]] = []  # child s/t/c, parent s/t/c
 
     oid_by_table: dict[tuple[str, str], int] = {}
@@ -173,11 +269,6 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 next_oid += 1
             continue
 
-        if line.startswith("}"):
-            current = None
-            in_indexes = False
-            continue
-
         # standalone Ref (works inside or outside a table body)
         if re.match(r"^ref\b", line, re.IGNORECASE):
             rm = _REF_RE.search(line)
@@ -192,20 +283,40 @@ def parse_dbml(text: str) -> dict[str, Any]:
 
         if current is None:
             continue
+        if in_indexes:
+            if line.startswith("}"):
+                in_indexes = False
+                continue
+            parsed_index = _parenthesized_body(line)
+            if parsed_index is not None:
+                index_columns, tail = parsed_index
+                settings = tail[1:-1] if tail.startswith("[") and tail.endswith("]") else ""
+                row = _index_row(
+                    current[0],
+                    current[1],
+                    oid_by_table[current],
+                    index_columns,
+                    settings,
+                    len(indexes) + 1,
+                )
+                if row is not None:
+                    indexes.append(row)
+            continue
+        if line.startswith("}"):
+            current = None
+            continue
         if re.match(r"^indexes\s*\{", line, re.IGNORECASE):
             in_indexes = True
-            continue
-        if in_indexes:
-            if "}" in line:
-                in_indexes = False
             continue
 
         cm = _COLUMN_RE.match(line)
         if not cm:
             continue
         col_name = (cm.group("qname") or cm.group("name")).strip('"')
-        settings = (cm.group("settings") or "").lower()
+        raw_settings = cm.group("settings") or ""
+        settings = raw_settings.lower()
         oid = oid_by_table[current]
+        default_expr = _setting_value(raw_settings, "default")
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
         columns.append(
             {
@@ -214,8 +325,8 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 "column_position": sum(1 for c in columns if c["relation_oid"] == oid) + 1,
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
-                "has_default": "default:" in settings,
-                "default_expr": None,
+                "has_default": default_expr is not None,
+                "default_expr": default_expr,
                 "column_comment": None,
             }
         )
@@ -223,7 +334,18 @@ def parse_dbml(text: str) -> dict[str, Any]:
             pk_columns.append(
                 {"relation_oid": oid, "column_name": col_name, "column_ordinal": len(pk_columns) + 1}
             )
-        im = _INLINE_REF_RE.search(cm.group("settings") or "")
+        if re.search(r"\bunique\b", settings):
+            row = _index_row(
+                current[0],
+                current[1],
+                oid,
+                col_name,
+                "unique",
+                len(indexes) + 1,
+            )
+            if row is not None:
+                indexes.append(row)
+        im = _INLINE_REF_RE.search(raw_settings)
         if im:
             ts, tt, tc = _split_col_ref(im.group("to"))
             if im.group("op") == "<":
@@ -258,7 +380,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
         "relations": relations,
         "columns": columns,
         "constraints": constraints,
-        "indexes": [],
+        "indexes": indexes,
         "pk_columns": pk_columns,
         "fk_edges": fk_edges,
         "citus_distributed_tables": [],

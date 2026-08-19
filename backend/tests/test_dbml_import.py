@@ -90,6 +90,34 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert "PRIMARY KEY" in ddl
 
 
+def test_preserves_defaults_unique_columns_and_simple_index_blocks():
+    text = """
+Table accounts {
+  id integer [pk]
+  email varchar(255) [unique]
+  status varchar [default: 'active']
+  indexes {
+    (status, email) [unique, name: 'accounts_status_email']
+    (id)
+  }
+}
+"""
+    snapshot = parse_dbml(text)
+    by_name = {column["column_name"]: column for column in snapshot["columns"]}
+    assert by_name["status"]["default_expr"] == "'active'"
+    assert by_name["status"]["has_default"] is True
+
+    indexes = {index["index_name"]: index for index in snapshot["indexes"]}
+    assert indexes["accounts_status_email"]["is_unique"] is True
+    assert indexes["accounts_status_email"]["index_def"].endswith(
+        '("status", "email")'
+    )
+    assert any(index["is_unique"] for index in indexes.values())
+    ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
+    assert "DEFAULT 'active'" in ddl
+    assert "CREATE UNIQUE INDEX" in ddl
+
+
 def test_pathological_long_line_is_skipped_fast():
     import time
 
