@@ -38,6 +38,12 @@ function mapToPrismaType(pgType: string, isFk: boolean): string {
   return "String"; // fallback
 }
 
+type OutgoingRelation = {
+  targetModel: string;
+  targetField: string;
+  relationName: string;
+};
+
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -59,7 +65,7 @@ export function exportPrisma(
   const fkNodeColumnPairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
-  const outgoingRelationsByModel = new Map<string, Array<{ sourceFields: string[], targetModel: string, targetFields: string[], relationName: string }>>();
+  const outgoingRelationsByModel = new Map<string, Map<string, OutgoingRelation>>();
 
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
@@ -94,14 +100,16 @@ export function exportPrisma(
       incomingRelationsByNode.set(edge.target, relList);
 
       const sourceModelStr = sanitizeName(sourceNode.data.title);
-      const outList = outgoingRelationsByModel.get(sourceModelStr) || [];
-      outList.push({
-        sourceFields: [sanitizeName(sourceField)],
+      let outgoingByField = outgoingRelationsByModel.get(sourceModelStr);
+      if (!outgoingByField) {
+        outgoingByField = new Map();
+        outgoingRelationsByModel.set(sourceModelStr, outgoingByField);
+      }
+      outgoingByField.set(sanitizeName(sourceField), {
         targetModel: sanitizeName(targetNode.data.title),
-        targetFields: [sanitizeName(targetField)],
+        targetField: sanitizeName(targetField),
         relationName: relName
       });
-      outgoingRelationsByModel.set(sourceModelStr, outList);
     }
   }
 
@@ -138,14 +146,12 @@ export function exportPrisma(
 
       // Determine if there is a relation defined on this field
       let relationDef = "";
-      const outgoingEdges = outgoingRelationsByModel.get(modelName) || [];
-      for (const edgeInfo of outgoingEdges) {
-        if (edgeInfo.sourceFields.includes(fieldName)) {
-          // This field is a foreign key, but in Prisma, we typically define the relation object field
-          // alongside the scalar field. We will add the relation object field here.
-          const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-          relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
-        }
+      const edgeInfo = outgoingRelationsByModel.get(modelName)?.get(fieldName);
+      if (edgeInfo) {
+        // This field is a foreign key, but in Prisma, we typically define the relation object field
+        // alongside the scalar field. We will add the relation object field here.
+        const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
+        relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetField}])`;
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;

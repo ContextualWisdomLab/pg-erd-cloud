@@ -80,3 +80,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2025-02-23 - Prisma 내보내기 시 O(N * C * E) 순회 회피
 **Learning:** 각 노드의 모든 컬럼에 대해 관계를 찾기 위해 `edgesProcessed` Map을 순회하는 것은 O(N * C * E) 복잡도를 가지며, 대형 ERD에서 심각한 병목 현상을 일으킵니다.
 **Action:** 소스 모델 이름을 기준으로 그룹화된 `outgoingRelationsByModel` Map을 미리 계산하여 노드당 O(1) 룩업을 제공함으로써 복잡도를 O(N * C + E)로 줄이세요.
+
+**Research reference:** Fredman, M. L., Komlós, J., & Szemerédi, E. (1984). “Storing a Sparse Table with O(1) Worst Case Access Time.” *Journal of the ACM*, 31(3), 538–544. https://doi.org/10.1145/828.1884
+
+**Summary:** The paper establishes constant-time access for a static dictionary. This PR applies the same pre-index-then-direct-lookup principle (an engineering inference, not the paper's exact algorithm) to source-model/source-field relation lookups while keeping preprocessing linear.
