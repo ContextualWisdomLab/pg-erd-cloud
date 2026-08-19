@@ -55,15 +55,33 @@ function compareRequests(
   left: PrismaIdentifierRequest,
   right: PrismaIdentifierRequest,
 ): number {
-  const sourceOrder = left.source.localeCompare(right.source);
+  const sourceOrder = compareUnicode(left.source, right.source);
   if (sourceOrder !== 0) {
     return sourceOrder;
   }
-  const namespaceOrder = left.namespace.localeCompare(right.namespace);
+  const namespaceOrder = compareUnicode(left.namespace, right.namespace);
   if (namespaceOrder !== 0) {
     return namespaceOrder;
   }
-  return left.key.localeCompare(right.key);
+  return compareUnicode(left.key, right.key);
+}
+
+function compareUnicode(left: string, right: string): number {
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftCodePoint = left.codePointAt(leftIndex) ?? 0;
+    const rightCodePoint = right.codePointAt(rightIndex) ?? 0;
+    if (leftCodePoint !== rightCodePoint) {
+      return leftCodePoint < rightCodePoint ? -1 : 1;
+    }
+    leftIndex += leftCodePoint > 0xffff ? 2 : 1;
+    rightIndex += rightCodePoint > 0xffff ? 2 : 1;
+  }
+  if (leftIndex === left.length && rightIndex === right.length) {
+    return 0;
+  }
+  return leftIndex === left.length ? -1 : 1;
 }
 
 /**

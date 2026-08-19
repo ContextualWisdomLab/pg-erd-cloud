@@ -36,6 +36,16 @@ describe('preferredPrismaName', () => {
     expect(preferredPrismaName('order item')).toBe('order_item');
   });
 
+  it('orders Unicode sources by code point for cross-runtime determinism', () => {
+    const result = allocatePrismaIdentifiers([
+      { key: 'accent', kind: 'model', namespace: 'models', source: 'é' },
+      { key: 'sharp-s', kind: 'model', namespace: 'models', source: 'ß' },
+    ]);
+
+    expect(result.names.get('sharp-s')).toBe('unnamed');
+    expect(result.names.get('accent')).toBe('unnamed_2');
+  });
+
   it('uses unnamed for Korean, emoji, and empty sources', () => {
     expect(preferredPrismaName('사용자')).toBe('unnamed');
     expect(preferredPrismaName('📦')).toBe('unnamed');

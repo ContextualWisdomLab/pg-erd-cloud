@@ -61,6 +61,18 @@ def test_punctuation_collisions_are_deterministic() -> None:
     assert len(set(forward["names"].values())) == 3
 
 
+def test_unicode_sources_use_codepoint_order() -> None:
+    """Frontend and backend use the same order for non-ASCII collisions."""
+    result = allocate_prisma_identifiers(
+        [
+            {"key": "accent", "kind": "model", "namespace": "models", "source": "é"},
+            {"key": "sharp-s", "kind": "model", "namespace": "models", "source": "ß"},
+        ]
+    )
+    assert result["names"]["sharp-s"] == "unnamed"
+    assert result["names"]["accent"] == "unnamed_2"
+
+
 def test_unicode_and_empty_sources_allocate_unique_identifiers() -> None:
     """Korean, emoji, and NFC/NFD Hangul remain traceable through unique names."""
     nfc = unicodedata.normalize("NFC", "가")

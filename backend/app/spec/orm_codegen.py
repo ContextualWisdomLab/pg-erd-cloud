@@ -184,6 +184,33 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
     if not model_alloc["ok"]:
         return PRISMA_EXPORT_FAILURE_SCHEMA
 
+    relation_requests: list[dict[str, str]] = []
+    for (child_oid, child_col), edge in ix["fk_by_child"].items():
+        child_model = model_alloc["names"].get(f"model:{child_oid}")
+        parent = ix["rel_by_oid"].get(edge.get("parent_relation_oid"))
+        if child_model is None or parent is None:
+            continue
+        parent_model = model_alloc["names"].get(
+            f"model:{parent.get('relation_oid')}"
+        )
+        if parent_model is None:
+            continue
+        relation_source = str(
+            edge.get("fk_constraint_name")
+            or f"{child_model}_{parent_model}_{child_col}"
+        )
+        relation_requests.append(
+            {
+                "key": f"relation:{child_oid}:{child_col}",
+                "kind": "relation",
+                "namespace": "relations",
+                "source": relation_source,
+            }
+        )
+    relation_alloc = allocate_prisma_identifiers(relation_requests)
+    if not relation_alloc["ok"]:
+        return PRISMA_EXPORT_FAILURE_SCHEMA
+
     field_requests: list[dict[str, str]] = []
     for rel in relations:
         oid = rel.get("relation_oid")
@@ -201,6 +228,39 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
                     "preferred": preferred_prisma_name(_snake_name(name, "column")),
                 }
             )
+    for (child_oid, child_col), edge in ix["fk_by_child"].items():
+        child_model = model_alloc["names"].get(f"model:{child_oid}")
+        parent = ix["rel_by_oid"].get(edge.get("parent_relation_oid"))
+        if child_model is None or parent is None:
+            continue
+        parent_model = model_alloc["names"].get(
+            f"model:{parent.get('relation_oid')}"
+        )
+        if parent_model is None:
+            continue
+        child_field = preferred_prisma_name(_snake_name(child_col, "column"))
+        forward_field = re.sub(r"_id$", "", child_field) or _snake_name(
+            parent_model, "relation"
+        )
+        reverse_field = f"{child_model[0].lower() + child_model[1:]}s"
+        field_requests.extend(
+            [
+                {
+                    "key": f"relation-field:{child_oid}:{child_col}:forward",
+                    "kind": "relation",
+                    "namespace": f"fields:{child_model}",
+                    "source": forward_field,
+                    "preferred": forward_field,
+                },
+                {
+                    "key": f"relation-field:{child_oid}:{child_col}:back",
+                    "kind": "relation",
+                    "namespace": f"fields:{parent_model}",
+                    "source": reverse_field,
+                    "preferred": reverse_field,
+                },
+            ]
+        )
     field_alloc = allocate_prisma_identifiers(field_requests)
     if not field_alloc["ok"]:
         return PRISMA_EXPORT_FAILURE_SCHEMA
@@ -266,9 +326,16 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
                 f"field:{parent_oid}:{parent_col}",
                 _snake_name(parent_col, "column"),
             )
-            field = re.sub(r"_id$", "", child_field) or _snake_name(pmodel, "relation")
+            relation_name = relation_alloc["names"].get(
+                f"relation:{child_oid}:{child_col}"
+            )
+            field = field_alloc["names"].get(
+                f"relation-field:{child_oid}:{child_col}:forward"
+            )
+            if relation_name is None or field is None:
+                continue
             lines.append(
-                f"  {field} {pmodel} @relation(fields: [{child_field}], references: [{parent_field}])"
+                f"  {field} {pmodel} @relation({quote_prisma_string(relation_name)}, fields: [{child_field}], references: [{parent_field}])"
             )
         for edge in children_of.get(oid, []):
             child = ix["rel_by_oid"].get(edge.get("child_relation_oid"))
@@ -278,7 +345,19 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
                 f"model:{child.get('relation_oid')}",
                 _class_name(str(child.get("relation_name"))),
             )
-            lines.append(f"  {cmodel[0].lower() + cmodel[1:]}s {cmodel}[]")
+            child_oid = child.get("relation_oid")
+            child_col = str(edge.get("child_column_name"))
+            relation_name = relation_alloc["names"].get(
+                f"relation:{child_oid}:{child_col}"
+            )
+            field = field_alloc["names"].get(
+                f"relation-field:{child_oid}:{child_col}:back"
+            )
+            if relation_name is None or field is None:
+                continue
+            lines.append(
+                f"  {field} {cmodel}[] @relation({quote_prisma_string(relation_name)})"
+            )
         if len(pk_cols) > 1:
             ordered = [
                 field_alloc["names"].get(
