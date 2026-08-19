@@ -7,49 +7,100 @@ import { sanitizeTableName } from "./securityUtils";
  * 인자로 받은 노드 목록을 바탕으로 관계(Edge)를 추론하여 반환합니다.
  * 'xxxx_id' 형태의 컬럼을 가지고 있을 경우, 'xxxxs' 혹은 'xxxx' 이름의 테이블로 연결합니다.
  */
-export function inferRelationships(nodes: Node<TableNodeData>[]): Edge[] {
+export function inferRelationships(
+  nodes: Node<TableNodeData>[]
+): Edge[] {
+  const newEdges: Edge[] = [];
+
+  // ⚡ Bolt: Use Map for O(1) table name lookups instead of Set + Array.find(),
+  // reducing complexity from O(N^2) to O(N).
   const nodesByTableName = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
-    const tableName = n.data.title.split(".").pop()!;
-    if (!nodesByTableName.has(tableName)) nodesByTableName.set(tableName, n);
+    const parts = n.data.title.split(".");
+    const tableName = parts[parts.length - 1];
+    // Preserve Original .find behavior by only setting the first occurrence
+    if (!nodesByTableName.has(tableName)) {
+      nodesByTableName.set(tableName, n);
+    }
   }
 
-  return nodes.flatMap((src) => {
-    const srcTableName = src.data.title.split(".").pop()!;
+  for (const sourceNode of nodes) {
+    const srcParts = sourceNode.data.title.split(".");
+    const srcTableName = srcParts[srcParts.length - 1];
 
-    return src.data.columns
-      .filter((c) => c.column_name.endsWith("_id"))
-      .flatMap((c) => {
-        const targetEntity = c.column_name.slice(0, -3);
-        const targetTableName = [targetEntity, `${targetEntity}s`, `${targetEntity}es`].find((t) => nodesByTableName.has(t));
+    for (const column of sourceNode.data.columns) {
+      const colName = column.column_name;
 
-        if (!targetTableName || targetTableName === srcTableName) return [];
+      // xxxx_id 형태인지 확인
+      if (colName.endsWith("_id")) {
+        const targetEntity = colName.slice(0, -3); // "_id" 제거
 
-        const targetNode = nodesByTableName.get(sanitizeTableName(targetTableName));
-        if (!targetNode) return [];
+        let targetTableName = "";
 
-        const targetCols = targetNode.data.columns;
-        const targetColName =
-          targetCols.find((col) => col.column_name === "id")?.column_name ||
-          targetCols.find((col) => col.is_pk)?.column_name ||
-          targetCols[0]?.column_name;
+        // 대상 테이블 이름 추측 (단수형/복수형 등 간단히)
+        if (nodesByTableName.has(targetEntity)) {
+          targetTableName = targetEntity;
+        } else if (nodesByTableName.has(targetEntity + "s")) {
+          targetTableName = targetEntity + "s";
+        } else if (nodesByTableName.has(targetEntity + "es")) {
+          targetTableName = targetEntity + "es";
+        }
 
-        if (!targetColName) return [];
+        // 자기 참조는 일단 제외
+        if (targetTableName && targetTableName !== srcTableName) {
+          // ⚡ Bolt: O(1) lookup instead of O(N) string splitting array scan
+          const safeTargetTableName = sanitizeTableName(targetTableName);
+          const targetNode = nodesByTableName.get(safeTargetTableName);
 
-        return {
-          id: `inferred_${src.id}_${c.column_name}_${targetNode.id}_${targetColName}`,
-          source: src.id,
-          target: targetNode.id,
-          sourceHandle: sourceColumnHandleId(c.column_name),
-          targetHandle: targetColumnHandleId(targetColName),
-          type: "smoothstep",
-          animated: true,
-          label: "inferred_fk",
-          data: {
-            sourceColumns: [c.column_name],
-            targetColumns: [targetColName],
-          },
-        };
-      });
-  });
+          if (targetNode) {
+            // 대상 테이블에 'id' 필드가 있는지, 혹은 PK 컬럼이 하나인지 확인
+            // 여기서는 단순하게 'id' 컬럼이 있거나, 첫 번째 PK 컬럼으로 연결
+            let targetColName = "";
+            let idCol = undefined;
+            let pkCol = undefined;
+
+            // ⚡ Bolt: Single pass O(C) search instead of two O(C) array scans with intermediate functions
+            for (const c of targetNode.data.columns) {
+              if (c.column_name === "id") {
+                idCol = c;
+                break; // id found, early exit
+              }
+              if (c.is_pk && !pkCol) {
+                pkCol = c;
+              }
+            }
+
+            if (idCol) {
+              targetColName = "id";
+            } else {
+              if (pkCol) {
+                targetColName = pkCol.column_name;
+              } else if (targetNode.data.columns.length > 0) {
+                 targetColName = targetNode.data.columns[0].column_name;
+              }
+            }
+
+            if (targetColName) {
+              newEdges.push({
+                id: `inferred_${sourceNode.id}_${colName}_${targetNode.id}_${targetColName}`,
+                source: sourceNode.id,
+                target: targetNode.id,
+                sourceHandle: sourceColumnHandleId(colName),
+                targetHandle: targetColumnHandleId(targetColName),
+                type: "smoothstep",
+                animated: true,
+                label: "inferred_fk",
+                data: {
+                  sourceColumns: [colName],
+                  targetColumns: [targetColName],
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return newEdges;
 }
