@@ -112,6 +112,7 @@ def _index_row(
     columns = [_quote_index_identifier(value) for value in _split_top_level(index_columns)]
     if not columns or any(column is None for column in columns):
         return None
+    safe_columns = [column for column in columns if column is not None]
     unique = any(part.strip().lower() == "unique" for part in _split_top_level(settings))
     raw_name = _setting_value(settings, "name")
     index_name = (raw_name or f"idx_{table}_{ordinal}").strip("'\"")
@@ -121,7 +122,7 @@ def _index_row(
     quoted_name = f'"{index_name}"'
     index_def = (
         f'CREATE {"UNIQUE " if unique else ""}INDEX {quoted_name} '
-        f"ON {quoted_table} ({', '.join(columns)})"
+        f"ON {quoted_table} ({', '.join(safe_columns)})"
     )
     return {
         "relation_oid": relation_oid,
