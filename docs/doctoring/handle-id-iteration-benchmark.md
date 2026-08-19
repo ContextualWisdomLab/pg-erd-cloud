@@ -50,9 +50,9 @@ does not substitute for a browser-level rendering benchmark.
 
 ## Evidence interpretation
 
-The committed raw artifact records one supporting Linux x64 run under Node
-22.16.0. It observed a paired median elapsed-time improvement of approximately
-52.14% for the fixed eight-string corpus and 10,000 iterations per sample. This
+The committed raw artifact records one supporting Darwin arm64 run under Node
+24.16.0. It observed a paired median elapsed-time improvement of approximately
+41.80% for the fixed eight-string corpus and 10,000 iterations per sample. This
 run validates the corrected evidence shape and shows the optimization is worth
 retesting, but it is not release evidence because the repository supports Node
 26.

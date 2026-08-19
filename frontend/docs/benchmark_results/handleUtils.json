@@ -1,1 +1,689 @@
-{"metadata":{"platform":"linux x64","node":"v22.16.0","v8":"12.4.254.21-node.26","iterationsPerSample":10000,"numberOfPairs":50,"corpusSize":8,"ordering":"deterministic counterbalanced AB/BA","heapMetric":"heapUsed after minus heapUsed before each timed sample; diagnostic only, not allocated bytes","rawEvidence":"samples preserve pair and execution order"},"samples":[{"pairIndex":0,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":116.54202899999999,"heapUsedDeltaBytes":240808},"optimized":{"elapsedMilliseconds":59.655311,"heapUsedDeltaBytes":607176},"elapsedImprovementPercent":48.81219117954433},{"pairIndex":1,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":116.31236799999999,"heapUsedDeltaBytes":54600},"optimized":{"elapsedMilliseconds":57.57687999999996,"heapUsedDeltaBytes":416784},"elapsedImprovementPercent":50.498058813487525},{"pairIndex":2,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":118.352393,"heapUsedDeltaBytes":93856},"optimized":{"elapsedMilliseconds":59.38143500000001,"heapUsedDeltaBytes":1324776},"elapsedImprovementPercent":49.826586945310005},{"pairIndex":3,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":118.74861899999996,"heapUsedDeltaBytes":1940688},"optimized":{"elapsedMilliseconds":57.60557300000005,"heapUsedDeltaBytes":1379224},"elapsedImprovementPercent":51.489479637653666},{"pairIndex":4,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":116.06959899999993,"heapUsedDeltaBytes":2792640},"optimized":{"elapsedMilliseconds":59.624325999999996,"heapUsedDeltaBytes":2594752},"elapsedImprovementPercent":48.6305401985579},{"pairIndex":5,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":116.06957899999998,"heapUsedDeltaBytes":2706968},"optimized":{"elapsedMilliseconds":55.403527999999824,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.26696910824512},{"pairIndex":6,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.31060100000013,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":54.32892599999991,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.47253927043928},{"pairIndex":7,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":116.41456900000003,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":56.86820899999998,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":51.15026453432993},{"pairIndex":8,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.926604,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":55.09339900000009,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.062101304237544},{"pairIndex":9,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":116.11765000000014,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":56.562726999999995,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":51.28843289542983},{"pairIndex":10,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.4888649999998,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":56.96611999999982,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":50.24309132595566},{"pairIndex":11,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":116.27271000000019,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":53.281473000000005,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":54.17542689079844},{"pairIndex":12,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":119.4890660000001,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":55.60182300000042,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":53.46702015396089},{"pairIndex":13,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":115.0481649999997,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":53.90502699999979,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":53.14568728671168},{"pairIndex":14,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":117.10842899999989,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":53.35964800000011,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":54.43568968037291},{"pairIndex":15,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":114.73848399999997,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":58.00358300000016,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":49.44714190227563},{"pairIndex":16,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.22895000000017,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":79.1815160000001,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":30.681743988717407},{"pairIndex":17,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":114.83352599999989,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":54.73475699999972,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.33556008721724},{"pairIndex":18,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":116.63270899999998,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":64.44257800000014,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":44.74742244047495},{"pairIndex":19,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":118.6361039999997,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":56.696515999999974,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.209728667421416},{"pairIndex":20,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":126.50646999999981,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":69.88099899999997,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":44.76092882838318},{"pairIndex":21,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":124.4821649999999,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":70.7297080000003,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":43.18085004385941},{"pairIndex":22,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":128.4080589999994,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":67.28733000000011,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":47.59882633223167},{"pairIndex":23,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":117.52048300000024,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":53.234363000000485,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":54.702055640802314},{"pairIndex":24,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":117.00499499999933,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":55.63224300000002,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.45310424567743},{"pairIndex":25,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":120.48621100000037,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":71.29656799999975,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":40.8259522743233},{"pairIndex":26,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":118.96207700000014,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":55.0869389999998,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":53.693697698301165},{"pairIndex":27,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":118.97492500000044,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":54.248617000000195,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":54.403319018692386},{"pairIndex":28,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":117.84046399999988,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":53.81701599999997,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":54.330614312584494},{"pairIndex":29,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":115.0032169999995,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":59.40850499999942,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":48.341875514665226},{"pairIndex":30,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.3978700000007,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":54.503444999999374,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.35624142302733},{"pairIndex":31,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":118.0877900000005,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":55.92934800000057,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":52.63748436650365},{"pairIndex":32,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":116.01843800000006,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":59.66709399999945,"heapUsedDeltaBytes":45536},"elapsedImprovementPercent":48.57102454697811},{"pairIndex":33,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":118.14610600000015,"heapUsedDeltaBytes":1888696},"optimized":{"elapsedMilliseconds":56.933632000000216,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":51.81082650324493},{"pairIndex":34,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":114.04765099999986,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":54.36774299999979,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":52.32892346024746},{"pairIndex":35,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":117.55923200000052,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":55.348768000000746,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":52.91839946691681},{"pairIndex":36,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":136.26525599999968,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":53.69705900000008,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":60.593726841125076},{"pairIndex":37,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":119.41304899999977,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":55.66975300000013,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":53.38051120359532},{"pairIndex":38,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":120.36442499999976,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":55.56662000000051,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":53.8346816345439},{"pairIndex":39,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":121.42538700000023,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":56.1586070000003,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":53.75052253282075},{"pairIndex":40,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":115.26177100000041,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":56.2096190000002,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":51.2330770971756},{"pairIndex":41,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":113.4953830000004,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":54.15999499999998,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":52.28000155742036},{"pairIndex":42,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":122.24387099999967,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":59.83084300000064,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":51.056161335073554},{"pairIndex":43,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":115.6408020000008,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":56.20449599999938,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":51.3973484895072},{"pairIndex":44,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":115.68753199999901,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":54.45978000000014,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":52.92510864524225},{"pairIndex":45,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":124.03452499999912,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":66.24981200000002,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":46.587603733718105},{"pairIndex":46,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":120.24518799999896,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":55.25381699999889,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":54.04904103106449},{"pairIndex":47,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":119.7967230000013,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":65.94781900000089,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":44.95023123462219},{"pairIndex":48,"executionOrder":"optimized_then_original","original":{"elapsedMilliseconds":117.18803700000171,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":61.47220500000003,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":47.543958774564054},{"pairIndex":49,"executionOrder":"original_then_optimized","original":{"elapsedMilliseconds":117.78705400000035,"heapUsedDeltaBytes":5969928},"optimized":{"elapsedMilliseconds":52.94880999999987,"heapUsedDeltaBytes":4158672},"elapsedImprovementPercent":55.047003722497635}],"elapsedMilliseconds":{"original":{"mean":118.15272350000004,"median":117.1482330000008},"optimized":{"mean":58.18949816000002,"median":56.18155149999984},"pairedImprovementPercent":{"mean":50.73857555641101,"median":52.13591498582948}},"heapUsedDeltaBytes":{"original":{"mean":3124637.92,"median":1888696},"optimized":{"mean":1565902.88,"median":45536}}}
+{
+  "metadata": {
+    "platform": "darwin arm64",
+    "node": "v24.16.0",
+    "v8": "13.6.233.17-node.49",
+    "iterationsPerSample": 10000,
+    "numberOfPairs": 50,
+    "corpusSize": 8,
+    "ordering": "deterministic counterbalanced AB/BA",
+    "rawEvidence": "samples preserve pair and execution order",
+    "heapMetric": "heapUsed after minus heapUsed before each timed sample; diagnostic only, not allocated bytes"
+  },
+  "samples": [
+    {
+      "pairIndex": 0,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 123.33366700000002,
+        "heapUsedDeltaBytes": 803504
+      },
+      "optimized": {
+        "elapsedMilliseconds": 66.243833,
+        "heapUsedDeltaBytes": 2020552
+      },
+      "elapsedImprovementPercent": 46.28892936427489
+    },
+    {
+      "pairIndex": 1,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 130.92699999999996,
+        "heapUsedDeltaBytes": 690984
+      },
+      "optimized": {
+        "elapsedMilliseconds": 66.36295799999994,
+        "heapUsedDeltaBytes": 3559504
+      },
+      "elapsedImprovementPercent": 49.31300801209838
+    },
+    {
+      "pairIndex": 2,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 135.17058299999997,
+        "heapUsedDeltaBytes": 2750736
+      },
+      "optimized": {
+        "elapsedMilliseconds": 71.48429099999998,
+        "heapUsedDeltaBytes": 1502400
+      },
+      "elapsedImprovementPercent": 47.11549701609262
+    },
+    {
+      "pairIndex": 3,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 137.16116699999998,
+        "heapUsedDeltaBytes": 2723936
+      },
+      "optimized": {
+        "elapsedMilliseconds": 75.26241600000003,
+        "heapUsedDeltaBytes": 1423024
+      },
+      "elapsedImprovementPercent": 45.12848086222536
+    },
+    {
+      "pairIndex": 4,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 156.25812499999984,
+        "heapUsedDeltaBytes": 2711168
+      },
+      "optimized": {
+        "elapsedMilliseconds": 90.66995800000007,
+        "heapUsedDeltaBytes": 1511664
+      },
+      "elapsedImprovementPercent": 41.974244219300495
+    },
+    {
+      "pairIndex": 5,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 170.1005,
+        "heapUsedDeltaBytes": 2683984
+      },
+      "optimized": {
+        "elapsedMilliseconds": 102.13137499999993,
+        "heapUsedDeltaBytes": 1493936
+      },
+      "elapsedImprovementPercent": 39.95821587826025
+    },
+    {
+      "pairIndex": 6,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 172.3594579999999,
+        "heapUsedDeltaBytes": 2726512
+      },
+      "optimized": {
+        "elapsedMilliseconds": 91.09370799999988,
+        "heapUsedDeltaBytes": 1458480
+      },
+      "elapsedImprovementPercent": 47.14899370361218
+    },
+    {
+      "pairIndex": 7,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 137.21395899999993,
+        "heapUsedDeltaBytes": 2711280
+      },
+      "optimized": {
+        "elapsedMilliseconds": 77.11975000000007,
+        "heapUsedDeltaBytes": 1466360
+      },
+      "elapsedImprovementPercent": 43.79598798690729
+    },
+    {
+      "pairIndex": 8,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 121.09820799999989,
+        "heapUsedDeltaBytes": 2726512
+      },
+      "optimized": {
+        "elapsedMilliseconds": 71.89866599999982,
+        "heapUsedDeltaBytes": 1430904
+      },
+      "elapsedImprovementPercent": 40.62780350969364
+    },
+    {
+      "pairIndex": 9,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 116.6066249999999,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 66.60670900000014,
+        "heapUsedDeltaBytes": 1458592
+      },
+      "elapsedImprovementPercent": 42.879138299388906
+    },
+    {
+      "pairIndex": 10,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 119.44450000000006,
+        "heapUsedDeltaBytes": 2655336
+      },
+      "optimized": {
+        "elapsedMilliseconds": 65.35383300000012,
+        "heapUsedDeltaBytes": 1555000
+      },
+      "elapsedImprovementPercent": 45.2851885185169
+    },
+    {
+      "pairIndex": 11,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 112.80237499999976,
+        "heapUsedDeltaBytes": 2726512
+      },
+      "optimized": {
+        "elapsedMilliseconds": 80.0678340000004,
+        "heapUsedDeltaBytes": 1458592
+      },
+      "elapsedImprovementPercent": 29.01937215417621
+    },
+    {
+      "pairIndex": 12,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 144.59874999999965,
+        "heapUsedDeltaBytes": 2687336
+      },
+      "optimized": {
+        "elapsedMilliseconds": 89.08862500000032,
+        "heapUsedDeltaBytes": 1448632
+      },
+      "elapsedImprovementPercent": 38.38907666905798
+    },
+    {
+      "pairIndex": 13,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 146.93120799999997,
+        "heapUsedDeltaBytes": 2738600
+      },
+      "optimized": {
+        "elapsedMilliseconds": 69.33795899999996,
+        "heapUsedDeltaBytes": 1466360
+      },
+      "elapsedImprovementPercent": 52.80923641490788
+    },
+    {
+      "pairIndex": 14,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 126.01187500000015,
+        "heapUsedDeltaBytes": 2697752
+      },
+      "optimized": {
+        "elapsedMilliseconds": 73.10279200000014,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 41.98737857047199
+    },
+    {
+      "pairIndex": 15,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 124.67108300000018,
+        "heapUsedDeltaBytes": 2690072
+      },
+      "optimized": {
+        "elapsedMilliseconds": 74.58924999999999,
+        "heapUsedDeltaBytes": 1519544
+      },
+      "elapsedImprovementPercent": 40.17117024643166
+    },
+    {
+      "pairIndex": 16,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 118.385041,
+        "heapUsedDeltaBytes": 2662888
+      },
+      "optimized": {
+        "elapsedMilliseconds": 69.35562499999969,
+        "heapUsedDeltaBytes": 1494048
+      },
+      "elapsedImprovementPercent": 41.41521224797338
+    },
+    {
+      "pairIndex": 17,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 110.62095899999986,
+        "heapUsedDeltaBytes": 2747720
+      },
+      "optimized": {
+        "elapsedMilliseconds": 65.55716699999994,
+        "heapUsedDeltaBytes": 1466360
+      },
+      "elapsedImprovementPercent": 40.737119265075236
+    },
+    {
+      "pairIndex": 18,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 119.48341600000003,
+        "heapUsedDeltaBytes": 2696184
+      },
+      "optimized": {
+        "elapsedMilliseconds": 66.9697500000002,
+        "heapUsedDeltaBytes": 1564960
+      },
+      "elapsedImprovementPercent": 43.95058976218073
+    },
+    {
+      "pairIndex": 19,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 114.45966599999974,
+        "heapUsedDeltaBytes": 2711280
+      },
+      "optimized": {
+        "elapsedMilliseconds": 75.25666600000022,
+        "heapUsedDeltaBytes": 1501816
+      },
+      "elapsedImprovementPercent": 34.250493095095706
+    },
+    {
+      "pairIndex": 20,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 111.75287500000013,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 72.47008300000016,
+        "heapUsedDeltaBytes": 1582688
+      },
+      "elapsedImprovementPercent": 35.15148223255994
+    },
+    {
+      "pairIndex": 21,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 105.88633300000038,
+        "heapUsedDeltaBytes": 2711280
+      },
+      "optimized": {
+        "elapsedMilliseconds": 64.4516250000006,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 39.13130885361723
+    },
+    {
+      "pairIndex": 22,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 108.9601249999996,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.68095799999992,
+        "heapUsedDeltaBytes": 1476320
+      },
+      "elapsedImprovementPercent": 41.5557223342024
+    },
+    {
+      "pairIndex": 23,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 104.6575840000005,
+        "heapUsedDeltaBytes": 2684096
+      },
+      "optimized": {
+        "elapsedMilliseconds": 65.51733299999978,
+        "heapUsedDeltaBytes": 1564960
+      },
+      "elapsedImprovementPercent": 37.39838959019017
+    },
+    {
+      "pairIndex": 24,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 105.17712500000016,
+        "heapUsedDeltaBytes": 2717392
+      },
+      "optimized": {
+        "elapsedMilliseconds": 59.448333999999704,
+        "heapUsedDeltaBytes": 1494048
+      },
+      "elapsedImprovementPercent": 43.47788647008595
+    },
+    {
+      "pairIndex": 25,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 112.0511660000002,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 64.65020900000036,
+        "heapUsedDeltaBytes": 1440864
+      },
+      "elapsedImprovementPercent": 42.30295738287967
+    },
+    {
+      "pairIndex": 26,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 104.91516700000011,
+        "heapUsedDeltaBytes": 2697752
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.13895800000046,
+        "heapUsedDeltaBytes": 1448632
+      },
+      "elapsedImprovementPercent": 39.819036841450774
+    },
+    {
+      "pairIndex": 27,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 106.41145899999992,
+        "heapUsedDeltaBytes": 2684096
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.17695800000001,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 40.629553815252116
+    },
+    {
+      "pairIndex": 28,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 105.55870800000048,
+        "heapUsedDeltaBytes": 2687336
+      },
+      "optimized": {
+        "elapsedMilliseconds": 61.53858300000047,
+        "heapUsedDeltaBytes": 1476320
+      },
+      "elapsedImprovementPercent": 41.702030873663034
+    },
+    {
+      "pairIndex": 29,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 103.60533299999952,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.83587499999976,
+        "heapUsedDeltaBytes": 1466360
+      },
+      "elapsedImprovementPercent": 38.38553175636233
+    },
+    {
+      "pairIndex": 30,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 103.75075000000015,
+        "heapUsedDeltaBytes": 2676544
+      },
+      "optimized": {
+        "elapsedMilliseconds": 60.24462500000027,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 41.933311325460124
+    },
+    {
+      "pairIndex": 31,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 106.19216699999924,
+        "heapUsedDeltaBytes": 2697752
+      },
+      "optimized": {
+        "elapsedMilliseconds": 61.94104100000004,
+        "heapUsedDeltaBytes": 1476320
+      },
+      "elapsedImprovementPercent": 41.67080044613791
+    },
+    {
+      "pairIndex": 32,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 108.18979200000012,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 58.931375000000116,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 45.52963462578794
+    },
+    {
+      "pairIndex": 33,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 104.94816700000047,
+        "heapUsedDeltaBytes": 2690072
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.02274999999918,
+        "heapUsedDeltaBytes": 1494048
+      },
+      "elapsedImprovementPercent": 39.94868914671097
+    },
+    {
+      "pairIndex": 34,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 105.77099999999973,
+        "heapUsedDeltaBytes": 2729752
+      },
+      "optimized": {
+        "elapsedMilliseconds": 63.42933399999947,
+        "heapUsedDeltaBytes": 1501816
+      },
+      "elapsedImprovementPercent": 40.03145096482057
+    },
+    {
+      "pairIndex": 35,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 105.70700000000033,
+        "heapUsedDeltaBytes": 2705304
+      },
+      "optimized": {
+        "elapsedMilliseconds": 70.35408299999926,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 33.44425345530661
+    },
+    {
+      "pairIndex": 36,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 114.13579200000004,
+        "heapUsedDeltaBytes": 2690072
+      },
+      "optimized": {
+        "elapsedMilliseconds": 64.96020800000042,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 43.0851559693033
+    },
+    {
+      "pairIndex": 37,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 109.09395800000038,
+        "heapUsedDeltaBytes": 2697752
+      },
+      "optimized": {
+        "elapsedMilliseconds": 60.411833000000115,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 44.624034082620874
+    },
+    {
+      "pairIndex": 38,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 101.40900000000056,
+        "heapUsedDeltaBytes": 2690072
+      },
+      "optimized": {
+        "elapsedMilliseconds": 57.190332999999555,
+        "heapUsedDeltaBytes": 1501816
+      },
+      "elapsedImprovementPercent": 43.60428265735858
+    },
+    {
+      "pairIndex": 39,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 99.1719579999999,
+        "heapUsedDeltaBytes": 2696184
+      },
+      "optimized": {
+        "elapsedMilliseconds": 57.67212500000005,
+        "heapUsedDeltaBytes": 1484088
+      },
+      "elapsedImprovementPercent": 41.84633825622349
+    },
+    {
+      "pairIndex": 40,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 102.34791700000005,
+        "heapUsedDeltaBytes": 2676544
+      },
+      "optimized": {
+        "elapsedMilliseconds": 60.82245800000055,
+        "heapUsedDeltaBytes": 5678032
+      },
+      "elapsedImprovementPercent": 40.572842337377004
+    },
+    {
+      "pairIndex": 41,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 100.15241699999933,
+        "heapUsedDeltaBytes": 2670504
+      },
+      "optimized": {
+        "elapsedMilliseconds": 57.81762500000059,
+        "heapUsedDeltaBytes": 1476320
+      },
+      "elapsedImprovementPercent": 42.270364778115166
+    },
+    {
+      "pairIndex": 42,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 102.77145799999926,
+        "heapUsedDeltaBytes": 2667360
+      },
+      "optimized": {
+        "elapsedMilliseconds": 58.550624999998945,
+        "heapUsedDeltaBytes": 1480792
+      },
+      "elapsedImprovementPercent": 43.028321151190276
+    },
+    {
+      "pairIndex": 43,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 99.79216599999927,
+        "heapUsedDeltaBytes": 2667360
+      },
+      "optimized": {
+        "elapsedMilliseconds": 56.409874999999374,
+        "heapUsedDeltaBytes": 1476320
+      },
+      "elapsedImprovementPercent": 43.47264193063032
+    },
+    {
+      "pairIndex": 44,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 101.03279099999963,
+        "heapUsedDeltaBytes": 2667360
+      },
+      "optimized": {
+        "elapsedMilliseconds": 58.70249999999942,
+        "heapUsedDeltaBytes": 1480792
+      },
+      "elapsedImprovementPercent": 41.897576599660965
+    },
+    {
+      "pairIndex": 45,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 100.61862500000097,
+        "heapUsedDeltaBytes": 2670504
+      },
+      "optimized": {
+        "elapsedMilliseconds": 61.040499999999156,
+        "heapUsedDeltaBytes": 1582688
+      },
+      "elapsedImprovementPercent": 39.33479015440872
+    },
+    {
+      "pairIndex": 46,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 98.74741600000016,
+        "heapUsedDeltaBytes": 2696184
+      },
+      "optimized": {
+        "elapsedMilliseconds": 57.67191699999967,
+        "heapUsedDeltaBytes": 1463064
+      },
+      "elapsedImprovementPercent": 41.59653048541587
+    },
+    {
+      "pairIndex": 47,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 99.45149999999921,
+        "heapUsedDeltaBytes": 2667360
+      },
+      "optimized": {
+        "elapsedMilliseconds": 58.55229200000031,
+        "heapUsedDeltaBytes": 1480792
+      },
+      "elapsedImprovementPercent": 41.1247774040605
+    },
+    {
+      "pairIndex": 48,
+      "executionOrder": "optimized_then_original",
+      "original": {
+        "elapsedMilliseconds": 104.5738339999989,
+        "heapUsedDeltaBytes": 2667360
+      },
+      "optimized": {
+        "elapsedMilliseconds": 56.539999999999054,
+        "heapUsedDeltaBytes": 1498520
+      },
+      "elapsedImprovementPercent": 45.932937679228964
+    },
+    {
+      "pairIndex": 49,
+      "executionOrder": "original_then_optimized",
+      "original": {
+        "elapsedMilliseconds": 100.7274580000012,
+        "heapUsedDeltaBytes": 2670504
+      },
+      "optimized": {
+        "elapsedMilliseconds": 58.67266599999857,
+        "heapUsedDeltaBytes": 1480792
+      },
+      "elapsedImprovementPercent": 41.751070497581836
+    }
+  ],
+  "elapsedMilliseconds": {
+    "original": {
+      "mean": 115.50398411999998,
+      "median": 108.57495849999987
+    },
+    "optimized": {
+      "mean": 67.04800491999993,
+      "median": 64.55091700000048
+    },
+    "pairedImprovementPercent": {
+      "mean": 41.769976797868104,
+      "median": 41.79870437690266
+    }
+  },
+  "heapUsedDeltaBytes": {
+    "original": {
+      "mean": 2619012.32,
+      "median": 2696184
+    },
+    "optimized": {
+      "mean": 1623596.48,
+      "median": 1484088
+    }
+  }
+}
