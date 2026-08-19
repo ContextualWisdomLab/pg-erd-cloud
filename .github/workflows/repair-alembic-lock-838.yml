@@ -6,7 +6,7 @@ on:
       - dependabot/pip/backend/alembic-gte-1.19.0
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: repair-alembic-lock-838
@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   repair:
+    permissions:
+      contents: write
     if: >-
       github.repository == 'ContextualWisdomLab/pg-erd-cloud' &&
       github.ref == 'refs/heads/dependabot/pip/backend/alembic-gte-1.19.0'
