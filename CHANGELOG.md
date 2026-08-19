@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+
 - [Docs] ADR/PRD/TRD/Architecture/UML/ERD, API·Forward Engineering matrix, threat model, test/operations/release strategy, traceability, references, lifecycle vocabulary, and machine-checked documentation links were added as the canonical authority graph.
 - [Security] Strix가 확인한 `nanoid<3.3.17` 개발 의존성 경로를 `3.3.17`로 고정하고 전체 lockfile audit을 0건으로 복구했습니다.
 - [Security] host-local TLS terminator가 Docker NAT를 거친 뒤 Traefik에 보이는 최소 direct-peer CIDR만 신뢰하고, 백엔드 rate limit·관측 로그가 `client, trusted-peer` 체인의 실제 client hop을 공통 해석하도록 고정했습니다.
@@ -13,6 +14,10 @@
 - [FE] 🌗 **Canvas and typography alignment**: editor and shared canvases follow the system color mode, form controls plus React Flow handles, controls, and relationship lines use accessible semantic boundary tokens, the public viewer cannot re-enable editing, status/navigation text meets contrast requirements, and bundled Inter weights plus a Noto Sans KR fallback keep the Korean UI readable on hosts without CJK system fonts.
 - [FE] 🔄 **Project-scoped async isolation**: project transitions clear stale data, expose distinct connection/snapshot loading states, preserve each project's in-flight create operation, serialize snapshot polling, and ignore late metadata, clipboard, and mutation completions outside their owning project.
 - [Docs] Replaced deleted Figma node `29:143` as current evidence with the live node inventory and an explicit source-precedence/QA record.
+
+- [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
+- [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
+
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🔒 **공개 스냅샷 경계 강화**: 공유 목록·상세·모든 export를 성공 상태로 제한하고 공개 DTO에서 원본 스냅샷 오류 진단을 제거합니다.
 - [BE] 🔒 **공개 LLM 비용 경계**: bearer 공유 경로에서는 결정적 Markdown과 LLM prompt만 허용하고, 외부 provider를 호출하는 live draft는 인증된 프로젝트 경로에만 유지합니다.

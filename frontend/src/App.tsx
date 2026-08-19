@@ -225,20 +225,30 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+
+  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
+  const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
+
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
+
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let cachedData = searchCache.get(node.data);
+      if (!cachedData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        cachedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchCache.set(node.data, cachedData);
+      }
+      return {
+        ...node,
+        data: cachedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
@@ -458,10 +468,10 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
   ]);
 
   useEffect(() => {
-    if (!snapshotId) return;
+    if (!snapshotId || !selectedProjectId) return;
     const projectEpoch = projectEpochRef.current;
     let isCurrent = true;
-    let timer: number;
+    let timer: number | null = null;
 
     const pollSnapshot = async () => {
       try {
@@ -470,7 +480,7 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
         setSnapshot(nextSnapshot);
         if (TERMINAL_SNAPSHOT_STATUSES.has(nextSnapshot.status)) {
           void loadProjectSnapshots(
-            selectedProjectId!,
+            selectedProjectId,
             projectEpoch,
             "스냅샷 목록을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요.",
           );
@@ -488,13 +498,11 @@ function AuthenticatedApp({ colorMode }: { colorMode: ColorMode }) {
       }, 1000);
     };
 
-    timer = window.setTimeout(() => {
-      void pollSnapshot();
-    }, 1000);
+    void pollSnapshot();
 
     return () => {
       isCurrent = false;
-      window.clearTimeout(timer);
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [loadProjectSnapshots, selectedProjectId, snapshotId]);
 
