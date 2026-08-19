@@ -6,7 +6,7 @@
 ## 2025-02-18 - Restrict DDL SQL Input
 **Vulnerability:** The `ApplySqlIn` schema allowed arbitrary SQL input in its `sql` field, missing validation to ensure it was a safe, conservative PostgreSQL DDL subset. This allowed potentially dangerous SQL patterns that could lead to SQL injection.
 **Learning:** Even when inputs are expected to be a specific subset, explicit regex validation must be implemented at the API boundary to prevent malicious injection, especially for fields used in database queries.
-**Prevention:** Use a strict allowlist pattern validation (e.g., `r"^\s*(?i:CREATE|ALTER|COMMENT)\s+(?i:TABLE|SCHEMA|INDEX|VIEW|TYPE|EXTENSION|DOMAIN|SEQUENCE)\b[^;]*;?\s*$"`) on user-controlled SQL fields to restrict execution to specific statements and prevent chained queries.
+**Superseded:** The broad regex recommendation was replaced by `validate_forward_ddl`, which validates the conservative forward-DDL subset and supports multi-statement batches.
 
 ## 2025-02-18 - Restrict DDL SQL Input Properly
 **Vulnerability:** The `ApplySqlIn` schema allowed arbitrary SQL input in its `sql` field at the validation level, exposing it to potential SQL injection or logic bypass before the custom executor (`validate_forward_ddl`) could process it. Relying on an oversimplified regex was incorrect and broke multi-statement support.

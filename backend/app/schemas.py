@@ -82,6 +82,7 @@ class ApplySqlIn(BaseModel):
     @field_validator("sql")
     @classmethod
     def validate_sql(cls, v: str) -> str:
+        """Validate that the value contains only supported forward DDL."""
         from app.pg_introspect.forward_ddl import validate_forward_ddl, ForwardDdlValidationError
         # The parser validates the structure to be a conservative DDL subset.
         try:
