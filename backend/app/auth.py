@@ -12,9 +12,11 @@ from fastapi import Depends, HTTPException, Request
 from jose import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import urlparse
 
 from app.db import get_session
 from app.models import ApiKey, UserAccount
+from app.pg_introspect.dsn_guard import DsnTargetError, validate_public_host
 from app.settings import settings
 
 
@@ -81,6 +83,38 @@ OIDC_JWT_LEEWAY_SECONDS = 30
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 
 
+def _parse_oidc_endpoint(raw_url: str, label: str) -> tuple[str, str, int]:
+    """Validate the syntax of an HTTPS OIDC endpoint URL."""
+
+    parsed = urlparse(raw_url)
+    if parsed.scheme.lower() != "https":
+        raise RuntimeError(f"OIDC {label} endpoint must use HTTPS")
+    if (
+        not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError(f"OIDC {label} endpoint is invalid")
+    try:
+        port = parsed.port or 443
+    except ValueError:
+        raise RuntimeError(f"OIDC {label} endpoint has an invalid port") from None
+    return raw_url.rstrip("/"), parsed.hostname, port
+
+
+async def _validate_oidc_endpoint(raw_url: str, label: str) -> str:
+    """Reject OIDC endpoints that could reach private network resources."""
+
+    url, host, port = _parse_oidc_endpoint(raw_url, label)
+    try:
+        await validate_public_host(host, port)
+    except DsnTargetError as err:
+        raise RuntimeError(f"OIDC {label} endpoint host is not allowed") from err
+    return url
+
+
 async def _get_oidc_config() -> dict:
     """Fetch and cache the OIDC discovery document."""
     if not settings.oidc_issuer:
@@ -91,9 +125,10 @@ async def _get_oidc_config() -> dict:
     if _oidc_config is not None and now < _oidc_config_expires_at:
         return cast(dict, _oidc_config)
 
+    issuer = await _validate_oidc_endpoint(settings.oidc_issuer, "issuer")
     async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
         r = await client.get(
-            f"{settings.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
+            f"{issuer}/.well-known/openid-configuration"
         )
         if r.is_redirect:
             raise RuntimeError("OIDC configuration endpoint must not redirect")
@@ -111,6 +146,7 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     jwks_uri = config.get("jwks_uri")
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
+    jwks_endpoint = await _validate_oidc_endpoint(jwks_uri, "JWKS")
 
     now = dt.datetime.now(dt.timezone.utc)
 
@@ -135,7 +171,7 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
                 return cast(dict, _oidc_jwks)
 
         async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
-            r = await client.get(jwks_uri)
+            r = await client.get(jwks_endpoint)
             if r.is_redirect:
                 raise RuntimeError("OIDC JWKS endpoint must not redirect")
             r.raise_for_status()

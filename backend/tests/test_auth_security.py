@@ -31,6 +31,21 @@ def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
     assert auth._parse_oidc_algorithms(raw) == expected
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+        "https://10.0.0.1",
+        "https://[::1]",
+    ],
+)
+async def test_oidc_endpoint_rejects_non_https_and_private_hosts(endpoint: str) -> None:
+    with pytest.raises(RuntimeError, match="HTTPS|not allowed"):
+        await auth._validate_oidc_endpoint(endpoint, "issuer")
+
+
 def make_request(headers: dict[str, str] | None = None) -> Request:
     return Request(
         {
@@ -83,7 +98,11 @@ async def test_oidc_config_fetch_disables_redirects(
             observed["url"] = url
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example/")
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(
@@ -120,7 +139,11 @@ async def test_oidc_config_rejects_redirect_response(
         async def get(self, _url: str) -> _FakeHttpResponse:
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(
@@ -159,7 +182,11 @@ async def test_jwks_fetch_disables_redirects(
             observed["url"] = url
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(
@@ -713,6 +740,10 @@ async def test_oidc_jwks_refresh_rate_limiting(
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(
@@ -762,6 +793,10 @@ async def test_oidc_jwks_force_refresh_is_serialized(
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(

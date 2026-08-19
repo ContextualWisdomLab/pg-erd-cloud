@@ -99,6 +99,28 @@ async def _resolved_ips(
     return resolved
 
 
+async def validate_public_host(
+    host: str, port: int | None = None
+) -> tuple[str, ...]:
+    """Resolve a hostname and reject loopback, private, and special IP ranges."""
+
+    normalized = host.lower().rstrip(".")
+    if not normalized or normalized == "localhost" or normalized.endswith(".localhost"):
+        raise DsnTargetError("host must not be localhost")
+
+    literal_ip = _parse_ip_literal(normalized)
+    if literal_ip is not None:
+        if _is_restricted_ip(literal_ip):
+            raise DsnTargetError("host resolves to a restricted IP range")
+        return (_connection_host_for_ip(literal_ip),)
+
+    resolved_ips = await _resolved_ips(normalized, port)
+    for ip in resolved_ips:
+        if _is_restricted_ip(ip):
+            raise DsnTargetError("host resolves to a restricted IP range")
+    return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
+
+
 def _parse_query_params(query: str) -> dict[str, list[str]]:
     params: dict[str, list[str]] = {}
     for key, value in parse_qsl(query, keep_blank_values=True):
@@ -159,20 +181,17 @@ async def _validated_ip_hosts(
 
     _validate_allowed_host(normalized)
 
-    literal_ip = _parse_ip_literal(normalized)
-    if literal_ip is not None:
-        if _is_restricted_ip(literal_ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
-        return (_connection_host_for_ip(literal_ip),)
-
-    if is_hostaddr:
+    if is_hostaddr and _parse_ip_literal(normalized) is None:
         raise DsnTargetError("database DSN query hostaddr is invalid")
 
-    resolved_ips = await _resolved_ips(normalized, port)
-    for ip in resolved_ips:
-        if _is_restricted_ip(ip):
-            raise DsnTargetError("database host resolves to a restricted IP range")
-    return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
+    try:
+        return await validate_public_host(normalized, port)
+    except DsnTargetError as err:
+        if str(err) == "host resolves to a restricted IP range":
+            raise DsnTargetError(
+                "database host resolves to a restricted IP range"
+            ) from err
+        raise
 
 
 async def validate_postgres_dsn_target(dsn: str) -> ValidatedDsnTarget:
