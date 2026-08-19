@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [BE/Security] OIDC JWT clock-skew leeway를 60초에서 고정된 30초로 줄여 만료 토큰의 추가 replay window를 절반으로 제한했습니다. 배포 설정으로 상한을 우회할 수 없습니다.
 - [BE/Security] `APP_SECRET_FILE` 검증과 읽기 사이의 symlink 교체 경쟁을 제거했습니다. `/run/secrets` 디렉터리를 파일 디스크립터로 고정하고 direct-child secret을 `O_NOFOLLOW`로 열어, 검증한 동일 descriptor만 regular file 확인·읽기에 사용합니다.
 - [BE/Security] Keyverse 단일 tenant 경계인 `OIDC_ORGANIZATION`이 비어 있거나 앞뒤 공백을 포함하면 애플리케이션 설정 로드 단계에서 실패합니다. 잘못된 경계가 요청 시점의 500 오류·인증 전체 거부 또는 조용한 tenant 검증 해제로 이어지지 않도록 fail-fast 합니다.
