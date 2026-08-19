@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { TableNodeData } from '../convert';
 import { exportDictionaryCsv, exportDictionaryMarkdown } from '../exportDataDictionary';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportDataDictionary', () => {
   const nodes: Node<TableNodeData>[] = [
@@ -98,6 +99,20 @@ describe('exportDataDictionary', () => {
     expect(exportDictionaryCsv([], edges)).toBe(
       '"Table Name","Table Comment","Column Name","Data Type","PK","FK","Not Null","Column Comment","Example Value"',
     );
+  });
+
+  it('does not classify opposite-direction handles as foreign keys', () => {
+    const csv = exportDictionaryCsv(nodes, [
+      {
+        id: 'wrong-direction',
+        source: 'users',
+        target: 'accounts',
+        sourceHandle: targetColumnHandleId('account_id'),
+        targetHandle: sourceColumnHandleId('id'),
+      },
+    ]);
+
+    expect(csv).toContain('"public.users","User accounts","account_id","integer","N","N"');
   });
 
   it('neutralizes CSV formula injection and normalizes control characters', () => {

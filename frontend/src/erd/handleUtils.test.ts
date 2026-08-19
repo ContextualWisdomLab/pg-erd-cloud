@@ -65,7 +65,17 @@ describe('handleUtils', () => {
     });
 
     it('should return null for invalid hex sequences', () => {
-      expect(parseColumnNameFromHandle('src-c-zzzz')).toBeNull();
+      for (const handle of [
+        'src-c-zzzz',
+        'src-c-0069x',
+        'src-c-empty-0069',
+        'foo-c-0069',
+        'src-c--0069',
+        'src-c-69',
+        'src-c-110000',
+      ]) {
+        expect(parseColumnNameFromHandle(handle)).toBeNull();
+      }
     });
   });
 });

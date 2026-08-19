@@ -67,8 +67,12 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const parsedSource = edge.sourceHandle ? parseColumnNameFromHandle(edge.sourceHandle) : null;
-  const parsedTarget = edge.targetHandle ? parseColumnNameFromHandle(edge.targetHandle) : null;
+  const parsedSource = edge.sourceHandle?.startsWith('src-c-')
+    ? parseColumnNameFromHandle(edge.sourceHandle)
+    : null;
+  const parsedTarget = edge.targetHandle?.startsWith('tgt-c-')
+    ? parseColumnNameFromHandle(edge.targetHandle)
+    : null;
 
   const sourceHandleColumn = parsedSource && (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource)
     ? parsedSource

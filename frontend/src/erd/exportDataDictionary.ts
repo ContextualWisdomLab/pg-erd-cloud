@@ -53,7 +53,7 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, Set<string>> {
       columns.add(column);
     }
 
-    if (edge.sourceHandle) {
+    if (edge.sourceHandle?.startsWith('src-c-')) {
       const parsed = parseColumnNameFromHandle(edge.sourceHandle);
       if (parsed) columns.add(parsed);
     }

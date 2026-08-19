@@ -18,19 +18,19 @@ export function targetColumnHandleId(columnName: string): string {
 export function parseColumnNameFromHandle(handleId: string): string | null {
   if (!handleId) return null;
   const parts = handleId.split('-');
-  if (parts.length < 3 || parts[1] !== 'c') {
+  if (!['src', 'tgt'].includes(parts[0]) || parts[1] !== 'c' || parts.length < 3) {
     return null;
   }
 
-  const encoded = parts.slice(2).join('-');
-  if (encoded === 'empty') return '';
+  const encodedParts = parts.slice(2);
+  if (encodedParts.length === 1 && encodedParts[0] === 'empty') return '';
+  if (!encodedParts.every((hex) => /^[0-9a-f]{4,6}$/i.test(hex))) return null;
 
   try {
-    return encoded
-      .split('-')
-      .map((hex) => String.fromCodePoint(parseInt(hex, 16)))
+    return encodedParts
+      .map((hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
       .join('');
-  } catch (e) {
+  } catch {
     return null;
   }
 }

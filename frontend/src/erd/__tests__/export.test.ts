@@ -193,6 +193,48 @@ describe('exportDDL', () => {
     expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
   });
 
+  it('ignores opposite-direction handles when inferring foreign key columns', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'parent',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.parent',
+          columns: [{ column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true }],
+          badges: { pk: true, fk: false },
+        },
+      },
+      {
+        id: 'child',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'public.child',
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_not_null: true, is_pk: true },
+            { column_name: 'parent_id', data_type: 'integer', is_not_null: true, is_pk: false },
+            { column_name: 'created_at', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+          badges: { pk: true, fk: true },
+        },
+      },
+    ];
+
+    const ddl = exportDDL(nodes, [
+      {
+        id: 'wrong-direction',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: targetColumnHandleId('parent_id'),
+        targetHandle: sourceColumnHandleId('id'),
+      },
+    ]);
+
+    expect(ddl).toContain('FOREIGN KEY (/* source columns */)');
+    expect(ddl).not.toContain('FOREIGN KEY ("parent_id")');
+  });
+
   it('should not throw if foreign key source or target is missing', () => {
     const nodes: Node<TableNodeData>[] = [
       {
