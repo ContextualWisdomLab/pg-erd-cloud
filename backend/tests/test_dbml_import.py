@@ -95,7 +95,7 @@ def test_preserves_defaults_unique_columns_and_simple_index_blocks():
 Table accounts {
   id integer [pk]
   email varchar(255) [unique]
-  status varchar [default: 'active']
+  status varchar [default: 'unique']
   indexes {
     (status, email) [unique, name: 'accounts_status_email']
     (id)
@@ -104,7 +104,7 @@ Table accounts {
 """
     snapshot = parse_dbml(text)
     by_name = {column["column_name"]: column for column in snapshot["columns"]}
-    assert by_name["status"]["default_expr"] == "'active'"
+    assert by_name["status"]["default_expr"] == "'unique'"
     assert by_name["status"]["has_default"] is True
 
     indexes = {index["index_name"]: index for index in snapshot["indexes"]}
@@ -112,9 +112,11 @@ Table accounts {
     assert indexes["accounts_status_email"]["index_def"].endswith(
         '("status", "email")'
     )
-    assert any(index["is_unique"] for index in indexes.values())
+    assert indexes["idx_accounts_1"]["is_unique"] is True
+    assert indexes["idx_accounts_3"]["is_unique"] is False
+    assert indexes["idx_accounts_3"]["index_def"].endswith('("id")')
     ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
-    assert "DEFAULT 'active'" in ddl
+    assert "DEFAULT 'unique'" in ddl
     assert "CREATE UNIQUE INDEX" in ddl
 
 

@@ -73,6 +73,11 @@ def _setting_value(settings: str, key: str) -> str | None:
     return None
 
 
+def _has_setting(settings: str, key: str) -> bool:
+    """Return whether a setting is present as a standalone DBML token."""
+    return any(part.strip().lower() == key for part in _split_top_level(settings))
+
+
 def _parenthesized_body(line: str) -> tuple[str, str] | None:
     if not line.startswith("("):
         return None
@@ -113,7 +118,7 @@ def _index_row(
     if not columns or any(column is None for column in columns):
         return None
     safe_columns = [column for column in columns if column is not None]
-    unique = any(part.strip().lower() == "unique" for part in _split_top_level(settings))
+    unique = _has_setting(settings, "unique")
     raw_name = _setting_value(settings, "name")
     index_name = (raw_name or f"idx_{table}_{ordinal}").strip("'\"")
     if not _SAFE_INDEX_IDENTIFIER_RE.fullmatch(index_name):
@@ -335,7 +340,7 @@ def parse_dbml(text: str) -> dict[str, Any]:
             pk_columns.append(
                 {"relation_oid": oid, "column_name": col_name, "column_ordinal": len(pk_columns) + 1}
             )
-        if re.search(r"\bunique\b", settings):
+        if _has_setting(raw_settings, "unique"):
             row = _index_row(
                 current[0],
                 current[1],
