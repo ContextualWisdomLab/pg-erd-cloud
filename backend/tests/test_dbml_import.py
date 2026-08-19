@@ -98,6 +98,7 @@ Table accounts {
   status varchar [default: 'unique']
   indexes {
     (status, email) [unique, name: 'accounts_status_email']
+    (lower(email)) [unique]
     (id)
   }
 }
@@ -115,9 +116,14 @@ Table accounts {
     assert indexes["idx_accounts_1"]["is_unique"] is True
     assert indexes["idx_accounts_3"]["is_unique"] is False
     assert indexes["idx_accounts_3"]["index_def"].endswith('("id")')
+    assert all("lower(email)" not in index["index_def"] for index in indexes.values())
     ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
     assert "DEFAULT 'unique'" in ddl
     assert "CREATE UNIQUE INDEX" in ddl
+    id_index_ddl = next(
+        statement for statement in ddl.split(";") if '"idx_accounts_3"' in statement
+    )
+    assert '("id")' in id_index_ddl
 
 
 def test_pathological_long_line_is_skipped_fast():
