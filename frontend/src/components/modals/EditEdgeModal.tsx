@@ -23,7 +23,7 @@ export function EditEdgeModal({
 
   if (!editingEdge) return null;
 
-  const relationshipActionLabel = relLabel.trim() || `${editingEdge.source}에서 ${editingEdge.target}으로의`;
+  const relationshipActionLabel = relLabel.trim() || editingEdge.id;
 
   return (
     <div
