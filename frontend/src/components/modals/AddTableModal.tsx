@@ -61,7 +61,9 @@ export function AddTableModal({
       >
         <h3 id="add-table-title">테이블 추가</h3>
         <div className="field">
-          <label htmlFor="new-table-name">테이블 이름</label>
+          <label htmlFor="new-table-name">
+            테이블 이름 <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
+          </label>
           <input
             id="new-table-name"
             value={newTableName}
