@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -233,5 +234,88 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
+  });
+
+  it('resolves encoded handles to real column names', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'posts',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [{
+      id: 'edge',
+      source: 'posts',
+      target: 'users',
+      sourceHandle: sourceColumnHandleId('user_id'),
+      targetHandle: targetColumnHandleId('id'),
+      label: 'posts_users',
+    }]);
+
+    expect(result).toContain(
+      'users_user_id users @relation("posts_users", fields: [user_id], references: [id])',
+    );
+    expect(result).toContain('posts_user_id posts[] @relation("posts_users")');
+  });
+
+  it('keeps duplicate source-field relations deterministic', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'posts',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+    const edge = {
+      id: 'template',
+      source: 'posts',
+      target: 'users',
+      sourceHandle: sourceColumnHandleId('user_id'),
+      targetHandle: targetColumnHandleId('id'),
+    } satisfies Edge;
+
+    const result = exportPrisma(nodes, [
+      { ...edge, id: 'first', label: 'first_relation' },
+      { ...edge, id: 'duplicate', label: 'duplicate_relation' },
+    ]);
+    const relationLines = result.split('\n').filter((line) => line.includes('fields: [user_id]'));
+
+    expect(relationLines).toHaveLength(1);
+    expect(relationLines[0]).toContain('@relation("first_relation"');
+    expect(result).not.toContain('duplicate_relation');
   });
 });
