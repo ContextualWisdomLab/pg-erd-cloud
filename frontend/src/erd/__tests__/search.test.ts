@@ -174,7 +174,7 @@ describe("ERD node search", () => {
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
   });
 
-  it("reuses cached text across 500 fixed-shape nodes with 100 columns each", () => {
+  it("reuses cached text across 1,000 fixed-shape nodes with 100 columns each", () => {
      const columns = [];
      for(let i=0; i<100; i++) {
        columns.push({
@@ -187,7 +187,7 @@ describe("ERD node search", () => {
      }
 
      const heavyNodes = [];
-     for(let i=0; i<500; i++) {
+     for(let i=0; i<1000; i++) {
         heavyNodes.push(tableNode(`t${i}`, {
             title: `heavy_table_${i}`,
             columns
@@ -200,14 +200,14 @@ describe("ERD node search", () => {
      const matched = findSearchMatchedNodeIds(heavyNodes, "heavy_table_499 field_99");
 
      expect(matched.has("t499")).toBe(true);
-     expect(_getSearchCacheMisses()).toBe(initialMisses + 500); // Exactly 1 miss per node
+     expect(_getSearchCacheMisses()).toBe(initialMisses + 1000); // Exactly 1 miss per node
 
      const missBeforeFast = _getSearchCacheMisses();
 
      // Re-run a different query over the same immutable node-data identities.
      const fastMatched = findSearchMatchedNodeIds(heavyNodes, "field_0 desc_0");
 
-     expect(fastMatched.size).toBe(500);
+     expect(fastMatched.size).toBe(1000);
 
      // 0 new cache misses, entirely hitting WeakMap.
      expect(_getSearchCacheMisses()).toBe(missBeforeFast);

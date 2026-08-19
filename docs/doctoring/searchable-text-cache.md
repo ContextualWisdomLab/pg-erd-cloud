@@ -8,7 +8,7 @@ The cached text contains only the fields already searched by the product: table 
 
 ## Verification
 
-Focused tests require all searchable fields to invalidate through immutable replacement and directly prove that a new React Flow node wrapper retaining the same `TableNodeData` object produces no additional cache miss. A fixed workload of 500 nodes with 100 columns each proves the second search over the same data identities adds zero cache misses. These are deterministic identity/allocation contracts, not wall-clock performance claims.
+Focused tests require all searchable fields to invalidate through immutable replacement and directly prove that a new React Flow node wrapper retaining the same `TableNodeData` object produces no additional cache miss. A fixed workload of 1,000 nodes with 100 columns each records exactly 1,000 first-query cache misses and zero additional misses on the second query over the same data identities. These are deterministic identity/allocation contracts, not wall-clock performance claims.
 
 ## Operations and rollback
 
