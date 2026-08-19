@@ -414,9 +414,9 @@ describe('App orchestration coverage', () => {
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.click(screen.getByTestId('table-cancel'))
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('table-delete'))
-    fireEvent.click(screen.getByTestId('table-delete'))
+    expect(screen.queryByTestId('table-delete')).not.toBeInTheDocument()
   })
 
   it('adds nodes and exercises groups, cardinality, exports, inference, and clearing', async () => {
