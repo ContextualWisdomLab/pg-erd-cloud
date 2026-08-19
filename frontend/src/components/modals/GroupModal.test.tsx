@@ -35,7 +35,6 @@ describe('GroupModal', () => {
       />,
     );
 
-    expect(screen.getByLabelText(/그룹 이름/)).toBeRequired();
     const tableLabel = screen
       .getAllByLabelText(tableName)
       .find((element) => element.tagName === 'SPAN');

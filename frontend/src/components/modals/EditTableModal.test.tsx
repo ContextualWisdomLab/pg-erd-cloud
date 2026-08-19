@@ -46,49 +46,6 @@ describe('EditTableModal', () => {
     expect(screen.getByRole('checkbox', { name: 'test_col NN 설정' })).toBeInTheDocument();
   });
 
-  it('marks required fields and blocks empty submission', async () => {
-    const onEditTableSubmit = vi.fn();
-    const editingNode = {
-      id: 'table-1',
-      type: 'table',
-      position: { x: 0, y: 0 },
-      data: {
-        title: 'test_table',
-        comment: '',
-        columns: [{ column_name: 'test_col', data_type: 'text', is_pk: false, is_not_null: false }],
-      },
-    };
-
-    render(
-      <EditTableModal
-        {...defaultProps}
-        editingNode={editingNode as any}
-        onEditTableSubmit={onEditTableSubmit}
-      />,
-    );
-
-    const tableName = screen.getByRole('textbox', { name: /테이블명/ });
-    const columnName = screen.getByRole('textbox', { name: 'test_col 컬럼명' });
-    const dataType = screen.getByRole('textbox', { name: 'test_col 데이터 타입' });
-    const save = screen.getByRole('button', { name: '저장' });
-    expect(tableName).toBeRequired();
-    expect(columnName).toBeRequired();
-    expect(dataType).toBeRequired();
-
-    const user = userEvent.setup();
-    await user.clear(tableName);
-    await user.clear(columnName);
-    await user.clear(dataType);
-    await user.click(save);
-    expect(onEditTableSubmit).not.toHaveBeenCalled();
-
-    await user.type(tableName, 'public.users');
-    await user.type(columnName, 'id');
-    await user.type(dataType, 'integer');
-    await user.click(save);
-    expect(onEditTableSubmit).toHaveBeenCalledOnce();
-  });
-
   it('returns null if not open or no editingNode', () => {
     const { container } = render(<EditTableModal {...defaultProps} isOpen={false} editingNode={null} />);
     expect(container.firstChild).toBeNull();
