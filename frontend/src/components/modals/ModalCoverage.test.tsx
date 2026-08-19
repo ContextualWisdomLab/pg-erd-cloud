@@ -113,6 +113,7 @@ describe('modal behavior coverage', () => {
       />,
     )
     expect(screen.getByText(/From: a/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/제약조건 이름 \(Label\)/)).toBeRequired()
     fireEvent.change(screen.getByLabelText(/제약조건 이름 \(Label\)/), {
       target: { value: 'fk_changed' },
     })
@@ -125,6 +126,23 @@ describe('modal behavior coverage', () => {
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
     expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('blocks whitespace-only relationship labels', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="   "
+        setRelLabel={vi.fn()}
+        onRelDelete={vi.fn()}
+        onRelCancel={vi.fn()}
+        onRelSubmit={onSubmit}
+      />,
+    )
+
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('covers EditTableModal column mutation, duplication, form, and table actions', () => {
