@@ -32,6 +32,9 @@ dependencies = [
   "python-multipart>=0.0.32",
 ]
 
+[project.scripts]
+pg-erd-snapshot = "app.local_snapshot_cli:main"
+
 [project.optional-dependencies]
 snowflake = [
   "snowflake-connector-python>=4,<5",
@@ -65,9 +68,11 @@ asyncio_mode = "auto"
 include = [
   "app/csrf.py",
   "app/db_introspect.py",
+  "app/local_snapshot_cli.py",
   "app/metrics.py",
   "app/permissions.py",
   "app/pg_introspect/queries.py",
+  "app/pg_introspect/snapshot_collect.py",
   "app/pooler.py",
   "app/schemas.py",
   "app/security.py",
