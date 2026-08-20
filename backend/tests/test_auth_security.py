@@ -481,11 +481,13 @@ async def test_auth_fails_closed_without_oidc(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("audience", [None, "", "   "])
 async def test_oidc_fails_closed_without_audience(
     monkeypatch: pytest.MonkeyPatch,
+    audience: str | None,
 ) -> None:
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
-    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(settings, "oidc_audience", audience)
 
     with pytest.raises(HTTPException) as exc_info:
         await auth._decode_verified_oidc_token("invalid-token")

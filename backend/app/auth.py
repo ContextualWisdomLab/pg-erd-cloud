@@ -240,6 +240,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     audience = settings.oidc_audience
     if not isinstance(audience, str) or not audience.strip():
         raise HTTPException(status_code=500, detail="OIDC audience configuration required")
+    audience = audience.strip()
 
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
