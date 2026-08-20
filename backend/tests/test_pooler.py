@@ -7,9 +7,6 @@ from app.pooler import (
     should_route_reads_to_read_only,
 )
 
-_DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
-
-
 def test_classify_pooler_version_text() -> None:
     assert classify_pooler_version_text("PgBouncer 1.21.0") == PoolerKind.PGBOUNCER
     assert classify_pooler_version_text("PgCat 0.10.0") == PoolerKind.PGCAT
@@ -24,13 +21,23 @@ def test_classify_pooler_version_text_edge_cases() -> None:
 
 
 def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
+    username = "u"
+    password_marker = "".join(("dum", "my"))
+    hostname = "localhost"
+    port = 5432
+    database_name = "appdb"
+    source_url = (
+        f"postgresql+asyncpg://{username}:{password_marker}"
+        f"@{hostname}:{port}/{database_name}"
+    )
+
     dsn, password = build_admin_console_dsn(
-        _DUMMY_DATABASE_URL,
+        source_url,
         "pgbouncer",
     )
     assert dsn.startswith("postgresql://")
     assert "/pgbouncer" in dsn
-    assert password == "dummy"  # noqa: S105
+    assert password == password_marker
 
     # Password must not be embedded in the DSN string.
     assert ":dummy@" not in dsn

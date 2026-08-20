@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from app.ddl.identifiers import quote_identifier
+from app.ddl.identifiers import (
+    SqlIdentifierError,
+    quote_identifier,
+    validate_identifier,
+)
 
 DdlDialect = Literal["postgresql", "snowflake"]
 
@@ -54,8 +58,27 @@ def _qname(schema: str, name: str) -> str:
     return f"{_q(schema)}.{_q(name)}"
 
 
+def _is_valid_identifier(value: object) -> bool:
+    """Return whether optional snapshot metadata is a safe identifier."""
+
+    if not isinstance(value, str):
+        return False
+    try:
+        validate_identifier(value)
+    except SqlIdentifierError:
+        return False
+    return True
+
+
 def _tablespace_clause(tablespace: object) -> str:
-    return f" TABLESPACE {_q(tablespace)}" if isinstance(tablespace, str) else ""
+    """Render an optional tablespace, omitting malformed snapshot metadata."""
+
+    if not isinstance(tablespace, str):
+        return ""
+    try:
+        return f" TABLESPACE {_q(tablespace)}"
+    except SqlIdentifierError:
+        return ""
 
 
 _CREATE_INDEX_RE = re.compile(
@@ -261,7 +284,12 @@ def _snapshot_tables(snapshot: dict) -> list[dict]:
     return [
         r
         for r in _rows(snapshot, "relations")
-        if r.get("relation_kind") in ("r", "p")
+        if (
+            r.get("relation_kind") in ("r", "p")
+            and isinstance(r.get("relation_oid"), int)
+            and _is_valid_identifier(r.get("schema_name"))
+            and _is_valid_identifier(r.get("relation_name"))
+        )
     ]
 
 
@@ -290,7 +318,7 @@ def _constraint_column_names(
     for col in cols_by_oid.get(oid, []):
         position = col.get("column_position")
         name = col.get("column_name")
-        if isinstance(position, int) and isinstance(name, str):
+        if isinstance(position, int) and _is_valid_identifier(name):
             cols_by_attnum[position] = name
 
     names: list[str] = []
@@ -298,7 +326,7 @@ def _constraint_column_names(
         if not isinstance(attnum, int):
             return []
         name = cols_by_attnum.get(attnum)
-        if name is None:
+        if name is None or not _is_valid_identifier(name):
             return []
         names.append(name)
     return names
@@ -308,7 +336,7 @@ def _render_schemas(tables: list[dict], lines: list[str]) -> None:
     schemas: set[str] = set()
     for table in tables:
         schema_name = table.get("schema_name")
-        if isinstance(schema_name, str):
+        if _is_valid_identifier(schema_name):
             schemas.add(schema_name)
 
     for s in sorted(schemas):
@@ -327,9 +355,9 @@ def _render_foreign_keys(constraints: list[dict], lines: list[str]) -> None:
         cname = con.get("constraint_name")
         cdef = con.get("constraint_def")
         if not (
-            isinstance(schema, str)
-            and isinstance(table, str)
-            and isinstance(cname, str)
+            _is_valid_identifier(schema)
+            and _is_valid_identifier(table)
+            and _is_valid_identifier(cname)
             and isinstance(cdef, str)
         ):
             continue
@@ -366,7 +394,7 @@ def _render_table_columns_pg(
         key=lambda x: int(x.get("column_position") or 0),
     ):
         col_name = c.get("column_name")
-        if not isinstance(col_name, str):
+        if not _is_valid_identifier(col_name):
             continue
         data_type = _mapped_data_type(c, source_dialect, "postgresql")
         parts = [f"{_q(col_name)} {data_type}"]
@@ -391,7 +419,7 @@ def _render_table_constraints_pg(
             continue
         cname = con.get("constraint_name")
         cdef = con.get("constraint_def")
-        if isinstance(cname, str) and isinstance(cdef, str):
+        if _is_valid_identifier(cname) and isinstance(cdef, str):
             table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
     return table_cons
 
@@ -420,15 +448,19 @@ def _render_table_pg(
     partition_parent_schema = t.get("partition_parent_schema")
     partition_parent_name = t.get("partition_parent_name")
     is_partition = t.get("is_partition") is True
-    if not (isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)):
+    if not (
+        _is_valid_identifier(schema)
+        and _is_valid_identifier(name)
+        and isinstance(oid, int)
+    ):
         return []
 
     lines: list[str] = []
     table_options = _tablespace_clause(tablespace)
     if (
         is_partition
-        and isinstance(partition_parent_schema, str)
-        and isinstance(partition_parent_name, str)
+        and _is_valid_identifier(partition_parent_schema)
+        and _is_valid_identifier(partition_parent_name)
         and isinstance(partition_bound, str)
     ):
         partition_clause = (
@@ -516,7 +548,7 @@ def _render_table_columns_snowflake(
         key=lambda x: int(x.get("column_position") or 0),
     ):
         col_name = c.get("column_name")
-        if not isinstance(col_name, str):
+        if not _is_valid_identifier(col_name):
             continue
         parts = [f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"]
         if c.get("has_default"):
@@ -540,7 +572,7 @@ def _render_table_constraints_snowflake(
         ctype = con.get("constraint_type")
         cname = con.get("constraint_name")
         cdef = con.get("constraint_def")
-        if not (isinstance(cname, str) and isinstance(cdef, str)):
+        if not (_is_valid_identifier(cname) and isinstance(cdef, str)):
             continue
         if ctype in ("p", "u"):
             col_names = _constraint_column_names(con, cols_by_oid)
@@ -565,12 +597,16 @@ def _render_indexes_snowflake(indexes: list[dict], lines: list[str]) -> None:
         table_schema = ix.get("table_schema_name")
         table_name = ix.get("table_name")
         if (
-            isinstance(ix_name, str)
-            and isinstance(table_schema, str)
-            and isinstance(table_name, str)
+            _is_valid_identifier(ix_name)
+            and _is_valid_identifier(table_schema)
+            and _is_valid_identifier(table_name)
         ):
+            try:
+                index_reference = f"{_q(ix_name)} on {_qname(table_schema, table_name)}"
+            except SqlIdentifierError:
+                index_reference = "metadata with an invalid identifier"
             lines.append(
-                f"-- NOTE: PostgreSQL index {_q(ix_name)} on {_qname(table_schema, table_name)} is not emitted for Snowflake; consider clustering/search optimization as needed."
+                f"-- NOTE: PostgreSQL index {index_reference} is not emitted for Snowflake; consider clustering/search optimization as needed."
             )
         else:
             lines.append(
@@ -599,7 +635,9 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
         name = t.get("relation_name")
         oid = t.get("relation_oid")
         if not (
-            isinstance(schema, str) and isinstance(name, str) and isinstance(oid, int)
+            _is_valid_identifier(schema)
+            and _is_valid_identifier(name)
+            and isinstance(oid, int)
         ):
             continue
 
@@ -618,9 +656,17 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
             lines.append(
                 f"-- NOTE: skipped PostgreSQL CHECK constraint {_q(cname)} on {_qname(schema, name)} for Snowflake export."
             )
-        if isinstance(t.get("tablespace_name"), str):
+        tablespace = t.get("tablespace_name")
+        if isinstance(tablespace, str):
+            try:
+                quoted_tablespace = _q(tablespace)
+            except SqlIdentifierError:
+                quoted_tablespace = ""
+        else:
+            quoted_tablespace = ""
+        if quoted_tablespace:
             lines.append(
-                f"-- NOTE: skipped PostgreSQL TABLESPACE {_q(t['tablespace_name'])} on {_qname(schema, name)} for Snowflake export."
+                f"-- NOTE: skipped PostgreSQL TABLESPACE {quoted_tablespace} on {_qname(schema, name)} for Snowflake export."
             )
         if t.get("relation_kind") == "p" or t.get("is_partition") is True:
             lines.append(
