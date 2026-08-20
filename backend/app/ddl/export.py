@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Literal, TypeGuard
 
 from app.ddl.identifiers import (
     SqlIdentifierError,
@@ -58,7 +58,7 @@ def _qname(schema: str, name: str) -> str:
     return f"{_q(schema)}.{_q(name)}"
 
 
-def _is_valid_identifier(value: object) -> bool:
+def _is_valid_identifier(value: object) -> TypeGuard[str]:
     """Return whether optional snapshot metadata is a safe identifier."""
 
     if not isinstance(value, str):
