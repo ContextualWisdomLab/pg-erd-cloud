@@ -198,20 +198,27 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
+  // Keep decorated node data stable while React Flow updates positions only.
+  const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
     return nodes.map((node) => {
-      const isHighlighted = searchMatchedNodeIds.has(node.id);
-      return {
-        ...node,
-        data: {
+      let cachedData = searchCache.get(node.data);
+      if (!cachedData) {
+        const isHighlighted = searchMatchedNodeIds.has(node.id);
+        cachedData = {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        },
+        };
+        searchCache.set(node.data, cachedData);
+      }
+      return {
+        ...node,
+        data: cachedData,
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
@@ -312,7 +319,7 @@ export default function App() {
     let isCurrent = true;
     let isPolling = false;
     let isTerminal = false;
-    const timer = window.setInterval(async () => {
+    const poll = async () => {
       if (!isCurrent || isPolling || isTerminal) return;
       isPolling = true;
       try {
@@ -336,7 +343,9 @@ export default function App() {
       } finally {
         isPolling = false;
       }
-    }, 1000);
+    };
+    const timer = window.setInterval(poll, 1000);
+    void poll();
     return () => {
       isCurrent = false;
       window.clearInterval(timer);
@@ -955,6 +964,18 @@ export default function App() {
     setLayoutMessage("되돌렸습니다");
   }
 
+  function selectProject(projectId: string | null) {
+    setSelectedProjectId(projectId);
+    setSelectedConnId(null);
+    if (projectId !== null) {
+      setSnapshotId(null);
+      setSnapshot(null);
+      setNodes([]);
+      setEdges([]);
+      setError(null);
+    }
+  }
+
   async function onCreateProject() {
     const nextProjectName = projectName.trim();
     /* v8 ignore next -- the create control is disabled for both guard states */
@@ -964,7 +985,7 @@ export default function App() {
     try {
       const p = await createProject(nextProjectName);
       setProjects((prev) => [p, ...prev]);
-      setSelectedProjectId(p.project_space_uuid);
+      selectProject(p.project_space_uuid);
     } finally {
       setIsCreatingProject(false);
     }
@@ -1079,7 +1100,7 @@ export default function App() {
             <select
               id="project-select"
               value={selectedProjectId || ""}
-              onChange={(e) => setSelectedProjectId(e.target.value || null)}
+              onChange={(e) => selectProject(e.target.value || null)}
               style={{ flex: 1, padding: 8 }}
             >
               <option value="" disabled>
@@ -1285,7 +1306,7 @@ export default function App() {
                       type="button"
                       className="projectCard"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >
@@ -1354,7 +1375,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >
