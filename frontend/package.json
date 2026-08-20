@@ -18,7 +18,7 @@
     "benchmark:handleUtils": "node --expose-gc scripts/handleUtils.benchmark.ts"
   },
   "dependencies": {
-    "@xyflow/react": "^12.11.1",
+    "@xyflow/react": "^12.11.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.8"
   },
