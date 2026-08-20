@@ -74,7 +74,6 @@ export function inferRelationships(
           // PostgreSQL identifiers without adding a security boundary.
           const targetNode = nodesByTableName.get(targetTableName);
 
-          /* v8 ignore next -- targetTableName is selected only after the same map confirms this key */
           if (targetNode) {
             // 대상 테이블에 'id' 필드가 있는지, 혹은 PK 컬럼이 하나인지 확인
             // 여기서는 단순하게 'id' 컬럼이 있거나, 첫 번째 PK 컬럼으로 연결
