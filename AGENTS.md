@@ -75,7 +75,7 @@ behind Traefik (`deploy/traefik/`).
   DOM-decomposes emails and files into a persisted knowledge graph. Each
   component below is a **standalone program that must ALSO work as a git
   submodule**, grown separately and together:
-  - **waf-ids-ai-soc** — WAF / IDS / AI SOC / load balancer / API management.
+  - **wardnet** — WAF / IDS / AI SOC / load balancer / API management.
   - **clearfolio** — document viewer.
   - **pg-erd-cloud** — ERD tool (this repo).
   - **contextual-orchestrator** — LLM cost/perf/upstream-LB gateway (beyond
@@ -83,7 +83,7 @@ behind Traefik (`deploy/traefik/`).
   - **codec-carver** — STT / omni-modal speech-video codec.
   - **fast-mlsirm** — LLM-as-a-Judge calibration + evaluation-item quality
     (uses aFIPC FIPC + kaefa item-fit).
-  - **feelanet-adfs** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
+  - **keyverse** — passwordless SSO (OIDC / SCIM / ADFS / LDAP / FIDO2 /
     OAuth2.1; eliminate passwords).
   - **newsdom-api** — PDF→DOM sidecar.
   - **semantic-data-portal** — upper ontology / catalog / governance plane with
@@ -99,3 +99,15 @@ behind Traefik (`deploy/traefik/`).
   literature — e.g. data modeling, ER theory, schema normalization, or
   graph/layout algorithms for diagram rendering.
 <!-- END cwl-agent-guidance -->
+
+## Code-owner review gates — disabled (on hold)
+
+The organization-level policy in `ContextualWisdomLab/.github` is authoritative.
+While the organization has only one maintainer, code-owner-specific requirements
+(`require_code_owner_reviews` in branch protection and
+`require_code_owner_review` in rulesets) remain on hold because they cannot be
+satisfied independently. Do not add or re-enable a CODEOWNERS-based merge gate
+until the central policy records multiple independent maintainers. This hold
+does not remove current-head independent approval, required status checks,
+security gates, latest-pusher restrictions, or unresolved-thread protection;
+when local text and central governance disagree, central governance wins.
