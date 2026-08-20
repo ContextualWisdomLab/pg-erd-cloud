@@ -1,689 +1,237 @@
 {
   "metadata": {
-    "platform": "darwin arm64",
-    "node": "v24.16.0",
-    "v8": "13.6.233.17-node.49",
+    "platform": "linux x64",
+    "node": "v22.22.1",
+    "v8": "12.4.254.21-node.35",
     "iterationsPerSample": 10000,
-    "numberOfPairs": 50,
-    "corpusSize": 8,
-    "ordering": "deterministic counterbalanced AB/BA",
-    "rawEvidence": "samples preserve pair and execution order",
-    "heapMetric": "heapUsed after minus heapUsed before each timed sample; diagnostic only, not allocated bytes"
+    "numSamples": 50
   },
-  "samples": [
-    {
-      "pairIndex": 0,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 123.33366700000002,
-        "heapUsedDeltaBytes": 803504
-      },
-      "optimized": {
-        "elapsedMilliseconds": 66.243833,
-        "heapUsedDeltaBytes": 2020552
-      },
-      "elapsedImprovementPercent": 46.28892936427489
-    },
-    {
-      "pairIndex": 1,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 130.92699999999996,
-        "heapUsedDeltaBytes": 690984
-      },
-      "optimized": {
-        "elapsedMilliseconds": 66.36295799999994,
-        "heapUsedDeltaBytes": 3559504
-      },
-      "elapsedImprovementPercent": 49.31300801209838
-    },
-    {
-      "pairIndex": 2,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 135.17058299999997,
-        "heapUsedDeltaBytes": 2750736
-      },
-      "optimized": {
-        "elapsedMilliseconds": 71.48429099999998,
-        "heapUsedDeltaBytes": 1502400
-      },
-      "elapsedImprovementPercent": 47.11549701609262
-    },
-    {
-      "pairIndex": 3,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 137.16116699999998,
-        "heapUsedDeltaBytes": 2723936
-      },
-      "optimized": {
-        "elapsedMilliseconds": 75.26241600000003,
-        "heapUsedDeltaBytes": 1423024
-      },
-      "elapsedImprovementPercent": 45.12848086222536
-    },
-    {
-      "pairIndex": 4,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 156.25812499999984,
-        "heapUsedDeltaBytes": 2711168
-      },
-      "optimized": {
-        "elapsedMilliseconds": 90.66995800000007,
-        "heapUsedDeltaBytes": 1511664
-      },
-      "elapsedImprovementPercent": 41.974244219300495
-    },
-    {
-      "pairIndex": 5,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 170.1005,
-        "heapUsedDeltaBytes": 2683984
-      },
-      "optimized": {
-        "elapsedMilliseconds": 102.13137499999993,
-        "heapUsedDeltaBytes": 1493936
-      },
-      "elapsedImprovementPercent": 39.95821587826025
-    },
-    {
-      "pairIndex": 6,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 172.3594579999999,
-        "heapUsedDeltaBytes": 2726512
-      },
-      "optimized": {
-        "elapsedMilliseconds": 91.09370799999988,
-        "heapUsedDeltaBytes": 1458480
-      },
-      "elapsedImprovementPercent": 47.14899370361218
-    },
-    {
-      "pairIndex": 7,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 137.21395899999993,
-        "heapUsedDeltaBytes": 2711280
-      },
-      "optimized": {
-        "elapsedMilliseconds": 77.11975000000007,
-        "heapUsedDeltaBytes": 1466360
-      },
-      "elapsedImprovementPercent": 43.79598798690729
-    },
-    {
-      "pairIndex": 8,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 121.09820799999989,
-        "heapUsedDeltaBytes": 2726512
-      },
-      "optimized": {
-        "elapsedMilliseconds": 71.89866599999982,
-        "heapUsedDeltaBytes": 1430904
-      },
-      "elapsedImprovementPercent": 40.62780350969364
-    },
-    {
-      "pairIndex": 9,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 116.6066249999999,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 66.60670900000014,
-        "heapUsedDeltaBytes": 1458592
-      },
-      "elapsedImprovementPercent": 42.879138299388906
-    },
-    {
-      "pairIndex": 10,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 119.44450000000006,
-        "heapUsedDeltaBytes": 2655336
-      },
-      "optimized": {
-        "elapsedMilliseconds": 65.35383300000012,
-        "heapUsedDeltaBytes": 1555000
-      },
-      "elapsedImprovementPercent": 45.2851885185169
-    },
-    {
-      "pairIndex": 11,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 112.80237499999976,
-        "heapUsedDeltaBytes": 2726512
-      },
-      "optimized": {
-        "elapsedMilliseconds": 80.0678340000004,
-        "heapUsedDeltaBytes": 1458592
-      },
-      "elapsedImprovementPercent": 29.01937215417621
-    },
-    {
-      "pairIndex": 12,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 144.59874999999965,
-        "heapUsedDeltaBytes": 2687336
-      },
-      "optimized": {
-        "elapsedMilliseconds": 89.08862500000032,
-        "heapUsedDeltaBytes": 1448632
-      },
-      "elapsedImprovementPercent": 38.38907666905798
-    },
-    {
-      "pairIndex": 13,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 146.93120799999997,
-        "heapUsedDeltaBytes": 2738600
-      },
-      "optimized": {
-        "elapsedMilliseconds": 69.33795899999996,
-        "heapUsedDeltaBytes": 1466360
-      },
-      "elapsedImprovementPercent": 52.80923641490788
-    },
-    {
-      "pairIndex": 14,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 126.01187500000015,
-        "heapUsedDeltaBytes": 2697752
-      },
-      "optimized": {
-        "elapsedMilliseconds": 73.10279200000014,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 41.98737857047199
-    },
-    {
-      "pairIndex": 15,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 124.67108300000018,
-        "heapUsedDeltaBytes": 2690072
-      },
-      "optimized": {
-        "elapsedMilliseconds": 74.58924999999999,
-        "heapUsedDeltaBytes": 1519544
-      },
-      "elapsedImprovementPercent": 40.17117024643166
-    },
-    {
-      "pairIndex": 16,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 118.385041,
-        "heapUsedDeltaBytes": 2662888
-      },
-      "optimized": {
-        "elapsedMilliseconds": 69.35562499999969,
-        "heapUsedDeltaBytes": 1494048
-      },
-      "elapsedImprovementPercent": 41.41521224797338
-    },
-    {
-      "pairIndex": 17,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 110.62095899999986,
-        "heapUsedDeltaBytes": 2747720
-      },
-      "optimized": {
-        "elapsedMilliseconds": 65.55716699999994,
-        "heapUsedDeltaBytes": 1466360
-      },
-      "elapsedImprovementPercent": 40.737119265075236
-    },
-    {
-      "pairIndex": 18,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 119.48341600000003,
-        "heapUsedDeltaBytes": 2696184
-      },
-      "optimized": {
-        "elapsedMilliseconds": 66.9697500000002,
-        "heapUsedDeltaBytes": 1564960
-      },
-      "elapsedImprovementPercent": 43.95058976218073
-    },
-    {
-      "pairIndex": 19,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 114.45966599999974,
-        "heapUsedDeltaBytes": 2711280
-      },
-      "optimized": {
-        "elapsedMilliseconds": 75.25666600000022,
-        "heapUsedDeltaBytes": 1501816
-      },
-      "elapsedImprovementPercent": 34.250493095095706
-    },
-    {
-      "pairIndex": 20,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 111.75287500000013,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 72.47008300000016,
-        "heapUsedDeltaBytes": 1582688
-      },
-      "elapsedImprovementPercent": 35.15148223255994
-    },
-    {
-      "pairIndex": 21,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 105.88633300000038,
-        "heapUsedDeltaBytes": 2711280
-      },
-      "optimized": {
-        "elapsedMilliseconds": 64.4516250000006,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 39.13130885361723
-    },
-    {
-      "pairIndex": 22,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 108.9601249999996,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.68095799999992,
-        "heapUsedDeltaBytes": 1476320
-      },
-      "elapsedImprovementPercent": 41.5557223342024
-    },
-    {
-      "pairIndex": 23,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 104.6575840000005,
-        "heapUsedDeltaBytes": 2684096
-      },
-      "optimized": {
-        "elapsedMilliseconds": 65.51733299999978,
-        "heapUsedDeltaBytes": 1564960
-      },
-      "elapsedImprovementPercent": 37.39838959019017
-    },
-    {
-      "pairIndex": 24,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 105.17712500000016,
-        "heapUsedDeltaBytes": 2717392
-      },
-      "optimized": {
-        "elapsedMilliseconds": 59.448333999999704,
-        "heapUsedDeltaBytes": 1494048
-      },
-      "elapsedImprovementPercent": 43.47788647008595
-    },
-    {
-      "pairIndex": 25,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 112.0511660000002,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 64.65020900000036,
-        "heapUsedDeltaBytes": 1440864
-      },
-      "elapsedImprovementPercent": 42.30295738287967
-    },
-    {
-      "pairIndex": 26,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 104.91516700000011,
-        "heapUsedDeltaBytes": 2697752
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.13895800000046,
-        "heapUsedDeltaBytes": 1448632
-      },
-      "elapsedImprovementPercent": 39.819036841450774
-    },
-    {
-      "pairIndex": 27,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 106.41145899999992,
-        "heapUsedDeltaBytes": 2684096
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.17695800000001,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 40.629553815252116
-    },
-    {
-      "pairIndex": 28,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 105.55870800000048,
-        "heapUsedDeltaBytes": 2687336
-      },
-      "optimized": {
-        "elapsedMilliseconds": 61.53858300000047,
-        "heapUsedDeltaBytes": 1476320
-      },
-      "elapsedImprovementPercent": 41.702030873663034
-    },
-    {
-      "pairIndex": 29,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 103.60533299999952,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.83587499999976,
-        "heapUsedDeltaBytes": 1466360
-      },
-      "elapsedImprovementPercent": 38.38553175636233
-    },
-    {
-      "pairIndex": 30,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 103.75075000000015,
-        "heapUsedDeltaBytes": 2676544
-      },
-      "optimized": {
-        "elapsedMilliseconds": 60.24462500000027,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 41.933311325460124
-    },
-    {
-      "pairIndex": 31,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 106.19216699999924,
-        "heapUsedDeltaBytes": 2697752
-      },
-      "optimized": {
-        "elapsedMilliseconds": 61.94104100000004,
-        "heapUsedDeltaBytes": 1476320
-      },
-      "elapsedImprovementPercent": 41.67080044613791
-    },
-    {
-      "pairIndex": 32,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 108.18979200000012,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 58.931375000000116,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 45.52963462578794
-    },
-    {
-      "pairIndex": 33,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 104.94816700000047,
-        "heapUsedDeltaBytes": 2690072
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.02274999999918,
-        "heapUsedDeltaBytes": 1494048
-      },
-      "elapsedImprovementPercent": 39.94868914671097
-    },
-    {
-      "pairIndex": 34,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 105.77099999999973,
-        "heapUsedDeltaBytes": 2729752
-      },
-      "optimized": {
-        "elapsedMilliseconds": 63.42933399999947,
-        "heapUsedDeltaBytes": 1501816
-      },
-      "elapsedImprovementPercent": 40.03145096482057
-    },
-    {
-      "pairIndex": 35,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 105.70700000000033,
-        "heapUsedDeltaBytes": 2705304
-      },
-      "optimized": {
-        "elapsedMilliseconds": 70.35408299999926,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 33.44425345530661
-    },
-    {
-      "pairIndex": 36,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 114.13579200000004,
-        "heapUsedDeltaBytes": 2690072
-      },
-      "optimized": {
-        "elapsedMilliseconds": 64.96020800000042,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 43.0851559693033
-    },
-    {
-      "pairIndex": 37,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 109.09395800000038,
-        "heapUsedDeltaBytes": 2697752
-      },
-      "optimized": {
-        "elapsedMilliseconds": 60.411833000000115,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 44.624034082620874
-    },
-    {
-      "pairIndex": 38,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 101.40900000000056,
-        "heapUsedDeltaBytes": 2690072
-      },
-      "optimized": {
-        "elapsedMilliseconds": 57.190332999999555,
-        "heapUsedDeltaBytes": 1501816
-      },
-      "elapsedImprovementPercent": 43.60428265735858
-    },
-    {
-      "pairIndex": 39,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 99.1719579999999,
-        "heapUsedDeltaBytes": 2696184
-      },
-      "optimized": {
-        "elapsedMilliseconds": 57.67212500000005,
-        "heapUsedDeltaBytes": 1484088
-      },
-      "elapsedImprovementPercent": 41.84633825622349
-    },
-    {
-      "pairIndex": 40,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 102.34791700000005,
-        "heapUsedDeltaBytes": 2676544
-      },
-      "optimized": {
-        "elapsedMilliseconds": 60.82245800000055,
-        "heapUsedDeltaBytes": 5678032
-      },
-      "elapsedImprovementPercent": 40.572842337377004
-    },
-    {
-      "pairIndex": 41,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 100.15241699999933,
-        "heapUsedDeltaBytes": 2670504
-      },
-      "optimized": {
-        "elapsedMilliseconds": 57.81762500000059,
-        "heapUsedDeltaBytes": 1476320
-      },
-      "elapsedImprovementPercent": 42.270364778115166
-    },
-    {
-      "pairIndex": 42,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 102.77145799999926,
-        "heapUsedDeltaBytes": 2667360
-      },
-      "optimized": {
-        "elapsedMilliseconds": 58.550624999998945,
-        "heapUsedDeltaBytes": 1480792
-      },
-      "elapsedImprovementPercent": 43.028321151190276
-    },
-    {
-      "pairIndex": 43,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 99.79216599999927,
-        "heapUsedDeltaBytes": 2667360
-      },
-      "optimized": {
-        "elapsedMilliseconds": 56.409874999999374,
-        "heapUsedDeltaBytes": 1476320
-      },
-      "elapsedImprovementPercent": 43.47264193063032
-    },
-    {
-      "pairIndex": 44,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 101.03279099999963,
-        "heapUsedDeltaBytes": 2667360
-      },
-      "optimized": {
-        "elapsedMilliseconds": 58.70249999999942,
-        "heapUsedDeltaBytes": 1480792
-      },
-      "elapsedImprovementPercent": 41.897576599660965
-    },
-    {
-      "pairIndex": 45,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 100.61862500000097,
-        "heapUsedDeltaBytes": 2670504
-      },
-      "optimized": {
-        "elapsedMilliseconds": 61.040499999999156,
-        "heapUsedDeltaBytes": 1582688
-      },
-      "elapsedImprovementPercent": 39.33479015440872
-    },
-    {
-      "pairIndex": 46,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 98.74741600000016,
-        "heapUsedDeltaBytes": 2696184
-      },
-      "optimized": {
-        "elapsedMilliseconds": 57.67191699999967,
-        "heapUsedDeltaBytes": 1463064
-      },
-      "elapsedImprovementPercent": 41.59653048541587
-    },
-    {
-      "pairIndex": 47,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 99.45149999999921,
-        "heapUsedDeltaBytes": 2667360
-      },
-      "optimized": {
-        "elapsedMilliseconds": 58.55229200000031,
-        "heapUsedDeltaBytes": 1480792
-      },
-      "elapsedImprovementPercent": 41.1247774040605
-    },
-    {
-      "pairIndex": 48,
-      "executionOrder": "optimized_then_original",
-      "original": {
-        "elapsedMilliseconds": 104.5738339999989,
-        "heapUsedDeltaBytes": 2667360
-      },
-      "optimized": {
-        "elapsedMilliseconds": 56.539999999999054,
-        "heapUsedDeltaBytes": 1498520
-      },
-      "elapsedImprovementPercent": 45.932937679228964
-    },
-    {
-      "pairIndex": 49,
-      "executionOrder": "original_then_optimized",
-      "original": {
-        "elapsedMilliseconds": 100.7274580000012,
-        "heapUsedDeltaBytes": 2670504
-      },
-      "optimized": {
-        "elapsedMilliseconds": 58.67266599999857,
-        "heapUsedDeltaBytes": 1480792
-      },
-      "elapsedImprovementPercent": 41.751070497581836
-    }
-  ],
-  "elapsedMilliseconds": {
+  "timeStats": {
     "original": {
-      "mean": 115.50398411999998,
-      "median": 108.57495849999987
+      "mean": 324.0609338400001,
+      "median": 293.6918740000001,
+      "raw": [
+        286.7625189999999,
+        286.80973000000085,
+        286.8704059999982,
+        287.03077200000007,
+        287.06106399999953,
+        287.44610900000043,
+        287.8718950000002,
+        288.3078510000014,
+        289.2745620000005,
+        291.1138660000033,
+        291.2287949999991,
+        291.3985080000002,
+        291.49536799999987,
+        291.6678780000002,
+        291.70408899999893,
+        291.74507000000085,
+        291.85466200000155,
+        291.90805100000034,
+        292.3993420000006,
+        292.56688099999883,
+        292.8258270000006,
+        292.8694460000006,
+        292.94880099999864,
+        293.0136519999978,
+        293.5168760000015,
+        293.6918740000001,
+        294.12193599999955,
+        294.1594690000002,
+        294.5720160000001,
+        295.22076000000015,
+        295.557186,
+        297.98382499999934,
+        300.19134399999894,
+        302.5727220000008,
+        307.310475,
+        309.04796799999997,
+        310.17847800000163,
+        326.5999950000005,
+        341.21480800000063,
+        345.811925,
+        355.78812599999947,
+        373.49536999999964,
+        378.13502100000005,
+        381.61743599999954,
+        387.67233699999997,
+        399.15835500000003,
+        418.68157400000064,
+        421.2877119999994,
+        449.2655530000002,
+        768.0184069999998
+      ]
     },
     "optimized": {
-      "mean": 67.04800491999993,
-      "median": 64.55091700000048
-    },
-    "pairedImprovementPercent": {
-      "mean": 41.769976797868104,
-      "median": 41.79870437690266
+      "mean": 168.23565089999994,
+      "median": 155.1122809999997,
+      "raw": [
+        150.32276600000114,
+        150.46266099999957,
+        150.67781900000045,
+        151.07122199999867,
+        151.08209100000022,
+        152.43929099999878,
+        152.45193799999993,
+        152.84484499999962,
+        153.2297460000009,
+        153.3871739999995,
+        153.40847700000086,
+        153.73134500000015,
+        153.75111800000013,
+        153.78421499999968,
+        153.80202899999858,
+        153.9626709999975,
+        154.08257299999968,
+        154.1515569999974,
+        154.1586959999986,
+        154.36718400000245,
+        154.82253799999853,
+        154.91930700000012,
+        154.93201599999884,
+        154.97841399999925,
+        155.03513100000055,
+        155.1122809999997,
+        155.12009600000238,
+        155.51319599999988,
+        155.60252600000058,
+        155.6729890000006,
+        156.1192229999997,
+        156.14961399999993,
+        156.27970099999948,
+        156.4285349999991,
+        158.0234359999995,
+        159.42810199999985,
+        160.11714899999998,
+        161.31069300000308,
+        162.26992900000187,
+        162.66281499999968,
+        163.06905300000108,
+        182.14804300000014,
+        185.00168499999927,
+        204.3042089999999,
+        212.43032499999936,
+        215.18690400000014,
+        219.45399999999972,
+        265.36309900000015,
+        265.73990200000026,
+        301.41821600000003
+      ]
     }
   },
-  "heapUsedDeltaBytes": {
+  "heapDeltaStats": {
     "original": {
-      "mean": 2619012.32,
-      "median": 2696184
+      "mean": 3454516.96,
+      "median": 1888696,
+      "raw": [
+        41000,
+        209944,
+        1888624,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        1888696,
+        2081624,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928,
+        5969928
+      ]
     },
     "optimized": {
-      "mean": 1623596.48,
-      "median": 1484088
+      "mean": 1857714.88,
+      "median": 907320,
+      "raw": [
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        45536,
+        907320,
+        978704,
+        996896,
+        1532312,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672,
+        4158672
+      ]
     }
   }
 }

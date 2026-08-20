@@ -1,4 +1,3 @@
-/** Encode a column name as the stable Unicode-code-point handle identifier. */
 export function sanitizeHandleId(columnName: string): string {
   if (!columnName) return 'c-empty';
 
@@ -17,12 +16,10 @@ export function sanitizeHandleId(columnName: string): string {
   return `c-${encoded}`
 }
 
-/** Prefix a stable column handle for use as an edge source. */
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
-/** Prefix a stable column handle for use as an edge target. */
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }

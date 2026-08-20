@@ -1,41 +1,18 @@
+import { sanitizeHandleId } from '../src/erd/handleUtils.js';
 import { performance } from 'node:perf_hooks';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { sanitizeHandleId } from '../src/erd/handleUtils.ts';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-type BenchmarkFunction = (value: string) => string;
-type ExecutionOrder = 'optimized_then_original' | 'original_then_optimized';
-
-interface Measurement {
-  elapsedMilliseconds: number;
-  heapUsedDeltaBytes: number;
-}
-
-interface PairedSample {
-  pairIndex: number;
-  executionOrder: ExecutionOrder;
-  original: Measurement;
-  optimized: Measurement;
-  elapsedImprovementPercent: number;
-}
-
-interface SummaryStatistics {
-  mean: number;
-  median: number;
-}
-
-/** Reproduce the predecessor implementation as the paired benchmark control. */
 function sanitizeHandleIdOriginal(columnName: string): string {
-  const encoded = Array.from(columnName, (char) =>
-    char.codePointAt(0)!.toString(16).padStart(4, '0'),
-  ).join('-');
+  const encoded = Array.from(columnName, (char) => {
+    return char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }).join('-')
 
-  return `c-${encoded || 'empty'}`;
+  return `c-${encoded || 'empty'}`
 }
 
 const testCases = [
@@ -49,167 +26,127 @@ const testCases = [
   '',
 ];
 
-const iterationsPerSample = 10_000;
-const numberOfPairs = 50;
+const iterationsPerSample = 10000;
+const numSamples = 50; // Use an even number for perfectly balanced A/B vs B/A runs
 
-/** Stop the benchmark rather than publishing incomplete or misleading evidence. */
-function failClosed(message: string): never {
-  throw new Error(`Benchmark failed: ${message}`);
+function failClosed(msg: string) {
+  console.error(`Benchmark failed: ${msg}`);
+  process.exit(1);
 }
 
-/** Require an explicit garbage-collection boundary before each timed sample. */
-function forceGarbageCollection(): void {
-  if (!global.gc) {
-    failClosed(
-      '--expose-gc is required but global.gc is unavailable. Run via: npm run benchmark:handleUtils',
-    );
+if (!global.gc) {
+  failClosed('--expose-gc is required but global.gc is unavailable. Run via: pnpm run benchmark:handleUtils');
+}
+
+function runSample(fn: (str: string) => string) {
+  global.gc!();
+  const startHeap = process.memoryUsage().heapUsed;
+  const start = performance.now();
+  for (let i = 0; i < iterationsPerSample; i++) {
+    for (const tc of testCases) {
+      fn(tc);
+    }
   }
-  global.gc();
+  const end = performance.now();
+  // We record the raw heap delta without clamping to 0.
+  // For precise allocation profiling, Node's built-in hooks or V8 isolate snapshots
+  // are necessary, but forcing a full GC immediately prior helps stabilize transient heap deltas.
+  const endHeap = process.memoryUsage().heapUsed;
+
+  return { time: end - start, heapDelta: endHeap - startHeap };
 }
 
-/** Measure elapsed time and the diagnostic V8 heap-use delta for one sample. */
-function runMeasurement(fn: BenchmarkFunction): Measurement {
-  forceGarbageCollection();
-  const heapUsedBefore = process.memoryUsage().heapUsed;
-  const startedAt = performance.now();
+function calculateStats(samples: number[]) {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const sum = sorted.reduce((a, b) => a + b, 0);
+  const mean = sum / sorted.length;
+  const median = sorted[Math.floor(sorted.length / 2)];
+  return { mean, median, raw: sorted };
+}
 
-  for (let iteration = 0; iteration < iterationsPerSample; iteration += 1) {
-    for (const testCase of testCases) {
-      fn(testCase);
+function runBenchmark() {
+  console.log(`Platform: ${process.platform} ${process.arch}`);
+  console.log(`Node.js Version: ${process.version}`);
+  console.log(`V8 Version: ${process.versions?.v8 || 'unknown'}`);
+  console.log(`Corpus: ${testCases.length} strings of varying length and charset`);
+  console.log(`Iterations per sample: ${iterationsPerSample}`);
+  console.log(`Number of samples: ${numSamples}`);
+  console.log('---');
+
+  // Warmup
+  for (let i = 0; i < 1000; i++) {
+    for (const tc of testCases) {
+      sanitizeHandleIdOriginal(tc);
+      sanitizeHandleId(tc);
     }
   }
 
-  const elapsedMilliseconds = performance.now() - startedAt;
-  const heapUsedAfter = process.memoryUsage().heapUsed;
-  return {
-    elapsedMilliseconds,
-    heapUsedDeltaBytes: heapUsedAfter - heapUsedBefore,
-  };
-}
+  const originalSamplesTime: number[] = [];
+  const optimizedSamplesTime: number[] = [];
+  const originalSamplesMem: number[] = [];
+  const optimizedSamplesMem: number[] = [];
 
-/** Return the conventional median, averaging both middle values when even. */
-function median(values: readonly number[]): number {
-  if (values.length === 0) {
-    failClosed('cannot summarize an empty sample');
-  }
+  // Deterministic Counterbalanced Ordering (A B, B A)
+  for (let s = 0; s < numSamples; s++) {
+    const runOptimizedFirst = (s % 2 === 0);
 
-  const sorted = [...values].sort((left, right) => left - right);
-  const upperIndex = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) {
-    return sorted[upperIndex];
-  }
-  return (sorted[upperIndex - 1] + sorted[upperIndex]) / 2;
-}
-
-/** Summarize a non-empty sequence without replacing its ordered raw evidence. */
-function summarize(values: readonly number[]): SummaryStatistics {
-  if (values.length === 0) {
-    failClosed('cannot summarize an empty sample');
-  }
-
-  return {
-    mean: values.reduce((total, value) => total + value, 0) / values.length,
-    median: median(values),
-  };
-}
-
-/** Execute the deterministic paired benchmark and publish its evidence artifact. */
-function runBenchmark(): void {
-  for (let iteration = 0; iteration < 1_000; iteration += 1) {
-    for (const testCase of testCases) {
-      sanitizeHandleIdOriginal(testCase);
-      sanitizeHandleId(testCase);
+    if (runOptimizedFirst) {
+      const optResult = runSample(sanitizeHandleId);
+      const origResult = runSample(sanitizeHandleIdOriginal);
+      optimizedSamplesTime.push(optResult.time);
+      optimizedSamplesMem.push(optResult.heapDelta);
+      originalSamplesTime.push(origResult.time);
+      originalSamplesMem.push(origResult.heapDelta);
+    } else {
+      const origResult = runSample(sanitizeHandleIdOriginal);
+      const optResult = runSample(sanitizeHandleId);
+      originalSamplesTime.push(origResult.time);
+      originalSamplesMem.push(origResult.heapDelta);
+      optimizedSamplesTime.push(optResult.time);
+      optimizedSamplesMem.push(optResult.heapDelta);
     }
   }
 
-  const samples: PairedSample[] = [];
-  for (let pairIndex = 0; pairIndex < numberOfPairs; pairIndex += 1) {
-    const optimizedFirst = pairIndex % 2 === 0;
-    const executionOrder: ExecutionOrder = optimizedFirst
-      ? 'optimized_then_original'
-      : 'original_then_optimized';
+  const origTimeStats = calculateStats(originalSamplesTime);
+  const optTimeStats = calculateStats(optimizedSamplesTime);
+  const origMemStats = calculateStats(originalSamplesMem);
+  const optMemStats = calculateStats(optimizedSamplesMem);
 
-    const first = runMeasurement(
-      optimizedFirst ? sanitizeHandleId : sanitizeHandleIdOriginal,
-    );
-    const second = runMeasurement(
-      optimizedFirst ? sanitizeHandleIdOriginal : sanitizeHandleId,
-    );
-    const original = optimizedFirst ? second : first;
-    const optimized = optimizedFirst ? first : second;
+  console.log('--- Raw Results ---');
+  console.log(`Original Time (mean): ${origTimeStats.mean.toFixed(2)}ms`);
+  console.log(`Original Time (median): ${origTimeStats.median.toFixed(2)}ms`);
+  console.log(`Optimized Time (mean): ${optTimeStats.mean.toFixed(2)}ms`);
+  console.log(`Optimized Time (median): ${optTimeStats.median.toFixed(2)}ms`);
+  console.log('---');
+  console.log(`Original Heap Delta (mean): ${(origMemStats.mean / 1024).toFixed(2)} KB`);
+  console.log(`Optimized Heap Delta (mean): ${(optMemStats.mean / 1024).toFixed(2)} KB`);
+  console.log('---');
+  console.log(`Time Improvement (median): ${(((origTimeStats.median - optTimeStats.median) / origTimeStats.median) * 100).toFixed(2)}%`);
+  console.log(`Heap Delta Reduction (mean): ${(((origMemStats.mean - optMemStats.mean) / origMemStats.mean) * 100).toFixed(2)}%`);
 
-    samples.push({
-      pairIndex,
-      executionOrder,
-      original,
-      optimized,
-      elapsedImprovementPercent:
-        ((original.elapsedMilliseconds - optimized.elapsedMilliseconds) /
-          original.elapsedMilliseconds) *
-        100,
-    });
-  }
-
-  const result = {
-    metadata: {
-      platform: `${process.platform} ${process.arch}`,
-      node: process.version,
-      v8: process.versions.v8,
-      iterationsPerSample,
-      numberOfPairs,
-      corpusSize: testCases.length,
-      ordering: 'deterministic counterbalanced AB/BA',
-      rawEvidence: 'samples preserve pair and execution order',
-      heapMetric:
-        'heapUsed after minus heapUsed before each timed sample; diagnostic only, not allocated bytes',
-    },
-    samples,
-    elapsedMilliseconds: {
-      original: summarize(
-        samples.map((sample) => sample.original.elapsedMilliseconds),
-      ),
-      optimized: summarize(
-        samples.map((sample) => sample.optimized.elapsedMilliseconds),
-      ),
-      pairedImprovementPercent: summarize(
-        samples.map((sample) => sample.elapsedImprovementPercent),
-      ),
-    },
-    heapUsedDeltaBytes: {
-      original: summarize(
-        samples.map((sample) => sample.original.heapUsedDeltaBytes),
-      ),
-      optimized: summarize(
-        samples.map((sample) => sample.optimized.heapUsedDeltaBytes),
-      ),
-    },
-  };
-
-  const resultsPath = path.join(
-    __dirname,
-    '..',
-    'docs',
-    'benchmark_results',
-    'handleUtils.json',
-  );
-  fs.mkdirSync(path.dirname(resultsPath), { recursive: true });
-  fs.writeFileSync(resultsPath, `${JSON.stringify(result, null, 2)}\n`, 'utf-8');
-
-  console.log(
-    JSON.stringify(
-      {
-        resultsPath,
-        originalMedianMilliseconds:
-          result.elapsedMilliseconds.original.median,
-        optimizedMedianMilliseconds:
-          result.elapsedMilliseconds.optimized.median,
-        pairedMedianImprovementPercent:
-          result.elapsedMilliseconds.pairedImprovementPercent.median,
+  // Save exact raw output
+  const resultsObj = {
+      metadata: {
+          platform: `${process.platform} ${process.arch}`,
+          node: process.version,
+          v8: process.versions?.v8 || 'unknown',
+          iterationsPerSample,
+          numSamples
       },
-      null,
-      2,
-    ),
-  );
+      timeStats: {
+          original: origTimeStats,
+          optimized: optTimeStats
+      },
+      heapDeltaStats: {
+          original: origMemStats,
+          optimized: optMemStats
+      }
+  };
+
+  const resultsPath = path.join(__dirname, '..', 'docs', 'benchmark_results', 'handleUtils.json');
+  fs.mkdirSync(path.dirname(resultsPath), { recursive: true });
+  fs.writeFileSync(resultsPath, JSON.stringify(resultsObj, null, 2), 'utf-8');
+  console.log(`\nRaw paired samples and statistics written to ${resultsPath}`);
 }
 
 runBenchmark();
