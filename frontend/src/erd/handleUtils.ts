@@ -14,3 +14,21 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function parseColumnNameFromHandle(handleId: string): string | null {
+  if (!handleId) return null;
+  const match = handleId.match(/^(src|tgt)-c-(.+)$/);
+  if (!match) return null;
+  const encoded = match[2];
+  if (encoded === 'empty') return '';
+  const codePoints = encoded.split('-').map((code) => {
+    if (!/^[0-9a-f]{1,6}$/i.test(code)) return null;
+    const codePoint = Number.parseInt(code, 16);
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+      return null;
+    }
+    return codePoint;
+  });
+  if (codePoints.some((codePoint) => codePoint === null)) return null;
+  return codePoints.map((codePoint) => String.fromCodePoint(codePoint!)).join('');
+}

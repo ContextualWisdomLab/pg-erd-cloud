@@ -50,6 +50,7 @@ import {
   type IndexRecommendation,
 } from "./erd/cardinality";
 import { snapshotToGraph, type TableNodeData } from "./erd/convert";
+import { buildForeignKeyEdge } from "./erd/connection";
 import {
   downloadText,
   exportDDL,
@@ -245,18 +246,13 @@ export default function App() {
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
-      const newEdge: Edge = {
-        ...params,
-        id: `edge_${Date.now()}`,
-        animated: false,
-        label: "fk_new_relation",
-      };
+      const newEdge = buildForeignKeyEdge(params, nodes, `edge_${Date.now()}`);
       // We could add it directly, but let's just add it then edit it.
       setEdges((eds) => addEdge(newEdge, eds));
       setEditingEdge(newEdge);
       setRelLabel(newEdge.label as string);
     },
-    [setEdges],
+    [setEdges, nodes],
   );
 
   useEffect(() => {
