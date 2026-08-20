@@ -65,6 +65,17 @@ def test_clean_snake_case_schema_has_no_findings():
     assert report["items"] == []
 
 
+def test_ignores_malformed_snapshot_and_identifier_values() -> None:
+    """Treat untrusted non-string snapshot fields as absent, not executable input."""
+
+    assert lint_naming([])["summary"]["total"] == 0  # type: ignore[arg-type]
+    report = lint_naming({
+        "relations": [{"relation_name": None}, {"relation_name": 42}],
+        "columns": [{"column_name": object()}],
+    })
+    assert report["summary"]["total"] == 0
+
+
 def test_my_own_new_tables_pass_the_lint():
     """Dog-fooding: the tables this project added must not violate the lint."""
     report = lint_naming(_snap({

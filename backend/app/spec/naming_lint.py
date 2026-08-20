@@ -78,7 +78,8 @@ def _item(category: str, severity: str, target: str, detail: str) -> dict[str, A
 
 def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Return naming-convention findings + a summary, breaking issues first."""
-    snapshot = snapshot or {}
+    if not isinstance(snapshot, dict):
+        snapshot = {}
     relations = _rows(snapshot, "relations")
     columns = _rows(snapshot, "columns")
     rel_by_oid = {r.get("relation_oid"): r for r in relations}
@@ -87,11 +88,11 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     identifiers: list[tuple[str, str]] = []
     for r in relations:
         name = r.get("relation_name")
-        if name:
+        if isinstance(name, str) and name:
             identifiers.append((f"{r.get('schema_name')}.{name}", str(name)))
     for c in columns:
         name = c.get("column_name")
-        if name:
+        if isinstance(name, str) and name:
             rel = rel_by_oid.get(c.get("relation_oid")) or {}
             identifiers.append((f"{rel.get('relation_name')}.{name}", str(name)))
 
