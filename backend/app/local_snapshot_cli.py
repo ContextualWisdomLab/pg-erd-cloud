@@ -120,7 +120,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         snapshot = asyncio.run(capture_local_snapshot(args))
-    except (OSError, asyncpg.PostgresError) as exc:
+    except (
+        OSError,
+        TimeoutError,
+        asyncio.TimeoutError,
+        asyncpg.PostgresError,
+    ) as exc:
         print(
             f"pg-erd-snapshot failed: {type(exc).__name__}",
             file=sys.stderr,

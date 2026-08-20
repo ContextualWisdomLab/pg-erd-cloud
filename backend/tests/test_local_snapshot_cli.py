@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -175,6 +176,8 @@ def test_main_writes_snapshot_json(
     ("error", "error_name"),
     [
         (OSError("socket denied"), "OSError"),
+        (TimeoutError("connection timed out"), "TimeoutError"),
+        (asyncio.TimeoutError("async connection timed out"), "TimeoutError"),
         (local_snapshot_cli.asyncpg.PostgresError("database denied"), "PostgresError"),
     ],
 )
