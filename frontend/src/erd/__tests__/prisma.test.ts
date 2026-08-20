@@ -70,9 +70,17 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'users_posts',
+      },
+      {
+        id: 'legacy',
+        source: '2',
+        target: '1',
         sourceHandle: 'src-user_id',
         targetHandle: 'tgt-id',
-        label: 'users_posts',
+        label: 'legacy_raw',
       },
     ];
 
@@ -86,6 +94,7 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
+    expect(result).not.toContain('@relation("legacy_raw"');
   });
 
   it('maps various types properly', () => {
@@ -232,8 +241,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: '1to1',
       },
     ];
@@ -523,16 +532,16 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: 'rel',
       },
       {
         id: 'e2',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: 'rel',
       },
     ];

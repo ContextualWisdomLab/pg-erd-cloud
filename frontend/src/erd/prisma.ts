@@ -120,26 +120,6 @@ function resolveFkColumns(
     };
   }
 
-  if (
-    edge.sourceHandle?.startsWith("src-") &&
-    !edge.sourceHandle.startsWith("src-c-")
-  ) {
-    const legacySource = edge.sourceHandle.slice(4);
-    const legacyTarget =
-      edge.targetHandle?.startsWith("tgt-") &&
-      !edge.targetHandle.startsWith("tgt-c-")
-        ? edge.targetHandle.slice(4)
-        : "id";
-    if (
-      sourceNode.data.columns.some((column) => column.column_name === legacySource)
-    ) {
-      return {
-        sourceColumns: [legacySource],
-        targetColumns: [legacyTarget],
-      };
-    }
-  }
-
   return null;
 }
 
