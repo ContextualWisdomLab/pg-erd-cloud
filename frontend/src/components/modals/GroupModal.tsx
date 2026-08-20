@@ -67,7 +67,6 @@ export function GroupModal({
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}
               placeholder="Billing"
-              required
             />
           </div>
           <div

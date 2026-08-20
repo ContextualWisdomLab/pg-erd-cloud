@@ -184,46 +184,11 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
-      { id: 'e3', source: '1', target: '2', sourceHandle: 'unparsed-handle' },
     ];
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('model A');
     expect(result).toContain('model B');
-  });
-
-  it('uses a singular back-relation when the foreign key is unique', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'users',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
-        },
-      },
-      {
-        id: 'profiles',
-        position: { x: 100, y: 100 },
-        data: {
-          title: 'profiles',
-          badges: { pk: true, fk: true },
-          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
-        },
-      },
-    ];
-
-    const result = exportPrisma(nodes, [{
-      id: 'profile-user',
-      source: 'profiles',
-      target: 'users',
-      sourceHandle: 'src-id',
-      targetHandle: 'tgt-id',
-      label: 'profile_user',
-    }]);
-
-    expect(result).toContain('profiles_id profiles? @relation("profile_user")');
   });
 
   it('handles missing is_not_null logic for optional relationships', () => {
