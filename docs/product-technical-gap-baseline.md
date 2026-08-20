@@ -1,9 +1,9 @@
 # Product and technical gap baseline
 
-- **Snapshot date:** 2026-08-20
+- **Snapshot date:** 2026-08-21
 - **Repository:** `ContextualWisdomLab/pg-erd-cloud`
 - **Protected-main evidence:** `8dc746920c12988f082e914879d95e13c9693535`
-- **Open-PR evidence:** GitHub REST search returned **61** open pull requests; exact heads remain mutable.
+- **Open-PR evidence:** GitHub REST query returned **62** open pull requests; exact heads remain mutable.
 - **Package evidence:** backend and frontend both declare version `0.1.0`.
 - **Status:** broad pre-GA product; no commercial release candidate is proven by this document.
 - **Purpose:** convert product, architecture, research, issue, PR, review, check, migration, design, and operability evidence into one executable completion backlog.
@@ -113,73 +113,73 @@ Figma does not replace executable behavior. Storybook stories, shared tokens, co
 
 ## Current open PR inventory
 
-The live REST query returned 61 open pull requests on 2026-08-20. Exact heads are mutable; refetch after every push. PR #942 is self-referential and records its own current head like every other PR.
+The live REST query returned **62** open pull requests on 2026-08-21. Exact heads are mutable; refetch after every push. PR #942 is self-referential and records its own current head like every other PR.
 
 | PR | Exact head | Current purpose |
 |---:|---|---|
-| #944 | `d393bf655171fb31de0a8cc6c9517ba69aa3c9fc` | feat(frontend): add Storybook design-token inventory |
-| #943 | `a968d54daf1ddd663b801628a7817f4c5bf459ba` | ci: schedule hourly PR review repair |
-| #942 | `6a414ec0986f43c1444096b427460218ee33b582` | docs: establish product and technical gap baseline |
-| #941 | `18a91beac732f2cf41f3971087adf76ad283318c` | fix(auth): offload API key hashing |
-| #940 | `9fb1c3b221a066de4b5ccba6d474a9695683720d` | refactor(snowflake): group constraint context |
-| #939 | `3ca5db715db50ee01f061131c02f57e82493f85e` | fix(frontend): validate ERD export handles |
-| #938 | `dc50a22140c636ba9ca1f58bb8b769d1eb3ff33d` | refactor(mysql): group introspection rows |
-| #936 | `5e73610f345535ce19f993561b728cfeb54f92e0` | fix(db): reconcile ORM metadata with migrations |
-| #933 | `ec54f20321b9caf5d7a29f84b4c608dd0f6f552d` | feat: add automatic column mapping and default fk label on edge creation |
-| #930 | `aaffad0a8c126ce089e873d323cbc70797aef5e8` | 🎨 Palette: Add visual indicators for required form fields in modals |
-| #926 | `369d82c491d3e029bcaff80487fc5885d87d7c2d` | 🛡️ Sentinel: [MEDIUM] Fix control character injection in Pydantic schemas |
-| #915 | `34e088c0a93928a9902a13a0e1b4ad3d8e544f03` | 🎨 Palette: [테이블 삭제 시 확인창 추가] |
-| #914 | `df336c0dec6177b5c67299591c789dcbdb555a33` | chore(deps): bump github/codeql-action/analyze from 4.36.2 to 4.37.7 |
-| #913 | `d70622107200a998b36a761666f74ea2c70b5efd` | chore(deps): bump github/codeql-action/init from 4.36.2 to 4.37.7 |
-| #912 | `802441e60f21769711d6bf93b8b797bd697fc7b3` | chore(deps): bump github/codeql-action/autobuild from 4.36.2 to 4.37.7 |
-| #910 | `5c1412bf3ec1236b3de879345fca2bc724af2212` | chore(deps-dev): bump @testing-library/jest-dom from 6.9.1 to 7.0.1 in /frontend |
-| #909 | `d3faffdd5407892148939eb1e278fd9150de573c` | chore(deps-dev): update snowflake-connector-python requirement from <5,>=4 to >=4.7.2,<5 in /backend |
-| #907 | `c6131676e4dfa79230e8ea4b61e8e8485d710552` | chore(deps-dev): update setuptools requirement from >=82.0.1 to >=84.0.0 in /backend |
-| #906 | `3c6db17b4943508c384761716a0f7d19f9aed5b3` | chore(deps): update sqlalchemy requirement from <2.1,>=2.0.51 to >=2.0.52,<2.1 in /backend |
-| #905 | `0070a2967b9dacf5f9033b62a530b65b638ff695` | chore(deps): update starlette requirement from >=1.1.0 to >=1.6.0 in /backend |
-| #904 | `4a80d4ec41f818a74268cad86fa493fc0e292e0b` | chore(deps): bump python from 3.14.6-slim to 3.14.7-slim in /backend |
-| #903 | `3c7a574799bf7e6a3b5a6ee8a1066eaba15c87e1` | feat(prisma): allocate collision-free identifiers with @map |
-| #902 | `57ff32131c7a28d9d5ed146325a327c687b1ea49` | chore(opencode): use NVIDIA NIM only |
-| #901 | `eeef7b7170a21e8f191482b6913f75356341c0ec` | fix(a11y): restore business-group color radiogroup contract |
-| #900 | `ed12e8d6e2ae75e4591827fe4315d4d7a53b9374` | feat(ai): delegate LLM drafts to adaptive orchestration |
-| #895 | `8436cb4b8ce7f5bdda897f8c13c2aa51ea9511e8` | security(auth): reject unsupported JWT critical headers |
-| #894 | `da7566d615a7882daf2271ed249971d667933c48` | perf(prisma): index outgoing relation lookup |
-| #890 | `a04935ded27fb4817a76682c3b6e01c63e03e32c` | test(api): verify the authenticated project-list contract |
-| #889 | `f7cd3c62c5ea69df3607481519264251d6d81510` | security(ci): harden manual CodeQL backfill inputs |
-| #888 | `6f47fe0f29135699101ac4179cb668acd8b423ca` | test(valkey): verify sentinel host formatting contracts |
-| #887 | `d221ab7951047ec84c11bc5707faaf4571269909` | fix(security): reject log-breaking identifier characters |
-| #886 | `c7a45292dbb6ad26f9d0cfef83bd9d5d9ecb1635` | test(api): verify the current-user HTTP contract |
-| #884 | `4499ab534ce3b3d7d09aa45a24565c165f24dde1` | perf(frontend): remove intermediate ERD handle-ID array |
-| #882 | `b924d0917e3ab4d2de674be4277d1634f03860db` | 🎨 Palette: 모달 내 일반 액션 버튼에 컨텍스트 ARIA label 추가 |
-| #881 | `5a8ce593bc8b94c89c4cab0b9af36784a0dd472a` | perf(search): memoize immutable ERD searchable text |
-| #874 | `a0c816003b13f4d6cb6f016ca739a9012e424dac` | fix: preserve DBML index evidence |
-| #868 | `d9f1b9478492595937b7382f6876e0a4c134dda9` | security(postgres): reject server-local file access via DSNs |
-| #858 | `a34b35e59bf76d8b311be041e040f0f1148b63e3` | a11y(frontend): keep unavailable toolbar actions discoverable |
-| #857 | `63424a49e4345f5f8305d85188d9a46349d407fe` | feat(databricks): add bounded Unity Catalog introspection |
-| #856 | `322d543386c2658e563ae383780847f51f767fb9` | feat(frontend): add relationship-aware ERD layout |
-| #855 | `b94eb617708782ccda5e5a3c199c749fbbf32a80` | fix(auth): bind OIDC tokens to configured organization |
-| #850 | `682f107782bd7a9d5b5605de7d78402dc71cdd21` | ⚡ Bolt: Optimize ERD column name resolution |
-| #838 | `d5b52f80ca24480c0000d20d75b568ff9a62b9a4` | chore(deps): update alembic requirement from >=1.18.5 to >=1.19.1 in /backend |
-| #835 | `423564054a82e4158219cf56a9348652265e12da` | fix(a11y): use native form submission paths |
-| #834 | `07a4e376ba0ed1ae2fead9892ba66f4b54b14c8d` | feat: establish forward engineering plan authority |
-| #832 | `35c12f43a045040c7b10f527528039cd014a678d` | security(api): reject non-text controls in multiline SQL |
-| #827 | `e99129920ba981ecd3a529451756489aaa3f7f5a` | ⚡ Bolt: [concurrent pooler detection] |
-| #824 | `e34f69c2099d0e37cd04efe5b974515d0678476d` | feat: align live Figma, harden sharing, and establish architecture authority |
-| #782 | `d70985baa0355e71845096529f8a8ea99ca7cba7` | fix(naming): classify PostgreSQL SYSTEM_USER as reserved |
-| #774 | `d655a6c57e620edde68bbd818f2360a655d40ce4` | fix(erd): preserve PostgreSQL identifiers in relationship inference |
-| #772 | `7de11c899a2617b7bedbb6c7558dcf199c153dc1` | chore(backend): remove dead relationship-inference lookup |
-| #768 | `03d637684658ed4f501ef7a0c9d7a101b5123e40` | test(data-dictionary): cover missing-column rendering |
-| #745 | `7c8afef1fde51e6c5086aa342f008f7aadbf4796` | 🛡️ Sentinel: [CRITICAL] Fix incomplete DSN secret redaction and over-redaction |
-| #744 | `409343ce286f49b5a700200b6cca1a5d7e159f0c` | fix(cors): allow every supported API method |
-| #738 | `43d594c9d955b273875c3234c02333439a819878` | test(frontend): await diagram data before search assertion (deflake main) |
-| #737 | `8e58fc0867ab909d427724064daefa1397bac48e` | docs: align ecosystem names and solo-maintainer review policy |
-| #725 | `203dce1b0ad4e79e709ce0c796c457d065db4fae` | chore(deps): synchronize FastAPI and Redis backend locks |
-| #724 | `dbc315867013fbf0481853039ec53d75e6101743` | feat: add trusted local PostgreSQL snapshot CLI |
-| #723 | `2a65c8263d325c5e4fcef51d95ee57e411cf4e49` | feat(diagram-views): complete saved-layout update contract |
-| #704 | `5f10da2a4bf4b4db93762281a5886650b74887a3` | a11y(frontend): expose unavailable table-save state to keyboard users |
-| #698 | `00eb7938217eeae51ed12c7188c85b36e5414174` | a11y(frontend): keep unavailable export actions discoverable |
+| 954 | `ec0ab84b72e0acd0970abf9817a8f7b59f451dc6` | 🎨 Palette: 닫기 버튼 시각적 심볼 개선 (X -> ✕) |
+| 944 | `5bbf2ee5b6efe9d15a99d7d4330fccb21e84e168` | feat(frontend): add Storybook design-token inventory |
+| 943 | `a968d54daf1ddd663b801628a7817f4c5bf459ba` | ci: schedule hourly PR review repair |
+| 942 | `153451e35cb5fc10ba71ec8d9dc7fb14ada1c1ce` | docs: establish product and technical gap baseline |
+| 941 | `ac16049ab74c3ed3b6687598b77b2f0d6911053c` | fix(auth): offload API key hashing |
+| 940 | `6cb7f19c84fd8511cb990b7b3f2298a0a90a2abc` | refactor(snowflake): group constraint context |
+| 939 | `c41249160f54d263f45f32bf9e22cc0add5a3ec0` | fix(frontend): validate ERD export handles |
+| 938 | `3f2e58989ea9e4a648bb7fbb3041a713ae890129` | refactor(mysql): group introspection rows |
+| 936 | `5e73610f345535ce19f993561b728cfeb54f92e0` | fix(db): reconcile ORM metadata with migrations |
+| 933 | `66005468dca31f51c0a3eed96bfdfd998ce25d71` | feat: add automatic column mapping and default fk label on edge creation |
+| 930 | `cc66e5945944c00d6a9531912b59f0b3aaaebbf8` | 🎨 Palette: Add visual indicators for required form fields in modals |
+| 926 | `ddb21e05880b8fc5f32b9ccedd54b74c81df3de1` | 🛡️ Sentinel: [MEDIUM] Fix control character injection in Pydantic schemas |
+| 915 | `e006cef6f4949126450f2877d64040e7787fb7ae` | 🎨 Palette: [테이블 삭제 시 확인창 추가] |
+| 914 | `df336c0dec6177b5c67299591c789dcbdb555a33` | chore(deps): bump github/codeql-action/analyze from 4.36.2 to 4.37.7 |
+| 913 | `a8d01fc46f0e4114fcb47d8967703faa9319678c` | chore(deps): bump github/codeql-action/init from 4.36.2 to 4.37.7 |
+| 912 | `6db324ac336a294b520dc05faffd176d8768ba23` | chore(deps): bump github/codeql-action/autobuild from 4.36.2 to 4.37.7 |
+| 910 | `10b86e5a6a82e5c3d223960c3e10cafdff93be5e` | chore(deps-dev): bump @testing-library/jest-dom from 6.9.1 to 7.0.1 in /frontend |
+| 909 | `7c3c5a584dff98dcd7e899f1dbd382afcb2b9a6a` | chore(deps-dev): update snowflake-connector-python requirement from <5,>=4 to >=4.7.2,<5 in /backend |
+| 907 | `22dd0142e3c91589b754094466a947c4d28332e7` | chore(deps-dev): update setuptools requirement from >=82.0.1 to >=84.0.0 in /backend |
+| 906 | `c87982f914552e584c51e115181d5b40aee599db` | chore(deps): update sqlalchemy requirement from <2.1,>=2.0.51 to >=2.0.52,<2.1 in /backend |
+| 905 | `c761cc5b16e667f6c40f92f649471d8c0d109d79` | chore(deps): update starlette requirement from >=1.1.0 to >=1.6.0 in /backend |
+| 904 | `1cfde61b4955b949668881e789a6d597fa9787d4` | chore(deps): bump python from 3.14.6-slim to 3.14.7-slim in /backend |
+| 903 | `3c7a574799bf7e6a3b5a6ee8a1066eaba15c87e1` | feat(prisma): allocate collision-free identifiers with @map |
+| 902 | `aa58625123766bfc46228f70efbd51cfa38ac7e5` | chore(opencode): use NVIDIA NIM only |
+| 901 | `962f8299650dbd4f6f67703159dbf5e46c268a82` | fix(a11y): restore business-group color radiogroup contract |
+| 900 | `b688317cfdaed848a75a3eeb8c1a10b15ae7f80e` | feat(ai): delegate LLM drafts to adaptive orchestration |
+| 895 | `f0e474e28844588a1fc56c76ace411ab58a51491` | security(auth): reject unsupported JWT critical headers |
+| 894 | `b0c511c3ef0f1cbe69619efd263152dcd4bb3665` | perf(prisma): index outgoing relation lookup |
+| 890 | `3ba23838e71f7fd1768ae76f2b25db77a8a85e77` | test(api): verify the authenticated project-list contract |
+| 889 | `8fbe9e814674bebeb85de8ea31485fc566e00f44` | security(ci): harden manual CodeQL backfill inputs |
+| 888 | `7d4358396e1bc59a48c139535d80dab6a89935a2` | test(valkey): verify sentinel host formatting contracts |
+| 887 | `a80bacc242bca71aa2fd060eacdde988c55a84f8` | fix(security): reject log-breaking identifier characters |
+| 886 | `514281bf7ac66a4c902b7155eec9497a78c273b3` | test(api): verify the current-user HTTP contract |
+| 884 | `e9585668f1284b0ff6e751a1bbd77f40853084f0` | perf(frontend): remove intermediate ERD handle-ID array |
+| 882 | `c30af0eec1efeaf3364924548004bdcd0b040e96` | 🎨 Palette: 모달 내 일반 액션 버튼에 컨텍스트 ARIA label 추가 |
+| 881 | `5a8ce593bc8b94c89c4cab0b9af36784a0dd472a` | perf(search): memoize immutable ERD searchable text |
+| 874 | `1d3624213aa06761eaae961312499ebf565d784e` | fix: preserve DBML index evidence |
+| 868 | `87672958270712cc8df00f9d2c79f9063bebf6b0` | security(postgres): reject server-local file access via DSNs |
+| 858 | `a34b35e59bf76d8b311be041e040f0f1148b63e3` | a11y(frontend): keep unavailable toolbar actions discoverable |
+| 857 | `fea40e0406fdc15339e9ecb9ace12234901350c5` | feat(databricks): add bounded Unity Catalog introspection |
+| 856 | `322d543386c2658e563ae383780847f51f767fb9` | feat(frontend): add relationship-aware ERD layout |
+| 855 | `b94eb617708782ccda5e5a3c199c749fbbf32a80` | fix(auth): bind OIDC tokens to configured organization |
+| 850 | `682f107782bd7a9d5b5605de7d78402dc71cdd21` | ⚡ Bolt: Optimize ERD column name resolution |
+| 838 | `5761ba6106fb8396bb511f3238c1ec6c21d6e13e` | chore(deps): update alembic requirement from >=1.18.5 to >=1.19.1 in /backend |
+| 835 | `423564054a82e4158219cf56a9348652265e12da` | fix(a11y): use native form submission paths |
+| 834 | `07a4e376ba0ed1ae2fead9892ba66f4b54b14c8d` | feat: establish forward engineering plan authority |
+| 832 | `f385d337838a8304a2efb0ce9a2a4575280bae84` | security(api): reject non-text controls in multiline SQL |
+| 827 | `137f715566a179c3b4f2c02b6b2957b5acc332f0` | ⚡ Bolt: [concurrent pooler detection] |
+| 824 | `e34f69c2099d0e37cd04efe5b974515d0678476d` | feat: align live Figma, harden sharing, and establish architecture authority |
+| 782 | `d70985baa0355e71845096529f8a8ea99ca7cba7` | fix(naming): classify PostgreSQL SYSTEM_USER as reserved |
+| 774 | `9e14c0ddf6e8f7afadb2f0fcdcab9cff956ca66f` | fix(erd): preserve PostgreSQL identifiers in relationship inference |
+| 772 | `fa121caed956b7e20bf1dafd199322944fd04e70` | chore(backend): remove dead relationship-inference lookup |
+| 768 | `03d637684658ed4f501ef7a0c9d7a101b5123e40` | test(data-dictionary): cover missing-column rendering |
+| 745 | `7c8afef1fde51e6c5086aa342f008f7aadbf4796` | 🛡️ Sentinel: [CRITICAL] Fix incomplete DSN secret redaction and over-redaction |
+| 744 | `409343ce286f49b5a700200b6cca1a5d7e159f0c` | fix(cors): allow every supported API method |
+| 738 | `43d594c9d955b273875c3234c02333439a819878` | test(frontend): await diagram data before search assertion (deflake main) |
+| 737 | `8e58fc0867ab909d427724064daefa1397bac48e` | docs: align ecosystem names and solo-maintainer review policy |
+| 725 | `203dce1b0ad4e79e709ce0c796c457d065db4fae` | chore(deps): synchronize FastAPI and Redis backend locks |
+| 724 | `dbc315867013fbf0481853039ec53d75e6101743` | feat: add trusted local PostgreSQL snapshot CLI |
+| 723 | `7c0457ab833b591d056261913a13a6b729c8e6e2` | feat(diagram-views): complete saved-layout update contract |
+| 704 | `5f10da2a4bf4b4db93762281a5886650b74887a3` | a11y(frontend): expose unavailable table-save state to keyboard users |
+| 698 | `00eb7938217eeae51ed12c7188c85b36e5414174` | a11y(frontend): keep unavailable export actions discoverable |
 
-## Exact-head verification loop
 
 1. Refetch protected `main`, the ruleset, and required contexts.
 2. Refetch every PR exact head, mergeability, draft state, review submissions, unresolved threads, and all check runs.
