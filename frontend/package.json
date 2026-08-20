@@ -11,6 +11,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
@@ -22,20 +24,24 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@storybook/react-vite": "^10.5.9",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.4",
+    "@types/node": "^24.10.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitest/coverage-v8": "^4.1.9",
     "fast-check": "^4.8.0",
     "jsdom": "^30.0.1",
+    "storybook": "^10.5.9",
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
   },
   "overrides": {
     "esbuild": "^0.25.0",
+    "nanoid": "^3.3.18",
     "postcss": "^8.5.18"
   }
 }

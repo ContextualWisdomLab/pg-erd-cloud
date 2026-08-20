@@ -26,6 +26,7 @@ dist/
 *.tsbuildinfo
 coverage/
 frontend/coverage/
+frontend/storybook-static/
 
 # opencode tooling artifacts
 registered_agents.json
