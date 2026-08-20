@@ -137,3 +137,7 @@ def test_list_projects_returns_exact_authorized_projection(
     assert response.status_code == 200
     assert response.json() == expected_payload
     assert len(session.executed_statements) == 1
+
+    compiled = session.executed_statements[0].compile()
+    assert current_user.user_account_uuid in compiled.params.values()
+    assert "project_member.user_account_uuid" in str(compiled)
