@@ -14,6 +14,11 @@ from app.pg_introspect.forward_ddl import ForwardDdlBatch
 from app.sanitize import sanitize_for_storage
 
 
+_TLS_ALLOWED_BASES = tuple(
+    Path(base).resolve() for base in ("/etc/ssl", "/etc/pki", "/run/secrets")
+)
+
+
 class _ServerHostnameSSLContext(ssl.SSLContext):
     """SSL context that keeps certificate verification tied to the DSN host."""
 
@@ -51,12 +56,7 @@ def _requires_verified_tls_hostname(dsn: str) -> bool:
 
 def _validate_tls_file_path(path_str: str) -> str:
     path = Path(path_str).resolve()
-    allowed_bases = [
-        Path("/etc/ssl").resolve(),
-        Path("/etc/pki").resolve(),
-        Path("/run/secrets").resolve(),
-    ]
-    if not any(path.is_relative_to(base) for base in allowed_bases):
+    if not any(path.is_relative_to(base) for base in _TLS_ALLOWED_BASES):
         raise ValueError("TLS certificate path is not in an allowed directory")
     if not path.is_file():
         raise ValueError("TLS certificate path does not exist or is not a file")
