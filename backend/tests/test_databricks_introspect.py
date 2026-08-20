@@ -14,6 +14,7 @@ class FakeCursor:
     def __init__(self) -> None:
         self.description: list[tuple[str]] = []
         self._rows: list[tuple[object, ...]] = []
+        self._offset = 0
         self.closed = False
 
     def execute(self, sql: str, params: Sequence[object] | None = None) -> None:
@@ -21,9 +22,12 @@ class FakeCursor:
         names = list(rows[0]) if rows else ["empty"]
         self.description = [(name,) for name in names]
         self._rows = [tuple(row.get(name) for name in names) for row in rows]
+        self._offset = 0
 
-    def fetchall(self) -> list[tuple[object, ...]]:
-        return self._rows
+    def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+        batch = self._rows[self._offset : self._offset + size]
+        self._offset += len(batch)
+        return batch
 
     def close(self) -> None:
         self.closed = True
@@ -322,9 +326,34 @@ def test_snapshot_skips_constraints_with_unknown_columns_and_defaults_flags() ->
         ),
         ("databricks://token:x@host/clusters/abc?catalog=main", "warehouse under"),
         (
-            "databricks://token:x@host/sql/1.0/warehouses/abc/extra?catalog=main",
-            "exactly one SQL warehouse",
+            "databricks://token:x@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/%2e%2e?catalog=main",
+            "alphanumeric SQL warehouse",
         ),
+        (
+            "databricks://token:x@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/%2f?catalog=main",
+            "alphanumeric SQL warehouse",
+        ),
+        (
+            "databricks://token:x@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/%00?catalog=main",
+            "alphanumeric SQL warehouse",
+        ),
+        (
+            "databricks://token:x@workspace.cloud.databricks.com/"
+            "sql/1.0/warehouses/?catalog=main",
+            "alphanumeric SQL warehouse",
+        ),
+        (
+            "databricks://token:x@workspace.cloud.databricks.com/"
+            f"sql/1.0/warehouses/{'a' * 129}?catalog=main",
+            "alphanumeric SQL warehouse",
+        ),
+            (
+                "databricks://token:x@host/sql/1.0/warehouses/abc/extra?catalog=main",
+                "path must identify",
+            ),
         (
             "databricks://token:x@host/sql/1.0/warehouses/abc?catalog=main&catalog=two",
             "duplicate Databricks",
@@ -377,13 +406,16 @@ def test_optional_connector_failure_and_row_shapes(
 
         def __init__(self, rows: list[dict[str, object]]) -> None:
             self.rows = rows
+            self.offset = 0
 
         def execute(self, sql: str, params: object) -> None:
             assert sql == "fixed"
             assert params is None
 
-        def fetchall(self) -> list[dict[str, object]]:
-            return self.rows
+        def fetchmany(self, size: int) -> list[dict[str, object]]:
+            batch = self.rows[self.offset : self.offset + size]
+            self.offset += len(batch)
+            return batch
 
     assert databricks_introspect_module._fetch_dicts(DictCursor([]), "fixed") == []
     assert databricks_introspect_module._fetch_dicts(
@@ -395,15 +427,67 @@ def test_optional_connector_failure_and_row_shapes(
     class MismatchedTupleCursor:
         description = (("one",), ("two",))
 
+        def __init__(self) -> None:
+            self.offset = 0
+
         def execute(self, sql: str, params: object) -> None:
             assert sql == "fixed"
             assert params is None
 
-        def fetchall(self) -> list[tuple[object, ...]]:
+        def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+            if self.offset:
+                return []
+            self.offset = 1
             return [(1,)]
 
     with pytest.raises(ValueError, match=r"zip\(\) argument 2 is shorter"):
         databricks_introspect_module._fetch_dicts(MismatchedTupleCursor(), "fixed")
+
+
+def test_fetch_dicts_rejects_query_and_snapshot_budget_excess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BatchCursor:
+        description = (("value",),)
+
+        def __init__(self, rows: list[tuple[object, ...]]) -> None:
+            self.rows = rows
+            self.offset = 0
+
+        def execute(self, sql: str, params: object) -> None:
+            assert sql == "fixed"
+            assert params is None
+            self.offset = 0
+
+        def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+            batch = self.rows[self.offset : self.offset + size]
+            self.offset += len(batch)
+            return batch
+
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_ROWS", 2)
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_BYTES", 1_000)
+    with pytest.raises(ValueError, match="query row limit"):
+        databricks_introspect_module._fetch_dicts(
+            BatchCursor([(1,), (2,), (3,)]), "fixed"
+        )
+
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_ROWS", 10)
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_BYTES", 3)
+    with pytest.raises(ValueError, match="query byte limit"):
+        databricks_introspect_module._fetch_dicts(
+            BatchCursor([("long-value",)]), "fixed"
+        )
+
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_BYTES", 1_000)
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_TOTAL_ROWS", 1)
+    budget = databricks_introspect_module._FetchBudget()
+    assert databricks_introspect_module._fetch_dicts(
+        BatchCursor([(1,)]), "fixed", budget=budget
+    )
+    with pytest.raises(ValueError, match="metadata row limit"):
+        databricks_introspect_module._fetch_dicts(
+            BatchCursor([(2,)]), "fixed", budget=budget
+        )
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import importlib
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -100,6 +101,12 @@ ORDER BY tc.table_schema, tc.table_name, tc.constraint_name, kcu.ordinal_positio
 
 _SUPPORTED_QUERY_PARAMS = {"catalog", "schema"}
 _PROVIDER_HOST_SUFFIXES = (".databricks.com", ".azuredatabricks.net")
+_WAREHOUSE_ID_PATTERN = re.compile(r"[A-Za-z0-9]{1,128}")
+_FETCH_BATCH_SIZE = 256
+_MAX_QUERY_ROWS = 100_000
+_MAX_TOTAL_ROWS = 250_000
+_MAX_QUERY_BYTES = 32 * 1024 * 1024
+_MAX_TOTAL_BYTES = 128 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -128,6 +135,35 @@ class DatabricksDsnConfig:
         return kwargs
 
 
+@dataclass
+class _FetchBudget:
+    """Bound the rows and approximate serialized bytes retained per snapshot."""
+
+    rows: int = 0
+    bytes: int = 0
+
+    def accept(self, row_bytes: int) -> None:
+        """Reject a row before retaining it when the snapshot budget is exhausted."""
+        if self.rows >= _MAX_TOTAL_ROWS:
+            raise ValueError("Databricks metadata row limit exceeded")
+        if self.bytes + row_bytes > _MAX_TOTAL_BYTES:
+            raise ValueError("Databricks metadata byte limit exceeded")
+        self.rows += 1
+        self.bytes += row_bytes
+
+
+def _metadata_row_bytes(row: object) -> int:
+    """Estimate UTF-8 serialized size without materializing a second row copy."""
+    if isinstance(row, dict):
+        return sum(
+            len(str(key).encode("utf-8")) + len(str(value).encode("utf-8"))
+            for key, value in row.items()
+        )
+    if isinstance(row, (tuple, list)):
+        return sum(len(str(value).encode("utf-8")) for value in row)
+    return len(str(row).encode("utf-8"))
+
+
 async def _parse_databricks_dsn(dsn: str) -> DatabricksDsnConfig:
     parsed = urlparse(dsn)
     scheme = parsed.scheme.lower().split("+", 1)[0]
@@ -142,14 +178,16 @@ async def _parse_databricks_dsn(dsn: str) -> DatabricksDsnConfig:
     if not parsed.password:
         raise ValueError("Databricks DSN must include an access token as the password")
 
-    http_path = unquote(parsed.path)
-    if not http_path.startswith("/sql/1.0/warehouses/"):
+    path_parts = parsed.path.split("/")
+    if len(path_parts) != 5 or path_parts[:4] != ["", "sql", "1.0", "warehouses"]:
         raise ValueError(
             "Databricks DSN path must identify a SQL warehouse under "
             "/sql/1.0/warehouses/"
         )
-    if http_path.endswith("/") or len(http_path.split("/")) != 5:
-        raise ValueError("Databricks DSN must identify exactly one SQL warehouse")
+    warehouse_id = unquote(path_parts[4])
+    if _WAREHOUSE_ID_PATTERN.fullmatch(warehouse_id) is None:
+        raise ValueError("Databricks DSN must identify exactly one alphanumeric SQL warehouse")
+    http_path = f"/sql/1.0/warehouses/{warehouse_id}"
 
     query: dict[str, str] = {}
     for key, value in parse_qsl(parsed.query, keep_blank_values=True):
@@ -196,16 +234,35 @@ def _connect(**kwargs: object) -> Any:
 
 
 def _fetch_dicts(
-    cursor: Any, sql: str, params: tuple[object, ...] = ()
+    cursor: Any,
+    sql: str,
+    params: tuple[object, ...] = (),
+    budget: _FetchBudget | None = None,
 ) -> list[dict[str, object]]:
+    """Fetch fixed-query metadata in bounded batches and fail closed on excess."""
     cursor.execute(sql, params or None)
-    rows = cursor.fetchall()
+    fetch_budget = budget or _FetchBudget()
+    rows: list[Any] = []
+    query_bytes = 0
+    while True:
+        batch = cursor.fetchmany(_FETCH_BATCH_SIZE)
+        if not batch:
+            break
+        for row in batch:
+            if len(rows) >= _MAX_QUERY_ROWS:
+                raise ValueError("Databricks metadata query row limit exceeded")
+            row_bytes = _metadata_row_bytes(row)
+            if query_bytes + row_bytes > _MAX_QUERY_BYTES:
+                raise ValueError("Databricks metadata query byte limit exceeded")
+            fetch_budget.accept(row_bytes)
+            rows.append(row)
     if not rows:
         return []
     names = [str(description[0]).lower() for description in cursor.description or []]
     if isinstance(rows[0], dict):
         return [
-            {str(key).lower(): value for key, value in row.items()} for row in rows
+            {str(key).lower(): value for key, value in row.items()}
+            for row in rows
         ]
     return [dict(zip(names, row, strict=True)) for row in rows]
 
@@ -488,12 +545,13 @@ def _introspect_sync(
     params = (effective_schema, effective_schema)
     conn = _connect(**config.connect_kwargs())
     cursor = conn.cursor()
+    budget = _FetchBudget()
     try:
-        version_rows = _fetch_dicts(cursor, VERSION_SQL)
-        schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, params)
-        table_rows = _fetch_dicts(cursor, TABLES_SQL, params)
-        column_rows = _fetch_dicts(cursor, COLUMNS_SQL, params)
-        constraint_rows = _fetch_dicts(cursor, CONSTRAINT_COLUMNS_SQL, params)
+        version_rows = _fetch_dicts(cursor, VERSION_SQL, budget=budget)
+        schema_rows = _fetch_dicts(cursor, SCHEMAS_SQL, params, budget)
+        table_rows = _fetch_dicts(cursor, TABLES_SQL, params, budget)
+        column_rows = _fetch_dicts(cursor, COLUMNS_SQL, params, budget)
+        constraint_rows = _fetch_dicts(cursor, CONSTRAINT_COLUMNS_SQL, params, budget)
     finally:
         try:
             cursor.close()
@@ -514,7 +572,7 @@ def _probe_sync(config: DatabricksDsnConfig) -> str:
     conn = _connect(**config.connect_kwargs())
     cursor = conn.cursor()
     try:
-        rows = _fetch_dicts(cursor, VERSION_SQL)
+        rows = _fetch_dicts(cursor, VERSION_SQL, budget=_FetchBudget())
         return str(rows[0].get("server_version") or "") if rows else ""
     finally:
         try:

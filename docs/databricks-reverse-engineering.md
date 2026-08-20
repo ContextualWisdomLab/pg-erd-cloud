@@ -19,8 +19,15 @@ arbitrary SQL, and it does not implement Databricks forward apply.
   the original TLS server name.
 - The server executes only fixed queries against the selected catalog's
   `information_schema` relations.
+- The warehouse path is reconstructed from a 1–128 character ASCII
+  alphanumeric warehouse identifier; decoded separators, dot segments, control
+  characters, and alternate path components are rejected.
 - Metadata result sets disable connector cloud fetch, avoiding an additional
   object-storage egress path.
+- Each metadata query is consumed with 256-row batches and is limited to
+  100,000 rows / 32 MiB of estimated UTF-8 row data. A snapshot is limited to
+  250,000 rows / 128 MiB across all fixed queries; limits fail closed before an
+  excess row is retained.
 - Catalog schemas, tables, views, columns, defaults, comments, and
   primary/unique/foreign-key metadata are mapped into the common snapshot shape
   with stable synthetic relation and constraint identifiers.
