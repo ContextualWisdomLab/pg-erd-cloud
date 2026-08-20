@@ -94,6 +94,26 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert "PRIMARY KEY" in ddl
 
 
+def test_preserves_column_defaults_for_snapshot_and_ddl_export():
+    snap = parse_dbml(
+        """
+Table public.accounts {
+  id integer [pk]
+  status varchar [default: 'active, pending']
+  created_at timestamptz [default: now()]
+}
+"""
+    )
+
+    columns = {column["column_name"]: column for column in snap["columns"]}
+    assert columns["status"]["has_default"] is True
+    assert columns["status"]["default_expr"] == "'active, pending'"
+    assert columns["created_at"]["default_expr"] == "now()"
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert "DEFAULT 'active, pending'" in ddl
+    assert "DEFAULT now()" in ddl
+
+
 def test_parses_simple_index_blocks_and_preserves_ddl_evidence():
     snap = parse_dbml(
         """

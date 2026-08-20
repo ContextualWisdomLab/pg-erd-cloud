@@ -129,23 +129,41 @@ def _split_csv(value: str) -> list[str] | None:
     """Split a bounded comma list while allowing quoted identifiers/settings."""
     parts: list[str] = []
     start = 0
-    quote = False
-    for position, char in enumerate(value):
-        if char == '"':
-            quote = not quote
-        elif char == "," and not quote:
+    quote: str | None = None
+    position = 0
+    while position < len(value):
+        char = value[position]
+        if quote is not None:
+            if char == quote:
+                if position + 1 < len(value) and value[position + 1] == quote:
+                    position += 2
+                    continue
+                quote = None
+        elif char in {'"', "'"}:
+            quote = char
+        elif char == ",":
             part = value[start:position].strip()
             if not part:
                 return None
             parts.append(part)
             start = position + 1
-    if quote:
+        position += 1
+    if quote is not None:
         return None
     part = value[start:].strip()
     if not part:
         return None
     parts.append(part)
     return parts
+
+
+def _setting_value(settings: str, key: str) -> str | None:
+    """Return one DBML ``key: value`` setting without matching value text."""
+    for setting in _split_csv(settings) or []:
+        name, separator, value = setting.partition(":")
+        if separator and name.strip().lower() == key:
+            return value.strip()
+    return None
 
 
 def _parse_index_line(
@@ -314,8 +332,10 @@ def parse_dbml(text: str) -> dict[str, Any]:
         if not cm:
             continue
         col_name = (cm.group("qname") or cm.group("name")).strip('"')
-        settings = (cm.group("settings") or "").lower()
+        raw_settings = cm.group("settings") or ""
+        settings = raw_settings.lower()
         oid = oid_by_table[current]
+        default_expr = _setting_value(raw_settings, "default")
         is_pk = bool(re.search(r"\bpk\b|primary\s+key", settings))
         columns.append(
             {
@@ -325,8 +345,8 @@ def parse_dbml(text: str) -> dict[str, Any]:
                 + 1,
                 "data_type": cm.group("type"),
                 "is_not_null": is_pk or "not null" in settings,
-                "has_default": "default:" in settings,
-                "default_expr": None,
+                "has_default": default_expr is not None,
+                "default_expr": default_expr,
                 "column_comment": None,
             }
         )
