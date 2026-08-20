@@ -10,6 +10,7 @@ from typing import Any, cast
 import httpx
 import jwt
 from fastapi import Depends, HTTPException, Request
+from jwt.types import Options
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -302,20 +303,28 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
+        key = jwt.PyJWK.from_dict(
+            cast(dict[str, Any], jwk),
+            algorithm=header_alg,
+        )
+        required_claims = ["exp", "iss", "jti"]
+        if settings.oidc_audience:
+            required_claims.append("aud")
+        options: Options = {
+            "verify_aud": bool(settings.oidc_audience),
+            "verify_exp": True,
+            "verify_iss": True,
+            "verify_jti": True,
+            "require": required_claims,
+        }
         claims = jwt.decode(
             token,
-            jwk,
+            key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
-            options={
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
-            },
+            options=options,
+            leeway=OIDC_JWT_LEEWAY_SECONDS,
         )
     except Exception as err:
         raise HTTPException(

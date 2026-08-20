@@ -47,6 +47,16 @@ def exp_claim() -> int:
     return int(auth.dt.datetime.now(auth.dt.timezone.utc).timestamp()) + 300
 
 
+def _mock_jwk_conversion(monkeypatch: pytest.MonkeyPatch) -> object:
+    fake_key = object()
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda *_args, **_kwargs: fake_key,
+    )
+    return fake_key
+
+
 class _FakeHttpResponse:
     def __init__(self, payload: dict[str, object], is_redirect: bool = False) -> None:
         self._payload = payload
@@ -254,6 +264,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    fake_key = _mock_jwk_conversion(monkeypatch)
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
     )
@@ -287,18 +298,19 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     assert subject == "user-1"
     assert display_name == "User One"
+    assert observed["args"] == ("token", fake_key)
     assert observed["kwargs"] == {
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
-            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+            "verify_exp": True,
+            "verify_iss": True,
+            "verify_jti": True,
+            "require": ["exp", "iss", "jti", "aud"],
         },
+        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
     }
 
 
@@ -344,6 +356,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    fake_key = _mock_jwk_conversion(monkeypatch)
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "new-key", "alg": "RS256"}
     )
@@ -383,7 +396,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["key"] is fake_key
 
 
 @pytest.mark.asyncio
@@ -392,6 +405,7 @@ async def test_oidc_requires_jti_claim(
 ) -> None:
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    _mock_jwk_conversion(monkeypatch)
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
     )
@@ -426,6 +440,7 @@ async def test_oidc_rejects_revoked_jti(
 ) -> None:
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    _mock_jwk_conversion(monkeypatch)
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
     )
@@ -570,6 +585,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
     monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    _mock_jwk_conversion(monkeypatch)
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
     )
