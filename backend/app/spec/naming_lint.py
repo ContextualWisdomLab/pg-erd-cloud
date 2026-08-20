@@ -73,6 +73,7 @@ def _case_style(name: str) -> str | None:
 
 
 def _item(category: str, severity: str, target: str, detail: str) -> dict[str, Any]:
+    """Build one stable finding payload for the naming report."""
     return {"category": category, "severity": severity, "target": target, "detail": detail}
 
 
