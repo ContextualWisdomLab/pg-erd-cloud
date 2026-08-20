@@ -331,7 +331,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
-    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
+    expect(await screen.findByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
@@ -666,8 +666,16 @@ describe('App orchestration coverage', () => {
       .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectSnapshots = reject }))
       .mockResolvedValueOnce(snapshots)
     await renderReadyApp()
+    await waitFor(() => {
+      expect(api.listConnections).toHaveBeenCalledWith('p1')
+      expect(api.listSnapshots).toHaveBeenCalledWith('p1')
+    })
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => {
+      expect(api.listConnections).toHaveBeenCalledWith('p2')
+      expect(api.listSnapshots).toHaveBeenCalledWith('p2')
+    })
     await act(async () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
