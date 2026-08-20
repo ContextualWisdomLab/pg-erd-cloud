@@ -49,8 +49,8 @@ import {
   type CardinalityStrength,
   type IndexRecommendation,
 } from "./erd/cardinality";
-import { snapshotToGraph, type TableNodeData, type ForeignKeyEdgeData } from "./erd/convert";
-import { parseColumnNameFromHandle } from "./erd/handleUtils";
+import { snapshotToGraph, type TableNodeData } from "./erd/convert";
+import { createForeignKeyEdge } from "./erd/connection";
 import {
   downloadText,
   exportDDL,
@@ -246,28 +246,8 @@ export default function App() {
 
   const onConnect = useCallback(
     (params: FlowConnection) => {
-      const sourceCol = parseColumnNameFromHandle(params.sourceHandle || "");
-      const targetCol = parseColumnNameFromHandle(params.targetHandle || "");
-      const sourceNode = nodes.find(n => n.id === params.source);
-      const targetNode = nodes.find(n => n.id === params.target);
-
-      const sourceTitle = sourceNode?.data?.title || "source";
-      const targetTitle = targetNode?.data?.title || "target";
-
-      const defaultLabel = `fk_${sourceTitle}_${targetTitle}`;
-
-      const edgeData: ForeignKeyEdgeData = {
-        sourceColumns: sourceCol ? [sourceCol] : [],
-        targetColumns: targetCol ? [targetCol] : []
-      };
-
-      const newEdge: Edge = {
-        ...params,
-        id: `edge_${Date.now()}`,
-        animated: false,
-        label: defaultLabel,
-        data: edgeData,
-      };
+      if (!params.source || !params.target) return;
+      const newEdge = createForeignKeyEdge(params as FlowConnection & { source: string; target: string }, nodes);
       // We could add it directly, but let's just add it then edit it.
       setEdges((eds) => addEdge(newEdge, eds));
       setEditingEdge(newEdge);
