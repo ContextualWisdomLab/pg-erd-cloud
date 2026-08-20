@@ -315,7 +315,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('Authenticating…')).toBeInTheDocument()
     await act(async () => rejectMe(new Error('denied')))
     expect(await screen.findByRole('heading', { name: 'Authentication required' })).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('denied')
+    expect(screen.getByRole('alert')).toHaveTextContent('An unexpected error occurred while authenticating.')
   })
 
   it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
@@ -648,7 +648,7 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
+    expect(screen.getByRole('alert')).toHaveTextContent('An unexpected error occurred while processing your request.')
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {
@@ -801,14 +801,14 @@ describe('App orchestration coverage', () => {
     api.listSnapshots.mockRejectedValueOnce(new Error('snapshots down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/down/)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unexpected error/)
     fireEvent.click(screen.getAllByRole('button', { name: '테이블 추가' })[0]!)
     fireEvent.click(screen.getByTestId('add-name'))
     fireEvent.click(screen.getByTestId('add-submit'))
     fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
     api.createShareLink.mockRejectedValueOnce(new Error('share down'))
     fireEvent.click(screen.getByTestId('share-create'))
-    await waitFor(() => expect(screen.getByTestId('share-error')).toHaveTextContent('share down'))
+    await waitFor(() => expect(screen.getByTestId('share-error')).toHaveTextContent(/unexpected error/))
 
     api.createShareLink.mockResolvedValueOnce({ url: 'http://localhost/api/share/fail-copy' })
     fireEvent.click(screen.getByTestId('share-create'))
@@ -831,6 +831,6 @@ describe('App orchestration coverage', () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
     })
-    expect(screen.getByRole('alert')).toHaveTextContent('poll down')
+    expect(screen.getByRole('alert')).toHaveTextContent(/unexpected error/)
   })
 })
