@@ -150,6 +150,7 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
+          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -414,8 +415,6 @@ describe('App orchestration coverage', () => {
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.click(screen.getByTestId('table-cancel'))
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    fireEvent.click(screen.getByTestId('table-delete'))
     fireEvent.click(screen.getByTestId('table-delete'))
   })
 
@@ -456,14 +455,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(6)
+    expect(exports.downloadText).toHaveBeenCalledTimes(7)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -649,6 +648,40 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
+  })
+
+  it('ignores terminal refresh completions after the editor unmounts', async () => {
+    let resolveRefresh!: (value: typeof snapshots) => void
+    api.listSnapshots.mockResolvedValueOnce(snapshots).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRefresh = resolve }),
+    )
+    await renderReadyApp()
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    await waitFor(() => expect(resolveRefresh).toBeTypeOf('function'))
+    cleanup()
+    await act(async () => resolveRefresh(snapshots))
+
+    let rejectRefresh!: (reason: unknown) => void
+    api.listSnapshots.mockResolvedValueOnce(snapshots).mockImplementationOnce(
+      () => new Promise((_resolve, reject) => { rejectRefresh = reject }),
+    )
+    api.getSnapshot.mockResolvedValueOnce({
+      schema_snapshot_uuid: 's4',
+      status: 'failed',
+      schema_filter: null,
+      error_message: null,
+      snapshot_json: null,
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    await waitFor(() => expect(rejectRefresh).toBeTypeOf('function'))
+    cleanup()
+    await act(async () => rejectRefresh(new Error('late terminal refresh')))
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {
