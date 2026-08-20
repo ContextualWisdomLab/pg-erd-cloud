@@ -102,6 +102,16 @@ def test_allocation_failure_is_closed_and_non_reflecting() -> None:
     )
     assert result["ok"] is False
     assert len(result["names"]) == 1
+    assert result["failure"] == {
+        "key": "b",
+        "kind": "field",
+        "namespace": "fields:users",
+        "source": "id",
+        "preferred": "id",
+        "lastCandidate": "id",
+        "attempts": 1,
+        "maxAttempts": 0,
+    }
 
 
 def test_manifest_records_pinned_contract_version() -> None:
@@ -112,6 +122,19 @@ def test_manifest_records_pinned_contract_version() -> None:
     manifest = build_prisma_manifest(allocated["mappings"])
     assert manifest["contractVersion"] == PRISMA_IDENTIFIER_CONTRACT_VERSION
     assert quote_prisma_string('quote "') == '"quote \\""'
+
+    failed = allocate_prisma_identifiers(
+        [
+            {"key": "a", "kind": "field", "namespace": "fields:users", "source": "id"},
+            {"key": "b", "kind": "field", "namespace": "fields:users", "source": "id"},
+        ],
+        max_attempts=0,
+    )
+    failed_manifest = build_prisma_manifest(
+        failed["mappings"], failed["failure"]
+    )
+    assert failed_manifest["failure"]["source"] == "id"
+    assert failed_manifest["failure"]["lastCandidate"] == "id"
 
 
 def test_reserved_name_predicates() -> None:

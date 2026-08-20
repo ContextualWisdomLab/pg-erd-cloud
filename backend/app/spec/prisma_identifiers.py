@@ -157,7 +157,21 @@ def allocate_prisma_identifiers(
         ):
             attempts += 1
             if attempts > max_attempts:
-                return {"ok": False, "names": names, "mappings": mappings}
+                return {
+                    "ok": False,
+                    "names": names,
+                    "mappings": mappings,
+                    "failure": {
+                        "key": request["key"],
+                        "kind": request["kind"],
+                        "namespace": request["namespace"],
+                        "source": request["source"],
+                        "preferred": base,
+                        "lastCandidate": candidate,
+                        "attempts": attempts,
+                        "maxAttempts": max_attempts,
+                    },
+                }
             candidate = f"{base}_{suffix}"
             suffix += 1
         used.add(candidate)
@@ -173,12 +187,17 @@ def allocate_prisma_identifiers(
     return {"ok": True, "names": names, "mappings": mappings}
 
 
-def build_prisma_manifest(mappings: list[dict[str, str]]) -> dict[str, Any]:
+def build_prisma_manifest(
+    mappings: list[dict[str, str]], failure: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Build the export manifest recorded beside a generated schema."""
-    return {
+    manifest: dict[str, Any] = {
         "contractVersion": PRISMA_IDENTIFIER_CONTRACT_VERSION,
         "mappings": mappings,
     }
+    if failure is not None:
+        manifest["failure"] = failure
+    return manifest
 
 
 def quote_prisma_string(value: str) -> str:

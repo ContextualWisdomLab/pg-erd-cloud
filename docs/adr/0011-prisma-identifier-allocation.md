@@ -24,8 +24,9 @@ Fail closed with a fixed message and a diagnostic manifest.
   are quoted, multilingual, or reserved.
 - Frontend and backend preferred-name styles stay different (`users` vs
   `Users` / `Member`); only collision and reserved-name policy is shared.
-- Full `prisma validate` CLI pinning remains a follow-up so this change does
-  not add a new supply-chain dependency.
+- Prisma CLI `6.19.3` is pinned in the frontend lockfile. CI runs both
+  `prisma format` and `prisma validate` against a multi-schema composite-key
+  fixture before accepting the generated schema path.
 
 ## References
 

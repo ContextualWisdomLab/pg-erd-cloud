@@ -65,6 +65,22 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Format Prisma fixture
+        working-directory: frontend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/erd
+        run: npx --no-install prisma format --schema prisma/fixtures/generated.prisma
+
+      - name: Require formatted Prisma fixture
+        working-directory: frontend
+        run: git diff --exit-code -- prisma/fixtures/generated.prisma
+
+      - name: Validate Prisma fixture
+        working-directory: frontend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/erd
+        run: npx --no-install prisma validate --schema prisma/fixtures/generated.prisma
+
       - name: Typecheck
         working-directory: frontend
         run: npm run typecheck

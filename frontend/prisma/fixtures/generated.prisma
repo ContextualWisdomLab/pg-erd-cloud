@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["auth", "public"]
+}
+
+model AuthUser {
+  tenantId    Int          @map("tenant_id")
+  id          Int
+  memberships Membership[] @relation("membership_auth_user")
+
+  @@id([tenantId, id])
+  @@map("users")
+  @@schema("auth")
+}
+
+model PublicUser {
+  id Int @id
+
+  @@map("users")
+  @@schema("public")
+}
+
+model Membership {
+  id       Int       @id
+  tenantId Int       @map("tenant_id")
+  userId   Int?      @map("user_id")
+  authUser AuthUser? @relation("membership_auth_user", fields: [tenantId, userId], references: [tenantId, id])
+
+  @@map("memberships")
+  @@schema("public")
+}

@@ -5,6 +5,7 @@ import {
   allocatePrismaIdentifiers,
   buildPrismaManifest,
   preferredPrismaName,
+  type PrismaIdentifierFailure,
   type PrismaIdentifierMapping,
   type PrismaIdentifierRequest,
 } from "./prismaIdentifiers";
@@ -20,6 +21,7 @@ export const PRISMA_EXPORT_FAILURE_SCHEMA = `// Prisma export failed.
 export type PrismaExportManifest = {
   contractVersion: string;
   mappings: PrismaIdentifierMapping[];
+  failure?: PrismaIdentifierFailure;
 };
 
 export type PrismaExportDocument = {
@@ -70,6 +72,27 @@ function compareNodes(
     return titleOrder;
   }
   return left.id.localeCompare(right.id);
+}
+
+type TableIdentity = { schemaName?: string; tableName: string };
+
+function tableIdentity(node: Node<TableNodeData>): TableIdentity {
+  const schemaName = node.data.schema_name?.trim();
+  const relationName = node.data.relation_name?.trim();
+  if (relationName) {
+    return { schemaName, tableName: relationName };
+  }
+  if (schemaName) {
+    return { schemaName, tableName: node.data.title };
+  }
+  const separator = node.data.title.indexOf(".");
+  if (separator > 0 && separator < node.data.title.length - 1) {
+    return {
+      schemaName: node.data.title.slice(0, separator),
+      tableName: node.data.title.slice(separator + 1),
+    };
+  }
+  return { tableName: node.data.title };
 }
 
 function resolveFkColumns(
@@ -154,7 +177,7 @@ export function exportPrismaDocument(
     key: `model:${node.id}`,
     kind: "model",
     namespace: "models",
-    source: node.data.title,
+    source: tableIdentity(node).tableName,
   }));
   const modelAllocation = allocatePrismaIdentifiers(
     modelRequests,
@@ -164,7 +187,10 @@ export function exportPrismaDocument(
     return {
       ok: false,
       schema: PRISMA_EXPORT_FAILURE_SCHEMA,
-      manifest: buildPrismaManifest(modelAllocation.mappings),
+      manifest: buildPrismaManifest(
+        modelAllocation.mappings,
+        modelAllocation.failure,
+      ),
     };
   }
 
@@ -236,7 +262,7 @@ export function exportPrismaDocument(
       manifest: buildPrismaManifest([
         ...modelAllocation.mappings,
         ...relationAllocation.mappings,
-      ]),
+      ], relationAllocation.failure),
     };
   }
 
@@ -273,20 +299,27 @@ export function exportPrismaDocument(
         ...modelAllocation.mappings,
         ...relationAllocation.mappings,
         ...fieldAllocation.mappings,
-      ]),
+      ], fieldAllocation.failure),
     };
   }
 
+  const schemas = [...new Set(
+    nodes
+      .map((node) => tableIdentity(node).schemaName)
+      .filter((schema): schema is string => Boolean(schema)),
+  )].sort();
   let output =
-    `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n`;
+    `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n${schemas.length > 0 ? `  schemas   = ${JSON.stringify(schemas)}\n` : ""}}\n\n`;
 
   for (const node of [...nodes].sort(compareNodes)) {
+    const identity = tableIdentity(node);
     const modelName = modelAllocation.names.get(`model:${node.id}`);
     if (!modelName) {
       continue;
     }
     output += `model ${modelName} {\n`;
 
+    const primaryColumns = node.data.columns.filter((col) => col.is_pk);
     for (const col of node.data.columns) {
       const fieldName = fieldAllocation.names.get(
         `field:${node.id}:${col.column_name}`,
@@ -298,7 +331,7 @@ export function exportPrismaDocument(
 
       let attributes = "";
       const isColUnique = col.column_name === "email";
-      if (col.is_pk) {
+      if (col.is_pk && primaryColumns.length === 1) {
         attributes += " @id";
         if (
           prismaType === "Int" &&
@@ -333,26 +366,33 @@ export function exportPrismaDocument(
       const forwardField = fieldAllocation.names.get(
         `relfield:${item.edge.id}:forward`,
       );
-      const sourceField = fieldAllocation.names.get(
-        `field:${item.sourceNode.id}:${item.sourceColumns[0]}`,
+      const sourceFields = item.sourceColumns.map((column) =>
+        fieldAllocation.names.get(
+          `field:${item.sourceNode.id}:${column}`,
+        ),
       );
-      const targetField = fieldAllocation.names.get(
-        `field:${item.targetNode.id}:${item.targetColumns[0]}`,
+      const targetFields = item.targetColumns.map((column) =>
+        fieldAllocation.names.get(
+          `field:${item.targetNode.id}:${column}`,
+        ),
       );
       if (
         !targetModel ||
         !relationName ||
         !forwardField ||
-        !sourceField ||
-        !targetField
+        sourceFields.some((field) => !field) ||
+        targetFields.some((field) => !field)
       ) {
         continue;
       }
-      const sourceColumn = item.sourceNode.data.columns.find(
-        (column) => column.column_name === item.sourceColumns[0],
-      );
-      const optional = sourceColumn?.is_not_null ? "" : "?";
-      output += `  ${forwardField} ${targetModel}${optional} @relation("${relationName}", fields: [${sourceField}], references: [${targetField}])\n`;
+      const optional = item.sourceColumns.every((columnName) =>
+        item.sourceNode.data.columns.find(
+          (column) => column.column_name === columnName,
+        )?.is_not_null,
+      )
+        ? ""
+        : "?";
+      output += `  ${forwardField} ${targetModel}${optional} @relation("${relationName}", fields: [${sourceFields.join(", ")}], references: [${targetFields.join(", ")}])\n`;
     }
 
     for (const item of resolvedEdges) {
@@ -371,15 +411,18 @@ export function exportPrismaDocument(
       if (!sourceModel || !relationName || !backField) {
         continue;
       }
-      const sourceColumn = item.sourceNode.data.columns.find(
-        (column) => column.column_name === item.sourceColumns[0],
-      );
-      const typeSuffix = sourceColumn?.is_pk ? "?" : "[]";
-      output += `  ${backField} ${sourceModel}${typeSuffix} @relation("${relationName}")\n`;
+      output += `  ${backField} ${sourceModel}[] @relation("${relationName}")\n`;
     }
 
-    if (modelName !== node.data.title) {
-      output += `  @@map(${quotePrismaString(node.data.title)})\n`;
+    if (primaryColumns.length > 1) {
+      const primaryFields = primaryColumns.map((column) =>
+        fieldAllocation.names.get(`field:${node.id}:${column.column_name}`),
+      );
+      output += `  @@id([${primaryFields.join(", ")}])\n`;
+    }
+    output += `  @@map(${quotePrismaString(identity.tableName)})\n`;
+    if (identity.schemaName) {
+      output += `  @@schema(${quotePrismaString(identity.schemaName)})\n`;
     }
     output += `}\n\n`;
   }

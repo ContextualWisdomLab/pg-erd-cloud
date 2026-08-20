@@ -119,6 +119,45 @@ def test_composite_pk_and_empty_snapshot():
     ast.parse(generate_sqlalchemy_models({}))  # empty snapshot still valid
 
 
+def test_prisma_preserves_schema_identity_and_composite_fk_pairs():
+    snap = {
+        "relations": [
+            {"relation_oid": 1, "relation_kind": "r", "schema_name": "auth", "relation_name": "users"},
+            {"relation_oid": 2, "relation_kind": "r", "schema_name": "public", "relation_name": "users"},
+            {"relation_oid": 3, "relation_kind": "r", "schema_name": "public", "relation_name": "memberships"},
+        ],
+        "columns": [
+            {"relation_oid": 1, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "id", "column_position": 2, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "id", "column_position": 2, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 3, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 3, "column_name": "user_id", "column_position": 2, "data_type": "int", "is_not_null": False},
+            {"relation_oid": 3, "column_name": "id", "column_position": 3, "data_type": "int", "is_not_null": True},
+        ],
+        "pk_columns": [
+            {"relation_oid": 1, "column_name": "tenant_id"},
+            {"relation_oid": 1, "column_name": "id"},
+            {"relation_oid": 2, "column_name": "tenant_id"},
+            {"relation_oid": 2, "column_name": "id"},
+            {"relation_oid": 3, "column_name": "id"},
+        ],
+        "fk_edges": [
+            {"fk_constraint_oid": 30, "fk_constraint_name": "fk_memberships_auth_user", "child_relation_oid": 3, "parent_relation_oid": 1, "child_column_name": "tenant_id", "parent_column_name": "tenant_id", "column_ordinal": 1},
+            {"fk_constraint_oid": 30, "fk_constraint_name": "fk_memberships_auth_user", "child_relation_oid": 3, "parent_relation_oid": 1, "child_column_name": "user_id", "parent_column_name": "id", "column_ordinal": 2},
+        ],
+    }
+
+    schema = generate_prisma_schema(snap)
+    assert 'schemas = ["auth", "public"]' in schema
+    assert schema.count('@@map("users")') == 2
+    assert '@@schema("auth")' in schema
+    assert '@@schema("public")' in schema
+    assert "@@id([tenant_id, id])" in schema
+    assert 'fields: [tenant_id, user_id], references: [tenant_id, id]' in schema
+    assert 'Users? @relation("fk_memberships_auth_user", fields: [tenant_id, user_id]' in schema
+
+
 def test_typeorm_entities_decorators_and_relations():
     from app.spec.orm_codegen import generate_typeorm_entities
 

@@ -14,6 +14,17 @@ export type PrismaIdentifierMapping = {
   generated: string;
 };
 
+export type PrismaIdentifierFailure = {
+  key: string;
+  kind: PrismaIdentifierKind;
+  namespace: string;
+  source: string;
+  preferred: string;
+  lastCandidate: string;
+  attempts: number;
+  maxAttempts: number;
+};
+
 export type PrismaIdentifierRequest = {
   key: string;
   kind: PrismaIdentifierKind;
@@ -26,6 +37,7 @@ export type PrismaIdentifierAllocation = {
   ok: boolean;
   names: Map<string, string>;
   mappings: PrismaIdentifierMapping[];
+  failure?: PrismaIdentifierFailure;
 };
 
 /**
@@ -113,7 +125,21 @@ export function allocatePrismaIdentifiers(
     ) {
       attempts += 1;
       if (attempts > maxAttempts) {
-        return { ok: false, names, mappings };
+        return {
+          ok: false,
+          names,
+          mappings,
+          failure: {
+            key: request.key,
+            kind: request.kind,
+            namespace: request.namespace,
+            source: request.source,
+            preferred: base,
+            lastCandidate: candidate,
+            attempts,
+            maxAttempts,
+          },
+        };
       }
       candidate = `${base}_${suffix}`;
       suffix += 1;
@@ -136,12 +162,15 @@ export function allocatePrismaIdentifiers(
  */
 export function buildPrismaManifest(
   mappings: PrismaIdentifierMapping[],
+  failure?: PrismaIdentifierFailure,
 ): {
   contractVersion: string;
   mappings: PrismaIdentifierMapping[];
+  failure?: PrismaIdentifierFailure;
 } {
-  return {
+  const manifest = {
     contractVersion: PRISMA_IDENTIFIER_CONTRACT_VERSION,
     mappings,
   };
+  return failure ? { ...manifest, failure } : manifest;
 }

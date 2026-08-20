@@ -323,6 +323,73 @@ describe('exportPrisma', () => {
     expect(result).toContain('fields: [author_id], references: [id]');
   });
 
+  it('preserves schema identity and composite key relationships', () => {
+    const compositeKeyColumns = (id: string) => [
+      { column_name: 'tenant_id', data_type: 'int', is_pk: true, is_not_null: true },
+      { column_name: id, data_type: 'int', is_pk: true, is_not_null: true },
+    ];
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'auth',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'auth.users',
+          schema_name: 'auth',
+          relation_name: 'users',
+          badges: { pk: true, fk: false },
+          columns: compositeKeyColumns('id'),
+        },
+      },
+      {
+        id: 'membership',
+        position: { x: 1, y: 0 },
+        data: {
+          title: 'public.memberships',
+          schema_name: 'public',
+          relation_name: 'memberships',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+            { column_name: 'tenant_id', data_type: 'int', is_pk: false, is_not_null: true },
+            { column_name: 'user_id', data_type: 'int', is_pk: false, is_not_null: false },
+          ],
+        },
+      },
+      {
+        id: 'public',
+        position: { x: 2, y: 0 },
+        data: {
+          title: 'public.users',
+          schema_name: 'public',
+          relation_name: 'users',
+          badges: { pk: true, fk: false },
+          columns: compositeKeyColumns('id'),
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'fk-membership-auth-user',
+        source: 'membership',
+        target: 'auth',
+        data: {
+          sourceColumns: ['tenant_id', 'user_id'],
+          targetColumns: ['tenant_id', 'id'],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('schemas   = ["auth","public"]');
+    expect(result.match(/@@map\("users"\)/g)).toHaveLength(2);
+    expect(result).toContain('@@schema("auth")');
+    expect(result).toContain('@@schema("public")');
+    expect(result).toContain('@@id([tenant_id, id])');
+    expect(result).toContain('fields: [tenant_id, user_id], references: [tenant_id, id]');
+    expect(result).toContain('users? @relation(');
+    expect(result).not.toContain('tenant_id Int @id');
+  });
+
   it('preserves reserved and colliding table names through @@map', () => {
     const nodes: Node<TableNodeData>[] = [
       {
@@ -398,6 +465,11 @@ describe('exportPrisma', () => {
     expect(document.ok).toBe(false);
     expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
     expect(document.schema).not.toContain('users');
+    expect(document.manifest.failure).toMatchObject({
+      source: 'users',
+      attempts: 1,
+      maxAttempts: 0,
+    });
     expect(PRISMA_EXPORT_FAILURE_MESSAGE).not.toMatch(/users|secret/i);
   });
 
@@ -419,6 +491,7 @@ describe('exportPrisma', () => {
     const document = exportPrismaDocument(nodes, [], { maxAttempts: 0 });
     expect(document.ok).toBe(false);
     expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
+    expect(document.manifest.failure?.source).toBe('id');
   });
 
   it('returns a fixed failure schema when relation allocation is exhausted', () => {
@@ -466,5 +539,6 @@ describe('exportPrisma', () => {
     const document = exportPrismaDocument(nodes, edges, { maxAttempts: 0 });
     expect(document.ok).toBe(false);
     expect(document.schema).toBe(PRISMA_EXPORT_FAILURE_SCHEMA);
+    expect(document.manifest.failure?.source).toBe('rel');
   });
 });
