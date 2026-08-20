@@ -4,13 +4,13 @@
 
 The ERD canvas treats the immutable `TableNodeData` object as the identity of the source table payload. While a normalized search query is active, a query-scoped `WeakMap<TableNodeData, TableNodeData>` stores the derived highlight/dim payload. Re-rendering with the same source object reuses the exact derived reference; changing the normalized query replaces the cache, and replacing the source payload produces a new derived object.
 
-Snapshot status polling is one sequential asynchronous process per active `(selectedProjectId, snapshotId)` effect. The first request starts immediately. A non-terminal response schedules one `setTimeout` only after the request completes. Terminal states stop polling and may refresh the snapshot list. Cleanup marks the process obsolete and clears the pending timeout, so late success, refresh, or rejection continuations cannot update the current view.
+Snapshot status polling is one sequential asynchronous process per active `(selectedProjectId, snapshotId)` effect. The first request starts immediately. A one-second interval may trigger a poll, but the `isPolling` guard prevents overlap until the current request completes. Terminal states clear the interval and may refresh the snapshot list. Cleanup marks the process obsolete and clears the interval, so late success, refresh, or rejection continuations cannot update the current view.
 
 ## Why
 
 React Flow can emit frequent position-only node updates. Reallocating every derived `node.data` object during those updates defeats reference-sensitive memoization below the canvas and creates garbage unrelated to actual table-content changes. `WeakMap` keys use object identity and do not keep otherwise unreachable key objects alive, which fits a cache whose lifetime follows the source payload.
 
-A fixed `setInterval` can start another request while the prior request is unresolved. Network responses are not guaranteed to complete in issue order, so an older non-terminal result can overwrite a newer terminal result. React's effect guidance explicitly recommends cleanup-scoped invalidation for manually fetched data because responses may arrive out of order. Completion-scheduled `setTimeout` polling additionally guarantees at most one in-flight status request per effect generation.
+A fixed `setInterval` can start another request while the prior request is unresolved. The local `isPolling` guard prevents that overlap. Network responses are not guaranteed to complete in issue order, so an older non-terminal result can overwrite a newer terminal result. React's effect guidance explicitly recommends cleanup-scoped invalidation for manually fetched data because responses may arrive out of order. Cleanup invalidation and the terminal guard ensure at most one active status request can publish state for an effect generation.
 
 ## Invariants
 
@@ -36,4 +36,4 @@ MDN Web Docs contributors. (2026). *WeakMap*. Mozilla. https://developer.mozilla
 
 React Team. (n.d.). *useEffect*. React. Retrieved August 7, 2026, from https://react.dev/reference/react/useEffect
 
-Web Hypertext Application Technology Working Group. (2026, July 13). *HTML Standard: Timers*. https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers
+Web Hypertext Application Technology Working Group. (2026, August 20). *HTML Standard: Timers*. https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers

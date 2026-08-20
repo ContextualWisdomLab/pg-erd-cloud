@@ -198,13 +198,10 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
-
-  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
+  // Keep decorated node data stable while React Flow updates positions only.
   const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
-
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
-
     return nodes.map((node) => {
       let cachedData = searchCache.get(node.data);
       if (!cachedData) {
@@ -320,44 +317,39 @@ export default function App() {
   useEffect(() => {
     if (!snapshotId) return;
     let isCurrent = true;
-    let timer: number | null = null;
-
-    async function poll() {
+    let isPolling = false;
+    let isTerminal = false;
+    const poll = async () => {
+      if (!isCurrent || isPolling || isTerminal) return;
+      isPolling = true;
       try {
-        const s = await getSnapshot(snapshotId as string);
-        if (!isCurrent) return;
+        const s = await getSnapshot(snapshotId);
+        if (!isCurrent || isTerminal) return;
         setSnapshot(s);
-
         if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+          isTerminal = true;
+          window.clearInterval(timer);
+          /* v8 ignore next -- selectProject clears snapshotId whenever no project is selected. */
           if (selectedProjectId) {
             try {
-              const snaps = await listSnapshots(selectedProjectId);
-              if (isCurrent) setSnapshots(snaps);
+              const items = await listSnapshots(selectedProjectId);
+              if (isCurrent) setSnapshots(items);
             } catch (e) {
               if (isCurrent) setError(String(e));
             }
           }
-          return;
-        }
-
-        if (isCurrent) {
-          timer = window.setTimeout(poll, 1000);
         }
       } catch (e) {
-        if (isCurrent) {
-          setError(String(e));
-          timer = window.setTimeout(poll, 1000);
-        }
+        if (isCurrent && !isTerminal) setError(String(e));
+      } finally {
+        isPolling = false;
       }
-    }
-
-    poll();
-
+    };
+    const timer = window.setInterval(poll, 1000);
+    void poll();
     return () => {
       isCurrent = false;
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
+      window.clearInterval(timer);
     };
   }, [selectedProjectId, snapshotId]);
 
@@ -973,6 +965,19 @@ export default function App() {
     setLayoutMessage("되돌렸습니다");
   }
 
+  function selectProject(projectId: string | null) {
+    if (projectId === selectedProjectId) return;
+    setSelectedProjectId(projectId);
+    setSelectedConnId(null);
+    setConnections([]);
+    setSnapshots([]);
+    setSnapshotId(null);
+    setSnapshot(null);
+    setNodes([]);
+    setEdges([]);
+    setError(null);
+  }
+
   async function onCreateProject() {
     const nextProjectName = projectName.trim();
     /* v8 ignore next -- the create control is disabled for both guard states */
@@ -982,7 +987,7 @@ export default function App() {
     try {
       const p = await createProject(nextProjectName);
       setProjects((prev) => [p, ...prev]);
-      setSelectedProjectId(p.project_space_uuid);
+      selectProject(p.project_space_uuid);
     } finally {
       setIsCreatingProject(false);
     }
@@ -1097,7 +1102,7 @@ export default function App() {
             <select
               id="project-select"
               value={selectedProjectId || ""}
-              onChange={(e) => setSelectedProjectId(e.target.value || null)}
+              onChange={(e) => selectProject(e.target.value || null)}
               style={{ flex: 1, padding: 8 }}
             >
               <option value="" disabled>
@@ -1303,7 +1308,7 @@ export default function App() {
                       type="button"
                       className="projectCard"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >
@@ -1372,7 +1377,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedProjectId(project.project_space_uuid);
+                        selectProject(project.project_space_uuid);
                         setActiveView("diagrams");
                       }}
                     >

@@ -182,13 +182,19 @@ describe('exportPrisma', () => {
     ];
 
     const edges: Edge[] = [
-      { id: 'e1', source: 'invalid', target: '2' },
-      { id: 'e2', source: '1', target: '2' },
+      { id: 'e1', source: '1', target: '2', sourceHandle: 'unrecognized-handle' },
     ];
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('model A');
     expect(result).toContain('model B');
+    expect(result).not.toContain('@relation');
+
+    const noHandleResult = exportPrisma(nodes, [{ id: 'e2', source: '1', target: '2' }]);
+    expect(noHandleResult).not.toContain('@relation');
+
+    const missingNodeResult = exportPrisma(nodes, [{ id: 'e3', source: 'missing', target: '2' }]);
+    expect(missingNodeResult).not.toContain('@relation');
   });
 
   it('handles missing is_not_null logic for optional relationships', () => {
@@ -233,5 +239,39 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
+  });
+
+  it('uses an optional back-relation for a unique foreign key', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'parent',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'parent_table',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'child',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'child_table',
+          badges: { pk: true, fk: true },
+          columns: [{ column_name: 'parent_id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [{
+      id: 'unique-relation',
+      source: 'child',
+      target: 'parent',
+      sourceHandle: 'src-parent_id',
+      targetHandle: 'tgt-id',
+      label: 'child_parent',
+    }]);
+
+    expect(result).toContain('child_table_parent_id child_table? @relation("child_parent")');
   });
 });

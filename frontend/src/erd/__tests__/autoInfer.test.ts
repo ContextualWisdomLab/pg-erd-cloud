@@ -204,4 +204,55 @@ describe("autoInfer", () => {
     expect(edges).toHaveLength(1);
     expect(edges[0].target).toBe("boxes_node");
   });
+
+  it("preserves dotted PostgreSQL relation names when inferring a target", () => {
+    const target: Node<TableNodeData> = {
+      id: "dotted-target",
+      position: { x: 0, y: 0 },
+      data: {
+        title: "public.audit.v2",
+        relation_name: "audit.v2",
+        columns: [{ column_name: "id", data_type: "integer", is_not_null: true, is_pk: true }],
+        badges: { pk: true, fk: false },
+      },
+    };
+    const source: Node<TableNodeData> = {
+      id: "dotted-source",
+      position: { x: 10, y: 10 },
+      data: {
+        title: "public.events",
+        columns: [{ column_name: "audit.v2_id", data_type: "integer", is_not_null: false, is_pk: false }],
+        badges: { pk: false, fk: true },
+      },
+    };
+
+    const edges = inferRelationships([target, source]);
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0]?.target).toBe("dotted-target");
+    expect(edges[0]?.data?.targetColumns).toEqual(["id"]);
+  });
+
+  it("parses quoted dotted relation names for hand-built nodes", () => {
+    const target: Node<TableNodeData> = {
+      id: "quoted-target",
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'public."audit""log"',
+        columns: [{ column_name: "id", data_type: "integer", is_not_null: true, is_pk: true }],
+        badges: { pk: true, fk: false },
+      },
+    };
+    const source: Node<TableNodeData> = {
+      id: "quoted-source",
+      position: { x: 10, y: 10 },
+      data: {
+        title: "public.events",
+        columns: [{ column_name: 'audit"log_id', data_type: "integer", is_not_null: false, is_pk: false }],
+        badges: { pk: false, fk: true },
+      },
+    };
+
+    expect(inferRelationships([target, source])).toHaveLength(1);
+  });
 });

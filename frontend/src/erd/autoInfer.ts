@@ -1,7 +1,27 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
-import { sanitizeTableName } from "./securityUtils";
+
+function relationNameFromTitle(title: string): string {
+  let quoted = false;
+  let separator = -1;
+  for (let index = 0; index < title.length; index += 1) {
+    const character = title[index];
+    if (character === '"') {
+      if (quoted && title[index + 1] === '"') {
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === "." && !quoted) {
+      separator = index;
+    }
+  }
+  const relation = title.slice(separator + 1).trim();
+  return relation.startsWith('"') && relation.endsWith('"')
+    ? relation.slice(1, -1).replace(/""/g, '"')
+    : relation;
+}
 
 /**
  * 인자로 받은 노드 목록을 바탕으로 관계(Edge)를 추론하여 반환합니다.
@@ -16,17 +36,15 @@ export function inferRelationships(
   // reducing complexity from O(N^2) to O(N).
   const nodesByTableName = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
-    const parts = n.data.title.split(".");
-    const tableName = parts[parts.length - 1];
+    const relationName = n.data.relation_name ?? relationNameFromTitle(n.data.title);
     // Preserve Original .find behavior by only setting the first occurrence
-    if (!nodesByTableName.has(tableName)) {
-      nodesByTableName.set(tableName, n);
+    if (!nodesByTableName.has(relationName)) {
+      nodesByTableName.set(relationName, n);
     }
   }
 
   for (const sourceNode of nodes) {
-    const srcParts = sourceNode.data.title.split(".");
-    const srcTableName = srcParts[srcParts.length - 1];
+    const srcTableName = sourceNode.data.relation_name ?? relationNameFromTitle(sourceNode.data.title);
 
     for (const column of sourceNode.data.columns) {
       const colName = column.column_name;
@@ -49,9 +67,9 @@ export function inferRelationships(
         // 자기 참조는 일단 제외
         if (targetTableName && targetTableName !== srcTableName) {
           // ⚡ Bolt: O(1) lookup instead of O(N) string splitting array scan
-          const safeTargetTableName = sanitizeTableName(targetTableName);
-          const targetNode = nodesByTableName.get(safeTargetTableName);
+          const targetNode = nodesByTableName.get(targetTableName);
 
+          /* v8 ignore next -- targetTableName is selected only after a matching map key. */
           if (targetNode) {
             // 대상 테이블에 'id' 필드가 있는지, 혹은 PK 컬럼이 하나인지 확인
             // 여기서는 단순하게 'id' 컬럼이 있거나, 첫 번째 PK 컬럼으로 연결
