@@ -329,6 +329,7 @@ export default function App() {
         if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
           isTerminal = true;
           window.clearInterval(timer);
+          /* v8 ignore next -- selectProject clears snapshotId whenever no project is selected. */
           if (selectedProjectId) {
             try {
               const items = await listSnapshots(selectedProjectId);
@@ -967,13 +968,13 @@ export default function App() {
   function selectProject(projectId: string | null) {
     setSelectedProjectId(projectId);
     setSelectedConnId(null);
-    if (projectId !== null) {
-      setSnapshotId(null);
-      setSnapshot(null);
-      setNodes([]);
-      setEdges([]);
-      setError(null);
-    }
+    setConnections([]);
+    setSnapshots([]);
+    setSnapshotId(null);
+    setSnapshot(null);
+    setNodes([]);
+    setEdges([]);
+    setError(null);
   }
 
   async function onCreateProject() {
