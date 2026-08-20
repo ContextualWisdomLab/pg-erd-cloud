@@ -39,7 +39,15 @@ vi.mock('./erd/export', () => ({
 }))
 vi.mock('./erd/mermaid', () => ({ exportMermaid: vi.fn(() => '') }))
 vi.mock('./erd/dbml', () => ({ exportDbml: vi.fn(() => '') }))
-vi.mock('./erd/prisma', () => ({ exportPrisma: vi.fn(() => '') }))
+vi.mock('./erd/prisma', () => ({
+  exportPrisma: vi.fn(() => ''),
+  exportPrismaDocument: vi.fn(() => ({
+    ok: true,
+    schema: '',
+    manifest: { contractVersion: 'test', mappings: [] },
+  })),
+  PRISMA_EXPORT_FAILURE_MESSAGE: 'Prisma 식별자를 고유하게 할당하지 못했습니다.',
+}))
 vi.mock('./erd/autoInfer', () => ({ inferRelationships: vi.fn(() => []) }))
 vi.mock('./components/modals', () => ({
   AddTableModal: () => null,

@@ -57,10 +57,47 @@ def test_prisma_models_relations_and_map():
     schema = generate_prisma_schema(SNAP)
     assert "model Member {" in schema and "model Orders {" in schema
     assert "member_id BigInt @id" in schema
-    assert "member Member @relation(fields: [member_id], references: [member_id])" in schema
+    assert 'member Member @relation("fk_orders_member", fields: [member_id], references: [member_id])' in schema
     assert "orderss Orders[]" in schema or "orders Orders[]" in schema  # reverse side exists
     assert '@@map("orders")' in schema
     assert "total Decimal?" in schema
+
+
+def test_prisma_relation_fields_do_not_collide_with_scalar_fields():
+    snap = {
+        "relations": [
+            {"relation_oid": 1, "relation_kind": "r", "schema_name": "public", "relation_name": "users"},
+            {"relation_oid": 2, "relation_kind": "r", "schema_name": "public", "relation_name": "orders"},
+        ],
+        "columns": [
+            {"relation_oid": 1, "column_name": "id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "orderss", "column_position": 2, "data_type": "text", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "user_id", "column_position": 2, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "user", "column_position": 3, "data_type": "text", "is_not_null": True},
+        ],
+        "pk_columns": [
+            {"relation_oid": 1, "column_name": "id"},
+            {"relation_oid": 2, "column_name": "id"},
+        ],
+        "fk_edges": [
+            {
+                "fk_constraint_oid": 10,
+                "fk_constraint_name": "orders_user_fk",
+                "child_relation_oid": 2,
+                "parent_relation_oid": 1,
+                "child_column_name": "user_id",
+                "parent_column_name": "id",
+                "column_ordinal": 1,
+            }
+        ],
+    }
+
+    schema = generate_prisma_schema(snap)
+    assert "  user String" in schema
+    assert '  user_2 Users @relation("orders_user_fk", fields: [user_id], references: [id])' in schema
+    assert "  orderss String" in schema
+    assert '  orderss_2 Orders[] @relation("orders_user_fk")' in schema
 
 
 def test_composite_pk_and_empty_snapshot():
@@ -80,6 +117,45 @@ def test_composite_pk_and_empty_snapshot():
     assert "@@id([a_id, b_id])" in schema
     assert "@id\n" not in schema.replace("@@id", "")  # no single-column @id emitted
     ast.parse(generate_sqlalchemy_models({}))  # empty snapshot still valid
+
+
+def test_prisma_preserves_schema_identity_and_composite_fk_pairs():
+    snap = {
+        "relations": [
+            {"relation_oid": 1, "relation_kind": "r", "schema_name": "auth", "relation_name": "users"},
+            {"relation_oid": 2, "relation_kind": "r", "schema_name": "public", "relation_name": "users"},
+            {"relation_oid": 3, "relation_kind": "r", "schema_name": "public", "relation_name": "memberships"},
+        ],
+        "columns": [
+            {"relation_oid": 1, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "id", "column_position": 2, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 2, "column_name": "id", "column_position": 2, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 3, "column_name": "tenant_id", "column_position": 1, "data_type": "int", "is_not_null": True},
+            {"relation_oid": 3, "column_name": "user_id", "column_position": 2, "data_type": "int", "is_not_null": False},
+            {"relation_oid": 3, "column_name": "id", "column_position": 3, "data_type": "int", "is_not_null": True},
+        ],
+        "pk_columns": [
+            {"relation_oid": 1, "column_name": "tenant_id"},
+            {"relation_oid": 1, "column_name": "id"},
+            {"relation_oid": 2, "column_name": "tenant_id"},
+            {"relation_oid": 2, "column_name": "id"},
+            {"relation_oid": 3, "column_name": "id"},
+        ],
+        "fk_edges": [
+            {"fk_constraint_oid": 30, "fk_constraint_name": "fk_memberships_auth_user", "child_relation_oid": 3, "parent_relation_oid": 1, "child_column_name": "tenant_id", "parent_column_name": "tenant_id", "column_ordinal": 1},
+            {"fk_constraint_oid": 30, "fk_constraint_name": "fk_memberships_auth_user", "child_relation_oid": 3, "parent_relation_oid": 1, "child_column_name": "user_id", "parent_column_name": "id", "column_ordinal": 2},
+        ],
+    }
+
+    schema = generate_prisma_schema(snap)
+    assert 'schemas = ["auth", "public"]' in schema
+    assert schema.count('@@map("users")') == 2
+    assert '@@schema("auth")' in schema
+    assert '@@schema("public")' in schema
+    assert "@@id([tenant_id, id])" in schema
+    assert 'fields: [tenant_id, user_id], references: [tenant_id, id]' in schema
+    assert 'Users? @relation("fk_memberships_auth_user", fields: [tenant_id, user_id]' in schema
 
 
 def test_typeorm_entities_decorators_and_relations():

@@ -61,7 +61,10 @@ import {
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
-import { exportPrisma } from "./erd/prisma";
+import {
+  PRISMA_EXPORT_FAILURE_MESSAGE,
+  exportPrismaDocument,
+} from "./erd/prisma";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
@@ -166,6 +169,7 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+  const [prismaExportError, setPrismaExportError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -575,6 +579,7 @@ export default function App() {
   function onCloseExport() {
     setIsExportModalOpen(false);
     setIsCopied(false);
+    setPrismaExportError(null);
     if (copyFeedbackTimeoutRef.current !== null) {
       window.clearTimeout(copyFeedbackTimeoutRef.current);
       copyFeedbackTimeoutRef.current = null;
@@ -664,7 +669,22 @@ export default function App() {
   }
 
   function onDownloadPrisma() {
-    downloadText("pg-erd-diagram.prisma", exportPrisma(nodes, edges), "text/plain");
+    const document = exportPrismaDocument(nodes, edges);
+    if (document.ok) {
+      setPrismaExportError(null);
+    } else {
+      setPrismaExportError(PRISMA_EXPORT_FAILURE_MESSAGE);
+    }
+    downloadText("pg-erd-diagram.prisma", document.schema, "text/plain");
+  }
+
+  function onDownloadPrismaManifest() {
+    const document = exportPrismaDocument(nodes, edges);
+    downloadText(
+      "pg-erd-diagram.prisma.manifest.json",
+      JSON.stringify(document.manifest, null, 2),
+      "application/json",
+    );
   }
 
   function onExportDictionaryCsv() {
@@ -1651,6 +1671,8 @@ export default function App() {
             onExportDictionaryMarkdown={onExportDictionaryMarkdown}
             onDownloadDbml={onDownloadDbml}
             onDownloadPrisma={onDownloadPrisma}
+            onDownloadPrismaManifest={onDownloadPrismaManifest}
+            prismaExportError={prismaExportError}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />

@@ -29,7 +29,7 @@ visual gap is a design-only issue or missing product code.
 | ERD editor | `06-erd-editor-main.png` | Inspect and edit schema structure on the canvas. | Empty canvas must distinguish snapshot generation from ready-to-create state. |
 | Add entity | `07-add-entity-modal.png` | Add a table manually when no snapshot exists or when modeling ahead. | Save remains disabled until a table name is present. |
 | Relationship settings | `08-relationship-settings-modal.png` | Edit or delete relationship labels. | Destructive actions require explicit confirmation. |
-| Share/export | `09-share-export-modal.png` | Create share links and copy/export SQL or visual formats. | Export sections must explain what is missing before output exists. |
+| Share/export | `09-share-export-modal.png` | Create share links and copy/export SQL or visual formats. | Export sections must explain what is missing before output exists. Prisma allocation failure uses a fixed message plus a diagnostic manifest download. |
 
 ## Key Screens
 

@@ -171,6 +171,25 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
+  it('shows a fixed Prisma allocation failure and offers the diagnostic manifest', () => {
+    const onDownloadPrismaManifest = vi.fn();
+    render(
+      <ExportModal
+        {...baseProps}
+        prismaExportError="Prisma 식별자를 고유하게 할당하지 못했습니다. 진단 매니페스트를 받은 뒤 테이블·컬럼 이름을 바꾼 다음 다시 내보내세요."
+        onDownloadPrismaManifest={onDownloadPrismaManifest}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'Prisma 식별자를 고유하게 할당하지 못했습니다. 진단 매니페스트를 받은 뒤 테이블·컬럼 이름을 바꾼 다음 다시 내보내세요.',
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Prisma 진단 매니페스트 받기' }));
+    expect(onDownloadPrismaManifest).toHaveBeenCalledOnce();
+  });
+
   it('exposes access-control guidance for disabled button', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
