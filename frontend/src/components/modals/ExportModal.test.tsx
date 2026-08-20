@@ -55,6 +55,8 @@ describe('ExportModal', () => {
     expect(screen.getByText('Prisma Schema')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary CSV')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary MD')).toBeInTheDocument();
+    const closeButton = screen.getByRole('button', { name: '공유 및 내보내기 닫기' });
+    expect(closeButton.querySelector('[aria-hidden="true"]')).toHaveTextContent('✕');
   });
 
   it('copies an already generated share link', () => {
