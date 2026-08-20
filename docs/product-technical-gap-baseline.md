@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-- **Snapshot date:** 2026-08-20 (UTC GitHub API evidence)
+- **Snapshot date:** 2026-08-20 (UTC GitHub API evidence; refreshed after PRs #942–#944)
 - **Repository:** `ContextualWisdomLab/pg-erd-cloud`
 - **Base evidence:** `origin/main` = `729eaccbdcf8508f943adc39d23464a8a55ca2bd`
 - **Purpose:** turn the current product, architecture, research, and live PR state into an executable release backlog. This is a baseline, not a claim that the product is release-ready.
@@ -25,18 +25,18 @@ The product must not silently become a general-purpose graph database, document 
 | Backend | `backend/app/api/`, `backend/app/pg_introspect/`, `backend/app/ddl/`, `backend/app/diff/`, `backend/app/spec/` | A broad standalone API and schema-analysis surface exists | Production SLOs, real multi-tenant load, and upgrade-safe migrations |
 | Persistence | `backend/app/models.py`, Alembic revisions `0001`–`0007` | Core metadata is relational and most objects use multi-word snake_case names | A complete automated 3NF audit, hot-partition plan, or zero migration drift |
 | Background work | `backend/app/jobs/worker.py`, `job_queue`, `FOR UPDATE SKIP LOCKED`, `docs/observability.md` | Queue work is separated from request handling and has basic metrics | High-volume fairness, partition rollover, back-pressure, and regional recovery |
-| Frontend | React/Vite ERD editor in `frontend/src/` with Vitest tests | The core canvas, navigation, exports, accessibility, and polling contracts are testable | Storybook inventory, reusable design-token package, and browser acceptance on protected main |
+| Frontend | React/Vite ERD editor in `frontend/src/` with Vitest tests; PR #944 adds a Storybook/token inventory | The core canvas, navigation, exports, accessibility, polling, and proposed visual-token contracts are testable | Storybook and browser acceptance on protected main; the PR is not merged yet |
 | Real database proof | `frontend/e2e/` and `scripts/run-e2e-with-report.sh` exist only in the current dirty local worktree at capture time | A local PostgreSQL/Playwright proof path has been prepared | That the proof is merged, reproducible in CI, or safe for production targets |
 | Ecosystem | `docs/clearfolio-integration.md`, `docs/llm-orchestrator-integration.md` | Connector intent and opt-in boundaries are documented | End-to-end deployed connector contracts and tenant-isolated persistence |
-| Design | `docs/ui-ux/` screenshots and product spec; PR #824 contains live-Figma architecture work | Existing visual intent and a Figma-alignment path exist | An approved live Figma handoff or a merged Storybook component contract |
+| Design | `docs/ui-ux/` screenshots and product spec; PR #824 contains live-Figma architecture work; PR #944 adds Storybook inventory | Existing visual intent and a Figma-alignment path exist | An approved live Figma handoff or a merged Storybook component contract |
 | Governance | root `AGENTS.md`, central ruleset `18156473`, required central workflows, and hourly scheduler PR #943 | Review/security/merge policy and a recurring repair loop are explicit | That every open PR is currently mergeable |
 
 ## Buyer-visible gaps, ordered by leverage
 
 | Priority | Gap | Buyer impact | Closure evidence |
 |---|---|---|---|
-| P0 | The open-PR queue is not release-shaped. The live queue contains 59 PRs and several exact-head checks are still pending or failing. | Buyers cannot predict what version is safe to deploy or whether a security fix is actually included. | Each PR has a current-head review/check record, resolved threads, normal merge, and release notes; no stale-head claims. |
-| P0 | Central Strix bounded scans can produce false evidence: PR #745 reported a credential in scanner-generated `.state/agents.db`; PR #724 previously omitted the unchanged PostgreSQL DSN guard from its bounded context. | Security gates can block good code or misdirect remediation, delaying releases and weakening trust in the control plane. | Central `.github` PR with scan working-directory isolation and import-context coverage, self-test proof, and fresh exact-head Strix runs. |
+| P0 | The open-PR queue is not release-shaped. The live queue contains 62 PRs and several exact-head checks are still pending or failing. | Buyers cannot predict what version is safe to deploy or whether a security fix is actually included. | Each PR has a current-head review/check record, resolved threads, normal merge, and release notes; no stale-head claims. |
+| P0 | Central Strix bounded scans can produce false evidence: PR #745 reported a credential in scanner-generated `.state/agents.db`; PR #724 reported a missing unchanged PostgreSQL DSN guard in bounded context. The canonical repair is central `.github` PR #1153; duplicate #1164 is closed. | Security gates can block good code or misdirect remediation, delaying releases and weakening trust in the control plane. | Merge #1153 through protected normal review, then collect fresh exact-head Strix runs for affected target PRs. |
 | P0 | Alembic and ORM metadata can drift when dependency PRs meet schema changes; PR #838 currently fails its repair check on index/type drift. | Database upgrades can fail at deploy time or silently diverge from the ERD product's own metadata model. | A migration-drift contract on a real PostgreSQL database, upgrade/downgrade proof, and a clean current-head check on #838/#936 dependency order. |
 | P0 | Runtime secrets/config still load directly from environment through `backend/app/settings.py`, contrary to the organization KV/credential-registry rule. | Secret rotation, auditability, and least-privilege deployment are weaker than a commercial product requires; PII masking is not a substitute for controlled access. | Bootstrap-only environment transport, encrypted KV reads at runtime, rotation/revocation tests, and no raw runtime `os.getenv()` path. |
 | P1 | Schema quality guidance is advisory rather than a complete enforceable contract. Naming lint and wide-table checks exist, but there is no complete 3NF/dependency audit or hot-partition decision record. | Architects receive warnings but not a defensible “safe to operate at scale” assessment. | Versioned 3NF/functional-dependency report, explicit justified exceptions for snapshot JSON, partition/key strategy for queue and event-heavy data, and real seeded-DB tests. |
@@ -57,7 +57,7 @@ The live-Figma work is currently PR #824 (`db59f97b16cb`). The companion ADR is 
 
 ## Executable loop
 
-1. The hourly workflow in PR #943 dispatches the central OpenCode review/fix scheduler for up to 100 open PRs; it does not bypass protected review or merge rules.
+1. The hourly workflow in PR #943 dispatches the central OpenCode review/fix scheduler for up to 100 open PRs; it does not bypass protected review or merge rules. After central #1153 merges, update the immutable workflow pin and revalidate the scheduler PR.
 2. Refetch the exact PR head, branch protection/ruleset, review threads, and all check runs.
 3. Repair only source-actionable findings at that head; treat provider latency as work to continue around, not as a product conclusion.
 4. Re-run focused proof, then the complete required local proof proportional to the change.
@@ -71,6 +71,9 @@ The following inventory was queried from the live REST API and records the exact
 
 | PR | Exact head | State | Title |
 |---:|---|---|---|
+| #944 | `d4989bd13c04` | ready | feat(frontend): add Storybook design-token inventory |
+| #943 | `c7289801c7eb` | ready | ci: schedule hourly PR review repair |
+| #942 | `7fb0061937e28` | ready | docs: establish product and technical gap baseline |
 | #941 | `18a91beac732` | ready | fix(auth): offload API key hashing |
 | #940 | `9fb1c3b221a0` | ready | refactor(snowflake): group constraint context |
 | #939 | `3ca5db715db5` | ready | fix(frontend): validate ERD export handles |
@@ -142,7 +145,7 @@ gh api repos/ContextualWisdomLab/pg-erd-cloud/pulls/<number>/reviews?per_page=10
 gh api repos/ContextualWisdomLab/pg-erd-cloud/pulls/<number>/comments?per_page=100
 ```
 
-At collection time, the exact-head completed-failure scan identified PR #838 (`repair`) and PR #745 (`strix`). PR #914's frontend failure was reproduced from its job log, repaired with commit `b2a265fa`, and its checks were requeued. These are mutable external facts; a later run must not reuse them without refetching.
+At collection time, the exact-head completed-failure scan identified PR #838 (`repair`), PR #745 (`strix`), and PR #724 (`strix`). PR #838 is the ORM/migration drift that PR #936 addresses; #724/#745 require the canonical central Strix repair before their scans are re-evaluated. PR #914's frontend failure was reproduced from its job log, repaired with commit `b2a265fa`, and its checks were requeued. These are mutable external facts; a later run must not reuse them without refetching.
 
 ## Release gate
 

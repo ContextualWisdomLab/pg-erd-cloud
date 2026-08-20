@@ -19,9 +19,12 @@ Figma establishes visual intent; Storybook stories, design tokens, accessibility
 The recurring delivery loop is proposed in pg-erd-cloud PR #943. It calls the
 central OpenCode review/fix scheduler hourly, inspects up to 100 open PRs, and
 uses the established protected merge credentials. The reusable workflow is
-pinned to central `.github` commit
-`aa8503f4383e8328d89104796bc3e9f7da810376`; the loop cannot approve, bypass,
-or merge around the repository ruleset.
+currently pinned to central `.github` commit
+`aa8503f4383e8328d89104796bc3e9f7da810376`; after canonical central Strix PR
+#1153 merges, the pin must be refreshed in #943 and rechecked. The loop cannot
+approve, bypass, or merge around the repository ruleset. Storybook/token
+inventory work is tracked in #944 and uses the Figma IDs above as its design
+authority.
 
 ## Consequences
 
@@ -37,4 +40,3 @@ Chen, P. P.-S. (1976). The entity-relationship model—Toward a unified view of 
 Codd, E. F. (1970). A relational model of data for large shared data banks. *Communications of the ACM, 13*(6), 377–387. https://doi.org/10.1145/362384.362685
 
 National Institute of Standards and Technology. (2022). *Secure software development framework (SSDF) version 1.1: Recommendations for mitigating the risk of software vulnerabilities* (NIST Special Publication 800-218). https://doi.org/10.6028/NIST.SP.800-218
-
