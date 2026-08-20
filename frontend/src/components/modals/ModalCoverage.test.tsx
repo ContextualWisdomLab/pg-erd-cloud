@@ -116,7 +116,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -245,6 +246,7 @@ describe('modal behavior coverage', () => {
     )
     expect(screen.getByText('등록된 그룹이 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '추가' })).toBeDisabled()
+    fireEvent.submit(screen.getByLabelText('그룹 이름').closest('form')!)
 
     rerender(
       <GroupModal
@@ -264,7 +266,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
