@@ -116,7 +116,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText(/제약조건 이름 \(Label\)/), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -125,6 +126,48 @@ describe('modal behavior coverage', () => {
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
     expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('rejects whitespace-only relationship labels before submit', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="   "
+        setRelLabel={vi.fn()}
+        onRelDelete={vi.fn()}
+        onRelCancel={vi.fn()}
+        onRelSubmit={onSubmit}
+      />,
+    )
+
+    const input = screen.getByLabelText(/제약조건 이름 \(Label\)/) as HTMLInputElement
+    const reportValidity = vi.spyOn(input, 'reportValidity')
+    fireEvent.submit(screen.getByRole('dialog'))
+
+    expect(input).toBeRequired()
+    expect(input).toHaveAttribute('name', 'rel-label')
+    expect(input).toHaveProperty('validationMessage', '관계 이름을 입력하세요.')
+    expect(reportValidity).toHaveBeenCalledOnce()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('ignores an edge submit when its named input is unavailable', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="fk_users"
+        setRelLabel={vi.fn()}
+        onRelDelete={vi.fn()}
+        onRelCancel={vi.fn()}
+        onRelSubmit={onSubmit}
+      />,
+    )
+
+    screen.getByLabelText(/제약조건 이름 \(Label\)/).remove()
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('covers EditTableModal column mutation, duplication, form, and table actions', () => {
@@ -264,7 +307,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText(/그룹 이름/), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
@@ -275,6 +319,58 @@ describe('modal behavior coverage', () => {
     expect(onDelete).toHaveBeenCalledWith('g1')
     expect(onAssign).toHaveBeenCalledWith('table-1', '')
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('rejects whitespace-only business group names before submit', () => {
+    const onCreate = vi.fn()
+    render(
+      <GroupModal
+        isOpen
+        businessGroups={[]}
+        newGroupName="   "
+        setNewGroupName={vi.fn()}
+        newGroupColor="#1f77b4"
+        setNewGroupColor={vi.fn()}
+        nodes={[]}
+        onCloseGroupManager={vi.fn()}
+        onCreateBusinessGroup={onCreate}
+        onDeleteBusinessGroup={vi.fn()}
+        onAssignBusinessGroup={vi.fn()}
+      />,
+    )
+
+    const input = screen.getByLabelText(/그룹 이름/) as HTMLInputElement
+    const reportValidity = vi.spyOn(input, 'reportValidity')
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!)
+
+    expect(input).toBeRequired()
+    expect(input).toHaveAttribute('name', 'business-group-name')
+    expect(input).toHaveProperty('validationMessage', '그룹 이름을 입력하세요.')
+    expect(reportValidity).toHaveBeenCalledOnce()
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('ignores a group submit when its named input is unavailable', () => {
+    const onCreate = vi.fn()
+    render(
+      <GroupModal
+        isOpen
+        businessGroups={[]}
+        newGroupName="Billing"
+        setNewGroupName={vi.fn()}
+        newGroupColor="#1f77b4"
+        setNewGroupColor={vi.fn()}
+        nodes={[]}
+        onCloseGroupManager={vi.fn()}
+        onCreateBusinessGroup={onCreate}
+        onDeleteBusinessGroup={vi.fn()}
+        onAssignBusinessGroup={vi.fn()}
+      />,
+    )
+
+    screen.getByLabelText(/그룹 이름/).remove()
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!)
+    expect(onCreate).not.toHaveBeenCalled()
   })
 
   it('covers CardinalityModal validation, ratios, applied states, and callbacks', () => {
