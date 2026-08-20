@@ -48,6 +48,15 @@ export function EditEdgeModal({
         tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
+          const input = e.currentTarget.elements.namedItem('rel-label');
+          if (!(input instanceof HTMLInputElement)) return;
+          input.setCustomValidity(
+            input.value.trim() ? '' : '제약조건 이름을 입력하세요.',
+          );
+          if (!e.currentTarget.checkValidity()) {
+            input.reportValidity();
+            return;
+          }
           onRelSubmit();
         }}
         style={{
@@ -72,8 +81,16 @@ export function EditEdgeModal({
           <input
             id="rel-label"
             value={relLabel}
-            onChange={(e) => setRelLabel(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setRelLabel(value);
+              e.currentTarget.setCustomValidity(
+                value.trim() ? '' : '제약조건 이름을 입력하세요.',
+              );
+            }}
             placeholder="fk_constraint_name"
+            required
+            aria-invalid={Boolean(relLabel) && !relLabel.trim()}
             autoFocus
           />
         </div>

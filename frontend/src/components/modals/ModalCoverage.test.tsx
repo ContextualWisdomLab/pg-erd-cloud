@@ -113,9 +113,35 @@ describe('modal behavior coverage', () => {
       />,
     )
     expect(screen.getByText(/From: a/)).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/제약조건 이름 \(Label\)/), {
+    rerender(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="   "
+        setRelLabel={setRelLabel}
+        onRelDelete={onDelete}
+        onRelCancel={onCancel}
+        onRelSubmit={onSubmit}
+      />,
+    )
+    const whitespaceRelInput = screen.getByLabelText(/제약조건 이름 \(Label\)/) as HTMLInputElement
+    const reportValidity = vi.spyOn(whitespaceRelInput, 'reportValidity')
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(whitespaceRelInput).toHaveAttribute('aria-invalid', 'true')
+    expect(reportValidity).toHaveBeenCalledOnce()
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.change(whitespaceRelInput, {
       target: { value: 'fk_changed' },
     })
+    rerender(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="fk_changed"
+        setRelLabel={setRelLabel}
+        onRelDelete={onDelete}
+        onRelCancel={onCancel}
+        onRelSubmit={onSubmit}
+      />,
+    )
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
