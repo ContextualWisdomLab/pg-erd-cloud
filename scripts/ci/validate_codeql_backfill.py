@@ -35,6 +35,24 @@ def main() -> int:
     require('ref: "refs/heads/${{ inputs.branch }}"' in text, "analysis ref must target the requested branch")
     require("sha: ${{ matrix.commit }}" in text, "analysis SHA must use the selected commit")
 
+    run_context_lines: list[str] = []
+    in_run_step = False
+    for line in text.splitlines():
+        if re.fullmatch(r" {8}run:\s*\|?", line):
+            in_run_step = True
+            continue
+        if in_run_step and line.strip() and not line.startswith(" " * 10):
+            in_run_step = False
+        if in_run_step:
+            run_context_lines.append(line)
+    require(
+        not any(
+            re.search(r"\$\{\{\s*(?:github|inputs)\.", line)
+            for line in run_context_lines
+        ),
+        "run steps must receive GitHub context through environment variables",
+    )
+
     language_match = re.search(r"language:\s*\[(?P<languages>[^\]]+)\]", text)
     require(language_match is not None, "language matrix is required")
     languages = {

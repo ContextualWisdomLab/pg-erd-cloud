@@ -38,11 +38,14 @@ jobs:
       - name: Enumerate target commits
         id: commits
         shell: bash
+        env:
+          INPUT_BRANCH: ${{ inputs.branch }}
+          INPUT_COMMIT_COUNT: ${{ inputs.commit_count }}
         run: |
           set -euo pipefail
 
-          count="${{ inputs.commit_count }}"
-          branch="${{ inputs.branch }}"
+          count="${INPUT_COMMIT_COUNT}"
+          branch="${INPUT_BRANCH}"
 
           if ! [[ "${count}" =~ ^[0-9]+$ ]]; then
             echo "commit_count must be a positive integer" >&2
@@ -51,6 +54,11 @@ jobs:
 
           if (( count < 1 || count > 127 )); then
             echo "commit_count must be between 1 and 127 to stay within the GitHub Actions workflow job limit" >&2
+            exit 1
+          fi
+
+          if ! git check-ref-format --branch "${branch}" >/dev/null; then
+            echo "branch must be a valid Git branch name" >&2
             exit 1
           fi
 
@@ -89,7 +97,7 @@ jobs:
         uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: "/language:${{ matrix.language }}/backfill"
           ref: "refs/heads/${{ inputs.branch }}"
