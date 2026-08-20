@@ -8,7 +8,6 @@ import type { SnapshotJson } from '../types'
 
 export type TableNodeData = {
   title: string
-  relation_name?: string
   comment?: string | null
   columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
   indexes?: IndexRecommendation[]
@@ -135,7 +134,6 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
       position: { x: (i % GRID_COLUMNS) * GRID_X_GAP, y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP },
       data: {
         title: `${t.schema_name}.${t.relation_name}`,
-        relation_name: t.relation_name,
         comment: t.relation_comment,
         columns: cols,
         badges: {

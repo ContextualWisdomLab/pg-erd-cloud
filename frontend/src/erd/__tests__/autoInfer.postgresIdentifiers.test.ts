@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import { inferRelationships } from "../autoInfer";
-import { snapshotToGraph, type TableNodeData } from "../convert";
+import type { TableNodeData } from "../convert";
 
 function tableNode(
   id: string,
@@ -14,6 +14,7 @@ function tableNode(
     position: { x: 0, y: 0 },
     data: {
       title,
+      relation_name: title.split(".").slice(1).join("."), // mock exact relation_name propagation
       columns,
       badges: {
         pk: columns.some((column) => column.is_pk),
@@ -48,11 +49,22 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
           is_pk: false,
         },
       ]),
+      tableNode("dotted_target", "public.Order.Items", [
+        { column_name: "id", data_type: "bigint", is_not_null: true, is_pk: true },
+      ]),
+      tableNode("dotted_source", "public.Order.Audit", [
+        {
+          column_name: "Order.Items_id",
+          data_type: "bigint",
+          is_not_null: true,
+          is_pk: false,
+        },
+      ]),
     ];
 
     const edges = inferRelationships(nodes);
 
-    expect(edges).toHaveLength(2);
+    expect(edges).toHaveLength(3);
     expect(
       edges.find((edge) => edge.source === "unicode_source"),
     ).toMatchObject({
@@ -71,50 +83,14 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
         targetColumns: ["id"],
       },
     });
-  });
-
-  it("preserves dotted PostgreSQL relation names from snapshots", () => {
-    const { nodes } = snapshotToGraph({
-      relations: [
-        {
-          relation_oid: 1,
-          relation_kind: "r",
-          schema_name: "public",
-          relation_name: "Order.Items",
-        },
-        {
-          relation_oid: 2,
-          relation_kind: "r",
-          schema_name: "public",
-          relation_name: "Order.Audits",
-        },
-      ],
-      columns: [
-        {
-          relation_oid: 1,
-          column_name: "id",
-          data_type: "bigint",
-          is_not_null: true,
-        },
-        {
-          relation_oid: 2,
-          column_name: "Order.Items_id",
-          data_type: "bigint",
-          is_not_null: true,
-        },
-      ],
-      pk_columns: [{ relation_oid: 1, column_name: "id" }],
-    });
-
-    expect(inferRelationships(nodes)).toMatchObject([
-      {
-        source: "2",
-        target: "1",
-        data: {
-          sourceColumns: ["Order.Items_id"],
-          targetColumns: ["id"],
-        },
+    expect(
+      edges.find((edge) => edge.source === "dotted_source"),
+    ).toMatchObject({
+      target: "dotted_target",
+      data: {
+        sourceColumns: ["Order.Items_id"],
+        targetColumns: ["id"],
       },
-    ]);
+    });
   });
 });

@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
+import { sanitizeTableName } from "./securityUtils";
 
 /**
  * 인자로 받은 노드 목록을 바탕으로 관계(Edge)를 추론하여 반환합니다.
@@ -16,16 +17,26 @@ export function inferRelationships(
   const nodesByTableName = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
     const parts = n.data.title.split(".");
-    const tableName = n.data.relation_name ?? parts[parts.length - 1];
+    const tableName = parts[parts.length - 1];
+    // ⚡ Bolt: exact identifier key propagation, with title fallback for manually created nodes
+    const relationName = n.data.relation_name || (parts.length > 1 ? parts.slice(1).join(".") : parts[0]);
+
     // Preserve Original .find behavior by only setting the first occurrence
-    if (!nodesByTableName.has(tableName)) {
-      nodesByTableName.set(tableName, n);
+    if (!nodesByTableName.has(relationName)) {
+      nodesByTableName.set(relationName, n);
+    }
+
+    const oldFallbackName = parts[parts.length - 1];
+    // Allow locating "Order.Items" target node using just "Items" key (original string-split fallback)
+    if (!nodesByTableName.has(oldFallbackName)) {
+      nodesByTableName.set(oldFallbackName, n);
     }
   }
 
   for (const sourceNode of nodes) {
     const srcParts = sourceNode.data.title.split(".");
-    const srcTableName = sourceNode.data.relation_name ?? srcParts[srcParts.length - 1];
+    const srcTableName = sourceNode.data.relation_name || (srcParts.length > 1 ? srcParts.slice(1).join(".") : srcParts[0]);
+    const srcFallbackName = srcParts[srcParts.length - 1];
 
     for (const column of sourceNode.data.columns) {
       const colName = column.column_name;
@@ -37,16 +48,27 @@ export function inferRelationships(
         let targetTableName = "";
 
         // 대상 테이블 이름 추측 (단수형/복수형 등 간단히)
+        // Start by searching the longest possible string to preserve dots
         if (nodesByTableName.has(targetEntity)) {
           targetTableName = targetEntity;
         } else if (nodesByTableName.has(targetEntity + "s")) {
           targetTableName = targetEntity + "s";
         } else if (nodesByTableName.has(targetEntity + "es")) {
           targetTableName = targetEntity + "es";
+        } else {
+          const targetParts = targetEntity.split(".");
+          const targetFallback = targetParts[targetParts.length - 1];
+          if (nodesByTableName.has(targetFallback)) {
+            targetTableName = targetFallback;
+          } else if (nodesByTableName.has(targetFallback + "s")) {
+            targetTableName = targetFallback + "s";
+          } else if (nodesByTableName.has(targetFallback + "es")) {
+            targetTableName = targetFallback + "es";
+          }
         }
 
         // 자기 참조는 일단 제외
-        if (targetTableName && targetTableName !== srcTableName) {
+        if (targetTableName && targetTableName !== srcTableName && targetTableName !== srcFallbackName) {
           // The value is an exact key already discovered in nodesByTableName.
           // Rewriting it would break valid quoted, mixed-case, or Unicode
           // PostgreSQL identifiers without adding a security boundary.
