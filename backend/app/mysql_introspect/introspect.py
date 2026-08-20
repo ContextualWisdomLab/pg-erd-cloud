@@ -94,6 +94,8 @@ def _schema_filter_clause(schema_filter: str | None) -> tuple[str, tuple[object,
 
 
 class MysqlTableRow(TypedDict):
+    """One row returned by the MySQL information_schema.TABLES query."""
+
     TABLE_SCHEMA: str
     TABLE_NAME: str
     TABLE_TYPE: str
@@ -101,6 +103,8 @@ class MysqlTableRow(TypedDict):
 
 
 class MysqlColumnRow(TypedDict):
+    """One row returned by the MySQL information_schema.COLUMNS query."""
+
     TABLE_SCHEMA: str
     TABLE_NAME: str
     COLUMN_NAME: str
@@ -113,6 +117,8 @@ class MysqlColumnRow(TypedDict):
 
 
 class MysqlKeyUsageRow(TypedDict):
+    """One row returned by the MySQL information_schema.KEY_COLUMN_USAGE query."""
+
     CONSTRAINT_NAME: str
     TABLE_SCHEMA: str
     TABLE_NAME: str
@@ -124,6 +130,8 @@ class MysqlKeyUsageRow(TypedDict):
 
 
 class MysqlIndexRow(TypedDict):
+    """One row returned by the MySQL information_schema.STATISTICS query."""
+
     TABLE_SCHEMA: str
     TABLE_NAME: str
     INDEX_NAME: str
