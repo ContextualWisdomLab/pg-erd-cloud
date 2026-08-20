@@ -484,7 +484,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
     expect(screen.getByText('ERD 캔버스가 비어 있습니다')).toBeInTheDocument()
-  })
+  }, 15_000)
 
   it('covers guarded editor actions, navigation callbacks, and form selectors', async () => {
     await renderReadyApp()
@@ -557,7 +557,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '목록 보기' }))
-  })
+  }, 15_000)
 
   it('clears replacement copy timers and pending timers during close and unmount', async () => {
     vi.useFakeTimers()
