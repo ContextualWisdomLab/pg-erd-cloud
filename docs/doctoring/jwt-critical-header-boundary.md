@@ -22,7 +22,7 @@ JWTs that omit `crit` retain the existing token-type, content-type, algorithm al
 
 ## Authority and invariants
 
-RFC 7515, Section 4.1.11 defines `crit` as a non-empty array of extension header names that are present in the JOSE header and that the recipient must understand and process. It forbids duplicate names, registered JWS/JWA names, names absent from the header, and the empty array. An unsupported listed extension makes the JWS invalid.
+RFC 7515, Section 4.1.11 imposes producer-side structural requirements: `crit` is a non-empty array of extension header names, and producers must not include duplicate names, registered JWS/JWA names, names absent from the JOSE header, or an empty array. Separately, a recipient must understand and process every extension listed in `crit`; this deployment supports none, so it rejects every otherwise-structurally-valid `crit` declaration. Rejecting registered names is therefore a producer validation rule, while rejecting unsupported critical extensions is this deployment's recipient policy.
 
 This repository uses JWS Compact Serialization for OIDC bearer tokens. Its JOSE header is the protected header segment, and the validation runs before any key lookup. Rejection therefore cannot be bypassed by selecting another key or algorithm.
 

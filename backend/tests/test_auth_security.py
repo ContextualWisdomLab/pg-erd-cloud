@@ -314,6 +314,36 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     }
 
 
+@pytest.mark.asyncio
+async def test_oidc_rejects_jwk_algorithm_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "alg": "RS384"}]}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(
+        auth.jwt.PyJWK,
+        "from_dict",
+        lambda *_args, **_kwargs: pytest.fail(
+            "mismatched JWK alg must be rejected first"
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._decode_verified_oidc_token("ey...fake...")
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
 @pytest.mark.parametrize(
     ("header", "detail"),
     [
