@@ -393,7 +393,7 @@ def test_optional_connector_failure_and_row_shapes(
     ]
 
     class MismatchedTupleCursor:
-        description = [("one",), ("two",)]
+        description = (("one",), ("two",))
 
         def execute(self, sql: str, params: object) -> None:
             assert sql == "fixed"
