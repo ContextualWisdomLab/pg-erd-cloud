@@ -47,3 +47,7 @@ Monitor the count of inferred candidates and accepted inferred edges by identifi
 PostgreSQL Global Development Group. (2026). *4.1. Lexical structure*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
 
 PostgreSQL Global Development Group. (2026). *9.4. String functions and operators*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/functions-string.html
+
+Su, W., Wang, J., & Lochovsky, F. H. (2006). Holistic schema matching for web query interfaces. In Y. K. Ng, M. Kitsuregawa, J. Li, & K. Chang (Eds.), *Advances in database technology—EDBT 2006* (pp. 77–94). Springer. https://doi.org/10.1007/11687238_8
+
+This peer-reviewed schema-matching work supports treating discovered schema identity as an exact matching key: inference may use bounded naming heuristics to propose a candidate, but it must not rewrite a confirmed identifier before lookup.
