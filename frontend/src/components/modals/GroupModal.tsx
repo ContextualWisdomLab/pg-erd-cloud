@@ -3,6 +3,7 @@ import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
 import { useDialogAccessibility } from './useDialogAccessibility';
+import './GroupModal.css';
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -32,6 +33,38 @@ export function GroupModal({
   onAssignBusinessGroup,
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
+  const swatchRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const checkedColorIndex = BUSINESS_GROUP_COLORS.findIndex(
+    (color) => color === newGroupColor,
+  );
+  const tabStopIndex = checkedColorIndex >= 0 ? checkedColorIndex : 0;
+
+  const selectColorAt = (index: number) => {
+    const color = BUSINESS_GROUP_COLORS[index];
+    if (color === undefined) return;
+
+    setNewGroupColor(color);
+    swatchRefs.current[index]?.focus();
+  };
+
+  const handleColorKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex: number | null = null;
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (index + 1) % BUSINESS_GROUP_COLORS.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex =
+        (index - 1 + BUSINESS_GROUP_COLORS.length) % BUSINESS_GROUP_COLORS.length;
+    }
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    selectColorAt(nextIndex);
+  };
 
   if (!isOpen) return null;
 
@@ -72,15 +105,21 @@ export function GroupModal({
             role="radiogroup"
             aria-label="그룹 색상"
           >
-            {BUSINESS_GROUP_COLORS.map((color) => (
+            {BUSINESS_GROUP_COLORS.map((color, index) => (
               <button
                 type="button"
+                role="radio"
                 aria-label={`색상 ${color}`}
-                aria-pressed={newGroupColor === color}
+                aria-checked={newGroupColor === color}
                 className="groupManager__swatch"
                 key={color}
                 onClick={() => setNewGroupColor(color)}
+                onKeyDown={(event) => handleColorKeyDown(event, index)}
+                ref={(element) => {
+                  swatchRefs.current[index] = element;
+                }}
                 style={{ background: color }}
+                tabIndex={tabStopIndex === index ? 0 : -1}
               />
             ))}
           </div>
