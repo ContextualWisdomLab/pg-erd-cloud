@@ -69,7 +69,7 @@ const tokenPreviewStyle = ({ kind, token }: TokenDefinition): CSSProperties => {
 
   if (kind === 'color') return { ...base, background: `var(${token})` }
   if (kind === 'radius') return { ...base, borderRadius: `var(${token})` }
-  if (kind === 'space') return { ...base, width: `var(${token})` }
+  if (kind === 'space') return { ...base, minWidth: 0, width: `var(${token})` }
   return { ...base, boxShadow: `var(${token})` }
 }
 

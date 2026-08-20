@@ -77,6 +77,12 @@ describe('Design token Storybook inventory', () => {
       }).getAttribute('style'),
     ).toContain('var(--radius-control)')
 
+    const verticalSpacePreview = within(layoutSection as HTMLElement).getByRole('img', {
+      name: 'control vertical space token preview',
+    })
+    expect(verticalSpacePreview.getAttribute('style')).toContain('min-width: 0')
+    expect(verticalSpacePreview.getAttribute('style')).toContain('var(--space-control-y)')
+
     expect(screen.getAllByRole('img')).toHaveLength(expectedTokens.length)
   })
 })
