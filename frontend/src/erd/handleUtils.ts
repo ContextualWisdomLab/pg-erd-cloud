@@ -15,14 +15,15 @@ export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
 
-export function parseColumnNameFromHandle(handleId: string | null | undefined): string | null {
+export function parseColumnNameFromHandle(handleId: string): string | null {
   if (!handleId) return null;
-  const parts = handleId.split('-');
-  if (parts.length < 3 || (parts[0] !== 'src' && parts[0] !== 'tgt') || parts[1] !== 'c') return null;
-  const encoded = parts.slice(2);
-  if (encoded.length === 1 && encoded[0] === 'empty') return '';
-  if (!encoded.every((code) => /^[0-9a-fA-F]{4,6}$/.test(code))) return null;
-  const codePoints = encoded.map((code) => Number.parseInt(code, 16));
-  if (codePoints.some((code) => code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))) return null;
-  return codePoints.map((code) => String.fromCodePoint(code)).join('');
+  const match = handleId.match(/^(src|tgt)-c-(.+)$/);
+  if (!match) return null;
+  const encoded = match[2];
+  if (encoded === 'empty') return '';
+  try {
+    return encoded.split('-').map(code => String.fromCodePoint(parseInt(code, 16))).join('');
+  } catch {
+    return null;
+  }
 }

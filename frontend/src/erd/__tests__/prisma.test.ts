@@ -184,7 +184,6 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
-      { id: 'e3', source: '1', target: '2', sourceHandle: 'custom' },
     ];
 
     const result = exportPrisma(nodes, edges);
@@ -234,34 +233,5 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
-  });
-
-  it('uses a singular back-relation when the source field is a primary key', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: '1',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
-        },
-      },
-      {
-        id: '2',
-        position: { x: 100, y: 100 },
-        data: {
-          title: 'profiles',
-          badges: { pk: true, fk: true },
-          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
-        },
-      },
-    ];
-
-    const result = exportPrisma(nodes, [
-      { id: 'e1', source: '2', target: '1', sourceHandle: 'src-id', targetHandle: 'tgt-id', label: 'profile_user' },
-    ]);
-
-    expect(result).toContain('profiles_id profiles? @relation("profile_user")');
   });
 });

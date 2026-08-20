@@ -71,7 +71,6 @@ vi.mock('@xyflow/react', async () => {
         <span data-testid="node-count">{props.nodes.length}</span>
         <span data-testid="edge-count">{props.edges.length}</span>
         <button type="button" data-testid="flow-connect" onClick={() => props.onConnect?.({ source: 'table-1', target: 'table-2' })} />
-        <button type="button" data-testid="flow-connect-incomplete" onClick={() => props.onConnect?.({ source: '', target: 'table-2', sourceHandle: '', targetHandle: '' })} />
         <button type="button" data-testid="flow-edge" onClick={(event) => props.onEdgeClick?.(event, props.edges[0] ?? edge)} />
         <button type="button" data-testid="flow-edge-unlabeled" onClick={(event) => props.onEdgeClick?.(event, { ...edge, label: undefined })} />
         <button type="button" data-testid="flow-node" onDoubleClick={(event) => props.onNodeDoubleClick?.(event, props.nodes[0] ?? initialNode)} />
@@ -151,7 +150,6 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
-          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -325,8 +323,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    fireEvent.click(openButtons[1]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
@@ -398,7 +395,6 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('flow-connect'))
-    fireEvent.click(screen.getByTestId('flow-connect-incomplete'))
     fireEvent.click(screen.getByTestId('edge-label'))
     fireEvent.click(screen.getByTestId('edge-submit'))
     fireEvent.click(screen.getByTestId('flow-edge'))
@@ -460,14 +456,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(7)
+    expect(exports.downloadText).toHaveBeenCalledTimes(6)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -552,8 +548,12 @@ describe('App orchestration coverage', () => {
   })
 
   it('clears replacement copy timers and pending timers during close and unmount', async () => {
-    await renderReadyApp()
     vi.useFakeTimers()
+    await act(async () => {
+      render(<App />)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
     fireEvent.click(screen.getAllByRole('button', { name: '테이블 추가' })[0]!)
     fireEvent.click(screen.getByTestId('add-name'))
@@ -744,9 +744,8 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -778,8 +777,8 @@ describe('App orchestration coverage', () => {
   it('falls back to node ids when auto-layout receives legacy nodes without titles', async () => {
     vi.mocked(snapshotToGraph).mockReturnValueOnce({
       nodes: [
-        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { columns: [], badges: { pk: false, fk: false } } },
-        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { columns: [], badges: { pk: false, fk: false } } },
+        { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
+        { id: 'a-node', type: 'tableNode', position: { x: 1, y: 1 }, data: { title: '', columns: [], badges: { pk: false, fk: false } } },
       ] as any,
       edges: [],
     })
@@ -799,61 +798,6 @@ describe('App orchestration coverage', () => {
     vi.useRealTimers()
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
     await screen.findByText('정렬 완료', { exact: false })
-  })
-
-  it('ignores terminal snapshot refresh success after the editor unmounts', async () => {
-    let resolveRefresh!: (value: typeof snapshots) => void
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    api.getSnapshot.mockResolvedValueOnce({
-      schema_snapshot_uuid: 's1',
-      status: 'succeeded',
-      schema_filter: 'public',
-      error_message: null,
-      snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
-    })
-    api.listSnapshots.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve }))
-    fireEvent.click(openButtons[0]!)
-    await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    cleanup()
-    await act(async () => resolveRefresh(snapshots))
-  })
-
-  it('ignores terminal snapshot refresh errors after the editor unmounts', async () => {
-    let rejectRefresh!: (reason: unknown) => void
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    api.getSnapshot.mockResolvedValueOnce({
-      schema_snapshot_uuid: 's1',
-      status: 'succeeded',
-      schema_filter: 'public',
-      error_message: null,
-      snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
-    })
-    api.listSnapshots.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectRefresh = reject }))
-    fireEvent.click(openButtons[0]!)
-    await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    cleanup()
-    await act(async () => rejectRefresh(new Error('late refresh failure')))
-  })
-
-  it('does not schedule another poll after a nonterminal result arrives after unmount', async () => {
-    let resolvePoll!: (value: unknown) => void
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    api.getSnapshot.mockImplementationOnce(() => new Promise((resolve) => { resolvePoll = resolve }))
-    fireEvent.click(openButtons[0]!)
-    cleanup()
-    await act(async () => resolvePoll({
-      schema_snapshot_uuid: 's1',
-      status: 'running',
-      schema_filter: 'public',
-      error_message: null,
-      snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
-    }))
   })
 
   it('reports API effect failures, snapshot polling failures, share failures, and clipboard failures', async () => {

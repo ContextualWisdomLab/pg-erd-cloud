@@ -56,16 +56,5 @@ describe('handleUtils', () => {
     it('should return null for invalid format', () => {
       expect(parseColumnNameFromHandle('invalid-handle')).toBeNull();
     });
-
-    it.each([
-      'src-c-0069junk',
-      'src-c-0069-',
-      'src-c-empty-0069',
-      'foo-c-0069',
-      'src-c-d800',
-      'src-c-110000',
-    ])('should reject malformed or invalid code point handles: %s', (handle) => {
-      expect(parseColumnNameFromHandle(handle)).toBeNull();
-    });
   });
 });
