@@ -67,6 +67,10 @@ class ProjectSpace(Base):
         DateTime(timezone=True), default=utcnow
     )
 
+    __table_args__ = (
+        Index("ix_project_space__created_by_user_uuid", "created_by_user_uuid"),
+    )
+
 
 class ProjectMember(Base):
     """Membership mapping between users and projects with a role."""
@@ -104,7 +108,6 @@ class DbConnection(Base):
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
-        index=True,
     )
     conn_name: Mapped[str] = mapped_column(Text())
     dsn_ciphertext: Mapped[bytes] = mapped_column(LargeBinary())
@@ -114,6 +117,10 @@ class DbConnection(Base):
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_db_connection__project_space_uuid", "project_space_uuid"),
     )
 
 
@@ -128,7 +135,6 @@ class SchemaSnapshot(Base):
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
-        index=True,
     )
     db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -145,6 +151,10 @@ class SchemaSnapshot(Base):
     error_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_schema_snapshot__project_space_uuid", "project_space_uuid"),
     )
 
 
@@ -204,7 +214,6 @@ class DiagramView(Base):
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
-        index=True,
     )
     name: Mapped[str] = mapped_column(Text())
     # Opaque, client-defined layout payload (node positions, hidden tables,
@@ -218,6 +227,10 @@ class DiagramView(Base):
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_diagram_view__project_space_uuid", "project_space_uuid"),
     )
 
 
@@ -237,7 +250,6 @@ class TableAnnotation(Base):
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
-        index=True,
     )
     schema_name: Mapped[str] = mapped_column(Text())
     relation_name: Mapped[str] = mapped_column(Text())
@@ -259,6 +271,7 @@ class TableAnnotation(Base):
             "relation_name",
             name="uq_table_annotation__project_table",
         ),
+        Index("ix_table_annotation__project_space_uuid", "project_space_uuid"),
     )
 
 
@@ -273,7 +286,6 @@ class ShareLink(Base):
     project_space_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
-        index=True,
     )
     created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -285,6 +297,10 @@ class ShareLink(Base):
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_share_link__project_space_uuid", "project_space_uuid"),
     )
 
 
@@ -305,14 +321,18 @@ class ApiKey(Base):
     user_account_uuid: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user_account.user_account_uuid", ondelete="CASCADE"),
-        index=True,
     )
     key_name: Mapped[str] = mapped_column(Text())
-    key_hash: Mapped[str] = mapped_column(Text(), unique=True, index=True)
+    key_hash: Mapped[str] = mapped_column(Text())
     key_prefix: Mapped[str] = mapped_column(Text())
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
     revoked_at: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_api_key__user", "user_account_uuid"),
+        Index("ix_api_key__hash", "key_hash", unique=True),
     )
