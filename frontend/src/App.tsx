@@ -340,7 +340,6 @@ export default function App() {
           return;
         }
 
-        /* v8 ignore next -- cleanup cannot interleave this synchronous branch; the guard above handles stale responses. */
         if (isCurrent) {
           timer = window.setTimeout(poll, 1000);
         }
@@ -863,6 +862,7 @@ export default function App() {
 
   function onDeleteTable() {
     if (!editingNode) return;
+    if (!window.confirm("정말로 이 테이블을 삭제하시겠습니까?")) return;
 
     // Remove the node
     setNodes((nds) => nds.filter((n) => n.id !== editingNode.id));
