@@ -4,7 +4,9 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.pg_introspect.forward_ddl import ForwardDdlValidationError, validate_forward_ddl
 
 
 class ProjectCreateIn(BaseModel):
@@ -73,7 +75,6 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
-        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
             "identifiers. Arbitrary SQL is rejected."
@@ -81,6 +82,16 @@ class ApplySqlIn(BaseModel):
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql(cls, value: str) -> str:
+        """Reject arbitrary SQL before it reaches the database adapter."""
+        try:
+            validate_forward_ddl(value)
+        except ForwardDdlValidationError as exc:
+            raise ValueError(str(exc)) from exc
+        return value
 
 
 class ApplySqlOut(BaseModel):

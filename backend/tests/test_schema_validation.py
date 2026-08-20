@@ -70,6 +70,20 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
 
 
+@pytest.mark.parametrize(
+    "sql",
+    (
+        "DROP TABLE users;",
+        "CREATE TABLE safe_table (id bigint); DROP TABLE users;",
+        "CREATE TABLE \"unsafe_table\" (id bigint);",
+    ),
+)
+def test_apply_sql_rejects_non_allowlisted_statements(sql: str) -> None:
+    """The request model must reject SQL before the execution layer runs."""
+    with pytest.raises(ValidationError):
+        ApplySqlIn(sql=sql)
+
+
 @pytest.mark.parametrize("model, field_name, payload", _C1_FIELD_CASES)
 @pytest.mark.parametrize("control", ("\x80", "\x9f"))
 def test_schema_fields_reject_unicode_c1_controls(model, field_name, payload, control) -> None:
