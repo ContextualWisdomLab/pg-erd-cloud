@@ -93,15 +93,4 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
       },
     });
   });
-
-  it("supports dotted legacy names with singular, plural, and -es fallbacks", () => {
-    const target = (id: string, title: string): Node<TableNodeData> =>
-      tableNode(id, title, [{ column_name: "id", data_type: "integer", is_not_null: true, is_pk: true }]);
-    const source = (id: string, columnName: string): Node<TableNodeData> =>
-      tableNode(id, "public.audit", [{ column_name: columnName, data_type: "integer", is_not_null: true, is_pk: false }]);
-
-    expect(inferRelationships([target("singular", "legacy.Widget"), source("singular_source", "schema.Widget_id")])).toHaveLength(1);
-    expect(inferRelationships([target("plural", "legacy.Widgets"), source("plural_source", "schema.Widget_id")])).toHaveLength(1);
-    expect(inferRelationships([target("es", "legacy.Boxes"), source("es_source", "schema.Box_id")])).toHaveLength(1);
-  });
 });

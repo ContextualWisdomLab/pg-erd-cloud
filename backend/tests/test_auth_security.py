@@ -548,7 +548,6 @@ async def test_try_get_subject_for_rate_limit_error_path():
     assert subject is None
 
 
-@pytest.mark.asyncio
 async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

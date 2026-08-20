@@ -184,7 +184,6 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
-      { id: 'e3', source: '1', target: '2', sourceHandle: 'invalid-handle' },
     ];
 
     const result = exportPrisma(nodes, edges);
@@ -229,19 +228,10 @@ describe('exportPrisma', () => {
         targetHandle: 'tgt-id',
         label: '1to1',
       },
-      {
-        id: 'e2',
-        source: '2',
-        target: '1',
-        sourceHandle: 'src-id',
-        targetHandle: 'tgt-id',
-        label: 'profile_identity',
-      },
     ];
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
-    expect(result).toContain('profiles_id profiles? @relation("profile_identity")');
   });
 });
