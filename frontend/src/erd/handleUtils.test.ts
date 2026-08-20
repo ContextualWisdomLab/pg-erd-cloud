@@ -56,5 +56,14 @@ describe('handleUtils', () => {
     it('should return null for invalid format', () => {
       expect(parseColumnNameFromHandle('invalid-handle')).toBeNull();
     });
+
+    it.each([
+      'src-c-0069-0064-invalid',
+      'src-c-d800',
+      'src-c-110000',
+      'src-c-0069-0064g',
+    ])('should reject malformed code point token %s', (handleId) => {
+      expect(parseColumnNameFromHandle(handleId)).toBeNull();
+    });
   });
 });
