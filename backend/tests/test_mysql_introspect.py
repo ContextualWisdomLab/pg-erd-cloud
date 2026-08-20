@@ -6,7 +6,11 @@ import pytest
 
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
-from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
+from app.mysql_introspect.introspect import (
+    MysqlIntrospectionRows,
+    _parse_mysql_dsn,
+    rows_to_snapshot,
+)
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -40,7 +44,10 @@ INDEXES = [
 
 
 def _snap():
-    return rows_to_snapshot("8.4.0", None, TABLES, COLUMNS, KEY_USAGE, INDEXES)
+    rows = MysqlIntrospectionRows(
+        tables=TABLES, columns=COLUMNS, key_usage=KEY_USAGE, indexes=INDEXES
+    )
+    return rows_to_snapshot("8.4.0", None, rows)
 
 
 def test_maps_tables_views_columns():

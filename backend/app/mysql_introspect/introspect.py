@@ -13,7 +13,7 @@ import asyncio
 import datetime as dt
 import importlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict, cast
 from urllib.parse import unquote, urlparse
 
 from app.pg_introspect.column_examples import add_column_examples
@@ -78,7 +78,9 @@ def _connect(config: MysqlDsnConfig) -> Any:
     )
 
 
-def _fetch_dicts(cursor: Any, sql: str, params: tuple[object, ...] = ()) -> list[dict]:
+def _fetch_dicts(
+    cursor: Any, sql: str, params: tuple[object, ...] = ()
+) -> list[dict[str, object]]:
     cursor.execute(sql, params or None)
     names = [d[0] for d in cursor.description or []]
     return [dict(zip(names, row)) for row in cursor.fetchall()]
@@ -91,47 +93,103 @@ def _schema_filter_clause(schema_filter: str | None) -> tuple[str, tuple[object,
     return f"TABLE_SCHEMA NOT IN ({placeholders})", _SYSTEM_SCHEMAS
 
 
+class MysqlTableRow(TypedDict):
+    """One row returned by the MySQL information_schema.TABLES query."""
+
+    TABLE_SCHEMA: str
+    TABLE_NAME: str
+    TABLE_TYPE: str
+    TABLE_COMMENT: str | None
+
+
+class MysqlColumnRow(TypedDict):
+    """One row returned by the MySQL information_schema.COLUMNS query."""
+
+    TABLE_SCHEMA: str
+    TABLE_NAME: str
+    COLUMN_NAME: str
+    ORDINAL_POSITION: int
+    COLUMN_TYPE: str | None
+    DATA_TYPE: str | None
+    IS_NULLABLE: str
+    COLUMN_DEFAULT: object | None
+    COLUMN_COMMENT: str | None
+
+
+class MysqlKeyUsageRow(TypedDict):
+    """One row returned by the MySQL information_schema.KEY_COLUMN_USAGE query."""
+
+    CONSTRAINT_NAME: str
+    TABLE_SCHEMA: str
+    TABLE_NAME: str
+    COLUMN_NAME: str
+    ORDINAL_POSITION: int
+    REFERENCED_TABLE_SCHEMA: str | None
+    REFERENCED_TABLE_NAME: str | None
+    REFERENCED_COLUMN_NAME: str | None
+
+
+class MysqlIndexRow(TypedDict):
+    """One row returned by the MySQL information_schema.STATISTICS query."""
+
+    TABLE_SCHEMA: str
+    TABLE_NAME: str
+    INDEX_NAME: str
+    NON_UNIQUE: int
+    SEQ_IN_INDEX: int
+    COLUMN_NAME: str
+
+
+@dataclass(frozen=True)
+class MysqlIntrospectionRows:
+    """Rows fetched from information_schema."""
+
+    tables: list[MysqlTableRow]
+    columns: list[MysqlColumnRow]
+    key_usage: list[MysqlKeyUsageRow]
+    indexes: list[MysqlIndexRow]
+
+
 def rows_to_snapshot(
     version: str,
     schema_filter: str | None,
-    tables: list[dict],
-    columns: list[dict],
-    key_usage: list[dict],
-    indexes: list[dict],
+    rows: MysqlIntrospectionRows,
 ) -> dict[str, Any]:
     """Pure transformation: information_schema rows → common snapshot JSON."""
     oid_by_table: dict[tuple[str, str], int] = {}
     relations: list[dict[str, Any]] = []
-    for i, row in enumerate(tables, start=1):
-        key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]))
+    for i, table_row in enumerate(rows.tables, start=1):
+        key = (str(table_row["TABLE_SCHEMA"]), str(table_row["TABLE_NAME"]))
         oid_by_table[key] = i
         relations.append(
             {
                 "relation_oid": i,
-                "relation_kind": "v" if str(row.get("TABLE_TYPE", "")).upper() == "VIEW" else "r",
+                "relation_kind": "v" if str(table_row.get("TABLE_TYPE", "")).upper() == "VIEW" else "r",
                 "schema_name": key[0],
                 "relation_name": key[1],
-                "relation_comment": str(row.get("TABLE_COMMENT") or "") or None,
+                "relation_comment": str(table_row.get("TABLE_COMMENT") or "") or None,
             }
         )
 
     out_columns: list[dict[str, Any]] = []
-    for row in columns:
-        oid = oid_by_table.get((str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"])))
+    for column_row in rows.columns:
+        oid = oid_by_table.get((str(column_row["TABLE_SCHEMA"]), str(column_row["TABLE_NAME"])))
         if oid is None:
             continue
         out_columns.append(
             {
                 "relation_oid": oid,
-                "column_name": str(row["COLUMN_NAME"]),
-                "column_position": int(row["ORDINAL_POSITION"]),
-                "data_type": str(row.get("COLUMN_TYPE") or row.get("DATA_TYPE") or ""),
-                "is_not_null": str(row.get("IS_NULLABLE", "YES")).upper() == "NO",
-                "has_default": row.get("COLUMN_DEFAULT") is not None,
+                "column_name": str(column_row["COLUMN_NAME"]),
+                "column_position": column_row["ORDINAL_POSITION"],
+                "data_type": str(column_row.get("COLUMN_TYPE") or column_row.get("DATA_TYPE") or ""),
+                "is_not_null": str(column_row.get("IS_NULLABLE", "YES")).upper() == "NO",
+                "has_default": column_row.get("COLUMN_DEFAULT") is not None,
                 "default_expr": (
-                    str(row["COLUMN_DEFAULT"]) if row.get("COLUMN_DEFAULT") is not None else None
+                    str(column_row["COLUMN_DEFAULT"])
+                    if column_row.get("COLUMN_DEFAULT") is not None
+                    else None
                 ),
-                "column_comment": str(row.get("COLUMN_COMMENT") or "") or None,
+                "column_comment": str(column_row.get("COLUMN_COMMENT") or "") or None,
             }
         )
     pos_by_oid_col = {
@@ -142,25 +200,25 @@ def rows_to_snapshot(
     fk_edges: list[dict[str, Any]] = []
     constraints: list[dict[str, Any]] = []
     pk_cols_by_oid: dict[int, list[str]] = {}
-    for row in key_usage:
-        oid = oid_by_table.get((str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"])))
+    for key_row in rows.key_usage:
+        oid = oid_by_table.get((str(key_row["TABLE_SCHEMA"]), str(key_row["TABLE_NAME"])))
         if oid is None:
             continue
-        col = str(row["COLUMN_NAME"])
-        if str(row.get("CONSTRAINT_NAME")) == "PRIMARY":
+        col = str(key_row["COLUMN_NAME"])
+        if str(key_row.get("CONSTRAINT_NAME")) == "PRIMARY":
             pk_columns.append(
                 {
                     "relation_oid": oid,
                     "column_name": col,
-                    "column_ordinal": int(row.get("ORDINAL_POSITION") or 1),
+                    "column_ordinal": key_row.get("ORDINAL_POSITION") or 1,
                 }
             )
             pk_cols_by_oid.setdefault(oid, []).append(col)
-        elif row.get("REFERENCED_TABLE_NAME"):
+        elif key_row.get("REFERENCED_TABLE_NAME"):
             parent = oid_by_table.get(
                 (
-                    str(row.get("REFERENCED_TABLE_SCHEMA") or row["TABLE_SCHEMA"]),
-                    str(row["REFERENCED_TABLE_NAME"]),
+                    str(key_row.get("REFERENCED_TABLE_SCHEMA") or key_row["TABLE_SCHEMA"]),
+                    str(key_row["REFERENCED_TABLE_NAME"]),
                 )
             )
             if parent is None:
@@ -169,12 +227,12 @@ def rows_to_snapshot(
             fk_edges.append(
                 {
                     "fk_constraint_oid": 100000 + edge_id,
-                    "fk_constraint_name": str(row.get("CONSTRAINT_NAME") or f"fk_{edge_id}"),
+                    "fk_constraint_name": str(key_row.get("CONSTRAINT_NAME") or f"fk_{edge_id}"),
                     "child_relation_oid": oid,
                     "parent_relation_oid": parent,
                     "child_column_name": col,
-                    "parent_column_name": str(row["REFERENCED_COLUMN_NAME"]),
-                    "column_ordinal": int(row.get("ORDINAL_POSITION") or 1),
+                    "parent_column_name": str(key_row["REFERENCED_COLUMN_NAME"]),
+                    "column_ordinal": key_row.get("ORDINAL_POSITION") or 1,
                 }
             )
 
@@ -218,13 +276,13 @@ def rows_to_snapshot(
 
     # group STATISTICS rows into per-index column lists
     grouped: dict[tuple[str, str, str], list[tuple[int, str, bool]]] = {}
-    for row in indexes:
-        ix_key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
+    for index_row in rows.indexes:
+        ix_key = (str(index_row["TABLE_SCHEMA"]), str(index_row["TABLE_NAME"]), str(index_row["INDEX_NAME"]))
         grouped.setdefault(ix_key, []).append(
             (
-                int(row.get("SEQ_IN_INDEX") or 1),
-                str(row["COLUMN_NAME"]),
-                not bool(int(row.get("NON_UNIQUE") or 0)),
+                index_row.get("SEQ_IN_INDEX") or 1,
+                str(index_row["COLUMN_NAME"]),
+                not bool(index_row.get("NON_UNIQUE") or 0),
             )
         )
     out_indexes: list[dict[str, Any]] = []
@@ -304,7 +362,13 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
             params,
         )
-        return rows_to_snapshot(version, schema_filter, tables, columns, key_usage, indexes)
+        rows = MysqlIntrospectionRows(
+            tables=cast(list[MysqlTableRow], tables),
+            columns=cast(list[MysqlColumnRow], columns),
+            key_usage=cast(list[MysqlKeyUsageRow], key_usage),
+            indexes=cast(list[MysqlIndexRow], indexes),
+        )
+        return rows_to_snapshot(version, schema_filter, rows)
     finally:
         conn.close()
 
