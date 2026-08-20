@@ -479,6 +479,16 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
+    const unavailableToolbarButtons = screen
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('aria-disabled') === 'true')
+    expect(unavailableToolbarButtons.length).toBeGreaterThan(0)
+    for (const button of unavailableToolbarButtons) {
+      expect(button).not.toBeDisabled()
+      fireEvent.click(button)
+    }
+    expect(screen.queryByRole('heading', { name: '내보내기 산출물' })).not.toBeInTheDocument()
+
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     for (const id of [
       'edge-guard-submit',
