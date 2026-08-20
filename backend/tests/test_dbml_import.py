@@ -99,6 +99,7 @@ def test_preserves_column_defaults_for_snapshot_and_ddl_export():
         """
 Table public.accounts {
   id integer [pk]
+  email varchar [unique]
   status varchar [default: 'active, pending']
   created_at timestamptz [default: now()]
 }
@@ -109,6 +110,10 @@ Table public.accounts {
     assert columns["status"]["has_default"] is True
     assert columns["status"]["default_expr"] == "'active, pending'"
     assert columns["created_at"]["default_expr"] == "now()"
+    unique_email = next(
+        index for index in snap["indexes"] if index["is_unique"] and '"email"' in index["index_def"]
+    )
+    assert unique_email["index_def"].startswith('CREATE UNIQUE INDEX')
     ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
     assert "DEFAULT 'active, pending'" in ddl
     assert "DEFAULT now()" in ddl

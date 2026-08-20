@@ -166,6 +166,11 @@ def _setting_value(settings: str, key: str) -> str | None:
     return None
 
 
+def _has_setting(settings: str, key: str) -> bool:
+    """Return whether a DBML setting is present as a standalone token."""
+    return any(setting.strip().lower() == key for setting in _split_csv(settings) or [])
+
+
 def _parse_index_line(
     line: str,
 ) -> tuple[list[str], bool, bool, str, str | None] | None:
@@ -357,6 +362,12 @@ def parse_dbml(text: str) -> dict[str, Any]:
                     "column_name": col_name,
                     "column_ordinal": len(pk_columns) + 1,
                 }
+            )
+        if _has_setting(raw_settings, "unique"):
+            ordinal = index_ordinals.get(current, 0) + 1
+            index_ordinals[current] = ordinal
+            index_specs.append(
+                (current, [col_name], True, False, "btree", None, ordinal)
             )
         im = _INLINE_REF_RE.search(cm.group("settings") or "")
         if im:
