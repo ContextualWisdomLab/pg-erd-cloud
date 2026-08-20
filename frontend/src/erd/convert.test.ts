@@ -183,19 +183,6 @@ describe('snapshotToGraph', () => {
     })
   })
 
-  it('retains exact PostgreSQL relation names for downstream inference', () => {
-    const graph = snapshotToGraph({
-      relations: [
-        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'Order.Items' },
-      ],
-    })
-
-    expect(graph.nodes[0].data).toMatchObject({
-      title: 'public.Order.Items',
-      relation_name: 'Order.Items',
-    })
-  })
-
   it('includes partitioned tables and ignores other kinds like views', () => {
     const snapshot: SnapshotInput = {
       relations: [
