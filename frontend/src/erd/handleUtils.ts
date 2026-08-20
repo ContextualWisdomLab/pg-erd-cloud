@@ -1,10 +1,16 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  if (!columnName) return 'c-empty'
+  let encoded = ''
+  let isFirst = true
+  for (const char of columnName) {
+    if (!isFirst) {
+      encoded += '-'
+    }
+    isFirst = false
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }
 
-  return `c-${encoded || 'empty'}`
+  return `c-${encoded}`
 }
 
 export function sourceColumnHandleId(columnName: string): string {
