@@ -411,7 +411,6 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
                 f"model:{child.get('relation_oid')}",
                 _class_name(str(child.get("relation_name"))),
             )
-            child_oid = child.get("relation_oid")
             group_key = _fk_group_key(rows)
             relation_name = relation_alloc["names"].get(
                 group_key
