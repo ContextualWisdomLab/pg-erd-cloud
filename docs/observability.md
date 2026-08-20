@@ -60,6 +60,15 @@ When enabled, the backend exposes metrics at:
 - `job_queue_processing_seconds_bucket|sum|count{job_type,outcome}`
   - handler runtime
 
+### Hot working-set and partition trigger
+
+The worker claims due jobs with `status = 'queued'` and
+`ORDER BY run_after, job_queue_uuid`. Migration `0009_hot_queue_claim_index`
+keeps that queued working set in a partial B-tree index instead of repeatedly
+scanning terminal history. Use the alert thresholds below as the measured
+input for a future time-range partition/retention migration; do not partition
+low-write metadata tables without queue-volume evidence.
+
 ## 3) Alerting (suggested baseline)
 
 Tune thresholds per environment; these are reasonable starting points.
