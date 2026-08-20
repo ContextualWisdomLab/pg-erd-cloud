@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { snapshotToGraph } from './convert'
+import { inferRelationships } from './autoInfer'
 
 type SnapshotInput = Parameters<typeof snapshotToGraph>[0]
 
@@ -168,6 +169,26 @@ describe('snapshotToGraph', () => {
     const graph = snapshotToGraph(snapshot)
     expect(graph.nodes).toHaveLength(0)
     expect(graph.edges).toHaveLength(0)
+  })
+
+  it('preserves dotted PostgreSQL relation names for inferred relationships', () => {
+    const snapshot: SnapshotInput = {
+      relations: [
+        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'Order.Items' },
+        { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'Order.Audit' },
+      ],
+      columns: [
+        { relation_oid: 1, column_name: 'id', data_type: 'bigint', is_not_null: true },
+        { relation_oid: 2, column_name: 'Order.Items_id', data_type: 'bigint', is_not_null: true },
+      ],
+    }
+
+    const graph = snapshotToGraph(snapshot)
+    const edges = inferRelationships(graph.nodes)
+
+    expect(graph.nodes[0].data.relation_name).toBe('Order.Items')
+    expect(edges).toHaveLength(1)
+    expect(edges[0]).toMatchObject({ source: '2', target: '1' })
   })
 
   it('includes partitioned tables and ignores other kinds like views', () => {
