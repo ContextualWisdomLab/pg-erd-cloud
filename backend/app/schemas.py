@@ -5,6 +5,7 @@ import uuid
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
+
 from app.pg_introspect.forward_ddl import validate_forward_ddl
 
 
