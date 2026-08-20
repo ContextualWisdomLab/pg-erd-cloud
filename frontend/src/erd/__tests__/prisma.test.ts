@@ -155,6 +155,28 @@ describe('exportPrisma', () => {
     expect(result).toContain('a_b_c String');
   });
 
+  it('prefixes Prisma reserved model and field names', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'reserved',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'model',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'enum', data_type: 'text', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, []);
+
+    expect(result).toContain('model M_model {');
+    expect(result).toContain('M_enum String');
+  });
+
   it('handles edge cases for edges without handles or invalid ids', () => {
     const nodes: Node<TableNodeData>[] = [
       {
