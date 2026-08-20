@@ -340,7 +340,6 @@ export default function App() {
           return;
         }
 
-        /* v8 ignore next -- after the current response guard, cleanup cannot interleave with this synchronous branch */
         if (isCurrent) {
           timer = window.setTimeout(poll, 1000);
         }
