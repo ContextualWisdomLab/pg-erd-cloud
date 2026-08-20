@@ -26,4 +26,8 @@ controlled orchestration experiments, not application defaults.
 
 Omidvar, H., & Akhlaghi, V. (2026). *A communication-theoretic framework for LLM agents: Cost-aware adaptive reliability* [Preprint]. arXiv. https://doi.org/10.48550/arXiv.2605.09121
 
+This framework treats routing, retry, voting, and verification as reliability operators and introduces a cost-aware router that moves along a quality-cost frontier. It supports making orchestration depth and verification an adaptive gateway decision rather than a fixed application-level model choice.
+
 Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Technical report]. arXiv. https://doi.org/10.48550/arXiv.2606.21228
+
+The Fugu report describes orchestrator models that dynamically select agentic scaffolds and combine specialized agents. It supports the default auto mode because task difficulty can determine whether a single worker, verification, or a deeper multi-agent workflow is appropriate.

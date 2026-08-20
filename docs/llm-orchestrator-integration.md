@@ -47,7 +47,7 @@ Orchestrator agent config (on the orchestrator side, env-backed key):
 ```
 
 Run: `python -m contextual_orchestrator --serve --agents agents.json \
---inference-token "$CONTEXTUAL_ORCHESTRATOR_TOKEN" --port 8000` with
+--auth-token "$CONTEXTUAL_ORCHESTRATOR_TOKEN" --port 8000` with
 `OPENAI_API_KEY` supplied from the org Secret at deploy time.
 
 ## Fallback
