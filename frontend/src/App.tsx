@@ -267,7 +267,7 @@ export default function App() {
         setSelectedProjectId(null);
         setConnections([]);
         setSelectedConnId(null);
-        setAuthError('An unexpected error occurred while authenticating.');
+        setAuthError(String(e));
       })
       .finally(() => {
         if (isCurrent) setIsAuthLoading(false);
@@ -293,14 +293,14 @@ export default function App() {
         if (c[0]) setSelectedConnId(c[0].db_connection_uuid);
       })
       .catch((e) => {
-        if (isCurrent) setError('An unexpected error occurred while processing your request.');
+        if (isCurrent) setError(String(e));
       });
     listSnapshots(selectedProjectId)
       .then((items) => {
         if (isCurrent) setSnapshots(items);
       })
       .catch((e) => {
-        if (isCurrent) setError('An unexpected error occurred while processing your request.');
+        if (isCurrent) setError(String(e));
       });
     return () => {
       isCurrent = false;
@@ -318,11 +318,11 @@ export default function App() {
             if (selectedProjectId) {
               listSnapshots(selectedProjectId)
                 .then(setSnapshots)
-                .catch((e) => setError('An unexpected error occurred while processing your request.'));
+                .catch((e) => setError(String(e)));
             }
           }
         })
-        .catch((e) => setError('An unexpected error occurred while processing your request.'));
+        .catch((e) => setError(String(e)));
     }, 1000);
     return () => clearInterval(timer);
   }, [selectedProjectId, snapshotId]);
@@ -578,7 +578,7 @@ export default function App() {
       const link = await createShareLink(selectedProjectId);
       setShareLinkUrl(link.url);
     } catch (error) {
-      setShareLinkError('An unexpected error occurred while processing your request.');
+      setShareLinkError(String(error));
     } finally {
       setIsCreatingShareLink(false);
     }
