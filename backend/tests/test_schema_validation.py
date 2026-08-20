@@ -16,6 +16,17 @@ from app.schemas import (
 
 
 _C1_FIELD_CASES = (
+    (ProjectCreateIn, "project_name", {"project_name": "safe"}),
+    (
+        ProjectMemberAddIn,
+        "member_subject",
+        {"member_subject": "dev:safe", "project_role": "viewer"},
+    ),
+    (
+        ConnectionCreateIn,
+        "conn_name",
+        {"conn_name": "safe", "dsn": "postgresql://localhost/db"},
+    ),
     (ApplySqlIn, "sql", {"sql": "CREATE TABLE safe_table (id integer);"}),
     (DiagramViewCreateIn, "name", {"name": "safe", "layout_json": {}}),
     (TableAnnotationUpsertIn, "schema_name", {"schema_name": "public", "relation_name": "users", "body": "note"}),
