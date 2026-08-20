@@ -23,16 +23,3 @@ We aim to:
 - Fix the issue and coordinate disclosure within **90 days**, when feasible
 
 Timelines may vary depending on severity, complexity, and downstream impact.
-
-## PostgreSQL connection-file boundary
-
-PostgreSQL connection strings are untrusted input. They may select a permitted
-network target and standard non-file connection options, but they cannot name
-files on the pg-erd-cloud host. The connection guard rejects `passfile`,
-`sslcert`, `sslcrl`, `sslkey`, and `sslrootcert` query parameters before DNS or
-driver setup, using one fixed error that does not disclose the supplied path.
-
-Client certificates and custom trust roots require a future server-owned secret
-provider that passes already-authorized material to the connection layer. A
-browser-supplied path and a hard-coded filesystem allowlist are not secret
-authorization and must not be used as a substitute.
