@@ -42,6 +42,8 @@ def infer_relationships(snapshot: dict[str, Any] | None) -> list[dict[str, Any]]
     pk_columns = snapshot.get("pk_columns") or []
     fk_edges = snapshot.get("fk_edges") or []
 
+    rel_by_oid: dict[Any, dict[str, Any]] = {r.get("relation_oid"): r for r in relations}
+
     # relation_name (lower) -> list of relation dicts (there may be same name in
     # multiple schemas; we only infer within the same schema to avoid noise).
     by_name: dict[str, list[dict[str, Any]]] = {}
