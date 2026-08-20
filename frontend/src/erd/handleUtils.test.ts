@@ -49,4 +49,9 @@ describe('handleUtils', () => {
     expect(decodeColumnHandle('src-user_id', 'src')).toBeNull();
     expect(decodeHandleId('src-c-110000')).toBeNull();
   });
+
+  it('rejects noncanonical overpadded hexadecimal chunks', () => {
+    expect(decodeHandleId('src-c-00069')).toBeNull();
+    expect(decodeColumnHandle('src-c-00075-0073-0065-0072', 'src')).toBeNull();
+  });
 });
