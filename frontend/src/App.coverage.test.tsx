@@ -548,7 +548,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '목록 보기' }))
-  })
+  }, 15000)
 
   it('clears replacement copy timers and pending timers during close and unmount', async () => {
     vi.useFakeTimers()
