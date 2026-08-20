@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { Inventory } from './design-tokens.stories'
 
@@ -47,6 +47,8 @@ const renderInventory = () => {
   const storyRender = Inventory.render as unknown as () => ReactElement
   render(storyRender())
 }
+
+afterEach(cleanup)
 
 describe('Design token Storybook inventory', () => {
   it('renders every shared token under the semantic inventory groups', () => {
