@@ -57,7 +57,7 @@ async def create_api_key(
         api_key_uuid=uuid.uuid4(),
         user_account_uuid=user.user_account_uuid,
         key_name=str(sanitize_for_storage(body.key_name)),
-        key_hash=hash_api_key(token),
+        key_hash=await hash_api_key(token),
         key_prefix=token[: len(API_KEY_PREFIX) + 6],
         created_at=dt.datetime.now(dt.timezone.utc),
         revoked_at=None,

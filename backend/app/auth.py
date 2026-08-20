@@ -411,7 +411,7 @@ API_KEY_PREFIX = "pgerd_"
 API_KEY_PBKDF2_ITERATIONS = 210_000
 
 
-def hash_api_key(token: str) -> str:
+async def hash_api_key(token: str) -> str:
     """Deterministic PBKDF2-HMAC digest of an API key (indexable lookup).
 
     API keys are server-generated random bearer credentials, but CodeQL treats
@@ -422,12 +422,15 @@ def hash_api_key(token: str) -> str:
     test guessed keys offline.
     """
 
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        token.encode("utf-8"),
-        settings.app_secret.encode("utf-8"),
-        API_KEY_PBKDF2_ITERATIONS,
-    ).hex()
+    def _hash() -> str:
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            token.encode("utf-8"),
+            settings.app_secret.encode("utf-8"),
+            API_KEY_PBKDF2_ITERATIONS,
+        ).hex()
+
+    return await asyncio.to_thread(_hash)
 
 
 async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
@@ -437,10 +440,11 @@ async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     401 so keys cannot be probed) and rejects revoked keys.
     """
 
+    key_hash = await hash_api_key(token)
     row = await session.execute(
         select(ApiKey, UserAccount)
         .join(UserAccount, UserAccount.user_account_uuid == ApiKey.user_account_uuid)
-        .where(ApiKey.key_hash == hash_api_key(token))
+        .where(ApiKey.key_hash == key_hash)
     )
     pair = row.first()
     if pair is None or pair[0].revoked_at is not None:
