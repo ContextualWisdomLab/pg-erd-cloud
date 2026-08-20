@@ -1,10 +1,24 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type {
+  Connection,
+  DiagramView,
+  DiagramViewDetail,
+  DiagramViewLayout,
+  Project,
+  ShareLink,
+  Snapshot,
+  SnapshotDetail,
+  SnapshotDetailResponse,
+  SnapshotJson,
+} from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+const MAX_DIAGRAM_VIEW_NAME_LENGTH = 200
+const MAX_DIAGRAM_VIEW_LAYOUT_BYTES = 512 * 1024
 
+let demoDiagramViewSequence = 0
 let demoProjects: Project[] = [
   { project_space_uuid: 'demo-shopping', project_name: '쇼핑몰 시스템' },
   { project_space_uuid: 'demo-hr', project_name: '회사 인사관리' },
@@ -28,6 +42,8 @@ const demoSnapshotsByProject: Record<string, Snapshot[]> = {
     { schema_snapshot_uuid: 'demo-commerce-snapshot', status: 'succeeded', schema_filter: 'sales' }
   ]
 }
+
+const demoDiagramViewsByProject: Record<string, DiagramViewDetail[]> = {}
 
 const demoSnapshotJson: SnapshotJson = {
   relations: [
@@ -76,6 +92,8 @@ type CsrfTokenResponse = {
 
 type ShareLinkResponse = Omit<ShareLink, 'url'>
 
+type DiagramViewMutation = 'create' | 'update'
+
 function isLocalDevelopmentHost(hostname: string): boolean {
   return (
     hostname === 'localhost' ||
@@ -90,6 +108,60 @@ function requireSecureCredentialTransport(): void {
   if (targetUrl.protocol !== 'https:' && !isLocalDevelopmentHost(targetUrl.hostname)) {
     throw new Error('createConnection requires HTTPS for credential transport')
   }
+}
+
+function cloneDiagramViewLayout(layout: DiagramViewLayout): DiagramViewLayout {
+  return structuredClone(layout)
+}
+
+function diagramViewSummary(view: DiagramViewDetail): DiagramView {
+  return {
+    diagram_view_uuid: view.diagram_view_uuid,
+    name: view.name,
+    created_at: view.created_at,
+    updated_at: view.updated_at,
+  }
+}
+
+function nextDemoDiagramViewId(): string {
+  demoDiagramViewSequence += 1
+  return `demo-view-${Date.now()}-${demoDiagramViewSequence}`
+}
+
+function validateDiagramViewInput(
+  mutation: DiagramViewMutation,
+  name: string,
+  layout: DiagramViewLayout,
+): void {
+  const operation = mutation === 'create' ? 'createDiagramView' : 'updateDiagramView'
+  const nameCodePoints = Array.from(name).length
+  if (nameCodePoints < 1 || nameCodePoints > MAX_DIAGRAM_VIEW_NAME_LENGTH) {
+    throw new Error(`${operation} failed: invalid name`)
+  }
+
+  let serialized: string
+  try {
+    serialized = JSON.stringify(layout)
+  } catch {
+    throw new Error(`${operation} failed: invalid layout`)
+  }
+  if (new TextEncoder().encode(serialized).byteLength > MAX_DIAGRAM_VIEW_LAYOUT_BYTES) {
+    throw new Error(`${operation} failed: layout payload too large`)
+  }
+}
+
+function findDemoDiagramView(
+  diagramViewId: string,
+): { projectId: string; index: number; view: DiagramViewDetail } | null {
+  for (const [projectId, views] of Object.entries(demoDiagramViewsByProject)) {
+    const index = views.findIndex(
+      (view) => view.diagram_view_uuid === diagramViewId,
+    )
+    if (index >= 0) {
+      return { projectId, index, view: views[index]! }
+    }
+  }
+  return null
 }
 
 export function shareLinkUrlFromPath(urlPath: unknown): string {
@@ -146,6 +218,7 @@ export async function createProject(project_name: string): Promise<Project> {
     demoProjects = [project, ...demoProjects]
     demoConnectionsByProject[project.project_space_uuid] = []
     demoSnapshotsByProject[project.project_space_uuid] = []
+    demoDiagramViewsByProject[project.project_space_uuid] = []
     return project
   }
   const r = await fetch(`${API_BASE}/api/projects`, {
@@ -218,6 +291,113 @@ export async function createSnapshot(projectId: string, db_connection_uuid: stri
   })
   if (!r.ok) throw new Error(`createSnapshot failed: ${r.status}`)
   return r.json()
+}
+
+export async function listDiagramViews(projectId: string): Promise<DiagramView[]> {
+  if (DEMO_MODE) {
+    return (demoDiagramViewsByProject[projectId] ?? []).map(diagramViewSummary)
+  }
+  const r = await fetch(`${API_BASE}/api/diagram-views/by-project/${projectId}`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`listDiagramViews failed: ${r.status}`)
+  return r.json()
+}
+
+export async function createDiagramView(
+  projectId: string,
+  name: string,
+  layout_json: DiagramViewLayout,
+): Promise<DiagramView> {
+  if (DEMO_MODE) {
+    validateDiagramViewInput('create', name, layout_json)
+    const now = new Date(Date.now()).toISOString()
+    const view: DiagramViewDetail = {
+      diagram_view_uuid: nextDemoDiagramViewId(),
+      name,
+      layout_json: cloneDiagramViewLayout(layout_json),
+      created_at: now,
+      updated_at: now,
+    }
+    demoDiagramViewsByProject[projectId] = [
+      view,
+      ...(demoDiagramViewsByProject[projectId] ?? []),
+    ]
+    return diagramViewSummary(view)
+  }
+  const r = await fetch(`${API_BASE}/api/diagram-views/by-project/${projectId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ name, layout_json }),
+  })
+  if (!r.ok) throw new Error(`createDiagramView failed: ${r.status}`)
+  return r.json()
+}
+
+export async function getDiagramView(
+  diagramViewId: string,
+): Promise<DiagramViewDetail> {
+  if (DEMO_MODE) {
+    const found = findDemoDiagramView(diagramViewId)
+    if (!found) throw new Error('getDiagramView failed: 404')
+    return {
+      ...diagramViewSummary(found.view),
+      layout_json: cloneDiagramViewLayout(found.view.layout_json),
+    }
+  }
+  const r = await fetch(`${API_BASE}/api/diagram-views/${diagramViewId}`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`getDiagramView failed: ${r.status}`)
+  return r.json()
+}
+
+export async function updateDiagramView(
+  diagramViewId: string,
+  name: string,
+  layout_json: DiagramViewLayout,
+): Promise<DiagramView> {
+  if (DEMO_MODE) {
+    const found = findDemoDiagramView(diagramViewId)
+    if (!found) throw new Error('updateDiagramView failed: 404')
+    validateDiagramViewInput('update', name, layout_json)
+    const updated: DiagramViewDetail = {
+      ...found.view,
+      name,
+      layout_json: cloneDiagramViewLayout(layout_json),
+      updated_at: new Date(Date.now()).toISOString(),
+    }
+    const currentViews = demoDiagramViewsByProject[found.projectId]!
+    demoDiagramViewsByProject[found.projectId] = [
+      updated,
+      ...currentViews.filter((_, index) => index !== found.index),
+    ]
+    return diagramViewSummary(updated)
+  }
+  const r = await fetch(`${API_BASE}/api/diagram-views/${diagramViewId}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ name, layout_json }),
+  })
+  if (!r.ok) throw new Error(`updateDiagramView failed: ${r.status}`)
+  return r.json()
+}
+
+export async function deleteDiagramView(diagramViewId: string): Promise<void> {
+  if (DEMO_MODE) {
+    const found = findDemoDiagramView(diagramViewId)
+    if (!found) throw new Error('deleteDiagramView failed: 404')
+    demoDiagramViewsByProject[found.projectId]!.splice(found.index, 1)
+    return
+  }
+  const r = await fetch(`${API_BASE}/api/diagram-views/${diagramViewId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+  })
+  if (!r.ok) throw new Error(`deleteDiagramView failed: ${r.status}`)
 }
 
 export async function createShareLink(projectId: string): Promise<ShareLink> {
