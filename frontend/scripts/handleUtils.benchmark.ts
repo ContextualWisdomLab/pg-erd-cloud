@@ -60,8 +60,11 @@ function calculateStats(samples: number[]) {
   const sorted = [...samples].sort((a, b) => a - b);
   const sum = sorted.reduce((a, b) => a + b, 0);
   const mean = sum / sorted.length;
-  const median = sorted[Math.floor(sorted.length / 2)];
-  return { mean, median, raw: sorted };
+  const middle = sorted.length / 2;
+  const median = Number.isInteger(middle)
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[Math.floor(middle)];
+  return { mean, median, raw: [...samples] };
 }
 
 function runBenchmark() {

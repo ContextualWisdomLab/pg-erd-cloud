@@ -184,6 +184,8 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
+      { id: 'e3', source: '1', target: '2', sourceHandle: 'not-a-column-handle' },
+      { id: 'e4', source: '1', target: '2', sourceHandle: 'src-id', targetHandle: 'tgt-id', label: 'unique_rel' },
     ];
 
     const result = exportPrisma(nodes, edges);
