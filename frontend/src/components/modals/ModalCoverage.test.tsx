@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import type { Node } from '@xyflow/react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { TableNodeData } from '../../erd/convert'
@@ -41,7 +42,8 @@ afterEach(() => {
 })
 
 describe('modal behavior coverage', () => {
-  it('covers AddTableModal visibility, input, validation, cancel, and submit', () => {
+  it('covers AddTableModal visibility, input, validation, cancel, and submit', async () => {
+    const user = userEvent.setup()
     const setNewTableName = vi.fn()
     const onCancel = vi.fn()
     const onSubmit = vi.fn()
@@ -55,6 +57,31 @@ describe('modal behavior coverage', () => {
       />,
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    rerender(
+      <AddTableModal
+        isOpen
+        newTableName="   "
+        setNewTableName={setNewTableName}
+        onAddTableCancel={onCancel}
+        onAddTableSubmit={onSubmit}
+      />,
+    )
+
+    const saveBtn = screen.getByRole('button', { name: '저장' })
+    expect(saveBtn).toHaveAttribute('aria-disabled', 'true')
+    expect(saveBtn).toHaveStyle({ opacity: 0.5, cursor: 'not-allowed' })
+
+    // Test focusability
+    saveBtn.focus()
+    expect(saveBtn).toHaveFocus()
+
+    // Test interactions don't trigger submit when disabled
+    fireEvent.click(saveBtn)
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onSubmit).not.toHaveBeenCalled()
 
     rerender(
       <AddTableModal
@@ -81,9 +108,23 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
+
+    expect(saveBtn).toHaveAttribute('aria-disabled', 'false')
+    expect(saveBtn).not.toHaveStyle({ opacity: 0.5, cursor: 'not-allowed' })
+
+    // Valid submissions
+    fireEvent.click(saveBtn)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+
+    saveBtn.focus()
+    await user.keyboard('{Enter}')
+    expect(onSubmit).toHaveBeenCalledTimes(2)
+
+    await user.keyboard(' ')
+    expect(onSubmit).toHaveBeenCalledTimes(3)
+
     fireEvent.submit(screen.getByRole('dialog'))
-    expect(onSubmit).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
+    expect(onSubmit).toHaveBeenCalledTimes(4)
   })
 
   it('covers EditEdgeModal visibility and actions', () => {

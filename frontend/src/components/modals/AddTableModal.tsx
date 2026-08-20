@@ -1,13 +1,15 @@
-import React from 'react';
-import { useDialogAccessibility } from './useDialogAccessibility';
+import React from 'react'
+import { useDialogAccessibility } from './useDialogAccessibility'
 
 interface AddTableModalProps {
-  isOpen: boolean;
-  newTableName: string;
-  setNewTableName: (name: string) => void;
-  onAddTableCancel: () => void;
-  onAddTableSubmit: () => void;
+  isOpen: boolean
+  newTableName: string
+  setNewTableName: (name: string) => void
+  onAddTableCancel: () => void
+  onAddTableSubmit: () => void
 }
+
+const SAVE_HELP_ID = 'add-table-save-help'
 
 export function AddTableModal({
   isOpen,
@@ -16,24 +18,28 @@ export function AddTableModal({
   onAddTableCancel,
   onAddTableSubmit,
 }: AddTableModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
+  const dialogRef = useDialogAccessibility<HTMLFormElement>(
+    isOpen,
+    onAddTableCancel,
+  )
+  const canSubmit = newTableName.trim().length > 0
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div
       className="modalOverlay"
       style={{
-        position: "absolute",
+        position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
+        backgroundColor: 'rgba(0,0,0,0.5)',
         zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <form
@@ -43,19 +49,19 @@ export function AddTableModal({
         aria-labelledby="add-table-title"
         ref={dialogRef}
         tabIndex={-1}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (newTableName.trim()) {
-            onAddTableSubmit();
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (canSubmit) {
+            onAddTableSubmit()
           }
         }}
         style={{
-          background: "#fff",
+          background: '#fff',
           padding: 20,
           borderRadius: 8,
           width: 300,
-          display: "flex",
-          flexDirection: "column",
+          display: 'flex',
+          flexDirection: 'column',
           gap: 12,
         }}
       >
@@ -65,24 +71,34 @@ export function AddTableModal({
           <input
             id="new-table-name"
             value={newTableName}
-            onChange={(e) => setNewTableName(e.target.value)}
+            onChange={(event) => setNewTableName(event.target.value)}
             placeholder="users"
             autoFocus
             required
+            aria-describedby={!canSubmit ? SAVE_HELP_ID : undefined}
           />
+          {!canSubmit ? (
+            <span id={SAVE_HELP_ID}>테이블 이름을 입력하면 저장할 수 있습니다.</span>
+          ) : null}
         </div>
         <div
           className="row"
-          style={{ justifyContent: "flex-end", marginTop: 8 }}
+          style={{ justifyContent: 'flex-end', marginTop: 8 }}
         >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
+          <button type="button" onClick={onAddTableCancel}>
+            취소
+          </button>
           <button
             type="submit"
-            disabled={!newTableName.trim()}
+            aria-disabled={!canSubmit}
+            aria-describedby={!canSubmit ? SAVE_HELP_ID : undefined}
+            onClick={(event) => {
+              if (!canSubmit) event.preventDefault()
+            }}
             style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
+              canSubmit
+                ? { background: '#034ea2', color: '#fff' }
+                : { opacity: 0.5, cursor: 'not-allowed' }
             }
           >
             저장
@@ -90,5 +106,5 @@ export function AddTableModal({
         </div>
       </form>
     </div>
-  );
+  )
 }
