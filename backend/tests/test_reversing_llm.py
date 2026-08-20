@@ -56,6 +56,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
         seen["authorization"] = request.headers.get("authorization")
         body = json.loads(request.content)
         seen["model"] = body["model"]
+        seen["orchestration_mode"] = body["orchestration_mode"]
         seen["messages"] = body["messages"]
         return httpx.Response(
             200,
@@ -74,6 +75,7 @@ async def test_generate_reversing_llm_draft_posts_chat_completion(
     assert seen["url"] == "https://llm.example/v1/chat/completions"
     assert seen["authorization"] == "Bearer test-key"
     assert seen["model"] == "test-model"
+    assert seen["orchestration_mode"] == "auto"
     messages = seen["messages"]
     assert isinstance(messages, list)
     assert messages[0]["role"] == "system"
