@@ -2,23 +2,21 @@ import type { Edge, Node } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
 import { sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
 
-function tableNameFromTitle(title: string): string {
-  const separator = title.indexOf(".");
-  return separator < 0 ? title : title.slice(separator + 1);
-}
-
 /**
  * 인자로 받은 노드 목록을 바탕으로 관계(Edge)를 추론하여 반환합니다.
  * 'xxxx_id' 형태의 컬럼을 가지고 있을 경우, 'xxxxs' 혹은 'xxxx' 이름의 테이블로 연결합니다.
  */
-export function inferRelationships(nodes: Node<TableNodeData>[]): Edge[] {
+export function inferRelationships(
+  nodes: Node<TableNodeData>[]
+): Edge[] {
   const newEdges: Edge[] = [];
 
   // ⚡ Bolt: Use Map for O(1) table name lookups instead of Set + Array.find(),
   // reducing complexity from O(N^2) to O(N).
   const nodesByTableName = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
-    const tableName = tableNameFromTitle(n.data.title);
+    const parts = n.data.title.split(".");
+    const tableName = parts[parts.length - 1];
     // Preserve Original .find behavior by only setting the first occurrence
     if (!nodesByTableName.has(tableName)) {
       nodesByTableName.set(tableName, n);
@@ -26,7 +24,8 @@ export function inferRelationships(nodes: Node<TableNodeData>[]): Edge[] {
   }
 
   for (const sourceNode of nodes) {
-    const srcTableName = tableNameFromTitle(sourceNode.data.title);
+    const srcParts = sourceNode.data.title.split(".");
+    const srcTableName = srcParts[srcParts.length - 1];
 
     for (const column of sourceNode.data.columns) {
       const colName = column.column_name;
@@ -77,7 +76,7 @@ export function inferRelationships(nodes: Node<TableNodeData>[]): Edge[] {
               if (pkCol) {
                 targetColName = pkCol.column_name;
               } else if (targetNode.data.columns.length > 0) {
-                targetColName = targetNode.data.columns[0].column_name;
+                 targetColName = targetNode.data.columns[0].column_name;
               }
             }
 

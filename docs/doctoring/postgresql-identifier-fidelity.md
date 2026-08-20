@@ -47,11 +47,3 @@ Monitor the count of inferred candidates and accepted inferred edges by identifi
 PostgreSQL Global Development Group. (2026). *4.1. Lexical structure*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
 
 PostgreSQL Global Development Group. (2026). *9.4. String functions and operators*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/functions-string.html
-
-Doan, A., Madhavan, J., Domingos, P., & Halevy, A. (2003). Learning to match the schemas of data sources: A multistrategy approach. *Machine Learning, 50*, 279–301. https://doi.org/10.1023/A:1021670620144
-
-This schema-matching research supports treating naming evidence as a matching
-signal while preserving the source identifiers that are being matched. The
-implementation applies that boundary to inferred relationships: `_id` naming
-suggests a candidate, but an existing table key is retained exactly rather
-than normalized into a different identifier.
