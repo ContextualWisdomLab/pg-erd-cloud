@@ -18,32 +18,22 @@ export function targetColumnHandleId(columnName: string): string {
 export function parseColumnNameFromHandle(handleId: string | null | undefined): string | null {
   if (!handleId) return null;
 
-  let idPart = handleId;
-  if (idPart.startsWith('src-')) {
-    idPart = idPart.slice(4);
-  } else if (idPart.startsWith('tgt-')) {
-    idPart = idPart.slice(4);
+  const parts = handleId.split('-');
+  if (parts.length < 3 || !['src', 'tgt'].includes(parts[0]) || parts[1] !== 'c') {
+    return null;
   }
 
-  if (idPart === 'c-empty') {
+  const encoded = parts.slice(2);
+  if (encoded.length === 1 && encoded[0] === 'empty') {
     return '';
   }
 
-  if (!idPart.startsWith('c-')) {
-    // Fallback for tests or legacy unencoded handles
-    return idPart;
-  }
-
-  const encoded = idPart.slice(2);
-  if (!encoded) return '';
-
-  const segments = encoded.split('-');
-  if (segments.some((segment) => !/^[0-9a-fA-F]{1,6}$/.test(segment))) {
+  if (!encoded.every((segment) => /^[0-9a-fA-F]{4,6}$/.test(segment))) {
     return null;
   }
 
   try {
-    return segments.map((hex) => {
+    return encoded.map((hex) => {
       const codePoint = Number.parseInt(hex, 16);
       if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
         throw new RangeError('invalid Unicode scalar');

@@ -65,14 +65,6 @@ describe('exportDbml', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
-        label: 'rel',
-      },
-      {
-        id: 'e2',
-        source: '2',
-        target: '1',
         sourceHandle: 'src-c-0075-0073-0065-0072-005f-0069-0064',
         targetHandle: 'tgt-c-0069-0064',
         label: 'encoded-rel',
@@ -80,7 +72,7 @@ describe('exportDbml', () => {
     ];
 
     const result = exportDbml(nodes, edges);
-    expect(result.match(/Ref: posts\.user_id > users\.id/g)).toHaveLength(2);
+    expect(result.match(/Ref: posts\.user_id > users\.id/g)).toHaveLength(1);
   });
 
   it('should export composite relation', () => {

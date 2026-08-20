@@ -38,14 +38,13 @@ describe('handleUtils', () => {
 
   describe('parseColumnNameFromHandle', () => {
     it('should decode a simple ascii string', () => {
-      expect(parseColumnNameFromHandle('c-0069-0064')).toBe('id');
       expect(parseColumnNameFromHandle('src-c-0069-0064')).toBe('id');
       expect(parseColumnNameFromHandle('tgt-c-0069-0064')).toBe('id');
     });
 
     it('should handle empty string', () => {
-      expect(parseColumnNameFromHandle('c-empty')).toBe('');
       expect(parseColumnNameFromHandle('src-c-empty')).toBe('');
+      expect(parseColumnNameFromHandle('tgt-c-empty')).toBe('');
     });
 
     it('should handle special characters', () => {
@@ -57,12 +56,21 @@ describe('handleUtils', () => {
     });
 
     it('should handle emojis', () => {
-      expect(parseColumnNameFromHandle('c-0069-0064-005f-1f680')).toBe('id_🚀');
+      expect(parseColumnNameFromHandle('src-c-0069-0064-005f-1f680')).toBe('id_🚀');
     });
 
-    it('should handle fallback unencoded handles', () => {
-      expect(parseColumnNameFromHandle('src-user_id')).toBe('user_id');
-      expect(parseColumnNameFromHandle('id')).toBe('id');
+    it.each([
+      'src-user_id',
+      'id',
+      'c-0069-0064',
+      'foo-c-0069',
+      'src-c-0069junk',
+      'src-c-0069-',
+      'src-c-empty-0069',
+      'src-c-d800',
+      'src-c-110000',
+    ])('should reject non-canonical handle %s', (handle) => {
+      expect(parseColumnNameFromHandle(handle)).toBe(null);
     });
 
     it('should handle null/undefined', () => {
