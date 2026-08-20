@@ -150,6 +150,7 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
+          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -325,6 +326,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('ERD_billing_1')).toBeInTheDocument())
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
@@ -456,14 +458,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(6)
+    expect(exports.downloadText).toHaveBeenCalledTimes(7)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -605,6 +607,42 @@ describe('App orchestration coverage', () => {
     render(<App />)
     cleanup()
     await act(async () => rejectMe(new Error('late failure')))
+  })
+
+  it('ignores terminal snapshot refresh completions after unmount', async () => {
+    let listCall = 0
+    let resolveRefresh!: (value: typeof snapshots) => void
+    api.listSnapshots.mockImplementation(() => {
+      listCall += 1
+      return listCall === 1
+        ? Promise.resolve(snapshots)
+        : new Promise((resolve) => { resolveRefresh = resolve })
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openButtons[0]!)
+    await waitFor(() => expect(resolveRefresh).toBeDefined())
+    cleanup()
+    await act(async () => resolveRefresh(snapshots))
+  })
+
+  it('ignores terminal snapshot refresh failures after unmount', async () => {
+    let listCall = 0
+    let rejectRefresh!: (reason: Error) => void
+    api.listSnapshots.mockImplementation(() => {
+      listCall += 1
+      return listCall === 1
+        ? Promise.resolve(snapshots)
+        : new Promise((_resolve, reject) => { rejectRefresh = reject })
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openButtons[0]!)
+    await waitFor(() => expect(rejectRefresh).toBeDefined())
+    cleanup()
+    await act(async () => rejectRefresh(new Error('late terminal refresh failure')))
   })
 
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
@@ -775,6 +813,7 @@ describe('App orchestration coverage', () => {
   })
 
   it('falls back to node ids when auto-layout receives legacy nodes without titles', async () => {
+    api.listSnapshots.mockReset().mockResolvedValue(snapshots)
     vi.mocked(snapshotToGraph).mockReturnValueOnce({
       nodes: [
         { id: 'z-node', type: 'tableNode', position: { x: 0, y: 0 }, data: { columns: [], badges: { pk: false, fk: false } } },
