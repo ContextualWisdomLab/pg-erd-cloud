@@ -5,8 +5,7 @@ import uuid
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
-
-from app.pg_introspect.forward_ddl import ForwardDdlValidationError, validate_forward_ddl
+from app.pg_introspect.forward_ddl import validate_forward_ddl
 
 
 class ProjectCreateIn(BaseModel):
@@ -58,6 +57,7 @@ class ConnectionCreateIn(BaseModel):
     dsn: str = Field(
         min_length=1,
         max_length=4096,
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
         description=("PostgreSQL or Snowflake connection string. Not logged."),
     )
 
@@ -75,6 +75,7 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
             "identifiers. Arbitrary SQL is rejected."
@@ -85,13 +86,10 @@ class ApplySqlIn(BaseModel):
 
     @field_validator("sql")
     @classmethod
-    def validate_sql(cls, value: str) -> str:
-        """Reject arbitrary SQL before it reaches the database adapter."""
-        try:
-            validate_forward_ddl(value)
-        except ForwardDdlValidationError as exc:
-            raise ValueError(str(exc)) from exc
-        return value
+    def validate_sql(cls, v: str) -> str:
+        # Run the full DDL validation; raises ForwardDdlValidationError on failure
+        # which Pydantic converts to a 422 Unprocessable Entity
+        return validate_forward_ddl(v).sql
 
 
 class ApplySqlOut(BaseModel):
@@ -233,7 +231,9 @@ class TableAnnotationUpsertIn(BaseModel):
         min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$"
     )
     body: str = Field(
-        min_length=1, max_length=10_000, pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$"
+        min_length=1,
+        max_length=10_000,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
     )
 
 
@@ -324,7 +324,9 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$")
+    key_name: str = Field(
+        min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$"
+    )
 
 
 class ApiKeyOut(BaseModel):

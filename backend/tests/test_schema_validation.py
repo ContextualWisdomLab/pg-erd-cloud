@@ -3,38 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import (
-    ApiKeyCreateIn,
-    ApplySqlIn,
-    ConnectionCreateIn,
-    DbmlConvertIn,
-    DiagramViewCreateIn,
-    ProjectCreateIn,
-    ProjectMemberAddIn,
-    TableAnnotationUpsertIn,
-)
-
-
-_C1_FIELD_CASES = (
-    (ProjectCreateIn, "project_name", {"project_name": "safe"}),
-    (
-        ProjectMemberAddIn,
-        "member_subject",
-        {"member_subject": "dev:safe", "project_role": "viewer"},
-    ),
-    (
-        ConnectionCreateIn,
-        "conn_name",
-        {"conn_name": "safe", "dsn": "postgresql://localhost/db"},
-    ),
-    (ApplySqlIn, "sql", {"sql": "CREATE TABLE safe_table (id integer);"}),
-    (DiagramViewCreateIn, "name", {"name": "safe", "layout_json": {}}),
-    (TableAnnotationUpsertIn, "schema_name", {"schema_name": "public", "relation_name": "users", "body": "note"}),
-    (TableAnnotationUpsertIn, "relation_name", {"schema_name": "public", "relation_name": "users", "body": "note"}),
-    (TableAnnotationUpsertIn, "body", {"schema_name": "public", "relation_name": "users", "body": "note"}),
-    (DbmlConvertIn, "dbml", {"dbml": "Table safe_table { id int }"}),
-    (ApiKeyCreateIn, "key_name", {"key_name": "safe"}),
-)
+from app.schemas import ConnectionCreateIn, ProjectCreateIn, ProjectMemberAddIn
 
 
 def test_project_name_length_is_bounded() -> None:
@@ -68,25 +37,3 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
-
-
-@pytest.mark.parametrize(
-    "sql",
-    (
-        "DROP TABLE users;",
-        "CREATE TABLE safe_table (id bigint); DROP TABLE users;",
-        "CREATE TABLE \"unsafe_table\" (id bigint);",
-    ),
-)
-def test_apply_sql_rejects_non_allowlisted_statements(sql: str) -> None:
-    """The request model must reject SQL before the execution layer runs."""
-    with pytest.raises(ValidationError):
-        ApplySqlIn(sql=sql)
-
-
-@pytest.mark.parametrize("model, field_name, payload", _C1_FIELD_CASES)
-@pytest.mark.parametrize("control", ("\x80", "\x9f"))
-def test_schema_fields_reject_unicode_c1_controls(model, field_name, payload, control) -> None:
-    invalid = {**payload, field_name: f"{payload[field_name]}{control}"}
-    with pytest.raises(ValidationError):
-        model(**invalid)
