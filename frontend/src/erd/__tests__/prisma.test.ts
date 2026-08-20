@@ -64,8 +64,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: 'users_posts',
       },
     ];
@@ -225,8 +225,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: '1to1',
       },
     ];
@@ -317,5 +317,42 @@ describe('exportPrisma', () => {
     expect(relationLines).toHaveLength(1);
     expect(relationLines[0]).toContain('@relation("first_relation"');
     expect(result).not.toContain('duplicate_relation');
+  });
+
+  it('rejects legacy raw relationship handles', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+      {
+        id: 'posts',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: false },
+          ],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [{
+      id: 'legacy',
+      source: 'posts',
+      target: 'users',
+      sourceHandle: 'src-user_id',
+      targetHandle: 'tgt-id',
+      label: 'legacy_relation',
+    }]);
+
+    expect(result).not.toContain('legacy_relation');
   });
 });

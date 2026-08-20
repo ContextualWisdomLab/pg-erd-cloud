@@ -57,13 +57,7 @@ function columnNameFromHandle(
   if (!handle?.startsWith(prefix)) return undefined;
 
   const column = columns.find((candidate) => makeHandle(candidate.column_name) === handle);
-  if (column) return column.column_name;
-
-  // Keep accepting diagrams created before handles were encoded.
-  const legacyColumnName = handle.slice(prefix.length);
-  return columns.some((column) => column.column_name === legacyColumnName)
-    ? legacyColumnName
-    : undefined;
+  return column?.column_name;
 }
 
 type OutgoingRelation = {
