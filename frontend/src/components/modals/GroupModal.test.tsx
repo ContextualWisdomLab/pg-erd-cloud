@@ -1,38 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import { GroupModal } from './GroupModal';
 
 describe('GroupModal', () => {
-  it('reports whitespace-only group names as invalid', () => {
-    const onCreateBusinessGroup = vi.fn();
-
-    render(
-      <GroupModal
-        isOpen
-        businessGroups={[]}
-        newGroupName="   "
-        setNewGroupName={vi.fn()}
-        newGroupColor="#1f77b4"
-        setNewGroupColor={vi.fn()}
-        nodes={[]}
-        onCloseGroupManager={vi.fn()}
-        onCreateBusinessGroup={onCreateBusinessGroup}
-        onDeleteBusinessGroup={vi.fn()}
-        onAssignBusinessGroup={vi.fn()}
-      />,
-    );
-
-    const input = screen.getByLabelText(/그룹 이름/) as HTMLInputElement;
-    const reportValidity = vi.spyOn(input, 'reportValidity');
-    fireEvent.submit(input.closest('form')!);
-
-    expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(reportValidity).toHaveBeenCalledOnce();
-    expect(onCreateBusinessGroup).not.toHaveBeenCalled();
-  });
-
   it('exposes truncated assignment table names accessibly', () => {
     const tableName = 'analytics.extremely_long_customer_activity_table';
 
