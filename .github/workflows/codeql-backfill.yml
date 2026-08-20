@@ -38,11 +38,14 @@ jobs:
       - name: Enumerate target commits
         id: commits
         shell: bash
+        env:
+          BRANCH_INPUT: ${{ inputs.branch }}
+          COMMIT_COUNT_INPUT: ${{ inputs.commit_count }}
         run: |
           set -euo pipefail
 
-          count="${{ inputs.commit_count }}"
-          branch="${{ inputs.branch }}"
+          count="${COMMIT_COUNT_INPUT}"
+          branch="${BRANCH_INPUT}"
 
           if ! [[ "${count}" =~ ^[0-9]+$ ]]; then
             echo "commit_count must be a positive integer" >&2
@@ -54,8 +57,20 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags --prune origin "${branch}"
-          git rev-list --max-count="${count}" "origin/${branch}" \
+          if ! normalized_branch="$(git check-ref-format --branch "${branch}")"; then
+            echo "branch must be a valid Git branch name" >&2
+            exit 1
+          fi
+
+          if [[ "${normalized_branch}" != "${branch}" ]]; then
+            echo "branch aliases are not accepted" >&2
+            exit 1
+          fi
+
+          source_ref="refs/heads/${branch}"
+          tracking_ref="refs/remotes/origin/${branch}"
+          git fetch --no-tags --prune origin -- "${source_ref}:${tracking_ref}"
+          git rev-list --max-count="${count}" "${tracking_ref}" \
             | jq -R -s -c 'split("\n")[:-1]' \
             | sed 's/^/commits=/' >> "${GITHUB_OUTPUT}"
 
@@ -81,15 +96,15 @@ jobs:
           persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           languages: ${{ matrix.language }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/autobuild@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:${{ matrix.language }}/backfill"
           ref: "refs/heads/${{ inputs.branch }}"
