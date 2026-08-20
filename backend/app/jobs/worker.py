@@ -1,3 +1,5 @@
+"""Claim and execute durable PostgreSQL-backed background jobs."""
+
 from __future__ import annotations
 
 import asyncio
@@ -29,6 +31,7 @@ Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[
 
 
 def _mark_job_running(job: JobQueue) -> JobQueue:
+    """Mark a claimed job as running and publish its queue-wait metric."""
     job.status = "running"
     job.started_at = dt.datetime.now(dt.timezone.utc)
     job.attempt_count = int(job.attempt_count) + 1
@@ -90,7 +93,7 @@ async def claim_one_job(session: AsyncSession) -> JobQueue | None:
             SELECT job_queue_uuid
             FROM job_queue
             WHERE status = 'queued' AND run_after <= now()
-            ORDER BY run_after ASC
+            ORDER BY run_after ASC, job_queue_uuid ASC
             FOR UPDATE SKIP LOCKED
             LIMIT 1
             """)

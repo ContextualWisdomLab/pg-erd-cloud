@@ -1,3 +1,5 @@
+"""SQLAlchemy metadata for the pg-erd-cloud relational store."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -11,6 +13,7 @@ from sqlalchemy import (
     LargeBinary,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -200,7 +203,16 @@ class JobQueue(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+    __table_args__ = (
+        Index("ix_job_queue__status_run_after", "status", "run_after"),
+        # Keep the due queued working set small as terminal history grows.
+        Index(
+            "ix_job_queue__queued_run_after_uuid",
+            "run_after",
+            "job_queue_uuid",
+            postgresql_where=text("status = 'queued'"),
+        ),
+    )
 
 
 class DiagramView(Base):
