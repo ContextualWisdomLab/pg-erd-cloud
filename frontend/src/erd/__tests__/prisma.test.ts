@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -206,6 +207,7 @@ describe('exportPrisma', () => {
     const edges: Edge[] = [
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
+      { id: 'e3', source: '1', target: '2', sourceHandle: 'src-unknown', targetHandle: 'tgt-unknown' },
     ];
 
     const result = exportPrisma(nodes, edges);
@@ -246,8 +248,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: '1to1',
       },
     ];
@@ -255,5 +257,63 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
+  });
+
+  it('preserves distinct relations sharing one source field', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'child',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'child_table',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: false, is_not_null: true },
+            { column_name: 'parent_id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'parent',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'parent_table',
+          badges: { pk: true, fk: false },
+          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [
+      {
+        id: 'primary',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: sourceColumnHandleId('parent_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'primary_parent',
+      },
+      {
+        id: 'secondary',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: sourceColumnHandleId('parent_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'secondary_parent',
+      },
+      {
+        id: 'primary-duplicate',
+        source: 'child',
+        target: 'parent',
+        sourceHandle: sourceColumnHandleId('parent_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'primary_parent',
+      },
+    ]);
+
+    expect(result).toContain('parent_table_parent_id parent_table @relation("primary_parent", fields: [parent_id], references: [id])');
+    expect(result).toContain('parent_table_parent_id_2 parent_table @relation("secondary_parent", fields: [parent_id], references: [id])');
+    expect(result).toContain('child_table_parent_id child_table? @relation("primary_parent")');
+    expect(result).toContain('child_table_parent_id_2 child_table? @relation("secondary_parent")');
   });
 });
