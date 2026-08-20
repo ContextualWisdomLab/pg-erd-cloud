@@ -309,7 +309,7 @@ export function exportPrismaDocument(
       .filter((schema): schema is string => Boolean(schema)),
   )].sort();
   let output =
-    `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n${schemas.length > 0 ? `  schemas   = ${JSON.stringify(schemas)}\n` : ""}}\n\n`;
+    `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n${schemas.length > 0 ? '  previewFeatures = ["multiSchema"]\n' : ""}}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n${schemas.length > 0 ? `  schemas   = ${JSON.stringify(schemas)}\n` : ""}}\n\n`;
 
   for (const node of [...nodes].sort(compareNodes)) {
     const identity = tableIdentity(node);
