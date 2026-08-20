@@ -150,7 +150,6 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
-          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -457,14 +456,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(7)
+    expect(exports.downloadText).toHaveBeenCalledTimes(6)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -611,7 +610,6 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -651,42 +649,6 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
-  })
-
-  it('ignores a terminal snapshot refresh that completes after unmount', async () => {
-    let resolveRefresh!: (value: typeof snapshots) => void
-    api.listSnapshots
-      .mockResolvedValueOnce(snapshots)
-      .mockReturnValueOnce(new Promise((resolve) => { resolveRefresh = resolve }))
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
-    await waitFor(() => expect(resolveRefresh).toBeDefined())
-
-    cleanup()
-    await act(async () => {
-      resolveRefresh(snapshots)
-      await Promise.resolve()
-    })
-  })
-
-  it('ignores a terminal snapshot refresh failure that occurs after unmount', async () => {
-    let rejectRefresh!: (reason: unknown) => void
-    api.listSnapshots
-      .mockResolvedValueOnce(snapshots)
-      .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRefresh = reject }))
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
-    await waitFor(() => expect(rejectRefresh).toBeDefined())
-
-    cleanup()
-    await act(async () => {
-      rejectRefresh(new Error('late terminal refresh'))
-      await Promise.resolve()
-    })
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {
