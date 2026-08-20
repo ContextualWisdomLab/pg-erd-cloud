@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -193,24 +193,16 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
         if (
             not isinstance(critical_names, list)
             or not critical_names
-            or any(
-                not isinstance(name, str) or not name
-                for name in critical_names
-            )
+            or any(not isinstance(name, str) or not name for name in critical_names)
             or len(set(critical_names)) != len(critical_names)
             or any(name not in header for name in critical_names)
-            or any(
-                name in JWS_REGISTERED_HEADER_PARAMETERS
-                for name in critical_names
-            )
+            or any(name in JWS_REGISTERED_HEADER_PARAMETERS for name in critical_names)
         ):
             raise HTTPException(status_code=401, detail="invalid crit header")
 
         # This deployment profile supports no critical JOSE extensions. A
         # structurally valid `crit` list therefore still fails closed.
-        raise HTTPException(
-            status_code=401, detail="unsupported critical parameter"
-        )
+        raise HTTPException(status_code=401, detail="unsupported critical parameter")
 
     token_type = header.get("typ")
     if token_type is not None:
@@ -233,8 +225,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     if not jwt_id:
         return
@@ -252,8 +244,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
@@ -503,7 +495,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
