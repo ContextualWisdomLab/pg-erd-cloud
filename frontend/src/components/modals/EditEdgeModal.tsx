@@ -48,6 +48,13 @@ export function EditEdgeModal({
         tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
+          const input = e.currentTarget.elements.namedItem("rel-label") as HTMLInputElement | null;
+          if (!relLabel.trim()) {
+            input?.setCustomValidity("관계 이름을 입력하세요.");
+            input?.reportValidity();
+            return;
+          }
+          input?.setCustomValidity("");
           onRelSubmit();
         }}
         style={{
@@ -71,9 +78,14 @@ export function EditEdgeModal({
           </label>
           <input
             id="rel-label"
+            name="rel-label"
             value={relLabel}
-            onChange={(e) => setRelLabel(e.target.value)}
+            onChange={(e) => {
+              e.currentTarget.setCustomValidity("");
+              setRelLabel(e.target.value);
+            }}
             placeholder="fk_constraint_name"
+            required
             autoFocus
           />
         </div>
