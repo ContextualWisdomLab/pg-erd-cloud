@@ -37,12 +37,12 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
           is_pk: false,
         },
       ]),
-      tableNode("quoted_target", "public.Order Items", [
+      tableNode("quoted_target", "public.Order.Items", [
         { column_name: "id", data_type: "bigint", is_not_null: true, is_pk: true },
       ]),
       tableNode("quoted_source", "public.Order Audit", [
         {
-          column_name: "Order Items_id",
+          column_name: "Order.Items_id",
           data_type: "bigint",
           is_not_null: true,
           is_pk: false,
@@ -67,7 +67,7 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
     ).toMatchObject({
       target: "quoted_target",
       data: {
-        sourceColumns: ["Order Items_id"],
+        sourceColumns: ["Order.Items_id"],
         targetColumns: ["id"],
       },
     });
