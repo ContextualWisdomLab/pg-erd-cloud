@@ -34,6 +34,13 @@ def test_short_dsn_password_does_not_corrupt_secret_key_names() -> None:
     assert "***word" not in redacted
 
 
+def test_unrelated_assignment_key_is_preserved() -> None:
+    dsn = "postgresql://user@db.example.com/app"
+    error = "driver reported bypass=enabled"
+
+    assert redact_dsn_error_message(error, dsn) == error
+
+
 def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     dsn = "postgresql://user:s3cr3t@[bad/db?password=q%2Fsecret"
     error = f"driver failed for s3cr3t with password=q/secret while using {dsn}"

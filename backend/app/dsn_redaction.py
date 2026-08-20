@@ -11,7 +11,7 @@ _SECRET_KEY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"(?P<prefix>\b[\w.-]*?(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|"
+    r"(?P<prefix>\b[\w.-]*?(?<![A-Za-z0-9])(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|"
     r"api[_-]?key|access[_-]?key|auth(?:entication)?)[\w.-]*?\s*[:=]\s*)"
     r"(?P<value>[^&\s,;\"'<>]+)",
     re.IGNORECASE,
