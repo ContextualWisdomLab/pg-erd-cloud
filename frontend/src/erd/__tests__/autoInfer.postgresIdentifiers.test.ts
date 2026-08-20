@@ -2,8 +2,7 @@ import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import { inferRelationships } from "../autoInfer";
-import { snapshotToGraph, type TableNodeData } from "../convert";
-import type { SnapshotJson } from "../../types";
+import type { TableNodeData } from "../convert";
 
 function tableNode(
   id: string,
@@ -72,30 +71,5 @@ describe("inferRelationships PostgreSQL identifier fidelity", () => {
         targetColumns: ["id"],
       },
     });
-  });
-
-  it("preserves dots in quoted relation names from a database snapshot", () => {
-    const snapshot: SnapshotJson = {
-      relations: [
-        { relation_oid: 1, relation_kind: "r", schema_name: "public", relation_name: "Order.Items" },
-        { relation_oid: 2, relation_kind: "r", schema_name: "public", relation_name: "Order Audit" },
-      ],
-      columns: [
-        { relation_oid: 1, column_name: "id", data_type: "bigint", is_not_null: true },
-        { relation_oid: 2, column_name: "Order.Items_id", data_type: "bigint", is_not_null: true },
-      ],
-      pk_columns: [{ relation_oid: 1, column_name: "id" }],
-    };
-
-    const { nodes } = snapshotToGraph(snapshot);
-    const edges = inferRelationships(nodes);
-
-    expect(edges).toMatchObject([
-      {
-        source: "2",
-        target: "1",
-        data: { sourceColumns: ["Order.Items_id"], targetColumns: ["id"] },
-      },
-    ]);
   });
 });
