@@ -237,6 +237,10 @@ def _bearer_token_from_request(request: Request) -> str:
 async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     """Validate the JOSE header, signing key, and claims signature."""
 
+    audience = settings.oidc_audience
+    if not isinstance(audience, str) or not audience.strip():
+        raise HTTPException(status_code=500, detail="OIDC audience configuration required")
+
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
     except Exception:  # noqa: BLE001
@@ -275,11 +279,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             token,
             jwk,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
-            audience=settings.oidc_audience,
+            audience=audience,
             issuer=settings.oidc_issuer,
             options={
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
+                "verify_aud": True,
+                "require_aud": True,
                 "require_iss": True,
                 "require_exp": True,
                 "require_jti": True,
