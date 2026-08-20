@@ -7,7 +7,9 @@ Bearer`, `{model, messages}`). [contextual-orchestrator](https://github.com/Cont
 exposes exactly that interface (`/v1/chat/completions`) while routing,
 delegating, verifying, and synthesizing across a pool of model agents.
 
-So the integration is **configuration only — no code change**.
+The endpoint remains OpenAI-compatible; pg-erd-cloud adds one explicit
+orchestration policy field so the gateway, rather than this product, owns model
+selection and workflow depth.
 
 ## Point pg-erd-cloud at the orchestrator
 
