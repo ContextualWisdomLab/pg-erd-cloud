@@ -51,6 +51,63 @@ describe('EditTableModal', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('requires the table name, column name, and data type before saving', async () => {
+    const onEditTableSubmit = vi.fn();
+    const editingNode = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'public.users',
+        comment: '',
+        columns: [
+          {
+            column_name: 'id',
+            data_type: 'bigint',
+            is_pk: true,
+            is_not_null: true,
+          },
+        ],
+      },
+    };
+
+    render(
+      <EditTableModal
+        {...defaultProps}
+        editingNode={editingNode as any}
+        onEditTableSubmit={onEditTableSubmit}
+      />,
+    );
+
+    const user = userEvent.setup();
+    const titleInput = screen.getByLabelText(/테이블명/);
+    const columnNameInput = screen.getByRole('textbox', { name: 'id 컬럼명' });
+    const dataTypeInput = screen.getByRole('textbox', { name: 'id 데이터 타입' });
+    const saveButton = screen.getByRole('button', { name: '저장' });
+
+    expect(titleInput).toBeRequired();
+    expect(columnNameInput).toBeRequired();
+    expect(dataTypeInput).toBeRequired();
+
+    await user.clear(titleInput);
+    await user.click(saveButton);
+    expect(onEditTableSubmit).not.toHaveBeenCalled();
+
+    await user.type(titleInput, 'public.users');
+    await user.clear(columnNameInput);
+    await user.click(saveButton);
+    expect(onEditTableSubmit).not.toHaveBeenCalled();
+
+    await user.type(columnNameInput, 'id');
+    await user.clear(dataTypeInput);
+    await user.click(saveButton);
+    expect(onEditTableSubmit).not.toHaveBeenCalled();
+
+    await user.type(dataTypeInput, 'bigint');
+    await user.click(saveButton);
+    expect(onEditTableSubmit).toHaveBeenCalledOnce();
+  });
+
   it('adds a column when 컬럼 추가 is clicked', async () => {
     const setNodesMock = vi.fn();
     const setEditingNodeMock = vi.fn();
