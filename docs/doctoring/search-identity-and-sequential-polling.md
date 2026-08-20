@@ -36,4 +36,4 @@ MDN Web Docs contributors. (2026). *WeakMap*. Mozilla. https://developer.mozilla
 
 React Team. (n.d.). *useEffect*. React. Retrieved August 7, 2026, from https://react.dev/reference/react/useEffect
 
-Web Hypertext Application Technology Working Group. (2026, July 13). *HTML Standard: Timers*. https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers
+Web Hypertext Application Technology Working Group. (2026, August 20). *HTML Standard: Timers*. https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers

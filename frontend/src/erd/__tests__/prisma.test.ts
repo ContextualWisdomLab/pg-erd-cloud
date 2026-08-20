@@ -182,14 +182,19 @@ describe('exportPrisma', () => {
     ];
 
     const edges: Edge[] = [
-      { id: 'e1', source: 'invalid', target: '2' },
-      { id: 'e2', source: '1', target: '2' },
-      { id: 'e3', source: '1', target: '2', sourceHandle: 'unrecognized-handle' },
+      { id: 'e1', source: '1', target: '2', sourceHandle: 'unrecognized-handle' },
     ];
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('model A');
     expect(result).toContain('model B');
+    expect(result).not.toContain('@relation');
+
+    const noHandleResult = exportPrisma(nodes, [{ id: 'e2', source: '1', target: '2' }]);
+    expect(noHandleResult).not.toContain('@relation');
+
+    const missingNodeResult = exportPrisma(nodes, [{ id: 'e3', source: 'missing', target: '2' }]);
+    expect(missingNodeResult).not.toContain('@relation');
   });
 
   it('handles missing is_not_null logic for optional relationships', () => {

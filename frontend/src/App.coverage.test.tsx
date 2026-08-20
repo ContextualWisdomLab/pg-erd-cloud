@@ -766,6 +766,87 @@ describe('App orchestration coverage', () => {
     await act(async () => rejectRefresh(new Error('late terminal refresh failure')))
   })
 
+  it('keeps the current project state when the selected project is reselected', async () => {
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    await waitFor(() => expect(api.listConnections).toHaveBeenCalledWith('p1'))
+    const connectionCalls = api.listConnections.mock.calls.length
+    const snapshotCalls = api.listSnapshots.mock.calls.length
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p1' } })
+
+    expect(api.listConnections).toHaveBeenCalledTimes(connectionCalls)
+    expect(api.listSnapshots).toHaveBeenCalledTimes(snapshotCalls)
+  })
+
+  it('ignores terminal refresh success after switching projects', async () => {
+    const p2Snapshots = [{ schema_snapshot_uuid: 'p2-s1', status: 'succeeded', schema_filter: 'hr' }]
+    let listCall = 0
+    let resolveRefresh!: (value: typeof snapshots) => void
+    api.listSnapshots.mockImplementation((projectId: string) => {
+      if (projectId === 'p1') {
+        listCall += 1
+        return listCall === 1
+          ? Promise.resolve(snapshots)
+          : new Promise((resolve) => { resolveRefresh = resolve })
+      }
+      return Promise.resolve(p2Snapshots)
+    })
+    api.getSnapshot.mockResolvedValue({
+      schema_snapshot_uuid: 's1',
+      status: 'succeeded',
+      schema_filter: null,
+      error_message: null,
+      snapshot_json: null,
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    fireEvent.click((await screen.findAllByRole('button', { name: '열기' }))[0]!)
+    await waitFor(() => expect(resolveRefresh).toBeTypeOf('function'))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledWith('p2'))
+    await act(async () => resolveRefresh(snapshots))
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+
+    expect(screen.getByText('ERD_hr_1')).toBeInTheDocument()
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument()
+  })
+
+  it('ignores terminal refresh failure after switching projects', async () => {
+    const p2Snapshots = [{ schema_snapshot_uuid: 'p2-s1', status: 'succeeded', schema_filter: 'hr' }]
+    let listCall = 0
+    let rejectRefresh!: (reason: Error) => void
+    api.listSnapshots.mockImplementation((projectId: string) => {
+      if (projectId === 'p1') {
+        listCall += 1
+        return listCall === 1
+          ? Promise.resolve(snapshots)
+          : new Promise((_resolve, reject) => { rejectRefresh = reject })
+      }
+      return Promise.resolve(p2Snapshots)
+    })
+    api.getSnapshot.mockResolvedValue({
+      schema_snapshot_uuid: 's1',
+      status: 'succeeded',
+      schema_filter: null,
+      error_message: null,
+      snapshot_json: null,
+    })
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    fireEvent.click((await screen.findAllByRole('button', { name: '열기' }))[0]!)
+    await waitFor(() => expect(rejectRefresh).toBeTypeOf('function'))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(api.listSnapshots).toHaveBeenCalledWith('p2'))
+    await act(async () => rejectRefresh(new Error('stale terminal refresh failure')))
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+
+    expect(screen.getByText('ERD_hr_1')).toBeInTheDocument()
+    expect(screen.queryByText('stale terminal refresh failure')).not.toBeInTheDocument()
+  })
+
   it('renders user identity fallbacks and a diagram list without a project label', async () => {
     api.getMe.mockResolvedValueOnce({ subject: 'subject-only', display_name: null })
     await renderReadyApp()

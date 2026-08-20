@@ -966,6 +966,7 @@ export default function App() {
   }
 
   function selectProject(projectId: string | null) {
+    if (projectId === selectedProjectId) return;
     setSelectedProjectId(projectId);
     setSelectedConnId(null);
     setConnections([]);

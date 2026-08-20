@@ -21,6 +21,7 @@ describe('snapshotToGraph', () => {
     expect(graph.nodes).toHaveLength(1)
     expect(graph.nodes[0].id).toBe('1')
     expect(graph.nodes[0].data.title).toBe('public.users')
+    expect(graph.nodes[0].data.relation_name).toBe('users')
     expect(graph.nodes[0].data.comment).toBe('User accounts')
     expect(graph.nodes[0].data.columns).toHaveLength(2)
     expect(graph.nodes[0].data.columns[0]).toMatchObject({
