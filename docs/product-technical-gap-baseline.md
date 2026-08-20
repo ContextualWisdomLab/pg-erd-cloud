@@ -29,7 +29,7 @@ The product must not silently become a general-purpose graph database, document 
 | Real database proof | `frontend/e2e/` and `scripts/run-e2e-with-report.sh` exist only in the current dirty local worktree at capture time | A local PostgreSQL/Playwright proof path has been prepared | That the proof is merged, reproducible in CI, or safe for production targets |
 | Ecosystem | `docs/clearfolio-integration.md`, `docs/llm-orchestrator-integration.md` | Connector intent and opt-in boundaries are documented | End-to-end deployed connector contracts and tenant-isolated persistence |
 | Design | `docs/ui-ux/` screenshots and product spec; PR #824 contains live-Figma architecture work | Existing visual intent and a Figma-alignment path exist | An approved live Figma handoff or a merged Storybook component contract |
-| Governance | root `AGENTS.md`, central ruleset `18156473`, required central workflows | Review/security/merge policy is explicit | That every open PR is currently mergeable |
+| Governance | root `AGENTS.md`, central ruleset `18156473`, required central workflows, and hourly scheduler PR #943 | Review/security/merge policy and a recurring repair loop are explicit | That every open PR is currently mergeable |
 
 ## Buyer-visible gaps, ordered by leverage
 
@@ -57,12 +57,13 @@ The live-Figma work is currently PR #824 (`db59f97b16cb`). The companion ADR is 
 
 ## Executable loop
 
-1. Refetch the exact PR head, branch protection/ruleset, review threads, and all check runs.
-2. Repair only source-actionable findings at that head; treat provider latency as work to continue around, not as a product conclusion.
-3. Re-run focused proof, then the complete required local proof proportional to the change.
-4. Push normally, refetch the new exact head, and wait for fresh checks/review.
-5. Merge only with normal protected-branch semantics; otherwise advance to the next eligible PR or product gap.
-6. After a merge, refresh this baseline's live queue evidence and CHANGELOG/release state.
+1. The hourly workflow in PR #943 dispatches the central OpenCode review/fix scheduler for up to 100 open PRs; it does not bypass protected review or merge rules.
+2. Refetch the exact PR head, branch protection/ruleset, review threads, and all check runs.
+3. Repair only source-actionable findings at that head; treat provider latency as work to continue around, not as a product conclusion.
+4. Re-run focused proof, then the complete required local proof proportional to the change.
+5. Push normally, refetch the new exact head, and wait for fresh checks/review.
+6. Merge only with normal protected-branch semantics; otherwise advance to the next eligible PR or product gap.
+7. After a merge, refresh this baseline's live queue evidence and CHANGELOG/release state.
 
 ## Current open PR inventory
 
@@ -158,4 +159,3 @@ A release candidate is not established until:
 ## References
 
 See `docs/doctoring/product-technical-gap-baseline.md` for APA 7 references and research traceability.
-
