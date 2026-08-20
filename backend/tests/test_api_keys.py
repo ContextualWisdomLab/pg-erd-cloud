@@ -23,11 +23,12 @@ def _user(uid=None):
     )
 
 
-def test_hash_is_deterministic_and_not_reversible():
+@pytest.mark.asyncio
+async def test_hash_is_deterministic_and_not_reversible():
     token = API_KEY_PREFIX + "abc123"
-    assert hash_api_key(token) == hash_api_key(token)
-    assert token not in hash_api_key(token)
-    assert len(hash_api_key(token)) == 64  # pbkdf2-hmac-sha256 hex
+    assert await hash_api_key(token) == await hash_api_key(token)
+    assert token not in await hash_api_key(token)
+    assert len(await hash_api_key(token)) == 64  # pbkdf2-hmac-sha256 hex
     assert API_KEY_PBKDF2_ITERATIONS >= 200_000
 
 
@@ -41,7 +42,7 @@ async def test_create_returns_secret_once_and_stores_only_hash():
     )
     assert out.secret.startswith(API_KEY_PREFIX)
     added = session.add.call_args[0][0]
-    assert added.key_hash == hash_api_key(out.secret)
+    assert added.key_hash == await hash_api_key(out.secret)
     assert out.secret not in (added.key_hash, added.key_prefix, added.key_name)
     assert out.key_prefix == out.secret[: len(API_KEY_PREFIX) + 6]
 

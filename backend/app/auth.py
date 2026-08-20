@@ -237,6 +237,11 @@ def _bearer_token_from_request(request: Request) -> str:
 async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     """Validate the JOSE header, signing key, and claims signature."""
 
+    audience = settings.oidc_audience
+    if not isinstance(audience, str) or not audience.strip():
+        raise HTTPException(status_code=500, detail="OIDC audience configuration required")
+    audience = audience.strip()
+
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
     except Exception:  # noqa: BLE001
@@ -275,11 +280,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             token,
             jwk,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
-            audience=settings.oidc_audience,
+            audience=audience,
             issuer=settings.oidc_issuer,
             options={
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
+                "verify_aud": True,
+                "require_aud": True,
                 "require_iss": True,
                 "require_exp": True,
                 "require_jti": True,
@@ -411,7 +416,7 @@ API_KEY_PREFIX = "pgerd_"
 API_KEY_PBKDF2_ITERATIONS = 210_000
 
 
-def hash_api_key(token: str) -> str:
+async def hash_api_key(token: str) -> str:
     """Deterministic PBKDF2-HMAC digest of an API key (indexable lookup).
 
     API keys are server-generated random bearer credentials, but CodeQL treats
@@ -422,12 +427,15 @@ def hash_api_key(token: str) -> str:
     test guessed keys offline.
     """
 
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        token.encode("utf-8"),
-        settings.app_secret.encode("utf-8"),
-        API_KEY_PBKDF2_ITERATIONS,
-    ).hex()
+    def _hash() -> str:
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            token.encode("utf-8"),
+            settings.app_secret.encode("utf-8"),
+            API_KEY_PBKDF2_ITERATIONS,
+        ).hex()
+
+    return await asyncio.to_thread(_hash)
 
 
 async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
@@ -437,10 +445,11 @@ async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     401 so keys cannot be probed) and rejects revoked keys.
     """
 
+    key_hash = await hash_api_key(token)
     row = await session.execute(
         select(ApiKey, UserAccount)
         .join(UserAccount, UserAccount.user_account_uuid == ApiKey.user_account_uuid)
-        .where(ApiKey.key_hash == hash_api_key(token))
+        .where(ApiKey.key_hash == key_hash)
     )
     pair = row.first()
     if pair is None or pair[0].revoked_at is not None:

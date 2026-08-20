@@ -480,6 +480,22 @@ async def test_auth_fails_closed_without_oidc(
     assert exc_info.value.detail == "OIDC configuration required"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("audience", [None, "", "   "])
+async def test_oidc_fails_closed_without_audience(
+    monkeypatch: pytest.MonkeyPatch,
+    audience: str | None,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", audience)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._decode_verified_oidc_token("invalid-token")
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "OIDC audience configuration required"
+
+
 class _FakeScalarResult:
     def __init__(self, user: object | None) -> None:
         self._user = user
@@ -551,6 +567,8 @@ async def test_try_get_subject_for_rate_limit_error_path():
 async def test_oidc_decode_rejects_invalid_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+
     def mock_get_unverified_header(token):
         raise Exception("Invalid header")
 
