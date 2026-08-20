@@ -54,6 +54,11 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "${branch}" =~ ^[A-Za-z0-9_./-]+$ ]]; then
+            echo "Invalid branch name format" >&2
+            exit 1
+          fi
+
           git fetch --no-tags --prune origin "${branch}"
           git rev-list --max-count="${count}" "origin/${branch}" \
             | jq -R -s -c 'split("\n")[:-1]' \

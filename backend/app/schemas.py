@@ -4,7 +4,9 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.pg_introspect.forward_ddl import validate_forward_ddl
 
 
 class ProjectCreateIn(BaseModel):
@@ -13,7 +15,7 @@ class ProjectCreateIn(BaseModel):
     project_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
     )
 
 
@@ -30,7 +32,7 @@ class ProjectMemberAddIn(BaseModel):
     member_subject: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\s\x00-\x1F\x7F]+$",
+        pattern=r"^[^\s\x00-\x1F\x7F-\x9F]+$",
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
@@ -51,11 +53,12 @@ class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
     )
     dsn: str = Field(
         min_length=1,
         max_length=4096,
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
         description=("PostgreSQL or Snowflake connection string. Not logged."),
     )
 
@@ -73,6 +76,7 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
             "identifiers. Arbitrary SQL is rejected."
@@ -80,6 +84,13 @@ class ApplySqlIn(BaseModel):
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql(cls, v: str) -> str:
+        # Run the full DDL validation; raises ForwardDdlValidationError on failure
+        # which Pydantic converts to a 422 Unprocessable Entity
+        return validate_forward_ddl(v).sql
 
 
 class ApplySqlOut(BaseModel):
@@ -190,7 +201,7 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$")
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -214,9 +225,17 @@ class DiagramViewDetailOut(DiagramViewOut):
 class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
-    schema_name: str = Field(min_length=1, max_length=255)
-    relation_name: str = Field(min_length=1, max_length=255)
-    body: str = Field(min_length=1, max_length=10_000)
+    schema_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$"
+    )
+    relation_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$"
+    )
+    body: str = Field(
+        min_length=1,
+        max_length=10_000,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
+    )
 
 
 class TableAnnotationOut(BaseModel):
@@ -285,7 +304,11 @@ class NamingLintOut(BaseModel):
 class DbmlConvertIn(BaseModel):
     """Request body for converting DBML text into a snapshot."""
 
-    dbml: str = Field(min_length=1, max_length=524_288)
+    dbml: str = Field(
+        min_length=1,
+        max_length=524_288,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]+$",
+    )
     include_ddl: bool = True
     dialect: Literal["postgresql", "snowflake"] = "postgresql"
 
@@ -302,7 +325,9 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128)
+    key_name: str = Field(
+        min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F-\x9F]+$"
+    )
 
 
 class ApiKeyOut(BaseModel):
