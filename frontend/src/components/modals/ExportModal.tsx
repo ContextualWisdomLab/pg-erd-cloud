@@ -160,7 +160,7 @@ export function ExportModal({
             aria-label="공유 및 내보내기 닫기"
             onClick={onCloseExport}
           >
-            X
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
 
