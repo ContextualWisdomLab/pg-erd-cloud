@@ -32,7 +32,7 @@ RESERVED_WORDS = frozenset(
     do else end except false fetch for foreign from grant group having in
     initially intersect into lateral leading limit localtime localtimestamp not
     null offset on only or order placing primary references returning select
-    session_user some symmetric table then to trailing true union unique user
+    session_user some symmetric system_user table then to trailing true union unique user
     using variadic when where window with""".split()
 )
 
@@ -73,12 +73,14 @@ def _case_style(name: str) -> str | None:
 
 
 def _item(category: str, severity: str, target: str, detail: str) -> dict[str, Any]:
+    """Build one stable finding payload for the naming report."""
     return {"category": category, "severity": severity, "target": target, "detail": detail}
 
 
 def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Return naming-convention findings + a summary, breaking issues first."""
-    snapshot = snapshot or {}
+    if not isinstance(snapshot, dict):
+        snapshot = {}
     relations = _rows(snapshot, "relations")
     columns = _rows(snapshot, "columns")
     rel_by_oid = {r.get("relation_oid"): r for r in relations}
@@ -87,11 +89,11 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     identifiers: list[tuple[str, str]] = []
     for r in relations:
         name = r.get("relation_name")
-        if name:
+        if isinstance(name, str) and name:
             identifiers.append((f"{r.get('schema_name')}.{name}", str(name)))
     for c in columns:
         name = c.get("column_name")
-        if name:
+        if isinstance(name, str) and name:
             rel = rel_by_oid.get(c.get("relation_oid")) or {}
             identifiers.append((f"{rel.get('relation_name')}.{name}", str(name)))
 
