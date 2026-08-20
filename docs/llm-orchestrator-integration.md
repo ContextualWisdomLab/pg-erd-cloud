@@ -7,9 +7,13 @@ Bearer`, `{model, messages}`). [contextual-orchestrator](https://github.com/Cont
 exposes exactly that interface (`/v1/chat/completions`) while routing,
 delegating, verifying, and synthesizing across a pool of model agents.
 
-So the integration is **configuration only — no code change**.
+The endpoint remains OpenAI-compatible; pg-erd-cloud adds one explicit
+orchestration policy field so the gateway, rather than this product, owns model
+selection and workflow depth.
 
 ## Point pg-erd-cloud at the orchestrator
+
+The production request also sends `orchestration_mode: "auto"`. This delegates route, independent verification, conducted workflow, provider choice, and known-cost tie-breaking to contextual-orchestrator instead of forcing a single worker in pg-erd-cloud.
 
 ```bash
 LLM_API_BASE_URL=https://<orchestrator-host>/v1
@@ -43,7 +47,7 @@ Orchestrator agent config (on the orchestrator side, env-backed key):
 ```
 
 Run: `python -m contextual_orchestrator --serve --agents agents.json \
---inference-token "$CONTEXTUAL_ORCHESTRATOR_TOKEN" --port 8000` with
+--auth-token "$CONTEXTUAL_ORCHESTRATOR_TOKEN" --port 8000` with
 `OPENAI_API_KEY` supplied from the org Secret at deploy time.
 
 ## Fallback
