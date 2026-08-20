@@ -650,38 +650,49 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
   })
 
-  it('ignores terminal refresh completions after the editor unmounts', async () => {
+  it('ignores terminal refresh completions after the editor effect is cleaned up', async () => {
+    const projectTwoSnapshots = [
+      { schema_snapshot_uuid: 'p2-snapshot', status: 'succeeded', schema_filter: 'p2-only' },
+    ]
     let resolveRefresh!: (value: typeof snapshots) => void
-    api.listSnapshots.mockResolvedValueOnce(snapshots).mockImplementationOnce(
-      () => new Promise((resolve) => { resolveRefresh = resolve }),
-    )
+    let rejectRefresh!: (reason: unknown) => void
+    let listSnapshotsCall = 0
+    api.listSnapshots.mockImplementation(() => {
+      listSnapshotsCall += 1
+      if (listSnapshotsCall === 1) return Promise.resolve(snapshots)
+      if (listSnapshotsCall === 2) {
+        return new Promise((resolve) => { resolveRefresh = resolve })
+      }
+      if (listSnapshotsCall === 3 || listSnapshotsCall === 4) {
+        return Promise.resolve(projectTwoSnapshots)
+      }
+      if (listSnapshotsCall === 5) return Promise.resolve(snapshots)
+      if (listSnapshotsCall === 6) {
+        return new Promise((_resolve, reject) => { rejectRefresh = reject })
+      }
+      return Promise.resolve(snapshots)
+    })
     await renderReadyApp()
     await waitFor(() => expect(api.listSnapshots).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await waitFor(() => expect(resolveRefresh).toBeTypeOf('function'))
-    cleanup()
-    await act(async () => resolveRefresh(snapshots))
-
-    let rejectRefresh!: (reason: unknown) => void
-    api.listSnapshots.mockResolvedValueOnce(snapshots).mockImplementationOnce(
-      () => new Promise((_resolve, reject) => { rejectRefresh = reject }),
-    )
-    api.getSnapshot.mockResolvedValueOnce({
-      schema_snapshot_uuid: 's4',
-      status: 'failed',
-      schema_filter: null,
-      error_message: null,
-      snapshot_json: null,
-    })
-    await renderReadyApp()
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(listSnapshotsCall).toBe(4))
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    expect(await screen.findByText('ERD_p2-only_1')).toBeInTheDocument()
+    await act(async () => resolveRefresh(snapshots))
+    expect(screen.getByText('ERD_p2-only_1')).toBeInTheDocument()
+    expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p1' } })
     await waitFor(() => expect(rejectRefresh).toBeTypeOf('function'))
-    cleanup()
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(listSnapshotsCall).toBe(8))
     await act(async () => rejectRefresh(new Error('late terminal refresh')))
+    expect(screen.queryByText(/late terminal refresh/)).not.toBeInTheDocument()
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {

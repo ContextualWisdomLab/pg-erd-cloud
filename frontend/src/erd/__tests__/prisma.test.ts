@@ -190,6 +190,7 @@ describe('exportPrisma', () => {
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('model A');
     expect(result).toContain('model B');
+    expect(result).not.toContain('@relation(');
   });
 
   it('handles missing is_not_null logic for optional relationships', () => {
