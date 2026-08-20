@@ -1,0 +1,27 @@
+name: pg-erd-cloud Hourly Review Repair
+
+on:
+  schedule:
+    # Keep this repository's heartbeat separate from the other CWL products.
+    - cron: "13 * * * *"
+
+concurrency:
+  group: pg-erd-cloud-hourly-review-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dispatch-review-repair:
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-fix-scheduler.yml@aa8503f4383e8328d89104796bc3e9f7da810376
+    with:
+      target_repository: ContextualWisdomLab/pg-erd-cloud
+      base_branch: main
+      max_prs: "100"
+      max_dispatches: "1"
+      retry_hours: "1"
+    secrets:
+      PR_REVIEW_MERGE_TOKEN: ${{ secrets.PR_REVIEW_MERGE_TOKEN }}
+      OPENCODE_APPROVE_TOKEN: ${{ secrets.OPENCODE_APPROVE_TOKEN }}
