@@ -44,6 +44,8 @@ describe('EditTableModal', () => {
     expect(screen.getByRole('textbox', { name: 'test_col 데이터 타입' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col PK 설정' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col NN 설정' })).toBeInTheDocument();
+    const closeButton = screen.getByRole('button', { name: '닫기' });
+    expect(closeButton.querySelector('[aria-hidden="true"]')).toHaveTextContent('✕');
   });
 
   it('returns null if not open or no editingNode', () => {
