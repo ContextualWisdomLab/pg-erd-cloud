@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🧹 **관계 추론 린트 경로 정리**: 사용되지 않는 관계 OID 인덱스를 제거해 전체 Ruff 검증이 ORM·마이그레이션 변경과 함께 통과하도록 합니다.
 - [BE] ⚡ **Job queue hot-path index**: queued jobs now use a partial, deterministic `(run_after, job_queue_uuid)` access path so terminal history does not expand worker claim scans; migration `0009_hot_queue_claim_index` is stacked after the ORM metadata reconciliation.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
