@@ -15,8 +15,7 @@ export function inferRelationships(
   // reducing complexity from O(N^2) to O(N).
   const nodesByTableName = new Map<string, Node<TableNodeData>>();
   for (const n of nodes) {
-    const parts = n.data.title.split(".");
-    const tableName = parts[parts.length - 1];
+    const tableName = n.data.relation_name ?? n.data.title.split(".").pop() ?? "";
     // Preserve Original .find behavior by only setting the first occurrence
     if (!nodesByTableName.has(tableName)) {
       nodesByTableName.set(tableName, n);
@@ -24,8 +23,8 @@ export function inferRelationships(
   }
 
   for (const sourceNode of nodes) {
-    const srcParts = sourceNode.data.title.split(".");
-    const srcTableName = srcParts[srcParts.length - 1];
+    const srcTableName =
+      sourceNode.data.relation_name ?? sourceNode.data.title.split(".").pop() ?? "";
 
     for (const column of sourceNode.data.columns) {
       const colName = column.column_name;
