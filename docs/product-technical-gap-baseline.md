@@ -1,8 +1,8 @@
 # Product and technical gap baseline
 
-- **Snapshot date:** 2026-08-20 (UTC GitHub API evidence; refreshed after PRs #942–#944)
+- **Snapshot date:** 2026-08-20 (UTC GitHub API evidence; refreshed after normal branch synchronization and PR #824 conflict repair)
 - **Repository:** `ContextualWisdomLab/pg-erd-cloud`
-- **Base evidence:** `origin/main` = `729eaccbdcf8508f943adc39d23464a8a55ca2bd`
+- **Base evidence:** `origin/main` = `8dc746920c12988f082e914879d95e13c9693535`
 - **Purpose:** turn the current product, architecture, research, and live PR state into an executable release backlog. This is a baseline, not a claim that the product is release-ready.
 
 ## Product boundary
@@ -35,7 +35,7 @@ The product must not silently become a general-purpose graph database, document 
 
 | Priority | Gap | Buyer impact | Closure evidence |
 |---|---|---|---|
-| P0 | The open-PR queue is not release-shaped. The live queue contains 62 PRs and several exact-head checks are still pending or failing. | Buyers cannot predict what version is safe to deploy or whether a security fix is actually included. | Each PR has a current-head review/check record, resolved threads, normal merge, and release notes; no stale-head claims. |
+| P0 | The open-PR queue is not release-shaped. The live queue contains 61 PRs and exact-head checks are still in flight across the queue. | Buyers cannot predict what version is safe to deploy or whether a security fix is actually included. | Each PR has a current-head review/check record, resolved threads, normal merge, and release notes; no stale-head claims. |
 | P0 | Central Strix bounded scans can produce false evidence: PR #745 reported a credential in scanner-generated `.state/agents.db`; PR #724 reported a missing unchanged PostgreSQL DSN guard in bounded context. The canonical repair is central `.github` PR #1153; duplicate #1164 is closed. | Security gates can block good code or misdirect remediation, delaying releases and weakening trust in the control plane. | Merge #1153 through protected normal review, then collect fresh exact-head Strix runs for affected target PRs. |
 | P0 | Alembic and ORM metadata can drift when dependency PRs meet schema changes; PR #838 currently fails its repair check on index/type drift. | Database upgrades can fail at deploy time or silently diverge from the ERD product's own metadata model. | A migration-drift contract on a real PostgreSQL database, upgrade/downgrade proof, and a clean current-head check on #838/#936 dependency order. |
 | P0 | Runtime secrets/config still load directly from environment through `backend/app/settings.py`, contrary to the organization KV/credential-registry rule. | Secret rotation, auditability, and least-privilege deployment are weaker than a commercial product requires; PII masking is not a substitute for controlled access. | Bootstrap-only environment transport, encrypted KV reads at runtime, rotation/revocation tests, and no raw runtime `os.getenv()` path. |
@@ -48,7 +48,7 @@ The product must not silently become a general-purpose graph database, document 
 
 ## ADR: design authority
 
-The live-Figma work is currently PR #824 (`db59f97b16cb`). The companion ADR is required to record:
+The live-Figma work is currently PR #824 (`e34f69c2099d`). The companion ADR is required to record:
 
 - **Figma File ID:** `csnpEEJfmqFWB0vNUoTkWA`
 - **Supplemental Figma File ID:** `OTN0rBGtnVy0P7yq4Iv9Si`
@@ -65,7 +65,80 @@ The live-Figma work is currently PR #824 (`db59f97b16cb`). The companion ADR is 
 6. Merge only with normal protected-branch semantics; otherwise advance to the next eligible PR or product gap.
 7. After a merge, refresh this baseline's live queue evidence and CHANGELOG/release state.
 
-## Current open PR inventory
+## Current open PR inventory (live refresh)
+
+The live REST API returned **61 open PRs** at this refresh. Each SHA below is
+the exact head used for review/check triage; a merge decision must refetch it
+again because remote agents and required workflows can change it.
+
+| PR | Exact current head | Title |
+|---:|---|---|
+| #944 | `d393bf655171fb31de0a8cc6c9517ba69aa3c9fc` | Storybook design-token inventory |
+| #943 | `a968d54daf1ddd663b801628a7817f4c5bf459ba` | hourly PR review repair scheduler |
+| #942 | `62ba4cc490ff4b124d3ba1d7e0f027d539492bd7` | product and technical gap baseline |
+| #941 | `18a91beac732f2cf41f3971087adf76ad283318c` | API key hashing |
+| #940 | `9fb1c3b221a066de4b5ccba6d474a9695683720d` | Snowflake constraint grouping |
+| #939 | `3ca5db715db50ee01f061131c02f57e82493f85e` | ERD export handle validation |
+| #938 | `dc50a22140c636ba9ca1f58bb8b769d1eb3ff33d` | MySQL introspection grouping |
+| #936 | `5e73610f345535ce19f993561b728cfeb54f92e0` | ORM metadata and migration reconciliation |
+| #933 | `ec54f20321b9caf5d7a29f84b4c608dd0f6f552d` | automatic column mapping |
+| #930 | `aaffad0a8c126ce089e873d323cbc70797aef5e8` | required form-field indicators |
+| #926 | `369d82c491d3e029bcaff80487fc5885d87d7c2d` | control-character schema rejection |
+| #915 | `34e088c0a93928a9902a13a0e1b4ad3d8e544f03` | table-delete confirmation |
+| #914 | `df336c0dec6177b5c67299591c789dcbdb555a33` | CodeQL analyze update |
+| #913 | `d70622107200a998b36a761666f74ea2c70b5efd` | CodeQL init update |
+| #912 | `802441e60f21769711d6bf93b8b797bd697fc7b3` | CodeQL autobuild update |
+| #910 | `5c1412bf3ec1236b3de879345fca2bc724af2212` | jest-dom update |
+| #909 | `d3faffdd5407892148939eb1e278fd9150de573c` | Snowflake connector update |
+| #907 | `c6131676e4dfa79230e8ea4b61e8e8485d710552` | setuptools update |
+| #906 | `3c6db17b4943508c384761716a0f7d19f9aed5b3` | SQLAlchemy update |
+| #905 | `0070a2967b9dacf5f9033b62a530b65b638ff695` | Starlette update |
+| #904 | `4a80d4ec41f818a74268cad86fa493fc0e292e0b` | Python image update |
+| #903 | `3c7a574799bf7e6a3b5a6ee8a1066eaba15c87e1` | Prisma collision-free identifiers |
+| #902 | `57ff32131c7a28d9d5ed146325a327c687b1ea49` | NVIDIA NIM OpenCode routing |
+| #901 | `eeef7b7170a21e8f191482b6913f75356341c0ec` | business-group color radiogroup |
+| #900 | `ed12e8d6e2ae75e4591827fe4315d4d7a53b9374` | adaptive LLM orchestration |
+| #895 | `8436cb4b8ce7f5bdda897f8c13c2aa51ea9511e8` | JWT critical-header rejection |
+| #894 | `f67f8888d917b27107f68d17f9b13f1ab429d7bf` | Prisma relation index |
+| #890 | `a04935ded27fb4817a76682c3b6e01c63e03e32c` | authenticated project-list contract |
+| #889 | `f7cd3c62c5ea69df3607481519264251d6d81510` | CodeQL backfill inputs |
+| #888 | `6f47fe0f29135699101ac4179cb668acd8b423ca` | Valkey sentinel host contract |
+| #887 | `d221ab7951047ec84c11bc5707faaf4571269909` | log-breaking identifier rejection |
+| #886 | `c7a45292dbb6ad26f9d0cfef83bd9d5d9ecb1635` | current-user HTTP contract |
+| #884 | `4499ab534ce3b3d7d09aa45a24565c165f24dde1` | ERD handle-array removal |
+| #882 | `b924d0917e3ab4d2de674be4277d1634f03860db` | modal action ARIA labels |
+| #881 | `5a8ce593bc8b94c89c4cab0b9af36784a0dd472a` | immutable search memoization |
+| #874 | `a0c816003b13f4d6cb6f016ca739a9012e424dac` | DBML index evidence |
+| #868 | `d9f1b9478492595937b7382f6876e0a4c134dda9` | server-local DSN rejection |
+| #858 | `a34b35e59bf76d8b311be041e040f0f1148b63e3` | unavailable toolbar actions |
+| #857 | `63424a49e4345f5f8305d85188d9a46349d407fe` | bounded Unity Catalog introspection |
+| #856 | `322d543386c2658e563ae383780847f51f767fb9` | relationship-aware ERD layout |
+| #855 | `b94eb617708782ccda5e5a3c199c749fbbf32a80` | OIDC organization binding |
+| #850 | `682f107782bd7a9d5b5605de7d78402dc71cdd21` | ERD column-name resolution |
+| #838 | `d5b52f80ca24480c0000d20d75b568ff9a62b9a4` | Alembic dependency update |
+| #835 | `423564054a82e4158219cf56a9348652265e12da` | native form submission paths |
+| #834 | `07a4e376ba0ed1ae2fead9892ba66f4b54b14c8d` | forward-engineering plan authority |
+| #832 | `35c12f43a045040c7b10f527528039cd014a678d` | non-text multiline SQL rejection |
+| #827 | `e99129920ba981ecd3a529451756489aaa3f7f5a` | concurrent pooler detection |
+| #824 | `e34f69c2099d0e37cd04efe5b974515d0678476d` | live Figma and sharing architecture |
+| #782 | `5057b01e0b1aaae3fab7852360dd4b99dd49b732` | PostgreSQL SYSTEM_USER naming |
+| #774 | `20afa6790cf8191173639d98c23b549de64e8a23` | PostgreSQL identifier inference |
+| #772 | `b6bf1d460c43d801b725f7e3600512c90588a02c` | dead relationship lookup removal |
+| #768 | `03d637684658ed4f501ef7a0c9d7a101b5123e40` | missing-column rendering test |
+| #745 | `7c8afef1fde51e6c5086aa342f008f7aadbf4796` | DSN secret redaction |
+| #744 | `409343ce286f49b5a700200b6cca1a5d7e159f0c` | supported CORS methods |
+| #738 | `43d594c9d955b273875c3234c02333439a819878` | diagram-data deflake |
+| #737 | `8e58fc0867ab909d427724064daefa1397bac48e` | ecosystem names and review policy |
+| #725 | `203dce1b0ad4e79e709ce0c796c457d065db4fae` | FastAPI and Redis lock synchronization |
+| #724 | `dbc315867013fbf0481853039ec53d75e6101743` | trusted local PostgreSQL snapshot CLI |
+| #723 | `2a65c8263d325c5e4fcef51d95ee57e411cf4e49` | saved-layout update contract |
+| #704 | `5f10da2a4bf4b4db93762281a5886650b74887a3` | unavailable table-save accessibility |
+| #698 | `00eb7938217eeae51ed12c7188c85b36e5414174` | unavailable export accessibility |
+
+The previous inventory below is retained as historical evidence from the first
+baseline capture and must not be used for a merge decision.
+
+## Historical open PR inventory
 
 The following inventory was queried from the live REST API and records the exact head used for triage on 2026-08-20. It is intentionally a snapshot; the verification command below must be rerun before every merge decision.
 
