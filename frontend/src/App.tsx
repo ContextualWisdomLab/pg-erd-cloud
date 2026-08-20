@@ -340,9 +340,7 @@ export default function App() {
           return;
         }
 
-        if (isCurrent) {
-          timer = window.setTimeout(poll, 1000);
-        }
+        timer = window.setTimeout(poll, 1000);
       } catch (e) {
         if (isCurrent) {
           setError(String(e));
