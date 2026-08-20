@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId } from './handleUtils';
+import { decodeColumnHandle } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -41,25 +41,46 @@ function sourceColumnsForEdge(edge: Edge): Set<string> {
 
 type ForeignKeyNodeInfo = {
   columns: Set<string>;
-  handles: Set<string>;
 };
 
-function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+function foreignKeyColumnsByNode(
+  nodes: Node<TableNodeData>[],
+  edges: Edge[],
+): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
+  const columnsByNode = new Map(
+    nodes.map((node) => [node.id, new Set((node.data.columns || []).map((column) => column.column_name))]),
+  );
 
   for (const edge of edges) {
+    const sourceColumns = columnsByNode.get(edge.source);
+    if (!sourceColumns) continue;
+    const targetColumns = columnsByNode.get(edge.target);
+
+    const sourceHandleColumn = decodeColumnHandle(edge.sourceHandle, 'src');
+    const targetHandleColumn = decodeColumnHandle(edge.targetHandle, 'tgt');
     let info = map.get(edge.source);
     if (!info) {
-      info = { columns: new Set<string>(), handles: new Set<string>() };
+      info = { columns: new Set<string>() };
       map.set(edge.source, info);
     }
 
-    for (const column of sourceColumnsForEdge(edge)) {
-      info.columns.add(column);
+    if (edge.sourceHandle || edge.targetHandle) {
+      if (
+        sourceHandleColumn === null ||
+        targetHandleColumn === null ||
+        !targetColumns ||
+        !sourceColumns.has(sourceHandleColumn) ||
+        !targetColumns.has(targetHandleColumn)
+      ) {
+        continue;
+      }
+      info.columns.add(sourceHandleColumn);
+      continue;
     }
 
-    if (edge.sourceHandle) {
-      info.handles.add(edge.sourceHandle);
+    for (const column of sourceColumnsForEdge(edge)) {
+      if (sourceColumns.has(column)) info.columns.add(column);
     }
   }
 
@@ -74,12 +95,7 @@ function isForeignKeyColumn(
   const info = edgeColumnsByNode.get(node.id);
   if (!info) return false;
 
-  if (info.columns.has(columnName)) {
-    return true;
-  }
-
-  const handleId = sourceColumnHandleId(columnName);
-  return info.handles.has(handleId);
+  return info.columns.has(columnName);
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {
@@ -102,7 +118,7 @@ export function exportDictionaryCsv(
     'Example Value',
   ];
   const rows: unknown[][] = [header];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkColumnsByNode = foreignKeyColumnsByNode(nodes, edges);
 
   for (const node of nodes) {
     const tableName = node.data.title || node.id;
@@ -137,7 +153,7 @@ export function exportDictionaryMarkdown(
   edges: Edge[],
 ): string {
   const lines: string[] = ['# Data Dictionary', ''];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const fkColumnsByNode = foreignKeyColumnsByNode(nodes, edges);
 
   if (nodes.length === 0) {
     lines.push('No tables found.');
