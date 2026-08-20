@@ -309,22 +309,38 @@ export default function App() {
 
   useEffect(() => {
     if (!snapshotId) return;
-    const timer = setInterval(() => {
-      getSnapshot(snapshotId)
-        .then((s) => {
-          setSnapshot(s);
-          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-            clearInterval(timer);
-            if (selectedProjectId) {
-              listSnapshots(selectedProjectId)
-                .then(setSnapshots)
-                .catch((e) => setError(String(e)));
+    let isCurrent = true;
+    let isPolling = false;
+    let isTerminal = false;
+    const timer = window.setInterval(async () => {
+      if (!isCurrent || isPolling || isTerminal) return;
+      isPolling = true;
+      try {
+        const s = await getSnapshot(snapshotId);
+        if (!isCurrent || isTerminal) return;
+        setSnapshot(s);
+        if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+          isTerminal = true;
+          window.clearInterval(timer);
+          if (selectedProjectId) {
+            try {
+              const items = await listSnapshots(selectedProjectId);
+              if (isCurrent) setSnapshots(items);
+            } catch (e) {
+              if (isCurrent) setError(String(e));
             }
           }
-        })
-        .catch((e) => setError(String(e)));
+        }
+      } catch (e) {
+        if (isCurrent && !isTerminal) setError(String(e));
+      } finally {
+        isPolling = false;
+      }
     }, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(timer);
+    };
   }, [selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {

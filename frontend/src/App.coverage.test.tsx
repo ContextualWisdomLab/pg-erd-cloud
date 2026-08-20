@@ -652,6 +652,34 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
   })
 
+  it('does not overlap polling requests or apply stale responses', async () => {
+    let resolvePoll!: (value: object) => void
+    api.getSnapshot.mockReturnValueOnce(new Promise((resolve) => { resolvePoll = resolve }))
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    vi.useFakeTimers()
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+    expect(api.getSnapshot).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await act(async () => {
+      resolvePoll({
+        schema_snapshot_uuid: 's1',
+        status: 'failed',
+        schema_filter: null,
+        error_message: 'stale response',
+        snapshot_json: null,
+      })
+      await Promise.resolve()
+    })
+    expect(screen.getByText('Snapshot: —')).toBeInTheDocument()
+    expect(screen.queryByText('stale response')).not.toBeInTheDocument()
+  })
+
   it('ignores stale project metadata failures after changing projects', async () => {
     let rejectConnections!: (reason: unknown) => void
     let rejectSnapshots!: (reason: unknown) => void
