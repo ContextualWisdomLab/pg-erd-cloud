@@ -93,7 +93,8 @@ export const Inventory: Story = {
                 <code style={{ minWidth: '220px' }}>{token}</code>
                 <span style={{ color: 'var(--color-text)' }}>{label}</span>
                 <span
-                  aria-label={`${label} token value`}
+                  role="img"
+                  aria-label={`${label} token preview`}
                   style={tokenPreviewStyle({ label, token, kind })}
                 />
               </div>
