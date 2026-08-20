@@ -7,10 +7,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    versioning-strategy: increase
-    # Enforce a 7-day cooldown for new releases to mitigate dependency confusion/takeover attacks
-    custom-ecosystem-attributes:
-      cooldown: 7
 
   # Keep Python dependencies fresh.
   - package-ecosystem: "pip"
@@ -18,10 +14,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    versioning-strategy: increase
-    # Enforce a 7-day cooldown for new releases to mitigate dependency confusion/takeover attacks
-    custom-ecosystem-attributes:
-      cooldown: 7
 
   # Keep Node.js dependencies fresh.
   - package-ecosystem: "npm"
@@ -29,10 +21,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    versioning-strategy: increase
-    # Enforce a 7-day cooldown for new releases to mitigate dependency confusion/takeover attacks
-    custom-ecosystem-attributes:
-      cooldown: 7
 
   # Keep Docker base image digests fresh.
   - package-ecosystem: "docker"
@@ -40,17 +28,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    versioning-strategy: increase
-    # Enforce a 7-day cooldown for new releases to mitigate dependency confusion/takeover attacks
-    custom-ecosystem-attributes:
-      cooldown: 7
 
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    versioning-strategy: increase
-    # Enforce a 7-day cooldown for new releases to mitigate dependency confusion/takeover attacks
-    custom-ecosystem-attributes:
-      cooldown: 7
