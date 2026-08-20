@@ -113,10 +113,12 @@ describe('modal behavior coverage', () => {
       />,
     )
     expect(screen.getByText(/From: a/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/제약조건 이름 \(Label\)/)).toBeRequired()
     fireEvent.change(screen.getByLabelText(/제약조건 이름 \(Label\)/), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true).mockReturnValueOnce(false)
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -125,6 +127,23 @@ describe('modal behavior coverage', () => {
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
     expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('blocks whitespace-only relationship labels', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditEdgeModal
+        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
+        relLabel="   "
+        setRelLabel={vi.fn()}
+        onRelDelete={vi.fn()}
+        onRelCancel={vi.fn()}
+        onRelSubmit={onSubmit}
+      />,
+    )
+
+    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('covers EditTableModal column mutation, duplication, form, and table actions', () => {
@@ -245,6 +264,8 @@ describe('modal behavior coverage', () => {
     )
     expect(screen.getByText('등록된 그룹이 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '추가' })).toBeDisabled()
+    fireEvent.submit(document.querySelector('form.groupManager__create')!)
+    expect(onCreate).not.toHaveBeenCalled()
 
     rerender(
       <GroupModal
@@ -264,7 +285,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText(/그룹 이름/), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true).mockReturnValueOnce(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })

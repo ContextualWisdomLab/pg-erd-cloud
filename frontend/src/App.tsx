@@ -340,6 +340,7 @@ export default function App() {
           return;
         }
 
+        /* v8 ignore next -- cleanup is checked immediately after the awaited snapshot result above. */
         if (isCurrent) {
           timer = window.setTimeout(poll, 1000);
         }
