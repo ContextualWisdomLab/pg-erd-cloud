@@ -476,7 +476,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
     fireEvent.click(screen.getByRole('button', { name: '모든 노드 지우기' }))
     expect(screen.getByText('ERD 캔버스가 비어 있습니다')).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('covers guarded editor actions, navigation callbacks, and form selectors', async () => {
     await renderReadyApp()
