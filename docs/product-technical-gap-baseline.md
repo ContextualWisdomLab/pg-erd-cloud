@@ -119,7 +119,7 @@ The live REST query returned 61 open pull requests on 2026-08-20. Exact heads ar
 |---:|---|---|
 | #944 | `d393bf655171fb31de0a8cc6c9517ba69aa3c9fc` | feat(frontend): add Storybook design-token inventory |
 | #943 | `a968d54daf1ddd663b801628a7817f4c5bf459ba` | ci: schedule hourly PR review repair |
-| #942 | `dd41f6a294a62856a3823bfe2afd439509a1bd08` | docs: establish product and technical gap baseline |
+| #942 | `6a414ec0986f43c1444096b427460218ee33b582` | docs: establish product and technical gap baseline |
 | #941 | `18a91beac732f2cf41f3971087adf76ad283318c` | fix(auth): offload API key hashing |
 | #940 | `9fb1c3b221a066de4b5ccba6d474a9695683720d` | refactor(snowflake): group constraint context |
 | #939 | `3ca5db715db50ee01f061131c02f57e82493f85e` | fix(frontend): validate ERD export handles |
@@ -166,7 +166,7 @@ The live REST query returned 61 open pull requests on 2026-08-20. Exact heads ar
 | #827 | `e99129920ba981ecd3a529451756489aaa3f7f5a` | ⚡ Bolt: [concurrent pooler detection] |
 | #824 | `e34f69c2099d0e37cd04efe5b974515d0678476d` | feat: align live Figma, harden sharing, and establish architecture authority |
 | #782 | `d70985baa0355e71845096529f8a8ea99ca7cba7` | fix(naming): classify PostgreSQL SYSTEM_USER as reserved |
-| #774 | `d5510e56b390ca0b9edbba54d284651448dd7a7a` | fix(erd): preserve PostgreSQL identifiers in relationship inference |
+| #774 | `d655a6c57e620edde68bbd818f2360a655d40ce4` | fix(erd): preserve PostgreSQL identifiers in relationship inference |
 | #772 | `7de11c899a2617b7bedbb6c7558dcf199c153dc1` | chore(backend): remove dead relationship-inference lookup |
 | #768 | `03d637684658ed4f501ef7a0c9d7a101b5123e40` | test(data-dictionary): cover missing-column rendering |
 | #745 | `7c8afef1fde51e6c5086aa342f008f7aadbf4796` | 🛡️ Sentinel: [CRITICAL] Fix incomplete DSN secret redaction and over-redaction |
