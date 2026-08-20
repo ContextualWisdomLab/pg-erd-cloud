@@ -1,81 +1,125 @@
 # Product and technical gap baseline
 
-- **Snapshot date:** 2026-08-20 (UTC GitHub API evidence; refreshed after normal branch synchronization and PR #824 conflict repair)
+- **Snapshot date:** 2026-08-20
 - **Repository:** `ContextualWisdomLab/pg-erd-cloud`
-- **Base evidence:** `origin/main` = `8dc746920c12988f082e914879d95e13c9693535`
-- **Purpose:** turn the current product, architecture, research, and live PR state into an executable release backlog. This is a baseline, not a claim that the product is release-ready.
+- **Protected-main evidence:** `8dc746920c12988f082e914879d95e13c9693535`
+- **Open-PR evidence:** GitHub REST search returned **61** open pull requests; exact heads remain mutable.
+- **Package evidence:** backend and frontend both declare version `0.1.0`.
+- **Status:** broad pre-GA product; no commercial release candidate is proven by this document.
+- **Purpose:** convert product, architecture, research, issue, PR, review, check, migration, design, and operability evidence into one executable completion backlog.
 
 ## Product boundary
 
-pg-erd-cloud is a standalone PostgreSQL-focused ERD collaboration product. It reverse-engineers a target database into immutable schema snapshots, renders and edits an ERD, exports DDL/DBML/Mermaid/data dictionaries/reversing specifications, computes schema diffs and migration-risk evidence, and exposes project-scoped sharing. It must remain independently runnable and consumable as a module by the CWL ecosystem.
+pg-erd-cloud is a standalone PostgreSQL-focused ERD collaboration product. It accepts an authorized database connection, creates immutable schema snapshots asynchronously, renders and edits an ERD, stores project-scoped views and annotations, computes diffs and migration-risk evidence, and exports DDL, DBML, Mermaid, Prisma, data dictionaries, and reversing specifications.
 
-The current documented ecosystem boundaries are:
+It must remain independently runnable and consumable as a module by the CWL ecosystem. Authority is split deliberately:
 
-- `naruon`: knowledge-graph and PIM hub;
-- `clearfolio`: reference-document conversion/viewer connector;
-- `contextual-orchestrator`: OpenAI-compatible model routing/orchestration boundary;
-- `.github`: central review, security, scheduler, Strix, Noema, and merge-governance control plane.
+- pg-erd-cloud owns ERD projects, membership, encrypted connection metadata, snapshots, views, annotations, sharing, API keys, migration-plan/run metadata, and its PostgreSQL job queue;
+- `keyverse` or an external issuer owns identity and lifecycle provisioning;
+- `clearfolio` owns document conversion and viewing;
+- `contextual-orchestrator` owns model discovery, routing, fallback, orchestration, and LLM evaluation;
+- `naruon` owns its PIM/knowledge-graph control plane and may consume explicit pg-erd-cloud evidence contracts;
+- central `.github` owns reusable review, security, Strix, Noema, and merge-governance workflows.
 
-The product must not silently become a general-purpose graph database, document viewer, or LLM gateway. Those capabilities belong behind connectors with explicit ownership, authentication, tenancy, and failure contracts.
+The product must not silently become a general-purpose graph database, document viewer, identity provider, object store, or LLM gateway.
+
+## Initial GA claim boundary
+
+The first defensible release target is **`single_tenant_managed`**: one customer organization per deployment/database, project RBAC, OIDC organization binding, customer-controlled network/secrets/backup policy, and no cross-customer SaaS claim.
+
+`multi_tenant_saas` is non-GA until issue #950 proves tenant authority on every persisted, queued, cached, exported, and connector object; database-enforced isolation; identity provisioning/deprovisioning; tenant-scoped encryption; backup/restore; residency; and adversarial cross-tenant tests.
+
+Forward-engineering persistent apply is also non-GA until issue #949 closes. DDL export and execution-neutral planning may ship earlier only when the release notes state that persistent apply remains disabled.
 
 ## Current evidence map
 
-| Area | Current evidence | What it proves | What it does not prove |
+| Area | Current evidence | What it proves | What remains unproved |
 |---|---|---|---|
-| Backend | `backend/app/api/`, `backend/app/pg_introspect/`, `backend/app/ddl/`, `backend/app/diff/`, `backend/app/spec/` | A broad standalone API and schema-analysis surface exists | Production SLOs, real multi-tenant load, and upgrade-safe migrations |
-| Persistence | `backend/app/models.py`, Alembic revisions `0001`–`0007` | Core metadata is relational and most objects use multi-word snake_case names | A complete automated 3NF audit, hot-partition plan, or zero migration drift |
-| Background work | `backend/app/jobs/worker.py`, `job_queue`, `FOR UPDATE SKIP LOCKED`, `docs/observability.md` | Queue work is separated from request handling and has basic metrics | High-volume fairness, partition rollover, back-pressure, and regional recovery |
-| Frontend | React/Vite ERD editor in `frontend/src/` with Vitest tests; PR #944 adds a Storybook/token inventory | The core canvas, navigation, exports, accessibility, polling, and proposed visual-token contracts are testable | Storybook and browser acceptance on protected main; the PR is not merged yet |
-| Real database proof | `frontend/e2e/` and `scripts/run-e2e-with-report.sh` exist only in the current dirty local worktree at capture time | A local PostgreSQL/Playwright proof path has been prepared | That the proof is merged, reproducible in CI, or safe for production targets |
-| Ecosystem | `docs/clearfolio-integration.md`, `docs/llm-orchestrator-integration.md` | Connector intent and opt-in boundaries are documented | End-to-end deployed connector contracts and tenant-isolated persistence |
-| Design | `docs/ui-ux/` screenshots and product spec; PR #824 contains live-Figma architecture work; PR #944 adds Storybook inventory | Existing visual intent and a Figma-alignment path exist | An approved live Figma handoff or a merged Storybook component contract |
-| Governance | root `AGENTS.md`, central ruleset `18156473`, required central workflows, and hourly scheduler PR #943 | Review/security/merge policy and a recurring repair loop are explicit | That every open PR is currently mergeable |
+| Backend | `backend/app/api/`, `backend/app/pg_introspect/`, `backend/app/ddl/`, `backend/app/diff/`, `backend/app/spec/` | A broad standalone API and schema-analysis surface exists | Complete buyer E2E, support matrix, SLOs, and safe live apply |
+| Persistence | `backend/app/models.py`, Alembic revisions, PR #936 and #838 | Core metadata is relational and migration drift is being addressed | Clean upgrade/downgrade evidence, full 3NF assessment, hot-partition plan |
+| Background work | `backend/app/jobs/worker.py`, `job_queue`, `FOR UPDATE SKIP LOCKED`, optional Valkey wake-up | Long-running snapshot work is separated from HTTP requests | Fairness, partition rollover, back-pressure, restart/region recovery, large-schema capacity |
+| Security | encrypted DSNs, target guards, OIDC/JWT work, API keys, CSRF/CORS/share controls | Multiple concrete trust boundaries exist | Auditable runtime secret authority, rotation/re-encryption, complete tenant claim, release security evidence |
+| Frontend | React/Vite/React Flow, Vitest tests, PR #944 Storybook/token inventory | Core canvas, navigation, exports, accessibility, polling, and visual-token work are testable | Protected-main Storybook/browser E2E, full repeated-component inventory, large-graph virtualization |
+| Forward engineering | exports/diffs plus the large execution-neutral stack in PR #834 | A sophisticated plan/dry-run/recovery foundation is being built | Bounded production consumer, sandbox lifecycle, approval, apply, convergence, recovery |
+| Snapshot lifecycle | immutable payload and timestamped snapshots | Captures can be retained and compared | Promotion, valid/system time, derivation lineage, retention, legal hold, recovery workflow |
+| Ecosystem | connector documentation and active LLM/Clearfolio work | Optional integration intent is explicit | Durable tenant/purpose contracts, failure UX, grounded verification, standalone contract tests |
+| Design | live Figma files, `docs/ui-ux/`, PR #944, issues #899/#928 | Reviewed visual intent and a component-contract path exist | Merged Figma ↔ token ↔ Storybook ↔ production traceability |
+| Governance | protected main, central ruleset, required checks, PR #943, issue #865 | Exact-head review/security/merge policy is explicit | A release-shaped queue and a reconciled Actions registry |
+| Packaging | backend/frontend `0.1.0`, Docker/Compose profiles | Installable development and production-style profiles exist | Signed release, SBOM, provenance, reproducible artifacts, backup/restore rehearsal |
 
-## Buyer-visible gaps, ordered by leverage
+## Definition of product completion
 
-| Priority | Gap | Buyer impact | Closure evidence |
+A release may be called complete only when every applicable gate has immutable evidence, not merely a document or an old successful check.
+
+| Gate | Required evidence |
+|---|---|
+| Buyer journey | Clean login → project → authorized connection → async snapshot → ERD work → diff/export → share/revoke → history → backup/restore browser/API E2E |
+| Data integrity | ORM/migration parity, clean install/upgrade rehearsal, encrypted-DSN recovery, queue recovery, deterministic snapshot/export contracts |
+| Security | Threat model, OIDC/JWT/CSRF/CORS/API-key/share/SSRF/TLS/secret tests, purpose/access controls, incident and rotation runbooks |
+| Quality | Production statement and branch coverage 100%, public API/docstring coverage 100%, real PostgreSQL integration, property/fuzz and accessibility/i18n/UI action tests |
+| Operability | Readiness/liveness, OpenTelemetry, SLI/SLO, dashboards, alerting, capacity, backup/restore, rollback/compensation, support matrix |
+| UX/design | Figma authority, design tokens, Storybook inventory, keyboard/focus/zoom/forced-colors/reduced-motion, exact-value alternatives for graphs |
+| Supply chain | Reproducible artifacts, dependency/action policy, SPDX/CycloneDX SBOM, SLSA v1.2 provenance, image digest, license notices, signed tag |
+| Commercial truth | Versioned GA/beta/experimental claims, known limits, release notes, upgrade policy, security/support contacts, no unproved multi-tenant/apply claim |
+| Ecosystem | Optional signed/versioned connectors with tenant/purpose/provenance/failure contracts; core product remains usable with every connector disabled |
+
+## Executable gap and issue map
+
+| Priority | Canonical issue/PR | Buyer-visible gap | Closure boundary |
 |---|---|---|---|
-| P0 | The open-PR queue is not release-shaped. The live queue contains 61 PRs and exact-head checks are still in flight across the queue. | Buyers cannot predict what version is safe to deploy or whether a security fix is actually included. | Each PR has a current-head review/check record, resolved threads, normal merge, and release notes; no stale-head claims. |
-| P0 | Central Strix bounded scans can produce false evidence: PR #745 reported a credential in scanner-generated `.state/agents.db`; PR #724 reported a missing unchanged PostgreSQL DSN guard in bounded context. The canonical repair is central `.github` PR #1153; duplicate #1164 is closed. | Security gates can block good code or misdirect remediation, delaying releases and weakening trust in the control plane. | Merge #1153 through protected normal review, then collect fresh exact-head Strix runs for affected target PRs. |
-| P0 | Alembic and ORM metadata can drift when dependency PRs meet schema changes; PR #838 currently fails its repair check on index/type drift. | Database upgrades can fail at deploy time or silently diverge from the ERD product's own metadata model. | A migration-drift contract on a real PostgreSQL database, upgrade/downgrade proof, and a clean current-head check on #838/#936 dependency order. |
-| P0 | Runtime secrets/config still load directly from environment through `backend/app/settings.py`, contrary to the organization KV/credential-registry rule. | Secret rotation, auditability, and least-privilege deployment are weaker than a commercial product requires; PII masking is not a substitute for controlled access. | Bootstrap-only environment transport, encrypted KV reads at runtime, rotation/revocation tests, and no raw runtime `os.getenv()` path. |
-| P1 | Schema quality guidance is advisory rather than a complete enforceable contract. Naming lint and wide-table checks exist, but there is no complete 3NF/dependency audit or hot-partition decision record. | Architects receive warnings but not a defensible “safe to operate at scale” assessment. | Versioned 3NF/functional-dependency report, explicit justified exceptions for snapshot JSON, partition/key strategy for queue and event-heavy data, and real seeded-DB tests. |
-| P1 | Snapshot history has timestamps and diffing but no first-class temporal lineage, retention, promotion, or rollback workflow. | Teams cannot reliably answer “what changed, when, by whom, and can I restore the known-good model?” | Immutable snapshot lineage API, actor/audit record, retention policy, promotion/rollback UX, and time-ordered integration tests. |
-| P1 | Clearfolio and contextual-orchestrator connectors are documented but not complete buyer workflows. Clearfolio explicitly lists project-scoped persistence and frontend attachment as follow-up; LLM integration is opt-in and basic. | A buyer must manually move between tools and cannot rely on durable document/model provenance. | Tenant-scoped connector persistence, signed request/response contract tests, failure/retry UX, model discovery/capability routing, and independent standalone operation. |
-| P1 | There is no merged Storybook inventory/design-token contract for repeated web objects. | Visual consistency, accessibility regression detection, and handoff to product teams remain expensive. | Storybook stories for shared controls/modals/ERD states, token source, CSS/token tests, keyboard/interaction tests, and Figma ID in an ADR. |
-| P2 | Python owns all introspection and queue hot paths without a measured Rust boundary. | The product has not yet demonstrated predictable CPU use and lowest-context-switch behavior on large schemas. | Benchmark first; introduce a small Rust/WASM or service boundary only for measured CPU/security hotspots, with Python API parity and CPU/GPU decision evidence. Do not rewrite by assertion. |
-| P2 | Research provenance is incomplete for normalization, ER modeling, layout, temporal data, and secure software operations. | Product decisions cannot be independently audited by enterprise architects or researchers. | APA 7 citations and redistribution-safe links in `docs/doctoring/`; attach PDFs only when licensing permits. |
+| P0 | #953 | No coherent commercial release candidate across 61 open PRs | Exact-head release shaping, product/migration/backup/security/accessibility/operability evidence, version/tag/SBOM/provenance |
+| P0 | #949 and PR #834 | Forward engineering stops before production apply authority and recovery | Decomposed plan → sandbox → preflight → approval → apply → convergence → recovery stack; persistent apply stays default-deny until complete |
+| P0 | PR #936 / #838 | ORM and Alembic metadata can drift | Real PostgreSQL clean install, upgrade/downgrade rehearsal, deterministic no-drift contract, dependency order |
+| P0 | #946 | Runtime configuration lacks one auditable secret lifecycle | Bootstrap-only transport, credential-provider contract, rotation/revocation, DSN re-encryption, standalone file provider |
+| P0 | #950 | Project membership is not proof of multi-tenant SaaS isolation | Explicit single-tenant GA profile; database-enforced tenant authority before any SaaS claim |
+| P0 | central `.github` #1153; target PRs #724/#745 | Bounded Strix context can create false or incomplete evidence | Merge canonical central repair, refresh immutable workflow pin, rerun affected exact heads |
+| P1 | #948 | Snapshot timestamps/diffs are not a lifecycle | Bitemporal promotion, typed lineage, retention/legal hold, metadata recovery, provenance export |
+| P1 | #947 | Schema quality is advisory and no hot-partition contract exists | Evidence-classified dependency/normalization assessment, waivers, workload-backed partition candidates |
+| P1 | #951 | No enterprise capacity envelope or measured Rust boundary | Reproducible large-schema profiles, SLO/SLI, browser/backend traces, Rust only for proven hotspots |
+| P1 | #952 | Clearfolio/contextual-orchestrator/naruon are not complete buyer workflows | Tenant/purpose-scoped durable connector receipts, grounded LLM verification, failure/retry/revocation UX, standalone fallback |
+| P1 | PR #944, issues #899/#928 | Repeated web controls lack a merged executable design-system contract | Shared tokens, Storybook states, CSS/interaction/accessibility tests, Figma mapping |
+| P1 | #865 | GitHub Actions registry advertises orphaned active workflow identities | Exact-main audit, safe disablement, immutable before/after ledger, central prevention |
+| P2 | doctoring file and all issues above | Research and standards traceability is incomplete | APA 7 mapping from requirement → owner → contract → test → limitation; licensed artifacts are not copied unlawfully |
 
-## ADR: design authority
+## Dependency order
 
-The live-Figma work is currently PR #824 (`e34f69c2099d`). The companion ADR is required to record:
+```mermaid
+flowchart TD
+  Baseline[PR #942 baseline] --> Release[Issue #953 release epic]
+  Scheduler[PR #943 protected hourly loop] --> Release
+  Strix[Central .github #1153] --> Queue[Exact-head PR queue]
+  Queue --> Release
+  Drift[PR #936 / #838 migration parity] --> Release
+  Secrets[Issue #946 credential authority] --> Release
+  Tenant[Issue #950 GA deployment profile] --> Release
+  Design[PR #944 + #899/#928 design contract] --> Release
+  Forward[Issue #949 bounded forward engineering] --> Release
+  Lineage[Issue #948 snapshot lifecycle] --> Release
+  Quality[Issue #947 schema quality] --> Release
+  Scale[Issue #951 SLO and Rust decision] --> Release
+  Connectors[Issue #952 optional ecosystem workflows] --> Release
+```
+
+Not every P1 item must block the first `single_tenant_managed` GA. Issue #953 must classify each item as `release_blocker`, `post_ga_committed`, `experimental`, or `not_planned`, with buyer-facing rationale. Core data integrity, secret safety, truthful deployment scope, backup/restore, operability, and release provenance cannot be deferred silently.
+
+## Design authority
+
+The visual source of intent is recorded in ADR-0002:
 
 - **Figma File ID:** `csnpEEJfmqFWB0vNUoTkWA`
 - **Supplemental Figma File ID:** `OTN0rBGtnVy0P7yq4Iv9Si`
-- **Authority rule:** Figma is the source for visual intent; Storybook and implementation tests are the executable component contract; screenshots are QA evidence only.
-- **Status:** proposed until the PR is reviewed, non-draft, and its live file access/visual sign-off is proven.
 
-## Executable loop
+Figma does not replace executable behavior. Storybook stories, shared tokens, component/accessibility tests, browser interaction tests, and production code are the executable contract. Screenshots are QA evidence only. Figma, Storybook, product requirements, implementation, tests, current PRs, and review findings must have explicit traceability.
 
-1. The hourly workflow in PR #943 dispatches the central OpenCode review/fix scheduler for up to 100 open PRs; it does not bypass protected review or merge rules. After central #1153 merges, update the immutable workflow pin and revalidate the scheduler PR.
-2. Refetch the exact PR head, branch protection/ruleset, review threads, and all check runs.
-3. Repair only source-actionable findings at that head; treat provider latency as work to continue around, not as a product conclusion.
-4. Re-run focused proof, then the complete required local proof proportional to the change.
-5. Push normally, refetch the new exact head, and wait for fresh checks/review.
-6. Merge only with normal protected-branch semantics; otherwise advance to the next eligible PR or product gap.
-7. After a merge, refresh this baseline's live queue evidence and CHANGELOG/release state.
+## Current open PR inventory
 
-## Current open PR inventory (live refresh)
+The live REST query returned 61 open PRs. The heads below are a dated triage snapshot, not reusable merge evidence. PR #942 is self-referential and therefore records `self`; its final head must always be refetched after this document changes.
 
-The live REST API returned **61 open PRs** at this refresh. Each SHA below is
-the exact head used for review/check triage; a merge decision must refetch it
-again because remote agents and required workflows can change it.
-
-| PR | Exact current head | Title |
+| PR | Captured exact head | Current purpose |
 |---:|---|---|
 | #944 | `d393bf655171fb31de0a8cc6c9517ba69aa3c9fc` | Storybook design-token inventory |
 | #943 | `a968d54daf1ddd663b801628a7817f4c5bf459ba` | hourly PR review repair scheduler |
-| #942 | `62ba4cc490ff4b124d3ba1d7e0f027d539492bd7` | product and technical gap baseline |
+| #942 | `self` | product and technical gap baseline |
 | #941 | `18a91beac732f2cf41f3971087adf76ad283318c` | API key hashing |
 | #940 | `9fb1c3b221a066de4b5ccba6d474a9695683720d` | Snowflake constraint grouping |
 | #939 | `3ca5db715db50ee01f061131c02f57e82493f85e` | ERD export handle validation |
@@ -117,7 +161,7 @@ again because remote agents and required workflows can change it.
 | #850 | `682f107782bd7a9d5b5605de7d78402dc71cdd21` | ERD column-name resolution |
 | #838 | `d5b52f80ca24480c0000d20d75b568ff9a62b9a4` | Alembic dependency update |
 | #835 | `423564054a82e4158219cf56a9348652265e12da` | native form submission paths |
-| #834 | `07a4e376ba0ed1ae2fead9892ba66f4b54b14c8d` | forward-engineering plan authority |
+| #834 | `eebf6ddf8eb8403c5c67c2ce4c0c9dd27c79f8b9` | forward-engineering plan authority and execution-neutral foundation |
 | #832 | `35c12f43a045040c7b10f527528039cd014a678d` | non-text multiline SQL rejection |
 | #827 | `e99129920ba981ecd3a529451756489aaa3f7f5a` | concurrent pooler detection |
 | #824 | `e34f69c2099d0e37cd04efe5b974515d0678476d` | live Figma and sharing architecture |
@@ -135,103 +179,44 @@ again because remote agents and required workflows can change it.
 | #704 | `5f10da2a4bf4b4db93762281a5886650b74887a3` | unavailable table-save accessibility |
 | #698 | `00eb7938217eeae51ed12c7188c85b36e5414174` | unavailable export accessibility |
 
-The previous inventory below is retained as historical evidence from the first
-baseline capture and must not be used for a merge decision.
+## Exact-head verification loop
 
-## Historical open PR inventory
+1. Refetch protected `main`, the ruleset, and required contexts.
+2. Refetch every PR exact head, mergeability, draft state, review submissions, unresolved threads, and all check runs.
+3. Classify source-actionable failures separately from provider queue/limit/control-plane failures.
+4. Repair only the current head. Do not transfer approval or check evidence from a predecessor SHA.
+5. Run focused tests, then the full proof proportional to the change; include real PostgreSQL/browser evidence when the contract crosses those boundaries.
+6. Push normally and refetch the new exact head. Do not force-push over concurrent agents.
+7. Merge only through normal protected-branch semantics. Otherwise advance to the next eligible PR or product gap.
+8. After each merge/closure wave, refresh this baseline, #953, CHANGELOG, and release scope.
 
-The following inventory was queried from the live REST API and records the exact head used for triage on 2026-08-20. It is intentionally a snapshot; the verification command below must be rerun before every merge decision.
-
-| PR | Exact head | State | Title |
-|---:|---|---|---|
-| #944 | `d4989bd13c04` | ready | feat(frontend): add Storybook design-token inventory |
-| #943 | `c7289801c7eb` | ready | ci: schedule hourly PR review repair |
-| #942 | `7fb0061937e28` | ready | docs: establish product and technical gap baseline |
-| #941 | `18a91beac732` | ready | fix(auth): offload API key hashing |
-| #940 | `9fb1c3b221a0` | ready | refactor(snowflake): group constraint context |
-| #939 | `3ca5db715db5` | ready | fix(frontend): validate ERD export handles |
-| #938 | `dc50a22140c6` | ready | refactor(mysql): group introspection rows |
-| #936 | `007fb6696c13` | ready | fix(db): reconcile ORM metadata with migrations |
-| #933 | `ec54f20321b9` | ready | feat: add automatic column mapping and default fk label on edge creation |
-| #930 | `aaffad0a8c12` | ready | 🎨 Palette: Add visual indicators for required form fields in modals |
-| #926 | `369d82c491d3` | ready | 🛡️ Sentinel: [MEDIUM] Fix control character injection in Pydantic schemas |
-| #915 | `34e088c0a939` | ready | 🎨 Palette: [테이블 삭제 시 확인창 추가] |
-| #914 | `b2a265fa0f12` | ready | chore(deps): bump github/codeql-action/analyze from 4.36.2 to 4.37.7 |
-| #913 | `d70622107200` | ready | chore(deps): bump github/codeql-action/init from 4.36.2 to 4.37.7 |
-| #912 | `802441e60f21` | ready | chore(deps): bump github/codeql-action/autobuild from 4.36.2 to 4.37.7 |
-| #910 | `5c1412bf3ec1` | ready | chore(deps-dev): bump @testing-library/jest-dom from 6.9.1 to 7.0.1 in /frontend |
-| #909 | `d3faffdd5407` | ready | chore(deps-dev): update snowflake-connector-python requirement from <5,>=4 to >=4.7.2,<5 in /backend |
-| #907 | `c6131676e4df` | ready | chore(deps-dev): update setuptools requirement from >=82.0.1 to >=84.0.0 in /backend |
-| #906 | `3c6db17b4943` | ready | chore(deps): update sqlalchemy requirement from <2.1,>=2.0.51 to >=2.0.52,<2.1 in /backend |
-| #905 | `0070a2967b9d` | ready | chore(deps): update starlette requirement from >=1.1.0 to >=1.6.0 in /backend |
-| #904 | `4a80d4ec41f8` | ready | chore(deps): bump python from 3.14.6-slim to 3.14.7-slim in /backend |
-| #903 | `e83f606e4a89` | ready | feat(prisma): allocate collision-free identifiers with @map |
-| #902 | `57ff32131c7a` | ready | chore(opencode): use NVIDIA NIM only |
-| #901 | `eeef7b7170a2` | ready | fix(a11y): restore business-group color radiogroup contract |
-| #900 | `ed12e8d6e2ae` | ready | feat(ai): delegate LLM drafts to adaptive orchestration |
-| #895 | `8436cb4b8ce7` | ready | security(auth): reject unsupported JWT critical headers |
-| #894 | `0fb24c0f11d1` | ready | perf(prisma): index outgoing relation lookup |
-| #890 | `a04935ded27f` | ready | test(api): verify the authenticated project-list contract |
-| #889 | `f7cd3c62c5ea` | ready | security(ci): harden manual CodeQL backfill inputs |
-| #888 | `6f47fe0f2913` | ready | test(valkey): verify sentinel host formatting contracts |
-| #887 | `d221ab795104` | ready | fix(security): reject log-breaking identifier characters |
-| #886 | `c7a45292dbb6` | ready | test(api): verify the current-user HTTP contract |
-| #884 | `4499ab534ce3` | ready | perf(frontend): remove intermediate ERD handle-ID array |
-| #882 | `b924d0917e3a` | ready | 🎨 Palette: 모달 내 일반 액션 버튼에 컨텍스트 ARIA label 추가 |
-| #881 | `5a8ce593bc8b` | ready | perf(search): memoize immutable ERD searchable text |
-| #874 | `a0c816003b13` | ready | fix: preserve DBML index evidence |
-| #868 | `d9f1b9478492` | ready | security(postgres): reject server-local file access via DSNs |
-| #858 | `a34b35e59bf7` | ready | a11y(frontend): keep unavailable toolbar actions discoverable |
-| #857 | `63424a49e434` | ready | feat(databricks): add bounded Unity Catalog introspection |
-| #856 | `322d543386c2` | ready | feat(frontend): add relationship-aware ERD layout |
-| #855 | `b94eb6177087` | ready | fix(auth): bind OIDC tokens to configured organization |
-| #850 | `682f107782bd` | ready | ⚡ Bolt: Optimize ERD column name resolution |
-| #838 | `d5b52f80ca24` | ready | chore(deps): update alembic requirement from >=1.18.5 to >=1.19.1 in /backend |
-| #836 | `d88f98b9cd9f` | ready | chore(deps): bump node from 26.5.0-alpine to 26.7.0-alpine in /frontend |
-| #835 | `423564054a82` | ready | fix(a11y): use native form submission paths |
-| #834 | `8ee872eb0e39` | ready | feat: establish forward engineering plan authority |
-| #832 | `35c12f43a045` | ready | security(api): reject non-text controls in multiline SQL |
-| #827 | `e99129920ba9` | ready | ⚡ Bolt: [concurrent pooler detection] |
-| #824 | `db59f97b16cb` | draft | feat: align live Figma, harden sharing, and establish architecture authority |
-| #782 | `602edabbb974` | ready | fix(naming): classify PostgreSQL SYSTEM_USER as reserved |
-| #774 | `f19848ab187b` | ready | fix(erd): preserve PostgreSQL identifiers in relationship inference |
-| #772 | `917064279217` | ready | chore(backend): remove dead relationship-inference lookup |
-| #768 | `1dbd7f919720` | ready | test(data-dictionary): cover missing-column rendering |
-| #745 | `5887448da640` | ready | 🛡️ Sentinel: [CRITICAL] Fix incomplete DSN secret redaction and over-redaction |
-| #744 | `e56490223e35` | ready | fix(cors): allow every supported API method |
-| #738 | `52c66dde059f` | ready | test(frontend): await diagram data before search assertion (deflake main) |
-| #737 | `cc08088001d6` | ready | docs: align ecosystem names and solo-maintainer review policy |
-| #725 | `6de38790e3cc` | ready | chore(deps): synchronize FastAPI and Redis backend locks |
-| #724 | `dd2d27930bcb` | ready | feat: add trusted local PostgreSQL snapshot CLI |
-| #723 | `bdce888ce64b` | ready | feat(diagram-views): complete saved-layout update contract |
-| #704 | `6608a4995427` | ready | a11y(frontend): expose unavailable table-save state to keyboard users |
-| #698 | `0a5b86f23a42` | ready | a11y(frontend): keep unavailable export actions discoverable |
-
-## Verification command
-
-Run from a clean checkout with GitHub authentication:
+Suggested evidence commands from a clean authenticated checkout:
 
 ```bash
+gh api 'search/issues?q=repo:ContextualWisdomLab/pg-erd-cloud+is:pr+is:open&per_page=1'
 gh api 'repos/ContextualWisdomLab/pg-erd-cloud/pulls?state=open&per_page=100'
-gh api repos/ContextualWisdomLab/pg-erd-cloud/commits/<exact-head-sha>/check-runs?per_page=100
+gh api repos/ContextualWisdomLab/pg-erd-cloud/commits/<exact-head>/check-runs?per_page=100
 gh api repos/ContextualWisdomLab/pg-erd-cloud/pulls/<number>/reviews?per_page=100
 gh api repos/ContextualWisdomLab/pg-erd-cloud/pulls/<number>/comments?per_page=100
 ```
 
-At collection time, the exact-head completed-failure scan identified PR #838 (`repair`), PR #745 (`strix`), and PR #724 (`strix`). PR #838 is the ORM/migration drift that PR #936 addresses; #724/#745 require the canonical central Strix repair before their scans are re-evaluated. PR #914's frontend failure was reproduced from its job log, repaired with commit `b2a265fa`, and its checks were requeued. These are mutable external facts; a later run must not reuse them without refetching.
+PR #943 is the repository's proposed hourly entry point into the central OpenCode review/fix loop. It cannot approve, bypass, or merge around the ruleset. After central `.github` #1153 merges, refresh the immutable reusable-workflow pin and rerun affected Strix heads.
 
 ## Release gate
 
-A release candidate is not established until:
+No release candidate exists until all statements below are true at one protected-main commit:
 
-- protected main contains the intended code and migrations;
-- the exact-head open-PR inventory is empty or every remaining PR is explicitly out of release scope;
-- backend, frontend, security, Strix, Noema, coverage, and migration checks are green;
-- real seeded PostgreSQL + browser acceptance passes;
-- connector failure/authorization paths are tested;
-- CHANGELOG and version/tag evidence identify the release;
-- the current ADR and doctoring references are present.
+- the intended code, migrations, docs, and release manifest are present;
+- every remaining open PR is explicitly outside release scope or the in-scope queue is merged/closed with canonical rationale;
+- required backend, frontend, coverage, security, Strix, OpenCode, dependency, filesystem/container, Scorecard, migration, and browser checks are terminal-success;
+- zero valid unresolved review/security threads remain and qualifying independent approval exists;
+- clean install, upgrade, backup/restore, queue recovery, real PostgreSQL, and buyer browser E2E pass;
+- the selected deployment profile, supported dialects/versions, live-apply status, connector status, limits, and non-goals are stated truthfully;
+- production coverage/docstring and frontend interaction/accessibility/i18n/design-token contracts meet organization policy;
+- capacity/SLO evidence and incident/runbook coverage exist;
+- version, CHANGELOG, signed tag, artifact hashes, image digest, SBOM, SLSA provenance, licenses, and rollback instructions identify the release;
+- this baseline and `docs/doctoring/product-technical-gap-baseline.md` are refreshed from the final commit.
 
-## References
+## Research and standards
 
-See `docs/doctoring/product-technical-gap-baseline.md` for APA 7 references and research traceability.
+See `docs/doctoring/product-technical-gap-baseline.md` for APA 7 references and requirement-to-decision traceability. A citation supports a decision; it does not close an implementation gap or establish certification.
