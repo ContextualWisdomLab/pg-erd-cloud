@@ -116,7 +116,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -183,7 +184,15 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
     fireEvent.submit(document.getElementById('editTableForm')!)
+
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    confirmSpy.mockReturnValueOnce(false)
     fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
+    expect(onDeleteTable).not.toHaveBeenCalled()
+
+    confirmSpy.mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
+
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
@@ -245,6 +254,8 @@ describe('modal behavior coverage', () => {
     )
     expect(screen.getByText('등록된 그룹이 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '추가' })).toBeDisabled()
+    fireEvent.submit(screen.getByRole('button', { name: '추가' }).closest('form')!)
+    expect(onCreate).not.toHaveBeenCalled()
 
     rerender(
       <GroupModal
@@ -264,7 +275,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
