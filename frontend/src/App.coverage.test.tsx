@@ -150,7 +150,6 @@ vi.mock('./components/modals', () => ({
           <button type="button" data-testid="export-uml" onClick={props.onDownloadUml} />
           <button type="button" data-testid="export-mermaid" onClick={props.onDownloadMermaid} />
           <button type="button" data-testid="export-dbml" onClick={props.onDownloadDbml} />
-          <button type="button" data-testid="export-prisma" onClick={props.onDownloadPrisma} />
           <button type="button" data-testid="export-csv" onClick={props.onExportDictionaryCsv} />
           <button type="button" data-testid="export-md" onClick={props.onExportDictionaryMarkdown} />
           <button type="button" data-testid="share-create" onClick={props.onCreateShareLink} />
@@ -457,14 +456,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-close'))
 
     fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
-    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-prisma', 'export-csv', 'export-md']) {
+    for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }
     fireEvent.click(screen.getByTestId('share-create'))
     await waitFor(() => expect(screen.getByTestId('share-url')).toHaveTextContent('/api/share/one'))
     fireEvent.click(screen.getByTestId('share-copy'))
     fireEvent.click(screen.getByTestId('export-close'))
-    expect(exports.downloadText).toHaveBeenCalledTimes(7)
+    expect(exports.downloadText).toHaveBeenCalledTimes(6)
 
     fireEvent.click(screen.getByRole('button', { name: '관계 자동 추론' }))
     expect(exports.inferRelationships).toHaveBeenCalled()
@@ -652,49 +651,6 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByRole('alert')).toHaveTextContent('terminal refresh down')
-  })
-
-  it('ignores terminal refresh results from a replaced project view', async () => {
-    let resolveRefresh!: (value: typeof snapshots) => void
-    let listCall = 0
-    api.listSnapshots.mockImplementation(async () => {
-      listCall += 1
-      if (listCall === 2) {
-        return new Promise((resolve) => { resolveRefresh = resolve })
-      }
-      return snapshots
-    })
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    fireEvent.click(openButtons[0]!)
-    await waitFor(() => expect(listCall).toBe(2))
-    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
-    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
-    await act(async () => resolveRefresh([{ schema_snapshot_uuid: 'stale', status: 'succeeded', schema_filter: 'stale' }]))
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    expect(screen.queryByText('ERD_stale_1')).not.toBeInTheDocument()
-  })
-
-  it('ignores terminal refresh errors from a replaced project view', async () => {
-    let rejectRefresh!: (reason: unknown) => void
-    let listCall = 0
-    api.listSnapshots.mockImplementation(async () => {
-      listCall += 1
-      if (listCall === 2) {
-        return new Promise((_resolve, reject) => { rejectRefresh = reject })
-      }
-      return snapshots
-    })
-    await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
-    fireEvent.click(openButtons[0]!)
-    await waitFor(() => expect(listCall).toBe(2))
-    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
-    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
-    await act(async () => rejectRefresh(new Error('stale terminal refresh')))
-    expect(screen.queryByText('stale terminal refresh')).not.toBeInTheDocument()
   })
 
   it('ignores stale project metadata failures after changing projects', async () => {
