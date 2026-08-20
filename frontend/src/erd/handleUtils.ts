@@ -39,6 +39,7 @@ export function decodeHandleId(handleId: string | null | undefined): string | nu
     if (!HEX_CHUNK_RE.test(hex)) return null;
     const codePoint = Number.parseInt(hex, 16);
     if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
+    if (hex !== codePoint.toString(16).padStart(4, '0')) return null;
     decoded += String.fromCodePoint(codePoint);
   }
   return decoded;
