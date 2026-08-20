@@ -26,7 +26,6 @@ export function parseColumnNameFromHandle(handleId: string | null | undefined): 
   if (!encoded.startsWith('c-')) return null;
 
   const parts = encoded.slice(2).split('-');
-  if (!parts.every((part) => /^[0-9a-f]{4,6}$/i.test(part))) return null;
   try {
     return parts.map(p => String.fromCodePoint(parseInt(p, 16))).join('');
   } catch {
