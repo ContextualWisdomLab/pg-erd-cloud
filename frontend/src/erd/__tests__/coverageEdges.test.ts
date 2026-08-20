@@ -90,7 +90,7 @@ describe('coverage edge contracts', () => {
       [noColumns, { ...noColumns, id: 'other', data: { ...noColumns.data } }],
       [{ id: 'missing-columns', source: 'none', target: 'other' }],
     )
-    expect(missingColumnsDdl).toContain('/* source columns */')
+    expect(missingColumnsDdl).not.toContain('/* source columns */')
   })
 
   it('covers nullable export metadata and snapshot index variants', () => {
@@ -138,9 +138,9 @@ describe('coverage edge contracts', () => {
     const csv = exportDictionaryCsv([source], edges)
     const markdown = exportDictionaryMarkdown([source], edges)
     expect(csv).toContain('"first_id","int","N","Y"')
-    expect(csv).toContain('"second_id","int","N","Y"')
+    expect(csv).toContain('"second_id","int","N","N"')
     expect(markdown).toContain('| first_id | int | N | Y |')
-    expect(markdown).toContain('| second_id | int | N | Y |')
+    expect(markdown).toContain('| second_id | int | N | N |')
   })
 
   it('covers search comment matches and direct empty term arrays', () => {

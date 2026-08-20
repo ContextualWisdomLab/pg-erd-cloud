@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { decodeColumnHandle } from './handleUtils';
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -69,16 +69,25 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
+    let targetField = "id";
+    if (edge.sourceHandle || edge.targetHandle) {
+      const decodedSource = decodeColumnHandle(edge.sourceHandle, 'src');
+      const decodedTarget = decodeColumnHandle(edge.targetHandle, 'tgt');
+      const sourceColumns = new Set((sourceNode.data.columns || []).map((column) => column.column_name));
+      const targetColumns = new Set((targetNode.data.columns || []).map((column) => column.column_name));
+      if (
+        decodedSource === null ||
+        decodedTarget === null ||
+        !sourceColumns.has(decodedSource) ||
+        !targetColumns.has(decodedTarget)
+      ) {
+        continue;
+      }
+      sourceField = decodedSource;
+      targetField = decodedTarget;
       fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
+    } else {
       fkNodesWithoutHandles.add(edge.source);
-    }
-
-    let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
     }
 
     if (sourceField) {
@@ -113,7 +122,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);

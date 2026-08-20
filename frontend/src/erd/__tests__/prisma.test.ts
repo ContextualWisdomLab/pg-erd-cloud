@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -63,9 +64,17 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
+        label: 'users_posts',
+      },
+      {
+        id: 'invalid',
+        source: '2',
+        target: '1',
         sourceHandle: 'src-user_id',
         targetHandle: 'tgt-id',
-        label: 'users_posts',
+        label: 'invalid_handle',
       },
     ];
 
@@ -79,6 +88,7 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
+    expect(result).not.toContain('@relation("invalid_handle"');
   });
 
   it('maps various types properly', () => {
@@ -224,8 +234,8 @@ describe('exportPrisma', () => {
         id: 'e1',
         source: '2',
         target: '1',
-        sourceHandle: 'src-user_id',
-        targetHandle: 'tgt-id',
+        sourceHandle: sourceColumnHandleId('user_id'),
+        targetHandle: targetColumnHandleId('id'),
         label: '1to1',
       },
     ];

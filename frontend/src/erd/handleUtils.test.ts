@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import {
+  decodeColumnHandle,
+  decodeHandleId,
+  sanitizeHandleId,
+  sourceColumnHandleId,
+  targetColumnHandleId,
+} from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -34,5 +40,13 @@ describe('handleUtils', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
     });
+  });
+
+  it('decodes canonical handles and rejects malformed endpoint handles', () => {
+    expect(decodeHandleId(sourceColumnHandleId('user_id'))).toBe('user_id');
+    expect(decodeColumnHandle(sourceColumnHandleId('user_id'), 'src')).toBe('user_id');
+    expect(decodeColumnHandle(targetColumnHandleId('user_id'), 'src')).toBeNull();
+    expect(decodeColumnHandle('src-user_id', 'src')).toBeNull();
+    expect(decodeHandleId('src-c-110000')).toBeNull();
   });
 });

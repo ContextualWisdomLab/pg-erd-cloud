@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { decodeColumnHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -59,22 +59,33 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  sourceColumnNames: Set<string>,
+  targetColumnNames: Set<string>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
+  if (edge.sourceHandle || edge.targetHandle) {
+    const sourceColumn = decodeColumnHandle(edge.sourceHandle, 'src');
+    const targetColumn = decodeColumnHandle(edge.targetHandle, 'tgt');
+    if (
+      sourceColumn === null ||
+      targetColumn === null ||
+      !sourceColumnNames.has(sourceColumn) ||
+      !targetColumnNames.has(targetColumn)
+    ) {
+      return null;
+    }
+    return { sourceColumns: [sourceColumn], targetColumns: [targetColumn] };
+  }
+
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
   const targetColumns = data?.targetColumns?.filter(Boolean) || [];
-  if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
+  if (
+    sourceColumns.length > 0 &&
+    sourceColumns.length === targetColumns.length &&
+    sourceColumns.every((column) => sourceColumnNames.has(column)) &&
+    targetColumns.every((column) => targetColumnNames.has(column))
+  ) {
     return { sourceColumns, targetColumns };
-  }
-
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
-  if (sourceHandleColumn && targetHandleColumn) {
-    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
@@ -96,8 +107,10 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const columnNamesByNode = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    columnNamesByNode.set(n.id, new Set((n.data.columns || []).map((column) => column.column_name)));
   }
 
   // Export tables
@@ -133,16 +146,19 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+      const fkColumns = fkColumnsForEdge(
+        edge,
+        sourceNode,
+        targetNode,
+        columnNamesByNode.get(sourceNode.id)!,
+        columnNamesByNode.get(targetNode.id)!,
+      );
+      if (!fkColumns) continue;
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
-      const sourceColumns = fkColumns
-        ? fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ')
-        : '/* source columns */';
-      const targetColumns = fkColumns
-        ? fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ')
-        : '/* target columns */';
+      const sourceColumns = fkColumns.sourceColumns.map(quoteSqlIdentifier).join(', ');
+      const targetColumns = fkColumns.targetColumns.map(quoteSqlIdentifier).join(', ');
       ddl += `ALTER TABLE ${sourceTable}\n`;
       ddl += `  ADD CONSTRAINT ${quoteSqlIdentifier(constraintName)}\n`;
       ddl += `  FOREIGN KEY (${sourceColumns})\n`;
