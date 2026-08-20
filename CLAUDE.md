@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-pg-erd-cloud is a PostgreSQL-focused cloud ERD (entity-relationship diagram) collaboration/sharing service — currently a runnable MVP skeleton. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders them as an interactive ERD (React Flow), and forward-engineers snapshots into DDL exports (PostgreSQL or Snowflake dialect), schema diffs/migration SQL, DBML/Mermaid exports, and "DB reversing spec" documents (markdown draft, LLM prompt, or live LLM draft via an OpenAI-compatible provider configured with `LLM_API_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`). Project owners can create share links for unauthenticated read/export access.
+pg-erd-cloud is a PostgreSQL-focused cloud ERD (entity-relationship diagram) collaboration/sharing service undergoing release hardening. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders them as an interactive ERD (React Flow), and forward-engineers snapshots into DDL exports (PostgreSQL or Snowflake dialect), schema diffs/migration SQL, DBML/Mermaid exports, and "DB reversing spec" documents (markdown draft, LLM prompt, or live LLM draft via an OpenAI-compatible provider configured with `LLM_API_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`). Project owners can create share links for unauthenticated read/export access. The standalone/module boundary is maintained in `ARCHITECTURE.md` and ADR-0002.
 
 Repository docs are mixed-language: README.md and CHANGELOG.md are Korean; CONTRIBUTING.md, SECURITY.md, and most of docs/ are English.
 
