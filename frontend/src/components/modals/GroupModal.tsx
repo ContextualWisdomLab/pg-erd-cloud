@@ -56,20 +56,7 @@ export function GroupModal({
           </button>
         </div>
 
-        <form
-          className="groupManager__create"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const input = e.currentTarget.elements.namedItem("business-group-name") as HTMLInputElement | null;
-            if (!newGroupName.trim()) {
-              input?.setCustomValidity("그룹 이름을 입력하세요.");
-              input?.reportValidity();
-              return;
-            }
-            input?.setCustomValidity("");
-            onCreateBusinessGroup();
-          }}
-        >
+        <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
           <div className="field">
             <label htmlFor="business-group-name">
               그룹 이름 <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
@@ -77,14 +64,9 @@ export function GroupModal({
             <input
               autoFocus
               id="business-group-name"
-              name="business-group-name"
               value={newGroupName}
-              onChange={(event) => {
-                event.currentTarget.setCustomValidity("");
-                setNewGroupName(event.target.value);
-              }}
+              onChange={(event) => setNewGroupName(event.target.value)}
               placeholder="Billing"
-              required
             />
           </div>
           <div
