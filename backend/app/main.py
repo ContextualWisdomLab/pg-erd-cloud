@@ -10,9 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.annotations import router as annotations_router
 from app.api.api_keys import router as api_keys_router
+from app.api.auth_routes import router as auth_router
 from app.api.connections import router as connections_router
 from app.api.dbml import router as dbml_router
-from app.api.auth_routes import router as auth_router
 from app.api.diagram_views import router as diagram_views_router
 from app.api.me import router as me_router
 from app.api.projects import router as projects_router

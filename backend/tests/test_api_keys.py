@@ -4,8 +4,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from fastapi import HTTPException
-
 from app.api.api_keys import create_api_key, list_api_keys, revoke_api_key
 from app.auth import (
     API_KEY_PBKDF2_ITERATIONS,
@@ -15,6 +13,7 @@ from app.auth import (
     hash_api_key,
 )
 from app.schemas import ApiKeyCreateIn
+from fastapi import HTTPException
 
 
 def _user(uid=None):
@@ -99,10 +98,15 @@ async def test_revoke_is_idor_safe_and_idempotent():
     own = SimpleNamespace(
         api_key_uuid=uuid.uuid4(),
         user_account_uuid=owner.user_account_uuid,
-        key_name="ci", key_prefix="pgerd_abc", created_at=ts, revoked_at=ts,
+        key_name="ci",
+        key_prefix="pgerd_abc",
+        created_at=ts,
+        revoked_at=ts,
     )
     session.get = AsyncMock(return_value=own)
-    out = await revoke_api_key(api_key_uuid=own.api_key_uuid, user=owner, session=session)
+    out = await revoke_api_key(
+        api_key_uuid=own.api_key_uuid, user=owner, session=session
+    )
     assert out.revoked_at == ts
     session.commit.assert_not_awaited()  # already revoked -> no write
 
@@ -111,8 +115,11 @@ async def test_revoke_is_idor_safe_and_idempotent():
 async def test_list_returns_only_metadata():
     user = _user()
     key = SimpleNamespace(
-        api_key_uuid=uuid.uuid4(), key_name="ci", key_prefix="pgerd_abc",
-        created_at=dt.datetime.now(dt.timezone.utc), revoked_at=None,
+        api_key_uuid=uuid.uuid4(),
+        key_name="ci",
+        key_prefix="pgerd_abc",
+        created_at=dt.datetime.now(dt.timezone.utc),
+        revoked_at=None,
     )
     session = AsyncMock()
     session.execute = AsyncMock(

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import ipaddress
 import socket
+from dataclasses import dataclass
 from urllib.parse import parse_qsl, urlparse
 
 from app.settings import settings

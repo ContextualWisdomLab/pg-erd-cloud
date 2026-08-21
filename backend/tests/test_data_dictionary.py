@@ -29,10 +29,38 @@ def _snapshot():
             },
         ],
         "columns": [
-            {"relation_oid": 1, "column_position": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True, "example_value": "1001"},
-            {"relation_oid": 1, "column_position": 2, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False, "has_default": True, "default_expr": "''::varchar", "column_comment": "a|b"},
-            {"relation_oid": 2, "column_position": 1, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 2, "column_position": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_position": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+                "example_value": "1001",
+            },
+            {
+                "relation_oid": 1,
+                "column_position": 2,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+                "has_default": True,
+                "default_expr": "''::varchar",
+                "column_comment": "a|b",
+            },
+            {
+                "relation_oid": 2,
+                "column_position": 1,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_position": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
         "pk_columns": [
             {"relation_oid": 1, "column_name": "member_id", "column_ordinal": 1},
@@ -49,8 +77,18 @@ def _snapshot():
             }
         ],
         "indexes": [
-            {"relation_oid": 1, "index_name": "member_pkey", "is_unique": True, "is_primary": True},
-            {"relation_oid": 1, "index_name": "ix_member_email", "is_unique": True, "is_primary": False},
+            {
+                "relation_oid": 1,
+                "index_name": "member_pkey",
+                "is_unique": True,
+                "is_primary": True,
+            },
+            {
+                "relation_oid": 1,
+                "index_name": "ix_member_email",
+                "is_unique": True,
+                "is_primary": False,
+            },
         ],
     }
 
@@ -86,7 +124,11 @@ def test_merges_project_annotations():
     md = snapshot_to_data_dictionary_md(
         _snapshot(),
         annotations=[
-            {"schema_name": "public", "relation_name": "orders", "body": "주문 트랜잭션 테이블"}
+            {
+                "schema_name": "public",
+                "relation_name": "orders",
+                "body": "주문 트랜잭션 테이블",
+            }
         ],
     )
     assert "> 📝 주문 트랜잭션 테이블" in md

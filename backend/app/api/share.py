@@ -17,20 +17,20 @@ from app.models import (
     SchemaSnapshotData,
     ShareLink,
 )
+from app.spec.index_design import generate_index_design_spec
 from app.spec.llm import (
     LlmConfigurationError,
     LlmProviderError,
     generate_index_design_llm_draft,
     generate_reversing_llm_draft,
 )
-from app.spec.index_design import generate_index_design_spec
 from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api", tags=["share"])
 
 
 def _redact_sensitive_snapshot_fields(
-    data: dict | list | str | int | float | bool | None,
+    data: dict | list | str | float | bool | None,
 ) -> dict | list | str | int | float | bool | None:
     """Redact sensitive fields from snapshot JSON payload when shared publicly."""
     if isinstance(data, dict):
@@ -46,7 +46,7 @@ def _redact_sensitive_snapshot_fields(
 
 
 def _redacted_snapshot_dict(
-    snapshot_json: dict | list | str | int | float | bool | None,
+    snapshot_json: dict | list | str | float | bool | None,
 ) -> dict:
     """Return a snapshot dict with sensitive fields redacted for public export.
 

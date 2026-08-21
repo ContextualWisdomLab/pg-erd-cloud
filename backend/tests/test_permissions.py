@@ -3,9 +3,8 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from fastapi import HTTPException
-
 from app.permissions import require_project_member
+from fastapi import HTTPException
 
 
 class FakeResult:

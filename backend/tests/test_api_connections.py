@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import uuid
 import datetime as dt
+import uuid
 
 import pytest
-from fastapi import FastAPI, HTTPException
-from fastapi.testclient import TestClient
-
 from app.api.connections import router
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.models import DbConnection
 from app.security import EncryptedBlob
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 app = FastAPI()
 app.include_router(router)

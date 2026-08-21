@@ -4,9 +4,7 @@ from unittest.mock import patch
 
 import httpx
 import pytest
-
 from app.integrations import clearfolio as cf
-
 
 SECRET = "gateway-shared-secret"
 PERMS = "job:create,job:read,job:retry,viewer:read,artifact-link:create,analytics:read"
@@ -32,8 +30,11 @@ def test_signature_binds_every_claim():
 
 def test_build_headers_sends_full_signed_set_and_self_verifies():
     cfg = cf.ClearfolioConfig(
-        gateway_url="https://cf.example.com", hmac_secret=SECRET,
-        tenant_id="pg-erd-cloud", permissions=PERMS, timeout_seconds=10.0,
+        gateway_url="https://cf.example.com",
+        hmac_secret=SECRET,
+        tenant_id="pg-erd-cloud",
+        permissions=PERMS,
+        timeout_seconds=10.0,
     )
     headers = cf.build_tenant_headers(cfg, "dev:alice", issued_at=1782995100)
     assert headers["X-Clearfolio-Tenant-Id"] == "pg-erd-cloud"
@@ -122,7 +123,10 @@ async def test_ids_are_url_encoded_as_path_segments(monkeypatch):
     assert captured == [
         ("GET", "https://cf.example.com/api/v1/convert/jobs/..%2Fjob%201%3Fx%3Dy"),
         ("GET", "https://cf.example.com/api/v1/viewer/folder%2Fdoc%201"),
-        ("POST", "https://cf.example.com/api/v1/viewer/folder%2Fdoc%201/artifact-links"),
+        (
+            "POST",
+            "https://cf.example.com/api/v1/viewer/folder%2Fdoc%201/artifact-links",
+        ),
     ]
 
 
@@ -131,8 +135,11 @@ def test_permissions_canonicalized_to_match_clearfolio():
     messy = " viewer:read , job:create,viewer:read, job:read ,"
     assert cf.canonicalize_permissions(messy) == "viewer:read,job:create,job:read"
     cfg = cf.ClearfolioConfig(
-        gateway_url="https://cf.example.com", hmac_secret=SECRET,
-        tenant_id=" pg-erd-cloud ", permissions=messy, timeout_seconds=10.0,
+        gateway_url="https://cf.example.com",
+        hmac_secret=SECRET,
+        tenant_id=" pg-erd-cloud ",
+        permissions=messy,
+        timeout_seconds=10.0,
     )
     h = cf.build_tenant_headers(cfg, " dev:alice ", issued_at=100)
     # sent header equals canonical form (no spaces/dupes), tenant/subject stripped

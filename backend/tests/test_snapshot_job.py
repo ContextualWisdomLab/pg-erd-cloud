@@ -2,9 +2,7 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from app.jobs.snapshot_job import _redact_snapshot_error_message
-from app.jobs.snapshot_job import handle_snapshot_job
+from app.jobs.snapshot_job import _redact_snapshot_error_message, handle_snapshot_job
 from app.models import DbConnection, JobQueue, SchemaSnapshot
 from app.security import encrypt_text
 
@@ -123,9 +121,8 @@ async def test_handle_snapshot_job_persists_and_raises_redacted_error() -> None:
     with patch(
         "app.jobs.snapshot_job.introspect_database",
         side_effect=fail_introspection,
-    ):
-        with pytest.raises(RuntimeError) as exc_info:
-            await handle_snapshot_job(lambda: session, job)
+    ), pytest.raises(RuntimeError) as exc_info:
+        await handle_snapshot_job(lambda: session, job)
 
     raised_error = str(exc_info.value)
     assert snapshot.status == "failed"

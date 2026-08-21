@@ -12,6 +12,7 @@ from app.db import get_read_session, get_session
 from app.db_introspect import apply_database_sql, probe_database
 from app.models import DbConnection
 from app.permissions import require_project_member
+from app.sanitize import sanitize_for_storage
 from app.schemas import (
     ApplySqlIn,
     ApplySqlOut,
@@ -20,7 +21,6 @@ from app.schemas import (
     ConnectionTestOut,
 )
 from app.security import decrypt_text, encrypt_text
-from app.sanitize import sanitize_for_storage
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 

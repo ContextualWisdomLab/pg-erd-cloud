@@ -33,20 +33,26 @@ from app.ddl.export import (
 from app.diff.schema_diff import _index_snapshot
 
 
-def _col_type(column_name: str, col: dict[str, Any], source: DdlDialect, target: DdlDialect) -> str:
+def _col_type(
+    column_name: str, col: dict[str, Any], source: DdlDialect, target: DdlDialect
+) -> str:
     return _mapped_data_type(
         {"data_type": col.get("data_type"), "column_name": column_name}, source, target
     )
 
 
-def _column_clause(name: str, col: dict[str, Any], source: DdlDialect, target: DdlDialect) -> str:
+def _column_clause(
+    name: str, col: dict[str, Any], source: DdlDialect, target: DdlDialect
+) -> str:
     clause = f"{_q(name)} {_col_type(name, col, source, target)}"
     if col.get("is_not_null"):
         clause += " NOT NULL"
     return clause
 
 
-def _create_table_sql(tbl: dict[str, Any], source: DdlDialect, target: DdlDialect) -> str:
+def _create_table_sql(
+    tbl: dict[str, Any], source: DdlDialect, target: DdlDialect
+) -> str:
     qname = _qname(tbl["schema_name"], tbl["relation_name"])
     lines = [
         "  " + _column_clause(name, col, source, target)
@@ -59,7 +65,9 @@ def _create_table_sql(tbl: dict[str, Any], source: DdlDialect, target: DdlDialec
     return f"CREATE TABLE {qname} (\n{body}\n);"
 
 
-def _alter_column_type_sql(qname: str, name: str, type_sql: str, target: DdlDialect) -> str:
+def _alter_column_type_sql(
+    qname: str, name: str, type_sql: str, target: DdlDialect
+) -> str:
     if target == "snowflake":
         return f"ALTER TABLE {qname} ALTER COLUMN {_q(name)} SET DATA TYPE {type_sql};"
     return f"ALTER TABLE {qname} ALTER COLUMN {_q(name)} TYPE {type_sql};"

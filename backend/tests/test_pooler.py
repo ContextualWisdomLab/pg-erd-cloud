@@ -30,7 +30,7 @@ def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
     )
     assert dsn.startswith("postgresql://")
     assert "/pgbouncer" in dsn
-    assert password == "dummy"  # noqa: S105
+    assert password == "dummy"
 
     # Password must not be embedded in the DSN string.
     assert ":dummy@" not in dsn

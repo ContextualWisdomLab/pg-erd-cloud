@@ -19,10 +19,30 @@ def _base():
             {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"},
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 1, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
-            {"relation_oid": 2, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 1,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
         pk_columns=[
             {"relation_oid": 1, "column_name": "member_id", "column_ordinal": 1},
@@ -52,10 +72,30 @@ def test_identical_snapshots_report_no_changes_even_with_different_oids():
             {"relation_oid": 901, "schema_name": "public", "relation_name": "orders"},
         ],
         columns=[
-            {"relation_oid": 900, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 900, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
-            {"relation_oid": 901, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 901, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 900,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 900,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
+            {
+                "relation_oid": 901,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 901,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
         pk_columns=[
             {"relation_oid": 900, "column_name": "member_id", "column_ordinal": 1},
@@ -90,11 +130,28 @@ def test_table_added_and_removed():
             {"relation_oid": 3, "schema_name": "public", "relation_name": "audit_log"},
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 1, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
-            {"relation_oid": 3, "column_name": "id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 1,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
+            {
+                "relation_oid": 3,
+                "column_name": "id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
-        pk_columns=[{"relation_oid": 1, "column_name": "member_id", "column_ordinal": 1}],
+        pk_columns=[
+            {"relation_oid": 1, "column_name": "member_id", "column_ordinal": 1}
+        ],
     )
     d = diff_snapshots(base, target)
     assert d["tables"]["added"] == ["public.audit_log"]
@@ -113,12 +170,32 @@ def test_column_added_removed_type_and_nullability_changed():
             {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"},
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
             # email: type widened AND became NOT NULL (a change)
-            {"relation_oid": 1, "column_name": "email", "data_type": "varchar(255)", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "email",
+                "data_type": "varchar(255)",
+                "is_not_null": True,
+            },
             # new column added
-            {"relation_oid": 1, "column_name": "phone", "data_type": "varchar(20)", "is_not_null": False},
-            {"relation_oid": 2, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "phone",
+                "data_type": "varchar(20)",
+                "is_not_null": False,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "order_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
             # orders.member_id removed
         ],
         pk_columns=[
@@ -132,7 +209,9 @@ def test_column_added_removed_type_and_nullability_changed():
 
     member = changed["public.member"]
     assert member["columns"]["added"] == ["phone"]
-    email_change = next(c for c in member["columns"]["changed"] if c["column"] == "email")
+    email_change = next(
+        c for c in member["columns"]["changed"] if c["column"] == "email"
+    )
     assert email_change["from"] == {"data_type": "varchar(100)", "is_not_null": False}
     assert email_change["to"] == {"data_type": "varchar(255)", "is_not_null": True}
 
@@ -146,10 +225,22 @@ def test_column_added_removed_type_and_nullability_changed():
 def test_primary_key_change_detected():
     base = _base()
     target = _snap(
-        relations=[{"relation_oid": 1, "schema_name": "public", "relation_name": "member"}],
+        relations=[
+            {"relation_oid": 1, "schema_name": "public", "relation_name": "member"}
+        ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 1, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 1,
+                "column_name": "email",
+                "data_type": "varchar(100)",
+                "is_not_null": False,
+            },
         ],
         # PK moved from member_id to email
         pk_columns=[{"relation_oid": 1, "column_name": "email", "column_ordinal": 1}],
@@ -166,8 +257,18 @@ def test_fk_added():
             {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"},
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
     )
     target = _snap(
@@ -176,8 +277,18 @@ def test_fk_added():
             {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"},
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
-            {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {
+                "relation_oid": 1,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 2,
+                "column_name": "member_id",
+                "data_type": "bigint",
+                "is_not_null": True,
+            },
         ],
         fk_edges=[
             {
@@ -218,12 +329,25 @@ def test_diff_skips_orphan_nameless_rows_and_detects_comment_change():
             }
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "id", "data_type": "int", "is_not_null": True},
-            {"relation_oid": 999, "column_name": "ghost", "data_type": "int"},  # orphan oid
+            {
+                "relation_oid": 1,
+                "column_name": "id",
+                "data_type": "int",
+                "is_not_null": True,
+            },
+            {
+                "relation_oid": 999,
+                "column_name": "ghost",
+                "data_type": "int",
+            },  # orphan oid
             {"relation_oid": 1, "column_name": None, "data_type": "int"},  # no name
         ],
         pk_columns=[
-            {"relation_oid": 999, "column_name": "id", "column_ordinal": 1},  # orphan oid
+            {
+                "relation_oid": 999,
+                "column_name": "id",
+                "column_ordinal": 1,
+            },  # orphan oid
             {"relation_oid": 1, "column_name": None, "column_ordinal": 1},  # no name
         ],
         fk_edges=[
@@ -247,7 +371,12 @@ def test_diff_skips_orphan_nameless_rows_and_detects_comment_change():
             }
         ],
         columns=[
-            {"relation_oid": 1, "column_name": "id", "data_type": "int", "is_not_null": True}
+            {
+                "relation_oid": 1,
+                "column_name": "id",
+                "data_type": "int",
+                "is_not_null": True,
+            }
         ],
     )
     d = diff_snapshots(base, target)

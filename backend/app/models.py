@@ -19,7 +19,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base for ORM models."""
 
-    pass
 
 
 def utcnow() -> dt.datetime:

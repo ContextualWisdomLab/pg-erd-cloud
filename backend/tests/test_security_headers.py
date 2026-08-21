@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.testclient import TestClient
-from starlette.requests import Request
-
 from app import security_headers
 from app.csrf import CSRF_HEADER_NAME
 from app.main import CORS_ALLOW_HEADERS
 from app.security_headers import make_security_headers_middleware
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 
 def test_security_headers_present_on_healthz_and_api() -> None:

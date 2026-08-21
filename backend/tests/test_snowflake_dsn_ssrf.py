@@ -1,7 +1,7 @@
 import pytest
-from app.snowflake_introspect.introspect import _parse_snowflake_dsn
 from app.pg_introspect.dsn_guard import DsnTargetError
 from app.settings import settings
+from app.snowflake_introspect.introspect import _parse_snowflake_dsn
 
 
 @pytest.mark.asyncio

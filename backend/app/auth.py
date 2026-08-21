@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -293,10 +293,8 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             issuer=settings.oidc_issuer,
             options={
                 "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
+                "require": ["iss", "exp", "jti"]
+                + (["aud"] if settings.oidc_audience else []),
                 "leeway": OIDC_JWT_LEEWAY_SECONDS,
             },
         )

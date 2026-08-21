@@ -3,12 +3,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
-
 from app.api.connections import apply_sql
 from app.auth import CurrentUser
 from app.db_introspect import apply_database_sql
 from app.schemas import ApplySqlIn
+from fastapi import HTTPException
 
 
 def _user():
@@ -28,7 +27,9 @@ async def test_apply_sql_returns_404_when_missing():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=None)
     with pytest.raises(HTTPException) as e:
-        await apply_sql(db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session)
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session
+        )
     assert e.value.status_code == 404
 
 
@@ -40,9 +41,13 @@ async def test_apply_sql_masks_non_member_as_404():
         "app.api.connections.require_project_member",
         new_callable=AsyncMock,
         side_effect=HTTPException(status_code=403, detail="project access denied"),
-    ):
-        with pytest.raises(HTTPException) as e:
-            await apply_sql(db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session)
+    ), pytest.raises(HTTPException) as e:
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(),
+            user=_user(),
+            session=session,
+        )
     assert e.value.status_code == 404
 
 
@@ -54,10 +59,17 @@ async def test_apply_sql_returns_403_when_member_lacks_editor():
     with patch(
         "app.api.connections.require_project_member",
         new_callable=AsyncMock,
-        side_effect=[None, HTTPException(status_code=403, detail="insufficient project role")],
-    ):
-        with pytest.raises(HTTPException) as e:
-            await apply_sql(db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session)
+        side_effect=[
+            None,
+            HTTPException(status_code=403, detail="insufficient project role"),
+        ],
+    ), pytest.raises(HTTPException) as e:
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(),
+            user=_user(),
+            session=session,
+        )
     assert e.value.status_code == 403
 
 
@@ -66,15 +78,21 @@ async def test_apply_sql_reports_ok_true_on_success():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=uuid.uuid4())
     session.get = AsyncMock(return_value=_conn())
-    with patch(
-        "app.api.connections.require_project_member", new_callable=AsyncMock
-    ), patch(
-        "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
-    ), patch(
-        "app.api.connections.apply_database_sql", new_callable=AsyncMock
-    ) as apply_mock:
+    with (
+        patch("app.api.connections.require_project_member", new_callable=AsyncMock),
+        patch(
+            "app.api.connections.decrypt_text",
+            return_value="postgresql://u@db.example.com/x",
+        ),
+        patch(
+            "app.api.connections.apply_database_sql", new_callable=AsyncMock
+        ) as apply_mock,
+    ):
         out = await apply_sql(
-            db_connection_uuid=uuid.uuid4(), body=_body(dry_run=True), user=_user(), session=session
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(dry_run=True),
+            user=_user(),
+            session=session,
         )
     assert out.ok is True and out.dry_run is True and out.error is None
     apply_mock.assert_awaited_once()
@@ -85,19 +103,27 @@ async def test_apply_sql_reports_ok_false_on_error():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=uuid.uuid4())
     session.get = AsyncMock(return_value=_conn())
-    with patch(
-        "app.api.connections.require_project_member", new_callable=AsyncMock
-    ), patch(
-        "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
-    ), patch(
-        "app.api.connections.apply_database_sql",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("syntax error at or near"),
+    with (
+        patch("app.api.connections.require_project_member", new_callable=AsyncMock),
+        patch(
+            "app.api.connections.decrypt_text",
+            return_value="postgresql://u@db.example.com/x",
+        ),
+        patch(
+            "app.api.connections.apply_database_sql",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("syntax error at or near"),
+        ),
     ):
         out = await apply_sql(
-            db_connection_uuid=uuid.uuid4(), body=_body(dry_run=False), user=_user(), session=session
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(dry_run=False),
+            user=_user(),
+            session=session,
         )
-    assert out.ok is False and out.dry_run is False and "syntax error" in (out.error or "")
+    assert (
+        out.ok is False and out.dry_run is False and "syntax error" in (out.error or "")
+    )
 
 
 @pytest.mark.asyncio
@@ -122,12 +148,11 @@ async def test_apply_database_sql_routes_postgres_and_redacts():
         "app.db_introspect.apply_postgres_ddl",
         new_callable=AsyncMock,
         side_effect=OSError("connect to postgresql://user:s3cret@db"),
-    ):
-        with pytest.raises(RuntimeError) as e:
-            await apply_database_sql(
-                "postgresql://user:s3cret@db.example.com/x",
-                "CREATE TABLE safe_table (id int);",
-            )
+    ), pytest.raises(RuntimeError) as e:
+        await apply_database_sql(
+            "postgresql://user:s3cret@db.example.com/x",
+            "CREATE TABLE safe_table (id int);",
+        )
     assert "s3cret" not in str(e.value)
 
 

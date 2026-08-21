@@ -26,7 +26,7 @@ with atheris.instrument_imports():
     from app.ddl.export import snapshot_json_to_sql
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _snapshot import ByteFeeder, build_snapshot  # noqa: E402
+from _snapshot import ByteFeeder, build_snapshot
 
 _DIALECTS = ["postgresql", "snowflake", "pg", "sf", "postgres", "BOGUS", "", "x"]
 

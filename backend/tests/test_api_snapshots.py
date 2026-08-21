@@ -1,12 +1,13 @@
 import uuid
 from types import SimpleNamespace
-import pytest
-from fastapi import HTTPException
 from unittest.mock import AsyncMock, call, patch
+
+import pytest
 from app.api.snapshots import create_snapshot, get_snapshot
-from app.schemas import SnapshotCreateIn
 from app.auth import CurrentUser
 from app.models import DbConnection, SchemaSnapshot, SchemaSnapshotData
+from app.schemas import SnapshotCreateIn
+from fastapi import HTTPException
 
 
 def _user() -> CurrentUser:
@@ -23,7 +24,9 @@ async def test_create_snapshot_rejects_invalid_connection_uuid():
 
     project_space_uuid = uuid.uuid4()
     body = SnapshotCreateIn(db_connection_uuid=uuid.uuid4(), schema_filter=None)
-    user = CurrentUser(user_account_uuid=uuid.uuid4(), subject="test", display_name="Test")
+    user = CurrentUser(
+        user_account_uuid=uuid.uuid4(), subject="test", display_name="Test"
+    )
 
     with patch("app.api.snapshots.require_project_member", new_callable=AsyncMock):
         with pytest.raises(HTTPException) as exc_info:
@@ -31,7 +34,7 @@ async def test_create_snapshot_rejects_invalid_connection_uuid():
                 project_space_uuid=project_space_uuid,
                 body=body,
                 user=user,
-                session=session_mock
+                session=session_mock,
             )
 
         assert exc_info.value.status_code == 404
@@ -102,22 +105,27 @@ async def test_get_snapshot_reads_data_only_after_project_membership():
         call(SchemaSnapshotData, snapshot_id),
     ]
 
+
 @pytest.mark.asyncio
 async def test_create_snapshot_rejects_connection_from_other_project():
     session_mock = AsyncMock()
 
     conn_mock = DbConnection(
         db_connection_uuid=uuid.uuid4(),
-        project_space_uuid=uuid.uuid4(), # Different project
+        project_space_uuid=uuid.uuid4(),  # Different project
         conn_name="test",
         dsn_ciphertext=b"x",
-        dsn_nonce=b"x"
+        dsn_nonce=b"x",
     )
     session_mock.get.return_value = conn_mock
 
     project_space_uuid = uuid.uuid4()
-    body = SnapshotCreateIn(db_connection_uuid=conn_mock.db_connection_uuid, schema_filter=None)
-    user = CurrentUser(user_account_uuid=uuid.uuid4(), subject="test", display_name="Test")
+    body = SnapshotCreateIn(
+        db_connection_uuid=conn_mock.db_connection_uuid, schema_filter=None
+    )
+    user = CurrentUser(
+        user_account_uuid=uuid.uuid4(), subject="test", display_name="Test"
+    )
 
     with patch("app.api.snapshots.require_project_member", new_callable=AsyncMock):
         with pytest.raises(HTTPException) as exc_info:
@@ -125,7 +133,7 @@ async def test_create_snapshot_rejects_connection_from_other_project():
                 project_space_uuid=project_space_uuid,
                 body=body,
                 user=user,
-                session=session_mock
+                session=session_mock,
             )
 
         assert exc_info.value.status_code == 404

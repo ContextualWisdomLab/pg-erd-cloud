@@ -83,12 +83,24 @@ def build_constraint_inventory(snapshot: dict[str, Any] | None) -> dict[str, Any
 
     check_rules.sort(key=lambda r: (r["table"], r["constraint"]))
     cascade_items.sort(
-        key=lambda i: (0 if i["severity"] == WARNING else 1, i["table"], i["constraint"])
+        key=lambda i: (
+            0 if i["severity"] == WARNING else 1,
+            i["table"],
+            i["constraint"],
+        )
     )
 
     summary = {
         "check_rules": len(check_rules),
-        "cascade_deletes": sum(1 for i in cascade_items if i["category"] == "cascade_delete"),
-        "set_null_deletes": sum(1 for i in cascade_items if i["category"] == "set_null_delete"),
+        "cascade_deletes": sum(
+            1 for i in cascade_items if i["category"] == "cascade_delete"
+        ),
+        "set_null_deletes": sum(
+            1 for i in cascade_items if i["category"] == "set_null_delete"
+        ),
     }
-    return {"check_rules": check_rules, "delete_actions": cascade_items, "summary": summary}
+    return {
+        "check_rules": check_rules,
+        "delete_actions": cascade_items,
+        "summary": summary,
+    }

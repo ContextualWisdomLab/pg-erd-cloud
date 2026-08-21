@@ -3,39 +3,125 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
 from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
 
 TABLES = [
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": ""},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "v_sales", "TABLE_TYPE": "VIEW", "TABLE_COMMENT": ""},
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "member",
+        "TABLE_TYPE": "BASE TABLE",
+        "TABLE_COMMENT": "회원",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "TABLE_TYPE": "BASE TABLE",
+        "TABLE_COMMENT": "",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "v_sales",
+        "TABLE_TYPE": "VIEW",
+        "TABLE_COMMENT": "",
+    },
 ]
 COLUMNS = [
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "COLUMN_NAME": "member_id", "ORDINAL_POSITION": 1,
-     "COLUMN_TYPE": "bigint", "DATA_TYPE": "bigint", "IS_NULLABLE": "NO", "COLUMN_DEFAULT": None, "COLUMN_COMMENT": ""},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "COLUMN_NAME": "email", "ORDINAL_POSITION": 2,
-     "COLUMN_TYPE": "varchar(255)", "DATA_TYPE": "varchar", "IS_NULLABLE": "YES", "COLUMN_DEFAULT": None, "COLUMN_COMMENT": ""},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "COLUMN_NAME": "order_id", "ORDINAL_POSITION": 1,
-     "COLUMN_TYPE": "bigint", "DATA_TYPE": "bigint", "IS_NULLABLE": "NO", "COLUMN_DEFAULT": None, "COLUMN_COMMENT": ""},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "COLUMN_NAME": "member_id", "ORDINAL_POSITION": 2,
-     "COLUMN_TYPE": "bigint", "DATA_TYPE": "bigint", "IS_NULLABLE": "NO", "COLUMN_DEFAULT": None, "COLUMN_COMMENT": ""},
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "member",
+        "COLUMN_NAME": "member_id",
+        "ORDINAL_POSITION": 1,
+        "COLUMN_TYPE": "bigint",
+        "DATA_TYPE": "bigint",
+        "IS_NULLABLE": "NO",
+        "COLUMN_DEFAULT": None,
+        "COLUMN_COMMENT": "",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "member",
+        "COLUMN_NAME": "email",
+        "ORDINAL_POSITION": 2,
+        "COLUMN_TYPE": "varchar(255)",
+        "DATA_TYPE": "varchar",
+        "IS_NULLABLE": "YES",
+        "COLUMN_DEFAULT": None,
+        "COLUMN_COMMENT": "",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "COLUMN_NAME": "order_id",
+        "ORDINAL_POSITION": 1,
+        "COLUMN_TYPE": "bigint",
+        "DATA_TYPE": "bigint",
+        "IS_NULLABLE": "NO",
+        "COLUMN_DEFAULT": None,
+        "COLUMN_COMMENT": "",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "COLUMN_NAME": "member_id",
+        "ORDINAL_POSITION": 2,
+        "COLUMN_TYPE": "bigint",
+        "DATA_TYPE": "bigint",
+        "IS_NULLABLE": "NO",
+        "COLUMN_DEFAULT": None,
+        "COLUMN_COMMENT": "",
+    },
 ]
 KEY_USAGE = [
-    {"CONSTRAINT_NAME": "PRIMARY", "TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "COLUMN_NAME": "member_id",
-     "ORDINAL_POSITION": 1, "REFERENCED_TABLE_SCHEMA": None, "REFERENCED_TABLE_NAME": None, "REFERENCED_COLUMN_NAME": None},
-    {"CONSTRAINT_NAME": "PRIMARY", "TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "COLUMN_NAME": "order_id",
-     "ORDINAL_POSITION": 1, "REFERENCED_TABLE_SCHEMA": None, "REFERENCED_TABLE_NAME": None, "REFERENCED_COLUMN_NAME": None},
-    {"CONSTRAINT_NAME": "fk_orders_member", "TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "COLUMN_NAME": "member_id",
-     "ORDINAL_POSITION": 1, "REFERENCED_TABLE_SCHEMA": "shop", "REFERENCED_TABLE_NAME": "member", "REFERENCED_COLUMN_NAME": "member_id"},
+    {
+        "CONSTRAINT_NAME": "PRIMARY",
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "member",
+        "COLUMN_NAME": "member_id",
+        "ORDINAL_POSITION": 1,
+        "REFERENCED_TABLE_SCHEMA": None,
+        "REFERENCED_TABLE_NAME": None,
+        "REFERENCED_COLUMN_NAME": None,
+    },
+    {
+        "CONSTRAINT_NAME": "PRIMARY",
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "COLUMN_NAME": "order_id",
+        "ORDINAL_POSITION": 1,
+        "REFERENCED_TABLE_SCHEMA": None,
+        "REFERENCED_TABLE_NAME": None,
+        "REFERENCED_COLUMN_NAME": None,
+    },
+    {
+        "CONSTRAINT_NAME": "fk_orders_member",
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "COLUMN_NAME": "member_id",
+        "ORDINAL_POSITION": 1,
+        "REFERENCED_TABLE_SCHEMA": "shop",
+        "REFERENCED_TABLE_NAME": "member",
+        "REFERENCED_COLUMN_NAME": "member_id",
+    },
 ]
 INDEXES = [
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "INDEX_NAME": "ix_orders_member",
-     "NON_UNIQUE": 1, "SEQ_IN_INDEX": 1, "COLUMN_NAME": "member_id"},
-    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "INDEX_NAME": "PRIMARY",
-     "NON_UNIQUE": 0, "SEQ_IN_INDEX": 1, "COLUMN_NAME": "member_id"},
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "orders",
+        "INDEX_NAME": "ix_orders_member",
+        "NON_UNIQUE": 1,
+        "SEQ_IN_INDEX": 1,
+        "COLUMN_NAME": "member_id",
+    },
+    {
+        "TABLE_SCHEMA": "shop",
+        "TABLE_NAME": "member",
+        "INDEX_NAME": "PRIMARY",
+        "NON_UNIQUE": 0,
+        "SEQ_IN_INDEX": 1,
+        "COLUMN_NAME": "member_id",
+    },
 ]
 
 

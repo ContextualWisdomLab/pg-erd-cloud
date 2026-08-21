@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
-
 from app.schemas import ConnectionCreateIn, ProjectCreateIn, ProjectMemberAddIn
+from pydantic import ValidationError
 
 
 def test_project_name_length_is_bounded() -> None:

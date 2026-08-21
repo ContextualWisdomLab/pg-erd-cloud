@@ -4,7 +4,6 @@ import datetime as dt
 import uuid
 
 import pytest
-
 from app.jobs import valkey_queue
 from app.settings import settings
 

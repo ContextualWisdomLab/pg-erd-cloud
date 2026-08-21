@@ -292,10 +292,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "issuer": "https://issuer.example",
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
+            "require": ["iss", "exp", "jti", "aud"],
             "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
     }

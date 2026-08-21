@@ -26,22 +26,13 @@ _SEVERITY_RANK = {HIGH: 0, INFO: 1}
 
 # PostgreSQL fully-reserved key words (cannot be a table/column name unquoted).
 RESERVED_WORDS = frozenset(
-    """all analyse analyze and any array as asc asymmetric both case cast check
-    collate column constraint create current_catalog current_date current_role
-    current_time current_timestamp current_user default deferrable desc distinct
-    do else end except false fetch for foreign from grant group having in
-    initially intersect into lateral leading limit localtime localtimestamp not
-    null offset on only or order placing primary references returning select
-    session_user some symmetric table then to trailing true union unique user
-    using variadic when where window with""".split()
+    ["all", "analyse", "analyze", "and", "any", "array", "as", "asc", "asymmetric", "both", "case", "cast", "check", "collate", "column", "constraint", "create", "current_catalog", "current_date", "current_role", "current_time", "current_timestamp", "current_user", "default", "deferrable", "desc", "distinct", "do", "else", "end", "except", "false", "fetch", "for", "foreign", "from", "grant", "group", "having", "in", "initially", "intersect", "into", "lateral", "leading", "limit", "localtime", "localtimestamp", "not", "null", "offset", "on", "only", "or", "order", "placing", "primary", "references", "returning", "select", "session_user", "some", "symmetric", "table", "then", "to", "trailing", "true", "union", "unique", "user", "using", "variadic", "when", "where", "window", "with"]
 )
 
 # Non-reserved keywords / built-in type names: legal as unquoted identifiers,
 # but they shadow a keyword/type and routinely confuse tooling and readers.
 DISCOURAGED_KEYWORDS = frozenset(
-    """name value type text timestamp date time number comment level position
-    path language role owner zone source target state key day month year hour
-    minute second precision boolean integer char character interval money""".split()
+    ["name", "value", "type", "text", "timestamp", "date", "time", "number", "comment", "level", "position", "path", "language", "role", "owner", "zone", "source", "target", "state", "key", "day", "month", "year", "hour", "minute", "second", "precision", "boolean", "integer", "char", "character", "interval", "money"]
 )
 
 _VALID_UNQUOTED = re.compile(r"^[a-z_][a-z0-9_$]*$")
@@ -73,7 +64,12 @@ def _case_style(name: str) -> str | None:
 
 
 def _item(category: str, severity: str, target: str, detail: str) -> dict[str, Any]:
-    return {"category": category, "severity": severity, "target": target, "detail": detail}
+    return {
+        "category": category,
+        "severity": severity,
+        "target": target,
+        "detail": detail,
+    }
 
 
 def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
@@ -102,18 +98,30 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         lower = name.lower()
         if lower in RESERVED_WORDS:
             items.append(
-                _item("reserved_word", HIGH, label,
-                      f"'{name}' is a SQL reserved word — only usable double-quoted; unquoted use breaks.")
+                _item(
+                    "reserved_word",
+                    HIGH,
+                    label,
+                    f"'{name}' is a SQL reserved word — only usable double-quoted; unquoted use breaks.",
+                )
             )
         elif not _VALID_UNQUOTED.match(name) or len(name) > 63:
             items.append(
-                _item("requires_quoting", HIGH, label,
-                      f"'{name}' is not a legal unquoted identifier (case/char/length) — forces double-quoting everywhere.")
+                _item(
+                    "requires_quoting",
+                    HIGH,
+                    label,
+                    f"'{name}' is not a legal unquoted identifier (case/char/length) — forces double-quoting everywhere.",
+                )
             )
         elif lower in DISCOURAGED_KEYWORDS:
             items.append(
-                _item("discouraged_keyword", INFO, label,
-                      f"'{name}' is a non-reserved keyword / type name — legal unquoted, but shadows a keyword and confuses tooling.")
+                _item(
+                    "discouraged_keyword",
+                    INFO,
+                    label,
+                    f"'{name}' is a non-reserved keyword / type name — legal unquoted, but shadows a keyword and confuses tooling.",
+                )
             )
         style = _case_style(name)
         if style is not None:
@@ -127,8 +135,12 @@ def lint_naming(snapshot: dict[str, Any] | None) -> dict[str, Any]:
             style = _case_style(name)
             if style is not None and style != dominant:
                 items.append(
-                    _item("inconsistent_case", INFO, label,
-                          f"'{name}' is {style}, but the schema is predominantly {dominant}.")
+                    _item(
+                        "inconsistent_case",
+                        INFO,
+                        label,
+                        f"'{name}' is {style}, but the schema is predominantly {dominant}.",
+                    )
                 )
 
     items.sort(key=lambda i: (_SEVERITY_RANK.get(i["severity"], 9), i["target"]))

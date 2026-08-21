@@ -4,14 +4,12 @@ import asyncio
 import datetime as dt
 import logging
 import time
-from collections.abc import Awaitable, Callable
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import TypeAlias
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import JobQueue
 from app.jobs.valkey_queue import (
     pop_due_job_signal,
     valkey_queue_enabled,
@@ -21,6 +19,7 @@ from app.metrics import (
     JOB_QUEUE_PROCESSING_SECONDS,
     JOB_QUEUE_WAIT_SECONDS,
 )
+from app.models import JobQueue
 from app.settings import settings
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ def _mark_job_running(job: JobQueue) -> JobQueue:
             wait_s = (job.started_at - job.run_after).total_seconds()
             if wait_s >= 0:
                 JOB_QUEUE_WAIT_SECONDS.labels(job_type=job.job_type).observe(wait_s)
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Never fail job claiming due to metrics.
             _logger.debug("job queue wait metric observation failed", exc_info=True)
     return job

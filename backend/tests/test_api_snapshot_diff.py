@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.api.snapshots import diff_snapshot
 from app.auth import CurrentUser
 

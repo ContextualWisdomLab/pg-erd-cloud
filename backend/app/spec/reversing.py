@@ -4,7 +4,6 @@ import json
 from collections import defaultdict
 from typing import Literal
 
-
 SpecMode = Literal["markdown", "llm-prompt"]
 
 

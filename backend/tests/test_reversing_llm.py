@@ -6,8 +6,6 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from fastapi import HTTPException
-
 from app.api import share, snapshots
 from app.auth import CurrentUser
 from app.models import SchemaSnapshot, SchemaSnapshotData, ShareLink
@@ -17,6 +15,7 @@ from app.spec.llm import (
     LlmProviderError,
     generate_reversing_llm_draft,
 )
+from fastapi import HTTPException
 
 
 def _snapshot() -> dict:

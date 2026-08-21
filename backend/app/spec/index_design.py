@@ -7,7 +7,6 @@ from typing import Literal
 
 from app.jobs.valkey_queue import valkey_queue_config_summary
 
-
 SpecMode = Literal["markdown", "llm-prompt"]
 MAX_IDENTIFIER_LENGTH = 63
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from app.settings import settings
 from app.spec.index_design import generate_index_design_spec
 

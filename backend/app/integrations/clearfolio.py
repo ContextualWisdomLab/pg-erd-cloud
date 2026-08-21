@@ -32,6 +32,7 @@ import httpx
 from app.pg_introspect.dsn_guard import _validated_ip_hosts
 from app.settings import settings
 
+
 def _sanitize(value: str) -> str:
     """Match Clearfolio's claim sanitizer: drop NUL, strip surrounding space."""
     return value.replace("\x00", "").strip()
@@ -81,8 +82,11 @@ class ClearfolioConfig:
     timeout_seconds: float
 
     @classmethod
-    def from_settings(cls) -> "ClearfolioConfig":
-        if not settings.clearfolio_gateway_url or not settings.clearfolio_tenant_claims_hmac_secret:
+    def from_settings(cls) -> ClearfolioConfig:
+        if (
+            not settings.clearfolio_gateway_url
+            or not settings.clearfolio_tenant_claims_hmac_secret
+        ):
             raise ClearfolioNotConfigured(
                 "CLEARFOLIO_GATEWAY_URL and CLEARFOLIO_TENANT_CLAIMS_HMAC_SECRET must be set"
             )
@@ -104,7 +108,9 @@ def sign_tenant_claims(
 ) -> str:
     """Base64URL (unpadded) HMAC-SHA256 of the newline-joined claim payload."""
     payload = "\n".join([tenant_id, subject_id, canonical_permissions, str(issued_at)])
-    digest = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+    digest = hmac.new(
+        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
@@ -136,7 +142,9 @@ async def _validate_gateway(config: ClearfolioConfig) -> None:
     parsed = urlparse(config.gateway_url)
     if not parsed.hostname:
         raise ClearfolioError("invalid CLEARFOLIO_GATEWAY_URL")
-    await _validated_ip_hosts(parsed.hostname, is_hostaddr=False, port=parsed.port or 443)
+    await _validated_ip_hosts(
+        parsed.hostname, is_hostaddr=False, port=parsed.port or 443
+    )
 
 
 async def _request(

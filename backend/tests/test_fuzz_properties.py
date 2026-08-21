@@ -20,16 +20,15 @@ from collections.abc import Mapping
 import pytest
 
 hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import HealthCheck, given, settings  # noqa: E402
-from hypothesis import strategies as st  # noqa: E402
-
-from app.ddl.export import snapshot_json_to_sql  # noqa: E402
-from app.dsn_redaction import redact_dsn_error_message  # noqa: E402
-from app.sanitize import sanitize_for_storage, strip_nul  # noqa: E402
-from app.spec.index_design import generate_index_design_spec  # noqa: E402
-from app.spec.naming_lint import lint_naming  # noqa: E402
-from app.spec.reversing import generate_reversing_spec  # noqa: E402
-from app.spec.wide_tables import detect_wide_tables  # noqa: E402
+from app.ddl.export import snapshot_json_to_sql
+from app.dsn_redaction import redact_dsn_error_message
+from app.sanitize import sanitize_for_storage, strip_nul
+from app.spec.index_design import generate_index_design_spec
+from app.spec.naming_lint import lint_naming
+from app.spec.reversing import generate_reversing_spec
+from app.spec.wide_tables import detect_wide_tables
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 _SETTINGS = settings(
     max_examples=200,
@@ -98,9 +97,7 @@ def _row(draw: st.DrawFn) -> dict:
         "constraint_type": draw(st.sampled_from(["p", "u", "c", "f", "x", "", None])),
         "constraint_name": draw(_HOSTILE_TEXT),
         "constraint_def": draw(_HOSTILE_TEXT),
-        "constrained_attnums": draw(
-            st.one_of(st.none(), st.lists(_OID, max_size=5))
-        ),
+        "constrained_attnums": draw(st.one_of(st.none(), st.lists(_OID, max_size=5))),
         "index_def": draw(_HOSTILE_TEXT),
         "index_name": draw(_HOSTILE_TEXT),
         "index_tablespace_name": draw(_HOSTILE_TEXT),

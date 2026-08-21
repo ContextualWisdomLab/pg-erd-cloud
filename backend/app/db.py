@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 import asyncio
 import math
 import time
+from collections.abc import AsyncGenerator
 
 import psycopg
 from sqlalchemy.ext.asyncio import (
@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.settings import settings
 from app.pooler import (
     PoolerDetectionResult,
     PoolerKind,
@@ -21,6 +20,7 @@ from app.pooler import (
     classify_pooler_version_text,
     should_route_reads_to_read_only,
 )
+from app.settings import settings
 
 
 def get_sync_database_url() -> str:
@@ -81,13 +81,12 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
             dsn,
             password=password,
             connect_timeout=timeout_seconds,
-        ) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SHOW VERSION;")
-                row = cur.fetchone()
-                if not row or row[0] is None:
-                    return None
-                return str(row[0])
+        ) as conn, conn.cursor() as cur:
+            cur.execute("SHOW VERSION;")
+            row = cur.fetchone()
+            if not row or row[0] is None:
+                return None
+            return str(row[0])
 
     try:
         return await asyncio.wait_for(

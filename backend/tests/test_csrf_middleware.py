@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-from starlette.requests import Request
-from starlette.responses import Response
-
 from app.csrf import (
     CSRF_HEADER_NAME,
     generate_csrf_token,
@@ -12,6 +8,9 @@ from app.csrf import (
     verify_csrf_token,
 )
 from app.main import app
+from fastapi.testclient import TestClient
+from starlette.requests import Request
+from starlette.responses import Response
 
 
 def make_request(
