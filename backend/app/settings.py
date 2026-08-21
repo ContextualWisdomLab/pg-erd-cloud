@@ -1,11 +1,64 @@
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
+from pydantic import field_validator
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_SECRETS_DIR = Path("/run/secrets")
+
+
+def _read_secret_file(
+    path: Path,
+    *,
+    allowed_base: Path = _SECRETS_DIR,
+) -> str:
+    """Read one direct-child secret without a path-check/read race."""
+
+    if not path.is_absolute() or path.parent != allowed_base:
+        raise ValueError(
+            f"APP_SECRET_FILE must be a direct child of {allowed_base}"
+        )
+
+    required_flags = ("O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")
+    if any(not hasattr(os, flag) for flag in required_flags):
+        raise ValueError("APP_SECRET_FILE secure loading is unsupported")
+
+    directory_fd = -1
+    secret_fd = -1
+    try:
+        directory_fd = os.open(
+            allowed_base,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        )
+        secret_fd = os.open(
+            path.name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+            dir_fd=directory_fd,
+        )
+        if not stat.S_ISREG(os.fstat(secret_fd).st_mode):
+            raise ValueError("APP_SECRET_FILE must be a regular file")
+
+        with os.fdopen(secret_fd, "r", encoding="utf-8", closefd=True) as handle:
+            secret_fd = -1
+            secret = handle.read().rstrip("\r\n")
+    except (OSError, UnicodeError):
+        raise ValueError("APP_SECRET_FILE could not be opened securely") from None
+    finally:
+        if secret_fd >= 0:
+            os.close(secret_fd)
+        if directory_fd >= 0:
+            os.close(directory_fd)
+
+    if secret == "":
+        raise ValueError("APP_SECRET_FILE is empty")
+    return secret
 
 
 class Settings(BaseSettings):
@@ -46,32 +99,7 @@ class Settings(BaseSettings):
         if not secret_file:
             return data
 
-        path = Path(str(secret_file))
-        try:
-            resolved = path.resolve(strict=True)
-        except FileNotFoundError as exc:
-            raise ValueError(f"APP_SECRET_FILE does not exist: {path}") from exc
-
-        # Security hardening: avoid symlink tricks and restrict secret files to
-        # the expected secrets mount.
-        #
-        # Docker/Podman secrets are typically mounted under /run/secrets.
-        allowed_base = Path("/run/secrets").resolve()
-        if path.is_symlink():
-            raise ValueError("APP_SECRET_FILE must not be a symlink")
-        if not resolved.is_relative_to(allowed_base):
-            raise ValueError(
-                f"APP_SECRET_FILE must be under {allowed_base}: {resolved}"
-            )
-        if not resolved.is_file():
-            raise ValueError(
-                f"APP_SECRET_FILE does not exist or is not a file: {resolved}"
-            )
-
-        # Important: secret files commonly include a trailing newline.
-        secret = resolved.read_text(encoding="utf-8").rstrip("\r\n")
-        if secret == "":
-            raise ValueError("APP_SECRET_FILE is empty")
+        secret = _read_secret_file(Path(str(secret_file)))
 
         # If APP_SECRET_FILE is provided, prefer it deterministically.
         new_data = dict(data)
@@ -111,6 +139,21 @@ class Settings(BaseSettings):
     # Optional OIDC (Casdoor). If set, JWTs are verified.
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
+    # Optional single-tenant Keyverse profile. When set, verified tokens must
+    # carry the exact opaque ``org`` claim; the deployment database is the
+    # tenant boundary for every project lookup.
+    oidc_organization: str | None = None
+
+    @field_validator("oidc_organization")
+    @classmethod
+    def _validate_oidc_organization(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.strip() or value != value.strip():
+            raise ValueError(
+                "OIDC_ORGANIZATION must be non-empty and have no surrounding whitespace"
+            )
+        return value
 
     # Optional allowlist for reverse-engineering database targets.
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.

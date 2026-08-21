@@ -148,7 +148,9 @@ pip install -e ".[snowflake]"
   있습니다.
 - `APP_SECRET`은 앱 DB에 저장되는 DSN 암호화 키로 사용되므로, 변경 시 기존 데이터
   복호화에 영향을 줄 수 있습니다. 가능하면 `APP_SECRET_FILE`(예:
-  `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요.
+  `/run/secrets/app_secret`) 방식으로 안전하게 주입하세요. 지정 파일은
+  `/run/secrets`의 regular, non-symlink direct child여야 하며, 백엔드는 디렉터리
+  descriptor 기준 `O_NOFOLLOW` open으로 검증과 읽기를 하나의 파일에 고정합니다.
 
 ### Frontend
 

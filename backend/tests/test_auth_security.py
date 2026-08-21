@@ -5,10 +5,12 @@ import uuid
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from starlette.requests import Request
 
 from app import auth
 from app.settings import settings
+from app.settings import Settings
 
 
 @pytest.mark.parametrize(
@@ -27,6 +29,21 @@ from app.settings import settings
 )
 def test_parse_oidc_algorithms(raw: str, expected: list[str]) -> None:
     assert auth._parse_oidc_algorithms(raw) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+        "https://10.0.0.1",
+        "https://[::1]",
+    ],
+)
+async def test_oidc_endpoint_rejects_non_https_and_private_hosts(endpoint: str) -> None:
+    with pytest.raises(RuntimeError, match="HTTPS|not allowed"):
+        await auth._validate_oidc_endpoint(endpoint, "issuer")
 
 
 def make_request(headers: dict[str, str] | None = None) -> Request:
@@ -81,7 +98,11 @@ async def test_oidc_config_fetch_disables_redirects(
             observed["url"] = url
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example/")
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(
@@ -118,7 +139,11 @@ async def test_oidc_config_rejects_redirect_response(
         async def get(self, _url: str) -> _FakeHttpResponse:
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(
@@ -157,7 +182,11 @@ async def test_jwks_fetch_disables_redirects(
             observed["url"] = url
             return response
 
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
     monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(
@@ -173,6 +202,28 @@ async def test_jwks_fetch_disables_redirects(
     assert observed["follow_redirects"] is False
     assert observed["url"] == "https://issuer.example/jwks"
     assert response.raise_for_status_called is True
+
+
+@pytest.mark.asyncio
+async def test_cached_jwks_does_not_revalidate_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cached signing keys remain usable during a transient DNS failure."""
+    cached = {"keys": [{"kid": "cached", "kty": "RSA"}]}
+    now = auth.dt.datetime.now(auth.dt.timezone.utc)
+
+    async def fake_config() -> dict[str, object]:
+        return {"jwks_uri": "https://issuer.example/jwks"}
+
+    async def reject_endpoint(_raw_url: str, _label: str) -> str:
+        raise AssertionError("cached JWKS must not perform endpoint validation")
+
+    monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", reject_endpoint)
+    monkeypatch.setattr(auth, "_oidc_jwks", cached)
+    monkeypatch.setattr(auth, "_oidc_jwks_expires_at", now + auth.dt.timedelta(minutes=1))
+
+    assert await auth._get_jwks() == cached
 
 
 @pytest.mark.asyncio
@@ -295,11 +346,63 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
             "verify_aud": True,
             "require_aud": True,
             "require_iss": True,
+            "require_iat": True,
             "require_exp": True,
             "require_jti": True,
             "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
     }
+    assert auth.OIDC_JWT_LEEWAY_SECONDS == 30
+
+
+@pytest.mark.asyncio
+async def test_oidc_audience_remains_optional_without_organization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy OIDC deployments without tenant binding keep working."""
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(settings, "oidc_organization", None)
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+
+    observed: dict[str, object] = {}
+
+    def fake_decode(*_args: object, **kwargs: object) -> dict:
+        observed.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    assert await auth._decode_verified_oidc_token("ey...fake...") == {}
+    assert observed["audience"] is None
+    assert observed["options"]["verify_aud"] is False  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_oidc_audience_is_required_for_organization_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tenant-bound OIDC rejects a missing audience before key lookup."""
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fail_jwks() -> dict:
+        raise AssertionError("tenant audience validation must precede JWKS lookup")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException, match="OIDC audience required"):
+        await auth._decode_verified_oidc_token("ey...fake...")
 
 
 @pytest.mark.parametrize(
@@ -480,6 +583,64 @@ async def test_auth_fails_closed_without_oidc(
     assert exc_info.value.detail == "OIDC configuration required"
 
 
+@pytest.mark.asyncio
+async def test_keyverse_organization_claim_is_required_and_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+    claims = {
+        "sub": "user-1",
+        "jti": "jwt-1",
+        "exp": exp_claim(),
+    }
+
+    with pytest.raises(HTTPException, match="token missing org"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = ["cwl-org"]
+    with pytest.raises(HTTPException, match="token missing org"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = "other-org"
+    with pytest.raises(HTTPException, match="token organization mismatch"):
+        await auth._verified_token_from_claims(claims, verify_revocation=False)
+
+    claims["org"] = "cwl-org"
+    verified = await auth._verified_token_from_claims(
+        claims, verify_revocation=False
+    )
+    assert verified.subject == "user-1"
+
+
+@pytest.mark.parametrize("organization", ["", " \t", " cwl-org", "cwl-org "])
+def test_keyverse_organization_rejects_unsafe_configuration(
+    organization: str,
+) -> None:
+    """Fail startup instead of weakening or breaking auth at request time."""
+
+    with pytest.raises(
+        ValidationError,
+        match="OIDC_ORGANIZATION must be non-empty and have no surrounding whitespace",
+    ):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@db/app",
+            app_secret="test-secret",
+            oidc_organization=organization,
+        )
+
+
+@pytest.mark.asyncio
+async def test_keyverse_organization_mode_rejects_api_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+
+    with pytest.raises(HTTPException, match="Keyverse organization token required"):
+        await auth.get_current_user(
+            make_request({"Authorization": "Bearer pgerd_test"}), object()
+        )
+
+
 class _FakeScalarResult:
     def __init__(self, user: object | None) -> None:
         self._user = user
@@ -651,6 +812,10 @@ async def test_oidc_jwks_refresh_rate_limiting(
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(
@@ -700,6 +865,10 @@ async def test_oidc_jwks_force_refresh_is_serialized(
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
+    async def allow_endpoint(raw_url: str, _label: str) -> str:
+        return raw_url.rstrip("/")
+
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", allow_endpoint)
     monkeypatch.setattr(auth, "_oidc_config", None)
     monkeypatch.setattr(auth, "_oidc_jwks", None)
     monkeypatch.setattr(
