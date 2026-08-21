@@ -103,6 +103,36 @@ Ref user_posts { posts.user_id > users.id }
     assert edge["parent_column_name"] == "id"
 
 
+def test_named_short_reference_accepts_a_colon():
+    dbml = """
+Table users {
+  id integer [pk]
+}
+Table posts {
+  user_id integer
+}
+Ref user_posts: posts.user_id > users.id
+"""
+
+    edge = parse_dbml(dbml)["fk_edges"][0]
+
+    assert edge["child_column_name"] == "user_id"
+    assert edge["parent_column_name"] == "id"
+
+
+def test_double_quote_inside_single_quoted_setting_does_not_end_comment_scan():
+    dbml = """
+Table users {
+  id integer [pk, note: 'diameter 5\" pipe // remains text']
+}
+"""
+
+    snapshot = parse_dbml(dbml)
+
+    assert snapshot["relations"][0]["relation_name"] == "users"
+    assert snapshot["columns"][0]["column_name"] == "id"
+
+
 def test_reverse_arrow_and_schema_qualified_and_quoted():
     text = '''
 Table auth.accounts {

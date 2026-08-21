@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlparse
 
-from app.ddl.identifiers import quote_identifier
 from app.pg_introspect.column_examples import add_column_examples
 from app.pg_introspect.dsn_guard import _validated_ip_hosts
 from app.sanitize import sanitize_for_storage
@@ -247,7 +246,12 @@ def _table_key(row: dict) -> tuple[str, str]:
 
 
 def _q(ident: str) -> str:
-    return quote_identifier(ident)
+    """Quote a Snowflake identifier without PostgreSQL's 63-byte limit."""
+    if not ident:
+        raise ValueError("Snowflake identifier must not be empty")
+    if "\x00" in ident:
+        raise ValueError("Snowflake identifier must not contain NUL")
+    return '"' + ident.replace('"', '""') + '"'
 
 
 def _constraint_type(value: object) -> str | None:

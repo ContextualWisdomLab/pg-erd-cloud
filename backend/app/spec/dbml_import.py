@@ -44,7 +44,7 @@ _COLUMN_RE = re.compile(
 _QUOTED_IDENTIFIER = r'"(?:""|[^"])+"'
 _PATH = rf'(?:{_QUOTED_IDENTIFIER}|\w+)(?:\.(?:{_QUOTED_IDENTIFIER}|\w+))*'
 _REF_RE = re.compile(
-    r"ref\s*(?:(?P<block_name>\w+)\s*\{\s*|:?\s*)"
+    r"ref\s*(?:(?P<block_name>\w+)\s*\{\s*|(?:(?P<short_name>\w+)\s*)?:?\s*)"
     rf"(?P<from>{_PATH})\s*(?P<op>[<>-])\s*(?P<to>{_PATH})\s*"
     r"(?(block_name)\})",
     re.IGNORECASE,
@@ -66,23 +66,28 @@ def _identifier(value: str, context: str) -> str:
 
 
 def _strip_line_comment(raw_line: str) -> str:
-    """Remove ``//`` only when it occurs outside a quoted identifier."""
+    """Remove ``//`` only when it occurs outside a quoted DBML value."""
 
     index = 0
-    quoted = False
+    quote: str | None = None
     while index < len(raw_line):
         char = raw_line[index]
-        if char == '"':
-            if quoted and index + 1 < len(raw_line) and raw_line[index + 1] == '"':
+        if quote is not None:
+            if char == quote and index + 1 < len(raw_line) and raw_line[index + 1] == quote:
                 index += 2
                 continue
-            quoted = not quoted
+            if char == quote:
+                quote = None
             index += 1
             continue
-        if not quoted and raw_line.startswith("//", index):
+        if char in {'"', "'", '`'}:
+            quote = char
+            index += 1
+            continue
+        if raw_line.startswith("//", index):
             return raw_line[:index]
         index += 1
-    if quoted:
+    if quote == '"':
         raise DbmlParseError("unterminated quoted identifier")
     return raw_line
 
