@@ -60,3 +60,30 @@ def test_valkey_queue_rejects_invalid_sentinel_hosts(
 
     with pytest.raises(ValueError, match="host:port"):
         valkey_queue.valkey_queue_config_summary()
+
+
+@pytest.mark.parametrize(
+    ("hosts", "expected"),
+    [
+        ([], ""),
+        ([("localhost", 26379)], "localhost:26379"),
+        (
+            [("valkey-a.local", 26379), ("valkey-b.local", 26380)],
+            "valkey-a.local:26379,valkey-b.local:26380",
+        ),
+    ],
+)
+def test_format_sentinel_hosts_preserves_order_and_shape(
+    hosts: list[tuple[str, int]],
+    expected: str,
+) -> None:
+    """Render common host sequences deterministically without extra whitespace."""
+
+    assert valkey_queue.format_sentinel_hosts(hosts) == expected
+
+
+def test_format_sentinel_hosts_consumes_single_pass_iterables() -> None:
+    """Accept a generator without requiring a reusable concrete collection."""
+
+    hosts = ((host, port) for host, port in [("127.0.0.1", 6379)])
+    assert valkey_queue.format_sentinel_hosts(hosts) == "127.0.0.1:6379"
