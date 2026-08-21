@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- [Docs/Figma] 🔎 **현재 Figma 권위 재검증**: 2026-08-21 Plugin API가 확인한 파일 ID·`Cover` 페이지·현재 프레임을 ADR과 계약에 반영하고, 이전 18페이지/화면 노드 목록은 역사적 감사 증거로 명확히 구분했습니다.
+- [BE] 🧹 **검증 실행 정합화**: backend 테스트 import 경로를 프로젝트 설정에 선언하고 사용하지 않는 관계 추론 지역 변수를 제거했습니다.
+- [FE] 🧪 **UI 테스트 실행 안정화**: 자원 경합 환경에서 frontend 상호작용 회귀가 조기 timeout으로 오판되지 않도록 기본 테스트 제한을 15초로 조정했습니다.
+- [FE] 🧪 **Frontend 테스트 결정성 보강**: 무거운 React/DOM 테스트 파일을 직렬 실행해 공유 jsdom 자원 경합으로 인한 간헐적 timeout·상태 미반영 실패를 제거했습니다.
 
 - [Docs] ADR/PRD/TRD/Architecture/UML/ERD, API·Forward Engineering matrix, threat model, test/operations/release strategy, traceability, references, lifecycle vocabulary, and machine-checked documentation links were added as the canonical authority graph.
 - [Security] Strix가 확인한 `nanoid<3.3.17` 개발 의존성 경로를 `3.3.17`로 고정하고 전체 lockfile audit을 0건으로 복구했습니다.

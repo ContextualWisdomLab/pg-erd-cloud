@@ -1,11 +1,11 @@
 # Live Figma Contract
 
-Last checked: 2026-08-09
+Last checked: 2026-08-21
 
 Audit binding:
 
-- Live Plugin API identity: file `csnpEEJfmqFWB0vNUoTkWA`, document `0:0`,
-  verified on 2026-08-09 (Asia/Seoul).
+- Live Plugin API identity: file `csnpEEJfmqFWB0vNUoTkWA`, current top-level
+  page `0:1` (`Cover`) and frame `8:2`, verified on 2026-08-21 (Asia/Seoul).
 - Code baseline inspected: `main@72afe6db712b145baaba084f64a1ff4fb36d9fd0`
   and PR #824 head `385af92424a6dba338ad9255bc1c920a7dd9f996`.
 - Figma's Plugin API does not expose `version` or `lastModified` on a DOCUMENT
@@ -18,8 +18,11 @@ Use it before the historical PNGs or QA captures in this directory.
 
 ## Precedence
 
-1. Concrete live `Screen Templates` and `Implementation Contracts` in the authoritative Figma file.
-2. Explicit Developer Handoff mappings and shared component contracts. When a concrete screen and a free-standing variable differ, use the concrete screen unless the handoff explicitly maps that property to the variable.
+1. Concrete nodes present in the current live Figma metadata.
+2. Dated Developer Handoff mappings and shared component contracts, only while
+   their referenced nodes remain present. When a concrete screen and a
+   free-standing variable differ, use the concrete screen unless the handoff
+   explicitly maps that property to the variable.
 3. Current frontend behavior where Figma explicitly documents it as an intentional extension.
 4. Committed QA captures under `docs/ui-ux/qa`.
 5. Legacy reference images `01-login-screen.png` through `09-share-export-modal.png`.
@@ -29,28 +32,22 @@ The former share/export node `29:143` no longer exists. Do not use it as a live 
 ## Authoritative file
 
 - File key: `csnpEEJfmqFWB0vNUoTkWA`
-- Screen Templates: `7:9`
-- Button: `21:2`
-- Form Controls: `24:2`
-- Badges and Swatches: `28:2`
-- ModalShell: `29:2`
-- TableNode: `32:2`
-- Editor Controls: `35:2`
-- Product Organisms: `36:2`
-- Developer Handoff: `39:2`
-- Implementation Contracts: `45:2`
+- Current live frame: `8:2` (`Cover / pg-erd-cloud Design System`)
 
 The supplemental file `OTN0rBGtnVy0P7yq4Iv9Si` contains only its `Page 2`
 canvas rather than the product screen inventory, plus conflicting variable
 collections. It is a token reference, not the screen authority.
 
-The authoritative file currently has 18 pages. Its variable collections contain
+The following screen, handoff, and variable inventory was captured on
+2026-08-09 and is historical until each node is reverified in the current
+file. The audit recorded 18 pages, including the `Screen Templates` page and
+the `Implementation Contracts` node. Its variable collections contained
 Primitives (27), Color (51 across Light/Dark), Spacing (17), Radius (4), Sizing
-(18), and Typography (16) variables. Counts are evidence for the check date,
-not stable API identifiers. The supplemental kit has a smaller conflicting
+(18), and Typography (16) variables. Counts are dated evidence, not current
+API guarantees. The supplemental kit has a smaller conflicting
 Primitives/Color/Spacing/Radius inventory with Light/High Contrast modes.
 
-## Screen nodes
+## Historical screen nodes (2026-08-09 audit)
 
 | Screen | Node | Target frame |
 | --- | --- | --- |

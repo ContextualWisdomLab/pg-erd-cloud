@@ -8,12 +8,12 @@
 ## Context
 
 The repository contained historical PNG references, current source behavior,
-two Figma files and a deleted share/export node. A metadata request that loaded
-only one page was previously misread as evidence that the design file was
-empty. Direct Figma Plugin API inspection instead shows 18 pages in file
-`csnpEEJfmqFWB0vNUoTkWA`, including `Screen Templates` (`7:9`), `Developer
-Handoff`, and `Implementation Contracts` (`45:2`). The screen page contains
-Auth, dashboard, list, editor and six current modal frames.
+two Figma files and a deleted share/export node. The 2026-08-09 Plugin API
+audit recorded an 18-page design inventory, but the current 2026-08-21 metadata
+read of file `csnpEEJfmqFWB0vNUoTkWA` now exposes one top-level `Cover` page
+(`0:1`) containing the `Cover / pg-erd-cloud Design System` frame (`8:2`).
+The older screen and handoff node inventory is retained as dated historical
+evidence, not as proof of the current Figma canvas.
 
 Figma also contains internal conflicts: a general 360 px sidebar variable and
 a concrete editor split of 300/850/290; modal showcase dimensions that differ
@@ -24,8 +24,9 @@ applicable WCAG 2.2 contrast criterion.
 
 Use the following precedence for UI implementation and review:
 
-1. Concrete live Screen Templates and Implementation Contracts.
-2. Explicit Developer Handoff mappings and component descriptions.
+1. Concrete nodes present in the current live Figma metadata.
+2. Dated handoff mappings and component descriptions, only while their nodes
+   remain present in the current file.
 3. Current source behavior explicitly documented by Figma as an intentional
    extension.
 4. Current committed QA evidence.
@@ -63,7 +64,9 @@ treated as proof of absence.
 
 ## Verification
 
-- Plugin API page/node inventory for the authoritative file.
+- Current Plugin API metadata: file `csnpEEJfmqFWB0vNUoTkWA`, page `0:1`,
+  frame `8:2`, checked 2026-08-21.
+- The 2026-08-09 page/node inventory is preserved as historical evidence.
 - `get_design_context` for concrete editor and Implementation Contracts nodes.
 - Semantic token, responsive CSS, dialog interaction and browser screenshot
   tests described in `design-qa.md` and `docs/test-strategy.md`.

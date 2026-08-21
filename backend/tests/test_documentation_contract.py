@@ -175,15 +175,14 @@ def test_prd_requirements_are_present_in_traceability_matrix() -> None:
     assert prd_ids <= traced_ids, f"untraced requirements: {sorted(prd_ids - traced_ids)}"
 
 
-def test_figma_contract_keeps_live_file_and_node_authority() -> None:
-    """Deleted or truncated Figma evidence must not replace live authority."""
+def test_figma_contract_keeps_current_live_file_authority() -> None:
+    """The contract records current live metadata and dated historical nodes."""
 
     contract = _read("docs/ui-ux/figma-contract.md")
     assert "csnpEEJfmqFWB0vNUoTkWA" in contract
-    assert "`7:9`" in contract
-    assert "`37:114`" in contract
-    assert "`39:2`" in contract
-    assert "`45:2`" in contract
+    assert "`0:1`" in contract
+    assert "`8:2`" in contract
+    assert "Historical screen nodes (2026-08-09 audit)" in contract
     assert "`29:143` no longer exists" in contract
 
 
