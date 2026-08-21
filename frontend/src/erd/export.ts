@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -59,6 +59,8 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  sourceColumnNames: ReadonlySet<string>,
+  targetColumnNames: ReadonlySet<string>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -67,12 +69,15 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  let sourceHandleColumn = parseColumnNameFromHandle(edge.sourceHandle);
+  if (sourceHandleColumn && !sourceColumnNames.has(sourceHandleColumn)) {
+    sourceHandleColumn = null;
+  }
+
+  let targetHandleColumn = parseColumnNameFromHandle(edge.targetHandle);
+  if (targetHandleColumn && !targetColumnNames.has(targetHandleColumn)) {
+    targetHandleColumn = null;
+  }
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -96,8 +101,13 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const columnNamesByNodeId = new Map<string, ReadonlySet<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    columnNamesByNodeId.set(
+      n.id,
+      new Set((n.data.columns || []).map((column) => column.column_name)),
+    );
   }
 
   // Export tables
@@ -131,9 +141,17 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
+    const sourceColumnNames = columnNamesByNodeId.get(edge.source);
+    const targetColumnNames = columnNamesByNodeId.get(edge.target);
 
-    if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+    if (sourceNode && targetNode && sourceColumnNames && targetColumnNames) {
+      const fkColumns = fkColumnsForEdge(
+        edge,
+        sourceNode,
+        targetNode,
+        sourceColumnNames,
+        targetColumnNames,
+      );
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);

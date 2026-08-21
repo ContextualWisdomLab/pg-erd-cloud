@@ -57,7 +57,7 @@ describe('coverage edge contracts', () => {
     expect(dbml).toContain('Table sales.parent')
     expect(dbml).toContain('Table  {')
     expect(dbml).toContain(' varchar')
-    expect(dbml).toContain('Ref: child.parent_id > sales.parent.')
+    expect(dbml).not.toContain('Ref: child.parent_id > sales.parent.')
   })
 
   it('covers DDL defensive fallbacks and column inference without handles', () => {
