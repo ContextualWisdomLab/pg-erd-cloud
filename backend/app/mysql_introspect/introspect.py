@@ -63,9 +63,7 @@ def _connect(config: MysqlDsnConfig) -> Any:
     try:
         pymysql = importlib.import_module("pymysql")
     except ImportError as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError(
-            "MySQL support requires the PyMySQL package"
-        ) from exc
+        raise RuntimeError("MySQL support requires the PyMySQL package") from exc
     return pymysql.connect(
         host=config.host,  # pinned IP (SSRF)
         port=config.port,
@@ -88,7 +86,7 @@ def _schema_filter_clause(schema_filter: str | None) -> tuple[str, tuple[object,
     if schema_filter:
         return "TABLE_SCHEMA = %s", (schema_filter,)
     placeholders = ", ".join(["%s"] * len(_SYSTEM_SCHEMAS))
-    return f"TABLE_SCHEMA NOT IN ({placeholders})", _SYSTEM_SCHEMAS
+    return "TABLE_SCHEMA NOT IN (" + placeholders + ")", _SYSTEM_SCHEMAS
 
 
 def rows_to_snapshot(
@@ -108,7 +106,9 @@ def rows_to_snapshot(
         relations.append(
             {
                 "relation_oid": i,
-                "relation_kind": "v" if str(row.get("TABLE_TYPE", "")).upper() == "VIEW" else "r",
+                "relation_kind": "v"
+                if str(row.get("TABLE_TYPE", "")).upper() == "VIEW"
+                else "r",
                 "schema_name": key[0],
                 "relation_name": key[1],
                 "relation_comment": str(row.get("TABLE_COMMENT") or "") or None,
@@ -129,7 +129,9 @@ def rows_to_snapshot(
                 "is_not_null": str(row.get("IS_NULLABLE", "YES")).upper() == "NO",
                 "has_default": row.get("COLUMN_DEFAULT") is not None,
                 "default_expr": (
-                    str(row["COLUMN_DEFAULT"]) if row.get("COLUMN_DEFAULT") is not None else None
+                    str(row["COLUMN_DEFAULT"])
+                    if row.get("COLUMN_DEFAULT") is not None
+                    else None
                 ),
                 "column_comment": str(row.get("COLUMN_COMMENT") or "") or None,
             }
@@ -169,7 +171,9 @@ def rows_to_snapshot(
             fk_edges.append(
                 {
                     "fk_constraint_oid": 100000 + edge_id,
-                    "fk_constraint_name": str(row.get("CONSTRAINT_NAME") or f"fk_{edge_id}"),
+                    "fk_constraint_name": str(
+                        row.get("CONSTRAINT_NAME") or f"fk_{edge_id}"
+                    ),
                     "child_relation_oid": oid,
                     "parent_relation_oid": parent,
                     "child_column_name": col,
@@ -190,7 +194,9 @@ def rows_to_snapshot(
                 "schema_name": rel["schema_name"],
                 "relation_oid": oid,
                 "relation_name": rel["relation_name"],
-                "constrained_attnums": [pos_by_oid_col.get((oid, c), i + 1) for i, c in enumerate(cols)],
+                "constrained_attnums": [
+                    pos_by_oid_col.get((oid, c), i + 1) for i, c in enumerate(cols)
+                ],
                 "constraint_def": f"PRIMARY KEY ({quoted})",
             }
         )
@@ -206,7 +212,9 @@ def rows_to_snapshot(
                 "relation_oid": edge["child_relation_oid"],
                 "relation_name": child_rel["relation_name"],
                 "constrained_attnums": [
-                    pos_by_oid_col.get((edge["child_relation_oid"], edge["child_column_name"]), 1)
+                    pos_by_oid_col.get(
+                        (edge["child_relation_oid"], edge["child_column_name"]), 1
+                    )
                 ],
                 "constraint_def": (
                     f'FOREIGN KEY ("{edge["child_column_name"]}") REFERENCES '
@@ -219,7 +227,11 @@ def rows_to_snapshot(
     # group STATISTICS rows into per-index column lists
     grouped: dict[tuple[str, str, str], list[tuple[int, str, bool]]] = {}
     for row in indexes:
-        ix_key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
+        ix_key = (
+            str(row["TABLE_SCHEMA"]),
+            str(row["TABLE_NAME"]),
+            str(row["INDEX_NAME"]),
+        )
         grouped.setdefault(ix_key, []).append(
             (
                 int(row.get("SEQ_IN_INDEX") or 1),
@@ -265,7 +277,9 @@ def rows_to_snapshot(
     return sanitize_for_storage(snapshot)  # type: ignore[return-value]
 
 
-def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[str, Any]:
+def _introspect_sync(
+    config: MysqlDsnConfig, schema_filter: str | None
+) -> dict[str, Any]:
     conn = _connect(config)
     try:
         cursor = conn.cursor()
@@ -275,7 +289,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
         tables = _fetch_dicts(
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT "
-            f"FROM information_schema.TABLES WHERE {where} "
+            "FROM information_schema.TABLES WHERE " + where + " "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME",
             params,
         )
@@ -283,7 +297,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, "
             "COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT "
-            f"FROM information_schema.COLUMNS WHERE {where} "
+            "FROM information_schema.COLUMNS WHERE " + where + " "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION",
             params,
         )
@@ -292,7 +306,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             "SELECT CONSTRAINT_NAME, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, "
             "ORDINAL_POSITION, REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, "
             "REFERENCED_COLUMN_NAME "
-            f"FROM information_schema.KEY_COLUMN_USAGE WHERE {where} "
+            "FROM information_schema.KEY_COLUMN_USAGE WHERE " + where + " "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION",
             params,
         )
@@ -300,11 +314,13 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, NON_UNIQUE, "
             "SEQ_IN_INDEX, COLUMN_NAME "
-            f"FROM information_schema.STATISTICS WHERE {where} "
+            "FROM information_schema.STATISTICS WHERE " + where + " "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
             params,
         )
-        return rows_to_snapshot(version, schema_filter, tables, columns, key_usage, indexes)
+        return rows_to_snapshot(
+            version, schema_filter, tables, columns, key_usage, indexes
+        )
     finally:
         conn.close()
 
