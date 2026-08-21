@@ -7,15 +7,18 @@ import datetime as dt
 
 import pytest
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
 from app.api.connections import router
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
 from app.models import DbConnection
+from app.main import redact_request_validation_input
 from app.security import EncryptedBlob
 
 app = FastAPI()
+app.add_exception_handler(RequestValidationError, redact_request_validation_input)
 app.include_router(router)
 
 
@@ -180,3 +183,23 @@ def test_create_connection_invalid_payload() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_validation_response_does_not_echo_secret_bearing_sql(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = TestClient(app)
+    redaction_marker = "-".join(("never", "log-me"))
+    secret_sql = (
+        "CREATE TABLE audit_record "
+        f"(credential text DEFAULT '{redaction_marker}')\x00;"
+    )
+
+    response = client.post(
+        f"/api/connections/{uuid.uuid4()}/apply-sql",
+        json={"sql": secret_sql, "dry_run": True},
+    )
+
+    assert response.status_code == 422
+    assert redaction_marker not in response.text
+    assert redaction_marker not in caplog.text

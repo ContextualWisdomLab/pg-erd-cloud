@@ -172,8 +172,40 @@ def _reject_unsafe_syntax(sql: str) -> None:
 
 
 def _split_statements(sql: str) -> list[str]:
-    statements = [part.strip() for part in sql.split(";")]
-    return [statement for statement in statements if statement]
+    """Split semicolon-delimited SQL without splitting quoted payloads.
+
+    This tokenizer does not authorize SQL; callers must still validate the
+    resulting structured statements. It only preserves PostgreSQL's doubled
+    quote escaping so punctuation inside string or identifier tokens cannot be
+    misclassified as an appended statement.
+    """
+
+    statements: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        current.append(char)
+        if quote is not None:
+            if char == quote:
+                if index + 1 < len(sql) and sql[index + 1] == quote:
+                    current.append(sql[index + 1])
+                    index += 1
+                else:
+                    quote = None
+        elif char in {"'", '"'}:
+            quote = char
+        elif char == ";":
+            statement = "".join(current[:-1]).strip()
+            if statement:
+                statements.append(statement)
+            current = []
+        index += 1
+    trailing = "".join(current).strip()
+    if trailing:
+        statements.append(trailing)
+    return statements
 
 
 def _tokenize(statement: str) -> list[str]:

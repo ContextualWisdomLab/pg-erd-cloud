@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectCreateIn(BaseModel):
@@ -80,6 +80,25 @@ class ApplySqlIn(BaseModel):
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
     dry_run: bool = True
+
+    @field_validator("sql")
+    @classmethod
+    def reject_non_text_controls(cls, value: str) -> str:
+        """Reject transport-unsafe controls while preserving multiline SQL.
+
+        Tab, line feed, and carriage return are valid SQL formatting
+        characters.  Other C0 controls and DEL can corrupt log, parser, or
+        driver boundaries and therefore fail before DDL authorization.  The
+        same applies to the C1 control block (U+007F through U+009F).
+        """
+
+        if any(
+            (codepoint < 0x20 and codepoint not in {0x09, 0x0A, 0x0D})
+            or 0x7F <= codepoint <= 0x9F
+            for codepoint in map(ord, value)
+        ):
+            raise ValueError("SQL contains a disallowed control character")
+        return value
 
 
 class ApplySqlOut(BaseModel):

@@ -34,6 +34,15 @@ async def test_require_project_member_allows_sufficient_role() -> None:
 
 
 @pytest.mark.asyncio
+async def test_require_project_member_allows_membership_without_minimum_role() -> None:
+    role = await require_project_member(
+        FakeSession("viewer"), uuid.uuid4(), uuid.uuid4()
+    )
+
+    assert role == "viewer"
+
+
+@pytest.mark.asyncio
 async def test_require_project_member_rejects_insufficient_role() -> None:
     with pytest.raises(HTTPException) as exc_info:
         await require_project_member(
