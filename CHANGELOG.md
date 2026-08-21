@@ -2,6 +2,7 @@
 
 ## Unreleased
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
+- [FE] 🔒 **nanoid 공급망 패치 고정**: 간접 의존성을 3.3.18 이상으로 고정해 zero-size custom generator 무한 루프 취약점(GHSA-2v37-7h3g-55p8)을 제거합니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 원본 `TableNodeData` identity에는 검색 가능한 소문자 텍스트와 장식된 `node.data` 참조를 재사용하여 위치-only 렌더링 중 반복 컬럼 순회·문자열 할당을 줄이고, 검색 필드 변경은 immutable data 교체로 캐시를 무효화합니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
