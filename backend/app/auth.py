@@ -302,20 +302,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     else:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
-    jwk_alg = jwk.get("alg")
-    if jwk_alg is not None and (
-        not isinstance(jwk_alg, str) or jwk_alg != header_alg
-    ):
-        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
-
     try:
-        if jwk_alg is not None:
-            key = jwt.PyJWK.from_dict(cast(dict[str, Any], jwk))
-        else:
-            key = jwt.PyJWK.from_dict(
-                cast(dict[str, Any], jwk),
-                algorithm=header_alg,
-            )
+        key = jwt.PyJWK.from_dict(
+            cast(dict[str, Any], jwk),
+            algorithm=header_alg,
+        )
         required_claims = ["exp", "iss", "jti"]
         if settings.oidc_audience:
             required_claims.append("aud")
@@ -323,7 +314,6 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             "verify_aud": bool(settings.oidc_audience),
             "verify_exp": True,
             "verify_iss": True,
-            "verify_jti": True,
             "require": required_claims,
         }
         claims = jwt.decode(
