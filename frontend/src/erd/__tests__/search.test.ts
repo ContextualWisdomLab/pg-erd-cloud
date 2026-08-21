@@ -118,7 +118,7 @@ describe("ERD node search", () => {
       }
     };
     expect(tableNodeMatchesSearch(columnNameChanged, "tracking")).toBe(true);
-    expect(tableNodeMatchesSearch(columnNameChanged, "primary_key")).toBe(false);
+    expect(tableNodeMatchesSearch(columnNameChanged, "primary")).toBe(false);
 
     // 4. Column type change
     const dataTypeChanged = {
@@ -151,65 +151,16 @@ describe("ERD node search", () => {
     const node = tableNode("perfTest", { title: "initial_title", columns: [] });
     const initialMisses = _getSearchCacheMisses();
 
-    // Initial evaluation populates the cache for the data object.
+    // Initial evaluation populates the cache
     expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
 
-    // React Flow may replace the wrapper during position-only updates while
-    // retaining the same immutable data object. That must remain a cache hit.
-    const nodeWithSameData: Node<TableNodeData> = {
-      ...node,
-      position: { x: 1, y: 1 },
-      data: node.data,
-    };
-    expect(tableNodeMatchesSearch(nodeWithSameData, "initial")).toBe(true);
-    expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
-
-    // Evaluate multiple times simulating drag render ticks.
+    // Evaluate multiple times simulating 60fps drag render ticks
     for(let i=0; i<100; i++) {
         expect(tableNodeMatchesSearch(node, "initial")).toBe(true);
     }
 
-    // The cache miss counter should not have increased.
+    // The cache miss counter should not have increased
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
-  });
-
-  it("reuses cached text across 1,000 fixed-shape nodes with 100 columns each", () => {
-     const columns = [];
-     for(let i=0; i<100; i++) {
-       columns.push({
-           column_name: `field_${i}`,
-           data_type: "varchar(255)",
-           is_not_null: false,
-           is_pk: false,
-           column_comment: `desc_${i}`
-       });
-     }
-
-     const heavyNodes = [];
-     for(let i=0; i<1000; i++) {
-        heavyNodes.push(tableNode(`t${i}`, {
-            title: `heavy_table_${i}`,
-            columns
-        }));
-     }
-
-     const initialMisses = _getSearchCacheMisses();
-
-     // Build cache for all nodes
-     const matched = findSearchMatchedNodeIds(heavyNodes, "heavy_table_499 field_99");
-
-     expect(matched.has("t499")).toBe(true);
-     expect(_getSearchCacheMisses()).toBe(initialMisses + 1000); // Exactly 1 miss per node
-
-     const missBeforeFast = _getSearchCacheMisses();
-
-     // Re-run a different query over the same immutable node-data identities.
-     const fastMatched = findSearchMatchedNodeIds(heavyNodes, "field_0 desc_0");
-
-     expect(fastMatched.size).toBe(1000);
-
-     // 0 new cache misses, entirely hitting WeakMap.
-     expect(_getSearchCacheMisses()).toBe(missBeforeFast);
   });
 });

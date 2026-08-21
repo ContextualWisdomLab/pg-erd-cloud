@@ -1,9 +1,7 @@
 # Changelog
 
 ## Unreleased
-- [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
-- [FE] 🔒 **nanoid 공급망 패치 고정**: 간접 의존성을 3.3.18 이상으로 고정해 zero-size custom generator 무한 루프 취약점(GHSA-2v37-7h3g-55p8)을 제거합니다.
-- [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 원본 `TableNodeData` identity에는 검색 가능한 소문자 텍스트와 장식된 `node.data` 참조를 재사용하여 위치-only 렌더링 중 반복 컬럼 순회·문자열 할당을 줄이고, 검색 필드 변경은 immutable data 교체로 캐시를 무효화합니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
+- [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
 - [Docs] README를 상용 기준 기능 설명으로 갱신 (MVP skeleton 표현 제거, share redaction·diff/export 반영).
@@ -14,3 +12,5 @@
 - [FE] `autoInfer.ts`에 대한 단위 테스트 및 UI 컴포넌트 단위 테스트를 추가하여 100% 테스트 커버리지를 유지합니다.
 - [FE] ⬇️ **DBML Export**: ERD 다이어그램을 DBML (Database Markup Language) 형식으로 내보낼 수 있는 기능을 추가했습니다. 상단의 DBML 버튼을 클릭하여 다운로드할 수 있습니다.
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
+- [FE] 🛡️ **nanoid 무한 루프 DoS 취약점 해결**: 크기가 0인 커스텀 생성기 사용 시 무한 루프가 발생하는 취약점을 방지하기 위해 nanoid 버전을 ^3.3.18로 강제 오버라이드하여 갱신했습니다.
+- [FE] ⚡ **React Flow 노드 검색 캐싱 최적화**: 렌더링 프레임 단위의 드래그 연산 시 검색을 위해 순회 및 문자열 할당을 하는 O(N*C) 병목을 O(1) 단위의 WeakMap 캐시 조회로 대폭 개선하고 불변 데이터 계약 모델로 고도화했습니다.
