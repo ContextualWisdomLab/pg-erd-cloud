@@ -3,6 +3,7 @@ import { performance } from 'node:perf_hooks';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,9 +61,15 @@ function calculateStats(samples: number[]) {
   const sorted = [...samples].sort((a, b) => a - b);
   const sum = sorted.reduce((a, b) => a + b, 0);
   const mean = sum / sorted.length;
-  const median = sorted[Math.floor(sorted.length / 2)];
-  return { mean, median, raw: sorted };
+  const middle = sorted.length / 2;
+  const median = sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[Math.floor(middle)];
+  return { mean, median, raw: samples };
 }
+
+assert.deepEqual(calculateStats([3, 1, 2, 4]).raw, [3, 1, 2, 4]);
+assert.equal(calculateStats([3, 1, 2, 4]).median, 2.5);
 
 function runBenchmark() {
   console.log(`Platform: ${process.platform} ${process.arch}`);
@@ -146,7 +153,7 @@ function runBenchmark() {
   const resultsPath = path.join(__dirname, '..', 'docs', 'benchmark_results', 'handleUtils.json');
   fs.mkdirSync(path.dirname(resultsPath), { recursive: true });
   fs.writeFileSync(resultsPath, JSON.stringify(resultsObj, null, 2), 'utf-8');
-  console.log(`\nRaw paired samples and statistics written to ${resultsPath}`);
+  console.log(`\nRaw samples and statistics written to ${resultsPath}`);
 }
 
 runBenchmark();
