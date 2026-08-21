@@ -1353,6 +1353,7 @@ export default function App() {
                   type="button"
                   onClick={onCreateProject}
                   disabled={!projectName.trim() || isCreatingProject}
+                  aria-busy={isCreatingProject}
                 >
                   {isCreatingProject ? "생성 중" : "새 프로젝트"}
                 </button>
