@@ -63,25 +63,34 @@ describe('Design token Storybook inventory', () => {
     }
   })
 
-  it('exposes each visual preview as a named image using its CSS custom property', () => {
+  it('exposes each visual preview through the CSS property owned by its token kind', () => {
     renderInventory()
 
     const brandPreview = screen.getByRole('img', { name: 'brand token preview' })
-    expect(brandPreview.getAttribute('style')).toContain('var(--color-brand)')
+    expect(brandPreview.getAttribute('style')).toContain('background: var(--color-brand)')
 
     const layoutSection = screen.getByRole('heading', { name: 'layout' }).closest('section')
     expect(layoutSection).not.toBeNull()
-    expect(
-      within(layoutSection as HTMLElement).getByRole('img', {
-        name: 'control radius token preview',
-      }).getAttribute('style'),
-    ).toContain('var(--radius-control)')
+
+    const controlRadiusPreview = within(layoutSection as HTMLElement).getByRole('img', {
+      name: 'control radius token preview',
+    })
+    expect(controlRadiusPreview.getAttribute('style')).toContain(
+      'border-radius: var(--radius-control)',
+    )
 
     const verticalSpacePreview = within(layoutSection as HTMLElement).getByRole('img', {
       name: 'control vertical space token preview',
     })
     expect(verticalSpacePreview.getAttribute('style')).toContain('min-width: 0')
-    expect(verticalSpacePreview.getAttribute('style')).toContain('var(--space-control-y)')
+    expect(verticalSpacePreview.getAttribute('style')).toContain('width: var(--space-control-y)')
+
+    const highlightShadowPreview = screen.getByRole('img', {
+      name: 'highlight shadow token preview',
+    })
+    expect(highlightShadowPreview.getAttribute('style')).toContain(
+      'box-shadow: var(--shadow-highlight)',
+    )
 
     expect(screen.getAllByRole('img')).toHaveLength(expectedTokens.length)
   })
