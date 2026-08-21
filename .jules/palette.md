@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2024-08-20 - 닫기 버튼 아이콘 개선
+**Learning:** 모달 닫기 버튼에 알파벳 'X'를 사용하면 스크린 리더가 그대로 읽거나 시각적으로 어색할 수 있습니다. 이미 aria-label="닫기"가 적용되어 있으므로 시각적인 심볼 ✕(Multiplication X)를 사용하고 aria-hidden="true"를 적용하여 접근성과 시각적 완성도를 동시에 높일 수 있습니다.
+**Action:** 아이콘 전용 버튼에는 적절한 시각적 심볼과 aria-hidden을 결합하고 항상 aria-label을 제공합니다.
