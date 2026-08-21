@@ -7,16 +7,16 @@ import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 import type { SnapshotJson } from '../types'
 
 export type TableNodeData = {
-  title: string
-  comment?: string | null
-  columns: Array<{ column_name: string; data_type: string; is_not_null: boolean; is_pk: boolean; column_comment?: string | null; example_value?: string | number | boolean | null }>
-  indexes?: IndexRecommendation[]
-  businessGroup?: BusinessGroup | null
-  isDimmed?: boolean
-  isHighlighted?: boolean
-  badges: {
-    pk: boolean
-    fk: boolean
+  readonly title: string
+  readonly comment?: string | null
+  readonly columns: ReadonlyArray<{ readonly column_name: string; readonly data_type: string; readonly is_not_null: boolean; readonly is_pk: boolean; readonly column_comment?: string | null; readonly example_value?: string | number | boolean | null }>
+  readonly indexes?: ReadonlyArray<IndexRecommendation>
+  readonly businessGroup?: BusinessGroup | null
+  readonly isDimmed?: boolean
+  readonly isHighlighted?: boolean
+  readonly badges: {
+    readonly pk: boolean
+    readonly fk: boolean
   }
 }
 
@@ -38,7 +38,7 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     set.add(p.column_name)
   }
 
-  const columnsByRel = new Map<number, TableNodeData['columns']>()
+  const columnsByRel = new Map<number, Array<{ readonly column_name: string; readonly data_type: string; readonly is_not_null: boolean; readonly is_pk: boolean; readonly column_comment?: string | null; readonly example_value?: string | number | boolean | null }>>()
   for (const c of snapshot.columns || []) {
     let list = columnsByRel.get(c.relation_oid)
     if (!list) {
