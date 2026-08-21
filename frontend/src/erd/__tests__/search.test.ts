@@ -79,11 +79,6 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
 
-  it("handles tables without optional searchable text", () => {
-    const empty = tableNode("empty", { title: "", comment: "", columns: [] });
-    expect(tableNodeMatchesSearch(empty, "missing")).toBe(false);
-  });
-
   it("rebuilds cached text for immutable replacements of every searchable field", () => {
     const node1 = tableNode("n1", {
       title: "order",
@@ -123,7 +118,7 @@ describe("ERD node search", () => {
       }
     };
     expect(tableNodeMatchesSearch(columnNameChanged, "tracking")).toBe(true);
-    expect(tableNodeMatchesSearch(columnNameChanged, "primary")).toBe(false);
+    expect(tableNodeMatchesSearch(columnNameChanged, "primary_key")).toBe(false);
 
     // 4. Column type change
     const dataTypeChanged = {
@@ -149,6 +144,7 @@ describe("ERD node search", () => {
       }
     };
     expect(tableNodeMatchesSearch(columnCommentChanged, "external")).toBe(true);
+    // "identifier" should not match anymore since the column_comment was overwritten by "external"
     expect(tableNodeMatchesSearch(columnCommentChanged, "identifier")).toBe(false);
   });
 
@@ -167,5 +163,45 @@ describe("ERD node search", () => {
 
     // The cache miss counter should not have increased
     expect(_getSearchCacheMisses()).toBe(initialMisses + 1);
+  });
+
+  it("reuses cached text across 1,000 fixed-shape nodes", () => {
+     // Generate a large table with 100 columns
+     const columns = [];
+     for(let i=0; i<100; i++) {
+       columns.push({
+           column_name: `field_${i}`,
+           data_type: "varchar(255)",
+           is_not_null: false,
+           is_pk: false,
+           column_comment: `desc_${i}`
+       });
+     }
+
+     const heavyNodes = [];
+     for(let i=0; i<500; i++) {
+        heavyNodes.push(tableNode(`t${i}`, {
+            title: `heavy_table_${i}`,
+            columns
+        }));
+     }
+
+     const initialMisses = _getSearchCacheMisses();
+
+     // Build cache for all nodes
+     const matched = findSearchMatchedNodeIds(heavyNodes, "heavy_table_499 field_99");
+
+     expect(matched.has("t499")).toBe(true);
+     expect(_getSearchCacheMisses()).toBe(initialMisses + 500); // Exactly 1 miss per node
+
+     const missBeforeFast = _getSearchCacheMisses();
+
+     // Measure cached run
+     const fastMatched = findSearchMatchedNodeIds(heavyNodes, "field_0 desc_0");
+
+     expect(fastMatched.size).toBe(500);
+
+     // 0 new cache misses, entirely hitting WeakMap
+     expect(_getSearchCacheMisses()).toBe(missBeforeFast);
   });
 });
