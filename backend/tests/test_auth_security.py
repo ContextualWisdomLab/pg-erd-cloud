@@ -205,6 +205,28 @@ async def test_jwks_fetch_disables_redirects(
 
 
 @pytest.mark.asyncio
+async def test_cached_jwks_does_not_revalidate_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cached signing keys remain usable during a transient DNS failure."""
+    cached = {"keys": [{"kid": "cached", "kty": "RSA"}]}
+    now = auth.dt.datetime.now(auth.dt.timezone.utc)
+
+    async def fake_config() -> dict[str, object]:
+        return {"jwks_uri": "https://issuer.example/jwks"}
+
+    async def reject_endpoint(_raw_url: str, _label: str) -> str:
+        raise AssertionError("cached JWKS must not perform endpoint validation")
+
+    monkeypatch.setattr(auth, "_get_oidc_config", fake_config)
+    monkeypatch.setattr(auth, "_validate_oidc_endpoint", reject_endpoint)
+    monkeypatch.setattr(auth, "_oidc_jwks", cached)
+    monkeypatch.setattr(auth, "_oidc_jwks_expires_at", now + auth.dt.timedelta(minutes=1))
+
+    assert await auth._get_jwks() == cached
+
+
+@pytest.mark.asyncio
 async def test_oidc_rejects_header_selected_algorithm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -331,6 +353,56 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         },
     }
     assert auth.OIDC_JWT_LEEWAY_SECONDS == 30
+
+
+@pytest.mark.asyncio
+async def test_oidc_audience_remains_optional_without_organization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy OIDC deployments without tenant binding keep working."""
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256",))
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(settings, "oidc_organization", None)
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fake_jwks() -> dict:
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+
+    observed: dict[str, object] = {}
+
+    def fake_decode(*_args: object, **kwargs: object) -> dict:
+        observed.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+    monkeypatch.setattr(auth.jwt, "decode", fake_decode)
+
+    assert await auth._decode_verified_oidc_token("ey...fake...") == {}
+    assert observed["audience"] is None
+    assert observed["options"]["verify_aud"] is False  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_oidc_audience_is_required_for_organization_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tenant-bound OIDC rejects a missing audience before key lookup."""
+    monkeypatch.setattr(settings, "oidc_organization", "cwl-org")
+    monkeypatch.setattr(settings, "oidc_audience", None)
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256"}
+    )
+
+    async def fail_jwks() -> dict:
+        raise AssertionError("tenant audience validation must precede JWKS lookup")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException, match="OIDC audience required"):
+        await auth._decode_verified_oidc_token("ey...fake...")
 
 
 @pytest.mark.parametrize(

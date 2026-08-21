@@ -146,7 +146,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     jwks_uri = config.get("jwks_uri")
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
-    jwks_endpoint = await _validate_oidc_endpoint(jwks_uri, "JWKS")
 
     now = dt.datetime.now(dt.timezone.utc)
 
@@ -170,6 +169,7 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
             ):
                 return cast(dict, _oidc_jwks)
 
+        jwks_endpoint = await _validate_oidc_endpoint(jwks_uri, "JWKS")
         async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
             r = await client.get(jwks_endpoint)
             if r.is_redirect:
@@ -300,7 +300,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             status_code=401,
             detail="unsupported token algorithm",
         )
-    if not settings.oidc_audience:
+    if settings.oidc_organization is not None and not settings.oidc_audience:
         raise HTTPException(status_code=500, detail="OIDC audience required")
 
     jwks = await _get_jwks()
