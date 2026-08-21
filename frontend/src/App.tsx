@@ -551,10 +551,12 @@ export default function App() {
 
   function onRelSubmit() {
     if (!editingEdge) return;
+    const trimmedLabel = relLabel.trim();
+    if (!trimmedLabel) return;
     setEdges((eds) =>
       eds.map((e) => {
         if (e.id === editingEdge.id) {
-          return { ...e, label: relLabel.trim() };
+          return { ...e, label: trimmedLabel };
         }
         return e;
       }),
