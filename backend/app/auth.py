@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
-from sqlalchemy import select, delete
+from jwt.types import Options
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -79,6 +80,21 @@ _last_jwks_refresh_at: dt.datetime = dt.datetime.fromtimestamp(0, tz=dt.timezone
 _jwks_lock = asyncio.Lock()
 OIDC_JWT_LEEWAY_SECONDS = 60
 OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
+JWS_REGISTERED_HEADER_PARAMETERS = frozenset(
+    {
+        "alg",
+        "jku",
+        "jwk",
+        "kid",
+        "x5u",
+        "x5c",
+        "x5t",
+        "x5t#S256",
+        "typ",
+        "cty",
+        "crit",
+    }
+)
 
 
 async def _get_oidc_config() -> dict:
@@ -173,6 +189,22 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
 def _validate_jwt_header(header: dict[str, Any]) -> str:
     """Validate JOSE header fields before signature verification."""
 
+    if "crit" in header:
+        critical_names = header["crit"]
+        if (
+            not isinstance(critical_names, list)
+            or not critical_names
+            or any(not isinstance(name, str) or not name for name in critical_names)
+            or len(set(critical_names)) != len(critical_names)
+            or any(name not in header for name in critical_names)
+            or any(name in JWS_REGISTERED_HEADER_PARAMETERS for name in critical_names)
+        ):
+            raise HTTPException(status_code=401, detail="invalid crit header")
+
+        # This deployment profile supports no critical JOSE extensions. A
+        # structurally valid `crit` list therefore still fails closed.
+        raise HTTPException(status_code=401, detail="unsupported critical parameter")
+
     token_type = header.get("typ")
     if token_type is not None:
         if (
@@ -194,8 +226,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     if not jwt_id:
         return
@@ -213,8 +245,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
@@ -271,20 +303,27 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
+        key = jwt.PyJWK.from_dict(
+            cast(dict[str, Any], jwk),
+            algorithm=header_alg,
+        )
+        required_claims = ["exp", "iss", "jti"]
+        if settings.oidc_audience:
+            required_claims.append("aud")
+        options: Options = {
+            "verify_aud": bool(settings.oidc_audience),
+            "verify_exp": True,
+            "verify_iss": True,
+            "require": required_claims,
+        }
         claims = jwt.decode(
             token,
-            jwk,
+            key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
-            options={
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
-            },
+            options=options,
+            leeway=OIDC_JWT_LEEWAY_SECONDS,
         )
     except Exception as err:
         raise HTTPException(
@@ -464,7 +503,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
