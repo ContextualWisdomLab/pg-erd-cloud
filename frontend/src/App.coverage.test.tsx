@@ -70,6 +70,9 @@ vi.mock('@xyflow/react', async () => {
       <div data-testid="react-flow">
         <span data-testid="node-count">{props.nodes.length}</span>
         <span data-testid="edge-count">{props.edges.length}</span>
+        <span data-testid="node-positions">
+          {JSON.stringify(props.nodes.map((node: any) => [node.id, node.position]))}
+        </span>
         <button type="button" data-testid="flow-connect" onClick={() => props.onConnect?.({ source: 'table-1', target: 'table-2' })} />
         <button type="button" data-testid="flow-edge" onClick={(event) => props.onEdgeClick?.(event, props.edges[0] ?? edge)} />
         <button type="button" data-testid="flow-edge-unlabeled" onClick={(event) => props.onEdgeClick?.(event, { ...edge, label: undefined })} />
@@ -382,6 +385,7 @@ describe('App orchestration coverage', () => {
     })
     expect(api.getSnapshot).toHaveBeenCalledWith('s1')
     expect(screen.getByTestId('node-count')).toHaveTextContent('2')
+    const originalPositions = screen.getByTestId('node-positions').textContent
 
     fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
@@ -391,8 +395,10 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument()
+    expect(screen.getByTestId('node-positions').textContent).not.toBe(originalPositions)
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+    expect(screen.getByTestId('node-positions').textContent).toBe(originalPositions)
 
     fireEvent.click(screen.getByTestId('flow-connect'))
     fireEvent.click(screen.getByTestId('edge-label'))

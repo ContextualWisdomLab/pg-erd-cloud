@@ -1,7 +1,13 @@
 # Changelog
 
 ## Unreleased
+
+- [FE] 🔒 **Frontend dependency security floor**: pin the transitive `nanoid` dependency to `3.3.18` or newer so the ERD build does not resolve the vulnerable `3.3.16` release.
+
+- [FE] 🧭 **관계 중심 ERD 자동 정렬**: 고정 알파벳 그리드를 정확히 고정한 Dagre 3.1.0 기반 결정론적 배치로 교체했습니다. FK 방향, 실제 측정된 테이블 크기, 순환·분리 컴포넌트를 반영하고, 잘못된 edge나 배치 실패 시 기존 좌표를 보존하며 툴바의 1단계 되돌리기를 유지합니다.
+
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
+
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
