@@ -14,22 +14,24 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
-    "e2e": "echo 'No e2e framework configured'"
+    "e2e": "echo 'No e2e framework configured'",
+    "benchmark:handleUtils": "NODE_OPTIONS=--expose-gc tsx scripts/handleUtils.benchmark.ts"
   },
   "dependencies": {
-    "@xyflow/react": "^12.11.3",
+    "@xyflow/react": "^12.11.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.4",
-    "@types/react": "^19.2.18",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.4",
     "@vitest/coverage-v8": "^4.1.9",
     "fast-check": "^4.8.0",
     "jsdom": "^30.0.1",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"

@@ -22,6 +22,15 @@ describe('handleUtils', () => {
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
     });
+
+    it('should handle combining characters', () => {
+      // Family emoji sequence: Woman, Woman, Girl, Boy
+      expect(sanitizeHandleId('👩‍👩‍👧‍👦')).toBe('c-1f469-200d-1f469-200d-1f467-200d-1f466');
+    });
+
+    it('should handle mixed-case strings', () => {
+      expect(sanitizeHandleId('userID_Test')).toBe('c-0075-0073-0065-0072-0049-0044-005f-0054-0065-0073-0074');
+    });
   });
 
   describe('sourceColumnHandleId', () => {
