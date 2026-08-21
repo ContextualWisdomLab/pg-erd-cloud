@@ -34,10 +34,6 @@ function failClosed(msg: string) {
   process.exit(1);
 }
 
-if (!global.gc) {
-  failClosed('--expose-gc is required but global.gc is unavailable. Run via: pnpm run benchmark:handleUtils');
-}
-
 function runSample(fn: (str: string) => string) {
   global.gc!();
   const startHeap = process.memoryUsage().heapUsed;
@@ -56,15 +52,23 @@ function runSample(fn: (str: string) => string) {
   return { time: end - start, heapDelta: endHeap - startHeap };
 }
 
-function calculateStats(samples: number[]) {
+/** Return mean, correctly interpolated median, and sorted raw samples. */
+export function calculateStats(samples: number[]) {
   const sorted = [...samples].sort((a, b) => a - b);
   const sum = sorted.reduce((a, b) => a + b, 0);
   const mean = sum / sorted.length;
-  const median = sorted[Math.floor(sorted.length / 2)];
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
   return { mean, median, raw: sorted };
 }
 
 function runBenchmark() {
+  if (!global.gc) {
+    failClosed('--expose-gc is required but global.gc is unavailable. Run via: pnpm run benchmark:handleUtils');
+  }
+
   console.log(`Platform: ${process.platform} ${process.arch}`);
   console.log(`Node.js Version: ${process.version}`);
   console.log(`V8 Version: ${process.versions?.v8 || 'unknown'}`);
@@ -149,4 +153,6 @@ function runBenchmark() {
   console.log(`\nRaw paired samples and statistics written to ${resultsPath}`);
 }
 
-runBenchmark();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  runBenchmark();
+}
