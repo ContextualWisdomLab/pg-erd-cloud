@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] ♿ **네이티브 폼 키보드 제출**: 편집기·프로젝트 목록의 프로젝트 생성과 연결 생성은 한 개의 guarded `submit` 경로를 사용해 Enter와 클릭이 정확히 한 번 동작합니다. 다이어그램·캔버스 검색은 `role="search"` 폼에서 Enter 내비게이션만 막고 실시간 필터를 유지합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
