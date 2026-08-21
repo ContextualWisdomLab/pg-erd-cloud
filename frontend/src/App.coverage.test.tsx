@@ -527,7 +527,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Billing.*다이어그램 보기/ }))
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    await screen.findAllByRole('button', { name: '열기' })
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
@@ -610,7 +610,7 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -824,7 +824,7 @@ describe('App orchestration coverage', () => {
     api.listSnapshots.mockResolvedValue(snapshots)
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
+    await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
     api.getSnapshot.mockRejectedValueOnce(new Error('poll down'))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
