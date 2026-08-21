@@ -6,7 +6,9 @@ from typing import Literal, TypeGuard
 from app.ddl.identifiers import (
     SqlIdentifierError,
     quote_identifier,
+    quote_snowflake_identifier,
     validate_identifier,
+    validate_snowflake_identifier,
 )
 
 DdlDialect = Literal["postgresql", "snowflake"]
@@ -47,24 +49,33 @@ def _snapshot_source_dialect(snapshot: dict) -> DdlDialect:
     return "postgresql"
 
 
-def _q(ident: str) -> str:
+def _q(ident: str, dialect: DdlDialect = "postgresql") -> str:
     """Validate and quote exactly one SQL identifier."""
 
+    if dialect == "snowflake":
+        return quote_snowflake_identifier(ident)
     return quote_identifier(ident)
 
 
-def _qname(schema: str, name: str) -> str:
+def _qname(
+    schema: str, name: str, dialect: DdlDialect = "postgresql"
+) -> str:
     """Quote a schema-qualified name."""
-    return f"{_q(schema)}.{_q(name)}"
+    return f"{_q(schema, dialect)}.{_q(name, dialect)}"
 
 
-def _is_valid_identifier(value: object) -> TypeGuard[str]:
+def _is_valid_identifier(
+    value: object, dialect: DdlDialect = "postgresql"
+) -> TypeGuard[str]:
     """Return whether optional snapshot metadata is a safe identifier."""
 
     if not isinstance(value, str):
         return False
     try:
-        validate_identifier(value)
+        if dialect == "snowflake":
+            validate_snowflake_identifier(value)
+        else:
+            validate_identifier(value)
     except SqlIdentifierError:
         return False
     return True
@@ -280,15 +291,17 @@ def _column_default_clause(default_expr: object, target: DdlDialect) -> str | No
     return None
 
 
-def _snapshot_tables(snapshot: dict) -> list[dict]:
+def _snapshot_tables(
+    snapshot: dict, dialect: DdlDialect = "postgresql"
+) -> list[dict]:
     return [
         r
         for r in _rows(snapshot, "relations")
         if (
             r.get("relation_kind") in ("r", "p")
             and isinstance(r.get("relation_oid"), int)
-            and _is_valid_identifier(r.get("schema_name"))
-            and _is_valid_identifier(r.get("relation_name"))
+            and _is_valid_identifier(r.get("schema_name"), dialect)
+            and _is_valid_identifier(r.get("relation_name"), dialect)
         )
     ]
 
@@ -307,7 +320,9 @@ def _group_by_relation(rows: object) -> dict[int, list[dict]]:
 
 
 def _constraint_column_names(
-    constraint: dict, cols_by_oid: dict[int, list[dict]]
+    constraint: dict,
+    cols_by_oid: dict[int, list[dict]],
+    dialect: DdlDialect = "postgresql",
 ) -> list[str]:
     oid = constraint.get("relation_oid")
     attnums = constraint.get("constrained_attnums")
@@ -318,7 +333,7 @@ def _constraint_column_names(
     for col in cols_by_oid.get(oid, []):
         position = col.get("column_position")
         name = col.get("column_name")
-        if isinstance(position, int) and _is_valid_identifier(name):
+        if isinstance(position, int) and _is_valid_identifier(name, dialect):
             cols_by_attnum[position] = name
 
     names: list[str] = []
@@ -326,26 +341,32 @@ def _constraint_column_names(
         if not isinstance(attnum, int):
             return []
         name = cols_by_attnum.get(attnum)
-        if name is None or not _is_valid_identifier(name):
+        if name is None or not _is_valid_identifier(name, dialect):
             return []
         names.append(name)
     return names
 
 
-def _render_schemas(tables: list[dict], lines: list[str]) -> None:
+def _render_schemas(
+    tables: list[dict], lines: list[str], dialect: DdlDialect = "postgresql"
+) -> None:
     schemas: set[str] = set()
     for table in tables:
         schema_name = table.get("schema_name")
-        if _is_valid_identifier(schema_name):
+        if _is_valid_identifier(schema_name, dialect):
             schemas.add(schema_name)
 
     for s in sorted(schemas):
-        lines.append(f"CREATE SCHEMA IF NOT EXISTS {_q(s)};")
+        lines.append(f"CREATE SCHEMA IF NOT EXISTS {_q(s, dialect)};")
     if schemas:
         lines.append("")
 
 
-def _render_foreign_keys(constraints: list[dict], lines: list[str]) -> None:
+def _render_foreign_keys(
+    constraints: list[dict],
+    lines: list[str],
+    dialect: DdlDialect = "postgresql",
+) -> None:
     fk_cons = [c for c in constraints if c.get("constraint_type") == "f"]
     if fk_cons:
         lines.append("-- Foreign keys")
@@ -355,14 +376,14 @@ def _render_foreign_keys(constraints: list[dict], lines: list[str]) -> None:
         cname = con.get("constraint_name")
         cdef = con.get("constraint_def")
         if not (
-            _is_valid_identifier(schema)
-            and _is_valid_identifier(table)
-            and _is_valid_identifier(cname)
+            _is_valid_identifier(schema, dialect)
+            and _is_valid_identifier(table, dialect)
+            and _is_valid_identifier(cname, dialect)
             and isinstance(cdef, str)
         ):
             continue
         lines.append(
-            f"ALTER TABLE {_qname(schema, table)} ADD CONSTRAINT {_q(cname)} {cdef};"
+            f"ALTER TABLE {_qname(schema, table, dialect)} ADD CONSTRAINT {_q(cname, dialect)} {cdef};"
         )
     if fk_cons:
         lines.append("")
@@ -548,9 +569,11 @@ def _render_table_columns_snowflake(
         key=lambda x: int(x.get("column_position") or 0),
     ):
         col_name = c.get("column_name")
-        if not _is_valid_identifier(col_name):
+        if not _is_valid_identifier(col_name, "snowflake"):
             continue
-        parts = [f"{_q(col_name)} {_mapped_data_type(c, source_dialect, 'snowflake')}"]
+        parts = [
+            f"{_q(col_name, 'snowflake')} {_mapped_data_type(c, source_dialect, 'snowflake')}"
+        ]
         if c.get("has_default"):
             default_clause = _column_default_clause(c.get("default_expr"), "snowflake")
             if default_clause:
@@ -572,16 +595,20 @@ def _render_table_constraints_snowflake(
         ctype = con.get("constraint_type")
         cname = con.get("constraint_name")
         cdef = con.get("constraint_def")
-        if not (_is_valid_identifier(cname) and isinstance(cdef, str)):
+        if not (_is_valid_identifier(cname, "snowflake") and isinstance(cdef, str)):
             continue
         if ctype in ("p", "u"):
-            col_names = _constraint_column_names(con, cols_by_oid)
+            col_names = _constraint_column_names(con, cols_by_oid, "snowflake")
             if col_names:
                 keyword = "PRIMARY KEY" if ctype == "p" else "UNIQUE"
-                quoted_cols = ", ".join(_q(name) for name in col_names)
-                table_cons.append(f"CONSTRAINT {_q(cname)} {keyword} ({quoted_cols})")
+                quoted_cols = ", ".join(
+                    _q(name, "snowflake") for name in col_names
+                )
+                table_cons.append(
+                    f"CONSTRAINT {_q(cname, 'snowflake')} {keyword} ({quoted_cols})"
+                )
             else:
-                table_cons.append(f"CONSTRAINT {_q(cname)} {cdef}")
+                table_cons.append(f"CONSTRAINT {_q(cname, 'snowflake')} {cdef}")
         elif ctype == "c":
             skipped_checks.append(cname)
     return table_cons, skipped_checks
@@ -597,12 +624,15 @@ def _render_indexes_snowflake(indexes: list[dict], lines: list[str]) -> None:
         table_schema = ix.get("table_schema_name")
         table_name = ix.get("table_name")
         if (
-            _is_valid_identifier(ix_name)
-            and _is_valid_identifier(table_schema)
-            and _is_valid_identifier(table_name)
+            _is_valid_identifier(ix_name, "snowflake")
+            and _is_valid_identifier(table_schema, "snowflake")
+            and _is_valid_identifier(table_name, "snowflake")
         ):
             try:
-                index_reference = f"{_q(ix_name)} on {_qname(table_schema, table_name)}"
+                index_reference = (
+                    f"{_q(ix_name, 'snowflake')} on "
+                    f"{_qname(table_schema, table_name, 'snowflake')}"
+                )
             except SqlIdentifierError:
                 index_reference = "metadata with an invalid identifier"
             lines.append(
@@ -622,21 +652,21 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
     constraints = _rows(snapshot, "constraints")
     indexes = _rows(snapshot, "indexes")
 
-    tables = _snapshot_tables(snapshot)
+    tables = _snapshot_tables(snapshot, "snowflake")
     cols_by_oid = _group_by_relation(columns)
     constraints_by_oid = _group_by_relation(constraints)
 
     lines: list[str] = []
     lines.append("-- Generated by pg-erd-cloud (MVP) for Snowflake\n")
-    _render_schemas(tables, lines)
+    _render_schemas(tables, lines, "snowflake")
 
     for t in tables:
         schema = t.get("schema_name")
         name = t.get("relation_name")
         oid = t.get("relation_oid")
         if not (
-            _is_valid_identifier(schema)
-            and _is_valid_identifier(name)
+            _is_valid_identifier(schema, "snowflake")
+            and _is_valid_identifier(name, "snowflake")
             and isinstance(oid, int)
         ):
             continue
@@ -647,34 +677,36 @@ def _snapshot_json_to_snowflake_sql(snapshot: dict) -> str:
         )
 
         all_defs = col_defs + table_cons
-        lines.append(f"CREATE TABLE IF NOT EXISTS {_qname(schema, name)} (")
+        lines.append(
+            f"CREATE TABLE IF NOT EXISTS {_qname(schema, name, 'snowflake')} ("
+        )
         for i, d in enumerate(all_defs):
             comma = "," if i < len(all_defs) - 1 else ""
             lines.append(f"  {d}{comma}")
         lines.append(");")
         for cname in skipped_checks:
             lines.append(
-                f"-- NOTE: skipped PostgreSQL CHECK constraint {_q(cname)} on {_qname(schema, name)} for Snowflake export."
+                f"-- NOTE: skipped PostgreSQL CHECK constraint {_q(cname, 'snowflake')} on {_qname(schema, name, 'snowflake')} for Snowflake export."
             )
         tablespace = t.get("tablespace_name")
         if isinstance(tablespace, str):
             try:
-                quoted_tablespace = _q(tablespace)
+                quoted_tablespace = _q(tablespace, "snowflake")
             except SqlIdentifierError:
                 quoted_tablespace = ""
         else:
             quoted_tablespace = ""
         if quoted_tablespace:
             lines.append(
-                f"-- NOTE: skipped PostgreSQL TABLESPACE {quoted_tablespace} on {_qname(schema, name)} for Snowflake export."
+                f"-- NOTE: skipped PostgreSQL TABLESPACE {quoted_tablespace} on {_qname(schema, name, 'snowflake')} for Snowflake export."
             )
         if t.get("relation_kind") == "p" or t.get("is_partition") is True:
             lines.append(
-                f"-- NOTE: skipped PostgreSQL partition metadata on {_qname(schema, name)} for Snowflake export."
+                f"-- NOTE: skipped PostgreSQL partition metadata on {_qname(schema, name, 'snowflake')} for Snowflake export."
             )
         lines.append("")
 
-    _render_foreign_keys(constraints, lines)
+    _render_foreign_keys(constraints, lines, "snowflake")
 
     _render_indexes_snowflake(indexes, lines)
 
