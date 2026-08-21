@@ -610,6 +610,7 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -640,7 +641,8 @@ describe('App orchestration coverage', () => {
       .mockResolvedValueOnce(snapshots)
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+        fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -743,7 +745,8 @@ describe('App orchestration coverage', () => {
       snapshot_json: { relations: [], columns: [], pk_columns: [], fk_edges: [] },
     }))
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+        fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -783,7 +786,8 @@ describe('App orchestration coverage', () => {
       edges: [],
     })
     await renderReadyApp()
-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+        fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {

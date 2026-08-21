@@ -66,7 +66,9 @@ export function EditEdgeModal({
           To: {editingEdge.target}
         </div>
         <div className="field">
-          <label htmlFor="rel-label">제약조건 이름 (Label)</label>
+          <label htmlFor="rel-label">
+            제약조건 이름 (Label) <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
+          </label>
           <input
             id="rel-label"
             value={relLabel}
