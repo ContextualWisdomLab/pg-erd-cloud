@@ -43,3 +43,14 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+
+def test_short_punctuation_password_does_not_corrupt_hostnames() -> None:
+    dsn = "postgresql://user:.@db.example.com/app"
+    error = "driver failed for db.example.com with password=."
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "db.example.com" in redacted
+    assert "password=***" in redacted
+    assert "password=." not in redacted

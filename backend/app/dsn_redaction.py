@@ -92,8 +92,8 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    prefix = r"(?<![A-Za-z0-9])" if secret and secret[0].isalnum() else ""
-    suffix = r"(?![A-Za-z0-9])" if secret and secret[-1].isalnum() else ""
+    prefix = r"(?<![A-Za-z0-9])"
+    suffix = r"(?![A-Za-z0-9])"
     pattern = re.compile(rf"{prefix}{re.escape(secret)}{suffix}")
     return pattern.sub("***", message)
 
