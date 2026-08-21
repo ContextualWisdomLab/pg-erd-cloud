@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import platform
 import resource
 import subprocess
@@ -43,7 +44,10 @@ def _percentile(samples: list[float], percentile: float) -> float:
     if not samples:
         raise ValueError("at least one benchmark sample is required")
     ordered = sorted(samples)
-    index = min(len(ordered) - 1, round((percentile / 100) * len(ordered)))
+    index = min(
+        len(ordered) - 1,
+        max(0, math.ceil((percentile / 100) * len(ordered)) - 1),
+    )
     return ordered[index]
 
 
@@ -77,7 +81,9 @@ def run(profile_name: str, variant: str, seed: int, repetitions: int) -> dict[st
 
     snapshot = generate_snapshot(profile_name, seed=seed, variant=variant)
     encoded = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
-    export = _measure(lambda: snapshot_json_to_sql(snapshot), repetitions)
+    export = _measure(
+        lambda: snapshot_json_to_sql(snapshot, "snowflake"), repetitions
+    )
     encoding = _measure(lambda: json.dumps(snapshot, ensure_ascii=False), repetitions)
     return {
         "profile": profile_name,

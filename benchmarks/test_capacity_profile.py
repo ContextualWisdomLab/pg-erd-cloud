@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pytest
 
 from capacity_profile import PROFILES, VARIANTS, generate_snapshot
+from run_capacity_benchmark import _percentile, run
 
 
 def test_profiles_have_issue_951_counts() -> None:
@@ -46,3 +47,23 @@ def test_invalid_profile_and_variant_fail_closed() -> None:
         generate_snapshot("unknown")
     with pytest.raises(ValueError, match="unknown capacity variant"):
         generate_snapshot("small", variant="unknown")
+
+
+def test_percentile_uses_nearest_rank_for_the_median() -> None:
+    assert _percentile([30.0, 10.0, 20.0], 50) == 20.0
+    assert _percentile([30.0, 10.0, 20.0], 95) == 30.0
+
+
+def test_benchmark_measures_the_reported_snowflake_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    dialects: list[str] = []
+
+    def fake_export(snapshot: dict, target_dialect: str = "postgresql") -> str:
+        del snapshot
+        dialects.append(target_dialect)
+        return ""
+
+    monkeypatch.setattr("run_capacity_benchmark.snapshot_json_to_sql", fake_export)
+    result = run("small", "baseline", seed=0, repetitions=1)
+
+    assert dialects == ["snowflake"]
+    assert "snowflake_ddl_export" in result["measurements"]
