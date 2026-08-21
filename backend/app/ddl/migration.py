@@ -29,6 +29,7 @@ from app.ddl.export import (
     _q,
     _qname,
     _snapshot_source_dialect,
+    reject_unsupported_snapshot_source,
 )
 from app.diff.schema_diff import _index_snapshot
 
@@ -181,6 +182,8 @@ def snapshot_diff_to_migration_sql(
     Matching is by name (oid-independent). Returns a ``-- No schema changes.``
     marker when the two snapshots are structurally identical.
     """
+    reject_unsupported_snapshot_source(base or {}, "migration")
+    reject_unsupported_snapshot_source(target or {}, "migration")
     dialect = _normalize_dialect(target_dialect)
     source = _snapshot_source_dialect(target or {})
     b = _index_snapshot(base)

@@ -325,11 +325,14 @@ async def export_migration_sql(
     target_json = target_data.snapshot_json if target_data else None
     if direction == "down":
         base_json, target_json = target_json, base_json
-    return snapshot_diff_to_migration_sql(
-        base_json,
-        target_json,
-        target_dialect=dialect,
-    )
+    try:
+        return snapshot_diff_to_migration_sql(
+            base_json,
+            target_json,
+            target_dialect=dialect,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
 @router.get("/{schema_snapshot_uuid}/export.sql", response_class=PlainTextResponse)
@@ -346,7 +349,10 @@ async def export_snapshot_sql(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     if data is None:
         return "-- snapshot data not found\n"
-    return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    try:
+        return snapshot_json_to_sql(data.snapshot_json, target_dialect=dialect)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
 @router.get("/{schema_snapshot_uuid}/wide-tables", response_model=WideTablesOut)

@@ -36,6 +36,9 @@ dependencies = [
 snowflake = [
   "snowflake-connector-python>=4,<5",
 ]
+databricks = [
+  "databricks-sql-connector>=4.4,<5",
+]
 dev = [
   "pytest>=9.0.3",
   "pytest-asyncio>=1.4.0",
@@ -60,6 +63,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [tool.coverage.run]
 include = [

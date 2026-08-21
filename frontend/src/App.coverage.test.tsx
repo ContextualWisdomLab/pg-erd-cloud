@@ -359,9 +359,10 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Connection DSN must use')
     expect(dsn).toHaveValue('')
 
-    fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
+    const databricksDsn = 'databricks://token:secret@workspace.cloud.databricks.com/sql/1.0/warehouses/abc?catalog=main'
+    fireEvent.change(dsn, { target: { value: databricksDsn } })
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
-    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', databricksDsn))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
