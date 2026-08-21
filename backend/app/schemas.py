@@ -2,18 +2,34 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
+
+
+def _validate_log_safe_text(value: str) -> str:
+    """Reject characters that can create a new logical log line."""
+
+    for character in value:
+        code_point = ord(character)
+        if (
+            code_point < 0x20
+            or 0x7F <= code_point <= 0x9F
+            or character in {"\u2028", "\u2029"}
+        ):
+            raise ValueError("must not contain log-breaking control characters")
+    return value
+
+
+_LogSafeText = Annotated[str, AfterValidator(_validate_log_safe_text)]
 
 
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
-    project_name: str = Field(
+    project_name: _LogSafeText = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
 
 
@@ -27,10 +43,10 @@ class ProjectOut(BaseModel):
 class ProjectMemberAddIn(BaseModel):
     """Request body for inviting/adding a project member."""
 
-    member_subject: str = Field(
+    member_subject: _LogSafeText = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\s\x00-\x1F\x7F]+$",
+        pattern=r"^\S+$",
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
@@ -48,10 +64,9 @@ class ProjectMemberOut(BaseModel):
 class ConnectionCreateIn(BaseModel):
     """Request body for creating a DB connection."""
 
-    conn_name: str = Field(
+    conn_name: _LogSafeText = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
     dsn: str = Field(
         min_length=1,
@@ -190,7 +205,7 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200)
+    name: _LogSafeText = Field(min_length=1, max_length=200)
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -214,8 +229,8 @@ class DiagramViewDetailOut(DiagramViewOut):
 class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
-    schema_name: str = Field(min_length=1, max_length=255)
-    relation_name: str = Field(min_length=1, max_length=255)
+    schema_name: _LogSafeText = Field(min_length=1, max_length=255)
+    relation_name: _LogSafeText = Field(min_length=1, max_length=255)
     body: str = Field(min_length=1, max_length=10_000)
 
 
@@ -302,7 +317,7 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128)
+    key_name: _LogSafeText = Field(min_length=1, max_length=128)
 
 
 class ApiKeyOut(BaseModel):
