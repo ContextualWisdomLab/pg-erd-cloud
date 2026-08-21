@@ -4,11 +4,10 @@ import asyncio
 import uuid
 
 import pytest
-from fastapi import HTTPException
-from starlette.requests import Request
-
 from app import auth
 from app.settings import settings
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 @pytest.mark.parametrize(
@@ -71,7 +70,7 @@ async def test_oidc_config_fetch_disables_redirects(
         def __init__(self, **kwargs: object) -> None:
             observed.update(kwargs)
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -109,7 +108,7 @@ async def test_oidc_config_rejects_redirect_response(
         def __init__(self, **_kwargs: object) -> None:
             return None
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -147,7 +146,7 @@ async def test_jwks_fetch_disables_redirects(
         def __init__(self, **kwargs: object) -> None:
             observed.update(kwargs)
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -293,10 +292,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "issuer": "https://issuer.example",
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
+            "require": ["iss", "exp", "jti", "aud"],
             "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
     }
@@ -594,6 +590,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "token verification failed"
 
+
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch: pytest.MonkeyPatch,
@@ -617,7 +614,9 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
 
     def fail_decode(*_: object, **__: object) -> dict:
-        raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
+        raise AssertionError(
+            "jwt.decode must not run for mismatched algorithm/key type"
+        )
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
@@ -626,6 +625,8 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,
@@ -636,7 +637,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
         def __init__(self, **kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -684,7 +685,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         def __init__(self, **kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -733,3 +734,33 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+
+def test_validate_jwt_header_crit():
+    import pytest
+    from app.auth import _validate_jwt_header
+    from fastapi import HTTPException
+
+    # Test valid crit (which is still rejected as unsupported)
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": ["b64"]})
+    assert exc.value.status_code == 401
+    assert "unsupported critical parameter" in exc.value.detail
+
+    # Test invalid crit type
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": "b64"})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
+    # Test empty crit
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": []})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
+    # Test crit with invalid element type
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": [123]})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
