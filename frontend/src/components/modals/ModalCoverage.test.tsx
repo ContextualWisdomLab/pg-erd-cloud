@@ -105,21 +105,6 @@ describe('modal behavior coverage', () => {
     rerender(
       <EditEdgeModal
         editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
-        relLabel=""
-        setRelLabel={setRelLabel}
-        onRelDelete={onDelete}
-        onRelCancel={onCancel}
-        onRelSubmit={onSubmit}
-      />,
-    )
-    expect(screen.getByText(/From: a/)).toBeInTheDocument()
-    const relInput = screen.getByRole('textbox', { name: /제약조건 이름 \(Label\)/ })
-    expect(relInput).toBeRequired()
-    fireEvent.submit(screen.getByRole('dialog'))
-    expect(onSubmit).not.toHaveBeenCalled()
-    rerender(
-      <EditEdgeModal
-        editingEdge={{ id: 'e', source: 'a', target: 'b', label: '' }}
         relLabel="fk_users"
         setRelLabel={setRelLabel}
         onRelDelete={onDelete}
@@ -127,6 +112,7 @@ describe('modal behavior coverage', () => {
         onRelSubmit={onSubmit}
       />,
     )
+    expect(screen.getByText(/From: a/)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/제약조건 이름 \(Label\)/), {
       target: { value: 'fk_changed' },
     })

@@ -130,7 +130,6 @@ vi.mock('./components/modals', () => ({
       {props.editingEdge ? (
         <>
           <button type="button" data-testid="edge-label" onClick={() => props.setRelLabel(' fk_new ')} />
-          <button type="button" data-testid="edge-whitespace" onClick={() => props.setRelLabel('   ')} />
           <button type="button" data-testid="edge-submit" onClick={props.onRelSubmit} />
           <button type="button" data-testid="edge-cancel" onClick={props.onRelCancel} />
           <button type="button" data-testid="edge-delete" onClick={props.onRelDelete} />
@@ -396,13 +395,8 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('flow-connect'))
-    fireEvent.click(screen.getByTestId('flow-edge'))
-    fireEvent.click(screen.getByTestId('edge-whitespace'))
-    fireEvent.click(screen.getByTestId('edge-submit'))
-    expect(screen.getByTestId('edge-modal')).toHaveAttribute('data-open', 'true')
     fireEvent.click(screen.getByTestId('edge-label'))
     fireEvent.click(screen.getByTestId('edge-submit'))
-    expect(screen.getByTestId('edge-modal')).toHaveAttribute('data-open', 'false')
     fireEvent.click(screen.getByTestId('flow-edge'))
     fireEvent.click(screen.getByTestId('edge-cancel'))
     fireEvent.click(screen.getByTestId('flow-edge-unlabeled'))

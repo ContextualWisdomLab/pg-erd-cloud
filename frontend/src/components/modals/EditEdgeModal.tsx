@@ -48,7 +48,6 @@ export function EditEdgeModal({
         tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!e.currentTarget.checkValidity() || !relLabel.trim()) return;
           onRelSubmit();
         }}
         style={{
@@ -75,7 +74,6 @@ export function EditEdgeModal({
             value={relLabel}
             onChange={(e) => setRelLabel(e.target.value)}
             placeholder="fk_constraint_name"
-            required
             autoFocus
           />
         </div>
