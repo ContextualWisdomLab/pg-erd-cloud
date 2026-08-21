@@ -2,7 +2,7 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import type { IndexRecommendation } from "../../erd/cardinality";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface CardinalityModalProps {
   isOpen: boolean;
@@ -47,30 +47,16 @@ export function CardinalityModal({
   formatPercent,
   strengthLabel,
 }: CardinalityModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(cardinalityNode), onCloseCardinalityWizard);
-
   if (!isOpen || !cardinalityNode) return null;
 
   return (
-    <div className="modalOverlay">
-      <div
-        className="modalContent cardinalityWizard"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cardinality-title"
-        ref={dialogRef}
-        tabIndex={-1}
-      >
-        <div className="modalHeader">
-          <h3 id="cardinality-title">인덱스 카디널리티</h3>
-          <button
-            type="button"
-            onClick={onCloseCardinalityWizard}
-            aria-label="카디널리티 계산 닫기"
-          >
-            닫기
-          </button>
-        </div>
+    <ModalShell
+      title="인덱스 카디널리티 계산"
+      titleId="cardinality-title"
+      onClose={onCloseCardinalityWizard}
+      closeLabel="카디널리티 계산 닫기"
+      size="cardinality"
+    >
 
         <div className="cardinalityWizard__controls">
           <div className="field">
@@ -234,7 +220,6 @@ export function CardinalityModal({
             );
           })}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

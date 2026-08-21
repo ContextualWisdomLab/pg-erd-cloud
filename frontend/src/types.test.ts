@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { snapshotDetailFromResponse, toPlainText, type SnapshotDetailResponse } from './types'
 
 describe('toPlainText', () => {
-  it('escapes html-sensitive characters and strips control characters', () => {
+  it('preserves display text and strips control characters', () => {
     expect(toPlainText('<script>alert("x")</script>\u0000')).toBe(
-      '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;'
+      '<script>alert("x")</script>'
     )
-    expect(toPlainText('hello & < > " \'')).toBe('hello &amp; &lt; &gt; &quot; &#39;')
+    expect(toPlainText('hello & < > " \'')).toBe('hello & < > " \'')
     expect(toPlainText('hello\x00world')).toBe('hello world')
   })
 
@@ -29,7 +29,7 @@ describe('snapshotDetailFromResponse', () => {
     }
 
     const detail = snapshotDetailFromResponse(mockResponse)
-    expect(detail.error_message).toBe('&lt;error&gt;')
+    expect(detail.error_message).toBe('<error>')
   })
 
   it('maps arbitrary error_message values safely', () => {
@@ -42,6 +42,6 @@ describe('snapshotDetailFromResponse', () => {
     }
 
     const result = snapshotDetailFromResponse(response)
-    expect(result.error_message).toBe('bad &lt;error&gt;')
+    expect(result.error_message).toBe('bad <error>')
   })
 })

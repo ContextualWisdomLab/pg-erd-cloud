@@ -1,5 +1,11 @@
 # LLM via Contextual Orchestrator
 
+Status date: 2026-08-09
+Lifecycle: OpenAI-compatible client path `implemented_on_main`; orchestrator
+runtime and policy `downstream`
+Owner: application integration maintainers; contextual-orchestrator owners for
+its runtime
+
 pg-erd-cloud's LLM features (`reversing-spec.md?mode=llm-draft`,
 `index-design.md?mode=llm-draft`) call an **OpenAI-compatible** chat-completions
 endpoint (`app/spec/llm.py`: `POST {base}/chat/completions`, `Authorization:

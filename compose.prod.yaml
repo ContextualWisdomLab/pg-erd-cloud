@@ -6,6 +6,8 @@ services:
       - --global.checknewversion=false
       - --global.sendanonymoususage=false
       - --entryPoints.web.address=:8080
+      - --entryPoints.web.forwardedHeaders.insecure=false
+      - --entryPoints.web.forwardedHeaders.trustedIPs=${TRAEFIK_TRUSTED_PROXY_CIDRS:?set TRAEFIK_TRUSTED_PROXY_CIDRS}
       - --providers.file.filename=/etc/traefik/dynamic.yaml
       - --providers.file.watch=true
       - --accesslog=true
@@ -47,6 +49,13 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-erd}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-erd}
       CORS_ORIGINS: http://localhost:8080
       APP_SECRET_FILE: /run/secrets/app_secret
+      # This service is not host-published and is reached through Traefik in this stack.
+      # The host-local TLS terminator reaches this loopback-published port through
+      # Docker NAT. Allowlist the minimal direct peer Traefik actually observes;
+      # Traefik appends it after the client hop, so the backend consumes the
+      # second hop from the right: "client, trusted-peer".
+      API_RATE_LIMIT_TRUST_X_FORWARDED_FOR: "true"
+      API_RATE_LIMIT_TRUSTED_PROXY_HOPS: "2"
     secrets:
       - app_secret
     depends_on:

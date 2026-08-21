@@ -49,6 +49,22 @@ describe('API client coverage', () => {
           snapshot_json: null,
         }),
       )
+      .mockResolvedValueOnce(
+        response({
+          project_space_uuid: 'p1',
+          permission_kind: 'viewer',
+          snapshots: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({
+          schema_snapshot_uuid: 's1',
+          status: 'succeeded',
+          schema_filter: null,
+          error_message: null,
+          snapshot_json: null,
+        }),
+      )
 
     await expect(api.getMe()).resolves.toEqual({
       subject: 'u',
@@ -62,7 +78,51 @@ describe('API client coverage', () => {
       schema_snapshot_uuid: 's1',
       status: 'succeeded',
     })
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    await expect(api.getSharedLinkInfo('share')).resolves.toMatchObject({
+      permission_kind: 'viewer',
+    })
+    await expect(api.getSharedSnapshot('share', 's1')).resolves.toMatchObject({
+      schema_snapshot_uuid: 's1',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(7)
+  })
+
+  it('encodes public-share path segments and normalizes snapshot diagnostics', async () => {
+    const fetchMock = vi.mocked(fetch)
+    const api = await loadApi({ baseUrl: 'https://api.example.test' })
+    fetchMock
+      .mockResolvedValueOnce(
+        response({
+          project_space_uuid: 'p1',
+          permission_kind: 'viewer',
+          snapshots: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({
+          schema_snapshot_uuid: 'snapshot/one',
+          status: 'failed',
+          schema_filter: null,
+          error_message: 'bad\u0000message',
+          snapshot_json: null,
+        }),
+      )
+
+    await expect(api.getSharedLinkInfo('team/blue')).resolves.toMatchObject({
+      project_space_uuid: 'p1',
+    })
+    await expect(api.getSharedSnapshot('team/blue', 'snapshot/one')).resolves.toMatchObject({
+      schema_snapshot_uuid: 'snapshot/one',
+      error_message: 'bad message',
+    })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://api.example.test/api/share/team%2Fblue',
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.example.test/api/share/team%2Fblue/snapshots/snapshot%2Fone',
+    )
   })
 
   it.each([
@@ -71,6 +131,8 @@ describe('API client coverage', () => {
     ['listConnections', (api: ApiModule) => api.listConnections('p'), 'listConnections failed: 401'],
     ['listSnapshots', (api: ApiModule) => api.listSnapshots('p'), 'listSnapshots failed: 401'],
     ['getSnapshot', (api: ApiModule) => api.getSnapshot('s'), 'getSnapshot failed: 401'],
+    ['getSharedLinkInfo', (api: ApiModule) => api.getSharedLinkInfo('share'), 'getSharedLinkInfo failed: 401'],
+    ['getSharedSnapshot', (api: ApiModule) => api.getSharedSnapshot('share', 's'), 'getSharedSnapshot failed: 401'],
   ])('reports %s read failures with the HTTP status', async (_name, invoke, message) => {
     vi.mocked(fetch).mockResolvedValue(response({}, false, 401))
     const api = await loadApi()
@@ -103,7 +165,7 @@ describe('API client coverage', () => {
     await api.createSnapshot('p', 'c', '')
     await expect(api.createShareLink('p')).resolves.toMatchObject({
       share_link_uuid: 'share',
-      url: 'https://api.example.test/api/share/share',
+      url: expect.stringContaining('/share/share'),
     })
 
     const writes = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')
@@ -211,16 +273,56 @@ describe('API client coverage', () => {
       status: 'succeeded',
       snapshot_json: { relations: expect.any(Array) },
     })
-    await expect(api.createShareLink(project.project_space_uuid)).resolves.toMatchObject({
+    const shareLink = await api.createShareLink(project.project_space_uuid)
+    expect(shareLink).toMatchObject({
       permission_kind: 'read',
       url_path: `/api/share/demo-${project.project_space_uuid}`,
     })
+    await expect(api.getSharedLinkInfo(shareLink.share_link_uuid)).resolves.toMatchObject({
+      project_space_uuid: project.project_space_uuid,
+    })
+    await expect(api.getSharedLinkInfo('unlisted-project')).resolves.toEqual({
+      project_space_uuid: 'unlisted-project',
+      permission_kind: 'read',
+      snapshots: [],
+    })
+    await expect(
+      api.getSharedSnapshot(shareLink.share_link_uuid, snapshot.schema_snapshot_uuid),
+    ).resolves.toMatchObject({ status: 'succeeded' })
+  })
+
+  it('resolves prefixed and direct public shares in demo mode', async () => {
+    const api = await loadApi({ demo: true })
+
+    await expect(api.getSharedLinkInfo('demo-demo-shopping')).resolves.toEqual({
+      project_space_uuid: 'demo-shopping',
+      permission_kind: 'read',
+      snapshots: [
+        {
+          schema_snapshot_uuid: 'demo-shopping-snapshot',
+          status: 'succeeded',
+          schema_filter: 'public',
+          created_at: '1970-01-01T00:00:00.000Z',
+        },
+      ],
+    })
+    await expect(api.getSharedLinkInfo('external-project')).resolves.toEqual({
+      project_space_uuid: 'external-project',
+      permission_kind: 'read',
+      snapshots: [],
+    })
+    await expect(api.getSharedSnapshot('ignored-share', 'snapshot-direct')).resolves.toMatchObject({
+      schema_snapshot_uuid: 'snapshot-direct',
+      status: 'succeeded',
+      snapshot_json: { relations: expect.any(Array) },
+    })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('validates share-link response paths', async () => {
     const api = await loadApi()
     expect(() => api.shareLinkUrlFromPath(null)).toThrow('invalid share URL path')
     expect(() => api.shareLinkUrlFromPath('/unrelated')).toThrow('invalid share URL path')
-    expect(api.shareLinkUrlFromPath('/api/share/ok')).toContain('/api/share/ok')
+    expect(api.shareLinkUrlFromPath('/api/share/ok')).toContain('/share/ok')
   })
 })

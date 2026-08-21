@@ -107,7 +107,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             />
           ) : null}
         </span>
-        <span style={{ display: "inline-flex", gap: 6 }}>
+        <span className="tableNode__titleMeta">
           {data.businessGroup ? (
             <AccessibleTruncatedText
               className="tableNode__groupBadge"

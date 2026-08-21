@@ -1,9 +1,10 @@
 # Cloud ERD Product Spec
 
-This document connects the UI reference images in this folder to the implemented
-pg-erd-cloud product surface. It is intentionally compact: use it as the shared
-contract for filling empty screens, reviewing new UI PRs, and deciding whether a
-visual gap is a design-only issue or missing product code.
+This UI appendix connects the reference images in this folder to the product
+surface. Product requirements and lifecycle authority live in
+[`docs/PRD.md`](../PRD.md); live visual authority and node precedence live in
+[`figma-contract.md`](figma-contract.md). Use this appendix for screen-specific
+empty states and implementation review, not as a competing product contract.
 
 ## Information Architecture
 
@@ -62,14 +63,14 @@ modals.
 ### Editor
 
 ```text
-+----------------------+---------------------------------------------+
-| Project selector     | [search] [layout] [undo] [+] [group] [SQL] |
-| New project          |                                             |
-| Connection selector  |                                             |
-| New connection       |                ERD canvas                    |
-| Schema filter        |                                             |
-| Reverse engineer     |     Empty state or table nodes/edges         |
-+----------------------+---------------------------------------------+
++----------------------+----------------------------------+------------+
+| Project selector     | [↔][↶][+][◇][#][SQL][IMG]…[↗]  | Properties |
+| New project          |                                  | Search     |
+| Connection selector  |                                  | Selection  |
+| New connection       |            ERD canvas            | Columns    |
+| Schema filter        |                                  | Share      |
+| Reverse engineer     | Empty state or table nodes/edges | Export     |
++----------------------+----------------------------------+------------+
 ```
 
 ### Share And Export Modal
@@ -110,3 +111,5 @@ modals.
   status text changes.
 - New visual work references the images in `docs/ui-ux` and the styles in
   `frontend/src/styles.css` before introducing new layout patterns.
+- Live implementation work follows `figma-contract.md` before historical PNG
+  or QA evidence.

@@ -3,9 +3,16 @@
 PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB를 스냅샷으로 역설계하고,
 대화형 ERD로 탐색·편집하며, DDL/명세서/공유 링크로 내보낼 수 있습니다.
 
+제품·기술·의사결정·데이터 모델의 현재/계획 상태는
+[문서 권위 인덱스](docs/README.md)에서 시작합니다. 특히
+[PRD](docs/PRD.md), [TRD](docs/TRD.md), [Architecture](ARCHITECTURE.md),
+[ADR](docs/adr/README.md), [UML](docs/UML.md), [ERD](docs/ERD.md)는
+`implemented_on_main`과 `active_pr`/`planned`를 구분합니다.
+
 ## 제공 기능(현재)
 
-- **Auth / workspace**: 인증 게이트, 프로젝트 스페이스, DB 연결(DSN 암호화 저장)
+- **Auth / workspace**: 백엔드 OIDC/API-key 검증, 프로젝트 스페이스, DB 연결
+  (DSN 암호화 저장). 비-demo 브라우저 OIDC 로그인/토큰 연결은 로드맵입니다.
 - **Backend DB = PostgreSQL** (앱 메타데이터 저장)
 - **Reverse engineering(리버스)**: 대상 PostgreSQL에 연결해서
   - schema/table/column
@@ -17,7 +24,9 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
   PK/UNIQUE/FK 메타데이터를 수집하고 `source_dialect: "snowflake"` 스냅샷으로 저장합니다.
   실행 환경에는 선택 의존성 `snowflake-connector-python`이 필요합니다.
 - **ERD UI**: React Flow(MIT)로 PK/FK·그룹·검색·레이아웃을 그래픽으로 렌더링
-- **Forward engineering(포워드)**: 스냅샷 기반 DDL export + 스냅샷 간 diff/마이그레이션 SQL
+- **스키마 산출물(현재)**: 스냅샷 기반 DDL export + 스냅샷 간
+  diff/마이그레이션 SQL. 이는 검토용 부분 기능이며, 승인·복구·수렴 증거를 갖춘
+  프로덕션 Forward Engineering 적용기로 간주하지 않습니다.
 
   - SQL export: `GET /api/snapshots/{snapshot_uuid}/export.sql`
   - Target dialect: `?dialect=postgresql`(기본값) 또는 `?dialect=snowflake`
@@ -32,8 +41,9 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
   - Live LLM draft: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md?mode=llm-draft`
     - `LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`을 설정한 OpenAI-compatible
       chat-completions provider를 호출합니다.
-  - Share link에서도 동일한 `/api/share/{share_uuid}/snapshots/{snapshot_uuid}/...`
-    경로를 사용할 수 있습니다.
+  - Share link의 `/api/share/{share_uuid}/snapshots/{snapshot_uuid}/...` 경로는
+    결정적 Markdown과 `mode=llm-prompt`만 제공합니다. 외부 provider를 호출하는
+    `mode=llm-draft`는 인증된 `/api/snapshots/...` 경로에서만 사용할 수 있습니다.
 - **컬럼 예시값 힌트**: 리버스 스냅샷의 각 컬럼에 `example_value`를 추가합니다.
   실제 테이블 데이터를 샘플링하지 않고 컬럼명/타입 메타데이터로 만든 합성 예시라서
   ERD, PlantUML/SVG export, 명세서, LLM prompt에서 안전하게 참고할 수 있습니다.
@@ -46,8 +56,13 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
 curl -X POST "http://localhost:8000/api/projects/<project_uuid>/share-links"
 ```
 
-반환된 `url_path`로 동료가 최신 스냅샷 목록/스냅샷 JSON/DDL·명세서 export를 조회할 수 있습니다.
+반환된 `url_path`로 동료가 최근 성공 스냅샷 목록/스냅샷 JSON/DDL·명세서 export를 조회할 수 있습니다.
 공개 share 응답·export에서는 **스키마 코멘트·`example_value` 등 민감 메타데이터를 제거(redact)** 합니다.
+공개 명세서 export는 Markdown/LLM prompt만 지원하고 live LLM draft는 호출하지 않습니다.
+공유 링크는 서버 설정(`SHARE_LINK_TTL_HOURS`, 기본 168시간)에 따라
+만료되고, 프로젝트 소유자는
+`DELETE /api/projects/{project_uuid}/share-links/{share_uuid}`로 조기 회수할 수
+있습니다. 현재 SPA는 회수 버튼을 제공하지 않으므로 API를 사용해야 합니다.
 `/api/share/*` 공개 조회/내보내기 경로는 전역 `/api/*` 제한보다 더 엄격한 별도
 IP 기반 rate limit을 적용합니다.
 
@@ -80,6 +95,8 @@ PostgreSQL은 `CREATE INDEX ... USING <method>`의 `<method>`가
 
 ```bash
 cp .env.example .env
+# Set DB_INTROSPECTION_ALLOWED_HOSTS to the exact target host(s); empty rejects
+# all snapshot/introspection connections by design.
 docker compose up -d --build
 ```
 
@@ -89,10 +106,20 @@ docker compose up -d --build
 ## 실행(프로덕션 스타일, Docker)
 
 Traefik을 edge router로 사용합니다. `/api/*`와 `/healthz`는 백엔드로 라우팅하고,
-나머지 경로는 정적 빌드된 프론트엔드 SPA로 라우팅합니다.
+나머지 경로는 정적 빌드된 프론트엔드 SPA로 라우팅합니다. Traefik은 host loopback에만
+공개되므로, 지원하는 참조 경로는 같은 호스트의 외부 TLS terminator가 이 port로
+연결하는 형태입니다. Docker NAT 뒤에서 Traefik이 실제 관측하는 최소 direct-peer
+`/32` 또는 `/128` CIDR(대개 Compose bridge gateway)을
+`TRAEFIK_TRUSTED_PROXY_CIDRS`에 설정해야 합니다. 이는 terminator 프로세스의 원래 host
+주소와 다를 수 있습니다. Traefik은 신뢰된 peer가 전달한 client 주소 뒤에 해당 peer를
+추가하고, 백엔드는 이 두-hop 체인의 오른쪽에서 두 번째 주소를 사용해 공개 공유
+속도 제한 버킷을 사용자별로 분리합니다.
 
 ```bash
 cp .env.example .env
+
+# Traefik access log/network inspection으로 Docker NAT 뒤의 direct peer를 확인한 뒤
+# .env에 최소 범위로 설정합니다. 예: TRAEFIK_TRUSTED_PROXY_CIDRS=172.30.0.1/32
 
 # 프로덕션 스타일에서는 Docker secret 파일로 APP_SECRET을 주입합니다.
 # (이 파일은 커밋 금지: .gitignore에 **/secrets/** 포함)
@@ -169,4 +196,5 @@ npm run dev
 
 - Casdoor OIDC 로그인 UI/리다이렉트 플로우(현재는 토큰 검증/DEV 모드만)
 - 실시간 협업(커서/코멘트/CRDT 기반 동시 편집)
-- 포워드 엔지니어링(diff 기반 변경 SQL 생성/검증)
+- 서버 권위 모델·구조화 plan·격리 dry-run/target preflight·정확한 승인 바인딩·
+  durable apply·복구·재수집 수렴 증거를 갖춘 Forward Engineering

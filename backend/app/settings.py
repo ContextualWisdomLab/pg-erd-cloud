@@ -85,13 +85,15 @@ class Settings(BaseSettings):
     api_rate_limit_requests: int = Field(120, ge=1)
     api_rate_limit_window_seconds: float = Field(60.0, gt=0.0)
     api_rate_limit_trust_x_forwarded_for: bool = False
+    api_rate_limit_trusted_proxy_hops: int = Field(1, ge=1)
     api_rate_limit_max_keys: int = Field(10_000, ge=1)
     share_link_rate_limit_enabled: bool = True
     share_link_rate_limit_requests: int = Field(30, ge=1)
     share_link_rate_limit_window_seconds: float = Field(60.0, gt=0.0)
     share_link_rate_limit_max_keys: int = Field(10_000, ge=1)
+    share_link_ttl_hours: int = Field(168, ge=1, le=8_760)
 
-    # Observability (MVP)
+    # Observability baseline
     observability_request_logging_enabled: bool = True
     # Metrics exposure must be opt-in.
     observability_metrics_enabled: bool = False
@@ -112,7 +114,8 @@ class Settings(BaseSettings):
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
 
-    # Optional allowlist for reverse-engineering database targets.
+    # Required allowlist for reverse-engineering database targets. The empty
+    # default is fail-closed until an operator configures approved hosts.
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
 

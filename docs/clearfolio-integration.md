@@ -1,5 +1,10 @@
 # Clearfolio reference-document viewer — integration
 
+Status date: 2026-08-09
+Lifecycle: pg-erd-cloud gateway adapter `implemented_on_main`; Clearfolio
+runtime and policy `downstream`
+Owner: integration maintainers; Clearfolio owners for its runtime
+
 [Clearfolio](https://github.com/ContextualWisdomLab/clearfolio) is a document-viewer
 platform (Java backend + JS preview). pg-erd-cloud links it so a project can attach
 external reference documents (requirements, design specs, contracts — PDF/DOCX/PPT)

@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   createSnapshot: vi.fn(),
   getSnapshot: vi.fn(),
   createShareLink: vi.fn(),
+  publicShareIdFromPath: vi.fn(() => null),
 }))
 
 type CapturedNode = {

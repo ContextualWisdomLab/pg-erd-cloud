@@ -36,6 +36,17 @@ def test_build_admin_console_dsn_strips_sqlalchemy_driver() -> None:
     assert ":dummy@" not in dsn
 
 
+def test_build_admin_console_dsn_keeps_plain_postgresql_driver() -> None:
+    dsn, password = build_admin_console_dsn(
+        "postgresql://u:dummy@localhost:5432/appdb",
+        "pgcat",
+    )
+
+    assert dsn.startswith("postgresql://")
+    assert dsn.endswith("/pgcat")
+    assert password == "dummy"  # noqa: S105
+
+
 def test_should_route_reads_to_read_only() -> None:
     ro_url = "postgresql+asyncpg://u:p@localhost:5432/ro"
 

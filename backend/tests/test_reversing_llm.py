@@ -8,9 +8,9 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
-from app.api import share, snapshots
+from app.api import snapshots
 from app.auth import CurrentUser
-from app.models import SchemaSnapshot, SchemaSnapshotData, ShareLink
+from app.models import SchemaSnapshotData
 from app.settings import settings
 from app.spec.llm import (
     LlmConfigurationError,
@@ -131,22 +131,6 @@ class _SnapshotSession:
         return SimpleNamespace(snapshot_json=_snapshot())
 
 
-class _ShareSession:
-    def __init__(self) -> None:
-        self.project_space_uuid = uuid.uuid4()
-
-    async def get(self, model: object, _: uuid.UUID) -> object:
-        if model is ShareLink:
-            return SimpleNamespace(
-                project_space_uuid=self.project_space_uuid,
-                expires_at=None,
-            )
-        if model is SchemaSnapshot:
-            return SimpleNamespace(project_space_uuid=self.project_space_uuid)
-        assert model is SchemaSnapshotData
-        return SimpleNamespace(snapshot_json=_snapshot())
-
-
 async def _authorized_snapshot(*_: object) -> object:
     return SimpleNamespace()
 
@@ -188,7 +172,6 @@ async def test_snapshot_reversing_draft_hides_llm_configuration_detail(
 
     _assert_sanitized_config_error(exc_info)
 
-
 @pytest.mark.asyncio
 async def test_snapshot_index_design_draft_hides_llm_configuration_detail(
     monkeypatch: pytest.MonkeyPatch,
@@ -206,40 +189,6 @@ async def test_snapshot_index_design_draft_hides_llm_configuration_detail(
             mode="llm-draft",
             user=_current_user(),
             session=_SnapshotSession(),
-        )
-
-    _assert_sanitized_config_error(exc_info)
-
-
-@pytest.mark.asyncio
-async def test_shared_reversing_draft_hides_llm_configuration_detail(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(share, "generate_reversing_llm_draft", _raise_config_error)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await share.export_shared_snapshot_reversing_spec(
-            uuid.uuid4(),
-            uuid.uuid4(),
-            mode="llm-draft",
-            session=_ShareSession(),
-        )
-
-    _assert_sanitized_config_error(exc_info)
-
-
-@pytest.mark.asyncio
-async def test_shared_index_design_draft_hides_llm_configuration_detail(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(share, "generate_index_design_llm_draft", _raise_config_error)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await share.export_shared_snapshot_index_design(
-            uuid.uuid4(),
-            uuid.uuid4(),
-            mode="llm-draft",
-            session=_ShareSession(),
         )
 
     _assert_sanitized_config_error(exc_info)

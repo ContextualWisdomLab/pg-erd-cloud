@@ -1,34 +1,12 @@
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { extname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { extname, isAbsolute, relative, resolve } from 'node:path'
+
+import { headersFor, securityHeaders } from './static-headers.mjs'
 
 const root = resolve(process.env.STATIC_ROOT ?? '/app/dist')
 const port = Number.parseInt(process.env.PORT ?? '8080', 10)
-
-const mimeTypes = new Map([
-  ['.css', 'text/css; charset=utf-8'],
-  ['.gif', 'image/gif'],
-  ['.html', 'text/html; charset=utf-8'],
-  ['.ico', 'image/x-icon'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'],
-  ['.js', 'text/javascript; charset=utf-8'],
-  ['.json', 'application/json; charset=utf-8'],
-  ['.map', 'application/json; charset=utf-8'],
-  ['.png', 'image/png'],
-  ['.svg', 'image/svg+xml'],
-  ['.txt', 'text/plain; charset=utf-8'],
-  ['.wasm', 'application/wasm'],
-  ['.webp', 'image/webp']
-])
-
-const securityHeaders = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
-}
 
 function isInsideRoot(filePath) {
   const rel = relative(root, filePath)
@@ -46,20 +24,7 @@ function requestPathToFile(url) {
   if (pathname.includes('\0')) return null
 
   const filePath = resolve(root, `.${pathname}`)
-  return isInsideRoot(filePath) ? filePath : null
-}
-
-function headersFor(filePath) {
-  const ext = extname(filePath).toLowerCase()
-  const cacheControl = filePath.includes(`${sep}assets${sep}`)
-    ? 'public, max-age=31536000, immutable'
-    : 'no-cache'
-
-  return {
-    ...securityHeaders,
-    'Content-Type': mimeTypes.get(ext) ?? 'application/octet-stream',
-    'Cache-Control': cacheControl
-  }
+  return isInsideRoot(filePath) ? { filePath, pathname } : null
 }
 
 async function resolveStaticFile(requestedFile) {
@@ -89,21 +54,21 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  const requestedFile = requestPathToFile(req.url ?? '/')
-  if (!requestedFile) {
+  const requestTarget = requestPathToFile(req.url ?? '/')
+  if (!requestTarget) {
     res.writeHead(400, securityHeaders)
     res.end('Bad request')
     return
   }
 
-  const filePath = await resolveStaticFile(requestedFile)
+  const filePath = await resolveStaticFile(requestTarget.filePath)
   if (!filePath) {
     res.writeHead(404, securityHeaders)
     res.end('Not found')
     return
   }
 
-  res.writeHead(200, headersFor(filePath))
+  res.writeHead(200, headersFor(filePath, requestTarget.pathname))
   if (req.method === 'HEAD') {
     res.end()
     return
