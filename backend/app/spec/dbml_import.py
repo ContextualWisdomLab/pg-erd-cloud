@@ -126,10 +126,11 @@ def _split_col_ref(raw: str) -> tuple[str, str, str]:
 
 
 def _split_csv(value: str) -> list[str] | None:
-    """Split a bounded comma list while allowing quoted identifiers/settings."""
+    """Split a bounded comma list while preserving quoted and nested values."""
     parts: list[str] = []
     start = 0
     quote: str | None = None
+    parenthesis_depth = 0
     position = 0
     while position < len(value):
         char = value[position]
@@ -139,16 +140,22 @@ def _split_csv(value: str) -> list[str] | None:
                     position += 2
                     continue
                 quote = None
-        elif char in {'"', "'"}:
+        elif char in {'"', "'", "`"}:
             quote = char
-        elif char == ",":
+        elif char == "(":
+            parenthesis_depth += 1
+        elif char == ")":
+            if parenthesis_depth == 0:
+                return None
+            parenthesis_depth -= 1
+        elif char == "," and parenthesis_depth == 0:
             part = value[start:position].strip()
             if not part:
                 return None
             parts.append(part)
             start = position + 1
         position += 1
-    if quote is not None:
+    if quote is not None or parenthesis_depth != 0:
         return None
     part = value[start:].strip()
     if not part:

@@ -101,6 +101,7 @@ Table public.accounts {
   id integer [pk]
   email varchar [unique]
   status varchar [default: 'active, pending']
+  full_name varchar [default: `coalesce(first_name, last_name)`]
   created_at timestamptz [default: now()]
 }
 """
@@ -109,6 +110,7 @@ Table public.accounts {
     columns = {column["column_name"]: column for column in snap["columns"]}
     assert columns["status"]["has_default"] is True
     assert columns["status"]["default_expr"] == "'active, pending'"
+    assert columns["full_name"]["default_expr"] == "`coalesce(first_name, last_name)`"
     assert columns["created_at"]["default_expr"] == "now()"
     unique_email = next(
         index for index in snap["indexes"] if index["is_unique"] and '"email"' in index["index_def"]
