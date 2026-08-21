@@ -33,7 +33,7 @@ with atheris.instrument_imports():
     from app.spec.wide_tables import detect_wide_tables
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _snapshot import ByteFeeder, build_snapshot
+from _snapshot import ByteFeeder, build_snapshot  # noqa: E402
 
 _MODES = ["markdown", "llm-prompt", "bogus", ""]
 

@@ -42,5 +42,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_diagram_view__project_space_uuid", table_name="diagram_view")
+    op.drop_index(
+        "ix_diagram_view__project_space_uuid", table_name="diagram_view"
+    )
     op.drop_table("diagram_view")

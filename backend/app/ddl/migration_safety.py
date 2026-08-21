@@ -50,12 +50,7 @@ def analyze_migration_safety(
     for key, tbl in b_tables.items():
         if key not in t_tables:
             items.append(
-                _item(
-                    "drop_table",
-                    DESTRUCTIVE,
-                    key,
-                    "Table is dropped — all its data is lost.",
-                )
+                _item("drop_table", DESTRUCTIVE, key, "Table is dropped — all its data is lost.")
             )
     for key, tbl in t_tables.items():
         if key not in b_tables:
@@ -73,25 +68,16 @@ def analyze_migration_safety(
             if col.get("is_not_null"):
                 items.append(
                     _item(
-                        "add_column",
-                        WARNING,
-                        f"{key}.{name}",
+                        "add_column", WARNING, f"{key}.{name}",
                         "New NOT NULL column — fails or locks if the table has rows and no default.",
                     )
                 )
             else:
-                items.append(
-                    _item("add_column", SAFE, f"{key}.{name}", "New nullable column.")
-                )
+                items.append(_item("add_column", SAFE, f"{key}.{name}", "New nullable column."))
         for name in b_cols:
             if name not in t_cols:
                 items.append(
-                    _item(
-                        "drop_column",
-                        DESTRUCTIVE,
-                        f"{key}.{name}",
-                        "Column dropped — its data is lost.",
-                    )
+                    _item("drop_column", DESTRUCTIVE, f"{key}.{name}", "Column dropped — its data is lost.")
                 )
         for name, col in t_cols.items():
             if name not in b_cols:
@@ -100,37 +86,24 @@ def analyze_migration_safety(
             if (old.get("data_type") or "") != (col.get("data_type") or ""):
                 items.append(
                     _item(
-                        "alter_column_type",
-                        WARNING,
-                        f"{key}.{name}",
+                        "alter_column_type", WARNING, f"{key}.{name}",
                         f"Type {old.get('data_type')} -> {col.get('data_type')} may rewrite/lock the table and can fail on incompatible data.",
                     )
                 )
             if not old.get("is_not_null") and col.get("is_not_null"):
                 items.append(
                     _item(
-                        "set_not_null",
-                        WARNING,
-                        f"{key}.{name}",
+                        "set_not_null", WARNING, f"{key}.{name}",
                         "SET NOT NULL scans the whole table and fails if existing NULLs are present.",
                     )
                 )
             if old.get("is_not_null") and not col.get("is_not_null"):
-                items.append(
-                    _item(
-                        "drop_not_null",
-                        SAFE,
-                        f"{key}.{name}",
-                        "Relaxing NOT NULL is safe.",
-                    )
-                )
+                items.append(_item("drop_not_null", SAFE, f"{key}.{name}", "Relaxing NOT NULL is safe."))
 
         if btbl.get("pk", []) != ttbl.get("pk", []):
             items.append(
                 _item(
-                    "primary_key_change",
-                    DESTRUCTIVE,
-                    key,
+                    "primary_key_change", DESTRUCTIVE, key,
                     "Primary key changed — usually needs data-aware handling and can lock the table.",
                 )
             )
@@ -140,21 +113,14 @@ def analyze_migration_safety(
         if sig not in base_fks:
             items.append(
                 _item(
-                    "add_foreign_key",
-                    WARNING,
-                    _fk_label(fk),
+                    "add_foreign_key", WARNING, _fk_label(fk),
                     "New foreign key validates all existing rows (brief lock) and fails if data violates it.",
                 )
             )
     for sig, fk in base_fks.items():
         if sig not in target_fks:
             items.append(
-                _item(
-                    "drop_foreign_key",
-                    SAFE,
-                    _fk_label(fk),
-                    "Dropping a foreign key relaxes a constraint — safe.",
-                )
+                _item("drop_foreign_key", SAFE, _fk_label(fk), "Dropping a foreign key relaxes a constraint — safe.")
             )
 
     items.sort(key=lambda i: (_SEVERITY_RANK.get(i["severity"], 9), i["target"]))

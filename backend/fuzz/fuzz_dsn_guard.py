@@ -31,7 +31,7 @@ os.environ.setdefault(
 os.environ.setdefault("APP_SECRET", "fuzz-not-a-secret")
 os.environ.setdefault("DB_INTROSPECTION_ALLOWED_HOSTS", "db.example.com,*.example.net")
 
-import atheris
+import atheris  # noqa: E402
 
 with atheris.instrument_imports():
     from app.pg_introspect import dsn_guard

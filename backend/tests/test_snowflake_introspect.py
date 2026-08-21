@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
+
 from app.snowflake_introspect.introspect import (
     _parse_snowflake_dsn,
     introspect_snowflake,

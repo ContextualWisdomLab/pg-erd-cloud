@@ -108,11 +108,11 @@ async def _client() -> Any:
 async def _close_client(client: Any) -> None:
     close = getattr(client, "aclose", None) or getattr(client, "close", None)
     if close is None:
-        return
+        return None
     result = close()
     if hasattr(result, "__await__"):
         _ = await result
-    return
+    return None
 
 
 async def enqueue_job_signal(
@@ -132,7 +132,7 @@ async def enqueue_job_signal(
             {str(job_queue_uuid): run_after.timestamp()},
         )
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001
         _logger.warning("Valkey job enqueue signal failed", exc_info=True)
         return False
     finally:
@@ -158,7 +158,7 @@ async def pop_due_job_signal(
             settings.valkey_queue_key,
             current.timestamp(),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         _logger.warning("Valkey job pop signal failed", exc_info=True)
         return None
     finally:

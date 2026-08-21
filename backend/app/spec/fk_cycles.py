@@ -122,9 +122,7 @@ def detect_fk_cycles(snapshot: dict[str, Any] | None) -> dict[str, Any]:
 
     items.sort(key=lambda i: (0 if i["severity"] == WARNING else 1, i["tables"]))
     summary = {
-        "circular_dependencies": sum(
-            1 for i in items if i["category"] == "circular_dependency"
-        ),
+        "circular_dependencies": sum(1 for i in items if i["category"] == "circular_dependency"),
         "self_references": len(self_refs),
         "total": len(items),
     }

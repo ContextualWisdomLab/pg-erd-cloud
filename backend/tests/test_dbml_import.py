@@ -45,7 +45,7 @@ def test_parses_refs_inline_and_standalone_deduped_semantics():
 
 
 def test_reverse_arrow_and_schema_qualified_and_quoted():
-    text = """
+    text = '''
 Table auth.accounts {
   account_id bigint [pk]
 }
@@ -54,16 +54,12 @@ Table "Order Items" {
   account_id bigint
 }
 Ref: auth.accounts.account_id < "Order Items".account_id
-"""
+'''
     snap = parse_dbml(text)
-    assert ("auth", "accounts") in {
-        (r["schema_name"], r["relation_name"]) for r in snap["relations"]
-    }
+    assert ("auth", "accounts") in {(r["schema_name"], r["relation_name"]) for r in snap["relations"]}
     edge = snap["fk_edges"][0]
     # '<' means the right side references the left
-    child = next(
-        r for r in snap["relations"] if r["relation_oid"] == edge["child_relation_oid"]
-    )
+    child = next(r for r in snap["relations"] if r["relation_oid"] == edge["child_relation_oid"])
     assert child["relation_name"] == "Order Items"
 
 
@@ -97,7 +93,7 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
 def test_pathological_long_line_is_skipped_fast():
     import time
 
-    hostile = "Table t {\n  id int [pk]\n}\nRef: " + '"a' * 100_000 + "\n"
+    hostile = 'Table t {\n  id int [pk]\n}\nRef: ' + '"a' * 100_000 + "\n"
     start = time.monotonic()
     snap = parse_dbml(hostile)
     assert time.monotonic() - start < 1.0  # no catastrophic backtracking

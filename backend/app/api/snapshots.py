@@ -10,11 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.ddl.export import snapshot_json_to_sql
-from app.ddl.migration import snapshot_diff_to_migration_sql
-from app.ddl.migration_safety import analyze_migration_safety
-from app.diff.schema_diff import diff_snapshots
-from app.jobs.valkey_queue import enqueue_job_signal
 from app.models import (
     DbConnection,
     JobQueue,
@@ -39,18 +34,15 @@ from app.schemas import (
     SnapshotOut,
     WideTablesOut,
 )
+from app.ddl.export import snapshot_json_to_sql
+from app.ddl.migration import snapshot_diff_to_migration_sql
+from app.ddl.migration_safety import analyze_migration_safety
+from app.diff.schema_diff import diff_snapshots
 from app.spec.audit_columns import check_audit_columns
 from app.spec.constraint_inventory import build_constraint_inventory
-from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.fk_cycles import detect_fk_cycles
-from app.spec.index_design import generate_index_design_spec
 from app.spec.index_redundancy import detect_index_redundancy
-from app.spec.llm import (
-    LlmConfigurationError,
-    LlmProviderError,
-    generate_index_design_llm_draft,
-    generate_reversing_llm_draft,
-)
+from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.naming_lint import lint_naming
 from app.spec.orm_codegen import (
     generate_prisma_schema,
@@ -58,10 +50,18 @@ from app.spec.orm_codegen import (
     generate_typeorm_entities,
 )
 from app.spec.relationship_inference import infer_relationships
-from app.spec.reversing import generate_reversing_spec
 from app.spec.schema_stats import compute_schema_stats
 from app.spec.sensitive_columns import detect_sensitive_columns
 from app.spec.wide_tables import detect_wide_tables
+from app.jobs.valkey_queue import enqueue_job_signal
+from app.spec.llm import (
+    LlmConfigurationError,
+    LlmProviderError,
+    generate_index_design_llm_draft,
+    generate_reversing_llm_draft,
+)
+from app.spec.index_design import generate_index_design_spec
+from app.spec.reversing import generate_reversing_spec
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
@@ -295,7 +295,9 @@ async def migration_safety(
 @router.get("/{schema_snapshot_uuid}/migration.sql", response_class=PlainTextResponse)
 async def export_migration_sql(
     schema_snapshot_uuid: uuid.UUID,
-    against: uuid.UUID = Query(..., description="Base snapshot UUID to migrate from"),
+    against: uuid.UUID = Query(
+        ..., description="Base snapshot UUID to migrate from"
+    ),
     dialect: str = Query("postgresql", pattern="^(postgresql|snowflake)$"),
     direction: str = Query(
         "up",

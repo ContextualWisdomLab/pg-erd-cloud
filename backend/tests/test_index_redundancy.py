@@ -7,9 +7,7 @@ def _snap(index_defs, unique=None):
     """index_defs: {index_name: 'col1, col2'} on one table 'orders'."""
     unique = unique or set()
     return {
-        "relations": [
-            {"relation_oid": 1, "schema_name": "public", "relation_name": "orders"}
-        ],
+        "relations": [{"relation_oid": 1, "schema_name": "public", "relation_name": "orders"}],
         "indexes": [
             {
                 "relation_oid": 1,
@@ -50,10 +48,7 @@ def test_detects_prefix_redundancy_but_not_unique_prefix():
 
     # but a UNIQUE index is a constraint — never suggested for dropping
     report2 = detect_index_redundancy(
-        _snap(
-            {"uq_short": "member_id", "ix_long": "member_id, created_at"},
-            unique={"uq_short"},
-        )
+        _snap({"uq_short": "member_id", "ix_long": "member_id, created_at"}, unique={"uq_short"})
     )
     assert report2["items"] == []
 
@@ -63,20 +58,10 @@ def test_different_columns_and_unparseable_defs_are_skipped():
     assert report["items"] == []
     # expression + partial indexes are skipped, not guessed
     snap = _snap({"ix_a": "member_id"})
-    snap["indexes"].append(
-        {
-            "relation_oid": 1,
-            "index_name": "ix_expr",
-            "index_def": "CREATE INDEX ix_expr ON public.orders (lower(email))",
-        }
-    )
-    snap["indexes"].append(
-        {
-            "relation_oid": 1,
-            "index_name": "ix_part",
-            "index_def": "CREATE INDEX ix_part ON public.orders (member_id) WHERE deleted_at IS NULL",
-        }
-    )
+    snap["indexes"].append({"relation_oid": 1, "index_name": "ix_expr",
+                            "index_def": "CREATE INDEX ix_expr ON public.orders (lower(email))"})
+    snap["indexes"].append({"relation_oid": 1, "index_name": "ix_part",
+                            "index_def": "CREATE INDEX ix_part ON public.orders (member_id) WHERE deleted_at IS NULL"})
     assert detect_index_redundancy(snap)["items"] == []
     assert detect_index_redundancy({})["summary"]["total"] == 0
 
@@ -108,9 +93,7 @@ def test_index_columns_skips_expression_indexes_including_multi_column():
     # plain column and mis-report the expression as a column.
     assert _index_columns("CREATE INDEX i ON t USING btree (lower(email))") == []
     assert _index_columns("CREATE INDEX i ON t USING btree (a, lower(b))") == []
-    assert (
-        _index_columns("CREATE INDEX i ON t USING btree (lower((email)::text))") == []
-    )
+    assert _index_columns("CREATE INDEX i ON t USING btree (lower((email)::text))") == []
     # Plain / opclass / DESC lists still parse to their leading column tokens.
     assert _index_columns("CREATE INDEX i ON t USING btree (email)") == ["email"]
     assert _index_columns("CREATE INDEX i ON t (member_id, org_id)") == [

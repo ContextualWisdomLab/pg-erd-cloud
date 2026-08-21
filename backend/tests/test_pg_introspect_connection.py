@@ -5,6 +5,7 @@ import ssl
 from typing import Any
 
 import pytest
+
 from app.pg_introspect import introspect
 from app.settings import settings
 
@@ -81,4 +82,4 @@ async def test_introspection_preserves_sni_for_verified_tls(
 
     assert captured["host"] == "93.184.216.34"
     assert isinstance(captured["ssl"], ssl.SSLContext)
-    assert captured["ssl"]._server_hostname == "db.example.com"
+    assert getattr(captured["ssl"], "_server_hostname") == "db.example.com"

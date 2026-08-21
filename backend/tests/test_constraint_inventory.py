@@ -18,18 +18,11 @@ def _con(ctype, name, table="orders", ftable=None, on_delete=None, check_expr=No
 
 
 def test_inventories_check_constraints_with_expressions():
-    snap = {
-        "constraints": [
-            _con("c", "chk_qty_positive", check_expr="(quantity > 0)"),
-            _con(
-                "c",
-                "chk_status",
-                table="member",
-                check_expr="(status IN ('active','banned'))",
-            ),
-            _con("p", "pk_orders"),
-        ]
-    }
+    snap = {"constraints": [
+        _con("c", "chk_qty_positive", check_expr="(quantity > 0)"),
+        _con("c", "chk_status", table="member", check_expr="(status IN ('active','banned'))"),
+        _con("p", "pk_orders"),
+    ]}
     inv = build_constraint_inventory(snap)
     assert inv["summary"]["check_rules"] == 2
     assert inv["check_rules"][0]["table"] == "public.member"  # sorted by table
@@ -37,13 +30,9 @@ def test_inventories_check_constraints_with_expressions():
 
 
 def test_flags_cascade_delete_as_warning():
-    snap = {
-        "constraints": [
-            _con(
-                "f", "fk_item_order", table="order_item", ftable="orders", on_delete="c"
-            ),
-        ]
-    }
+    snap = {"constraints": [
+        _con("f", "fk_item_order", table="order_item", ftable="orders", on_delete="c"),
+    ]}
     inv = build_constraint_inventory(snap)
     assert inv["summary"]["cascade_deletes"] == 1
     item = inv["delete_actions"][0]
@@ -52,13 +41,11 @@ def test_flags_cascade_delete_as_warning():
 
 
 def test_set_null_is_info_and_spelled_out_codes_work():
-    snap = {
-        "constraints": [
-            _con("f", "fk_a", table="a", ftable="b", on_delete="set null"),
-            _con("f", "fk_c", table="c", ftable="d", on_delete="CASCADE"),
-            _con("f", "fk_plain", table="e", ftable="f", on_delete="a"),  # no action
-        ]
-    }
+    snap = {"constraints": [
+        _con("f", "fk_a", table="a", ftable="b", on_delete="set null"),
+        _con("f", "fk_c", table="c", ftable="d", on_delete="CASCADE"),
+        _con("f", "fk_plain", table="e", ftable="f", on_delete="a"),  # no action
+    ]}
     inv = build_constraint_inventory(snap)
     assert inv["summary"]["set_null_deletes"] == 1
     assert inv["summary"]["cascade_deletes"] == 1

@@ -18,7 +18,7 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
 
     _server_hostname: str
 
-    def __new__(cls, server_hostname: str) -> _ServerHostnameSSLContext:
+    def __new__(cls, server_hostname: str) -> "_ServerHostnameSSLContext":
         context = super().__new__(cls, ssl.PROTOCOL_TLS_CLIENT)
         context._server_hostname = server_hostname
         return context
@@ -60,7 +60,9 @@ def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     return context
 
 
-async def _connect_guarded_postgres(dsn: str, *, timeout: float) -> asyncpg.Connection:
+async def _connect_guarded_postgres(
+    dsn: str, *, timeout: float
+) -> asyncpg.Connection:
     target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
+
 from app import main as main_app
 from app.csrf import CSRF_HEADER_NAME, generate_csrf_token
 from app.settings import settings
-from fastapi.testclient import TestClient
 
 
 def test_logout_route_uses_tighter_revocation_rate_limit() -> None:

@@ -104,22 +104,14 @@ def detect_index_redundancy(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         rel = rel_by_oid.get(oid) or {}
         table = f"{rel.get('schema_name')}.{rel.get('relation_name')}"
         for i, (name_a, cols_a, unique_a) in enumerate(idx_list):
-            for name_b, cols_b, unique_b in idx_list[i + 1 :]:
+            for name_b, cols_b, unique_b in idx_list[i + 1:]:
                 if cols_a == cols_b:
                     # exact duplicate: suggest dropping the non-unique one
-                    drop = (
-                        name_b
-                        if unique_a and not unique_b
-                        else name_a
-                        if unique_b and not unique_a
-                        else name_b
-                    )
+                    drop = name_b if unique_a and not unique_b else name_a if unique_b and not unique_a else name_b
                     items.append(
                         {
-                            "category": "duplicate_index",
-                            "severity": WARNING,
-                            "table": table,
-                            "index": drop,
+                            "category": "duplicate_index", "severity": WARNING,
+                            "table": table, "index": drop,
                             "kept": name_a if drop == name_b else name_b,
                             "columns": list(cols_a),
                             "detail": f"'{drop}' duplicates '{name_a if drop == name_b else name_b}' on ({', '.join(cols_a)}) — drop it.",
@@ -135,10 +127,8 @@ def detect_index_redundancy(snapshot: dict[str, Any] | None) -> dict[str, Any]:
                             break  # unique index enforces a constraint; never suggest dropping
                         items.append(
                             {
-                                "category": "prefix_redundant_index",
-                                "severity": INFO,
-                                "table": table,
-                                "index": s_name,
+                                "category": "prefix_redundant_index", "severity": INFO,
+                                "table": table, "index": s_name,
                                 "kept": l_name,
                                 "columns": list(shorter),
                                 "detail": f"'{s_name}' on ({', '.join(shorter)}) is a prefix of '{l_name}' on ({', '.join(longer)}) — likely droppable.",
@@ -146,14 +136,10 @@ def detect_index_redundancy(snapshot: dict[str, Any] | None) -> dict[str, Any]:
                         )
                         break
 
-    items.sort(
-        key=lambda i: (0 if i["severity"] == WARNING else 1, i["table"], i["index"])
-    )
+    items.sort(key=lambda i: (0 if i["severity"] == WARNING else 1, i["table"], i["index"]))
     summary = {
         "duplicates": sum(1 for i in items if i["category"] == "duplicate_index"),
-        "prefix_redundant": sum(
-            1 for i in items if i["category"] == "prefix_redundant_index"
-        ),
+        "prefix_redundant": sum(1 for i in items if i["category"] == "prefix_redundant_index"),
         "total": len(items),
     }
     return {"items": items, "summary": summary}

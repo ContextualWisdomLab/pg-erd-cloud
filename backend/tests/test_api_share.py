@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+
 from app.api.share import (
     export_shared_snapshot_index_design,
     export_shared_snapshot_reversing_spec,

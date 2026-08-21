@@ -69,9 +69,7 @@ def _index_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         if name is None:
             continue
         ordinal = pk.get("column_ordinal")
-        ordinal = (
-            int(ordinal) if isinstance(ordinal, int) else len(pk_tmp.get(table, []))
-        )
+        ordinal = int(ordinal) if isinstance(ordinal, int) else len(pk_tmp.get(table, []))
         pk_tmp.setdefault(table, []).append((ordinal, str(name)))
     for table, items in pk_tmp.items():
         items.sort(key=lambda pair: pair[0])
@@ -104,7 +102,8 @@ def _index_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
         # Signature is oid-independent: names + column pairing, not the FK name
         # (constraint names may auto-generate differently between runs).
         signature = (
-            f"{child}({','.join(child_cols)})->{parent}({','.join(parent_cols)})"
+            f"{child}({','.join(child_cols)})->"
+            f"{parent}({','.join(parent_cols)})"
         )
         fks[signature] = {
             "name": name or None,

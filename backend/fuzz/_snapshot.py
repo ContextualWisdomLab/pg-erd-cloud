@@ -15,8 +15,7 @@ same corpus generation logic backs every harness.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import Any, Callable
 
 # Value "kinds" the generators special-case: strings, ints, bools, None,
 # nested dicts/lists, and single-char relation/constraint discriminators.
@@ -55,11 +54,11 @@ class ByteFeeder:
         return self._consume_int(cap)
 
     @classmethod
-    def from_fdp(cls, fdp: Any) -> ByteFeeder:
+    def from_fdp(cls, fdp: Any) -> "ByteFeeder":
         return cls(lambda hi: fdp.ConsumeIntInRange(0, hi) if hi > 0 else 0)
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> ByteFeeder:
+    def from_bytes(cls, data: bytes) -> "ByteFeeder":
         state = {"i": 0}
 
         def consume(hi: int) -> int:

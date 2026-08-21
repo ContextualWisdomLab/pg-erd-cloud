@@ -1,17 +1,19 @@
 import pytest
 from app.snowflake_introspect.introspect import (
-    SnowflakeDsnConfig,
-    _build_constraints,
-    _connect,
-    _constraint_def,
-    _constraint_type,
-    _fetch_dicts,
-    _format_snowflake_data_type,
     _int_or_none,
-    _introspect_snowflake_sync_with_config,
     _parse_snowflake_dsn,
+    _connect,
+    _fetch_dicts,
     _snowflake_relation_kind,
+    _format_snowflake_data_type,
     _table_key,
+    _constraint_type,
+    _constraint_def,
+    _build_constraints,
+)
+from app.snowflake_introspect.introspect import (
+    _introspect_snowflake_sync_with_config,
+    SnowflakeDsnConfig,
 )
 
 

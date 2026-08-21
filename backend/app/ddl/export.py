@@ -258,7 +258,9 @@ def _column_default_clause(default_expr: object, target: DdlDialect) -> str | No
 
 def _snapshot_tables(snapshot: dict) -> list[dict]:
     return [
-        r for r in _rows(snapshot, "relations") if r.get("relation_kind") in ("r", "p")
+        r
+        for r in _rows(snapshot, "relations")
+        if r.get("relation_kind") in ("r", "p")
     ]
 
 

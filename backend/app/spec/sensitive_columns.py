@@ -27,66 +27,14 @@ _SEVERITY_RANK = {HIGH: 0, MEDIUM: 1, LOW: 2}
 # wins, so the most specific / most sensitive categories come first. `framework`
 # names the regulation that brings the column into scope.
 _RULES: list[tuple[str, str, str, re.Pattern[str]]] = [
-    (
-        "credential",
-        HIGH,
-        "Secrets (must never be stored in plaintext)",
-        re.compile(
-            r"pass(word|wd)?|passwd|secret|api[_-]?key|token|private[_-]?key|salt|otp"
-        ),
-    ),
-    (
-        "national_id",
-        HIGH,
-        "GDPR Art.9 / PIPA unique-identifier & special category",
-        re.compile(
-            r"ssn|social[_-]?security|resident[_-]?reg|jumin|national[_-]?id|passport|tax[_-]?id|driver[_-]?licen"
-        ),
-    ),
-    (
-        "payment",
-        HIGH,
-        "PCI DSS (cardholder data environment)",
-        re.compile(
-            r"card[_-]?(no|num|number)|credit[_-]?card|ccnum|cvv|cvc|iban|account[_-]?(no|number)|routing"
-        ),
-    ),
-    (
-        "special_category",
-        HIGH,
-        "GDPR Art.9 / PIPA sensitive data",
-        re.compile(
-            r"(^|_)health|medical|diagnos|disease|biometric|fingerprint|(^|_)race($|_)|ethnic|religion|political|sexual|genetic"
-        ),
-    ),
-    (
-        "contact",
-        MEDIUM,
-        "GDPR / PIPA personal data",
-        re.compile(r"e[_-]?mail|(^|_)email|phone|mobile|(^|_)tel($|_)|fax"),
-    ),
-    (
-        "location",
-        MEDIUM,
-        "GDPR / PIPA personal data",
-        re.compile(
-            r"address|(^|_)addr($|_)|zip[_-]?code|postal|(^|_)city($|_)|latitude|longitude|(^|_)geo"
-        ),
-    ),
-    (
-        "personal",
-        MEDIUM,
-        "GDPR / PIPA personal data",
-        re.compile(r"birth|(^|_)dob($|_)|gender|nationality|marital"),
-    ),
-    (
-        "name",
-        LOW,
-        "GDPR / PIPA personal data",
-        re.compile(
-            r"(first|last|full|middle|given|family)[_-]?name|(^|_)fname|(^|_)lname|username|nickname"
-        ),
-    ),
+    ("credential", HIGH, "Secrets (must never be stored in plaintext)", re.compile(r"pass(word|wd)?|passwd|secret|api[_-]?key|token|private[_-]?key|salt|otp")),
+    ("national_id", HIGH, "GDPR Art.9 / PIPA unique-identifier & special category", re.compile(r"ssn|social[_-]?security|resident[_-]?reg|jumin|national[_-]?id|passport|tax[_-]?id|driver[_-]?licen"),),
+    ("payment", HIGH, "PCI DSS (cardholder data environment)", re.compile(r"card[_-]?(no|num|number)|credit[_-]?card|ccnum|cvv|cvc|iban|account[_-]?(no|number)|routing")),
+    ("special_category", HIGH, "GDPR Art.9 / PIPA sensitive data", re.compile(r"(^|_)health|medical|diagnos|disease|biometric|fingerprint|(^|_)race($|_)|ethnic|religion|political|sexual|genetic")),
+    ("contact", MEDIUM, "GDPR / PIPA personal data", re.compile(r"e[_-]?mail|(^|_)email|phone|mobile|(^|_)tel($|_)|fax")),
+    ("location", MEDIUM, "GDPR / PIPA personal data", re.compile(r"address|(^|_)addr($|_)|zip[_-]?code|postal|(^|_)city($|_)|latitude|longitude|(^|_)geo")),
+    ("personal", MEDIUM, "GDPR / PIPA personal data", re.compile(r"birth|(^|_)dob($|_)|gender|nationality|marital")),
+    ("name", LOW, "GDPR / PIPA personal data", re.compile(r"(first|last|full|middle|given|family)[_-]?name|(^|_)fname|(^|_)lname|username|nickname")),
 ]
 
 

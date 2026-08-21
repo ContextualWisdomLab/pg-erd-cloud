@@ -6,60 +6,18 @@ from app.spec.schema_stats import compute_schema_stats
 def _snap():
     return {
         "relations": [
-            {
-                "relation_oid": 1,
-                "relation_kind": "r",
-                "schema_name": "public",
-                "relation_name": "member",
-            },
-            {
-                "relation_oid": 2,
-                "relation_kind": "r",
-                "schema_name": "public",
-                "relation_name": "orders",
-            },
-            {
-                "relation_oid": 3,
-                "relation_kind": "v",
-                "schema_name": "public",
-                "relation_name": "v_report",
-            },
+            {"relation_oid": 1, "relation_kind": "r", "schema_name": "public", "relation_name": "member"},
+            {"relation_oid": 2, "relation_kind": "r", "schema_name": "public", "relation_name": "orders"},
+            {"relation_oid": 3, "relation_kind": "v", "schema_name": "public", "relation_name": "v_report"},
         ],
         "columns": [
-            {
-                "relation_oid": 1,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
-            {
-                "relation_oid": 1,
-                "column_name": "email",
-                "data_type": "text",
-                "is_not_null": True,
-            },
-            {
-                "relation_oid": 1,
-                "column_name": "nickname",
-                "data_type": "text",
-                "is_not_null": False,
-            },
-            {
-                "relation_oid": 2,
-                "column_name": "order_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
+            {"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "email", "data_type": "text", "is_not_null": True},
+            {"relation_oid": 1, "column_name": "nickname", "data_type": "text", "is_not_null": False},
+            {"relation_oid": 2, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
         ],
         "pk_columns": [{"relation_oid": 1, "column_name": "member_id"}],
-        "fk_edges": [
-            {
-                "child_relation_oid": 2,
-                "parent_relation_oid": 1,
-                "child_column_name": "member_id",
-                "parent_column_name": "member_id",
-            }
-        ],
+        "fk_edges": [{"child_relation_oid": 2, "parent_relation_oid": 1, "child_column_name": "member_id", "parent_column_name": "member_id"}],
         "indexes": [{"relation_oid": 1, "index_name": "pk_member"}],
     }
 
@@ -77,7 +35,7 @@ def test_column_stats_and_widest_table():
     assert s["columns"]["nullable"] == 1
     assert s["columns"]["not_null"] == 3
     assert s["columns"]["avg_per_table"] == 2.0  # 4 columns / 2 tables
-    assert s["columns"]["max_per_table"] == 3  # member has 3
+    assert s["columns"]["max_per_table"] == 3    # member has 3
     assert s["widest_tables"][0] == {"table": "public.member", "columns": 3}
 
 

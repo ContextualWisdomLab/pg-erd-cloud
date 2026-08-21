@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
-from app.security import decrypt_text, encrypt_text, redact_dsn
+from unittest.mock import patch
 from cryptography.exceptions import InvalidTag
+
+from app.security import decrypt_text, encrypt_text, redact_dsn
 
 
 @pytest.mark.parametrize(

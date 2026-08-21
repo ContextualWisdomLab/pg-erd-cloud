@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from starlette.requests import Request
+
 from app.rate_limit import (
     InMemoryFixedWindowRateLimiter,
     RateLimitPolicy,
     make_rate_limit_middleware,
 )
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from starlette.requests import Request
 
 
 async def _no_subject(_: Request) -> str | None:

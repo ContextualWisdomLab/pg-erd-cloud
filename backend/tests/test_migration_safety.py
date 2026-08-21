@@ -14,26 +14,12 @@ def _snap(relations, columns, pk_columns=None, fk_edges=None):
 
 def _member(oid=1, email_not_null=False):
     return _snap(
-        relations=[
-            {"relation_oid": oid, "schema_name": "public", "relation_name": "member"}
-        ],
+        relations=[{"relation_oid": oid, "schema_name": "public", "relation_name": "member"}],
         columns=[
-            {
-                "relation_oid": oid,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
-            {
-                "relation_oid": oid,
-                "column_name": "email",
-                "data_type": "varchar(100)",
-                "is_not_null": email_not_null,
-            },
+            {"relation_oid": oid, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {"relation_oid": oid, "column_name": "email", "data_type": "varchar(100)", "is_not_null": email_not_null},
         ],
-        pk_columns=[
-            {"relation_oid": oid, "column_name": "member_id", "column_ordinal": 1}
-        ],
+        pk_columns=[{"relation_oid": oid, "column_name": "member_id", "column_ordinal": 1}],
     )
 
 
@@ -57,17 +43,8 @@ def test_drop_table_and_column_are_destructive():
 
     # target: email column dropped
     dropped_col = _snap(
-        relations=[
-            {"relation_oid": 2, "schema_name": "public", "relation_name": "member"}
-        ],
-        columns=[
-            {
-                "relation_oid": 2,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            }
-        ],
+        relations=[{"relation_oid": 2, "schema_name": "public", "relation_name": "member"}],
+        columns=[{"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True}],
         pk_columns=[{"relation_oid": 2, "column_name": "member_id"}],
     )
     a2 = analyze_migration_safety(base, dropped_col)
@@ -78,28 +55,11 @@ def test_add_nullable_is_safe_add_not_null_is_warning():
     base = _member()
     # add nullable column
     add_nullable = _snap(
-        relations=[
-            {"relation_oid": 3, "schema_name": "public", "relation_name": "member"}
-        ],
+        relations=[{"relation_oid": 3, "schema_name": "public", "relation_name": "member"}],
         columns=[
-            {
-                "relation_oid": 3,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
-            {
-                "relation_oid": 3,
-                "column_name": "email",
-                "data_type": "varchar(100)",
-                "is_not_null": False,
-            },
-            {
-                "relation_oid": 3,
-                "column_name": "nickname",
-                "data_type": "text",
-                "is_not_null": False,
-            },
+            {"relation_oid": 3, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {"relation_oid": 3, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
+            {"relation_oid": 3, "column_name": "nickname", "data_type": "text", "is_not_null": False},
         ],
         pk_columns=[{"relation_oid": 3, "column_name": "member_id"}],
     )
@@ -107,28 +67,11 @@ def test_add_nullable_is_safe_add_not_null_is_warning():
 
     # add NOT NULL column
     add_nn = _snap(
-        relations=[
-            {"relation_oid": 4, "schema_name": "public", "relation_name": "member"}
-        ],
+        relations=[{"relation_oid": 4, "schema_name": "public", "relation_name": "member"}],
         columns=[
-            {
-                "relation_oid": 4,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
-            {
-                "relation_oid": 4,
-                "column_name": "email",
-                "data_type": "varchar(100)",
-                "is_not_null": False,
-            },
-            {
-                "relation_oid": 4,
-                "column_name": "status",
-                "data_type": "text",
-                "is_not_null": True,
-            },
+            {"relation_oid": 4, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
+            {"relation_oid": 4, "column_name": "email", "data_type": "varchar(100)", "is_not_null": False},
+            {"relation_oid": 4, "column_name": "status", "data_type": "text", "is_not_null": True},
         ],
         pk_columns=[{"relation_oid": 4, "column_name": "member_id"}],
     )
@@ -138,23 +81,11 @@ def test_add_nullable_is_safe_add_not_null_is_warning():
 def test_type_change_and_set_not_null_are_warnings():
     base = _member(email_not_null=False)
     target = _snap(
-        relations=[
-            {"relation_oid": 5, "schema_name": "public", "relation_name": "member"}
-        ],
+        relations=[{"relation_oid": 5, "schema_name": "public", "relation_name": "member"}],
         columns=[
-            {
-                "relation_oid": 5,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
+            {"relation_oid": 5, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
             # email: varchar(100) -> text AND now NOT NULL
-            {
-                "relation_oid": 5,
-                "column_name": "email",
-                "data_type": "text",
-                "is_not_null": True,
-            },
+            {"relation_oid": 5, "column_name": "email", "data_type": "text", "is_not_null": True},
         ],
         pk_columns=[{"relation_oid": 5, "column_name": "member_id"}],
     )
@@ -166,18 +97,8 @@ def test_type_change_and_set_not_null_are_warnings():
 def test_add_fk_is_warning_drop_fk_is_safe_and_report_is_sorted():
     orders_rel = {"relation_oid": 2, "schema_name": "public", "relation_name": "orders"}
     orders_cols = [
-        {
-            "relation_oid": 2,
-            "column_name": "order_id",
-            "data_type": "bigint",
-            "is_not_null": True,
-        },
-        {
-            "relation_oid": 2,
-            "column_name": "member_id",
-            "data_type": "bigint",
-            "is_not_null": True,
-        },
+        {"relation_oid": 2, "column_name": "order_id", "data_type": "bigint", "is_not_null": True},
+        {"relation_oid": 2, "column_name": "member_id", "data_type": "bigint", "is_not_null": True},
     ]
     fk = {
         "fk_constraint_name": "fk_orders_member",
@@ -188,27 +109,11 @@ def test_add_fk_is_warning_drop_fk_is_safe_and_report_is_sorted():
         "column_ordinal": 1,
     }
     base = _snap(
-        relations=[
-            {"relation_oid": 1, "schema_name": "public", "relation_name": "member"},
-            orders_rel,
-        ],
-        columns=[
-            {
-                "relation_oid": 1,
-                "column_name": "member_id",
-                "data_type": "bigint",
-                "is_not_null": True,
-            },
-            *orders_cols,
-        ],
+        relations=[{"relation_oid": 1, "schema_name": "public", "relation_name": "member"}, orders_rel],
+        columns=[{"relation_oid": 1, "column_name": "member_id", "data_type": "bigint", "is_not_null": True}, *orders_cols],
         pk_columns=[{"relation_oid": 1, "column_name": "member_id"}],
     )
-    target = _snap(
-        relations=base["relations"],
-        columns=base["columns"],
-        pk_columns=base["pk_columns"],
-        fk_edges=[fk],
-    )
+    target = _snap(relations=base["relations"], columns=base["columns"], pk_columns=base["pk_columns"], fk_edges=[fk])
 
     add = analyze_migration_safety(base, target)
     assert ("add_foreign_key", "warning") in _cats(add)
@@ -224,6 +129,4 @@ def test_add_fk_is_warning_drop_fk_is_safe_and_report_is_sorted():
     )
     mixed = analyze_migration_safety(target, mixed_target)
     severities = [i["severity"] for i in mixed["items"]]
-    assert severities == sorted(
-        severities, key={"destructive": 0, "warning": 1, "safe": 2}.get
-    )
+    assert severities == sorted(severities, key={"destructive": 0, "warning": 1, "safe": 2}.get)

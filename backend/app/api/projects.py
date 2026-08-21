@@ -10,15 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.permissions import require_project_member
-from app.sanitize import sanitize_for_storage
+from app.models import ProjectMember, ProjectSpace, UserAccount
 from app.schemas import (
     ProjectCreateIn,
     ProjectMemberAddIn,
     ProjectMemberOut,
     ProjectOut,
 )
+from app.sanitize import sanitize_for_storage
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from app.observability import _get_client_ip, _get_route_template, setup_observability
-from app.settings import settings
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
+
+from app.observability import _get_client_ip, _get_route_template, setup_observability
+from app.settings import settings
 
 
 def test_request_id_header_and_metrics_endpoint() -> None:

@@ -11,9 +11,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.11.3
         version: 12.11.3(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      nanoid:
-        specifier: 3.3.18
-        version: 3.3.18
       react:
         specifier: ^19.2.4
         version: 19.2.8

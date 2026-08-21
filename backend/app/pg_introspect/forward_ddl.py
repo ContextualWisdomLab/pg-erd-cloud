@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
+import re
 
 
 class ForwardDdlValidationError(ValueError):
@@ -89,31 +89,23 @@ _CONSTRAINT_WORDS = {
     "REFERENCES",
     "UNIQUE",
 }
-_CREATE_TABLE_WORDS = (
-    _TYPE_WORDS
-    | _CONSTRAINT_WORDS
-    | {
-        "CREATE",
-        "EXISTS",
-        "IF",
-        "NOT",
-        "TABLE",
-    }
-)
-_ALTER_TABLE_WORDS = (
-    _TYPE_WORDS
-    | _CONSTRAINT_WORDS
-    | {
-        "ADD",
-        "ALTER",
-        "COLUMN",
-        "EXISTS",
-        "IF",
-        "RENAME",
-        "TABLE",
-        "TO",
-    }
-)
+_CREATE_TABLE_WORDS = _TYPE_WORDS | _CONSTRAINT_WORDS | {
+    "CREATE",
+    "EXISTS",
+    "IF",
+    "NOT",
+    "TABLE",
+}
+_ALTER_TABLE_WORDS = _TYPE_WORDS | _CONSTRAINT_WORDS | {
+    "ADD",
+    "ALTER",
+    "COLUMN",
+    "EXISTS",
+    "IF",
+    "RENAME",
+    "TABLE",
+    "TO",
+}
 _CREATE_INDEX_WORDS = {
     "BTREE",
     "CREATE",
@@ -203,7 +195,9 @@ def _reject_dangerous_keywords(tokens: list[str]) -> None:
             continue
         upper = _upper(token)
         if upper in _DANGEROUS_KEYWORDS:
-            raise ForwardDdlValidationError(f"{upper} is not allowed in forward DDL")
+            raise ForwardDdlValidationError(
+                f"{upper} is not allowed in forward DDL"
+            )
 
 
 def _validate_create_table(tokens: list[str]) -> None:
@@ -364,9 +358,9 @@ def _split_top_level_commas(tokens: list[str]) -> list[list[str]]:
 def _matches(tokens: list[str], index: int, expected: list[str]) -> bool:
     if index + len(expected) > len(tokens):
         return False
-    return [
-        _upper(token) for token in tokens[index : index + len(expected)]
-    ] == expected
+    return (
+        [_upper(token) for token in tokens[index : index + len(expected)]] == expected
+    )
 
 
 def _upper(token: str) -> str:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 
 import pytest
+
 from app.pg_introspect.dsn_guard import (
     DsnTargetError,
     _unique_hosts,
@@ -286,7 +287,9 @@ def test_unique_hosts_deduplicates_repeated_hosts() -> None:
 async def test_dsn_guard_rejects_non_integer_query_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
+    monkeypatch.setattr(
+        settings, "db_introspection_allowed_hosts", "db.example.com"
+    )
     with pytest.raises(DsnTargetError, match="query port is invalid"):
         await validate_postgres_dsn_target(
             "postgresql://user:pass@db.example.com/app?port=abc"
@@ -303,6 +306,12 @@ async def test_dsn_guard_rejects_host_resolving_to_no_usable_address(
         "getaddrinfo",
         lambda *_args, **_kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ())],
     )
-    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
-    with pytest.raises(DsnTargetError, match="did not resolve to an IP address"):
-        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+    monkeypatch.setattr(
+        settings, "db_introspection_allowed_hosts", "db.example.com"
+    )
+    with pytest.raises(
+        DsnTargetError, match="did not resolve to an IP address"
+    ):
+        await validate_postgres_dsn_target(
+            "postgresql://user:pass@db.example.com/app"
+        )

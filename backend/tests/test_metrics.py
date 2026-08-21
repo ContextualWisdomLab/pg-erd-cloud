@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY
 
 from app.metrics import (
     normalize_route_label,
     prime_http_metrics,
     render_metrics,
 )
-from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY
 
 
 def test_normalize_route_label_empty() -> None:
