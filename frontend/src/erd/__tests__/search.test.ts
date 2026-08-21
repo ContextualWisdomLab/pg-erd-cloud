@@ -79,6 +79,11 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
 
+  it("handles tables without optional searchable text", () => {
+    const empty = tableNode("empty", { title: "", comment: "", columns: [] });
+    expect(tableNodeMatchesSearch(empty, "missing")).toBe(false);
+  });
+
   it("rebuilds cached text for immutable replacements of every searchable field", () => {
     const node1 = tableNode("n1", {
       title: "order",

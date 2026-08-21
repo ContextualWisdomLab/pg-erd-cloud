@@ -116,7 +116,8 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -261,10 +262,43 @@ describe('modal behavior coverage', () => {
         onAssignBusinessGroup={onAssign}
       />,
     )
-    fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
+    rerender(
+      <GroupModal
+        isOpen
+        businessGroups={[group]}
+        newGroupName=""
+        setNewGroupName={setName}
+        newGroupColor="#1f77b4"
+        setNewGroupColor={setColor}
+        nodes={[groupedNode]}
+        onCloseGroupManager={onClose}
+        onCreateBusinessGroup={onCreate}
+        onDeleteBusinessGroup={onDelete}
+        onAssignBusinessGroup={onAssign}
+      />,
+    )
+    const groupName = screen.getByLabelText('그룹 이름')
+    fireEvent.submit(groupName.closest('form')!)
+    fireEvent.change(groupName, { target: { value: 'New' } })
+    rerender(
+      <GroupModal
+        isOpen
+        businessGroups={[group]}
+        newGroupName="New"
+        setNewGroupName={setName}
+        newGroupColor="#1f77b4"
+        setNewGroupColor={setColor}
+        nodes={[groupedNode]}
+        onCloseGroupManager={onClose}
+        onCreateBusinessGroup={onCreate}
+        onDeleteBusinessGroup={onDelete}
+        onAssignBusinessGroup={onAssign}
+      />,
+    )
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
     expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
