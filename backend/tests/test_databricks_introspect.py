@@ -478,6 +478,12 @@ def test_fetch_dicts_rejects_query_and_snapshot_budget_excess(
             BatchCursor([("long-value",)]), "fixed"
         )
 
+    monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_BYTES", 10)
+    with pytest.raises(ValueError, match="query byte limit"):
+        databricks_introspect_module._fetch_dicts(
+            BatchCursor([("12345",), ("67890",), ("extra",)]), "fixed"
+        )
+
     monkeypatch.setattr(databricks_introspect_module, "_MAX_QUERY_BYTES", 1_000)
     monkeypatch.setattr(databricks_introspect_module, "_MAX_TOTAL_ROWS", 1)
     budget = databricks_introspect_module._FetchBudget()

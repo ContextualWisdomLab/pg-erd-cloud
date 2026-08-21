@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BE] 🔒 **Databricks 메타데이터 쿼리 누적 바이트 제한 보강**: 여러 행의 직렬화 크기를 누적해 단일 쿼리 메모리 한도를 우회하지 못하도록 했습니다.
+
 - [BE] 🧱 **Databricks Unity Catalog 역설계 부분 지원**: 엄격한 credential-in-password DSN, 공통 SSRF 검사, 선택형 `databricks-sql-connector>=4.4,<5`, 고정 읽기 전용 Information Schema 쿼리, 결정적 schema/table/view/column/PK/UNIQUE/FK 스냅샷 변환을 추가했습니다. Unity Catalog 및 Preview 제약조건 메타데이터가 필요하며 index/CHECK/forward apply는 capability에서 명시적으로 미지원 처리합니다. 미지원 DDL export/migration API는 서버 오류 대신 설명 가능한 HTTP 422로 fail closed 합니다.
 
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.

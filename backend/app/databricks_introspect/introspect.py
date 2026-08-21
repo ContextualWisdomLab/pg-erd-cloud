@@ -255,6 +255,7 @@ def _fetch_dicts(
             if query_bytes + row_bytes > _MAX_QUERY_BYTES:
                 raise ValueError("Databricks metadata query byte limit exceeded")
             fetch_budget.accept(row_bytes)
+            query_bytes += row_bytes
             rows.append(row)
     if not rows:
         return []
