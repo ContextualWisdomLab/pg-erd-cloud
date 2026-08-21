@@ -124,38 +124,16 @@ async def get_pooler_detection() -> PoolerDetectionResult:
         ):
             return _pooler_cache
 
-        # Try all supported pooler admin consoles concurrently.
-        probes = {
-            asyncio.create_task(_probe_pooler_admin_console(admin_db))
-            for admin_db in ("pgbouncer", "pgcat")
-        }
-        pending = set(probes)
-        try:
-            while pending:
-                done, pending = await asyncio.wait(
-                    pending, return_when=asyncio.FIRST_COMPLETED
+        # Try PgBouncer first, then PgCat.
+        for admin_db in ("pgbouncer", "pgcat"):
+            version_text = await _probe_pooler_admin_console(admin_db)
+            if version_text:
+                kind = classify_pooler_version_text(version_text)
+                _pooler_cache = PoolerDetectionResult(
+                    kind=kind, detected=True, version_text=version_text
                 )
-                result_to_return = None
-                for task in done:
-                    try:
-                        version_text = task.result()
-                        if version_text and result_to_return is None:
-                            kind = classify_pooler_version_text(version_text)
-                            _pooler_cache = PoolerDetectionResult(
-                                kind=kind, detected=True, version_text=version_text
-                            )
-                            _pooler_cache_at = time.monotonic()
-                            result_to_return = _pooler_cache
-                    except Exception:
-                        # Best-effort probe; allow other concurrent tasks to continue or fail.
-                        pass
-
-                if result_to_return:
-                    return result_to_return
-        finally:
-            for p in pending:
-                p.cancel()
-            await asyncio.gather(*probes, return_exceptions=True)
+                _pooler_cache_at = time.monotonic()
+                return _pooler_cache
 
         _pooler_cache = PoolerDetectionResult(
             kind=PoolerKind.UNKNOWN, detected=False, version_text=None

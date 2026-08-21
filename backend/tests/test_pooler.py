@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import time
-
-import pytest
-
-import app.db
 from app.pooler import (
     PoolerKind,
     build_admin_console_dsn,
@@ -14,71 +8,6 @@ from app.pooler import (
 )
 
 _DUMMY_DATABASE_URL = "postgresql+asyncpg://u:dummy@localhost:5432/appdb"
-
-@pytest.mark.asyncio
-async def test_get_pooler_detection_concurrency(monkeypatch) -> None:
-    # Set config to auto-detect
-    monkeypatch.setattr(app.db.settings, "db_pooler_kind", None)
-    # Clear cache
-    app.db._pooler_cache = None
-    app.db._pooler_cache_at = 0.0
-
-    cancellation_observed = False
-
-    async def mock_probe(admin_db):
-        nonlocal cancellation_observed
-        try:
-            if admin_db == "pgbouncer":
-                await asyncio.sleep(0.5)
-                return None
-            elif admin_db == "pgcat":
-                await asyncio.sleep(0.01)
-                return "PgCat 0.10.0"
-            return None
-        except asyncio.CancelledError:
-            cancellation_observed = True
-            raise
-
-    monkeypatch.setattr(app.db, "_probe_pooler_admin_console", mock_probe)
-
-    start = time.monotonic()
-    result = await app.db.get_pooler_detection()
-    elapsed = time.monotonic() - start
-
-    assert result.detected is True
-    assert result.kind == PoolerKind.PGCAT
-    assert elapsed < 0.25, f"Took {elapsed:.2f}s, expected < 0.25s (did not run concurrently)"
-    assert cancellation_observed is True, "Expected the losing probe to be cancelled and its cleanup awaited before returning"
-
-
-@pytest.mark.asyncio
-async def test_get_pooler_detection_retrieves_failures_from_same_completion_batch(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(app.db.settings, "db_pooler_kind", None)
-    app.db._pooler_cache = None
-    app.db._pooler_cache_at = 0.0
-    gathered: list[asyncio.Task[object]] = []
-    real_gather = asyncio.gather
-
-    async def recording_gather(*tasks, **kwargs):
-        gathered.extend(tasks)
-        return await real_gather(*tasks, **kwargs)
-
-    async def mock_probe(admin_db):
-        await asyncio.sleep(0)
-        if admin_db == "pgbouncer":
-            raise RuntimeError("probe failed")
-        return "PgCat 0.10.0"
-
-    monkeypatch.setattr(app.db, "_probe_pooler_admin_console", mock_probe)
-    monkeypatch.setattr(app.db.asyncio, "gather", recording_gather)
-
-    result = await app.db.get_pooler_detection()
-
-    assert result.kind == PoolerKind.PGCAT
-    assert len(gathered) == 2
-    assert all(task.done() for task in gathered)
 
 
 def test_classify_pooler_version_text() -> None:
