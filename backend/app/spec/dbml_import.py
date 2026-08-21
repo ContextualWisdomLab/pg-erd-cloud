@@ -237,7 +237,11 @@ def parse_dbml(text: str) -> dict[str, Any]:
     in_indexes = False
     col_counts_by_oid: dict[int, int] = {}
 
-    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+    # ``str.splitlines`` treats Unicode separators such as U+0085 as newlines,
+    # but those characters are valid data inside a quoted PostgreSQL identifier.
+    # DBML's line grammar is LF-delimited; retain every other character so the
+    # identifier decoder can validate and round-trip it losslessly.
+    for line_number, raw_line in enumerate(text.split("\n"), start=1):
         if line_number > _DBML_MAX_LINES:
             raise DbmlIdentifierError("DBML text exceeds 10000 lines")
         # ReDoS guard: no legitimate DBML line approaches this length; capping

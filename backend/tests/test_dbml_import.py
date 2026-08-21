@@ -136,6 +136,15 @@ Table "odd""schema"."select; -- audit" {
     assert 'CONSTRAINT "pk_select; -- audit" PRIMARY KEY ("quote""column")' in ddl
 
 
+def test_unicode_line_separator_inside_quoted_identifier_is_data() -> None:
+    """Only LF separates DBML records; Unicode separators remain identifier data."""
+    identifier = "order\x85items"
+
+    snapshot = parse_dbml(f'Table "{identifier}" {{\n  id integer\n}}')
+
+    assert snapshot["relations"][0]["relation_name"] == identifier
+
+
 @pytest.mark.parametrize(
     "dbml",
     [

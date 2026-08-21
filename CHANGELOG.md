@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- [BE/CI] DBML parsing now treats only LF as a record delimiter so Unicode
+  separators inside quoted identifiers remain data and round-trip safely.
+- [FE/Security] Pin the transitive Nano ID dependency to `3.3.18` or newer to
+  remove the high-severity zero-size generator denial-of-service advisory.
+- [FE/CI] Serialize Vitest files and allow the orchestration suite enough time
+  to run deterministically under constrained CI workers.
 
 - Bound guarded PostgreSQL live-preflight connection acquisition to an
   injected finite timeout in `(0, 60]` seconds and propagate it through the
