@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [FE] 🔒 **Frontend dependency security floor**: pin the transitive `nanoid` dependency to `3.3.18` or newer so the ERD build does not resolve the vulnerable `3.3.16` release.
+
 - [FE] 🧭 **관계 중심 ERD 자동 정렬**: 고정 알파벳 그리드를 정확히 고정한 Dagre 3.1.0 기반 결정론적 배치로 교체했습니다. FK 방향, 실제 측정된 테이블 크기, 순환·분리 컴포넌트를 반영하고, 잘못된 edge나 배치 실패 시 기존 좌표를 보존하며 툴바의 1단계 되돌리기를 유지합니다.
 
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
