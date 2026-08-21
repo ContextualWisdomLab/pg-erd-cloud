@@ -1437,8 +1437,14 @@ export default function App() {
             </label>
             <button
               type="button"
-              onClick={onAutoLayout}
-              disabled={nodes.length === 0 || isLayouting}
+              onClick={(e) => {
+                if (nodes.length === 0 || isLayouting) {
+                  e.preventDefault();
+                  return;
+                }
+                onAutoLayout();
+              }}
+              aria-disabled={nodes.length === 0 || isLayouting}
               aria-label="ERD 자동 정렬"
               aria-busy={isLayouting}
               title={
@@ -1449,8 +1455,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onUndoLayout}
-              disabled={!undoPositions || isLayouting}
+              onClick={(e) => {
+                if (!undoPositions || isLayouting) {
+                  e.preventDefault();
+                  return;
+                }
+                onUndoLayout();
+              }}
+              aria-disabled={!undoPositions || isLayouting}
               title={
                 !undoPositions ? "되돌릴 작업이 없습니다" : "정렬 되돌리기"
               }
@@ -1460,8 +1472,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onAutoInferRelationships}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onAutoInferRelationships();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "추론할 테이블이 없습니다" : "관계 자동 추론"
               }
@@ -1471,8 +1489,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onClearCanvas}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onClearCanvas();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "지울 노드가 없습니다" : "모든 노드 지우기"
               }
@@ -1490,8 +1514,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenGroupManager}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenGroupManager();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "묶을 테이블이 없습니다" : "업무 그룹"
               }
@@ -1501,8 +1531,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenCardinalityWizard}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenCardinalityWizard();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0
                   ? "계산할 테이블이 없습니다"
@@ -1514,8 +1550,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenExport();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DDL 내보내기"
               }
@@ -1525,8 +1567,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenExport}
-              disabled={!selectedProjectId}
+              onClick={(e) => {
+                if (!selectedProjectId) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenExport();
+              }}
+              aria-disabled={!selectedProjectId}
               title={
                 !selectedProjectId
                   ? "공유할 프로젝트를 먼저 선택하세요"
@@ -1538,8 +1586,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenExport();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
@@ -1551,8 +1605,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenExport();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
               }
@@ -1562,8 +1622,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
+              onClick={(e) => {
+                if (nodes.length === 0) {
+                  e.preventDefault();
+                  return;
+                }
+                onOpenExport();
+              }}
+              aria-disabled={nodes.length === 0}
               title={
                 nodes.length === 0
                   ? "내보낼 테이블이 없습니다"
