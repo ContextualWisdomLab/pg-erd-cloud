@@ -807,6 +807,181 @@ button:disabled {
   gap: 8px;
 }
 
+.forwardPlanReview {
+  display: grid;
+  gap: 16px;
+  color: #172033;
+}
+
+.forwardPlanReview > header,
+.forwardPlanReview > section {
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.forwardPlanReview dl,
+.forwardPlanReview__statementList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.forwardPlanReview dl > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.forwardPlanReview dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.forwardPlanReview__statementList {
+  list-style-position: inside;
+}
+
+.forwardPlanReview__statementList > li {
+  border-left: 4px solid #f59e0b;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.forwardPlanReview__statementList header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.forwardPlanReview pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.forwardEngineeringModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 65%);
+}
+
+.forwardEngineeringModal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1040px, 100%);
+  max-height: min(880px, 94vh);
+  border-radius: 12px;
+  background: #f8fafc;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 35%);
+}
+
+.forwardEngineeringModal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #d8dfeb;
+  padding: 16px 20px;
+}
+
+.forwardEngineeringModal__header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.forwardEngineeringModal__body {
+  display: grid;
+  gap: 20px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.forwardDryRunIntent {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  color: #172033;
+}
+
+.forwardDryRunIntent h3,
+.forwardDryRunIntent p {
+  margin: 0;
+}
+
+.forwardDryRunIntent button {
+  justify-self: start;
+}
+
+.forwardRunStatus {
+  display: grid;
+  gap: 16px;
+  color: #172033;
+}
+
+.forwardRunStatus > header,
+.forwardRunStatus > section {
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.forwardRunStatus dl,
+.forwardRunStatus ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.forwardRunStatus dl > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.forwardRunStatus dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.forwardRunStatus ol > li {
+  border-left: 4px solid #0f766e;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.forwardRunAction {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8dfeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  color: #172033;
+}
+
+.forwardRunAction p {
+  margin: 0;
+}
+
+.forwardRunAction button {
+  justify-self: start;
+}
+
 .cardinalityWizard {
   width: min(760px, 96vw);
   padding: 20px;

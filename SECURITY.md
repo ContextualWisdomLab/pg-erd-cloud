@@ -1,5 +1,21 @@
 # Security Policy
 
+## Forward Engineering safety boundary
+
+The live Forward Engineering workflow is not production-complete. Current code
+implements a narrow server-authoritative model/plan control plane; isolated dry
+run, durable apply, and convergence verification remain release blockers. See
+the [Forward Engineering threat model](docs/security/forward-engineering-threat-model.md),
+[v1 contract](docs/contracts/forward-engineering-v1.md), and
+[operator runbook](docs/runbooks/forward-engineering.md). The legacy
+`apply-sql` endpoint is a transitional compatibility surface and must not be
+presented as the target graphical workflow.
+
+The authenticated DBML conversion/export path has a separate
+[identifier-to-DDL boundary](docs/doctoring/dbml-identifier-ddl-boundary.md).
+It validates and delimits identifier data but grants no target connection or
+execution authority.
+
 ## Reporting a Vulnerability
 
 If you believe you have found a security vulnerability in this project, please **do not** open a public issue.

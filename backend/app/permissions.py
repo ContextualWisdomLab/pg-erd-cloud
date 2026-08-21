@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProjectMember
 
-_ROLE_RANK = {"viewer": 0, "editor": 1, "owner": 2}
+_ROLE_RANK = {"viewer": 0, "editor": 1, "deployer": 2, "owner": 3}
 
 
 async def require_project_member(

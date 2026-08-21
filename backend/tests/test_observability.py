@@ -21,8 +21,8 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         app = FastAPI()
 
         @app.get("/healthz")
-        def healthz() -> dict[str, bool]:
-            return {"ok": True}
+        def healthz(request: Request) -> dict[str, object]:
+            return {"ok": True, "request_id": request.state.request_id}
 
         setup_observability(app)
         client = TestClient(app)
@@ -30,6 +30,7 @@ def test_request_id_header_and_metrics_endpoint() -> None:
         r = client.get("/healthz")
         assert r.status_code == 200
         assert "X-Request-Id" in r.headers
+        assert r.json()["request_id"] == r.headers["X-Request-Id"]
 
         unauth = client.get("/metrics")
         assert unauth.status_code == 403

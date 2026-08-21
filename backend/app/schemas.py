@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreateIn(BaseModel):
@@ -34,7 +34,7 @@ class ProjectMemberAddIn(BaseModel):
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
-    project_role: Literal["viewer", "editor"] = Field(default="viewer")
+    project_role: Literal["viewer", "editor", "deployer"] = Field(default="viewer")
 
 
 class ProjectMemberOut(BaseModel):
@@ -73,9 +73,11 @@ class ApplySqlIn(BaseModel):
     sql: str = Field(
         min_length=1,
         max_length=262_144,
+        pattern=r"^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]*$",
         description=(
             "Conservative PostgreSQL DDL subset with unquoted snake_case "
-            "identifiers. Arbitrary SQL is rejected."
+            "identifiers. Arbitrary SQL is rejected; non-text controls are "
+            "rejected while tab, LF, and CR remain valid transport text."
         ),
     )
     # Default to a rolled-back pre-flight; the caller must opt in to persist.
@@ -129,6 +131,214 @@ class SnapshotDetailOut(BaseModel):
     schema_filter: str | None
     error_message: str | None
     snapshot_json: dict | None
+
+
+class SchemaModelCreateIn(BaseModel):
+    """Create a named editable model and its first immutable revision."""
+
+    model_name: str = Field(
+        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+    )
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None = None
+
+
+class SchemaModelReviseIn(BaseModel):
+    """Save a successor revision under optimistic concurrency control."""
+
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None = None
+
+
+class SchemaModelDetailOut(BaseModel):
+    """Editable model identity together with one immutable revision."""
+
+    schema_model_uuid: uuid.UUID
+    model_name: str
+    schema_model_revision_uuid: uuid.UUID
+    revision_number: int
+    revision_digest: str
+    model_json: dict
+    base_schema_snapshot_uuid: uuid.UUID | None
+
+
+class MigrationPlanCreateIn(BaseModel):
+    """Bind one model revision to an exact target connection and snapshot."""
+
+    db_connection_uuid: uuid.UUID
+    base_schema_snapshot_uuid: uuid.UUID
+
+
+class MigrationPlanObjectRef(BaseModel):
+    """Structured PostgreSQL object identity carried beside rendered SQL."""
+
+    database: str | None = None
+    schema_name: str | None = None
+    table_name: str | None = None
+    column_name: str | None = None
+
+
+class MigrationPlanRisk(BaseModel):
+    """Conservative operational and data-integrity risk for one statement."""
+
+    severity: Literal["safe", "warning", "destructive"]
+    lock_mode: str
+    possible_rewrite: bool
+    table_scan: bool
+    data_loss: bool
+    detail: str
+
+
+class MigrationPlanStatement(BaseModel):
+    """One server-compiled statement and its execution authority metadata."""
+
+    kind: str
+    target: str
+    object_ref: MigrationPlanObjectRef
+    sql: str
+    transactional: bool
+    dependencies: list[str]
+    dependency_refs: list[MigrationPlanObjectRef]
+    reversible: bool
+    risk: MigrationPlanRisk
+    required_privileges: list[str]
+    preconditions: list[dict[str, object]]
+
+
+class MigrationPlanBlocker(BaseModel):
+    """Unsupported semantic change that suppresses executable statements."""
+
+    code: str
+    object: str
+    object_ref: MigrationPlanObjectRef
+    detail: str
+
+
+class MigrationPlanRiskSummary(BaseModel):
+    """Statement counts grouped by conservative risk severity."""
+
+    safe: int
+    warning: int
+    destructive: int
+
+
+class MigrationPlanOut(BaseModel):
+    """Immutable structured plan preview returned for review and dry run."""
+
+    migration_plan_uuid: uuid.UUID
+    project_space_uuid: uuid.UUID
+    schema_model_revision_uuid: uuid.UUID
+    db_connection_uuid: uuid.UUID
+    base_schema_snapshot_uuid: uuid.UUID
+    plan_digest: str
+    base_digest: str
+    target_digest: str
+    compiler_version: str
+    snapshot_contract_version: int = Field(ge=1)
+    postgresql_major: int = Field(ge=14, le=18)
+    created_by_user_uuid: uuid.UUID
+    created_at: dt.datetime
+    can_dry_run: bool
+    requires_destructive_confirmation: bool
+    statements: list[MigrationPlanStatement]
+    proposed_statements: list[MigrationPlanStatement]
+    blockers: list[MigrationPlanBlocker]
+    risk_summary: MigrationPlanRiskSummary
+    expires_at: dt.datetime
+
+
+class MigrationRunEventOut(BaseModel):
+    """One ordered, sanitized event in a durable migration-run history."""
+
+    sequence_number: int = Field(ge=1)
+    event_type: str
+    state_before: str | None
+    state_after: str
+    evidence: dict[str, object]
+    previous_event_digest: str | None
+    event_digest: str
+    actor_user_uuid: uuid.UUID | None
+    created_at: dt.datetime
+
+
+class MigrationRunCancelIn(BaseModel):
+    """Bind a cancellation intent to the exact optimistic run version."""
+
+    expected_state_version: int = Field(ge=1, strict=True)
+
+
+class MigrationRunCreateIn(BaseModel):
+    """Bind one idempotent dry-run intent to an immutable migration plan."""
+
+    plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MigrationApplyRunCreateIn(BaseModel):
+    """Bind an execution-free apply intent to exact reviewed evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    passed_dry_run_uuid: uuid.UUID
+    target_connection_name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
+    destructive_acknowledged: bool = Field(strict=True)
+
+
+MigrationRunState = Literal[
+    "queued",
+    "sandbox_running",
+    "live_preflight_running",
+    "passed",
+    "drifted",
+    "failed",
+    "cancelled",
+    "applying",
+    "reconciling",
+    "verifying",
+    "verified",
+    "drifted_no_apply",
+    "not_applied",
+    "verification_failed",
+    "failed_rolled_back",
+    "applied_with_drift",
+    "outcome_unknown",
+]
+
+
+class MigrationRunActionOut(BaseModel):
+    """Accepted durable run action selected by the control-plane CAS."""
+
+    migration_run_uuid: uuid.UUID
+    state: MigrationRunState
+    state_version: int = Field(ge=1)
+    cancellation_requested: bool
+    reused: bool
+
+
+class MigrationRunOut(BaseModel):
+    """Authorized immutable view of one durable run and its event history."""
+
+    migration_run_uuid: uuid.UUID
+    project_space_uuid: uuid.UUID
+    migration_plan_uuid: uuid.UUID
+    run_kind: Literal["dry_run", "apply"]
+    state: MigrationRunState
+    state_version: int = Field(ge=1)
+    plan_digest: str
+    requested_by_user_uuid: uuid.UUID
+    cancellation_requested: bool
+    observed_base_digest: str | None
+    evidence: dict[str, object]
+    error_code: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    started_at: dt.datetime | None
+    finished_at: dt.datetime | None
+    events: list[MigrationRunEventOut]
 
 
 class WideTablesOut(BaseModel):

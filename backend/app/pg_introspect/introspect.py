@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import ssl
 from urllib.parse import parse_qsl, urlparse
@@ -10,6 +11,9 @@ from app.pg_introspect import queries
 from app.pg_introspect.column_examples import add_column_examples
 from app.pg_introspect.dsn_guard import validate_postgres_dsn_target
 from app.pg_introspect.forward_ddl import ForwardDdlBatch
+from app.pg_introspect.snapshot_contract import (
+    CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+)
 from app.sanitize import sanitize_for_storage
 
 
@@ -60,9 +64,11 @@ def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     return context
 
 
-async def _connect_guarded_postgres(
+async def connect_guarded_postgres(
     dsn: str, *, timeout: float
 ) -> asyncpg.Connection:
+    """Open one PostgreSQL connection after DNS/SSRF/TLS target validation."""
+
     target = await validate_postgres_dsn_target(dsn)
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
@@ -94,7 +100,7 @@ async def _connect_guarded_postgres(
 async def probe_postgres(dsn: str) -> str:
     """SSRF-guarded connectivity check: connect and return the server version."""
 
-    conn = await _connect_guarded_postgres(dsn, timeout=10)
+    conn = await connect_guarded_postgres(dsn, timeout=10)
     try:
         await conn.fetchval("SELECT 1")
         return str(await conn.fetchval("SHOW server_version"))
@@ -113,7 +119,7 @@ async def apply_postgres_ddl(
     TLS hostname handling.
     """
 
-    conn = await _connect_guarded_postgres(dsn, timeout=15)
+    conn = await connect_guarded_postgres(dsn, timeout=15)
     try:
         tx = conn.transaction()
         await tx.start()
@@ -130,55 +136,106 @@ async def apply_postgres_ddl(
         await conn.close()
 
 
+async def capture_postgres_snapshot(
+    conn: asyncpg.Connection, schema_filter: str | None
+) -> dict:
+    """Capture a snapshot on a caller-owned connection and transaction.
+
+    The caller owns connection authorization, transaction isolation, commit or
+    rollback, and connection closure. Keeping those capabilities outside this
+    function lets live preflight bind snapshot evidence and bounded checks to
+    one already-authorized repeatable-read transaction.
+    """
+
+    try:
+        transaction_active = conn.is_in_transaction()
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:  # noqa: BLE001
+        raise RuntimeError(
+            "postgres snapshot capture transaction is missing"
+        ) from None
+    if transaction_active is not True:
+        raise RuntimeError(
+            "postgres snapshot capture transaction is missing"
+        )
+
+    version = await conn.fetchval("SHOW server_version")
+    schema_name = schema_filter
+    include_system = False
+
+    schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
+    relations = await conn.fetch(
+        queries.RELATIONS_SQL, schema_name, include_system
+    )
+    columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)
+    constraints = await conn.fetch(
+        queries.CONSTRAINTS_SQL, schema_name, include_system
+    )
+    indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
+    pk_columns = await conn.fetch(
+        queries.PK_COLUMNS_SQL, schema_name, include_system
+    )
+    fk_edges = await conn.fetch(
+        queries.FK_EDGES_SQL, schema_name, include_system
+    )
+    citus_distributed_tables: list[asyncpg.Record] = []
+    has_citus = await conn.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension "
+        "WHERE extname = 'citus')"
+    )
+    if has_citus:
+        savepoint = conn.transaction()
+        await savepoint.start()
+        try:
+            citus_distributed_tables = await conn.fetch(
+                queries.CITUS_DISTRIBUTED_TABLES_SQL,
+                schema_name,
+                include_system,
+            )
+        except (
+            asyncpg.InsufficientPrivilegeError,
+            asyncpg.UndefinedColumnError,
+            asyncpg.UndefinedFunctionError,
+            asyncpg.UndefinedTableError,
+        ):
+            await savepoint.rollback()
+            citus_distributed_tables = []
+        else:
+            await savepoint.commit()
+
+    snapshot = {
+        "snapshot_contract_version": CURRENT_POSTGRES_SNAPSHOT_CONTRACT_VERSION,
+        "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "server_version": str(version),
+        "schema_filter": schema_filter,
+        "schemas": [dict(r) for r in schemas],
+        "relations": [dict(r) for r in relations],
+        "columns": add_column_examples([dict(r) for r in columns]),
+        "constraints": [dict(r) for r in constraints],
+        "indexes": [dict(r) for r in indexes],
+        "pk_columns": [dict(r) for r in pk_columns],
+        "fk_edges": [dict(r) for r in fk_edges],
+        "citus_distributed_tables": [dict(r) for r in citus_distributed_tables],
+    }
+    sanitized = sanitize_for_storage(snapshot)
+    return sanitized  # type: ignore[return-value]
+
+
 async def introspect_postgres(dsn: str, schema_filter: str | None) -> dict:
     """Introspect a PostgreSQL database and return a snapshot JSON."""
 
     # Note: avoid logging DSN.
-    conn = await _connect_guarded_postgres(dsn, timeout=10)
+    conn = await connect_guarded_postgres(dsn, timeout=10)
     try:
-        version = await conn.fetchval("SHOW server_version")
-        schema_name = schema_filter
-        include_system = False
-
-        schemas = await conn.fetch(queries.SCHEMAS_SQL, schema_name, include_system)
-        relations = await conn.fetch(queries.RELATIONS_SQL, schema_name, include_system)
-        columns = await conn.fetch(queries.COLUMNS_SQL, schema_name, include_system)
-        constraints = await conn.fetch(
-            queries.CONSTRAINTS_SQL, schema_name, include_system
-        )
-        indexes = await conn.fetch(queries.INDEXES_SQL, schema_name, include_system)
-        pk_columns = await conn.fetch(
-            queries.PK_COLUMNS_SQL, schema_name, include_system
-        )
-        fk_edges = await conn.fetch(queries.FK_EDGES_SQL, schema_name, include_system)
-        citus_distributed_tables = []
-        has_citus = await conn.fetchval(
-            "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'citus')"
-        )
-        if has_citus:
-            try:
-                citus_distributed_tables = await conn.fetch(
-                    queries.CITUS_DISTRIBUTED_TABLES_SQL,
-                    schema_name,
-                    include_system,
-                )
-            except asyncpg.UndefinedTableError:
-                citus_distributed_tables = []
-
-        snapshot = {
-            "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-            "server_version": str(version),
-            "schema_filter": schema_filter,
-            "schemas": [dict(r) for r in schemas],
-            "relations": [dict(r) for r in relations],
-            "columns": add_column_examples([dict(r) for r in columns]),
-            "constraints": [dict(r) for r in constraints],
-            "indexes": [dict(r) for r in indexes],
-            "pk_columns": [dict(r) for r in pk_columns],
-            "fk_edges": [dict(r) for r in fk_edges],
-            "citus_distributed_tables": [dict(r) for r in citus_distributed_tables],
-        }
-
-        return sanitize_for_storage(snapshot)  # type: ignore[return-value]
+        tx = conn.transaction(isolation="repeatable_read", readonly=True)
+        await tx.start()
+        try:
+            snapshot = await capture_postgres_snapshot(conn, schema_filter)
+        except BaseException:
+            await tx.rollback()
+            raise
+        await tx.commit()
+        return snapshot
     finally:
         await conn.close()

@@ -1,5 +1,17 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type {
+  Connection,
+  MigrationApplyIntent,
+  MigrationPlan,
+  MigrationRun,
+  MigrationRunAction,
+  Project,
+  ShareLink,
+  Snapshot,
+  SnapshotDetail,
+  SnapshotDetailResponse,
+  SnapshotJson,
+} from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -258,4 +270,76 @@ export async function getSnapshot(snapshotId: string): Promise<SnapshotDetail> {
   if (!r.ok) throw new Error(`getSnapshot failed: ${r.status}`)
   const response = (await r.json()) as SnapshotDetailResponse
   return snapshotDetailFromResponse(response)
+}
+
+export async function getMigrationPlan(planId: string): Promise<MigrationPlan> {
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`getMigrationPlan failed: ${r.status}`)
+  return r.json()
+}
+
+export async function createDryRun(
+  planId: string,
+  planDigest: string,
+  idempotencyKey: string,
+): Promise<MigrationRunAction> {
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}/dry-runs`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      ...(await jsonHeaders()),
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({ plan_digest: planDigest }),
+  })
+  if (!r.ok) throw new Error(`createDryRun failed: ${r.status}`)
+  return r.json()
+}
+
+export async function createApplyRun(
+  planId: string,
+  intent: MigrationApplyIntent,
+  idempotencyKey: string,
+): Promise<MigrationRunAction> {
+  const requestBody: MigrationApplyIntent = {
+    plan_digest: intent.plan_digest,
+    passed_dry_run_uuid: intent.passed_dry_run_uuid,
+    target_connection_name: intent.target_connection_name,
+    destructive_acknowledged: intent.destructive_acknowledged,
+  }
+  const r = await fetch(`${API_BASE}/api/migration-plans/${encodeURIComponent(planId)}/apply-runs`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      ...(await jsonHeaders()),
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(requestBody),
+  })
+  if (!r.ok) throw new Error(`createApplyRun failed: ${r.status}`)
+  return r.json()
+}
+
+export async function getMigrationRun(runId: string): Promise<MigrationRun> {
+  const r = await fetch(`${API_BASE}/api/migration-runs/${encodeURIComponent(runId)}`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`getMigrationRun failed: ${r.status}`)
+  return r.json()
+}
+
+export async function cancelMigrationRun(
+  runId: string,
+  expectedStateVersion: number,
+): Promise<MigrationRunAction> {
+  const r = await fetch(`${API_BASE}/api/migration-runs/${encodeURIComponent(runId)}/cancel`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ expected_state_version: expectedStateVersion }),
+  })
+  if (!r.ok) throw new Error(`cancelMigrationRun failed: ${r.status}`)
+  return r.json()
 }

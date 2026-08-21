@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.ddl.export import snapshot_json_to_sql
-from app.spec.dbml_import import parse_dbml
+from app.spec.dbml_import import DbmlIdentifierError, parse_dbml
 
 BASIC = """
 // a typical dbdiagram.io document
@@ -90,14 +92,14 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert "PRIMARY KEY" in ddl
 
 
-def test_pathological_long_line_is_skipped_fast():
+def test_pathological_long_line_is_rejected_fast():
     import time
 
     hostile = 'Table t {\n  id int [pk]\n}\nRef: ' + '"a' * 100_000 + "\n"
     start = time.monotonic()
-    snap = parse_dbml(hostile)
+    with pytest.raises(DbmlIdentifierError):
+        parse_dbml(hostile)
     assert time.monotonic() - start < 1.0  # no catastrophic backtracking
-    assert len(snap["relations"]) == 1
 
 
 def test_pathological_table_header_dots_are_rejected_fast():
@@ -110,3 +112,127 @@ def test_pathological_table_header_dots_are_rejected_fast():
     assert {(r["schema_name"], r["relation_name"]) for r in snap["relations"]} == {
         ("public", "users")
     }
+
+
+def test_quoted_identifiers_round_trip_through_postgresql_ddl() -> None:
+    """Quoted DBML names must decode once and re-escape at the DDL sink."""
+    text = '''
+Table "odd""schema"."select; -- audit" {
+  "quote""column" integer [pk]
+}
+'''
+
+    snapshot = parse_dbml(text)
+    ddl = snapshot_json_to_sql(snapshot, target_dialect="postgresql")
+
+    assert snapshot["relations"][0]["schema_name"] == 'odd"schema'
+    assert snapshot["relations"][0]["relation_name"] == "select; -- audit"
+    assert snapshot["columns"][0]["column_name"] == 'quote"column'
+    assert 'CREATE SCHEMA IF NOT EXISTS "odd""schema";' in ddl
+    assert (
+        'CREATE TABLE IF NOT EXISTS "odd""schema"."select; -- audit" (' in ddl
+    )
+    assert '"quote""column" integer NOT NULL' in ddl
+    assert 'CONSTRAINT "pk_select; -- audit" PRIMARY KEY ("quote""column")' in ddl
+
+
+def test_unicode_line_separator_inside_quoted_identifier_is_data() -> None:
+    """Only LF separates DBML records; Unicode separators remain identifier data."""
+    identifier = "order\x85items"
+
+    snapshot = parse_dbml(f'Table "{identifier}" {{\n  id integer\n}}')
+
+    assert snapshot["relations"][0]["relation_name"] == identifier
+
+
+@pytest.mark.parametrize(
+    "dbml",
+    [
+        'Table "unterminated {\n  id integer\n}',
+        'Table public.orders.extra {\n  id integer\n}',
+        'Table "nul\x00name" {\n  id integer\n}',
+        f'Table "{"é" * 32}" {{\n  id integer\n}}',
+        'Table users {\n  "unterminated integer\n}',
+        'Table users {\n  "nul\x00column" integer\n}',
+        'Ref: catalog.public.users.id > public.accounts.id',
+        'Ref: "unterminated > public.accounts.id',
+    ],
+)
+def test_invalid_or_ambiguous_dbml_identifiers_fail_closed(dbml: str) -> None:
+    """Malformed, ambiguous, NUL, and overlong names must not degrade to omission."""
+    with pytest.raises(DbmlIdentifierError):
+        parse_dbml(dbml)
+
+
+def test_comment_markers_and_dots_inside_quoted_names_are_data() -> None:
+    """DBML comments and path separators apply only outside quoted identifiers."""
+    snapshot = parse_dbml(
+        '''
+Table "odd.schema"."orders//archive" {
+  "value.part//raw" integer [pk]
+}
+'''
+    )
+
+    relation = snapshot["relations"][0]
+    assert relation["schema_name"] == "odd.schema"
+    assert relation["relation_name"] == "orders//archive"
+    assert snapshot["columns"][0]["column_name"] == "value.part//raw"
+
+
+def test_generated_constraint_names_fit_postgresql_identifier_limit() -> None:
+    """Derived names must never rely on PostgreSQL's lossy identifier truncation."""
+    relation_name = "r" * 61
+    snapshot = parse_dbml(f"Table {relation_name} {{\n  id integer [pk]\n}}")
+
+    constraint_name = snapshot["constraints"][0]["constraint_name"]
+
+    assert len(constraint_name.encode("utf-8")) <= 63
+    assert constraint_name.startswith("pk_")
+
+
+def test_parser_rejects_input_above_authenticated_route_limit() -> None:
+    """Direct parser callers inherit the route's total-input resource bound."""
+    with pytest.raises(DbmlIdentifierError):
+        parse_dbml("\n".join("x" * 3_000 for _ in range(200)))
+
+
+def test_parser_rejects_more_than_ten_thousand_lines() -> None:
+    """Line iteration is bounded even when each attacker-controlled line is tiny."""
+    with pytest.raises(DbmlIdentifierError):
+        parse_dbml("\n" * 10_001)
+
+
+def test_column_positions_scale_and_reset_per_relation() -> None:
+    """Column ordinals stay linear and restart independently for every relation."""
+    first_columns = "\n".join(
+        f"  column_{index} integer" for index in range(1_000)
+    )
+    text = f"""
+Table wide_relation {{
+{first_columns}
+}}
+Table second_relation {{
+  first_column integer
+  second_column integer
+}}
+"""
+
+    snapshot = parse_dbml(text)
+    relation_oids = {
+        relation["relation_name"]: relation["relation_oid"]
+        for relation in snapshot["relations"]
+    }
+    wide_positions = [
+        column["column_position"]
+        for column in snapshot["columns"]
+        if column["relation_oid"] == relation_oids["wide_relation"]
+    ]
+    second_positions = [
+        column["column_position"]
+        for column in snapshot["columns"]
+        if column["relation_oid"] == relation_oids["second_relation"]
+    ]
+
+    assert wide_positions == list(range(1, 1_001))
+    assert second_positions == [1, 2]

@@ -19,6 +19,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -43,6 +45,203 @@ jobs:
           PYTHONPATH: .
         run: pytest -q
 
+  postgres-integration:
+    name: PostgreSQL ${{ matrix.major }} + Valkey dual-lease acceptance
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - major: "14"
+            image: postgres@sha256:f1341c01408dc7278e9d365ed4f860cd3f87dd16b4464ac326fc0f422083a579
+          - major: "15"
+            image: postgres@sha256:3d0f7584ed7d04e27fa050d6683a74746608faf21f202be78460d679cc56461f
+          - major: "16"
+            image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+          - major: "17"
+            image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+          - major: "18"
+            image: postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Start PostgreSQL with ephemeral credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -hex 24)"
+          preflight_password="$(openssl rand -hex 24)"
+          app_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          echo "::add-mask::$preflight_password"
+          echo "::add-mask::$app_secret"
+
+          credentials_file="$RUNNER_TEMP/postgres.env"
+          umask 077
+          {
+            echo "POSTGRES_DB=pg_erd_cloud_test"
+            echo "POSTGRES_PASSWORD=$password"
+            echo "POSTGRES_USER=postgres"
+          } > "$credentials_file"
+          docker run --detach --name pg-erd-cloud-postgres \
+            --env-file "$credentials_file" \
+            --publish 5432:5432 \
+            "${{ matrix.image }}"
+          rm -f "$credentials_file"
+
+          encoded_password="$(PASSWORD="$password" python3 - <<'PY'
+          import os
+          from urllib.parse import quote
+
+          print(quote(os.environ["PASSWORD"], safe=""))
+          PY
+          )"
+          database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_test"
+          echo "::add-mask::$database_url"
+          {
+            echo "APP_SECRET=$app_secret"
+            echo "DATABASE_URL=$database_url"
+            echo "POSTGRES_INTEGRATION_URL=$database_url"
+          } >> "$GITHUB_ENV"
+
+          # The official image briefly starts a temporary server while it
+          # initializes a new PGDATA directory. A readiness probe can succeed
+          # against that server immediately before the entrypoint restarts it.
+          # Wait for the stable image marker before probing the final server.
+          init_complete="PostgreSQL init process complete; ready for start up."
+          for attempt in {1..20}; do
+            postgres_logs="$(docker logs pg-erd-cloud-postgres 2>&1 || true)"
+            if [[ "$postgres_logs" == *"$init_complete"* ]]; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              printf '%s\n' "$postgres_logs"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in {1..20}; do
+            if docker exec pg-erd-cloud-postgres \
+              pg_isready -U postgres -d pg_erd_cloud_test; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs pg-erd-cloud-postgres
+              exit 1
+            fi
+            sleep 2
+          done
+
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE DATABASE pg_erd_cloud_sandbox"
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE DATABASE pg_erd_cloud_target"
+          docker exec pg-erd-cloud-postgres \
+            psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c "CREATE ROLE cwl_erd_preflight LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '$preflight_password'; ALTER ROLE cwl_erd_preflight SET default_transaction_read_only = on; ALTER ROLE cwl_erd_preflight SET statement_timeout = '5s'; REVOKE ALL ON DATABASE pg_erd_cloud_target FROM PUBLIC; GRANT CONNECT ON DATABASE pg_erd_cloud_target TO cwl_erd_preflight; REVOKE CREATE, TEMPORARY ON DATABASE pg_erd_cloud_target FROM cwl_erd_preflight"
+          encoded_preflight_password="$(PASSWORD="$preflight_password" python3 - <<'PY'
+          import os
+          from urllib.parse import quote
+
+          print(quote(os.environ["PASSWORD"], safe=""))
+          PY
+          )"
+          sandbox_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_sandbox"
+          target_database_url="postgresql+asyncpg://postgres:${encoded_password}@127.0.0.1:5432/pg_erd_cloud_target"
+          preflight_database_url="postgresql+asyncpg://cwl_erd_preflight:${encoded_preflight_password}@127.0.0.1:5432/pg_erd_cloud_target"
+          echo "::add-mask::$sandbox_database_url"
+          echo "::add-mask::$target_database_url"
+          echo "::add-mask::$preflight_database_url"
+          {
+            echo "POSTGRES_SANDBOX_INTEGRATION_URL=$sandbox_database_url"
+            echo "POSTGRES_TARGET_INTEGRATION_URL=$target_database_url"
+            echo "POSTGRES_PREFLIGHT_INTEGRATION_URL=$preflight_database_url"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Install backend deps
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Apply metadata migrations
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: alembic upgrade head
+
+      - name: Verify PostgreSQL and Valkey dual-lease recovery
+        working-directory: backend
+        env:
+          EXPECTED_POSTGRES_MAJOR: ${{ matrix.major }}
+          PYTHONPATH: .
+          VALKEY_INTEGRATION_URL: redis://127.0.0.1:6379/0
+        run: pytest -q tests/test_postgres_migration_run_integration.py
+
+  valkey-integration:
+    name: Valkey 8 queue signal boundary
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Install backend deps
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Verify real Valkey signal isolation
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          VALKEY_INTEGRATION_URL: redis://127.0.0.1:6379/0
+        run: pytest -q tests/test_valkey_queue_integration.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -53,6 +252,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0

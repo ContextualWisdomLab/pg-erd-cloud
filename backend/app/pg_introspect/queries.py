@@ -34,6 +34,13 @@ SELECT
   c.relname AS relation_name,
   c.relkind::text AS relation_kind,
   pg_catalog.obj_description(c.oid, 'pg_class') AS relation_comment,
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_attribute dropped
+    WHERE dropped.attrelid = c.oid
+      AND dropped.attnum > 0
+      AND dropped.attisdropped
+  ) AS has_dropped_columns,
   c.relispartition AS is_partition,
   pg_catalog.pg_get_partkeydef(c.oid) AS partition_key,
   pg_catalog.pg_get_expr(c.relpartbound, c.oid) AS partition_bound,
@@ -99,6 +106,8 @@ SELECT
   a.attnotnull AS is_not_null,
   a.atthasdef AS has_default,
   pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
+  a.attidentity::text AS identity,
+  a.attgenerated::text AS generated,
   pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
@@ -328,6 +337,8 @@ SELECT
   n.nspname AS schema_name,
   rel.oid AS relation_oid,
   rel.relname AS relation_name,
+  con.condeferrable AS is_deferrable,
+  con.condeferred AS is_initially_deferred,
   k.ordinality AS column_ordinal,
   a.attname AS column_name
 FROM pk con

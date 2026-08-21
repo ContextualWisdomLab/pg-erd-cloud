@@ -98,6 +98,132 @@ export type SnapshotDetailResponse = Omit<SnapshotDetail, 'error_message'> & {
   error_message: unknown
 }
 
+export type MigrationRunState =
+  | 'queued'
+  | 'sandbox_running'
+  | 'live_preflight_running'
+  | 'passed'
+  | 'drifted'
+  | 'failed'
+  | 'cancelled'
+  | 'applying'
+  | 'reconciling'
+  | 'verifying'
+  | 'verified'
+  | 'drifted_no_apply'
+  | 'not_applied'
+  | 'verification_failed'
+  | 'failed_rolled_back'
+  | 'applied_with_drift'
+  | 'outcome_unknown'
+
+export type MigrationPlanObjectRef = Readonly<{
+  database: string | null
+  schema_name: string | null
+  table_name: string | null
+  column_name: string | null
+}>
+
+export type MigrationPlanRisk = Readonly<{
+  severity: 'safe' | 'warning' | 'destructive'
+  lock_mode: string
+  possible_rewrite: boolean
+  table_scan: boolean
+  data_loss: boolean
+  detail: string
+}>
+
+export type MigrationPlanStatement = Readonly<{
+  kind: string
+  target: string
+  object_ref: MigrationPlanObjectRef
+  sql: string
+  transactional: boolean
+  dependencies: ReadonlyArray<string>
+  dependency_refs: ReadonlyArray<MigrationPlanObjectRef>
+  reversible: boolean
+  risk: MigrationPlanRisk
+  required_privileges: ReadonlyArray<string>
+  preconditions: ReadonlyArray<Readonly<Record<string, unknown>>>
+}>
+
+export type MigrationPlanBlocker = Readonly<{
+  code: string
+  object: string
+  object_ref: MigrationPlanObjectRef
+  detail: string
+}>
+
+export type MigrationPlan = {
+  migration_plan_uuid: string
+  project_space_uuid: string
+  schema_model_revision_uuid: string
+  db_connection_uuid: string
+  base_schema_snapshot_uuid: string
+  plan_digest: string
+  base_digest: string
+  target_digest: string
+  compiler_version: string
+  snapshot_contract_version: number
+  postgresql_major: number
+  created_by_user_uuid: string
+  created_at: string
+  can_dry_run: boolean
+  requires_destructive_confirmation: boolean
+  statements: ReadonlyArray<MigrationPlanStatement>
+  proposed_statements: ReadonlyArray<MigrationPlanStatement>
+  blockers: ReadonlyArray<MigrationPlanBlocker>
+  risk_summary: Readonly<{ safe: number; warning: number; destructive: number }>
+  expires_at: string
+}
+
+export type MigrationRunAction = {
+  migration_run_uuid: string
+  state: MigrationRunState
+  state_version: number
+  cancellation_requested: boolean
+  reused: boolean
+}
+
+export type MigrationRunEvent = {
+  sequence_number: number
+  event_type: string
+  state_before: string | null
+  state_after: string
+  evidence: Readonly<Record<string, unknown>>
+  previous_event_digest: string | null
+  event_digest: string
+  actor_user_uuid: string | null
+  created_at: string
+}
+
+export type MigrationRun = {
+  migration_run_uuid: string
+  project_space_uuid: string
+  migration_plan_uuid: string
+  run_kind: 'dry_run' | 'apply'
+  state: MigrationRunState
+  state_version: number
+  plan_digest: string
+  requested_by_user_uuid: string
+  cancellation_requested: boolean
+  observed_base_digest: string | null
+  evidence: Readonly<Record<string, unknown>>
+  error_code: string | null
+  created_at: string
+  updated_at: string
+  started_at: string | null
+  finished_at: string | null
+  events: ReadonlyArray<MigrationRunEvent>
+}
+
+export type MigrationApplyIntent = {
+  plan_digest: string
+  passed_dry_run_uuid: string
+  target_connection_name: string
+  destructive_acknowledged: boolean
+}
+
 export function snapshotDetailFromResponse(response: SnapshotDetailResponse): SnapshotDetail {
   return {
     ...response,

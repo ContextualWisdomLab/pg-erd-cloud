@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 import datetime as dt
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -117,7 +118,13 @@ def test_create_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     async def mock_require(*args: object, **kwargs: object) -> str:
         return "editor"
 
+    async def allow_target(_dsn: str) -> None:
+        return None
+
     monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
+    monkeypatch.setattr(
+        "app.api.connections.validate_database_dsn_target", allow_target
+    )
 
     def mock_encrypt(text: str) -> EncryptedBlob:
         return EncryptedBlob(ciphertext=b"encrypted_dsn", nonce=b"nonce")
@@ -149,6 +156,39 @@ def test_create_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert added_obj.conn_name == "New Conn"
     assert added_obj.dsn_ciphertext == b"encrypted_dsn"
     assert added_obj.project_space_uuid == project_uuid
+
+
+def test_create_connection_rejects_unsafe_dsn_before_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject a link-local database target before encryption or persistence."""
+
+    async def mock_require(*args: object, **kwargs: object) -> str:
+        return "editor"
+
+    encrypt = MagicMock()
+    monkeypatch.setattr("app.api.connections.require_project_member", mock_require)
+    monkeypatch.setattr("app.api.connections.encrypt_text", encrypt)
+
+    session = FakeSession()
+
+    def fake_get_session() -> FakeSession:
+        return session
+
+    app.dependency_overrides[get_session] = fake_get_session
+
+    response = TestClient(app).post(
+        f"/api/connections/by-project/{uuid.uuid4()}",
+        json={
+            "conn_name": "Blocked target",
+            "dsn": "postgresql://user:secret@169.254.169.254:5432/app",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "database DSN target is not allowed"}
+    encrypt.assert_not_called()
+    assert session.added == []
 
 
 def test_create_connection_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:

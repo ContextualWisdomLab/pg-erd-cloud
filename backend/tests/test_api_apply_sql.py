@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.api.connections import apply_sql
+from app.api.connections import apply_sql, router
 from app.auth import CurrentUser
+from app.db import get_session
 from app.db_introspect import apply_database_sql
 from app.schemas import ApplySqlIn
 
@@ -21,6 +22,18 @@ def _conn():
 
 def _body(dry_run=True):
     return ApplySqlIn(sql="CREATE TABLE safe_table (id bigint);", dry_run=dry_run)
+
+
+def test_live_apply_authorization_reads_from_primary_session() -> None:
+    route = next(
+        route
+        for route in router.routes
+        if getattr(route, "path", "") == "/api/connections/{db_connection_uuid}/apply-sql"
+    )
+
+    assert any(
+        dependency.call is get_session for dependency in route.dependant.dependencies
+    )
 
 
 @pytest.mark.asyncio
@@ -81,12 +94,77 @@ async def test_apply_sql_reports_ok_true_on_success():
 
 
 @pytest.mark.asyncio
+async def test_persistent_legacy_apply_is_disabled_before_target_access():
+    """Default-deny persistent compatibility apply before credential access."""
+
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    session.get = AsyncMock(return_value=_conn())
+    with patch(
+        "app.api.connections.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.connections.decrypt_text"
+    ) as decrypt_mock, patch(
+        "app.api.connections.apply_database_sql", new_callable=AsyncMock
+    ) as apply_mock:
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_sql(
+                db_connection_uuid=uuid.uuid4(),
+                body=_body(dry_run=False),
+                user=_user(),
+                session=session,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "persistent legacy apply is disabled"
+    session.get.assert_not_awaited()
+    decrypt_mock.assert_not_called()
+    apply_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_live_apply_requires_deployer_role_while_dry_run_requires_editor():
+    session = AsyncMock()
+    project_uuid = uuid.uuid4()
+    session.scalar = AsyncMock(return_value=project_uuid)
+    session.get = AsyncMock(return_value=_conn())
+    with patch(
+        "app.api.connections.require_project_member", new_callable=AsyncMock
+    ) as membership, patch(
+        "app.api.connections.settings.legacy_persistent_apply_enabled", True
+    ), patch(
+        "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
+    ), patch(
+        "app.api.connections.apply_database_sql", new_callable=AsyncMock
+    ):
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(dry_run=False),
+            user=_user(),
+            session=session,
+        )
+        await apply_sql(
+            db_connection_uuid=uuid.uuid4(),
+            body=_body(dry_run=True),
+            user=_user(),
+            session=session,
+        )
+
+    minimum_roles = [
+        call.kwargs.get("minimum_role") for call in membership.await_args_list
+    ]
+    assert minimum_roles == [None, "deployer", None, "editor"]
+
+
+@pytest.mark.asyncio
 async def test_apply_sql_reports_ok_false_on_error():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=uuid.uuid4())
     session.get = AsyncMock(return_value=_conn())
     with patch(
         "app.api.connections.require_project_member", new_callable=AsyncMock
+    ), patch(
+        "app.api.connections.settings.legacy_persistent_apply_enabled", True
     ), patch(
         "app.api.connections.decrypt_text", return_value="postgresql://u@db.example.com/x"
     ), patch(

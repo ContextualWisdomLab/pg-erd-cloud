@@ -41,11 +41,16 @@ def _snapshot_source_dialect(snapshot: dict) -> DdlDialect:
     return "postgresql"
 
 
-def _q(ident: str) -> str:
-    """Quote a SQL identifier."""
+def quote_identifier(ident: str) -> str:
+    """Return one SQL-delimited identifier with embedded quotes escaped."""
 
     # Quote identifier with double-quotes, escaping internal quotes.
     return '"' + ident.replace('"', '""') + '"'
+
+
+def _q(ident: str) -> str:
+    """Quote an identifier through the dialect-owned rendering boundary."""
+    return quote_identifier(ident)
 
 
 def _qname(schema: str, name: str) -> str:

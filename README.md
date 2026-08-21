@@ -26,6 +26,11 @@ PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB�
     - Snowflake reverse snapshot JSON(`source_dialect: "snowflake"`)도 PostgreSQL
       DDL export에서 주요 type을 매핑합니다.
   - DBML / Mermaid / Prisma 등 프론트엔드 export 경로 포함
+  - 안전한 live workflow는 단계적으로 구현 중입니다. 현재 서버 권위의 버전형 schema model과
+    불변 structured migration plan(위험·lock·권한·precondition 포함)을 제공하며, 지원하지
+    않는 FK/index/default/identity/generated 등은 누락하지 않고 fail-closed 처리합니다.
+    격리 dry-run, durable apply, 재역설계 convergence와 실제 프론트엔드 flow가 완료되기
+    전에는 production-ready live apply로 간주하지 않습니다.
 - **DB Reversing 명세서 생성**:
   - Markdown draft: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md`
   - LLM prompt: `GET /api/snapshots/{snapshot_uuid}/reversing-spec.md?mode=llm-prompt`
@@ -75,6 +80,25 @@ PostgreSQL은 `CREATE INDEX ... USING <method>`의 `<method>`가
   <https://www.postgresql.org/docs/current/catalog-pg-am.html>
 - pg_get_indexdef / pg_get_expr:
   <https://www.postgresql.org/docs/current/functions-info.html>
+
+## 정본 설계 문서
+
+- [Architecture](ARCHITECTURE.md): 현재/목표 구성요소와 신뢰 경계
+- [PRD](docs/PRD.md): 사용자 여정, 요구사항, 성공 기준, 릴리스 게이트
+- [TRD](docs/TRD.md): 구현 경계, API/지원 매트릭스, 기술 추적성
+- [ADR index](docs/adr/README.md): 서버 권위 계획, 격리 dry run, 실행 분할,
+  durable recovery, 권한·수렴 결정
+- [Forward Engineering v1 contract](docs/contracts/forward-engineering-v1.md):
+  모델/계획/상태/error의 규범 계약
+- [UML](docs/UML.md) · [Metadata ERD](docs/DATA_MODEL.md) ·
+  [위협 모델](docs/security/forward-engineering-threat-model.md) ·
+  [운영 런북](docs/runbooks/forward-engineering.md)
+- [문서 충분성 감사](docs/DOCUMENTATION_AUDIT.md): 코드↔요구사항↔테스트↔문서
+  연결과 남은 공백
+
+`docs/superpowers/specs/2026-08-09-forward-engineering-design.md`는 승인된 목표
+설계와 구현 순서를 보존하는 상세 설계 기록입니다. 현재 동작은 위 정본 문서와 코드가
+우선하며, Figma/FigJam은 보조 시각자료입니다.
 
 ## 실행(로컬, Docker)
 
@@ -164,9 +188,14 @@ npm run dev
 - 대상 DB 연결정보(DSN)는 **APP_SECRET** 기반으로 암호화하여 앱 DB에 저장합니다.
 - 역공학(리버스) 작업은 요청 경로에서 동기 대기하지 않고 job queue로 비동기 처리합니다.
 - API 보안 체크리스트(프로젝트 기준): [docs/api-security-checklist.md](docs/api-security-checklist.md)
+- Forward Engineering 위협·복구 기준:
+  [threat model](docs/security/forward-engineering-threat-model.md),
+  [runbook](docs/runbooks/forward-engineering.md)
 
 ## 로드맵(요약)
 
 - Casdoor OIDC 로그인 UI/리다이렉트 플로우(현재는 토큰 검증/DEV 모드만)
 - 실시간 협업(커서/코멘트/CRDT 기반 동시 편집)
-- 포워드 엔지니어링(diff 기반 변경 SQL 생성/검증)
+- 포워드 엔지니어링 2–4단계: 현재 Partial인 signed-plan 격리 실행 코어와
+  live read-only preflight primitive를 배포 가능한 sandbox/worker로 완성하고,
+  durable apply/recovery, post-apply convergence, 접근 가능한 frontend workflow 구현

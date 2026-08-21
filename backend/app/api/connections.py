@@ -9,9 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_read_session, get_session
-from app.db_introspect import apply_database_sql, probe_database
+from app.db_introspect import (
+    apply_database_sql,
+    probe_database,
+    validate_database_dsn_target,
+)
 from app.models import DbConnection
 from app.permissions import require_project_member
+from app.request_validation import SecretSafeLegacyApplyRoute
 from app.schemas import (
     ApplySqlIn,
     ApplySqlOut,
@@ -21,8 +26,13 @@ from app.schemas import (
 )
 from app.security import decrypt_text, encrypt_text
 from app.sanitize import sanitize_for_storage
+from app.settings import settings
 
-router = APIRouter(prefix="/api/connections", tags=["connections"])
+router = APIRouter(
+    prefix="/api/connections",
+    tags=["connections"],
+    route_class=SecretSafeLegacyApplyRoute,
+)
 
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[ConnectionOut])
@@ -56,6 +66,12 @@ async def create_connection(
     await require_project_member(
         session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
     )
+    try:
+        await validate_database_dsn_target(body.dsn)
+    except Exception:  # noqa: BLE001 - expose no host, DNS, or credential detail
+        raise HTTPException(
+            status_code=422, detail="database DSN target is not allowed"
+        ) from None
     encrypted = encrypt_text(str(sanitize_for_storage(body.dsn)))
     c = DbConnection(
         db_connection_uuid=uuid.uuid4(),
@@ -76,12 +92,16 @@ async def apply_sql(
     db_connection_uuid: uuid.UUID,
     body: ApplySqlIn,
     user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    session: AsyncSession = Depends(get_session),
 ) -> ApplySqlOut:
     """Forward engineering: apply allow-listed DDL to a stored connection.
 
     SECURITY-SENSITIVE (writes to a live database):
-    * Requires the **editor** role on the connection's project.
+    * Requires **editor** for rollback-only compatibility validation and the
+      stronger **deployer** role for a persistent live apply. Persistent apply
+      is disabled by default and requires an explicit operator opt-in.
+    * Authorization and connection lookup use the primary session so replica
+      lag cannot revive a revoked deployer role.
     * IDOR-safe: non-members get a uniform 404 (no enumeration); members
       lacking editor get 403.
     * Rejects arbitrary SQL and requires unquoted snake_case database object
@@ -109,9 +129,14 @@ async def apply_sql(
         if exc.status_code == 403:
             raise HTTPException(status_code=404, detail="connection not found")
         raise
+    required_role = "editor" if body.dry_run else "deployer"
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+        session, project_space_uuid, user.user_account_uuid, minimum_role=required_role
     )
+    if not body.dry_run and not settings.legacy_persistent_apply_enabled:
+        raise HTTPException(
+            status_code=403, detail="persistent legacy apply is disabled"
+        )
 
     conn = await session.get(DbConnection, db_connection_uuid)
     if conn is None:

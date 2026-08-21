@@ -4,6 +4,8 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -11,6 +13,7 @@ from sqlalchemy import (
     LargeBinary,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -162,6 +165,446 @@ class SchemaSnapshotData(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
+
+
+class SchemaModel(Base):
+    """Project-scoped editable schema identity with immutable revisions."""
+
+    __tablename__ = "schema_model"
+
+    schema_model_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    model_name: Mapped[str] = mapped_column(Text())
+    current_revision_number: Mapped[int] = mapped_column(Integer())
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid", "model_name", name="uq_schema_model__project_name"
+        ),
+    )
+
+
+class SchemaModelRevision(Base):
+    """Immutable canonical JSON revision used as migration-plan input."""
+
+    __tablename__ = "schema_model_revision"
+
+    schema_model_revision_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    schema_model_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_model.schema_model_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    revision_number: Mapped[int] = mapped_column(Integer())
+    revision_digest: Mapped[str] = mapped_column(Text())
+    model_json: Mapped[dict] = mapped_column(JSONB())
+    base_schema_snapshot_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "schema_model_uuid",
+            "revision_number",
+            name="uq_schema_model_revision__model_number",
+        ),
+    )
+
+
+class MigrationPlan(Base):
+    """Immutable server-compiled plan bound to one target and base snapshot."""
+
+    __tablename__ = "migration_plan"
+
+    migration_plan_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+        index=True,
+    )
+    schema_model_revision_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "schema_model_revision.schema_model_revision_uuid", ondelete="RESTRICT"
+        ),
+        index=True,
+    )
+    db_connection_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("db_connection.db_connection_uuid", ondelete="RESTRICT"),
+    )
+    base_schema_snapshot_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("schema_snapshot.schema_snapshot_uuid", ondelete="RESTRICT"),
+    )
+    compiler_version: Mapped[str] = mapped_column(Text())
+    base_digest: Mapped[str] = mapped_column(Text())
+    target_digest: Mapped[str] = mapped_column(Text())
+    statement_digest: Mapped[str] = mapped_column(Text())
+    plan_json: Mapped[dict] = mapped_column(JSONB())
+    created_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "schema_model_revision_uuid",
+            "db_connection_uuid",
+            "base_schema_snapshot_uuid",
+            "statement_digest",
+            name="uq_migration_plan__immutable_identity",
+        ),
+        Index("ix_migration_plan__expires_at", "expires_at"),
+    )
+
+
+class MigrationRun(Base):
+    """Durable dry-run or apply attempt bound to one immutable plan."""
+
+    __tablename__ = "migration_run"
+
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_space_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
+    )
+    migration_plan_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_plan.migration_plan_uuid", ondelete="RESTRICT"),
+    )
+    passed_dry_run_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    run_kind: Mapped[str] = mapped_column(Text())
+    state: Mapped[str] = mapped_column(Text())
+    state_version: Mapped[int] = mapped_column(Integer(), default=1)
+    idempotency_key_hash: Mapped[str] = mapped_column(Text())
+    plan_digest: Mapped[str] = mapped_column(Text())
+    request_digest: Mapped[str] = mapped_column(Text())
+    confirmation_digest: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    destructive_confirmation: Mapped[bool | None] = mapped_column(
+        Boolean(), nullable=True
+    )
+    latest_event_digest: Mapped[str] = mapped_column(Text())
+    requested_by_user_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_account.user_account_uuid")
+    )
+    cancellation_requested: Mapped[bool] = mapped_column(Boolean(), default=False)
+    observed_base_digest: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    evidence_json: Mapped[dict] = mapped_column(JSONB())
+    error_code: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    started_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_space_uuid",
+            "run_kind",
+            "idempotency_key_hash",
+            name="uq_migration_run__idempotent_action",
+        ),
+        CheckConstraint(
+            "run_kind IN ('dry_run', 'apply')",
+            name="ck_migration_run__run_kind",
+        ),
+        CheckConstraint(
+            "state IN ('queued', 'sandbox_running', 'live_preflight_running', "
+            "'passed', 'drifted', 'failed', 'applying', 'reconciling', "
+            "'verifying', 'verified', 'drifted_no_apply', 'not_applied', "
+            "'verification_failed', 'failed_rolled_back', "
+            "'applied_with_drift', 'outcome_unknown', 'cancelled')",
+            name="ck_migration_run__state",
+        ),
+        CheckConstraint(
+            "(run_kind = 'dry_run' AND state IN ('queued', 'sandbox_running', "
+            "'live_preflight_running', 'passed', 'drifted', 'failed', "
+            "'cancelled')) OR "
+            "(run_kind = 'apply' AND state IN ('queued', 'applying', "
+            "'reconciling', 'verifying', 'verified', 'drifted_no_apply', "
+            "'not_applied', 'verification_failed', 'failed_rolled_back', "
+            "'applied_with_drift', 'outcome_unknown', 'cancelled'))",
+            name="ck_migration_run__kind_state",
+        ),
+        CheckConstraint(
+            "state_version >= 1", name="ck_migration_run__state_version"
+        ),
+        CheckConstraint(
+            "latest_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__latest_event_digest",
+        ),
+        CheckConstraint(
+            "idempotency_key_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__idempotency_key_hash",
+        ),
+        CheckConstraint(
+            "plan_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__plan_digest",
+        ),
+        CheckConstraint(
+            "request_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__request_digest",
+        ),
+        CheckConstraint(
+            "observed_base_digest IS NULL OR "
+            "observed_base_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__observed_base_digest",
+        ),
+        CheckConstraint(
+            "confirmation_digest IS NULL OR "
+            "confirmation_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run__confirmation_digest",
+        ),
+        CheckConstraint(
+            "(run_kind = 'dry_run' AND passed_dry_run_uuid IS NULL AND "
+            "confirmation_digest IS NULL AND destructive_confirmation IS NULL) OR "
+            "(run_kind = 'apply' AND passed_dry_run_uuid IS NOT NULL AND "
+            "confirmation_digest IS NOT NULL AND destructive_confirmation IS NOT NULL)",
+            name="ck_migration_run__apply_confirmation",
+        ),
+        Index("ix_migration_run__migration_plan_uuid", "migration_plan_uuid"),
+        Index("ix_migration_run__passed_dry_run_uuid", "passed_dry_run_uuid"),
+        Index("ix_migration_run__project_state", "project_space_uuid", "state"),
+    )
+
+
+class MigrationRunDispatch(Base):
+    """Transactional outbox intent for one isolated dry-run dispatch."""
+
+    __tablename__ = "migration_run_dispatch"
+
+    migration_run_dispatch_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    dispatch_kind: Mapped[str] = mapped_column(Text())
+    status: Mapped[str] = mapped_column(Text())
+    attempt_count: Mapped[int] = mapped_column(Integer(), default=0)
+    not_before: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    published_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            name="uq_migration_run_dispatch__migration_run_uuid",
+        ),
+        CheckConstraint(
+            "dispatch_kind = 'isolated_dry_run'",
+            name="ck_migration_run_dispatch__dispatch_kind",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'published')",
+            name="ck_migration_run_dispatch__status",
+        ),
+        CheckConstraint(
+            "attempt_count >= 0",
+            name="ck_migration_run_dispatch__attempt_count",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND published_at IS NULL) OR "
+            "(status = 'published' AND published_at IS NOT NULL)",
+            name="ck_migration_run_dispatch__published_at",
+        ),
+        Index(
+            "ix_migration_run_dispatch__status_not_before",
+            "status",
+            "not_before",
+        ),
+    )
+
+
+class MigrationRunAttempt(Base):
+    """Durable, lease-bound worker ownership history for one migration run."""
+
+    __tablename__ = "migration_run_attempt"
+
+    migration_run_attempt_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer())
+    acquired_state_version: Mapped[int] = mapped_column(Integer())
+    status: Mapped[str] = mapped_column(Text())
+    worker_identity_hash: Mapped[str] = mapped_column(Text())
+    signal_lease_token_hash: Mapped[str] = mapped_column(Text())
+    lease_expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    acquired_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    last_heartbeat_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            "attempt_number",
+            name="uq_migration_run_attempt__run_number",
+        ),
+        CheckConstraint(
+            "attempt_number >= 1",
+            name="ck_migration_run_attempt__attempt_number",
+        ),
+        CheckConstraint(
+            "acquired_state_version >= 1",
+            name="ck_migration_run_attempt__acquired_state_version",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'completed', 'abandoned')",
+            name="ck_migration_run_attempt__status",
+        ),
+        CheckConstraint(
+            "worker_identity_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_attempt__worker_identity_hash",
+        ),
+        CheckConstraint(
+            "signal_lease_token_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_attempt__signal_lease_token_hash",
+        ),
+        CheckConstraint(
+            "last_heartbeat_at >= acquired_at AND "
+            "lease_expires_at > acquired_at AND "
+            "((status = 'active' AND finished_at IS NULL) OR "
+            "(status IN ('completed', 'abandoned') AND finished_at IS NOT NULL "
+            "AND finished_at >= last_heartbeat_at))",
+            name="ck_migration_run_attempt__timestamps",
+        ),
+        Index(
+            "ix_migration_run_attempt__active_run",
+            "migration_run_uuid",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+        Index(
+            "ix_migration_run_attempt__lease_expiry",
+            "status",
+            "lease_expires_at",
+        ),
+    )
+
+
+class MigrationRunEvent(Base):
+    """Append-only, bounded evidence for one migration-run transition."""
+
+    __tablename__ = "migration_run_event"
+
+    migration_run_event_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    migration_run_uuid: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("migration_run.migration_run_uuid", ondelete="CASCADE"),
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer())
+    event_type: Mapped[str] = mapped_column(Text())
+    state_before: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    state_after: Mapped[str] = mapped_column(Text())
+    evidence_json: Mapped[dict] = mapped_column(JSONB())
+    previous_event_digest: Mapped[str | None] = mapped_column(
+        Text(), nullable=True
+    )
+    event_digest: Mapped[str] = mapped_column(Text())
+    actor_user_uuid: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_account.user_account_uuid"),
+        nullable=True,
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "migration_run_uuid",
+            "sequence_number",
+            name="uq_migration_run_event__run_sequence",
+        ),
+        CheckConstraint(
+            "sequence_number >= 1",
+            name="ck_migration_run_event__sequence_number",
+        ),
+        CheckConstraint(
+            "(sequence_number = 1 AND previous_event_digest IS NULL) OR "
+            "(sequence_number > 1 AND previous_event_digest IS NOT NULL)",
+            name="ck_migration_run_event__previous_digest",
+        ),
+        CheckConstraint(
+            "previous_event_digest IS NULL OR "
+            "previous_event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__previous_digest_format",
+        ),
+        CheckConstraint(
+            "event_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_migration_run_event__event_digest",
+        ),
+        CheckConstraint(
+            "event_type ~ '^[a-z][a-z0-9_]{0,63}$'",
+            name="ck_migration_run_event__event_type",
+        ),
+        CheckConstraint(
+            "state_before IS NULL OR state_before IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown', 'cancelled')",
+            name="ck_migration_run_event__state_before",
+        ),
+        CheckConstraint(
+            "state_after IN ('queued', 'sandbox_running', 'live_preflight_running', 'passed', 'drifted', 'failed', 'applying', 'reconciling', 'verifying', 'verified', 'drifted_no_apply', 'not_applied', 'verification_failed', 'failed_rolled_back', 'applied_with_drift', 'outcome_unknown', 'cancelled')",
+            name="ck_migration_run_event__state_after",
+        ),
+    )
+
 
 
 class JobQueue(Base):
