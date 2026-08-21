@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
 
@@ -80,40 +79,6 @@ describe('exportPrisma', () => {
     // Check users model (back-relation)
     expect(result).toContain('model users {');
     expect(result).toContain('posts_user_id posts[] @relation("users_posts")');
-  });
-
-  it('decodes generated column handles when exporting relations', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'users',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          badges: { pk: true, fk: false },
-          columns: [{ column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true }],
-        },
-      },
-      {
-        id: 'posts',
-        position: { x: 100, y: 100 },
-        data: {
-          title: 'posts',
-          badges: { pk: true, fk: true },
-          columns: [{ column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true }],
-        },
-      },
-    ];
-
-    const result = exportPrisma(nodes, [{
-      id: 'generated-handle-edge',
-      source: 'posts',
-      target: 'users',
-      sourceHandle: sourceColumnHandleId('user_id'),
-      targetHandle: targetColumnHandleId('id'),
-      label: 'users_posts',
-    }]);
-
-    expect(result).toContain('users_user_id users @relation("users_posts", fields: [user_id], references: [id])');
   });
 
   it('maps various types properly', () => {

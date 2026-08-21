@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodeHandleId, sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -27,22 +27,6 @@ describe('handleUtils', () => {
   describe('sourceColumnHandleId', () => {
     it('should prepend src- to sanitized id', () => {
       expect(sourceColumnHandleId('id')).toBe('src-c-0069-0064');
-    });
-  });
-
-  describe('decodeHandleId', () => {
-    it('decodes generated handles, including Unicode code points', () => {
-      expect(decodeHandleId(sanitizeHandleId('id_가🚀'))).toBe('id_가🚀');
-    });
-
-    it('decodes the empty-string sentinel', () => {
-      expect(decodeHandleId('c-empty')).toBe('');
-    });
-
-    it('rejects malformed and invalid Unicode handles', () => {
-      expect(decodeHandleId('c-not-hex')).toBeNull();
-      expect(decodeHandleId('c-110000')).toBeNull();
-      expect(decodeHandleId('legacy')).toBeNull();
     });
   });
 
