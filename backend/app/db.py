@@ -125,10 +125,11 @@ async def get_pooler_detection() -> PoolerDetectionResult:
             return _pooler_cache
 
         # Try all supported pooler admin consoles concurrently.
-        pending = {
+        probes = {
             asyncio.create_task(_probe_pooler_admin_console(admin_db))
             for admin_db in ("pgbouncer", "pgcat")
         }
+        pending = set(probes)
         try:
             while pending:
                 done, pending = await asyncio.wait(
@@ -154,8 +155,7 @@ async def get_pooler_detection() -> PoolerDetectionResult:
         finally:
             for p in pending:
                 p.cancel()
-            if pending:
-                await asyncio.gather(*pending, return_exceptions=True)
+            await asyncio.gather(*probes, return_exceptions=True)
 
         _pooler_cache = PoolerDetectionResult(
             kind=PoolerKind.UNKNOWN, detected=False, version_text=None
