@@ -347,8 +347,14 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '편집기' }))
 
     fireEvent.change(screen.getByLabelText('New project'), { target: { value: '  New  ' } })
+    let resolveProject!: (project: { project_space_uuid: string; project_name: string }) => void
+    api.createProject.mockReturnValueOnce(new Promise((resolve) => { resolveProject = resolve }))
+    const createProjectButton = screen.getByRole('button', { name: 'Create' })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    expect(createProjectButton).toHaveAttribute('aria-busy', 'true')
+    await act(async () => resolveProject({ project_space_uuid: 'p3', project_name: 'New' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('New'))
+    expect(createProjectButton).toHaveAttribute('aria-busy', 'false')
 
     const dsn = screen.getByLabelText('Connection DSN')
     fireEvent.change(dsn, { target: { value: 'postgresql://[' } })
