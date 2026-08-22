@@ -9,13 +9,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.tooling.json",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit",
+    "lint": "npm run typecheck",
     "e2e": "echo 'No e2e framework configured'"
   },
   "dependencies": {
