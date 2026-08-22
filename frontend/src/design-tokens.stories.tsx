@@ -12,7 +12,7 @@ type TokenDefinition = {
 }
 
 const tokenValues = new Map<string, string>(
-  [...designTokensCss.matchAll(/^\s*(--[\w-]+):\s*([^;]+);$/gm)].map((match) => [
+  [...designTokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((match) => [
     match[1],
     match[2].trim(),
   ]),
