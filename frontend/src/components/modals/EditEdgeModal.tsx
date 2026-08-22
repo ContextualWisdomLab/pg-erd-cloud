@@ -86,6 +86,7 @@ export function EditEdgeModal({
               onRelDelete();
             }}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
+            aria-label={`${editingEdge.source}에서 ${editingEdge.target}로의 관계 삭제`}
           >
             삭제
           </button>

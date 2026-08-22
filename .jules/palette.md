@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2024-08-22 - 모달 파괴적/복제 액션 버튼 접근성 개선
+**Learning:** 스크린 리더 사용자를 위해 '삭제', '복제'와 같은 공통 버튼에 명확한 대상 컨텍스트(aria-label)가 제공되지 않으면 어떤 요소가 삭제/복제되는지 알 수 없어 사용성에 치명적임을 인지했습니다.
+**Action:** 모달 내에서 파괴적이거나 복제하는 작업을 수행하는 버튼에는 항상 대상 식별자(테이블명, 관계 등)가 포함된 aria-label을 추가합니다.
