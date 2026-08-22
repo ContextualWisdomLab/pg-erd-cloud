@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { designTokenValues } from './design-token-values'
 import { Inventory } from './design-tokens.stories'
 
-const designTokensCss = readFileSync(new URL('./design-tokens.css', import.meta.url), 'utf8')
+const designTokensCss = readFileSync('src/design-tokens.css', 'utf8')
 const expectedTokenValues = new Map(
   [...designTokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((match) => [
     match[1],
