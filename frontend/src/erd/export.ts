@@ -67,12 +67,22 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  let sourceHandleColumn: string | undefined;
+  for (const column of sourceNode.data.columns || []) {
+    if (sourceColumnHandleId(column.column_name) === edge.sourceHandle) {
+      sourceHandleColumn = column.column_name;
+      break;
+    }
+  }
+
+  let targetHandleColumn: string | undefined;
+  for (const column of targetNode.data.columns || []) {
+    if (targetColumnHandleId(column.column_name) === edge.targetHandle) {
+      targetHandleColumn = column.column_name;
+      break;
+    }
+  }
+
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
