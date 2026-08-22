@@ -56,6 +56,15 @@ const renderInventory = () => {
   render(storyRender())
 }
 
+const previewFor = (token: string): HTMLElement => {
+  const row = screen.getByText(token).closest('div')
+  expect(row).not.toBeNull()
+
+  const preview = row?.querySelector('[data-token-preview="true"]')
+  expect(preview).not.toBeNull()
+  return preview as HTMLElement
+}
+
 afterEach(cleanup)
 
 describe('Design token Storybook inventory', () => {
@@ -71,39 +80,29 @@ describe('Design token Storybook inventory', () => {
     }
   })
 
-  it('exposes each visual preview through the CSS property owned by its token kind', () => {
+  it('exposes each decorative visual preview through the CSS property owned by its token kind', () => {
     renderInventory()
 
-    const brandPreview = screen.getByRole('img', { name: 'brand token preview' })
-    expect(brandPreview.getAttribute('style')).toContain('background: var(--color-brand)')
-
-    const layoutSection = screen.getByRole('heading', { name: 'layout' }).closest('section')
-    expect(layoutSection).not.toBeNull()
-
-    const controlRadiusPreview = within(layoutSection as HTMLElement).getByRole('img', {
-      name: 'control radius token preview',
-    })
-    expect(controlRadiusPreview.getAttribute('style')).toContain(
+    expect(previewFor('--color-brand').getAttribute('style')).toContain(
+      'background: var(--color-brand)',
+    )
+    expect(previewFor('--radius-control').getAttribute('style')).toContain(
       'border-radius: var(--radius-control)',
     )
 
-    const verticalSpacePreview = within(layoutSection as HTMLElement).getByRole('img', {
-      name: 'control vertical space token preview',
-    })
+    const verticalSpacePreview = previewFor('--space-control-y')
     expect(verticalSpacePreview.getAttribute('style')).toContain('min-width: 0')
     expect(verticalSpacePreview.getAttribute('style')).toContain('width: var(--space-control-y)')
 
-    const highlightShadowPreview = screen.getByRole('img', {
-      name: 'highlight shadow token preview',
-    })
-    expect(highlightShadowPreview.getAttribute('style')).toContain(
+    expect(previewFor('--shadow-highlight').getAttribute('style')).toContain(
       'box-shadow: var(--shadow-highlight)',
     )
-
-    expect(screen.getAllByRole('img')).toHaveLength(expectedTokens.length)
+    expect(document.querySelectorAll('[data-token-preview="true"]')).toHaveLength(
+      expectedTokens.length,
+    )
   })
 
-  it('shows every exact CSS value as text and keeps visual previews decorative', () => {
+  it('shows every exact CSS value as text and keeps visual previews out of the accessibility tree', () => {
     renderInventory()
 
     expect([...expectedTokenValues.keys()]).toEqual(expectedTokens)
@@ -116,7 +115,7 @@ describe('Design token Storybook inventory', () => {
       expect(exactValue).toBeTruthy()
       expect(within(row as HTMLElement).getByText(exactValue as string)).toBeTruthy()
       expect(within(row as HTMLElement).queryByRole('img')).toBeNull()
-      expect(row?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+      expect(previewFor(token).getAttribute('aria-hidden')).toBe('true')
     }
   })
 })
