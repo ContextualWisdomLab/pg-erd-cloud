@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FE] ♿ **디자인 토큰 exact-value 대체 표현**: Storybook의 모든 디자인 토큰 행이 `design-tokens.css`의 실제 값을 텍스트로 노출하고 시각 swatch는 접근성 트리에서 제외하도록 정합화했습니다. Figma handoff의 속성/값 표현과 동일한 비시각 감사 경계를 회귀 테스트로 고정합니다.
 - [FE] 🧪 **Storybook 검증 경로 정합화**: Storybook을 10.5.10으로 갱신하고 TypeScript 5.9 호환 도구체계를 고정했으며, Storybook vendor 선언은 애플리케이션 타입검사 대상에서 제외했습니다. 이제 `npm run typecheck`, `npm run test`, `npm run storybook:build`를 같은 순서로 실행해 디자인 토큰 UI를 확인할 수 있습니다.
 - [FE] 🎨 **Storybook design-token inventory**: the shared CSS tokens are now a
   standalone source consumed by the app and a Storybook inventory build, so
