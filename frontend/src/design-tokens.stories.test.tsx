@@ -1,55 +1,20 @@
+import { readFileSync } from 'node:fs'
+
 import { cleanup, render, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import designTokensCss from './design-tokens.css?raw'
+import { designTokenValues } from './design-token-values'
 import { Inventory } from './design-tokens.stories'
 
-const expectedTokens = [
-  '--color-brand',
-  '--color-text',
-  '--color-text-strong',
-  '--color-muted',
-  '--color-muted-strong',
-  '--color-muted-soft',
-  '--color-disabled',
-  '--color-nav-text',
-  '--color-success',
-  '--color-success-strong',
-  '--color-success-soft',
-  '--color-warning',
-  '--color-danger',
-  '--color-danger-strong',
-  '--color-danger-soft',
-  '--color-accent',
-  '--color-surface',
-  '--color-surface-sidebar',
-  '--color-surface-soft',
-  '--color-surface-muted',
-  '--color-surface-panel',
-  '--color-surface-status',
-  '--color-surface-active',
-  '--color-surface-floating',
-  '--color-surface-empty',
-  '--color-overlay',
-  '--color-border',
-  '--color-border-soft',
-  '--color-border-subtle',
-  '--color-border-active',
-  '--radius-control',
-  '--radius-panel',
-  '--space-control-y',
-  '--space-control-x',
-  '--shadow-highlight',
-  '--shadow-modal',
-]
-
+const designTokensCss = readFileSync(new URL('./design-tokens.css', import.meta.url), 'utf8')
 const expectedTokenValues = new Map(
   [...designTokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((match) => [
     match[1],
     match[2].trim(),
   ]),
 )
+const expectedTokens = Object.keys(designTokenValues)
 
 const renderInventory = () => {
   const storyRender = Inventory.render as unknown as () => ReactElement
@@ -68,6 +33,10 @@ const previewFor = (token: string): HTMLElement => {
 afterEach(cleanup)
 
 describe('Design token Storybook inventory', () => {
+  it('keeps the executable value mirror identical to the runtime CSS source', () => {
+    expect(Object.fromEntries(expectedTokenValues)).toEqual(designTokenValues)
+  })
+
   it('renders every shared token under the semantic inventory groups', () => {
     renderInventory()
 
@@ -104,8 +73,6 @@ describe('Design token Storybook inventory', () => {
 
   it('shows every exact CSS value as text and keeps visual previews out of the accessibility tree', () => {
     renderInventory()
-
-    expect([...expectedTokenValues.keys()]).toEqual(expectedTokens)
 
     for (const token of expectedTokens) {
       const row = screen.getByText(token).closest('div')

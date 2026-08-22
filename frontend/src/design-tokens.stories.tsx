@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import designTokensCss from './design-tokens.css?raw'
+import { designTokenValues } from './design-token-values'
 
 type TokenKind = 'color' | 'radius' | 'space' | 'shadow'
 
@@ -11,15 +11,8 @@ type TokenDefinition = {
   kind: TokenKind
 }
 
-const tokenValues = new Map<string, string>(
-  [...designTokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((match) => [
-    match[1],
-    match[2].trim(),
-  ]),
-)
-
 const exactTokenValue = (token: string): string => {
-  const value = tokenValues.get(token)
+  const value = designTokenValues[token as keyof typeof designTokenValues]
   if (value === undefined) {
     throw new Error(`Storybook design-token inventory is missing ${token}`)
   }
