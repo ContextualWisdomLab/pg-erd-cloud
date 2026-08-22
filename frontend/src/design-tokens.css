@@ -1,0 +1,39 @@
+/* Shared design tokens for the application and Storybook. */
+:root {
+  --color-brand: #034ea2;
+  --color-text: #0f172a;
+  --color-text-strong: #111827;
+  --color-muted: #64748b;
+  --color-muted-strong: #4b5563;
+  --color-muted-soft: #6b7280;
+  --color-disabled: #9ca3af;
+  --color-nav-text: #334155;
+  --color-success: #047857;
+  --color-success-strong: #166534;
+  --color-success-soft: #dcfce7;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-danger-strong: #991b1b;
+  --color-danger-soft: #fee2e2;
+  --color-accent: #2563eb;
+  --color-surface: #fff;
+  --color-surface-sidebar: #fbfdff;
+  --color-surface-soft: #f8fafc;
+  --color-surface-muted: #f3f4f6;
+  --color-surface-panel: #f9fafb;
+  --color-surface-status: #f1f5f9;
+  --color-surface-active: #eff6ff;
+  --color-surface-floating: rgba(255, 255, 255, 0.92);
+  --color-surface-empty: rgba(255, 255, 255, 0.94);
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-border: #d1d5db;
+  --color-border-soft: #e5e7eb;
+  --color-border-subtle: #e2e8f0;
+  --color-border-active: #dbeafe;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --space-control-y: 8px;
+  --space-control-x: 10px;
+  --shadow-highlight: 0 0 0 3px rgba(3, 78, 162, 0.18);
+  --shadow-modal: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
