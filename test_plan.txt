@@ -1,0 +1,1 @@
+I will remove the `Array.find` usage inside the `export.ts` and `prisma.ts` files, replacing them with a native `for` loop to avoid intermediate callback allocation and O(N) array scanning without an early return.
