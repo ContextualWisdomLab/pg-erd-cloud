@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import designTokensCss from './design-tokens.css?raw'
 import { Inventory } from './design-tokens.stories'
 
 const expectedTokens = [
@@ -42,6 +43,13 @@ const expectedTokens = [
   '--shadow-highlight',
   '--shadow-modal',
 ]
+
+const expectedTokenValues = new Map(
+  [...designTokensCss.matchAll(/^\s*(--[\w-]+):\s*([^;]+);$/gm)].map((match) => [
+    match[1],
+    match[2].trim(),
+  ]),
+)
 
 const renderInventory = () => {
   const storyRender = Inventory.render as unknown as () => ReactElement
@@ -93,5 +101,22 @@ describe('Design token Storybook inventory', () => {
     )
 
     expect(screen.getAllByRole('img')).toHaveLength(expectedTokens.length)
+  })
+
+  it('shows every exact CSS value as text and keeps visual previews decorative', () => {
+    renderInventory()
+
+    expect([...expectedTokenValues.keys()]).toEqual(expectedTokens)
+
+    for (const token of expectedTokens) {
+      const row = screen.getByText(token).closest('div')
+      expect(row).not.toBeNull()
+
+      const exactValue = expectedTokenValues.get(token)
+      expect(exactValue).toBeTruthy()
+      expect(within(row as HTMLElement).getByText(exactValue as string)).toBeTruthy()
+      expect(within(row as HTMLElement).queryByRole('img')).toBeNull()
+      expect(row?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    }
   })
 })
