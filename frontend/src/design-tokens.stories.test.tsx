@@ -45,7 +45,7 @@ const expectedTokens = [
 ]
 
 const expectedTokenValues = new Map(
-  [...designTokensCss.matchAll(/^\s*(--[\w-]+):\s*([^;]+);$/gm)].map((match) => [
+  [...designTokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((match) => [
     match[1],
     match[2].trim(),
   ]),
