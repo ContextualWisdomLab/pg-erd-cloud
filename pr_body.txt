@@ -1,0 +1,15 @@
+💡 What
+- ExportModal에 DBML 다운로드 버튼 추가
+- 메인 화면에 있던 독립된 DBML 다운로드 버튼을 제거하고, ExportModal 안으로 통합하였습니다.
+- 관련된 통합테스트 및 유닛 테스트 업데이트 (`App.coverage.test.tsx`, `ExportModal.test.tsx`)
+
+🎯 Why
+- 기존에 분리되어 있던 DBML 내보내기 버튼을 모달 안으로 통합하여 사용자 인터페이스의 일관성을 높였습니다.
+- SVG, PlantUML 등 다른 파일 형식과 동일한 경험을 제공합니다.
+
+📸 Before/After
+- Before: 메인 도구 모음에 `DBML 내보내기` 버튼이 존재
+- After: `공유 및 내보내기` 모달 안 `산출물` 목록에 DBML 항목으로 이동됨
+
+♿ Accessibility
+- 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
