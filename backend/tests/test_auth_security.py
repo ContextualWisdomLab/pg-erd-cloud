@@ -733,3 +733,16 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+def test_crit_header_validation():
+    with pytest.raises(HTTPException, match="invalid crit header"):
+        auth._validate_jwt_header({"alg": "RS256", "crit": "not-a-list"})
+
+    with pytest.raises(HTTPException, match="crit header too long"):
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["a", "b", "c", "d", "e", "f"]})
+
+    with pytest.raises(HTTPException, match="invalid crit parameter"):
+        auth._validate_jwt_header({"alg": "RS256", "crit": [123]})
+
+    with pytest.raises(HTTPException, match="unsupported crit parameter"):
+        auth._validate_jwt_header({"alg": "RS256", "crit": ["unknown"]})
