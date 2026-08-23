@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-06-30 - Dynamically Disabled Buttons with Explanatory Hints
+**Learning:** Using the native `disabled` attribute on buttons removes them from the tab sequence. This makes it impossible for keyboard or screen reader users to reach the button and discover any attached explanatory hints (like `aria-describedby` explaining why it's disabled).
+**Action:** When a dynamically disabled button provides important contextual hints about its disabled state, use `aria-disabled="true"` instead of the native `disabled` attribute. Ensure visual disabled styling (opacity, cursor) is applied and an `onClick={e => e.preventDefault()}` handler is added to prevent submission while maintaining discoverability in the tab sequence.
