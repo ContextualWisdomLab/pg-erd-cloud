@@ -39,7 +39,6 @@ describe('App edit functionality', () => {
   });
 
   it('renders compact visual labels while preserving toolbar accessible names', async () => {
-    vi.useRealTimers();
     const user = userEvent.setup();
     render(<App />);
 

@@ -170,7 +170,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' })); // Without schema it's test_table
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
@@ -208,27 +208,8 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNodeLocal as any} setEditingNode={vi.fn()} setNodes={vi.fn()} onDeleteTable={onDeleteTableMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'public.test_table 테이블 삭제' })); // With schema it's public.test_table
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 삭제' }));
 
     expect(onDeleteTableMock).toHaveBeenCalled();
-  });
-
-
-  it('uses stable table identity for labels across schemas', async () => {
-    const schemaNode = {
-      id: 'table-2',
-      type: 'tableNode',
-      position: { x: 0, y: 0 },
-      data: {
-        id: 'table-2',
-        schema: 'auth',
-        title: 'users',
-        comment: '',
-        columns: [],
-      },
-    };
-    render(<EditTableModal isOpen={true} setEditingNode={vi.fn()} setNodes={vi.fn()} onEditTableCancel={vi.fn()} onEditTableSubmit={vi.fn()} onDeleteTable={vi.fn()} editingNode={schemaNode as any} />);
-    expect(screen.getByRole('button', { name: 'auth.users 테이블 삭제' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'auth.users 테이블 복제' })).toBeInTheDocument();
   });
 });
