@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-02-23 - 그룹 및 관계 삭제 시 중복 확인창 제거
+**Learning:** 모달창 내부의 `window.confirm`과 부모 컴포넌트의 핸들러에 있는 `window.confirm`이 중복으로 발생하여 사용자에게 두 번의 확인을 요구하는 불편한 UX 문제가 있었습니다.
+**Action:** 부모 컴포넌트에 있는 상세한 설명의 확인창만 남기고 `GroupModal.tsx`와 `EditEdgeModal.tsx` 내의 불필요한 `window.confirm` 코드를 제거하여 프로세스를 간소화했습니다.
