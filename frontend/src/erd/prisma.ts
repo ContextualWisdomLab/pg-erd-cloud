@@ -57,6 +57,7 @@ export function exportPrisma(
   // Prisma relations require a field on both sides if we want back-relations,
   // but let's just generate the minimal required relations.
   const fkNodeColumnPairs = new Set<string>();
+  const fkNodeHandlePairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
@@ -67,17 +68,23 @@ export function exportPrisma(
     if (!sourceNode || !targetNode) continue;
 
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
+    const edgeData = edge.data as { sourceColumns?: string[], targetColumns?: string[] } | undefined;
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
+    if (edgeData?.sourceColumns?.[0]) {
+      sourceField = edgeData.sourceColumns[0];
       fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+    } else if (edge.sourceHandle?.startsWith("src-")) {
+      sourceField = edge.sourceHandle.slice(4); // Legacy encoded handle
+      fkNodeHandlePairs.add(`${edge.source}:${sourceField}`);
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
+    if (edgeData?.targetColumns?.[0]) {
+      targetField = edgeData.targetColumns[0];
+    } else if (edge.targetHandle?.startsWith("tgt-")) {
       targetField = edge.targetHandle.slice(4);
     }
 
@@ -112,9 +119,12 @@ export function exportPrisma(
     for (const col of node.data.columns) {
       const fieldName = sanitizeName(col.column_name);
 
-      const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
-        (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+      let isFk = fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
+                 (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+
+      if (!isFk && fkNodeHandlePairs.size > 0) {
+        isFk = fkNodeHandlePairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`);
+      }
 
       const prismaType = mapToPrismaType(col.data_type, isFk);
 

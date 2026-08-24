@@ -78,8 +78,11 @@ function isForeignKeyColumn(
     return true;
   }
 
-  const handleId = sourceColumnHandleId(columnName);
-  return info.handles.has(handleId);
+  if (info.handles.size > 0) {
+    const handleId = sourceColumnHandleId(columnName);
+    return info.handles.has(handleId);
+  }
+  return false;
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {
