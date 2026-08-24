@@ -80,11 +80,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-08-24 - [Optimize Node Column Lookup in export.ts via Edge Handle Reverse parsing]
 **Learning:** We replaced an O(E * C) loop where `nodes.data.columns.find` scanning via encoding every column name to handle format and checking equality with edge handle, to simply parsing the target column from the edge handle directly using `parseColumnNameFromHandle` and doing O(C) string equality check over the columns.
 **Action:** When working with foreign key edge parsing logic inside ERD diagram generation, rather than searching and translating every table column to its DOM representation, implement a reverse-parsing helper to decode DOM representations to standard identifiers to minimize translation overhead on large node sets.
-
-## 2024-08-24 - [Fix Strix Flag regarding Handle Generation functions DoS limits]
-**Learning:** Strix correctly flagged `sanitizeHandleId` and related functions inside `handleUtils.ts` for potential DoS and CPU expansion if an unconstrained input string is passed through  map loops to encode the handles.
-**Action:** When implementing hex-conversions or string manipulation algorithms for graph identifiers, always add an early max length sanity limit to prevent massive resource allocation due to intentionally oversized user input.
-
-## 2024-08-24 - [Fix Strix Flag regarding Handle Generation functions DoS limits]
-**Learning:** Strix correctly flagged `sanitizeHandleId` and related functions inside `handleUtils.ts` for potential DoS and CPU expansion if an unconstrained input string is passed through `Array.from()` map loops to encode the handles.
-**Action:** When implementing hex-conversions or string manipulation algorithms for graph identifiers, always add an early max length sanity limit to prevent massive resource allocation due to intentionally oversized user input.

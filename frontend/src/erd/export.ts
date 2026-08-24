@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,10 +67,12 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
+  // ⚡ Bolt: Parse column name from edge handle directly (O(L)) instead of encoding every column name in the table (O(C * L))
   let sourceHandleColumn = parseColumnNameFromHandle(edge.sourceHandle);
   if (sourceHandleColumn && !(sourceNode.data.columns || []).some(c => c && c.column_name === sourceHandleColumn)) {
     sourceHandleColumn = null;
   }
+  // ⚡ Bolt: Verify the parsed column actually exists in the table using a fast string equality check
   let targetHandleColumn = parseColumnNameFromHandle(edge.targetHandle);
   if (targetHandleColumn && !(targetNode.data.columns || []).some(c => c && c.column_name === targetHandleColumn)) {
     targetHandleColumn = null;
