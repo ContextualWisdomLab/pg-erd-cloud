@@ -44,6 +44,8 @@ describe('EditTableModal', () => {
     expect(screen.getByRole('textbox', { name: 'test_col 데이터 타입' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col PK 설정' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'test_col NN 설정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'test_table 테이블 삭제' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'test_table 테이블 복제' })).toBeInTheDocument();
   });
 
   it('returns null if not open or no editingNode', () => {
@@ -170,7 +172,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '복제' }));
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' }));
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
