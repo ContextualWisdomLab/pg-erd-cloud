@@ -26,17 +26,27 @@ export function exportMermaid(
   }
 
   const fkNodeColumnPairs = new Set<string>();
+  const fkNodeHandlePairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
 
   for (const edge of edges) {
-    if (edge.sourceHandle?.startsWith("src-")) {
-      fkNodeColumnPairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
+    const edgeData = edge.data as any;
+    if (edgeData?.sourceColumns) {
+      for (const col of edgeData.sourceColumns) {
+        fkNodeColumnPairs.add(`${edge.source}:${col}`);
+      }
+    } else if (edge.sourceHandle?.startsWith("src-")) {
+      fkNodeHandlePairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      fkNodeColumnPairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
+    if (edgeData?.targetColumns) {
+      for (const col of edgeData.targetColumns) {
+        fkNodeColumnPairs.add(`${edge.target}:${col}`);
+      }
+    } else if (edge.targetHandle?.startsWith("tgt-")) {
+      fkNodeHandlePairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
     }
   }
 
@@ -48,11 +58,15 @@ export function exportMermaid(
       let modifiers = "";
       if (col.is_pk) modifiers += " PK";
 
-      const safeId = sanitizeHandleId(col.column_name);
-      // ⚡ Bolt: O(1) lookups instead of O(E) array search for every column
-      const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${safeId}`) ||
-        (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+      // ⚡ Bolt: Use direct O(1) string matching against edge data to bypass expensive O(N*C) sanitizeHandleId encodings.
+      let isFk = fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
+                 (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+
+      // Fallback only if there are legacy edges that require handle matching
+      if (!isFk && fkNodeHandlePairs.size > 0) {
+        const safeId = sanitizeHandleId(col.column_name);
+        isFk = fkNodeHandlePairs.has(`${node.id}:${safeId}`);
+      }
 
       if (isFk && !col.is_pk) modifiers += " FK";
 
