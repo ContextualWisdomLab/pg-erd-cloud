@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-25 - [Table Modal Action Context]
+**Learning:** 모달 창 내의 액션 버튼(예: '복제', '테이블 삭제')이 단순히 동작 이름만 가지고 있으면, 스크린 리더 사용자는 어떤 대상을 복제하거나 삭제하는지 맥락을 잃을 수 있습니다.
+**Action:** 현재 선택된 컨텍스트(예: 테이블 이름)를 포함하는 명시적인 `aria-label`을 액션 버튼에 추가하여, 시각적 정보 없이도 동작의 대상을 명확히 알 수 있도록 합니다.
