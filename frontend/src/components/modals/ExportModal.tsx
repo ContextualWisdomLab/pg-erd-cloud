@@ -34,6 +34,13 @@ type ExportArtifact = {
   ariaLabel: string;
 };
 
+const accessManagementDisabledStyle: React.CSSProperties = {
+  opacity: 0.6,
+  cursor: 'not-allowed',
+  backgroundColor: 'var(--color-surface-muted)',
+  color: 'var(--color-disabled)',
+};
+
 export function ExportModal({
   isOpen,
   isCopied,
@@ -203,9 +210,13 @@ export function ExportModal({
               <button
                 type="button"
                 aria-disabled="true"
-                onClick={(e) => e.preventDefault()}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
+                style={accessManagementDisabledStyle}
               >
                 접근 관리
               </button>
