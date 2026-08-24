@@ -109,7 +109,6 @@ export function GroupModal({
                     type="button"
                     aria-label={`${group.name} 그룹 삭제`}
                     onClick={() => {
-                      if (!window.confirm(`'${group.name}' 그룹을 삭제하시겠습니까?`)) return;
                       onDeleteBusinessGroup(group.id);
                     }}
                   >
