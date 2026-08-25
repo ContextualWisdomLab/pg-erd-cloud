@@ -2,21 +2,25 @@ import type { Node } from "@xyflow/react";
 
 import type { TableNodeData } from "./convert";
 
-function fieldIncludes(value: string | null | undefined, term: string): boolean {
-  return Boolean(value && value.toLocaleLowerCase().includes(term));
-}
+const nodeSearchTextCache = new WeakMap<TableNodeData, string>();
 
-function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
-  if (fieldIncludes(node.data.title, term)) return true;
-  if (fieldIncludes(node.data.comment, term)) return true;
+function getNodeSearchText(node: Node<TableNodeData>): string {
+  let text = nodeSearchTextCache.get(node.data);
+  if (text !== undefined) return text;
 
-  for (const column of node.data.columns) {
-    if (fieldIncludes(column.column_name, term)) return true;
-    if (fieldIncludes(column.data_type, term)) return true;
-    if (fieldIncludes(column.column_comment, term)) return true;
+  const parts: string[] = [];
+  if (node.data.title) parts.push(node.data.title);
+  if (node.data.comment) parts.push(node.data.comment);
+
+  for (const col of node.data.columns) {
+    if (col.column_name) parts.push(col.column_name);
+    if (col.data_type) parts.push(col.data_type);
+    if (col.column_comment) parts.push(col.column_comment);
   }
 
-  return false;
+  text = parts.join(" ").toLocaleLowerCase();
+  nodeSearchTextCache.set(node.data, text);
+  return text;
 }
 
 export function tableNodeMatchesSearch(
@@ -29,7 +33,9 @@ export function tableNodeMatchesSearch(
         new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
       );
   if (terms.length === 0) return false;
-  return terms.every((term) => nodeIncludesTerm(node, term));
+
+  const nodeText = getNodeSearchText(node);
+  return terms.every((term) => nodeText.includes(term));
 }
 
 export function findSearchMatchedNodeIds(
