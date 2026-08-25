@@ -43,8 +43,9 @@ The exact pull-request head must prove:
 - click, Enter, Space, and direct submit are inert while unavailable;
 - a valid name removes the temporary explanation and submits exactly once;
 - cancel and input-change behavior remain unchanged;
-- frontend typecheck, the complete 100% coverage suite, production build, Security Scan, Semgrep, CodeRabbit, and independent current-head review pass;
-- package manifests, lockfiles, CI package-manager policy, and unrelated App orchestration tests remain identical to `main`.
+- frontend typecheck, the complete 100% coverage suite, production build, and every live repository/organization-required workflow or check reach terminal success on the exact current head;
+- the active organization ruleset's OpenCode review, Security Scan, Strix, SAST Semgrep, Noema review, scheduler/empty-PR controls as applicable, two qualifying approvals, last-push approval, and review-thread resolution are satisfied without bypass;
+- package manifests, lockfiles, CI package-manager policy, search/polling behavior and tests, and unrelated App orchestration remain identical to protected `main`.
 
 ## APA 7 references
 
