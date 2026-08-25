@@ -729,7 +729,9 @@ button:disabled {
 }
 
 .exportModal__disabledHintButton {
-  opacity: 0.9;
+  opacity: 0.6;
+  cursor: not-allowed;
+  color: var(--color-disabled);
 }
 
 .exportModal__hint {

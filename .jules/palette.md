@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-25 - Making Disabled Button Hints Discoverable
+**Learning:** Native `disabled` attributes remove buttons from the tab order, making it impossible for screen reader users to discover helpful context provided by `aria-describedby` (e.g., explaining why a button is disabled).
+**Action:** When a disabled button requires explanatory text (like an access management hint), use `aria-disabled="true"`, prevent default click behavior, and apply visually disabled styles instead of the native `disabled` attribute to maintain keyboard focusability.
