@@ -187,7 +187,7 @@ async def test_oidc_rejects_header_selected_algorithm(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -207,7 +207,7 @@ async def test_oidc_rejects_header_selected_algorithm(
         )
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "unsupported token algorithm"
+    assert exc_info.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
@@ -244,7 +244,7 @@ async def test_oidc_decode_rejects_kty_mismatch(
         await auth._decode_verified_oidc_token("ey...fake...")
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "algorithm/key type mismatch"
+    assert exc_info.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
@@ -259,7 +259,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -293,10 +293,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "issuer": "https://issuer.example",
         "options": {
             "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
+            "require": ["iss", "exp", "jti", "aud"],
             "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
     }
@@ -307,11 +304,11 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     [
         (
             {"kid": "key-1", "alg": "RS256", "typ": "nested+jwt"},
-            "unsupported token type",
+            "invalid token",
         ),
         (
             {"kid": "key-1", "alg": "RS256", "cty": "JWT"},
-            "unsupported token content type",
+            "invalid token",
         ),
     ],
 )
@@ -353,8 +350,8 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
-        return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
+            return {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
+        return {"keys": [{"kid": "old-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -383,7 +380,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["key"] is not None
 
 
 @pytest.mark.asyncio
@@ -397,7 +394,7 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -417,7 +414,7 @@ async def test_oidc_requires_jti_claim(
         )
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "token missing jti"
+    assert exc_info.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
@@ -431,7 +428,7 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -464,7 +461,7 @@ async def test_oidc_rejects_revoked_jti(
         )
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "token revoked"
+    assert exc_info.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
@@ -560,7 +557,7 @@ async def test_oidc_decode_rejects_invalid_header(
         await auth._decode_verified_oidc_token("invalid_token")
 
     assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == "invalid token header"
+    assert excinfo.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
@@ -575,7 +572,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.PyJWTError("mocked decoding error")
@@ -592,7 +589,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
         await auth._decode_verified_oidc_token("Bearer token")
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "token verification failed"
+    assert exc_info.value.detail == "invalid token"
 
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
@@ -607,7 +604,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -625,7 +622,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
         await auth._decode_verified_oidc_token("ey...")
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "algorithm/key type mismatch"
+    assert exc_info.value.detail == "invalid token"
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,
@@ -647,7 +644,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
             request_count += 1
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA"}]})
+            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -665,12 +662,12 @@ async def test_oidc_jwks_refresh_rate_limiting(
     )
 
     jwks = await auth._get_jwks()
-    assert jwks == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+    assert jwks == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
     assert request_count == 2
 
     before_second_refresh = request_count
     jwks2 = await auth._get_jwks(force_refresh=True)
-    assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+    assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]}
     assert request_count == before_second_refresh
 
 
@@ -696,7 +693,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
             await asyncio.sleep(0)
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA"}]})
+            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -726,10 +723,37 @@ async def test_oidc_jwks_force_refresh_is_serialized(
     )
 
     assert refreshed == [
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "tVKUtcx_n9rt5afY_2WFNvU6PlFMggCrossDi6IGpYGH1xX0IEYf382aB0h4jVOhOaF_sHq1wVlZ1a1gDqF4Axtw89G2Fm_1WkK55Fq5i0Q5t-F4VwBv9lMxt70IIfn9Fj3f4E28z0qZ8a35P6UoMv_x2E2H-2A8-L1A_l4", "e": "AQAB"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "crit",
+    [
+        "not-a-list",
+        [],
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+        [123],
+        ["unsupported-extension"]
+    ],
+)
+async def test_oidc_rejects_invalid_crit(
+    monkeypatch: pytest.MonkeyPatch, crit: object
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": crit})
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer token"})
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid token"
