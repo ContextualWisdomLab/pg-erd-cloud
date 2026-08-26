@@ -198,30 +198,20 @@ export default function App() {
   const searchMatchedNodeIds = useMemo(() => {
     return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
   }, [nodes, normalizedNodeSearch]);
-
-  // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
-  const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);
-
   const visibleNodes = useMemo(() => {
     if (!normalizedNodeSearch) return nodes;
-
     return nodes.map((node) => {
-      let cachedData = searchCache.get(node.data);
-      if (!cachedData) {
-        const isHighlighted = searchMatchedNodeIds.has(node.id);
-        cachedData = {
+      const isHighlighted = searchMatchedNodeIds.has(node.id);
+      return {
+        ...node,
+        data: {
           ...node.data,
           isDimmed: !isHighlighted,
           isHighlighted,
-        };
-        searchCache.set(node.data, cachedData);
-      }
-      return {
-        ...node,
-        data: cachedData,
+        },
       };
     });
-  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds, searchCache]);
+  }, [nodes, normalizedNodeSearch, searchMatchedNodeIds]);
   const nodeSearchStatus = normalizedNodeSearch
     ? `${searchMatchedNodeIds.size}개 테이블 일치`
     : "";
@@ -319,46 +309,22 @@ export default function App() {
 
   useEffect(() => {
     if (!snapshotId) return;
-    let isCurrent = true;
-    let timer: number | null = null;
-
-    async function poll() {
-      try {
-        const s = await getSnapshot(snapshotId as string);
-        if (!isCurrent) return;
-        setSnapshot(s);
-
-        if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
-          if (selectedProjectId) {
-            try {
-              const snaps = await listSnapshots(selectedProjectId);
-              if (isCurrent) setSnapshots(snaps);
-            } catch (e) {
-              if (isCurrent) setError(String(e));
+    const timer = setInterval(() => {
+      getSnapshot(snapshotId)
+        .then((s) => {
+          setSnapshot(s);
+          if (s.status === "succeeded" || s.status === "failed" || s.status === "not_found") {
+            clearInterval(timer);
+            if (selectedProjectId) {
+              listSnapshots(selectedProjectId)
+                .then(setSnapshots)
+                .catch((e) => setError(String(e)));
             }
           }
-          return;
-        }
-
-        if (isCurrent) {
-          timer = window.setTimeout(poll, 1000);
-        }
-      } catch (e) {
-        if (isCurrent) {
-          setError(String(e));
-          timer = window.setTimeout(poll, 1000);
-        }
-      }
-    }
-
-    poll();
-
-    return () => {
-      isCurrent = false;
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-    };
+        })
+        .catch((e) => setError(String(e)));
+    }, 1000);
+    return () => clearInterval(timer);
   }, [selectedProjectId, snapshotId]);
 
   const graph = useMemo(() => {

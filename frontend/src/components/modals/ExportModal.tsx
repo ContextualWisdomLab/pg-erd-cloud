@@ -241,7 +241,7 @@ export function ExportModal({
                       }
                     }}
                     aria-disabled={artifact.disabled ? true : undefined}
-                    aria-describedby={artifact.disabled ? `export-desc-${artifact.label.replace(/\s+/g, '-')}` : undefined}
+                    aria-describedby={`export-desc-${artifact.label.replace(/\s+/g, '-')}`}
                     aria-label={artifact.ariaLabel}
                     aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
                   >

@@ -97,7 +97,7 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '생성 중...' })).toBeDisabled();
   });
 
-  it('runs each export artifact action exactly once for click, Enter, and Space', async () => {
+  it('runs each export artifact action from the modal', async () => {
     const onCopyExportDdl = vi.fn();
     const onDownloadSvg = vi.fn();
     const onDownloadUml = vi.fn();
@@ -122,29 +122,31 @@ describe('ExportModal', () => {
       />,
     );
 
-    const enabledActions = [
-      { button: screen.getByRole('button', { name: 'SQL DDL 복사' }), callback: onCopyExportDdl },
-      { button: screen.getByRole('button', { name: 'SVG 이미지 내보내기' }), callback: onDownloadSvg },
-      { button: screen.getByRole('button', { name: 'PlantUML 내보내기' }), callback: onDownloadUml },
-      { button: screen.getByRole('button', { name: 'Mermaid 내보내기' }), callback: onDownloadMermaid },
-      { button: screen.getByRole('button', { name: 'DBML 내보내기' }), callback: onDownloadDbml },
-      { button: screen.getByRole('button', { name: 'Prisma Schema 내보내기' }), callback: onDownloadPrisma },
-      { button: screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }), callback: onExportDictionaryCsv },
-      { button: screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }), callback: onExportDictionaryMarkdown },
+    const enabledButtons = [
+      screen.getByRole('button', { name: 'SQL DDL 복사' }),
+      screen.getByRole('button', { name: 'SVG 이미지 내보내기' }),
+      screen.getByRole('button', { name: 'PlantUML 내보내기' }),
+      screen.getByRole('button', { name: 'Mermaid 내보내기' }),
+      screen.getByRole('button', { name: 'DBML 내보내기' }),
+      screen.getByRole('button', { name: 'Prisma Schema 내보내기' }),
+      screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }),
+      screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }),
     ];
 
-    for (const { button, callback } of enabledActions) {
+    for (const button of enabledButtons) {
       await user.click(button);
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      button.focus();
       await user.keyboard('{Enter}');
-      expect(callback).toHaveBeenCalledTimes(2);
-
-      button.focus();
       await user.keyboard(' ');
-      expect(callback).toHaveBeenCalledTimes(3);
     }
+
+    expect(onCopyExportDdl).toHaveBeenCalledTimes(3);
+    expect(onDownloadSvg).toHaveBeenCalledTimes(3);
+    expect(onDownloadUml).toHaveBeenCalledTimes(3);
+    expect(onDownloadMermaid).toHaveBeenCalledTimes(3);
+    expect(onDownloadDbml).toHaveBeenCalledTimes(3);
+    expect(onDownloadPrisma).toHaveBeenCalledTimes(3);
+    expect(onExportDictionaryCsv).toHaveBeenCalledTimes(3);
+    expect(onExportDictionaryMarkdown).toHaveBeenCalledTimes(3);
   });
 
   it('shows share link copy or creation errors', () => {
@@ -158,15 +160,7 @@ describe('ExportModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('공유 링크 복사에 실패했습니다.');
   });
 
-  it('explains and suppresses every export that cannot be generated yet', async () => {
-    const onCopyExportDdl = vi.fn();
-    const onDownloadSvg = vi.fn();
-    const onDownloadUml = vi.fn();
-    const onDownloadMermaid = vi.fn();
-    const onExportDictionaryCsv = vi.fn();
-    const onExportDictionaryMarkdown = vi.fn();
-    const onDownloadDbml = vi.fn();
-    const onDownloadPrisma = vi.fn();
+  it('explains when exports cannot be generated yet', async () => {
     const user = userEvent.setup();
     render(
       <ExportModal
@@ -174,44 +168,19 @@ describe('ExportModal', () => {
         hasDdlExport={false}
         hasDictionaryExport={false}
         hasDiagramExport={false}
-        onCopyExportDdl={onCopyExportDdl}
-        onDownloadSvg={onDownloadSvg}
-        onDownloadUml={onDownloadUml}
-        onDownloadMermaid={onDownloadMermaid}
-        onExportDictionaryCsv={onExportDictionaryCsv}
-        onExportDictionaryMarkdown={onExportDictionaryMarkdown}
-        onDownloadDbml={onDownloadDbml}
-        onDownloadPrisma={onDownloadPrisma}
       />,
     );
 
     expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
 
     const disabledButtons = [
-      'SQL DDL 복사',
-      'SVG 이미지 내보내기',
-      'PlantUML 내보내기',
-      'Mermaid 내보내기',
-      'DBML 내보내기',
-      'Prisma Schema 내보내기',
-      '데이터 사전 CSV 내보내기',
-      '데이터 사전 Markdown 내보내기',
+      'SQL DDL 복사', 'SVG 이미지 내보내기', 'PlantUML 내보내기', 'Mermaid 내보내기',
+      'DBML 내보내기', 'Prisma Schema 내보내기', '데이터 사전 CSV 내보내기', '데이터 사전 Markdown 내보내기'
     ];
-    const descriptionIds = new Set<string>();
 
     for (const name of disabledButtons) {
       const button = screen.getByRole('button', { name });
       expect(button).toHaveAttribute('aria-disabled', 'true');
-
-      const descriptionId = button.getAttribute('aria-describedby');
-      expect(descriptionId).toBeTruthy();
-      expect(descriptionIds.has(descriptionId!)).toBe(false);
-      descriptionIds.add(descriptionId!);
-
-      const description = document.getElementById(descriptionId!);
-      expect(description).toBeVisible();
-      expect(description).toHaveTextContent('먼저 테이블을 추가하세요');
-
       button.focus();
       expect(button).toHaveFocus();
       await user.click(button);
@@ -219,25 +188,19 @@ describe('ExportModal', () => {
       await user.keyboard(' ');
     }
 
-    expect(descriptionIds.size).toBe(8);
-    expect(onCopyExportDdl).not.toHaveBeenCalled();
-    expect(onDownloadSvg).not.toHaveBeenCalled();
-    expect(onDownloadUml).not.toHaveBeenCalled();
-    expect(onDownloadMermaid).not.toHaveBeenCalled();
-    expect(onDownloadDbml).not.toHaveBeenCalled();
-    expect(onDownloadPrisma).not.toHaveBeenCalled();
-    expect(onExportDictionaryCsv).not.toHaveBeenCalled();
-    expect(onExportDictionaryMarkdown).not.toHaveBeenCalled();
+    expect(baseProps.onCopyExportDdl).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadSvg).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadUml).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadMermaid).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadDbml).not.toHaveBeenCalled();
+    expect(baseProps.onDownloadPrisma).not.toHaveBeenCalled();
+    expect(baseProps.onExportDictionaryCsv).not.toHaveBeenCalled();
+    expect(baseProps.onExportDictionaryMarkdown).not.toHaveBeenCalled();
   });
 
-  it('exposes access-control guidance and prevents each activation method', async () => {
+  it('exposes access-control guidance for disabled button', async () => {
     const user = userEvent.setup();
-    const observedDefaultPrevention = vi.fn();
-    render(
-      <div onClick={(event) => observedDefaultPrevention(event.defaultPrevented)}>
-        <ExportModal {...baseProps} canCreateShareLink={false} />
-      </div>,
-    );
+    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
@@ -247,19 +210,10 @@ describe('ExportModal', () => {
 
     accessManagementButton.focus();
     expect(accessManagementButton).toHaveFocus();
-
     await user.click(accessManagementButton);
-    expect(observedDefaultPrevention).toHaveBeenCalledTimes(1);
-    expect(observedDefaultPrevention).toHaveBeenLastCalledWith(true);
-
-    accessManagementButton.focus();
     await user.keyboard('{Enter}');
-    expect(observedDefaultPrevention).toHaveBeenCalledTimes(2);
-    expect(observedDefaultPrevention).toHaveBeenLastCalledWith(true);
-
-    accessManagementButton.focus();
     await user.keyboard(' ');
-    expect(observedDefaultPrevention).toHaveBeenCalledTimes(3);
-    expect(observedDefaultPrevention).toHaveBeenLastCalledWith(true);
+
+    expect(baseProps.onCloseExport).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,0 @@
-button[aria-disabled="true"] {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background-color: var(--color-surface-muted);
-  color: var(--color-disabled);
-}
