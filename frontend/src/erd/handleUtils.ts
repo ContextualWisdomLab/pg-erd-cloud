@@ -17,8 +17,8 @@ export function targetColumnHandleId(columnName: string): string {
 
 export function parseColumnNameFromHandle(handleId: string): string | null {
   const prefixMatch = handleId.match(/^(?:src-|tgt-)?c-(.+)$/);
-  if (!prefixMatch) return null;
-  const encoded = prefixMatch[1]!;
+  if (!prefixMatch || !prefixMatch[1]) return null;
+  const encoded = prefixMatch[1];
   if (encoded === 'empty') return '';
   try {
     return encoded.split('-').map(code => String.fromCodePoint(parseInt(code, 16))).join('');

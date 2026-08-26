@@ -75,22 +75,9 @@ function fkColumnsForEdge(
     const sourceColumnsArr = sourceNode.data.columns || [];
     const targetColumnsArr = targetNode.data.columns || [];
 
-    // Using simple loop/some instead of map+includes for better performance
-    let sourceExists = false;
-    for (let i = 0; i < sourceColumnsArr.length; i++) {
-      if (sourceColumnsArr[i] && sourceColumnsArr[i]!.column_name === parsedSource) {
-        sourceExists = true;
-        break;
-      }
-    }
-
-    let targetExists = false;
-    for (let i = 0; i < targetColumnsArr.length; i++) {
-      if (targetColumnsArr[i] && targetColumnsArr[i]!.column_name === parsedTarget) {
-        targetExists = true;
-        break;
-      }
-    }
+    // Check existence using .some()
+    const sourceExists = sourceColumnsArr.some((c) => c && c.column_name === parsedSource);
+    const targetExists = targetColumnsArr.some((c) => c && c.column_name === parsedTarget);
 
     if (sourceExists && targetExists) {
       return { sourceColumns: [parsedSource], targetColumns: [parsedTarget] };
