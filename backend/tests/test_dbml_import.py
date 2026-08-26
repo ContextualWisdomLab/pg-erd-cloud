@@ -152,6 +152,23 @@ Table public.lineage {
     assert 'CREATE INDEX CONCURRENTLY "ix_lineage_created"' in ddl
 
 
+def test_preserves_explicit_postgresql_index_identifier():
+    snap = parse_dbml(
+        """
+Table public.orders {
+  id integer
+  indexes {
+    (id) [name: '매출 지역 인덱스']
+  }
+}
+"""
+    )
+
+    assert snap["indexes"][0]["index_name"] == "매출 지역 인덱스"
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert 'CREATE INDEX CONCURRENTLY "매출 지역 인덱스"' in ddl
+
+
 def test_index_tuple_closes_only_outside_quoted_identifier():
     snap = parse_dbml(
         '''
