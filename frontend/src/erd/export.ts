@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { parseColumnNameFromHandle, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -65,6 +65,36 @@ function fkColumnsForEdge(
   const targetColumns = data?.targetColumns?.filter(Boolean) || [];
   if (sourceColumns.length > 0 && sourceColumns.length === targetColumns.length) {
     return { sourceColumns, targetColumns };
+  }
+
+  const parsedSource = edge.sourceHandle ? parseColumnNameFromHandle(edge.sourceHandle) : null;
+  const parsedTarget = edge.targetHandle ? parseColumnNameFromHandle(edge.targetHandle) : null;
+
+  if (parsedSource !== null && parsedTarget !== null) {
+    // Validate that the parsed column actually exists in the node data
+    const sourceColumnsArr = sourceNode.data.columns || [];
+    const targetColumnsArr = targetNode.data.columns || [];
+
+    // Using simple loop/some instead of map+includes for better performance
+    let sourceExists = false;
+    for (let i = 0; i < sourceColumnsArr.length; i++) {
+      if (sourceColumnsArr[i] && sourceColumnsArr[i]!.column_name === parsedSource) {
+        sourceExists = true;
+        break;
+      }
+    }
+
+    let targetExists = false;
+    for (let i = 0; i < targetColumnsArr.length; i++) {
+      if (targetColumnsArr[i] && targetColumnsArr[i]!.column_name === parsedTarget) {
+        targetExists = true;
+        break;
+      }
+    }
+
+    if (sourceExists && targetExists) {
+      return { sourceColumns: [parsedSource], targetColumns: [parsedTarget] };
+    }
   }
 
   const sourceHandleColumn = (sourceNode.data.columns || [])
