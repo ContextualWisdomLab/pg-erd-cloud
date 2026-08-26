@@ -241,6 +241,8 @@ def _quote_identifier(value: str) -> str:
 
 
 def _index_name(base: str, ordinal: int, preserve: bool = False) -> str:
+    if preserve and "\x00" not in base and len(base.encode("utf-8")) <= 63:
+        return base
     safe = re.sub(r"[^A-Za-z0-9_]", "_", base).strip("_") or "index"
     if safe[0].isdigit():
         safe = f"ix_{safe}"
