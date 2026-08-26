@@ -45,7 +45,7 @@ def test_parses_refs_inline_and_standalone_deduped_semantics():
 
 
 def test_reverse_arrow_and_schema_qualified_and_quoted():
-    text = '''
+    text = """
 Table auth.accounts {
   account_id bigint [pk]
 }
@@ -54,12 +54,16 @@ Table "Order Items" {
   account_id bigint
 }
 Ref: auth.accounts.account_id < "Order Items".account_id
-'''
+"""
     snap = parse_dbml(text)
-    assert ("auth", "accounts") in {(r["schema_name"], r["relation_name"]) for r in snap["relations"]}
+    assert ("auth", "accounts") in {
+        (r["schema_name"], r["relation_name"]) for r in snap["relations"]
+    }
     edge = snap["fk_edges"][0]
     # '<' means the right side references the left
-    child = next(r for r in snap["relations"] if r["relation_oid"] == edge["child_relation_oid"])
+    child = next(
+        r for r in snap["relations"] if r["relation_oid"] == edge["child_relation_oid"]
+    )
     assert child["relation_name"] == "Order Items"
 
 
@@ -90,10 +94,166 @@ def test_dbml_snapshot_feeds_existing_ddl_export():
     assert "PRIMARY KEY" in ddl
 
 
+def test_preserves_column_defaults_for_snapshot_and_ddl_export():
+    snap = parse_dbml(
+        """
+Table public.accounts {
+  id integer [pk]
+  email varchar [unique]
+  status varchar [default: 'active, pending']
+  full_name varchar [default: `coalesce(first_name, last_name)`]
+  created_at timestamptz [default: now()]
+}
+"""
+    )
+
+    columns = {column["column_name"]: column for column in snap["columns"]}
+    assert columns["status"]["has_default"] is True
+    assert columns["status"]["default_expr"] == "'active, pending'"
+    assert columns["full_name"]["default_expr"] == "`coalesce(first_name, last_name)`"
+    assert columns["created_at"]["default_expr"] == "now()"
+    unique_email = next(
+        index for index in snap["indexes"] if index["is_unique"] and '"email"' in index["index_def"]
+    )
+    assert unique_email["index_def"].startswith('CREATE UNIQUE INDEX')
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert "DEFAULT 'active, pending'" in ddl
+    assert "DEFAULT now()" in ddl
+
+
+def test_parses_simple_index_blocks_and_preserves_ddl_evidence():
+    snap = parse_dbml(
+        """
+Table public.lineage {
+  id integer [pk]
+  workspace_id varchar
+  fingerprint varchar
+  created_at timestamptz
+  indexes {
+    (workspace_id, fingerprint) [unique]
+    (created_at) [name: 'ix_lineage_created', type: hash]
+    (missing_column) [unique]
+  }
+}
+"""
+    )
+    assert len(snap["indexes"]) == 2
+    unique, named = snap["indexes"]
+    assert unique["is_unique"] is True
+    assert unique["access_method"] == "btree"
+    assert '"workspace_id", "fingerprint"' in unique["index_def"]
+    assert named["index_name"] == "ix_lineage_created"
+    assert named["access_method"] == "hash"
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert (
+        'CREATE UNIQUE INDEX CONCURRENTLY "ix_lineage_workspace_id_fingerprint_1"'
+        in ddl
+    )
+    assert 'CREATE INDEX CONCURRENTLY "ix_lineage_created"' in ddl
+
+
+def test_preserves_explicit_postgresql_index_identifier():
+    snap = parse_dbml(
+        """
+Table public.orders {
+  id integer
+  indexes {
+    (id) [name: '매출 지역 인덱스']
+  }
+}
+"""
+    )
+
+    assert snap["indexes"][0]["index_name"] == "매출 지역 인덱스"
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert 'CREATE INDEX CONCURRENTLY "매출 지역 인덱스"' in ddl
+
+
+def test_index_tuple_closes_only_outside_quoted_identifier():
+    snap = parse_dbml(
+        '''
+Table public.metrics {
+  "sales)region" varchar
+  indexes {
+    ("sales)region") [unique]
+  }
+}
+'''
+    )
+
+    assert len(snap["indexes"]) == 1
+    assert '"sales)region"' in snap["indexes"][0]["index_def"]
+
+
+def test_column_after_indexes_block_remains_in_current_table():
+    snap = parse_dbml(
+        """
+Table public.events {
+  id integer
+  indexes {
+    (id)
+  }
+  created_at timestamptz
+}
+"""
+    )
+
+    assert {column["column_name"] for column in snap["columns"]} == {
+        "id",
+        "created_at",
+    }
+
+
+def test_index_names_are_unique_in_schema_and_do_not_collide_with_relations():
+    snap = parse_dbml(
+        """
+Table public.shared_name {
+  id integer
+  indexes {
+    (id) [name: 'shared_name']
+  }
+}
+Table public.second {
+  id integer
+  indexes {
+    (id) [name: 'shared_name']
+  }
+}
+"""
+    )
+
+    names = [index["index_name"] for index in snap["indexes"]]
+    assert len(names) == len(set(names)) == 2
+    assert "shared_name" not in names
+
+
+def test_primary_index_becomes_constraint_without_duplicate_index():
+    snap = parse_dbml(
+        """
+Table public.accounts {
+  tenant_id integer
+  account_id integer
+  indexes {
+    (tenant_id, account_id) [pk]
+  }
+}
+"""
+    )
+
+    assert snap["indexes"] == []
+    assert [column["column_name"] for column in snap["pk_columns"]] == [
+        "tenant_id",
+        "account_id",
+    ]
+    ddl = snapshot_json_to_sql(snap, target_dialect="postgresql")
+    assert 'PRIMARY KEY ("tenant_id", "account_id")' in ddl
+    assert "CREATE UNIQUE INDEX" not in ddl
+
+
 def test_pathological_long_line_is_skipped_fast():
     import time
 
-    hostile = 'Table t {\n  id int [pk]\n}\nRef: ' + '"a' * 100_000 + "\n"
+    hostile = "Table t {\n  id int [pk]\n}\nRef: " + '"a' * 100_000 + "\n"
     start = time.monotonic()
     snap = parse_dbml(hostile)
     assert time.monotonic() - start < 1.0  # no catastrophic backtracking
