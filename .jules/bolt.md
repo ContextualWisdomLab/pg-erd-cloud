@@ -81,3 +81,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-08-26 - GitHub Actions `setup-node` caching with pnpm
 **Learning:** When migrating a repository to use `pnpm` exclusively, setting `cache: "pnpm"` in `actions/setup-node` will fail if `pnpm` is not already installed on the runner. `setup-node` does not automatically install `pnpm` for caching purposes.
 **Action:** Always install `pnpm` globally (e.g., using `uses: pnpm/action-setup@v4`) **before** the `actions/setup-node` step in GitHub Actions workflows to ensure caching works correctly.
+
+## 2026-08-26 - GitHub Actions `setup-node` caching with pnpm requires Action Setup
+**Learning:** When migrating a repository to use `pnpm` exclusively, setting `cache: "pnpm"` in `actions/setup-node` will fail if `pnpm` is not already installed on the runner. Attempting to install it via `npm install -g pnpm` before `setup-node` does not reliably hook into the runner's path for the setup step.
+**Action:** Always install `pnpm` globally using the dedicated action `uses: pnpm/action-setup@v4` **before** the `actions/setup-node` step in GitHub Actions workflows to ensure the `pnpm` binary is available for dependency caching.
