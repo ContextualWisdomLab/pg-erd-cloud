@@ -2,7 +2,6 @@ version: 2
 
 updates:
   # Keep pinned GitHub Actions (SHA) fresh.
-  # nosemgrep
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -10,7 +9,6 @@ updates:
     open-pull-requests-limit: 5
 
   # Keep Python dependencies fresh.
-  # nosemgrep
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
@@ -18,7 +16,6 @@ updates:
     open-pull-requests-limit: 5
 
   # Keep Node.js dependencies fresh.
-  # nosemgrep
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
@@ -26,14 +23,12 @@ updates:
     open-pull-requests-limit: 5
 
   # Keep Docker base image digests fresh.
-  # nosemgrep
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
 
-  # nosemgrep
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:

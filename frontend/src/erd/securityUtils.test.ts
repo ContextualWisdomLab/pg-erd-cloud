@@ -1,30 +1,31 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeTableName } from './securityUtils';
+import { describe, it, expect } from "vitest";
+import { sanitizeTableName } from "./securityUtils";
 
-describe('securityUtils', () => {
-  describe('sanitizeTableName', () => {
-    it('should allow alphanumeric characters and underscores', () => {
-      expect(sanitizeTableName('valid_Table_Name123')).toBe('valid_Table_Name123');
-    });
+describe("sanitizeTableName", () => {
+  it("should keep alphanumeric characters and underscores", () => {
+    expect(sanitizeTableName("Users_Table_123")).toBe("Users_Table_123");
+  });
 
-    it('should remove whitespace', () => {
-      expect(sanitizeTableName('invalid table name')).toBe('invalidtablename');
-    });
+  it("should remove spaces", () => {
+    expect(sanitizeTableName("My Table Name")).toBe("MyTableName");
+  });
 
-    it('should remove special characters', () => {
-      expect(sanitizeTableName('table@#name!')).toBe('tablename');
-    });
+  it("should remove special characters", () => {
+    expect(sanitizeTableName("Table!@#$%^&*()-=Name")).toBe("TableName");
+    expect(sanitizeTableName("Drop Table;--")).toBe("DropTable");
+    expect(sanitizeTableName("<script>alert(1)</script>")).toBe("scriptalert1script");
+  });
 
-    it('should remove unicode/emoji characters', () => {
-      expect(sanitizeTableName('table_이름🚀')).toBe('table_');
-    });
+  it("should remove unicode/emojis", () => {
+    expect(sanitizeTableName("Table_🌟")).toBe("Table_");
+    expect(sanitizeTableName("사용자")).toBe("");
+  });
 
-    it('should handle empty string', () => {
-      expect(sanitizeTableName('')).toBe('');
-    });
+  it("should handle empty strings", () => {
+    expect(sanitizeTableName("")).toBe("");
+  });
 
-    it('should return empty string if all characters are invalid', () => {
-      expect(sanitizeTableName('!!! @@@')).toBe('');
-    });
+  it("should handle strings with only special characters", () => {
+    expect(sanitizeTableName("!!!***@@@")).toBe("");
   });
 });

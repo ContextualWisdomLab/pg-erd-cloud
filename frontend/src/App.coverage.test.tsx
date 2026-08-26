@@ -323,8 +323,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
-    // Open the first project in the list (index 0 is the project open button now that diagram list structure changed)
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
@@ -611,7 +610,6 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -643,7 +641,6 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -747,7 +744,6 @@ describe('App orchestration coverage', () => {
     }))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -788,7 +784,6 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
