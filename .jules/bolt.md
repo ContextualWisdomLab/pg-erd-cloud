@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2026-08-26 - GitHub Actions `setup-node` caching with pnpm
+**Learning:** When migrating a repository to use `pnpm` exclusively, setting `cache: "pnpm"` in `actions/setup-node` will fail if `pnpm` is not already installed on the runner. `setup-node` does not automatically install `pnpm` for caching purposes.
+**Action:** Always install `pnpm` globally (e.g., using `uses: pnpm/action-setup@v4`) **before** the `actions/setup-node` step in GitHub Actions workflows to ensure caching works correctly.
