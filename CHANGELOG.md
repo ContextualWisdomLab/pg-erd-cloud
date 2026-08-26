@@ -2,6 +2,7 @@
 
 ## Unreleased
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
+- [FE] 🧭 **관계 추론의 PostgreSQL 식별자 보존**: 자동 관계 추론은 snapshot의 정확한 `relation_name`을 사용하고 ASCII allowlist나 마지막 점 구간으로 식별자를 다시 쓰지 않습니다. 따라서 공백·대소문자 혼합·Unicode·점이 포함된 quoted relation 이름도 손실 없이 연결되며, 모호한 trailing-segment 별칭이 잘못된 테이블을 선택하지 않는 회귀 테스트로 고정했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
 - [BE] 🛠️ **함수 인덱스 중복 오탐 수정**: `lower(email)` 등 expression index를 평문 컬럼 인덱스의 중복으로 잘못 판단하지 않도록 괄호 파서를 강화했습니다.
