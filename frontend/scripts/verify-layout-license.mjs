@@ -8,10 +8,11 @@ function assert(condition, message) {
   }
 }
 
-const [packageJson, lockFile, notices] = await Promise.all([
+const [packageJson, lockFile, notices, publicNotices] = await Promise.all([
   readFile(new URL("package.json", projectRoot), "utf8").then(JSON.parse),
   readFile(new URL("package-lock.json", projectRoot), "utf8").then(JSON.parse),
   readFile(new URL("THIRD_PARTY_NOTICES.md", projectRoot), "utf8"),
+  readFile(new URL("public/THIRD_PARTY_NOTICES.md", projectRoot), "utf8"),
 ]);
 
 const expectedDagreVersion = "3.1.0";
@@ -52,6 +53,10 @@ assert(
   Object.keys(lockedGraphlib?.dependencies ?? {}).length === 0,
   "@dagrejs/graphlib must not add an unreviewed runtime dependency",
 );
+assert(
+  notices === publicNotices,
+  "public/THIRD_PARTY_NOTICES.md must exactly match the reviewed source notice",
+);
 
 for (const requiredNotice of [
   "## @dagrejs/dagre 3.1.0",
@@ -66,5 +71,5 @@ for (const requiredNotice of [
 }
 
 console.log(
-  "Verified commercial-use layout boundary: @dagrejs/dagre 3.1.0 + @dagrejs/graphlib 4.0.3, both MIT.",
+  "Verified commercial-use layout boundary: @dagrejs/dagre 3.1.0 + @dagrejs/graphlib 4.0.3, both MIT, with an exact public notice artifact.",
 );
