@@ -43,3 +43,22 @@ def test_malformed_dsn_still_redacts_embedded_secrets() -> None:
     assert "s3cr3t" not in redacted
     assert "q/secret" not in redacted
     assert "password=***" in redacted
+
+
+def test_short_password_surrounded_by_non_alphanumerics() -> None:
+    dsn = "postgresql://user:=ab=@db.example.com/app"
+    error = "driver failed for =ab= with password==ab= while using postgresql://user:=ab=@db.example.com/app"
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "=ab=" not in redacted
+    assert "postgresql://user:***@db.example.com/app" in redacted
+
+
+def test_short_password_is_alphanumeric_but_bounded_by_non_alphanumeric() -> None:
+    dsn = "postgresql://user:pass@db.example.com/app"
+    error = "driver failed for =pass= with password==pass="
+
+    redacted = redact_dsn_error_message(error, dsn)
+
+    assert "=pass=" not in redacted or "pass" not in redacted
