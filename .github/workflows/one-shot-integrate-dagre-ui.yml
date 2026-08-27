@@ -5,6 +5,7 @@ on:
     branches: ["feat/relationship-aware-auto-layout"]
     paths:
       - ".github/workflows/one-shot-integrate-dagre-ui.yml"
+      - "frontend/src/erd/dagreLayout.ts"
 
 permissions:
   contents: write
