@@ -171,27 +171,13 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('keeps access-control guidance focusable while fully blocking activation', async () => {
-    const parentClick = vi.fn();
-    render(
-      <div onClick={parentClick}>
-        <ExportModal {...baseProps} canCreateShareLink={false} />
-      </div>
-    );
+  it('exposes access-control guidance for disabled button', () => {
+    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-
-    // Verify it is functionally disabled but discoverable
-    expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
-    accessManagementButton.focus();
-    expect(accessManagementButton).toHaveFocus();
-
+    expect(accessManagementButton).toBeDisabled();
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
-
-    // Ensure it does not trigger click events or bubble up
-    fireEvent.click(accessManagementButton);
-    expect(parentClick).not.toHaveBeenCalled();
   });
 });
