@@ -154,7 +154,7 @@ describe("computeDagreLayout", () => {
   it("uses measured and explicit dimensions while estimating missing metadata", () => {
     const measured = tableNode("measured");
     const explicit = tableNode("explicit");
-    const minimal: Node<{ columns?: readonly unknown[] }> = {
+    const minimal: Node<{ columns?: readonly { column_comment?: string | null; example_value?: unknown }[] }> = {
       id: "minimal",
       position: { x: 0, y: 0 },
       data: {},
