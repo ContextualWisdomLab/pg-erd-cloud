@@ -21,13 +21,14 @@ The implementation contract is:
 
 1. React Flow foreign-key edges retain their product semantics: dependent child table as `source`, referenced parent table as `target`.
 2. The layout graph reverses that edge only for ranking, so referenced tables precede dependent tables in left-to-right or top-to-bottom output.
-3. Node and edge inputs are sorted by stable identifiers before the layout call.
-4. Measured dimensions are used when available; explicit dimensions are the next source; otherwise a bounded column-count estimate is used.
-5. Cycles are handled by Dagre's greedy acyclicer, while ranking uses network simplex.
-6. Edges with an endpoint not present in the current node set are excluded from layout calculation rather than creating phantom nodes.
-7. A thrown engine error or incomplete/non-finite geometry fails closed. Every original coordinate is preserved, and no new undo snapshot is published.
-8. Snapshot conversion and the explicit toolbar action call the same pure layout boundary.
-9. The existing React Flow `smoothstep` renderer remains responsible for visual edge paths. This ADR does not claim orthogonal obstacle routing or column-port optimization.
+3. Node and edge inputs are sorted with locale-independent code-unit comparison before the layout call.
+4. Every accepted relationship receives a deterministic index-qualified internal multigraph name, so repeated or empty external edge IDs cannot collapse parallel relationships.
+5. Measured dimensions are used when available; explicit dimensions are the next source; otherwise a bounded column-count estimate is used.
+6. Cycles are handled by Dagre's greedy acyclicer, while ranking uses network simplex.
+7. Edges with an endpoint not present in the current node set are excluded from layout calculation rather than creating phantom nodes.
+8. A thrown engine error or incomplete/non-finite geometry fails closed. Every original coordinate is preserved, and no new undo snapshot is published.
+9. Snapshot conversion and the explicit toolbar action call the same pure layout boundary.
+10. The existing React Flow `smoothstep` renderer remains responsible for visual edge paths. This ADR does not claim orthogonal obstacle routing or column-port optimization.
 
 ## Commercial-license boundary
 
@@ -67,8 +68,8 @@ Deferred. It offers a broad commercial graph-layout product, but it adds procure
 ### Positive
 
 - Initial diagrams and explicit auto-layout communicate parent-to-child structure.
-- Coordinates remain deterministic for a stable graph and dimensions.
-- Cycles, parallel foreign keys, disconnected tables, and missing edge endpoints are covered by executable tests.
+- Coordinates remain deterministic for a stable graph and dimensions without relying on runtime locale collation.
+- Cycles, repeated or empty edge IDs, parallel foreign keys, disconnected tables, and missing edge endpoints are covered by executable tests.
 - Layout failures cannot partially overwrite saved or manually arranged coordinates.
 - Commercial-use permission and required notice retention are both explicit and continuously checked.
 - The pure function is independent of React rendering and can later move to a Web Worker without changing the product contract.

@@ -36,7 +36,8 @@ The previous initial layout and `ERD 자동 정렬` action placed tables in an a
 
 - parent/reference tables precede dependent child tables;
 - LR and TB directions exist in the pure layout boundary;
-- cycles, parallel foreign keys, disconnected tables, missing endpoints, and variable dimensions have regression coverage;
+- cycles, parallel foreign keys, disconnected tables, missing endpoints, repeated or empty edge identifiers, and variable dimensions have regression coverage;
+- node and relationship registration use locale-independent code-unit ordering;
 - input nodes and product edge semantics are not mutated;
 - complete finite geometry is required before publishing any coordinate;
 - layout failure preserves every existing coordinate and does not overwrite the undo boundary;
@@ -101,7 +102,10 @@ The CI verifier deliberately fails if the exact versions, MIT declarations, revi
 | Root-cause repair | Unreachable callback removed; no suppression or ignore added |
 | UI integration run 2 | Passed; temporary workflow deleted itself after committing verified UI integration |
 | Focused layout coverage | 100% statement, branch, function, and line gate in the successful one-shot run |
-| Pull-request exact-head repository/security checks | Must rerun after this documentation and CI commit |
+| Hostile-input RED head | Repeated edge IDs collapsed and locale-sensitive ordering violated the new executable contract; the two focused tests failed as expected |
+| Hostile-input GREEN head | Unique internal multigraph names and code-unit comparison implemented; exact-head frontend Check passed all 214 tests |
+| Existing asynchronous App test | One predecessor RED run also exposed the known diagram-list timing flake; it did not reproduce on the GREEN exact head and is not treated as a layout defect |
+| Pull-request exact-head repository/security checks | Must rerun after this final traceability commit and after Ready-for-review transition |
 | Independent approval | Required before protected merge; not inferred from automated review |
 | Shipped on `main` | No, until ordinary protected merge succeeds |
 

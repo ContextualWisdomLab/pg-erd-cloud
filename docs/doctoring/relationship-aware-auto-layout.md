@@ -22,7 +22,8 @@ The current product slice uses:
 
 - a greedy cycle breaker so cyclic schemas still receive finite coordinates;
 - network-simplex ranking for layer assignment;
-- stable node/edge ordering before invocation;
+- locale-independent code-unit ordering before invocation;
+- a unique internal multigraph name for every visible relationship, even when hostile input repeats an external edge ID;
 - measured or bounded estimated table dimensions;
 - parent-before-child ranking derived from foreign-key direction;
 - complete-result validation before publishing any new position.
@@ -35,9 +36,9 @@ Crossing minimization is computationally difficult in general, and the selected 
 |---|---|---|
 | Referenced tables precede dependent tables | Foreign-key edge is reversed only inside `computeDagreLayout` | LR and TB parent/child tests |
 | Product edge semantics remain unchanged | Snapshot edges stay child `source` → parent `target` | `convertLayout.test.ts` |
-| Stable result for stable input | Nodes and edges sorted by stable identifiers | reversed-input determinism test |
+| Stable result for stable input | Nodes and edges use locale-independent code-unit sorting | reversed-input and Unicode identifier tests |
 | Cyclic schema support | `acyclicer: "greedy"` | cycle regression test |
-| Parallel FK support | directed multigraph and stable edge names | parallel-edge regression test |
+| Parallel FK support | directed multigraph and index-qualified internal edge names | parallel, empty-ID, and repeated-ID regression tests |
 | Disconnected tables | all visible nodes registered before edges | disconnected-node regression test |
 | Missing endpoint safety | incomplete edges ignored for placement | hostile endpoint regression test |
 | Variable table dimensions | measured → explicit → bounded estimate | dimension-source regression test |
@@ -70,6 +71,9 @@ This is a bounded compliance assertion for the new layout subtree. It is not a l
 4. The first UI integration run passed 212 tests and the build but failed the new module's 100% function/statement coverage gate.
 5. Root-cause analysis found an unreachable default-edge-label callback: every edge already supplied an explicit label object. The unused callback was removed rather than excluded or suppressed.
 6. The second integration run passed the exact coverage gate and deleted its one-shot workflow after committing the verified UI integration.
+7. A subsequent self-review added failing contracts for repeated external edge IDs and locale-independent identifier ordering. The predecessor head failed both focused tests as expected.
+8. The fix qualified every internal multigraph edge name by deterministic index and replaced locale collation with code-unit comparison. The next exact-head frontend Check passed all 214 tests.
+9. One RED run also exposed the repository's previously known asynchronous diagram-list test flake. It did not reproduce on the corrected exact head, so it remains a separate test-reliability issue rather than a reason to mix unrelated production changes into this layout slice.
 
 Repository pull-request checks, security checks, dependency review, and independent review remain authoritative for merge readiness. A successful one-shot workflow is evidence for the bounded change, not a substitute for protected-branch gates.
 
