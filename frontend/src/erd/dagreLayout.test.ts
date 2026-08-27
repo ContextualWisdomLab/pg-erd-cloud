@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeDagreLayout,
+  requireDagreLayout,
   type DagreLayoutEngine,
 } from "./dagreLayout";
 import type { TableNodeData } from "./convert";
@@ -81,7 +82,7 @@ describe("computeDagreLayout", () => {
     ];
     const edges: Edge[] = [
       { id: "alpha_beta_1", source: "alpha", target: "beta" },
-      { id: "alpha_beta_2", source: "alpha", target: "beta" },
+      { id: "", source: "alpha", target: "beta" },
       { id: "beta_gamma", source: "beta", target: "gamma" },
       { id: "gamma_alpha", source: "gamma", target: "alpha" },
       { id: "missing", source: "missing", target: "alpha" },
@@ -121,17 +122,26 @@ describe("computeDagreLayout", () => {
     expect(positionsById(forward.nodes)).toEqual(positionsById(reversed.nodes));
   });
 
-  it("uses measured node dimensions when available", () => {
-    const first = tableNode("first");
-    const second = tableNode("second");
-    first.measured = { width: 600, height: 300 };
-    second.width = 420;
-    second.height = 180;
+  it("uses measured and explicit dimensions while estimating missing metadata", () => {
+    const measured = tableNode("measured");
+    const explicit = tableNode("explicit");
+    const minimal: Node<{ columns?: readonly unknown[] }> = {
+      id: "minimal",
+      position: { x: 0, y: 0 },
+      data: {},
+    };
+    measured.measured = { width: 600, height: 300 };
+    explicit.width = 420;
+    explicit.height = 180;
 
-    const result = computeDagreLayout([first, second], [], "LR");
+    const result = computeDagreLayout(
+      [measured, explicit, minimal],
+      [],
+      "LR",
+    );
 
     expect(result.applied).toBe(true);
-    expect(result.nodes[0].position).not.toEqual(result.nodes[1].position);
+    expect(new Set(result.nodes.map((node) => node.position.x)).size).toBe(3);
   });
 
   it("fails closed and preserves every position when the layout engine throws", () => {
@@ -163,5 +173,28 @@ describe("computeDagreLayout", () => {
       nodes: structuredClone(nodes),
       reason: "invalid_geometry",
     });
+  });
+});
+
+describe("requireDagreLayout", () => {
+  it("returns the applied node set", () => {
+    const nodes = [tableNode("parent"), tableNode("child")];
+
+    const result = requireDagreLayout(nodes, [
+      { id: "fk", source: "child", target: "parent" },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(positionsById(result).parent.x).toBeLessThan(
+      positionsById(result).child.x,
+    );
+  });
+
+  it("throws the fail-closed reason for an invalid engine result", () => {
+    const invalidEngine: DagreLayoutEngine = () => undefined;
+
+    expect(() =>
+      requireDagreLayout([tableNode("one")], [], "LR", invalidEngine),
+    ).toThrow("Dagre layout failed: invalid_geometry");
   });
 });
