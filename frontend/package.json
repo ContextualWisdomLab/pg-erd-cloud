@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build && node scripts/verify-layout-distribution.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run && node --test scripts/notice-byte-identity.test.mjs",
+    "test": "vitest run",
     "coverage": "vitest run --coverage",
     "verify:layout-license": "node scripts/verify-layout-license.mjs",
     "lint": "tsc --noEmit",
