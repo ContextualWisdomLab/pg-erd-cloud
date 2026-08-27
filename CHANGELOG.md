@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [FE] 🧭 **PostgreSQL 식별자 충실도 복구**: 관계 자동 추론이 이미 존재하는 테이블 키를 ASCII 전용 sanitizer로 다시 쓰지 않도록 수정하고, snapshot node에 원본 `relation_name`을 별도로 보존하여 유니코드·공백·점이 포함된 quoted-style 식별자도 정확한 대상 테이블로 연결합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
