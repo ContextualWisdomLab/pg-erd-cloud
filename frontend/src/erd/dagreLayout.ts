@@ -108,7 +108,6 @@ export function computeDagreLayout<T extends LayoutNodeData>(
   }
 
   const graph = new Graph({ directed: true, multigraph: true });
-  graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: direction,
     align: "UL",
