@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
-import unavailableActionStyles from './accessibility.css?raw';
+const unavailableActionStyles = readFileSync(
+  new URL('./accessibility.css', import.meta.url),
+  'utf8',
+);
 
 describe('aria-disabled visual contract', () => {
   it('keeps unavailable buttons visually distinct without removing focusability', () => {
