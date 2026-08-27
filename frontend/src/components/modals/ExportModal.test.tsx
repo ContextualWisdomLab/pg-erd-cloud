@@ -97,6 +97,32 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '생성 중...' })).toBeDisabled();
   });
 
+  it('keeps unavailable share-link creation discoverable and inert until a project is selected', async () => {
+    const onCreateShareLink = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ExportModal
+        {...baseProps}
+        canCreateShareLink={false}
+        onCreateShareLink={onCreateShareLink}
+      />,
+    );
+
+    const createShareLinkButton = screen.getByRole('button', { name: '링크 만들기' });
+    expect(createShareLinkButton).not.toBeDisabled();
+    expect(createShareLinkButton).toHaveAttribute('aria-disabled', 'true');
+    expect(createShareLinkButton).toHaveAttribute('aria-describedby', 'share-link-create-hint');
+    expect(screen.getByText('먼저 프로젝트를 선택하세요.')).toBeVisible();
+
+    createShareLinkButton.focus();
+    expect(createShareLinkButton).toHaveFocus();
+    await user.click(createShareLinkButton);
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+
+    expect(onCreateShareLink).not.toHaveBeenCalled();
+  });
+
   it('runs each export artifact action exactly once for click, Enter, and Space', async () => {
     const onCopyExportDdl = vi.fn();
     const onDownloadSvg = vi.fn();
