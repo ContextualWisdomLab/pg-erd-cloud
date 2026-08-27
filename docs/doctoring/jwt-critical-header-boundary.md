@@ -40,7 +40,7 @@ Focused regression tests cover the supported no-`crit` path, every malformed sha
 
 Monitor fixed authentication failure categories rather than token contents. Do not log bearer tokens, complete JOSE headers, extension values, signing keys, or raw provider errors.
 
-Rollback is limited to reverting the validation change if a verified provider unexpectedly emits `crit`. Operators must not bypass validation as an incident workaround. A provider requiring a critical extension must first supply a documented extension contract and an implementation that actually processes it.
+Do not roll back to a release that accepts unsupported or malformed `crit` declarations. Before any rollback, verify the target release's critical-header behavior and obtain security approval. If a provider unexpectedly emits `crit`, require either a provider-side correction or a separately reviewed fail-closed mitigation that preserves rejection of unprocessed critical extensions. Operators must not disable or bypass this boundary as an incident workaround. A provider requiring a critical extension must first supply a documented extension contract and an implementation that actually processes it.
 
 ## References
 
