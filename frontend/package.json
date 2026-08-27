@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
+    "verify:layout-license": "node scripts/verify-layout-license.mjs",
     "lint": "tsc --noEmit",
     "e2e": "echo 'No e2e framework configured'"
   },

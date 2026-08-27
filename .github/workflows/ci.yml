@@ -65,6 +65,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Verify ERD layout commercial-license boundary
+        working-directory: frontend
+        run: npm run verify:layout-license
+
       - name: Typecheck
         working-directory: frontend
         run: npm run typecheck
