@@ -202,7 +202,8 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
@@ -226,12 +227,21 @@ export function ExportModal({
                 <div className="exportModal__artifactRow" key={artifact.label}>
                   <div>
                     <strong>{artifact.label}</strong>
-                    <span>{artifact.description}</span>
+                    <span id={`export-desc-${artifact.label.replace(/\s+/g, '-')}`}>
+                      {artifact.description}
+                    </span>
                   </div>
                   <button
                     type="button"
-                    onClick={artifact.onExport}
-                    disabled={artifact.disabled}
+                    onClick={(e) => {
+                      if (artifact.disabled) {
+                        e.preventDefault();
+                      } else {
+                        artifact.onExport();
+                      }
+                    }}
+                    aria-disabled={artifact.disabled ? true : undefined}
+                    aria-describedby={artifact.disabled ? `export-desc-${artifact.label.replace(/\s+/g, '-')}` : undefined}
                     aria-label={artifact.ariaLabel}
                     aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
                   >
