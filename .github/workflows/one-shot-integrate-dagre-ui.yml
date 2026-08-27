@@ -1,0 +1,131 @@
+name: one-shot integrate Dagre UI
+
+on:
+  push:
+    branches: ["feat/relationship-aware-auto-layout"]
+    paths:
+      - ".github/workflows/one-shot-integrate-dagre-ui.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-integrate-dagre-ui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integrate-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: feat/relationship-aware-auto-layout
+          fetch-depth: 0
+
+      - name: Replace fixed-grid toolbar layout with the checked Dagre boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("frontend/src/App.tsx")
+          text = path.read_text(encoding="utf-8")
+          old_import = 'import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";'
+          new_import = 'import { requireDagreLayout } from "./erd/dagreLayout";'
+          if text.count(old_import) != 1:
+              raise SystemExit("expected exactly one legacy layout import")
+          text = text.replace(old_import, new_import)
+
+          start_marker = "  function computeSortedGridLayout("
+          end_marker = "\n  const onNodeDoubleClick"
+          if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+              raise SystemExit("legacy auto-layout boundary changed unexpectedly")
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = '''  async function onAutoLayout() {
+            /* v8 ignore next -- the toolbar disables this handler for both guard states */
+            if (nodes.length === 0 || isLayouting) return;
+            setIsLayouting(true);
+            setLayoutMessage("");
+
+            try {
+              // Yield to the browser so the UI can reflect the loading state.
+              await new Promise<void>((resolve) =>
+                requestAnimationFrame(() => resolve()),
+              );
+
+              const next = requireDagreLayout(nodes, edges, "LR");
+              setUndoPositions(snapshotNodePositions(nodes));
+              setNodes(next);
+
+              requestAnimationFrame(() => {
+                reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 });
+              });
+
+              setLayoutMessage("관계 기반 정렬 완료");
+            } catch (error) {
+              /* v8 ignore else -- Vitest always runs with import.meta.env.DEV enabled */
+              if (import.meta.env.DEV) {
+                console.error("Auto-layout failed", error);
+              }
+              setLayoutMessage("정렬에 실패했습니다. 다시 시도해 주세요.");
+            } finally {
+              setIsLayouting(false);
+            }
+          }
+          '''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+          PY
+          git diff --check
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the locked frontend graph
+        working-directory: frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify types, behavior, coverage, and production build
+        working-directory: frontend
+        run: |
+          npm run typecheck
+          npm run test
+          npm run coverage
+          npm run build
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const entry = Object.entries(summary).find(([file]) =>
+            file.split(path.sep).join('/').endsWith('/src/erd/dagreLayout.ts'),
+          );
+          if (!entry) throw new Error('dagreLayout.ts coverage entry is missing');
+          for (const metric of ['statements', 'branches', 'functions', 'lines']) {
+            const pct = entry[1][metric].pct;
+            if (pct !== 100) throw new Error(`dagreLayout.ts ${metric} coverage is ${pct}, expected 100`);
+          }
+          NODE
+
+      - name: Remove one-shot workflow and publish verified integration
+        env:
+          BRANCH_NAME: feat/relationship-aware-auto-layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-integrate-dagre-ui.yml
+          git add frontend/src/App.tsx
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort)" = $'.github/workflows/one-shot-integrate-dagre-ui.yml\nfrontend/src/App.tsx'
+          git commit -m "feat(frontend): use relationship-aware auto layout"
+          git push origin "HEAD:${BRANCH_NAME}"
