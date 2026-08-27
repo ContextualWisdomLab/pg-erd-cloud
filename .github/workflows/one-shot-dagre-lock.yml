@@ -1,0 +1,63 @@
+name: one-shot Dagre lock and validation
+
+on:
+  push:
+    branches: ["feat/relationship-aware-auto-layout"]
+    paths:
+      - ".github/workflows/one-shot-dagre-lock.yml"
+      - "frontend/package.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-dagre-lock-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lock-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: feat/relationship-aware-auto-layout
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Regenerate only the npm lock contract
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify locked install and frontend contract
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm run test
+          npm run build
+
+      - name: Remove one-shot workflow and publish verified lock
+        env:
+          BRANCH_NAME: feat/relationship-aware-auto-layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-dagre-lock.yml
+          git add frontend/package-lock.json
+          git diff --cached --check
+          git commit -m "build(frontend): lock Dagre dependency"
+          git push origin "HEAD:${BRANCH_NAME}"
