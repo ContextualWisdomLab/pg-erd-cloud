@@ -83,6 +83,7 @@ OIDC_ALLOWED_TOKEN_TYPES = {"jwt", "at+jwt"}
 JWS_REGISTERED_HEADER_PARAMETERS = frozenset(
     {
         "alg",
+        "b64",
         "jku",
         "jwk",
         "kid",
@@ -302,11 +303,20 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     else:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
+    jwk_alg = jwk.get("alg")
+    if jwk_alg is not None and (
+        not isinstance(jwk_alg, str) or jwk_alg != header_alg
+    ):
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
+
     try:
-        key = jwt.PyJWK.from_dict(
-            cast(dict[str, Any], jwk),
-            algorithm=header_alg,
-        )
+        if jwk_alg is None:
+            key = jwt.PyJWK.from_dict(
+                cast(dict[str, Any], jwk),
+                algorithm=header_alg,
+            )
+        else:
+            key = jwt.PyJWK.from_dict(cast(dict[str, Any], jwk))
         required_claims = ["exp", "iss", "jti"]
         if settings.oidc_audience:
             required_claims.append("aud")
