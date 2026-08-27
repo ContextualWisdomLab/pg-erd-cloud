@@ -935,7 +935,14 @@ export default function App() {
 
 
   function onAddTableSubmit() {
-    if (!newTableName.trim()) return;
+    const trimmedName = newTableName.trim();
+    if (!trimmedName) return;
+
+    if (nodes.some((n) => n.data.title === trimmedName)) {
+      alert("이미 존재하는 테이블 이름입니다.");
+      return;
+    }
+
     const newId = `new_table_${Date.now()}`;
 
     // Create a new node with a basic 'id' column
