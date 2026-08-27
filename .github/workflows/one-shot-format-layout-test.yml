@@ -1,0 +1,111 @@
+name: one-shot format layout test
+
+on:
+  push:
+    branches: ["feat/relationship-aware-auto-layout"]
+    paths:
+      - ".github/workflows/one-shot-format-layout-test.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-format-layout-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  format-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout exact branch head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: feat/relationship-aware-auto-layout
+          fetch-depth: 0
+
+      - name: Format the new geometry contract consistently
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("frontend/src/erd/dagreLayout.test.ts")
+          text = path.read_text(encoding="utf-8")
+          start = text.index('  it("reserves height for rendered detail, overflow, and index rows before measurement", () => {')
+          end = text.index('  it("fails closed and preserves every position when the layout engine throws", () => {', start)
+          replacement = '''  it("reserves height for rendered detail, overflow, and index rows before measurement", () => {
+            const plain = tableNode("plain", { x: 0, y: 0 }, 1);
+            const rich = tableNode("rich", { x: 0, y: 0 }, 26);
+            rich.data.columns = rich.data.columns.map((column, index) => ({
+              ...column,
+              column_comment: `comment ${index}`,
+              example_value: `example ${index}`,
+            }));
+            rich.data.indexes = Array.from({ length: 5 }, (_, index) => ({
+              index_name: `idx_rich_${index}`,
+              columns: ["column_0"],
+              access_method: "btree" as const,
+              estimated_distinct: 1,
+              cardinality_ratio: 1,
+              strength: "recommended" as const,
+              reason: "test",
+              source: "cardinality-wizard" as const,
+            }));
+            let plainHeight = 0;
+            let richHeight = 0;
+            const inspectingEngine: DagreLayoutEngine = (graph) => {
+              plainHeight = graph.node("plain").height;
+              richHeight = graph.node("rich").height;
+              runDagreLayout(graph);
+            };
+
+            const result = computeDagreLayout(
+              [plain, rich],
+              [],
+              "LR",
+              inspectingEngine,
+            );
+
+            expect(result.applied).toBe(true);
+            expect(richHeight).toBeGreaterThan(plainHeight + 1000);
+          });
+
+          '''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+          PY
+          git diff --check
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "26"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and verify frontend
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify:layout-license
+          npm run typecheck
+          npm run test
+          npm run coverage
+          npm run build
+
+      - name: Remove workflow and publish verified formatting
+        env:
+          BRANCH_NAME: feat/relationship-aware-auto-layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-format-layout-test.yml
+          git add frontend/src/erd/dagreLayout.test.ts
+          git diff --cached --check
+          git commit -m "style(frontend): terminate layout test statements explicitly"
+          git push origin "HEAD:${BRANCH_NAME}"
