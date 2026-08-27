@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+import { noticesAreByteIdentical } from "./notice-byte-identity.mjs";
+
 const projectRoot = new URL("../", import.meta.url);
 
 function assert(condition, message) {
@@ -11,8 +13,8 @@ function assert(condition, message) {
 const [packageJson, lockFile, notices, publicNotices] = await Promise.all([
   readFile(new URL("package.json", projectRoot), "utf8").then(JSON.parse),
   readFile(new URL("package-lock.json", projectRoot), "utf8").then(JSON.parse),
-  readFile(new URL("THIRD_PARTY_NOTICES.md", projectRoot), "utf8"),
-  readFile(new URL("public/THIRD_PARTY_NOTICES.md", projectRoot), "utf8"),
+  readFile(new URL("THIRD_PARTY_NOTICES.md", projectRoot)),
+  readFile(new URL("public/THIRD_PARTY_NOTICES.md", projectRoot)),
 ]);
 
 const expectedDagreVersion = "3.1.0";
@@ -54,10 +56,11 @@ assert(
   "@dagrejs/graphlib must not add an unreviewed runtime dependency",
 );
 assert(
-  notices === publicNotices,
+  noticesAreByteIdentical(notices, publicNotices),
   "public/THIRD_PARTY_NOTICES.md must exactly match the reviewed source notice",
 );
 
+const noticeText = notices.toString("utf8");
 for (const requiredNotice of [
   "## @dagrejs/dagre 3.1.0",
   "## @dagrejs/graphlib 4.0.3",
@@ -65,7 +68,7 @@ for (const requiredNotice of [
   "The above copyright notice and this permission notice shall be included",
 ]) {
   assert(
-    notices.includes(requiredNotice),
+    noticeText.includes(requiredNotice),
     `THIRD_PARTY_NOTICES.md is missing required text: ${requiredNotice}`,
   );
 }
