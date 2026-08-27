@@ -1,3 +1,4 @@
+import { layout as runDagreLayout } from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
@@ -104,6 +105,34 @@ describe("computeDagreLayout", () => {
       true,
     );
     expect(new Set(coordinateKeys).size).toBe(nodes.length);
+  });
+
+  it("preserves parallel relationships even when hostile input repeats an edge id", () => {
+    const nodes = [tableNode("parent"), tableNode("child")];
+    const edges: Edge[] = [
+      { id: "duplicate", source: "child", target: "parent" },
+      { id: "duplicate", source: "child", target: "parent" },
+    ];
+    const inspectingEngine: DagreLayoutEngine = (graph) => {
+      expect(graph.edgeCount()).toBe(2);
+      runDagreLayout(graph);
+    };
+
+    const result = computeDagreLayout(nodes, edges, "LR", inspectingEngine);
+
+    expect(result.applied).toBe(true);
+  });
+
+  it("registers identifiers in locale-independent code-unit order", () => {
+    const nodes = [tableNode("ä"), tableNode("z"), tableNode("A")];
+    const inspectingEngine: DagreLayoutEngine = (graph) => {
+      expect(graph.nodes()).toEqual(["A", "z", "ä"]);
+      runDagreLayout(graph);
+    };
+
+    const result = computeDagreLayout(nodes, [], "LR", inspectingEngine);
+
+    expect(result.applied).toBe(true);
   });
 
   it("is deterministic regardless of input node and edge order", () => {
