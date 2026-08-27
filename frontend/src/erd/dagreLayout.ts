@@ -42,6 +42,12 @@ function cloneNodes<T extends LayoutNodeData>(
   }));
 }
 
+function compareStable(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function positiveFinite(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
@@ -121,7 +127,7 @@ export function computeDagreLayout<T extends LayoutNodeData>(
   });
 
   const sortedNodes = [...nodes].sort((left, right) =>
-    left.id.localeCompare(right.id, "en"),
+    compareStable(left.id, right.id),
   );
   for (const node of sortedNodes) {
     graph.setNode(node.id, nodeDimensions(node));
@@ -130,13 +136,13 @@ export function computeDagreLayout<T extends LayoutNodeData>(
   const sortedEdges = [...edges].sort((left, right) => {
     const leftKey = `${left.target}\u0000${left.source}\u0000${left.id}`;
     const rightKey = `${right.target}\u0000${right.source}\u0000${right.id}`;
-    return leftKey.localeCompare(rightKey, "en");
+    return compareStable(leftKey, rightKey);
   });
   for (const [index, edge] of sortedEdges.entries()) {
     if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) {
       continue;
     }
-    const edgeName = edge.id || `${edge.target}:${edge.source}:${index}`;
+    const edgeName = `${edge.id || "edge"}:${index}`;
     graph.setEdge(edge.target, edge.source, {}, edgeName);
   }
 
