@@ -4,14 +4,26 @@ import type { Edge, Node } from "@xyflow/react";
 const DEFAULT_NODE_WIDTH = 280;
 const BASE_NODE_HEIGHT = 80;
 const COLUMN_ROW_HEIGHT = 25;
+const DETAIL_LINE_HEIGHT = 16;
+const OVERFLOW_ROW_HEIGHT = 22;
+const INDEX_SECTION_HEIGHT = 30;
+const INDEX_ROW_HEIGHT = 34;
 const MAX_RENDERED_COLUMNS = 25;
+const MAX_RENDERED_INDEXES = 4;
 const NODE_SEPARATION = 60;
 const RANK_SEPARATION = 120;
 const EDGE_SEPARATION = 24;
 const LAYOUT_MARGIN = 24;
 
+type LayoutColumnData = {
+  column_comment?: string | null;
+  example_value?: unknown;
+};
+
 type LayoutNodeData = {
-  columns?: readonly unknown[];
+  comment?: string | null;
+  columns?: readonly LayoutColumnData[];
+  indexes?: readonly unknown[];
 };
 
 type DagreNodeGeometry = {
@@ -52,6 +64,42 @@ function positiveFinite(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function hasVisibleText(value: unknown): boolean {
+  return String(value ?? "").trim().length > 0;
+}
+
+function estimatedNodeHeight(data: LayoutNodeData): number {
+  const columns = data.columns ?? [];
+  const renderedColumns = columns.slice(0, MAX_RENDERED_COLUMNS);
+  const columnHeight = renderedColumns.reduce((height, column) => {
+    const detailLines =
+      Number(hasVisibleText(column.column_comment)) +
+      Number(hasVisibleText(column.example_value));
+    return height + COLUMN_ROW_HEIGHT + detailLines * DETAIL_LINE_HEIGHT;
+  }, 0);
+  const overflowHeight =
+    columns.length > MAX_RENDERED_COLUMNS ? OVERFLOW_ROW_HEIGHT : 0;
+  const titleCommentHeight = hasVisibleText(data.comment)
+    ? DETAIL_LINE_HEIGHT
+    : 0;
+  const indexCount = data.indexes?.length ?? 0;
+  const renderedIndexCount = Math.min(indexCount, MAX_RENDERED_INDEXES);
+  const indexHeight =
+    indexCount > 0
+      ? INDEX_SECTION_HEIGHT +
+        renderedIndexCount * INDEX_ROW_HEIGHT +
+        (indexCount > MAX_RENDERED_INDEXES ? OVERFLOW_ROW_HEIGHT : 0)
+      : 0;
+
+  return (
+    BASE_NODE_HEIGHT +
+    titleCommentHeight +
+    columnHeight +
+    overflowHeight +
+    indexHeight
+  );
+}
+
 function nodeDimensions<T extends LayoutNodeData>(node: Node<T>): {
   width: number;
   height: number;
@@ -63,17 +111,11 @@ function nodeDimensions<T extends LayoutNodeData>(node: Node<T>): {
     : positiveFinite(node.width)
       ? node.width
       : DEFAULT_NODE_WIDTH;
-  const renderedColumnCount = Math.min(
-    node.data.columns?.length ?? 0,
-    MAX_RENDERED_COLUMNS,
-  );
-  const estimatedHeight =
-    BASE_NODE_HEIGHT + renderedColumnCount * COLUMN_ROW_HEIGHT;
   const height = positiveFinite(measuredHeight)
     ? measuredHeight
     : positiveFinite(node.height)
       ? node.height
-      : estimatedHeight;
+      : estimatedNodeHeight(node.data);
 
   return { width, height };
 }
