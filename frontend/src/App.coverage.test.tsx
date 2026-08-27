@@ -26,6 +26,14 @@ const exports = vi.hoisted(() => ({
   inferRelationships: vi.fn(),
 }))
 
+const layout = vi.hoisted(() => ({
+  requireDagreLayout: vi.fn(),
+}))
+
+vi.mock('./erd/dagreLayout', () => ({
+  requireDagreLayout: layout.requireDagreLayout,
+}))
+
 vi.mock('./api', () => api)
 vi.mock('./erd/export', () => ({
   downloadText: exports.downloadText,
@@ -69,6 +77,9 @@ vi.mock('@xyflow/react', async () => {
     return (
       <div data-testid="react-flow">
         <span data-testid="node-count">{props.nodes.length}</span>
+        <span data-testid="node-positions">
+          {JSON.stringify(props.nodes.map((node: any) => ({ id: node.id, position: node.position })))}
+        </span>
         <span data-testid="edge-count">{props.edges.length}</span>
         <button type="button" data-testid="flow-connect" onClick={() => props.onConnect?.({ source: 'table-1', target: 'table-2' })} />
         <button type="button" data-testid="flow-edge" onClick={(event) => props.onEdgeClick?.(event, props.edges[0] ?? edge)} />
@@ -260,6 +271,12 @@ const snapshots = [
 
 beforeEach(() => {
   vi.clearAllMocks()
+  layout.requireDagreLayout.mockImplementation((nodes: any[]) =>
+    nodes.map((node, index) => ({
+      ...node,
+      position: { x: 1000 + index * 100, y: 2000 + index * 100 },
+    })),
+  )
   api.getMe.mockResolvedValue({ subject: 'user', display_name: 'User', user_account_uuid: 'u' })
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue(connections)
@@ -299,6 +316,13 @@ afterEach(() => {
 async function renderReadyApp() {
   render(<App />)
   await screen.findByRole('heading', { name: '대시보드' })
+}
+
+function readNodePositions() {
+  return JSON.parse(screen.getByTestId('node-positions').textContent ?? '[]') as Array<{
+    id: string
+    position: { x: number; y: number }
+  }>
 }
 
 function forceClick(button: HTMLButtonElement) {
@@ -382,6 +406,7 @@ describe('App orchestration coverage', () => {
     })
     expect(api.getSnapshot).toHaveBeenCalledWith('s1')
     expect(screen.getByTestId('node-count')).toHaveTextContent('2')
+    const originalPositions = readNodePositions()
 
     fireEvent.change(screen.getByLabelText('테이블 또는 컬럼 검색'), { target: { value: 'users' } })
     expect(screen.getByText('1개 테이블 일치', { exact: false })).toBeInTheDocument()
@@ -391,8 +416,18 @@ describe('App orchestration coverage', () => {
       await Promise.resolve()
     })
     expect(screen.getByText('정렬 완료', { exact: false })).toBeInTheDocument()
+    expect(layout.requireDagreLayout).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.any(Array),
+      'LR',
+    )
+    expect(readNodePositions()).toEqual([
+      { id: 'table-1', position: { x: 1000, y: 2000 } },
+      { id: 'table-2', position: { x: 1100, y: 2100 } },
+    ])
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByText('되돌렸습니다', { exact: false })).toBeInTheDocument()
+    expect(readNodePositions()).toEqual(originalPositions)
 
     fireEvent.click(screen.getByTestId('flow-connect'))
     fireEvent.click(screen.getByTestId('edge-label'))
@@ -634,6 +669,41 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
     expect(screen.getByTestId('node-count')).toHaveTextContent('3')
   })
+
+  it('preserves current nodes and the prior undo boundary when layout calculation fails', async () => {
+  await renderReadyApp()
+  fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+  const openButtons = await screen.findAllByRole('button', { name: '열기' })
+  vi.useFakeTimers()
+  fireEvent.click(openButtons[0]!)
+  await act(async () => {
+    vi.advanceTimersByTime(1000)
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  vi.useRealTimers()
+
+  const originalPositions = readNodePositions()
+  fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
+  await screen.findByText('관계 기반 정렬 완료', { exact: false })
+  const arrangedPositions = readNodePositions()
+  expect(arrangedPositions).not.toEqual(originalPositions)
+
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+  layout.requireDagreLayout.mockImplementationOnce(() => {
+    throw new Error('layout unavailable')
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
+  await screen.findByText('정렬에 실패했습니다. 다시 시도해 주세요.', { exact: false })
+
+  expect(consoleError).toHaveBeenCalledWith(
+    'Auto-layout failed',
+    expect.objectContaining({ message: 'layout unavailable' }),
+  )
+  expect(readNodePositions()).toEqual(arrangedPositions)
+  fireEvent.click(screen.getByRole('button', { name: '정렬 되돌리기' }))
+  expect(readNodePositions()).toEqual(originalPositions)
+})
 
   it('shows terminal refresh failures from the polling loop', async () => {
     api.listSnapshots

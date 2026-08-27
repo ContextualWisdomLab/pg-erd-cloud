@@ -173,6 +173,38 @@ describe("computeDagreLayout", () => {
     expect(new Set(result.nodes.map((node) => node.position.x)).size).toBe(3);
   });
 
+  it("reserves height for rendered detail, overflow, and index rows before measurement", () => {
+  const plain = tableNode("plain", { x: 0, y: 0 }, 1)
+  const rich = tableNode("rich", { x: 0, y: 0 }, 26)
+  rich.data.columns = rich.data.columns.map((column, index) => ({
+    ...column,
+    column_comment: `comment ${index}`,
+    example_value: `example ${index}`,
+  }))
+  rich.data.indexes = Array.from({ length: 5 }, (_, index) => ({
+    index_name: `idx_rich_${index}`,
+    columns: ["column_0"],
+    access_method: "btree" as const,
+    estimated_distinct: 1,
+    cardinality_ratio: 1,
+    strength: "recommended" as const,
+    reason: "test",
+    source: "cardinality-wizard" as const,
+  }))
+  let plainHeight = 0
+  let richHeight = 0
+  const inspectingEngine: DagreLayoutEngine = (graph) => {
+    plainHeight = graph.node("plain").height
+    richHeight = graph.node("rich").height
+    runDagreLayout(graph)
+  }
+
+  const result = computeDagreLayout([plain, rich], [], "LR", inspectingEngine)
+
+  expect(result.applied).toBe(true)
+  expect(richHeight).toBeGreaterThan(plainHeight + 1000)
+})
+
   it("fails closed and preserves every position when the layout engine throws", () => {
     const nodes = [
       tableNode("one", { x: 125, y: 225 }),
