@@ -61,6 +61,18 @@ def test_jwt_header_rejects_registered_names_as_critical(
     assert error.value.detail == "invalid crit header"
 
 
+def test_jwt_header_rejects_b64_as_registered_critical_name() -> None:
+    """Reject RFC 7797 ``b64`` because this profile does not process it."""
+
+    with pytest.raises(HTTPException) as error:
+        auth._validate_jwt_header(
+            {"alg": "RS256", "b64": False, "crit": ["b64"]},
+        )
+
+    assert error.value.status_code == 401
+    assert error.value.detail == "invalid crit header"
+
+
 def test_jwt_header_rejects_critical_name_missing_from_header() -> None:
     """Reject a critical extension name that has no matching header member."""
 
@@ -87,6 +99,32 @@ def test_jwt_header_rejects_structurally_valid_unsupported_extension() -> None:
 
     assert error.value.status_code == 401
     assert error.value.detail == "unsupported critical parameter"
+
+
+@pytest.mark.asyncio
+async def test_malformed_critical_header_rejection_precedes_jwks_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject malformed critical metadata before any signing-key I/O."""
+
+    monkeypatch.setattr(
+        auth.jwt,
+        "get_unverified_header",
+        lambda _token: {"alg": "RS256", "crit": []},
+    )
+
+    async def fail_jwks(*_args: object, **_kwargs: object) -> dict[str, object]:
+        """Fail if malformed protected metadata crosses the validation boundary."""
+
+        raise AssertionError("JWKS must not load for malformed critical headers")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException) as error:
+        await auth._decode_verified_oidc_token("header.payload.signature")
+
+    assert error.value.status_code == 401
+    assert error.value.detail == "invalid crit header"
 
 
 @pytest.mark.asyncio
@@ -118,3 +156,37 @@ async def test_critical_extension_rejection_precedes_jwks_lookup(
 
     assert error.value.status_code == 401
     assert error.value.detail == "unsupported critical parameter"
+
+
+@pytest.mark.asyncio
+async def test_jwk_algorithm_metadata_must_match_token_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject a JWK whose declared algorithm conflicts with the token header."""
+
+    monkeypatch.setattr(auth, "OIDC_ALLOWED_ALGORITHMS", ("RS256", "RS384"))
+    monkeypatch.setattr(
+        auth.jwt,
+        "get_unverified_header",
+        lambda _token: {"kid": "key-1", "alg": "RS256"},
+    )
+
+    async def fake_jwks(*_args: object, **_kwargs: object) -> dict[str, object]:
+        return {
+            "keys": [
+                {"kid": "key-1", "kty": "RSA", "alg": "RS384"},
+            ]
+        }
+
+    monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
+
+    def fail_key_construction(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("mismatched JWK alg must fail before key construction")
+
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", fail_key_construction)
+
+    with pytest.raises(HTTPException) as error:
+        await auth._decode_verified_oidc_token("header.payload.signature")
+
+    assert error.value.status_code == 401
+    assert error.value.detail == "algorithm/key type mismatch"
