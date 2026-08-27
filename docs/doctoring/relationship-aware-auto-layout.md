@@ -4,8 +4,6 @@
 
 pg-erd-cloud provides deterministic, relationship-aware **table-node placement** for ERD snapshots and the explicit `ERD 자동 정렬` action. It does not claim mathematically optimal crossing reduction, port-aware orthogonal edge routing, or stable incremental layout.
 
-The implementation is intentionally narrower than a full graph-drawing platform:
-
 ```text
 PostgreSQL foreign-key evidence
 → React Flow child→parent edge
@@ -18,13 +16,14 @@ PostgreSQL foreign-key evidence
 
 Layered drawing is appropriate when a directed relation should communicate precedence or dependency. The classical Sugiyama-family process separates cycle handling, layer assignment, crossing reduction, and coordinate assignment rather than treating diagram placement as a simple alphabetical grid. Dagre is a JavaScript implementation of directed-graph layout that draws on this research lineage.
 
-The current product slice uses:
+The product slice uses:
 
 - a greedy cycle breaker so cyclic schemas still receive finite coordinates;
 - network-simplex ranking for layer assignment;
-- locale-independent code-unit ordering before invocation;
-- a unique internal multigraph name for every visible relationship, even when hostile input repeats an external edge ID;
-- measured or bounded estimated table dimensions;
+- locale-independent code-unit ordering;
+- an index-qualified internal multigraph name for every relationship, including repeated or empty external IDs;
+- measured, explicit, or conservatively estimated table dimensions;
+- pre-measurement height for title comments, rendered column rows, visible comments/examples, column overflow, index sections, index rows, and index overflow;
 - parent-before-child ranking derived from foreign-key direction;
 - complete-result validation before publishing any new position.
 
@@ -34,48 +33,50 @@ Crossing minimization is computationally difficult in general, and the selected 
 
 | Product requirement | Implementation | Executable evidence |
 |---|---|---|
-| Referenced tables precede dependent tables | Foreign-key edge is reversed only inside `computeDagreLayout` | LR and TB parent/child tests |
-| Product edge semantics remain unchanged | Snapshot edges stay child `source` → parent `target` | `convertLayout.test.ts` |
-| Stable result for stable input | Nodes and edges use locale-independent code-unit sorting | reversed-input and Unicode identifier tests |
+| Referenced tables precede dependent tables | FK edge is reversed only inside `computeDagreLayout` | LR and TB parent/child tests |
+| Product edge semantics remain unchanged | Snapshot edges remain child `source` → parent `target` | `convertLayout.test.ts` |
+| Stable result for stable input | Locale-independent code-unit sorting | reversed-input and Unicode identifier tests |
 | Cyclic schema support | `acyclicer: "greedy"` | cycle regression test |
-| Parallel FK support | directed multigraph and index-qualified internal edge names | parallel, empty-ID, and repeated-ID regression tests |
-| Disconnected tables | all visible nodes registered before edges | disconnected-node regression test |
-| Missing endpoint safety | incomplete edges ignored for placement | hostile endpoint regression test |
-| Variable table dimensions | measured → explicit → bounded estimate | dimension-source regression test |
-| No partial coordinate corruption | validate every node before publishing | throwing and invalid-engine tests |
+| Parallel FK support | Directed multigraph and index-qualified internal names | parallel, empty-ID, and repeated-ID tests |
+| Disconnected tables | Every visible node registered before edges | disconnected-node test |
+| Missing endpoint safety | Incomplete edges excluded from placement | hostile endpoint test |
+| Variable and rich table dimensions | measured → explicit → conservative rendered-content estimate | dimension-source and rich-node-height tests |
+| No partial coordinate corruption | Every node validated before publication | throwing and invalid-engine tests |
 | One implementation for load and toolbar | `snapshotToGraph` and `App` share the same boundary | conversion and UI tests |
-| One-step undo only after success | undo snapshot written after checked layout returns | existing App coverage scenarios |
-| Commercial-use dependency boundary | exact lock, notice, offline verifier | `verify-layout-license.mjs` and CI |
+| Successful coordinates and exact Undo | UI exposes and compares actual node positions | `App.coverage.test.tsx` |
+| Calculation failure preserves state | Checked layout throws before Undo replacement or node update | UI failure regression test |
+| Commercial-use dependency boundary | Exact lock, notices, offline verifier | `verify-layout-license.mjs` and CI |
+| Notice included in shipped bundle | public notice copied by Vite and compared after build | `verify-layout-distribution.mjs` |
 
 ## License and distribution evidence
 
 The production dependency is exactly `@dagrejs/dagre` 3.1.0. Its sole runtime dependency is exactly `@dagrejs/graphlib` 4.0.3. The checked lockfile declares MIT for both. The upstream tagged releases carry the same MIT notice and copyright statement.
 
-MIT permits commercial use, modification, distribution, sublicensing, and sale, provided the copyright and permission notice is retained in copies or substantial portions. The exact notices are preserved in `frontend/THIRD_PARTY_NOTICES.md`.
+MIT permits commercial use, modification, distribution, sublicensing, and sale, provided the copyright and permission notice is retained in copies or substantial portions. The exact notice is preserved in:
 
-The offline CI verifier rejects:
+- `frontend/THIRD_PARTY_NOTICES.md` — reviewed source authority;
+- `frontend/public/THIRD_PARTY_NOTICES.md` — byte-identical Vite public artifact;
+- `dist/THIRD_PARTY_NOTICES.md` — required production-build artifact.
 
-- version drift;
-- a non-MIT lock declaration;
-- a new Dagre runtime dependency;
-- any Graphlib runtime dependency;
-- removal of the required notice text.
-
-This is a bounded compliance assertion for the new layout subtree. It is not a legal opinion on every dependency already present in the frontend.
+The offline verifiers reject version drift, a non-MIT lock declaration, a changed runtime dependency graph, missing notice text, a mismatched public copy, or an omitted/mismatched production artifact. This is a bounded compliance assertion for the new layout subtree, not a legal opinion on every dependency already present in the frontend.
 
 ## TDD and verification history
 
-1. The first PR head contained only the layout contract tests and failed because `dagreLayout.ts` did not yet exist.
-2. The implementation was added only after that RED evidence.
-3. A one-shot workflow generated the exact npm lock, installed it with `npm ci`, ran type checking, behavior tests, and a production build, then deleted itself.
-4. The first UI integration run passed 212 tests and the build but failed the new module's 100% function/statement coverage gate.
-5. Root-cause analysis found an unreachable default-edge-label callback: every edge already supplied an explicit label object. The unused callback was removed rather than excluded or suppressed.
-6. The second integration run passed the exact coverage gate and deleted its one-shot workflow after committing the verified UI integration.
-7. A subsequent self-review added failing contracts for repeated external edge IDs and locale-independent identifier ordering. The predecessor head failed both focused tests as expected.
-8. The fix qualified every internal multigraph edge name by deterministic index and replaced locale collation with code-unit comparison. The next exact-head frontend Check passed all 214 tests.
-9. One RED run also exposed the repository's previously known asynchronous diagram-list test flake. It did not reproduce on the corrected exact head, so it remains a separate test-reliability issue rather than a reason to mix unrelated production changes into this layout slice.
+1. The first PR head contained only layout contract tests and failed because `dagreLayout.ts` did not yet exist.
+2. A one-shot workflow generated the exact npm lock, ran `npm ci`, typecheck, tests, and build, then deleted itself.
+3. The first UI integration run passed 212 behavior tests and build but failed the new module's 100% function/statement coverage gate.
+4. Root-cause analysis found an unreachable default-edge-label callback. It was removed rather than excluded or suppressed.
+5. The second integration run passed 100% statement, branch, function, and line coverage for the module and deleted its one-shot workflow.
+6. Self-review added RED contracts for repeated edge IDs and locale-dependent ordering. Both failed on the predecessor head as expected.
+7. The GREEN fix retained every relationship with a unique internal name and switched to code-unit ordering. The next exact-head frontend Check passed all 214 tests.
+8. A distribution test was added before the Vite public notice existed. All tests and the Vite bundle succeeded, but the build failed exactly because `dist/THIRD_PARTY_NOTICES.md` was absent.
+9. The public notice and pre-/post-build equality checks were added; the next frontend build passed and verified the notice in the shipped artifact.
+10. Code review requested UI-level state evidence. Tests now assert the applied coordinates, exact Undo coordinates, and calculation-failure preservation of current nodes and the previous Undo boundary.
+11. Review also identified possible underestimation for comments, examples, overflow, and indexes. A focused geometry test first failed because the old estimate reserved only 705 pixels for the rich node.
+12. The estimator was expanded to account for all rendered detail rows. A full one-shot verification then passed license verification, typecheck, the complete test suite, coverage, and production build before deleting itself.
+13. A static-review formatting finding was repaired with explicit terminators and repository-consistent indentation. The workflow again required the full verification chain and committed only after success, then deleted itself.
 
-Repository pull-request checks, security checks, dependency review, and independent review remain authoritative for merge readiness. A successful one-shot workflow is evidence for the bounded change, not a substitute for protected-branch gates.
+Ordinary pull-request checks, security checks, dependency review, central model reviews, and independent human approval remain authoritative for merge readiness. Successful one-shot workflows are bounded evidence, not substitutes for protected-branch gates.
 
 ## Operational observations
 
@@ -85,9 +86,9 @@ Monitor these signals before broad large-schema claims:
 - browser long-task duration;
 - peak heap growth;
 - coordinate validation failure count;
-- user-triggered undo after auto-layout;
+- user-triggered Undo after auto-layout;
 - saved-view conflict rate following layout;
-- difference between pre-measurement and post-measurement coordinates.
+- difference between estimated and measured geometry.
 
 No performance threshold is asserted until a reproducible schema corpus and browser benchmark are checked into the repository.
 
@@ -98,8 +99,8 @@ No performance threshold is asserted until a reproducible schema corpus and brow
 - Schema/domain compound nodes are not represented.
 - User-pinned nodes and incremental mental-map preservation are not implemented.
 - The layout runs on the browser main thread rather than a Web Worker.
-- Direction is internally supported as `LR` and `TB`, but the product does not yet expose a persisted direction control.
-- No screenshot-based visual regression suite or assistive-technology review has yet been recorded for the new geometry.
+- Direction is internally supported as `LR` and `TB`, but no persisted direction control is exposed.
+- No screenshot-based visual regression suite or assistive-technology review has yet been recorded.
 
 Each expansion requires a separate product contract, benchmark, license review, and ADR rather than silently widening this decision.
 

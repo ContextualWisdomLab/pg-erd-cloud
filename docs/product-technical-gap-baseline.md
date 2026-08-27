@@ -19,7 +19,7 @@ The buyer outcome is:
 
 | Capability | Current evidence | Gap state | Required next action |
 |---|---|---|---|
-| Relationship-aware ERD node placement | PR #996 uses exact MIT-licensed Dagre 3.1.0 and Graphlib 4.0.3; initial conversion and toolbar action share a deterministic fail-closed boundary | Implemented on the PR branch; not shipped until merge | Complete exact-head CI, coverage, security, dependency, review, and protected merge gates |
+| Relationship-aware ERD node placement | PR #996 uses exact MIT-licensed Dagre 3.1.0 and Graphlib 4.0.3; initial conversion and toolbar action share a deterministic fail-closed boundary | Implemented on the PR branch; not shipped until merge | Complete final exact-head CI, central review, security, dependency, and independent-approval gates |
 | Saved ERD view CRUD contract | Open PR #723 provides backend update and typed frontend API foundations | API foundation is not a complete buyer workspace | Deliver Save, Save As, Open, Rename, Delete, dirty-state, recovery, optimistic concurrency, and permission-aware UI after the contract merges |
 | Design-system authority | Open PR #944 owns the Storybook design-token inventory and paired Figma evidence | Separate lane; not duplicated by #996 | Integrate graph/loading/error states through the owning design-system lane |
 | PostgreSQL relation identity | Clean replacement PR #990 addresses Unicode, spaces, mixed case, and dotted quoted identifiers in relationship inference | Open; layout must consume exact identifiers without becoming a second identity authority | Merge the identity fix through its own checks and rerun relevant integration tests on combined main |
@@ -36,13 +36,15 @@ The previous initial layout and `ERD 자동 정렬` action placed tables in an a
 
 - parent/reference tables precede dependent child tables;
 - LR and TB directions exist in the pure layout boundary;
-- cycles, parallel foreign keys, disconnected tables, missing endpoints, repeated or empty edge identifiers, and variable dimensions have regression coverage;
+- cycles, parallel foreign keys, disconnected tables, missing endpoints, repeated or empty edge identifiers, and Unicode identifiers have regression coverage;
 - node and relationship registration use locale-independent code-unit ordering;
+- measured sizes are preferred, while pre-measurement geometry conservatively includes table comments, rendered column rows, column comments/examples, overflow rows, and index rows;
 - input nodes and product edge semantics are not mutated;
 - complete finite geometry is required before publishing any coordinate;
-- layout failure preserves every existing coordinate and does not overwrite the undo boundary;
+- layout failure preserves every existing coordinate and does not overwrite the previous Undo boundary;
+- UI tests assert applied coordinates, exact Undo restoration, and calculation-failure state preservation;
 - snapshot initialization and explicit auto-layout use the same code path;
-- exact dependency versions, MIT declarations, runtime dependency shape, and required notices are checked offline in CI.
+- exact dependency versions, MIT declarations, runtime dependency shape, required notices, and production-bundle notice distribution are checked offline in CI.
 
 ### Claim boundary
 
@@ -81,16 +83,16 @@ Business groups and database schemas need a defined relationship to layout clust
 
 ### 6. Visual and accessibility evidence
 
-The new geometry is behavior-tested but does not yet have checked screenshot regression evidence. Product validation must cover dense relationships, zoom/fit, loading, failure, undo, keyboard operation, reduced motion, exact-value alternatives, print/export, and screen-reader announcements. Reusable states should enter the established Figma/Storybook authority rather than forming a second design system.
+The new geometry is behavior-tested but does not yet have checked screenshot regression evidence. Product validation must cover dense relationships, zoom/fit, loading, failure, Undo, keyboard operation, reduced motion, exact-value alternatives, print/export, and screen-reader announcements. Reusable states should enter the established Figma/Storybook authority rather than forming a second design system.
 
 ## Commercial dependency baseline
 
 | Package | Exact version | Runtime role | License | Distribution obligation recorded |
 |---|---:|---|---|---|
-| `@dagrejs/dagre` | 3.1.0 | layered node layout | MIT | exact copyright and permission notice in `frontend/THIRD_PARTY_NOTICES.md` |
-| `@dagrejs/graphlib` | 4.0.3 | directed multigraph structure | MIT | exact copyright and permission notice in `frontend/THIRD_PARTY_NOTICES.md` |
+| `@dagrejs/dagre` | 3.1.0 | layered node layout | MIT | exact notice in reviewed source, public Vite artifact, and production `dist` artifact |
+| `@dagrejs/graphlib` | 4.0.3 | directed multigraph structure | MIT | exact notice in reviewed source, public Vite artifact, and production `dist` artifact |
 
-The CI verifier deliberately fails if the exact versions, MIT declarations, reviewed runtime dependency graph, or notice text change. This is a bounded assertion for the new layout subtree, not a repository-wide legal certification.
+The CI verifier deliberately fails if the exact versions, MIT declarations, reviewed runtime dependency graph, notice text, public notice copy, or production-build notice changes. This is a bounded assertion for the new layout subtree, not a repository-wide legal certification.
 
 ## Verification state for PR #996
 
@@ -102,10 +104,13 @@ The CI verifier deliberately fails if the exact versions, MIT declarations, revi
 | Root-cause repair | Unreachable callback removed; no suppression or ignore added |
 | UI integration run 2 | Passed; temporary workflow deleted itself after committing verified UI integration |
 | Focused layout coverage | 100% statement, branch, function, and line gate in the successful one-shot run |
-| Hostile-input RED head | Repeated edge IDs collapsed and locale-sensitive ordering violated the new executable contract; the two focused tests failed as expected |
-| Hostile-input GREEN head | Unique internal multigraph names and code-unit comparison implemented; exact-head frontend Check passed all 214 tests |
-| Existing asynchronous App test | One predecessor RED run also exposed the known diagram-list timing flake; it did not reproduce on the GREEN exact head and is not treated as a layout defect |
-| Pull-request exact-head repository/security checks | Must rerun after this final traceability commit and after Ready-for-review transition |
+| Hostile-input RED/GREEN | Repeated IDs and locale ordering failed first; unique internal names and code-unit comparison then passed all 214 frontend tests |
+| Production notice RED/GREEN | Vite bundle initially failed because `dist/THIRD_PARTY_NOTICES.md` was absent; public copy plus post-build equality verification then passed |
+| Review-requested UI contracts | Successful coordinates, exact Undo restoration, and calculation failure preserving current nodes and the prior Undo boundary are directly asserted |
+| Rich-node geometry RED/GREEN | Old estimate failed a comments/examples/overflow/index contract; conservative rendered-content height then passed the complete verification chain |
+| Final one-shot verification | License verification, typecheck, complete tests, coverage, and production build succeeded before the workflows committed and deleted themselves |
+| Existing asynchronous App test | One predecessor RED run exposed the known diagram-list timing flake; it did not reproduce on corrected heads and remains a separate test-reliability issue |
+| Final documentation head | This traceability commit intentionally moves the head; all ordinary required checks and central reviews must rerun on it |
 | Independent approval | Required before protected merge; not inferred from automated review |
 | Shipped on `main` | No, until ordinary protected merge succeeds |
 
@@ -113,4 +118,4 @@ The CI verifier deliberately fails if the exact versions, MIT declarations, revi
 
 Do not represent #996 as shipped until the unchanged latest head has every then-live required check in terminal success, no valid unresolved review finding, and a qualifying independent non-author approval. Queued, stale, predecessor-head, skipped-required, model-only, author-only, or local evidence is non-passing.
 
-Rollback removes the new dependency and layout call sites, restores the fixed-grid fallback, and removes notices only after the production dependency graph no longer contains the packages. Persisted node positions remain compatible because this slice does not change the saved layout schema.
+Rollback removes the new dependency and layout call sites, restores the fixed-grid fallback, and removes source/public/distributed notices only after the production dependency graph no longer contains the packages. Persisted node positions remain compatible because this slice does not change the saved layout schema.
