@@ -62,7 +62,7 @@ import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
 import { exportPrisma } from "./erd/prisma";
-import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import { requireDagreLayout } from "./erd/dagreLayout";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
@@ -485,57 +485,37 @@ export default function App() {
     });
   }
 
-  function computeSortedGridLayout(
-    currentNodes: Array<Node<TableNodeData>>,
-  ): Array<Node<TableNodeData>> {
-    const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = a.data?.title ?? a.id;
-      const bTitle = b.data?.title ?? b.id;
-      return aTitle.localeCompare(bTitle, "en");
+  async function onAutoLayout() {
+  /* v8 ignore next -- the toolbar disables this handler for both guard states */
+  if (nodes.length === 0 || isLayouting) return;
+  setIsLayouting(true);
+  setLayoutMessage("");
+
+  try {
+    // Yield to the browser so the UI can reflect the loading state.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+
+    const next = requireDagreLayout(nodes, edges, "LR");
+    setUndoPositions(snapshotNodePositions(nodes));
+    setNodes(next);
+
+    requestAnimationFrame(() => {
+      reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 });
     });
 
-    return sorted.map((n, i) => ({
-      ...n,
-      position: {
-        x: (i % GRID_COLUMNS) * GRID_X_GAP,
-        y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP,
-      },
-    }));
-  }
-
-  async function onAutoLayout() {
-    /* v8 ignore next -- the toolbar disables this handler for both guard states */
-    if (nodes.length === 0 || isLayouting) return;
-    setIsLayouting(true);
-    setLayoutMessage("");
-
-    // Capture current positions for a one-step undo.
-    setUndoPositions(snapshotNodePositions(nodes));
-
-    try {
-      // Yield to the browser so the UI can reflect the loading state.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
-
-      const next = computeSortedGridLayout(nodes);
-      setNodes(next);
-
-      requestAnimationFrame(() => {
-        reactFlowRef.current?.fitView({ padding: 0.2, duration: 200 });
-      });
-
-      setLayoutMessage("정렬 완료");
-    } catch (error) {
-      /* v8 ignore else -- Vitest always runs with import.meta.env.DEV enabled */
-      if (import.meta.env.DEV) {
-        console.error("Auto-layout failed", error);
-      }
-      setLayoutMessage("정렬에 실패했습니다. 다시 시도해 주세요.");
-    } finally {
-      setIsLayouting(false);
+    setLayoutMessage("관계 기반 정렬 완료");
+  } catch (error) {
+    /* v8 ignore else -- Vitest always runs with import.meta.env.DEV enabled */
+    if (import.meta.env.DEV) {
+      console.error("Auto-layout failed", error);
     }
+    setLayoutMessage("정렬에 실패했습니다. 다시 시도해 주세요.");
+  } finally {
+    setIsLayouting(false);
   }
+}
 
   const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
