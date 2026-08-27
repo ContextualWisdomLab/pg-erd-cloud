@@ -178,3 +178,21 @@ export function computeDagreLayout<T extends LayoutNodeData>(
     }),
   };
 }
+
+/**
+ * Returns a successfully computed layout or throws for the caller's existing
+ * error boundary. This keeps React UI control flow simple while preserving the
+ * fail-closed result contract for snapshot conversion and other batch callers.
+ */
+export function requireDagreLayout<T extends LayoutNodeData>(
+  nodes: Array<Node<T>>,
+  edges: Edge[],
+  direction: LayoutDirection = "LR",
+  layoutEngine: DagreLayoutEngine = runDagreLayout,
+): Array<Node<T>> {
+  const result = computeDagreLayout(nodes, edges, direction, layoutEngine);
+  if (!result.applied) {
+    throw new Error(`Dagre layout failed: ${result.reason}`);
+  }
+  return result.nodes;
+}
