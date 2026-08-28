@@ -193,8 +193,15 @@ export function ExportModal({
                 <button
                   type="button"
                   className="exportModal__primaryAction"
-                  onClick={onCreateShareLink}
-                  disabled={!canCreateShareLink || isCreatingShareLink}
+                  onClick={(e) => {
+                    if (!canCreateShareLink || isCreatingShareLink) {
+                      e.preventDefault();
+                    } else {
+                      onCreateShareLink();
+                    }
+                  }}
+                  aria-disabled={!canCreateShareLink || isCreatingShareLink}
+                  style={(!canCreateShareLink || isCreatingShareLink) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   aria-busy={isCreatingShareLink}
                 >
                   {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
@@ -202,7 +209,9 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
