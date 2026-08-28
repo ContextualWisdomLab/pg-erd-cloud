@@ -21,6 +21,7 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadGraphql: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -54,6 +55,7 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadGraphql,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -118,6 +120,14 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
       ariaLabel: 'Prisma Schema 내보내기',
+    },
+    {
+      label: 'GraphQL Schema',
+      description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadGraphql,
+      ariaLabel: 'GraphQL Schema 내보내기',
     },
     {
       label: 'Data Dictionary CSV',
