@@ -733,3 +733,44 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+async def test_oidc_rejects_crit_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+
+    # Test with string crit
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": "invalid"}
+    )
+
+    async def fail_jwks() -> dict:
+        raise AssertionError("JWKS must not load for unsupported token headers")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("some_token")
+    assert excinfo.value.status_code == 401
+    assert "invalid token" in excinfo.value.detail.lower()
+
+    # Test with valid list but unsupported items
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["exp"]}
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("some_token")
+    assert excinfo.value.status_code == 401
+    assert "invalid token" in excinfo.value.detail.lower()
+
+    # Test with too large crit array
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["ext"] * 11}
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("some_token")
+    assert excinfo.value.status_code == 401
+    assert "invalid token" in excinfo.value.detail.lower()
