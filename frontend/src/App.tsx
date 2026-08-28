@@ -491,8 +491,7 @@ export default function App() {
     setIsLayouting(true);
     setLayoutMessage("");
 
-    // Capture current positions for a one-step undo.
-    setUndoPositions(snapshotNodePositions(nodes));
+    const previousPositions = snapshotNodePositions(nodes);
 
     try {
       // Yield to the browser so the UI can reflect the loading state.
@@ -501,6 +500,7 @@ export default function App() {
       );
 
       const next = computeDagreLayout(nodes, edges);
+      setUndoPositions(previousPositions);
       setNodes(next);
 
       requestAnimationFrame(() => {
