@@ -630,6 +630,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
     await waitFor(() => expect(screen.getByText('정렬에 실패했습니다. 다시 시도해 주세요.', { exact: false })).toBeInTheDocument())
     expect(consoleError).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '정렬 되돌리기' })).toBeDisabled()
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
     fireEvent.click(screen.getByRole('button', { name: 'ERD 자동 정렬' }))
