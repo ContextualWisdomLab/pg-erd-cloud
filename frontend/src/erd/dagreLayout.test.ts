@@ -159,7 +159,7 @@ describe('computeDagreLayout', () => {
     expect(Number.isFinite(bareResult!.position.x)).toBe(true)
   })
 
-  it('keeps nodes whose layout geometry is missing or invalid', () => {
+  it('rejects missing or invalid layout geometry so callers can report failure', () => {
     const nodes = [node('bad-size', 1, 2), node('missing-center', 3, 4), node('overflow', 5, 6)]
     vi.spyOn(dagre, 'layout').mockImplementationOnce((graph) => {
       Object.assign(graph.node('bad-size'), { width: 0, x: 10, y: 10 })
@@ -173,10 +173,10 @@ describe('computeDagreLayout', () => {
       return graph
     })
 
-    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+    expect(() => computeDagreLayout(nodes, [])).toThrow('Dagre layout failed')
   })
 
-  it('preserves every prior coordinate when any node geometry is invalid', () => {
+  it('rejects the entire layout when any node geometry is invalid', () => {
     const nodes = [node('valid', 12, 34), node('invalid', 56, 78)]
     vi.spyOn(dagre, 'layout').mockImplementationOnce((graph) => {
       Object.assign(graph.node('valid'), {
@@ -194,10 +194,10 @@ describe('computeDagreLayout', () => {
       return graph
     })
 
-    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+    expect(() => computeDagreLayout(nodes, [])).toThrow('Dagre layout failed')
   })
 
-  it('preserves every prior coordinate when top-left conversion overflows', () => {
+  it('rejects top-left conversion overflow', () => {
     const nodes = [node('valid', 12, 34), node('overflow', 56, 78)]
     vi.spyOn(dagre, 'layout').mockImplementationOnce((graph) => {
       Object.assign(graph.node('valid'), {
@@ -215,15 +215,15 @@ describe('computeDagreLayout', () => {
       return graph
     })
 
-    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+    expect(() => computeDagreLayout(nodes, [])).toThrow('Dagre layout failed')
   })
 
-  it('preserves prior coordinates when the layout engine throws', () => {
+  it('surfaces layout-engine failures to the caller', () => {
     const nodes = [node('first', 12, 34), node('second', 56, 78)]
     vi.spyOn(dagre, 'layout').mockImplementationOnce(() => {
       throw new Error('layout failed')
     })
 
-    expect(computeDagreLayout(nodes, [])).toEqual(nodes)
+    expect(() => computeDagreLayout(nodes, [])).toThrow('Dagre layout failed')
   })
 })
