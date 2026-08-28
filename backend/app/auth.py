@@ -189,7 +189,7 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if crit is not None:
         if not isinstance(crit, list) or not all(isinstance(c, str) for c in crit):
             raise HTTPException(status_code=401, detail="invalid token")
-        # We don't support any critical extensions.
+        # We don\'t support any critical extensions.
         raise HTTPException(status_code=401, detail="invalid token")
 
     header_alg_raw = header.get("alg")
