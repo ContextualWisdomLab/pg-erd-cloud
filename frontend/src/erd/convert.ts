@@ -157,5 +157,11 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     type: 'smoothstep'
   }))
 
-  return { nodes: computeDagreLayout(nodes, edges), edges }
+  try {
+    return { nodes: computeDagreLayout(nodes, edges), edges }
+  } catch {
+    // Imported snapshots remain usable even if the optional layout engine cannot
+    // produce finite geometry; the deterministic grid above is the fallback.
+    return { nodes, edges }
+  }
 }
