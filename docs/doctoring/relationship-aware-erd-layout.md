@@ -19,22 +19,26 @@ The pure `computeDagreLayout` helper:
 - ignores edges whose source or target node is absent;
 - inserts nodes and edges in a stable order for repeatable output;
 - returns new node objects without mutating either input collection; and
-- preserves the prior coordinate of every node if Dagre throws or returns
-  missing or non-finite geometry.
+- throws a bounded layout error if Dagre throws or returns missing/non-finite
+  geometry so interactive callers cannot report false success.
 
 The toolbar captures positions before the layout and keeps exactly one undo
-snapshot. Nodes added after layout are not removed by undo. Dagre failures do
-not move nodes; handler-level failures continue to use the existing polite live
-region.
+snapshot. Nodes added after layout are not removed by undo. A Dagre failure is
+caught before `setNodes`, so the current diagram remains unchanged and the
+existing polite live region tells the customer that layout failed and to retry.
+Snapshot import has a separate fail-safe boundary: if layout fails there, the
+deterministic fixed grid created during conversion is retained so the imported
+schema remains usable rather than failing to render.
 
 ## Verification contract
 
 Focused unit coverage includes empty and single-direction graphs, LR and TB,
 cycles, disconnected components, dangling endpoints, measured rectangles,
-determinism, non-overlap, input immutability, and engine failure. Application
-coverage proves the toolbar changes coordinates and restores the exact prior
-coordinates in one undo. Snapshot conversion verifies that the same
-relationship-aware contract supplies initial positions.
+determinism, non-overlap, input immutability, invalid geometry, top-left
+overflow, and engine failure. Application coverage proves the toolbar changes
+coordinates, reports handler failures through its live region, and restores the
+exact prior coordinates in one undo. Snapshot conversion additionally covers
+the deterministic-grid fallback when Dagre fails.
 
 ## Limitations
 
