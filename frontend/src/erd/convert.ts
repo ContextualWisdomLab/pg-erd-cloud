@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react'
 
 import type { BusinessGroup } from './businessGroups'
 import type { IndexRecommendation } from './cardinality'
+import { computeDagreLayout } from './dagreLayout'
 import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils'
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from './layoutConstants'
 import type { SnapshotJson } from '../types'
@@ -156,5 +157,11 @@ export function snapshotToGraph(snapshot: SnapshotJson): { nodes: Array<Node<Tab
     type: 'smoothstep'
   }))
 
-  return { nodes, edges }
+  try {
+    return { nodes: computeDagreLayout(nodes, edges), edges }
+  } catch {
+    // Imported snapshots remain usable even if the optional layout engine cannot
+    // produce finite geometry; the deterministic grid above is the fallback.
+    return { nodes, edges }
+  }
 }

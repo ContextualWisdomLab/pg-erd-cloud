@@ -62,7 +62,7 @@ import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
 import { exportDbml } from "./erd/dbml";
 import { exportPrisma } from "./erd/prisma";
-import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
+import { computeDagreLayout } from "./erd/dagreLayout";
 import { findSearchMatchedNodeIds } from "./erd/search";
 import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
 
@@ -485,32 +485,13 @@ export default function App() {
     });
   }
 
-  function computeSortedGridLayout(
-    currentNodes: Array<Node<TableNodeData>>,
-  ): Array<Node<TableNodeData>> {
-    const sorted = [...currentNodes].sort((a, b) => {
-      const aTitle = a.data?.title ?? a.id;
-      const bTitle = b.data?.title ?? b.id;
-      return aTitle.localeCompare(bTitle, "en");
-    });
-
-    return sorted.map((n, i) => ({
-      ...n,
-      position: {
-        x: (i % GRID_COLUMNS) * GRID_X_GAP,
-        y: Math.floor(i / GRID_COLUMNS) * GRID_Y_GAP,
-      },
-    }));
-  }
-
   async function onAutoLayout() {
     /* v8 ignore next -- the toolbar disables this handler for both guard states */
     if (nodes.length === 0 || isLayouting) return;
     setIsLayouting(true);
     setLayoutMessage("");
 
-    // Capture current positions for a one-step undo.
-    setUndoPositions(snapshotNodePositions(nodes));
+    const previousPositions = snapshotNodePositions(nodes);
 
     try {
       // Yield to the browser so the UI can reflect the loading state.
@@ -518,7 +499,8 @@ export default function App() {
         requestAnimationFrame(() => resolve()),
       );
 
-      const next = computeSortedGridLayout(nodes);
+      const next = computeDagreLayout(nodes, edges);
+      setUndoPositions(previousPositions);
       setNodes(next);
 
       requestAnimationFrame(() => {
