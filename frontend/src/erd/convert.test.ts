@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import dagre from '@dagrejs/dagre'
+import { describe, it, expect, vi } from 'vitest'
 import { snapshotToGraph } from './convert'
 
 type SnapshotInput = Parameters<typeof snapshotToGraph>[0]
@@ -218,5 +219,26 @@ describe('snapshotToGraph', () => {
 
     // Edges are still created based on the constraint even if badges aren't updated
     expect(graph.edges).toHaveLength(1)
+  })
+
+  it('falls back to the deterministic import grid when Dagre fails', () => {
+    const snapshot: SnapshotInput = {
+      relations: [
+        { relation_oid: 1, relation_kind: 'r', schema_name: 'public', relation_name: 'users' },
+        { relation_oid: 2, relation_kind: 'r', schema_name: 'public', relation_name: 'orders' }
+      ],
+      columns: [],
+      constraints: []
+    }
+    vi.spyOn(dagre, 'layout').mockImplementationOnce(() => {
+      throw new Error('layout unavailable')
+    })
+
+    const graph = snapshotToGraph(snapshot)
+
+    expect(graph.nodes.map((node) => node.position)).toEqual([
+      { x: 0, y: 0 },
+      { x: 320, y: 0 },
+    ])
   })
 })
