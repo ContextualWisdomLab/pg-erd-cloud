@@ -1,12 +1,15 @@
-💡 What:
-Changes the '접근 관리' (Access Management) button in the ExportModal to use `aria-disabled="true"` instead of the native HTML `disabled` attribute, and manually prevents default click actions. Also updates the relevant tests.
+💡 What
+- ExportModal에 DBML 다운로드 버튼 추가
+- 메인 화면에 있던 독립된 DBML 다운로드 버튼을 제거하고, ExportModal 안으로 통합하였습니다.
+- 관련된 통합테스트 및 유닛 테스트 업데이트 (`App.coverage.test.tsx`, `ExportModal.test.tsx`)
 
-🎯 Why:
-The native HTML `disabled` attribute removes interactive elements from the browser's tab order. Because this button provides critical access-control guidance via an `aria-describedby` hint, screen reader and keyboard users were previously unable to focus on it to discover why it was disabled or read the context.
+🎯 Why
+- 기존에 분리되어 있던 DBML 내보내기 버튼을 모달 안으로 통합하여 사용자 인터페이스의 일관성을 높였습니다.
+- SVG, PlantUML 등 다른 파일 형식과 동일한 경험을 제공합니다.
 
-📸 Before/After:
-No visual changes. (Maintained visual styling of `opacity: 0.6` and `cursor: not-allowed`).
+📸 Before/After
+- Before: 메인 도구 모음에 `DBML 내보내기` 버튼이 존재
+- After: `공유 및 내보내기` 모달 안 `산출물` 목록에 DBML 항목으로 이동됨
 
-♿ Accessibility:
-- Keeps the disabled control in the tab order.
-- Allows screen readers to announce the disabled state AND the `aria-describedby` helper text ("접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.").
+♿ Accessibility
+- 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
