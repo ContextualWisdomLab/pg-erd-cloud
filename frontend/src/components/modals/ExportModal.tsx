@@ -21,6 +21,7 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadGraphql: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -54,6 +55,7 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadGraphql,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -118,6 +120,14 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
       ariaLabel: 'Prisma Schema 내보내기',
+    },
+    {
+      label: 'GraphQL Schema',
+      description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadGraphql,
+      ariaLabel: 'GraphQL Schema 내보내기',
     },
     {
       label: 'Data Dictionary CSV',
@@ -193,8 +203,15 @@ export function ExportModal({
                 <button
                   type="button"
                   className="exportModal__primaryAction"
-                  onClick={onCreateShareLink}
-                  disabled={!canCreateShareLink || isCreatingShareLink}
+                  onClick={(e) => {
+                    if (!canCreateShareLink || isCreatingShareLink) {
+                      e.preventDefault();
+                    } else {
+                      onCreateShareLink();
+                    }
+                  }}
+                  aria-disabled={!canCreateShareLink || isCreatingShareLink}
+                  style={(!canCreateShareLink || isCreatingShareLink) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   aria-busy={isCreatingShareLink}
                 >
                   {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
@@ -202,7 +219,9 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
