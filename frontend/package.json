@@ -14,7 +14,8 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
-    "e2e": "echo 'No e2e framework configured'"
+    "e2e": "echo 'No e2e framework configured'",
+    "benchmark:handle-utils": "node --expose-gc scripts/handleUtils.benchmark.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.3",
