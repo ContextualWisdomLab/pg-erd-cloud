@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs'
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ExportModal } from './ExportModal'
-import {
+import exportModalMeta, {
   creatingShareLinkStoryArgs,
   errorExportStoryArgs,
   exportModalStoryArgs,
@@ -13,6 +14,28 @@ import {
 afterEach(cleanup)
 
 describe('ExportModal Storybook state contract', () => {
+  it('indexes only UpperCamelCase Storybook exports', () => {
+    const includeStories = exportModalMeta.includeStories
+    expect(includeStories).toBeInstanceOf(RegExp)
+    if (!(includeStories instanceof RegExp)) {
+      throw new Error('includeStories must be a RegExp')
+    }
+    expect(includeStories.test('PrerequisitesMissing')).toBe(true)
+    expect(includeStories.test('exportModalStoryArgs')).toBe(false)
+  })
+
+  it('keeps aria-disabled primary actions visually unavailable on hover', () => {
+    const css = readFileSync(new URL('../../accessibility.css', import.meta.url), 'utf8')
+    const selector = '.exportModal .exportModal__primaryAction[aria-disabled="true"]:hover'
+    const start = css.indexOf(selector)
+    expect(start).toBeGreaterThanOrEqual(0)
+    const end = css.indexOf('}', start)
+    expect(end).toBeGreaterThan(start)
+    const block = css.slice(start, end)
+    expect(block).toContain('background-color: var(--color-surface-muted)')
+    expect(block).toContain('color: var(--color-disabled)')
+  })
+
   it('keeps unavailable actions focusable and explains the next action', () => {
     render(<ExportModal {...exportModalStoryArgs} />)
 
