@@ -1,5 +1,0 @@
-🚨 Severity: MEDIUM
-💡 Vulnerability: User-provided string fields (such as `name` in DiagramViewCreateIn, `schema_name` and `relation_name` in TableAnnotationUpsertIn, and `key_name` in ApiKeyCreateIn) lacked strict validation against control characters.
-🎯 Impact: This could potentially lead to Log Injection (CRLF injection), Null Byte Injection, or terminal escape injection if these strings are subsequently logged or rendered directly.
-🔧 Fix: Add explicit regex validation `pattern=r"^[^\x00-\x1F\x7F]+$"` on Pydantic string fields to strictly reject control characters.
-✅ Verification: Ran the full backend test suite (`uv run pytest`) and verified no regressions for standard, benign usage.
