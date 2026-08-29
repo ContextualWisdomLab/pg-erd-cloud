@@ -73,7 +73,7 @@ describe('App edit functionality', () => {
     await user.click(await screen.findByRole('button', { name: '다이어그램' }));
     await screen.findByText('ERD_billing_1');
 
-    await user.type(screen.getByLabelText('다이어그램 검색'), 'hr');
+    await user.type(screen.getByRole('searchbox', { name: '다이어그램 검색' }), 'hr');
 
     expect(screen.queryByText('ERD_billing_1')).not.toBeInTheDocument();
     expect(screen.getByText('ERD_hr_2')).toBeInTheDocument();
