@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -112,17 +112,6 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     if not isinstance(jwks_uri, str):
         raise RuntimeError("OIDC jwks_uri missing")
 
-    now = dt.datetime.now(dt.timezone.utc)
-
-    if _oidc_jwks is not None:
-        if not force_refresh and now < _oidc_jwks_expires_at:
-            return cast(dict, _oidc_jwks)
-        if (
-            force_refresh
-            and now < _last_jwks_refresh_at + OIDC_JWKS_MIN_REFRESH_INTERVAL
-        ):
-            return cast(dict, _oidc_jwks)
-
     async with _jwks_lock:
         now = dt.datetime.now(dt.timezone.utc)
         if _oidc_jwks is not None:
@@ -218,11 +207,11 @@ async def is_token_jti_revoked(jwt_id: str) -> bool:
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
-        stmt = select(RevokedToken).where(
+        stmt = select(RevokedToken.jwt_id).where(
             RevokedToken.jwt_id == jwt_id, RevokedToken.expires_at > current
-        )
+        ).limit(1)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return result.scalar() is not None
 
 
 def _bearer_token_from_request(request: Request) -> str:
@@ -239,8 +228,34 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
 
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
-    except Exception:  # noqa: BLE001
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="invalid token header")
+
+    if "crit" in header:
+        crit = header["crit"]
+        if not isinstance(crit, list):
+            raise HTTPException(
+                status_code=401, detail="critical header must be a list"
+            )
+        if not crit:
+            raise HTTPException(
+                status_code=401, detail="critical header must not be empty"
+            )
+        if len(crit) > 10:
+            raise HTTPException(status_code=401, detail="too many critical headers")
+
+        for crit_header in crit:
+            if not isinstance(crit_header, str):
+                raise HTTPException(
+                    status_code=401, detail="critical header must be a string"
+                )
+            if len(crit_header) > 50:
+                raise HTTPException(
+                    status_code=401, detail="critical header name too long"
+                )
+
+        # This verifier implements no JWS extension Header Parameters.
+        raise HTTPException(status_code=401, detail="critical header not understood")
 
     header_alg = _validate_jwt_header(header)
     if header_alg not in OIDC_ALLOWED_ALGORITHMS:
@@ -256,6 +271,10 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         jwk = _pick_jwk(jwks, header.get("kid"))
     if jwk is None:
         raise HTTPException(status_code=401, detail="unknown signing key")
+
+    jwk_algorithm = jwk.get("alg", header_alg)
+    if not isinstance(jwk_algorithm, str) or jwk_algorithm != header_alg:
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     kty = jwk.get("kty")
     if not isinstance(kty, str):
@@ -273,20 +292,20 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         claims = jwt.decode(
             token,
-            jwk,
+            jwt.PyJWK(jwk).key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
+            leeway=OIDC_JWT_LEEWAY_SECONDS,
             options={
                 "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
+                "verify_iss": True,
+                "verify_exp": True,
+                "verify_jti": True,
+                "require": ["exp", "iss", "jti"] + (["aud"] if bool(settings.oidc_audience) else []),
             },
         )
-    except Exception as err:
+    except jwt.PyJWTError as err:
         raise HTTPException(
             status_code=401, detail="token verification failed"
         ) from err
