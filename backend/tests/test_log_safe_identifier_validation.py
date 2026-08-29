@@ -22,6 +22,8 @@ _LOG_BREAKING_CHARACTERS = (
     + tuple(chr(code_point) for code_point in range(0x7F, 0xA0))
     + ("\u2028", "\u2029")
 )
+_LOG_SAFE_SCHEMA_PATTERN = r"^[^\x00-\x1F\x7F-\x9F\u2028\u2029]+$"
+_MEMBER_SUBJECT_SCHEMA_PATTERN = r"^[^\s\x00-\x1F\x7F-\x9F\u2028\u2029]+$"
 
 
 def _place_character(character: str, position: str) -> str:
@@ -115,3 +117,26 @@ def test_member_subject_still_rejects_visible_whitespace() -> None:
             member_subject="dev:bad user",
             project_role="viewer",
         )
+
+
+@pytest.mark.parametrize(
+    ("model_type", "field_name", "expected_pattern"),
+    (
+        (ProjectCreateIn, "project_name", _LOG_SAFE_SCHEMA_PATTERN),
+        (ProjectMemberAddIn, "member_subject", _MEMBER_SUBJECT_SCHEMA_PATTERN),
+        (ConnectionCreateIn, "conn_name", _LOG_SAFE_SCHEMA_PATTERN),
+        (DiagramViewCreateIn, "name", _LOG_SAFE_SCHEMA_PATTERN),
+        (TableAnnotationUpsertIn, "schema_name", _LOG_SAFE_SCHEMA_PATTERN),
+        (TableAnnotationUpsertIn, "relation_name", _LOG_SAFE_SCHEMA_PATTERN),
+        (ApiKeyCreateIn, "key_name", _LOG_SAFE_SCHEMA_PATTERN),
+    ),
+)
+def test_identifier_json_schema_exposes_log_safety_contract(
+    model_type: type[BaseModel],
+    field_name: str,
+    expected_pattern: str,
+) -> None:
+    """Expose the runtime log-safety contract to OpenAPI/JSON Schema clients."""
+
+    property_schema = model_type.model_json_schema()["properties"][field_name]
+    assert property_schema["pattern"] == expected_pattern
