@@ -1,16 +1,23 @@
+/** Encode a column name as the stable Unicode-code-point handle fragment. */
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  if (columnName.length === 0) return 'c-empty'
 
-  return `c-${encoded || 'empty'}`
+  let encoded = ''
+  let separator = ''
+  for (const character of columnName) {
+    encoded += `${separator}${character.codePointAt(0)!.toString(16).padStart(4, '0')}`
+    separator = '-'
+  }
+
+  return `c-${encoded}`
 }
 
+/** Build the stable source-side React Flow handle identifier for a column. */
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
+/** Build the stable target-side React Flow handle identifier for a column. */
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
