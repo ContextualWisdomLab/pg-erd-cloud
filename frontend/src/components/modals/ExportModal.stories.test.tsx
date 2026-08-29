@@ -1,7 +1,7 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { ExportModal } from './ExportModal'
 import {
   creatingShareLinkStoryArgs,
@@ -9,6 +9,8 @@ import {
   exportModalStoryArgs,
   readyExportStoryArgs,
 } from './ExportModal.stories'
+
+afterEach(cleanup)
 
 describe('ExportModal Storybook state contract', () => {
   it('keeps unavailable actions focusable and explains the next action', () => {
