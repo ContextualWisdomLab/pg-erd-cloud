@@ -49,14 +49,8 @@ export function exportPrisma(
   let output = `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n`;
 
   const nodesById = new Map<string, Node<TableNodeData>>();
-  const pkColumnsByNodeId = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
-    const pks = new Set<string>();
-    for (const c of n.data.columns) {
-      if (c.is_pk) pks.add(c.column_name);
-    }
-    pkColumnsByNodeId.set(n.id, pks);
   }
 
   // To build relations, we need to know which fields are foreign keys.
@@ -90,7 +84,7 @@ export function exportPrisma(
     }
 
     if (sourceField) {
-      const isUnique = pkColumnsByNodeId.get(sourceNode.id)?.has(sourceField) || false;
+      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
