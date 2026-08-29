@@ -69,6 +69,7 @@ export function ExportModal({
     : isShareLinkCopied
       ? '링크가 복사되었습니다. 접근 권한이 있는 팀원이 최신 스냅샷을 열 수 있습니다.'
       : '선택한 다이어그램을 공유하거나 산출물로 내보낼 준비가 되었습니다.';
+  const isShareLinkUnavailable = !canCreateShareLink && !isCreatingShareLink;
 
   const artifacts: ExportArtifact[] = [
     {
@@ -190,19 +191,35 @@ export function ExportModal({
                   {isShareLinkCopied ? '복사 완료' : '링크 복사'}
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="exportModal__primaryAction"
-                  onClick={onCreateShareLink}
-                  disabled={!canCreateShareLink || isCreatingShareLink}
-                  aria-busy={isCreatingShareLink}
-                >
-                  {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="exportModal__primaryAction"
+                    onClick={(e) => {
+                      if (!canCreateShareLink) {
+                        e.preventDefault();
+                      } else {
+                        onCreateShareLink();
+                      }
+                    }}
+                    disabled={isCreatingShareLink}
+                    aria-disabled={isShareLinkUnavailable ? true : undefined}
+                    aria-describedby={isShareLinkUnavailable ? 'share-link-create-hint' : undefined}
+                    aria-busy={isCreatingShareLink}
+                  >
+                    {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
+                  </button>
+                  {isShareLinkUnavailable ? (
+                    <p id="share-link-create-hint" className="exportModal__hint">
+                      먼저 프로젝트를 선택하세요.
+                    </p>
+                  ) : null}
+                </>
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
@@ -226,12 +243,21 @@ export function ExportModal({
                 <div className="exportModal__artifactRow" key={artifact.label}>
                   <div>
                     <strong>{artifact.label}</strong>
-                    <span>{artifact.description}</span>
+                    <span id={`export-desc-${artifact.label.replace(/\s+/g, '-')}`}>
+                      {artifact.description}
+                    </span>
                   </div>
                   <button
                     type="button"
-                    onClick={artifact.onExport}
-                    disabled={artifact.disabled}
+                    onClick={(e) => {
+                      if (artifact.disabled) {
+                        e.preventDefault();
+                      } else {
+                        artifact.onExport();
+                      }
+                    }}
+                    aria-disabled={artifact.disabled ? true : undefined}
+                    aria-describedby={artifact.disabled ? `export-desc-${artifact.label.replace(/\s+/g, '-')}` : undefined}
                     aria-label={artifact.ariaLabel}
                     aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
                   >
