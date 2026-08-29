@@ -594,7 +594,7 @@ cryptography==50.0.0 \
     # via
     #   pg-erd-cloud-backend (backend/pyproject.toml)
     #   python-jose
-ecdsa==0.19.2 \
+ecdsa==0.19.0 \
     --hash=sha256:62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930 \
     --hash=sha256:840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399
     # via python-jose

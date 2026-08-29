@@ -192,6 +192,7 @@ class DiagramViewCreateIn(BaseModel):
 
     name: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00-\x1F\x7F]+$")
     # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
+    # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -217,7 +218,9 @@ class TableAnnotationUpsertIn(BaseModel):
 
     schema_name: str = Field(min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$")
     # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
+    # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
     relation_name: str = Field(min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$")
+    # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
     # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
     body: str = Field(min_length=1, max_length=10_000)
 
@@ -306,6 +309,7 @@ class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
     key_name: str = Field(min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F]+$")
+    # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
     # SECURITY: Prevent control character injection (e.g. CRLF, Null Byte)
 
 
