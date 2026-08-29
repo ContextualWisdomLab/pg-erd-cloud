@@ -1,6 +1,8 @@
 # CHANGELOG
 
 ## [Unreleased]
+### Performance
+- **Prisma 내보내기 최적화**: Prisma 스키마 변환 시 중첩 루프에 의해 발생하던 O(N*C*E) 연산 병목을 O(1) 해시 맵 조회를 활용해 O(N*C + E)로 성능 개선.
 ### Added
 - **테이블 및 컬럼 편집 기능**: UI 패널을 통해 노드를 선택하고, 테이블의 이름/코멘트를 수정하며, 컬럼을 추가/수정/삭제하거나 테이블을 삭제할 수 있는 기능 추가.
 - **테스트 추가**: 프론트엔드 테스트 커버리지 100% 목표 달성을 위해 `cardinality.ts`, `types.ts`, `export.ts` 의 미달성 분기 및 함수 테스트 추가 (`cardinality_extra.test.ts` 등).
