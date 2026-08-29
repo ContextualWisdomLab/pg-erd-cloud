@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
@@ -25,7 +26,7 @@ describe('ExportModal Storybook state contract', () => {
   })
 
   it('keeps aria-disabled primary actions visually unavailable on hover', () => {
-    const css = readFileSync(new URL('../../accessibility.css', import.meta.url), 'utf8')
+    const css = readFileSync(resolve(process.cwd(), 'src/accessibility.css'), 'utf8')
     const selector = '.exportModal .exportModal__primaryAction[aria-disabled="true"]:hover'
     const start = css.indexOf(selector)
     expect(start).toBeGreaterThanOrEqual(0)
