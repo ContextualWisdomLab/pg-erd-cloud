@@ -184,4 +184,27 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
   });
+
+  it('calls onDeleteTable when 테이블 삭제 is clicked and confirmed', async () => {
+    const onDeleteTableMock = vi.fn();
+    const editingNode = {
+      id: 'table-1',
+      type: 'table',
+      position: { x: 0, y: 0 },
+      data: { title: 'test_table', comment: '', columns: [] }
+    };
+
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true).mockReturnValueOnce(false);
+
+    render(<EditTableModal {...defaultProps} editingNode={editingNode as any} onDeleteTable={onDeleteTableMock} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: '테이블 삭제' }));
+    expect(window.confirm).toHaveBeenCalledWith("'test_table' 테이블을 삭제하시겠습니까?");
+    expect(onDeleteTableMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: '테이블 삭제' }));
+    expect(window.confirm).toHaveBeenCalledTimes(2);
+    expect(onDeleteTableMock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -56,3 +56,6 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-06-25 - [Add Confirmation to Table Deletion]
+**Learning:** Destructive actions such as deleting a table need user confirmation to prevent accidental data loss. Using `window.confirm` provides a simple, native way to add this safeguard without requiring complex custom modal logic, significantly improving the safety of the UI.
+**Action:** Always wrap destructive action handlers with `window.confirm` dialogues (e.g., `'${itemName}' 테이블을 삭제하시겠습니까?`) to ensure users explicitly verify their intent before the action is executed.
