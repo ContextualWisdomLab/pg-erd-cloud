@@ -76,3 +76,7 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+      - name: Build Storybook
+        working-directory: frontend
+        run: npm run storybook:build
