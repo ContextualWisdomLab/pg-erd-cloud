@@ -4,24 +4,13 @@ import datetime as dt
 import uuid
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 
-def _validate_log_safe_text(value: str) -> str:
-    """Reject characters that can create a new logical log line."""
-
-    for character in value:
-        code_point = ord(character)
-        if (
-            code_point < 0x20
-            or 0x7F <= code_point <= 0x9F
-            or character in {"\u2028", "\u2029"}
-        ):
-            raise ValueError("must not contain log-breaking control characters")
-    return value
-
-
-_LogSafeText = Annotated[str, AfterValidator(_validate_log_safe_text)]
+_LOG_SAFE_PATTERN = r"^[^\x00-\x1F\x7F-\x9F\u2028\u2029]+$"
+_MEMBER_SUBJECT_PATTERN = r"^[^\s\x00-\x1F\x7F-\x9F\u2028\u2029]+$"
+_LogSafeText = Annotated[str, StringConstraints(pattern=_LOG_SAFE_PATTERN)]
+_LogSafeSubject = Annotated[str, StringConstraints(pattern=_MEMBER_SUBJECT_PATTERN)]
 
 
 class ProjectCreateIn(BaseModel):
@@ -43,10 +32,9 @@ class ProjectOut(BaseModel):
 class ProjectMemberAddIn(BaseModel):
     """Request body for inviting/adding a project member."""
 
-    member_subject: _LogSafeText = Field(
+    member_subject: _LogSafeSubject = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^\S+$",
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
