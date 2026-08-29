@@ -51,6 +51,7 @@ export const errorExportStoryArgs = {
 const meta = {
   title: 'Product/Share and Export/Export Modal',
   component: ExportModal,
+  includeStories: /^[A-Z]/,
   parameters: {
     layout: 'fullscreen',
   },

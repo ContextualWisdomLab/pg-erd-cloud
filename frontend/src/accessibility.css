@@ -4,3 +4,8 @@
   background-color: var(--color-surface-muted);
   color: var(--color-disabled);
 }
+
+.exportModal .exportModal__primaryAction[aria-disabled="true"]:hover {
+  background-color: var(--color-surface-muted);
+  color: var(--color-disabled);
+}
