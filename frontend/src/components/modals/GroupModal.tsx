@@ -35,7 +35,10 @@ export function GroupModal({
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
   const groupNameInputRef = React.useRef<HTMLInputElement>(null);
-  const hasWhitespaceOnlyName = newGroupName.length > 0 && !newGroupName.trim();
+  const hasMissingGroupName = !newGroupName.trim();
+  const groupNameGuidance = newGroupName.length === 0
+    ? "그룹 이름을 입력하세요."
+    : "공백이 아닌 그룹 이름을 입력하세요.";
 
   if (!isOpen) return null;
 
@@ -83,18 +86,23 @@ export function GroupModal({
               id="business-group-name"
               ref={groupNameInputRef}
               value={newGroupName}
+              onInvalid={(event) => {
+                if (!event.currentTarget.value.trim()) {
+                  event.currentTarget.setCustomValidity("그룹 이름을 입력하세요.");
+                }
+              }}
               onChange={(event) => {
                 event.currentTarget.setCustomValidity("");
                 setNewGroupName(event.target.value);
               }}
               placeholder="Billing"
               required
-              aria-invalid={hasWhitespaceOnlyName || undefined}
-              aria-describedby={hasWhitespaceOnlyName ? "business-group-name-error" : undefined}
+              aria-invalid={hasMissingGroupName || undefined}
+              aria-describedby={hasMissingGroupName ? "business-group-name-error" : undefined}
             />
-            {hasWhitespaceOnlyName ? (
+            {hasMissingGroupName ? (
               <div id="business-group-name-error" className="field-hint" role="status">
-                공백이 아닌 그룹 이름을 입력하세요.
+                {groupNameGuidance}
               </div>
             ) : null}
           </div>

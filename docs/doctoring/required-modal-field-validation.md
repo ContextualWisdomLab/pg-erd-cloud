@@ -8,7 +8,8 @@ Several modal forms displayed a visual required marker while the executable cons
 
 - Native `required` remains the semantic baseline for every mandatory text input in this slice.
 - Relationship labels and business-group names additionally reject whitespace-only values before the mutation callback runs.
-- The browser validation message tells the customer exactly what to enter next: `제약조건 이름을 입력하세요.` or `그룹 이름을 입력하세요.`.
+- Empty relationship and group names receive the same actionable Korean guidance through the input's native invalid event; whitespace-only values receive equivalent guidance through the explicit trim guard.
+- The business-group form also renders linked guidance while its Add action is disabled, so the customer can see the next action without needing to trigger an unavailable submit control.
 - Changing either value clears the stale custom validity message immediately.
 - The visual `*` is centralized in `RequiredIndicator`, uses the existing `--color-danger` token, and is `aria-hidden="true"` because the input itself carries the required semantics.
 - No API, database, persistence, authorization, or deployment contract changes.
@@ -21,7 +22,7 @@ This PR reuses that shared token contract rather than adding a local color. It d
 
 ## Verification
 
-Focused tests pin semantic `required` state for add-table, relationship, group, table-title, column-name, and column-type inputs; whitespace-only mutation blocking; actionable validation text; clearing stale custom validity; and the decorative marker's exclusion from the accessibility tree. Existing modal coverage continues to exercise valid submit/cancel/delete flows.
+Focused tests pin semantic `required` state for add-table, relationship, group, table-title, column-name, and column-type inputs; empty and whitespace-only validation guidance; whitespace-only mutation blocking; linked visible group guidance; clearing stale custom validity; and the decorative marker's exclusion from the accessibility tree. Existing modal coverage continues to exercise valid submit/cancel/delete flows.
 
 ## Standards traceability
 

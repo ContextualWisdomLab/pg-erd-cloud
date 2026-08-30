@@ -83,6 +83,11 @@ export function EditEdgeModal({
             id="rel-label"
             ref={relLabelInputRef}
             value={relLabel}
+            onInvalid={(e) => {
+              if (!e.currentTarget.value.trim()) {
+                e.currentTarget.setCustomValidity("제약조건 이름을 입력하세요.");
+              }
+            }}
             onChange={(e) => {
               e.currentTarget.setCustomValidity("");
               setRelLabel(e.target.value);
