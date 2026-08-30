@@ -10,6 +10,7 @@ interface AddTableModalProps {
   onAddTableSubmit: () => void;
 }
 
+/** Renders the add-table dialog with native required-name semantics. */
 export function AddTableModal({
   isOpen,
   newTableName,

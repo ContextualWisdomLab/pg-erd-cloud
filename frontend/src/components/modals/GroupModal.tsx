@@ -19,6 +19,7 @@ interface GroupModalProps {
   onAssignBusinessGroup: (nodeId: string, groupId: string) => void;
 }
 
+/** Renders business-group management and prevents blank group creation. */
 export function GroupModal({
   isOpen,
   businessGroups,
@@ -34,6 +35,7 @@ export function GroupModal({
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
   const groupNameInputRef = React.useRef<HTMLInputElement>(null);
+  const hasWhitespaceOnlyName = newGroupName.length > 0 && !newGroupName.trim();
 
   if (!isOpen) return null;
 
@@ -87,7 +89,14 @@ export function GroupModal({
               }}
               placeholder="Billing"
               required
+              aria-invalid={hasWhitespaceOnlyName || undefined}
+              aria-describedby={hasWhitespaceOnlyName ? "business-group-name-error" : undefined}
             />
+            {hasWhitespaceOnlyName ? (
+              <div id="business-group-name-error" className="field-hint" role="status">
+                공백이 아닌 그룹 이름을 입력하세요.
+              </div>
+            ) : null}
           </div>
           <div
             className="groupManager__swatches"

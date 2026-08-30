@@ -36,7 +36,7 @@ describe('required modal field validation', () => {
     expect(input).toHaveProperty('validationMessage', '');
   });
 
-  it('keeps the group name required and blocks whitespace-only creation', () => {
+  it('explains and blocks whitespace-only group creation', () => {
     const onCreateBusinessGroup = vi.fn();
     const setNewGroupName = vi.fn();
 
@@ -58,6 +58,8 @@ describe('required modal field validation', () => {
 
     const input = screen.getByLabelText(/그룹 이름/);
     expect(input).toBeRequired();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('공백이 아닌 그룹 이름을 입력하세요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '추가' })).toBeDisabled();
 
     fireEvent.submit(input.closest('form')!);

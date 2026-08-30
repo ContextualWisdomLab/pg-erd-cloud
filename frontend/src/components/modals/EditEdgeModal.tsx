@@ -12,6 +12,7 @@ interface EditEdgeModalProps {
   onRelSubmit: () => void;
 }
 
+/** Renders relationship editing and blocks blank constraint names before mutation. */
 export function EditEdgeModal({
   editingEdge,
   relLabel,

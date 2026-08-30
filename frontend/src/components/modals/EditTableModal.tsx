@@ -14,6 +14,7 @@ interface EditTableModalProps {
   onDeleteTable: () => void;
 }
 
+/** Renders table and column editing with native required-field semantics. */
 export function EditTableModal({
   isOpen,
   editingNode,
