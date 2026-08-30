@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
+import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 import { exportPrisma } from '../prisma';
 
 function relationNodes(): Node<TableNodeData>[] {
@@ -36,8 +37,8 @@ function relationEdge(id: string, label: string): Edge {
     id,
     source: 'orders',
     target: 'customers',
-    sourceHandle: 'src-customer_id',
-    targetHandle: 'tgt-id',
+    sourceHandle: sourceColumnHandleId('customer_id'),
+    targetHandle: targetColumnHandleId('id'),
     label,
   };
 }
