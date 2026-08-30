@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-01-01 - 폼 필수 입력 및 비활성 버튼 툴팁 추가
+**Learning:** 사용자는 저장 버튼이 비활성화되어 있을 때 그 이유를 알지 못하면 혼란을 겪을 수 있습니다. 또한, 모달의 필수 입력 필드는 시각적으로 명확하게 표시되어야 합니다.
+**Action:** 모달의 필수 입력 폼 필드 라벨에 시각적 별표를 추가하고 입력에 `aria-required`를 적용합니다. 또한 비활성화된 제출 버튼에 비활성화된 이유를 설명하는 툴팁(`title`)을 추가합니다.
