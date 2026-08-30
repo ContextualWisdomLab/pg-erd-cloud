@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-08-30 - Fix RTL DOM Bleed Causing Extraneous Rendered Components
+**Learning:** In frontend Vitest tests, if you encounter `TestingLibraryElementError: Found multiple elements` across different test cases within the same file, it indicates that `@testing-library/react` auto-cleanup is not triggering.
+**Action:** Fix this DOM bleed by explicitly importing `cleanup` from `@testing-library/react` and adding `afterEach(cleanup)` to the test suite.
