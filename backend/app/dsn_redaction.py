@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
+from urllib.parse import quote, quote_plus, unquote_plus, urlsplit
 
 _SECRET_KEY_PATTERN = re.compile(
     r"(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|api[_-]?key|"
