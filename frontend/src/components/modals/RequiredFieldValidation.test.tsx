@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 
 import { AddTableModal } from './AddTableModal';
 import { EditEdgeModal } from './EditEdgeModal';
@@ -8,6 +8,7 @@ import { EditTableModal } from './EditTableModal';
 import { GroupModal } from './GroupModal';
 
 describe('required modal field validation', () => {
+  afterEach(cleanup);
   it('provides actionable validation when the relationship label is empty', () => {
     render(
       <EditEdgeModal
