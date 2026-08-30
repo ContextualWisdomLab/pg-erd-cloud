@@ -2,7 +2,9 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { AddTableModal } from './AddTableModal';
 import { EditEdgeModal } from './EditEdgeModal';
+import { EditTableModal } from './EditTableModal';
 import { GroupModal } from './GroupModal';
 
 describe('required modal field validation', () => {
@@ -34,7 +36,7 @@ describe('required modal field validation', () => {
     expect(input).toHaveProperty('validationMessage', '');
   });
 
-  it('keeps group creation reachable and explains a whitespace-only group name', () => {
+  it('keeps the group name required and blocks whitespace-only creation', () => {
     const onCreateBusinessGroup = vi.fn();
     const setNewGroupName = vi.fn();
 
@@ -55,9 +57,8 @@ describe('required modal field validation', () => {
     );
 
     const input = screen.getByLabelText(/그룹 이름/);
-    const submit = screen.getByRole('button', { name: '추가' });
     expect(input).toBeRequired();
-    expect(submit).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: '추가' })).toBeDisabled();
 
     fireEvent.submit(input.closest('form')!);
 
@@ -67,5 +68,51 @@ describe('required modal field validation', () => {
     fireEvent.change(input, { target: { value: 'Billing' } });
     expect(setNewGroupName).toHaveBeenCalledWith('Billing');
     expect(input).toHaveProperty('validationMessage', '');
+  });
+
+  it('keeps the add-table required marker decorative and the input semantic', () => {
+    render(
+      <AddTableModal
+        isOpen
+        newTableName=""
+        setNewTableName={vi.fn()}
+        onAddTableCancel={vi.fn()}
+        onAddTableSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText(/테이블 이름/)).toBeRequired();
+    const indicator = document.querySelector('[data-required-indicator="true"]');
+    expect(indicator).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('marks the table title, column name, and data type as required', () => {
+    render(
+      <EditTableModal
+        isOpen
+        editingNode={{
+          id: 'table-1',
+          type: 'tableNode',
+          position: { x: 0, y: 0 },
+          data: {
+            title: 'public.users',
+            comment: '',
+            columns: [
+              { column_name: 'id', data_type: 'bigint', is_pk: true, is_not_null: true },
+            ],
+            badges: { pk: true, fk: false },
+          },
+        }}
+        setEditingNode={vi.fn()}
+        setNodes={vi.fn()}
+        onEditTableCancel={vi.fn()}
+        onEditTableSubmit={vi.fn()}
+        onDeleteTable={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText(/테이블명 \(schema\.table\)/)).toBeRequired();
+    expect(screen.getByRole('textbox', { name: 'id 컬럼명' })).toBeRequired();
+    expect(screen.getByRole('textbox', { name: 'id 데이터 타입' })).toBeRequired();
   });
 });

@@ -57,6 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2024-08-19 - Add visual required indicators to modal forms
-**Learning:** Adding visual `*` indicators to form fields improves clarity, but directly appending `*` to label text breaks React Testing Library `getByLabelText` tests that use exact string matching. Tests must be updated to use regex matching (e.g. `getByLabelText(/테이블 이름/)`) when modifying labels. Decorative asterisks should always include `aria-hidden="true"` to prevent screen reader clutter, as `required` attributes handle the accessibility.
-**Action:** When adding required text or symbols inside `<label>` elements, preemptively scan and update any corresponding tests to use regex queries.

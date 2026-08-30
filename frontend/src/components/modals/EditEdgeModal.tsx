@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Edge } from "@xyflow/react";
+import { RequiredIndicator } from './RequiredIndicator';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditEdgeModalProps {
@@ -20,6 +21,7 @@ export function EditEdgeModal({
   onRelSubmit,
 }: EditEdgeModalProps) {
   const dialogRef = useDialogAccessibility<HTMLFormElement>(Boolean(editingEdge), onRelCancel);
+  const relLabelInputRef = React.useRef<HTMLInputElement>(null);
 
   if (!editingEdge) return null;
 
@@ -48,6 +50,13 @@ export function EditEdgeModal({
         tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
+          const input = relLabelInputRef.current;
+          if (!relLabel.trim()) {
+            input?.setCustomValidity("제약조건 이름을 입력하세요.");
+            input?.reportValidity();
+            return;
+          }
+          input?.setCustomValidity("");
           onRelSubmit();
         }}
         style={{
@@ -67,14 +76,19 @@ export function EditEdgeModal({
         </div>
         <div className="field">
           <label htmlFor="rel-label">
-            제약조건 이름 (Label) <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
+            제약조건 이름 (Label) <RequiredIndicator />
           </label>
           <input
             id="rel-label"
+            ref={relLabelInputRef}
             value={relLabel}
-            onChange={(e) => setRelLabel(e.target.value)}
+            onChange={(e) => {
+              e.currentTarget.setCustomValidity("");
+              setRelLabel(e.target.value);
+            }}
             placeholder="fk_constraint_name"
             autoFocus
+            required
           />
         </div>
         <div

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
+import { RequiredIndicator } from './RequiredIndicator';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditTableModalProps {
@@ -31,13 +32,13 @@ export function EditTableModal({
       <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
         <div className="modal__header">
           <h3 id="edit-table-title">테이블 편집</h3>
-          <button type="button" aria-label="닫기" onClick={onEditTableCancel} title="닫기">✕</button>
+          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
         </div>
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
             <div className="col">
               <label htmlFor="editTableTitle">
-                테이블명 (schema.table) <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
+                테이블명 (schema.table) <RequiredIndicator />
               </label>
               <input
                 id="editTableTitle"

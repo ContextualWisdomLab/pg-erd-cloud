@@ -2,6 +2,7 @@ import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
 import { BUSINESS_GROUP_COLORS, type BusinessGroup } from "../../erd/businessGroups";
+import { RequiredIndicator } from './RequiredIndicator';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface GroupModalProps {
@@ -32,6 +33,7 @@ export function GroupModal({
   onAssignBusinessGroup,
 }: GroupModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseGroupManager);
+  const groupNameInputRef = React.useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -56,17 +58,35 @@ export function GroupModal({
           </button>
         </div>
 
-        <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
+        <form
+          className="groupManager__create"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const input = groupNameInputRef.current;
+            if (!newGroupName.trim()) {
+              input?.setCustomValidity("그룹 이름을 입력하세요.");
+              input?.reportValidity();
+              return;
+            }
+            input?.setCustomValidity("");
+            onCreateBusinessGroup();
+          }}
+        >
           <div className="field">
             <label htmlFor="business-group-name">
-              그룹 이름 <span style={{ color: "var(--color-danger)" }} aria-hidden="true">*</span>
+              그룹 이름 <RequiredIndicator />
             </label>
             <input
               autoFocus
               id="business-group-name"
+              ref={groupNameInputRef}
               value={newGroupName}
-              onChange={(event) => setNewGroupName(event.target.value)}
+              onChange={(event) => {
+                event.currentTarget.setCustomValidity("");
+                setNewGroupName(event.target.value);
+              }}
               placeholder="Billing"
+              required
             />
           </div>
           <div
