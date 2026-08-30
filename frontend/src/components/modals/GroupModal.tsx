@@ -58,13 +58,15 @@ export function GroupModal({
 
         <form className="groupManager__create" onSubmit={(e) => { e.preventDefault(); if (newGroupName.trim()) { onCreateBusinessGroup(); } }}>
           <div className="field">
-            <label htmlFor="business-group-name">그룹 이름</label>
+            <label htmlFor="business-group-name">그룹 이름<span aria-hidden="true" style={{ color: "#ef4444" }}> *</span></label>
             <input
               autoFocus
               id="business-group-name"
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}
               placeholder="Billing"
+              required
+              aria-required="true"
             />
           </div>
           <div
@@ -87,6 +89,7 @@ export function GroupModal({
           <button
             type="submit"
             disabled={!newGroupName.trim()}
+            title={!newGroupName.trim() ? "그룹 이름을 입력하세요" : "추가"}
           >
             추가
           </button>
