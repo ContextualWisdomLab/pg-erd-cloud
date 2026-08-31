@@ -84,6 +84,23 @@ describe('Prisma relation indexing', () => {
     );
   });
 
+  it('preserves legacy raw source and target handle suffixes', () => {
+    const schema = exportPrisma(relationNodes(), [
+      {
+        id: 'edge-legacy-raw',
+        source: 'orders',
+        target: 'customers',
+        sourceHandle: 'src-customer_id',
+        targetHandle: 'tgt-id',
+        label: 'orders_customer_legacy',
+      },
+    ]);
+
+    expect(schema).toContain(
+      'customers_customer_id customers @relation("orders_customer_legacy", fields: [customer_id], references: [id])',
+    );
+  });
+
   it.each([
     ['encoded column first', ['a', 'c-0061']],
     ['legacy raw column first', ['c-0061', 'a']],
