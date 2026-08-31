@@ -57,6 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2026-08-30 - Diagnose Testing Library duplicate matches before adding cleanup
-**Learning:** `TestingLibraryElementError: Found multiple elements` means a query matched more than one node; it does not by itself prove cross-test DOM bleed or missing auto-cleanup. Duplicate matches can come from prior renders that were not cleaned up, multiple legitimate elements in one render, an over-broad query, or a faulty fixture/component state.
-**Action:** Inspect the rendered DOM and query scope first. If duplicates come from prior renders across tests, ensure Testing Library auto-cleanup is registered or add one explicit `afterEach(cleanup)` at the suite boundary. If duplicates exist within a single render, fix or scope the query (`within`, `getAllBy*`) or correct the fixture/component semantics instead of masking the cause with cleanup.
+## 2026-08-30 - Fix RTL DOM Bleed Causing Extraneous Rendered Components
+**Learning:** In frontend Vitest tests, the guidance now treats "Found multiple elements" as a duplicate-match symptom rather than proof of failed auto-cleanup, requires inspecting the rendered DOM/query scope first, and uses explicit cleanup only when cross-test bleed is actually verified.
+**Action:** Always inspect the rendered DOM and query scope when debugging multiple-elements errors, applying explicit cleanup only as a verified last resort for actual state bleed.
