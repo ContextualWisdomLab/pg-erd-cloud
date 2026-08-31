@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
+import { RequiredIndicator } from './RequiredIndicator';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditTableModalProps {
@@ -13,6 +14,7 @@ interface EditTableModalProps {
   onDeleteTable: () => void;
 }
 
+/** Renders table and column editing with native required-field semantics. */
 export function EditTableModal({
   isOpen,
   editingNode,
@@ -36,12 +38,15 @@ export function EditTableModal({
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
             <div className="col">
-              <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
+              <label htmlFor="editTableTitle">
+                테이블명 (schema.table) <RequiredIndicator />
+              </label>
               <input
                 id="editTableTitle"
                 name="title"
                 defaultValue={editingNode.data.title}
                 placeholder="public.users"
+                required
                 autoFocus
               />
             </div>
@@ -114,7 +119,8 @@ export function EditTableModal({
                       type="text"
                       name={`col_name_${idx}`}
                       defaultValue={col.column_name}
-                      placeholder="컬럼명"
+                      placeholder="컬럼명 (필수)"
+                      required
                       style={{ flex: 2 }}
                       aria-label={`${col.column_name} 컬럼명`}
                     />
@@ -122,7 +128,8 @@ export function EditTableModal({
                       type="text"
                       name={`col_type_${idx}`}
                       defaultValue={col.data_type}
-                      placeholder="데이터 타입"
+                      placeholder="데이터 타입 (필수)"
+                      required
                       style={{ flex: 1.5 }}
                       aria-label={`${col.column_name} 데이터 타입`}
                     />

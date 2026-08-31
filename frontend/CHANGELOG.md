@@ -6,5 +6,8 @@
 - **테스트 추가**: 프론트엔드 테스트 커버리지 100% 목표 달성을 위해 `cardinality.ts`, `types.ts`, `export.ts` 의 미달성 분기 및 함수 테스트 추가 (`cardinality_extra.test.ts` 등).
 - `.gitignore` 파일에 `coverage/` 폴더를 추가하여 불필요한 테스트 아티팩트가 커밋되지 않도록 보완.
 
+### Fixed
+- 필수 모달 필드의 시각적 표시와 실제 `required`/공백 검증을 정합화하고, 유효하지 않은 관계·그룹 이름에는 고객이 다음에 입력할 값을 설명하는 검증 메시지를 제공합니다.
+
 ### Security
 - `postcss` 트랜지티브 의존성을 `overrides`로 `^8.5.18`(8.5.25로 해석)에 고정해 GHSA-r28c-9q8g-f849(High, source-map 자동 로딩의 경로 순회를 통한 임의 `.map` 노출)을 제거했습니다. postcss는 Vite 빌드 툴체인 전용 트랜지티브 의존성으로 배포 런타임 경로에 없으며, 조치 후 `npm audit --audit-level=high` → High 이상 취약점 0건. 변경 범위는 `frontend/package.json`의 `overrides` 맵(`postcss` 항목 추가)과 재생성된 `frontend/package-lock.json`이며, 애플리케이션 소스는 수정하지 않았습니다.

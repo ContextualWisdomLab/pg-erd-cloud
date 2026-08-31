@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Edge } from "@xyflow/react";
+import { RequiredIndicator } from './RequiredIndicator';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 interface EditEdgeModalProps {
@@ -11,6 +12,7 @@ interface EditEdgeModalProps {
   onRelSubmit: () => void;
 }
 
+/** Renders relationship editing and blocks blank constraint names before mutation. */
 export function EditEdgeModal({
   editingEdge,
   relLabel,
@@ -20,6 +22,7 @@ export function EditEdgeModal({
   onRelSubmit,
 }: EditEdgeModalProps) {
   const dialogRef = useDialogAccessibility<HTMLFormElement>(Boolean(editingEdge), onRelCancel);
+  const relLabelInputRef = React.useRef<HTMLInputElement>(null);
 
   if (!editingEdge) return null;
 
@@ -48,6 +51,13 @@ export function EditEdgeModal({
         tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
+          const input = relLabelInputRef.current;
+          if (!relLabel.trim()) {
+            input?.setCustomValidity("제약조건 이름을 입력하세요.");
+            input?.reportValidity();
+            return;
+          }
+          input?.setCustomValidity("");
           onRelSubmit();
         }}
         style={{
@@ -66,13 +76,25 @@ export function EditEdgeModal({
           To: {editingEdge.target}
         </div>
         <div className="field">
-          <label htmlFor="rel-label">제약조건 이름 (Label)</label>
+          <label htmlFor="rel-label">
+            제약조건 이름 (Label) <RequiredIndicator />
+          </label>
           <input
             id="rel-label"
+            ref={relLabelInputRef}
             value={relLabel}
-            onChange={(e) => setRelLabel(e.target.value)}
+            onInvalid={(e) => {
+              if (!e.currentTarget.value.trim()) {
+                e.currentTarget.setCustomValidity("제약조건 이름을 입력하세요.");
+              }
+            }}
+            onChange={(e) => {
+              e.currentTarget.setCustomValidity("");
+              setRelLabel(e.target.value);
+            }}
             placeholder="fk_constraint_name"
             autoFocus
+            required
           />
         </div>
         <div
