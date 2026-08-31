@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # Optional allowlist for reverse-engineering database targets.
     # Comma-separated exact hostnames/IPs or wildcard domains like *.example.com.
     db_introspection_allowed_hosts: str = ""
+    # Explicitly marks an isolated local E2E process; false in every deployment.
+    e2e_test_mode: bool = False
+    # Local targets remain blocked by default. Enable only for an isolated local
+    # E2E database while e2e_test_mode is also true.
+    db_introspection_allow_local_targets: bool = False
 
     # Optional OpenAI-compatible chat-completions provider for live reversing
     # spec drafts. Leave unset to keep all reversing spec generation local.
