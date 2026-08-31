@@ -26,10 +26,13 @@ dist/
 *.tsbuildinfo
 coverage/
 frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
 
 # opencode tooling artifacts
 registered_agents.json
 task_agent_mapping.json
+.codegraph/
 backend/venv/
 
 # agent + tooling working artifacts (case-collision + noise guard)

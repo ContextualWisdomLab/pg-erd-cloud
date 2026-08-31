@@ -79,6 +79,20 @@ def _connection_host_for_ip(
     return str(ip)
 
 
+def _is_allowed_local_e2e_ip(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Allow only loopback addresses for the explicitly isolated E2E path."""
+
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return (
+        settings.e2e_test_mode
+        and settings.db_introspection_allow_local_targets
+        and ip.is_loopback
+    )
+
+
 async def _resolved_ips(
     host: str, port: int | None
 ) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
@@ -153,15 +167,19 @@ async def _validated_ip_hosts(
     h: str, is_hostaddr: bool, port: int | None
 ) -> tuple[str, ...]:
     normalized = h.lower().rstrip(".")
-
-    if normalized == "localhost" or normalized.endswith(".localhost"):
+    if (
+        (normalized == "localhost" or normalized.endswith(".localhost"))
+        and not (
+            settings.e2e_test_mode and settings.db_introspection_allow_local_targets
+        )
+    ):
         raise DsnTargetError("database host must not be localhost")
 
     _validate_allowed_host(normalized)
 
     literal_ip = _parse_ip_literal(normalized)
     if literal_ip is not None:
-        if _is_restricted_ip(literal_ip):
+        if _is_restricted_ip(literal_ip) and not _is_allowed_local_e2e_ip(literal_ip):
             raise DsnTargetError("database host resolves to a restricted IP range")
         return (_connection_host_for_ip(literal_ip),)
 
@@ -170,7 +188,7 @@ async def _validated_ip_hosts(
 
     resolved_ips = await _resolved_ips(normalized, port)
     for ip in resolved_ips:
-        if _is_restricted_ip(ip):
+        if _is_restricted_ip(ip) and not _is_allowed_local_e2e_ip(ip):
             raise DsnTargetError("database host resolves to a restricted IP range")
     return tuple(_connection_host_for_ip(ip) for ip in sorted(resolved_ips, key=str))
 

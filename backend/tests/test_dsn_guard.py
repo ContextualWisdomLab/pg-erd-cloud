@@ -147,6 +147,35 @@ async def test_dsn_guard_rejects_localhost() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dsn_guard_allows_localhost_for_isolated_local_e2e(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "localhost")
+    monkeypatch.setattr(settings, "e2e_test_mode", True)
+    monkeypatch.setattr(settings, "db_introspection_allow_local_targets", True)
+
+    target = await validate_postgres_dsn_target(
+        "postgresql://user:pass@localhost:5432/app"
+    )
+    assert "127.0.0.1" in target.hosts
+    assert set(target.hosts) <= {"127.0.0.1", "::1"}
+
+
+@pytest.mark.asyncio
+async def test_dsn_guard_allows_loopback_literal_for_isolated_local_e2e(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "127.0.0.1")
+    monkeypatch.setattr(settings, "e2e_test_mode", True)
+    monkeypatch.setattr(settings, "db_introspection_allow_local_targets", True)
+
+    target = await validate_postgres_dsn_target(
+        "postgresql://user:pass@127.0.0.1:5432/app"
+    )
+    assert target.hosts == ("127.0.0.1",)
+
+
+@pytest.mark.asyncio
 async def test_dsn_guard_rejects_missing_host() -> None:
     with pytest.raises(DsnTargetError, match="include a host"):
         await validate_postgres_dsn_target("postgresql:///app")
@@ -178,6 +207,23 @@ async def test_dsn_guard_rejects_dns_to_restricted_ip(
     monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
 
     with pytest.raises(DsnTargetError, match="restricted IP"):
+        await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
+
+
+@pytest.mark.asyncio
+async def test_dsn_guard_rejects_restricted_dns_even_for_local_e2e(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: fake_addrinfo("10.0.0.9"),
+    )
+    monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
+    monkeypatch.setattr(settings, "e2e_test_mode", True)
+    monkeypatch.setattr(settings, "db_introspection_allow_local_targets", True)
+
+    with pytest.raises(DsnTargetError, match="restricted IP range"):
         await validate_postgres_dsn_target("postgresql://user:pass@db.example.com/app")
 
 
