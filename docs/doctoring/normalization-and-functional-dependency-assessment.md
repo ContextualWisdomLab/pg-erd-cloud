@@ -104,12 +104,24 @@ signal is catalog-declared.
 Deferred: generated `EXPLAIN` / `EXPLAIN ANALYZE` partition-pruning fixtures
 against a real PostgreSQL, and persisted `capacity_profile` records.
 
+## Exact-value HTML view — landed
+
+`app.spec.assessment_html.render_assessment_html(report, *, title)` renders
+either report envelope (they share the `summary` + `relation_assessments` +
+`findings` shape) as a self-contained accessible HTML fragment: every cell is
+`html.escape(…, quote=True)`, state is a text label (`[declared]`,
+`risk: review`) never colour alone, one `<table>` per finding kind with
+`<caption>` and `<th scope>`, scoped inline `<style>`, no external
+CSS/JS/scripts. Both assessment endpoints accept `?format=html` (returns
+`text/html`); the uniform JSON not-found response is unchanged regardless of
+`format`.
+
 ## Deferred (later bounded increments on #947)
 
 - **3NF / transitive-dependency** detection — needs data profiling or
   declared functional dependencies; catalog evidence alone cannot prove a
   transitive dependency without asserting a theorem from names.
-- **Exact-value HTML table + persisted assessment runs** — an accessible
+- **Persisted assessment runs** — an accessible
   non-color-only HTML rendering, and the `assessment_run` /
   `capacity_profile` / `partition_candidate` / `remediation_action` records
   persisted with tool/commit provenance.
