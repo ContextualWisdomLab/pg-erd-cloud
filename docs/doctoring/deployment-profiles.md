@@ -62,12 +62,29 @@ from what is actually enforced. PII masking is **not** relied on for tenant
 isolation — a compliant non-masking control (enforced tenant ownership on
 every persisted and cached object) is the boundary.
 
+## Decision — tenant-authority column-presence check (this increment)
+
+`app/deploy/tenant_authority_check.py`
+`check_tenant_authority(table_definitions, *, tenant_isolation)` is the
+concrete check behind the `all_authority_objects_tenant_scoped` boolean in
+the profile model. Given a list of
+`{"name", "columns", "derives_tenant_from"}` table descriptions it
+partitions every object in `AUTHORITY_BEARING_OBJECTS` into `carrying` (has
+the immutable `tenant_account_uuid` column), `derived` (reaches its tenant
+through a named parent object), `missing_scoping`, and `missing_definition`,
+and reports `compliant` only when none is missing. For
+`single_org_per_database` it returns `applicable=False` /
+`compliant=True` with a `not_applicable_reason` rather than a false pass.
+Pure — no DB, no `Settings`, no migration; the caller assembles
+`table_definitions` from ORM metadata, an Alembic diff, or an introspection
+snapshot.
+
 ## Deferred (later increments on #950)
 
 - The `tenant_account` authority tables + Alembic migration.
 - A repository/query layer that derives `tenant_account_uuid` on every
-  authority-bearing read and write, plus a test that asserts no
-  authority-bearing table lacks the column.
+  authority-bearing read and write, plus a test that feeds the real ORM
+  metadata to `check_tenant_authority` and asserts `compliant`.
 - SSO / SCIM identity-link + provisioning-request/receipt flows.
 - `data_residency_policy` enforcement and per-tenant object-storage prefixes.
 - `Settings`-selected active profile + a startup self-check that runs
