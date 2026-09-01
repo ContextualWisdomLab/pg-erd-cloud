@@ -67,7 +67,7 @@ def _connect(config: MysqlDsnConfig) -> Any:
             "MySQL support requires the PyMySQL package"
         ) from exc
     return pymysql.connect(
-        host=config.host,
+        host=config.host,  # pinned IP (SSRF)
         port=config.port,
         user=config.user,
         password=config.password,
@@ -250,10 +250,9 @@ def rows_to_snapshot(
             }
         )
         if unique and name != "PRIMARY":
-            relation = rel_by_oid[ix_oid]
             constraints.append(
                 {
-                    "constraint_oid": 400000 + len(out_indexes),
+                    "constraint_oid": 500000 + len(out_indexes),
                     "constraint_name": name,
                     "constraint_type": "u",
                     "schema_name": schema,
