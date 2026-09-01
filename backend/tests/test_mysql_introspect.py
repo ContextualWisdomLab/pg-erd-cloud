@@ -74,6 +74,8 @@ def test_unique_indexes_are_normalized_into_common_unique_constraints():
         if c["constraint_type"] == "u" and c["constraint_name"] == "ux_orders_member"
     )
     assert unique["constrained_attnums"] == [2]
+    constraint_oids = [c["constraint_oid"] for c in snap["constraints"]]
+    assert len(constraint_oids) == len(set(constraint_oids))
 
     result = assess_normalization(snap)
     orders = next(
