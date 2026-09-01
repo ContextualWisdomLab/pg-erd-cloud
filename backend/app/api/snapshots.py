@@ -142,7 +142,7 @@ async def create_snapshot(
     job = JobQueue(
         job_queue_uuid=uuid.uuid4(),
         job_type="snapshot",
-        status="queued",
+        job_status="queued",
         payload_json={"schema_snapshot_uuid": str(snap.schema_snapshot_uuid)},
         run_after=dt.datetime.now(dt.timezone.utc),
         attempt_count=0,
