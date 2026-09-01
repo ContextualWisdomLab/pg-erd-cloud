@@ -1,5 +1,7 @@
 # pg-erd-cloud
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/pg-erd-cloud)
+
 PostgreSQL 중심 클라우드 ERD 협업·공유 서비스입니다. 대상 DB를 스냅샷으로 역설계하고,
 대화형 ERD로 탐색·편집하며, DDL/명세서/공유 링크로 내보낼 수 있습니다.
 
