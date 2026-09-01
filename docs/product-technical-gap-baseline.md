@@ -1,6 +1,6 @@
 # Product & technical gap baseline
 
-**Last consolidated:** 2026-09-01 (autonomous review/merge loop, iter16).
+**Last consolidated:** 2026-09-02 (autonomous review/merge loop, iter18).
 
 This document is the single tracker for the distance between what
 pg-erd-cloud does today and a defensible first commercial release. It is
@@ -43,15 +43,15 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter16 the loop is holding **11 stacked increment
-PRs** — #1024, #1025, #1031, #1032, #1033, #1035, #1036, #1037, #1038,
-#1039, #1041 — plus **this document** (#1040). Separately, **#942** (the
-original baseline draft) is green on every required check and waits only on
-one non-author approval; it is not one of the 11 increments.
+the gate clears. As of iter18 the loop is holding **12 stacked increment
+PRs** — #1024, #1025, #1031, #1032, #1033, #1035, #1036, #1041, #1045,
+#1037, #1038, #1039 — plus **this document** (#1040). Separately, **#942**
+(the original baseline draft) is green on every required check and waits
+only on one non-author approval; it is not one of the 12 increments.
 
 Dependency order for the merge wave once the gate clears: #942 → #1024 →
-#1025 → #1031 → #1032 → #1033 → #1035 → #1036 → #1041 → #1037 → #1038 →
-#1039 → #1040.
+#1025 → #1031 → #1032 → #1033 → #1035 → #1036 → #1041 → #1045 → #1037 →
+#1038 → #1039 → #1040.
 
 ## Status legend
 
@@ -330,14 +330,23 @@ decision evidence.
   [--json]` CLI. `tracemalloc` torn down in `finally`; a cancelled run
   returns no partial report. **No threshold or verdict** (meta-test
   enforced). 9 tests.
+- **#1045** — `app/perf/baseline_stats.py` (stacked on #1041):
+  `aggregate_baseline(profile_name, *, repeat, seed=None) -> dict` runs
+  `run_baseline` `repeat` times over the *same* seeded workload (snapshot
+  fixed; only timing varies) and reduces each path's `wall_seconds` and
+  `peak_bytes` sample lists to `{samples, min, max, mean, p50, p95, p99}`
+  via `statistics.quantiles` (standard library only). `result_size_bytes`
+  is deterministic, so it stays a scalar. `repeat < 1` → `ValueError`;
+  `repeat == 1` → degenerate summary; a cancelled run returns no partial
+  aggregate. `python -m app.perf.baseline_stats --profile small --repeat 5
+  [--seed N] [--json]` CLI. **No threshold or verdict** (meta-test
+  enforced). 9 tests.
 
-**Remaining increments.** Repeat-run percentile aggregation over
-`run_baseline` (p50/p95/p99 + min/max per path, still threshold-free); the
-DB / event-loop paths (API list/detail/pagination/search, queue
-claim/retry/lease/cleanup/fairness) in the benchmark workflow;
-`docs/PERFORMANCE.md`; the release-candidate benchmark workflow with a
-reproducibility receipt; frontend traces; per-hotspot Rust decision-gate
-ADRs.
+**Remaining increments.** The DB / event-loop paths (API
+list/detail/pagination/search, queue claim/retry/lease/cleanup/fairness) in
+the benchmark workflow; `docs/PERFORMANCE.md`; the release-candidate
+benchmark workflow with a reproducibility receipt; frontend traces;
+per-hotspot Rust decision-gate ADRs.
 
 **Status:** `in-progress`.
 
@@ -559,11 +568,13 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes (this revision: iter16 — filled the
-#949 / #952 / #953 sections from their issue bodies, added #1041, corrected
-the stacked-PR count, and reconciled the #952 orchestrator wording with the
-existing configuration-only `/chat/completions` integration in
-`docs/llm-orchestrator-integration.md`). When the gate clears and PR #942
-merges, reconcile its `docs/product-technical-gap-baseline.md`,
+ships or the incident status changes (this revision: iter18 — added #1045
+(repeat-run percentile aggregation) to the #951 increment list, updated the
+stacked-PR count to 12, and refreshed the merge-wave order. iter16 filled
+the #949 / #952 / #953 sections from their issue bodies and reconciled the
+#952 orchestrator wording with the existing configuration-only
+`/chat/completions` integration in `docs/llm-orchestrator-integration.md`).
+When the gate clears and PR #942 merges, reconcile its
+`docs/product-technical-gap-baseline.md`,
 `docs/doctoring/product-technical-gap-baseline.md`, and
 `docs/adr/0002-product-technical-gap-baseline.md` with this consolidation.
