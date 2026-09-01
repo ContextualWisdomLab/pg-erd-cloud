@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🏢 **GA 배포 프로파일 모델 (1차 증분)**: `app/deploy/profile.py`에 두 배포 프로파일(`single_tenant_managed` / `multi_tenant_saas`)의 타입드 모델과 순수 `validate_profile(profile) -> list[str]` 정직성 검증기를 추가했습니다(인프라·`Settings`·마이그레이션 없음). 단일테넌트는 GA인데 `local_dev` identity·org binding 미강제·고객소유 백업정책 미문서·cross-customer claim이면 문제로 보고하고, 멀티테넌트는 테넌트 authority 테이블·모든 authority 객체의 불변 tenant id·프로비저닝 lifecycle·데이터 레지던시 정책이 전부 갖춰지기 전엔 `ga_ready` 주장을 거부합니다. `AUTHORITY_BEARING_OBJECTS`로 tenant-scope 대상 객체를 열거합니다. 테스트 9종. `docs/doctoring/deployment-profiles.md`.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
