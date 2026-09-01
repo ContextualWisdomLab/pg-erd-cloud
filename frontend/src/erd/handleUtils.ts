@@ -1,11 +1,9 @@
 export function sanitizeHandleId(columnName: string): string {
   let encoded = ''
-  let first = true
   for (const char of columnName) {
-    if (!first) {
+    if (encoded.length > 0) {
       encoded += '-'
     }
-    first = false
     // for...of iterates over Unicode code points, so char is a single scalar.
     encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
   }
