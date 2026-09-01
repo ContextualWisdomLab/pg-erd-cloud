@@ -116,11 +116,40 @@ CSS/JS/scripts. Both assessment endpoints accept `?format=html` (returns
 `text/html`); the uniform JSON not-found response is unchanged regardless of
 `format`.
 
+## Transitive-dependency (3NF) assessment — landed
+
+`app.spec.transitive_dependency_assessment.assess_transitive_dependencies(
+snapshot, *, declared_functional_dependencies=None, waivers=None)` adds the
+third-normal-form layer the catalog-only analyzer deliberately skips. It
+works from two evidence sources and never infers a dependency from column
+names:
+
+- **Catalog only** → `non_key_reference_cluster` (evidence class
+  `inferred`, confidence `low`): a relation carries more than one
+  foreign-key column that is not a candidate key, alongside non-prime
+  descriptive columns. That is the *structural precondition* for a
+  transitive dependency, not proof of one — the finding says so and points
+  the caller at profiling or a declared FD.
+- **Caller-declared functional dependencies** → `transitive_dependency_via_declared_fd`
+  (evidence class `declared`): a supplied FD `X → Y` where `X` is not a
+  superkey and every column of `Y` is non-prime. That is a genuine 3NF
+  violation, asserted only because the caller supplied the dependency.
+  Each such finding is paired with a `candidate_3nf_split` proposal
+  (evidence class `proposed`, never applied automatically).
+
+`declared_functional_dependencies` is an optional list of
+`{"relation": "schema.table", "determinant": [...], "dependent": [...]}`.
+Entries naming an unknown relation or column are returned under
+`unresolved_declared_fds` with a reason rather than silently dropped.
+Waivers use the same `scope` shape as `assess_normalization`. Row-level FD
+discovery from table data stays out of scope (it needs profiling, which
+belongs in a separate service).
+
 ## Deferred (later bounded increments on #947)
 
-- **3NF / transitive-dependency** detection — needs data profiling or
-  declared functional dependencies; catalog evidence alone cannot prove a
-  transitive dependency without asserting a theorem from names.
+- **Row-level functional-dependency discovery** — profiling a sample of
+  table data to *find* the dependencies a caller would otherwise have to
+  declare; belongs in a separate profiling service, not this pure analyzer.
 - **Persisted assessment runs** — an accessible
   non-color-only HTML rendering, and the `assessment_run` /
   `capacity_profile` / `partition_candidate` / `remediation_action` records
