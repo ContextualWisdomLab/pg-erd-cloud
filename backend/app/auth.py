@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -166,7 +166,7 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
 
     exp = claims.get("exp")
     if not isinstance(exp, int | float):
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="token missing exp")
     return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
 
 
@@ -179,15 +179,15 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
             not isinstance(token_type, str)
             or token_type.strip().lower() not in OIDC_ALLOWED_TOKEN_TYPES
         ):
-            raise HTTPException(status_code=401, detail="invalid token")
+            raise HTTPException(status_code=401, detail="unsupported token type")
 
     content_type = header.get("cty")
     if content_type is not None:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="unsupported token content type")
 
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="token missing alg")
     return header_alg_raw.upper()
 
 
@@ -240,11 +240,14 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
     except Exception:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="invalid token header")
 
     header_alg = _validate_jwt_header(header)
     if header_alg not in OIDC_ALLOWED_ALGORITHMS:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(
+            status_code=401,
+            detail="unsupported token algorithm",
+        )
 
     jwks = await _get_jwks()
     jwk = _pick_jwk(jwks, header.get("kid"))
@@ -252,20 +255,20 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         jwks = await _get_jwks(force_refresh=True)
         jwk = _pick_jwk(jwks, header.get("kid"))
     if jwk is None:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="unknown signing key")
 
     kty = jwk.get("kty")
     if not isinstance(kty, str):
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
     jwk_kty = kty.upper()
     if jwk_kty == "RSA":
         if not (header_alg.startswith("RS") or header_alg.startswith("PS")):
-            raise HTTPException(status_code=401, detail="invalid token")
+            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
     elif jwk_kty == "EC":
         if not header_alg.startswith("ES"):
-            raise HTTPException(status_code=401, detail="invalid token")
+            raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
     else:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
         claims = jwt.decode(
@@ -284,7 +287,9 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             },
         )
     except Exception as err:
-        raise HTTPException(status_code=401, detail="invalid token") from err
+        raise HTTPException(
+            status_code=401, detail="token verification failed"
+        ) from err
 
     return cast(dict[str, Any], claims)
 
@@ -298,13 +303,13 @@ async def _verified_token_from_claims(
     jwt_id = claims.get("jti")
     name = claims.get("name") or claims.get("preferred_username")
     if not isinstance(sub, str):
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="token missing sub")
     if not isinstance(jwt_id, str) or not jwt_id.strip():
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="token missing jti")
 
     expires_at = _jwt_expiry(claims)
     if verify_revocation and await is_token_jti_revoked(jwt_id):
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="token revoked")
 
     return VerifiedToken(
         subject=sub,
