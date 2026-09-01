@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -41,16 +41,15 @@ function sourceColumnsForEdge(edge: Edge): Set<string> {
 
 type ForeignKeyNodeInfo = {
   columns: Set<string>;
-  handles: Set<string>;
 };
 
-function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+function foreignKeyColumnsByNode(edges: Edge[], nodesById: Map<string, Node<TableNodeData>>): Map<string, ForeignKeyNodeInfo> {
   const map = new Map<string, ForeignKeyNodeInfo>();
 
   for (const edge of edges) {
     let info = map.get(edge.source);
     if (!info) {
-      info = { columns: new Set<string>(), handles: new Set<string>() };
+      info = { columns: new Set<string>() };
       map.set(edge.source, info);
     }
 
@@ -59,7 +58,11 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
     }
 
     if (edge.sourceHandle) {
-      info.handles.add(edge.sourceHandle);
+      const parsedCol = parseColumnNameFromHandle(edge.sourceHandle);
+      const sourceNode = nodesById.get(edge.source);
+      if (parsedCol && sourceNode && (sourceNode.data.columns || []).some(c => c && c.column_name === parsedCol)) {
+        info.columns.add(parsedCol);
+      }
     }
   }
 
@@ -74,12 +77,7 @@ function isForeignKeyColumn(
   const info = edgeColumnsByNode.get(node.id);
   if (!info) return false;
 
-  if (info.columns.has(columnName)) {
-    return true;
-  }
-
-  const handleId = sourceColumnHandleId(columnName);
-  return info.handles.has(handleId);
+  return info.columns.has(columnName);
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {
@@ -102,7 +100,12 @@ export function exportDictionaryCsv(
     'Example Value',
   ];
   const rows: unknown[][] = [header];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+
+  const nodesById = new Map<string, Node<TableNodeData>>();
+  for (const n of nodes) {
+    nodesById.set(n.id, n);
+  }
+  const fkColumnsByNode = foreignKeyColumnsByNode(edges, nodesById);
 
   for (const node of nodes) {
     const tableName = node.data.title || node.id;
@@ -137,7 +140,11 @@ export function exportDictionaryMarkdown(
   edges: Edge[],
 ): string {
   const lines: string[] = ['# Data Dictionary', ''];
-  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+  const nodesById = new Map<string, Node<TableNodeData>>();
+  for (const n of nodes) {
+    nodesById.set(n.id, n);
+  }
+  const fkColumnsByNode = foreignKeyColumnsByNode(edges, nodesById);
 
   if (nodes.length === 0) {
     lines.push('No tables found.');

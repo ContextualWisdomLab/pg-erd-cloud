@@ -42,6 +42,7 @@ describe('coverage edge contracts', () => {
   it('covers empty identifiers, empty types, schema variants, and incomplete DBML relations', () => {
     const parent = node('parent', 'sales.parent', [
       { column_name: '', data_type: '', is_not_null: false, is_pk: false },
+      { column_name: 'parent_id', data_type: 'int', is_not_null: false, is_pk: false },
     ])
     const child = node('child', 'child', [
       { column_name: 'parent_id', data_type: 'int', is_not_null: false, is_pk: false },
@@ -50,14 +51,14 @@ describe('coverage edge contracts', () => {
       { id: 'missing', source: 'missing', target: 'parent' },
       { id: 'partial-data', source: 'child', target: 'parent', data: { sourceColumns: ['parent_id'] } },
       { id: 'empty-data', source: 'child', target: 'parent', data: { sourceColumns: [], targetColumns: [] } },
-      { id: 'handles', source: 'child', target: 'parent', sourceHandle: 'src-parent_id', targetHandle: 'tgt-' },
+      { id: 'handles', source: 'child', target: 'parent', sourceHandle: 'src-c-0070-0061-0072-0065-006e-0074-005f-0069-0064', targetHandle: 'tgt-c-0070-0061-0072-0065-006e-0074-005f-0069-0064' },
     ]
 
     const dbml = exportDbml([parent, child, node('empty', '', [])], edges)
     expect(dbml).toContain('Table sales.parent')
     expect(dbml).toContain('Table  {')
     expect(dbml).toContain(' varchar')
-    expect(dbml).toContain('Ref: child.parent_id > sales.parent.')
+    expect(dbml).toContain('Ref: child.parent_id > sales.parent.parent_id')
   })
 
   it('covers DDL defensive fallbacks and column inference without handles', () => {
