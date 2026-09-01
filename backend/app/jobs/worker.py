@@ -29,7 +29,7 @@ Handler: TypeAlias = Callable[[Callable[[], AsyncSession], JobQueue], Awaitable[
 
 
 def _mark_job_running(job: JobQueue) -> JobQueue:
-    job.status = "running"
+    job.job_status = "running"
     job.started_at = dt.datetime.now(dt.timezone.utc)
     job.attempt_count = int(job.attempt_count) + 1
 
@@ -56,7 +56,7 @@ async def _claim_job_by_id(
             FROM job_queue
             WHERE
               job_queue_uuid = :job_queue_uuid
-              AND status = 'queued'
+              AND job_status = 'queued'
               AND run_after <= now()
             FOR UPDATE SKIP LOCKED
             LIMIT 1
@@ -89,7 +89,7 @@ async def claim_one_job(session: AsyncSession) -> JobQueue | None:
         text("""
             SELECT job_queue_uuid
             FROM job_queue
-            WHERE status = 'queued' AND run_after <= now()
+            WHERE job_status = 'queued' AND run_after <= now()
             ORDER BY run_after ASC
             FOR UPDATE SKIP LOCKED
             LIMIT 1
@@ -141,7 +141,7 @@ async def run_worker_forever(
             handler = handlers.get(job.job_type)
             if handler is None:
                 async with session.begin():
-                    job.status = "failed"
+                    job.job_status = "failed"
                     job.last_error = f"Unknown job_type: {job.job_type}"
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
                 continue
@@ -151,7 +151,7 @@ async def run_worker_forever(
                 await handler(session_factory, job)
                 duration_s = time.perf_counter() - started
                 async with session.begin():
-                    job.status = "succeeded"
+                    job.job_status = "succeeded"
                     job.last_error = None
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
 
@@ -163,7 +163,7 @@ async def run_worker_forever(
             except Exception as e:  # noqa: BLE001
                 duration_s = time.perf_counter() - started
                 async with session.begin():
-                    job.status = "failed"
+                    job.job_status = "failed"
                     job.last_error = str(e)
                     job.finished_at = dt.datetime.now(dt.timezone.utc)
 
