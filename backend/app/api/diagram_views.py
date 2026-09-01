@@ -25,16 +25,16 @@ router = APIRouter(prefix="/api/diagram-views", tags=["diagram-views"])
 MAX_LAYOUT_BYTES = 512 * 1024
 
 
-def _bound_layout_size(layout: dict) -> None:
-    encoded = json.dumps(layout, separators=(",", ":")).encode("utf-8")
-    if len(encoded) > MAX_LAYOUT_BYTES:
+def _bound_layout_size(layout_payload: dict) -> None:
+    encoded_layout = json.dumps(layout_payload, separators=(",", ":")).encode("utf-8")
+    if len(encoded_layout) > MAX_LAYOUT_BYTES:
         raise HTTPException(status_code=413, detail="layout payload too large")
 
 
 async def _get_authorized_view(
-    session: AsyncSession,
+    database_session: AsyncSession,
     diagram_view_uuid: uuid.UUID,
-    user: CurrentUser,
+    current_user: CurrentUser,
     minimum_role: str | None = None,
 ) -> DiagramView | None:
     """Fetch a view only after project membership has been checked.
@@ -43,7 +43,7 @@ async def _get_authorized_view(
     with a uniform 404 (no existence enumeration).
     """
 
-    project_space_uuid = await session.scalar(
+    project_space_uuid = await database_session.scalar(
         select(DiagramView.project_space_uuid).where(
             DiagramView.diagram_view_uuid == diagram_view_uuid
         )
@@ -52,105 +52,119 @@ async def _get_authorized_view(
         return None
     try:
         await require_project_member(
-            session,
+            database_session,
             project_space_uuid,
-            user.user_account_uuid,
+            current_user.user_account_uuid,
             minimum_role=minimum_role,
         )
-    except HTTPException as exc:
-        if exc.status_code == 403:
+    except HTTPException as http_exception:
+        if http_exception.status_code == 403:
             return None
         raise
-    return await session.get(DiagramView, diagram_view_uuid)
+    return await database_session.get(DiagramView, diagram_view_uuid)
 
 
 @router.post("/by-project/{project_space_uuid}", response_model=DiagramViewOut)
 async def create_view(
     project_space_uuid: uuid.UUID,
-    body: DiagramViewCreateIn,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    diagram_view_request: DiagramViewCreateIn,
+    current_user: CurrentUser = Depends(get_current_user),
+    database_session: AsyncSession = Depends(get_session),
 ) -> DiagramViewOut:
     """Save a new ERD canvas view for a project."""
     await require_project_member(
-        session, project_space_uuid, user.user_account_uuid, minimum_role="editor"
+        database_session,
+        project_space_uuid,
+        current_user.user_account_uuid,
+        minimum_role="editor",
     )
-    _bound_layout_size(body.layout_json)
-    now = dt.datetime.now(dt.timezone.utc)
-    view = DiagramView(
+    _bound_layout_size(diagram_view_request.layout_json)
+    current_time = dt.datetime.now(dt.timezone.utc)
+    diagram_view = DiagramView(
         diagram_view_uuid=uuid.uuid4(),
         project_space_uuid=project_space_uuid,
-        name=body.name,
-        layout_json=body.layout_json,
-        created_by=user.user_account_uuid,
-        created_at=now,
-        updated_at=now,
+        diagram_name=diagram_view_request.diagram_name,
+        layout_json=diagram_view_request.layout_json,
+        created_by=current_user.user_account_uuid,
+        created_at=current_time,
+        updated_at=current_time,
     )
-    session.add(view)
-    await session.commit()
+    database_session.add(diagram_view)
+    await database_session.commit()
     return DiagramViewOut(
-        diagram_view_uuid=view.diagram_view_uuid,
-        name=view.name,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
+        diagram_view_uuid=diagram_view.diagram_view_uuid,
+        diagram_name=diagram_view.diagram_name,
+        created_at=diagram_view.created_at,
+        updated_at=diagram_view.updated_at,
     )
 
 
 @router.get("/by-project/{project_space_uuid}", response_model=list[DiagramViewOut])
 async def list_views(
     project_space_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    current_user: CurrentUser = Depends(get_current_user),
+    database_session: AsyncSession = Depends(get_read_session),
 ) -> list[DiagramViewOut]:
     """List saved views for a project (newest first)."""
-    await require_project_member(session, project_space_uuid, user.user_account_uuid)
-    rows = await session.execute(
+    await require_project_member(
+        database_session,
+        project_space_uuid,
+        current_user.user_account_uuid,
+    )
+    query_result = await database_session.execute(
         select(DiagramView)
         .where(DiagramView.project_space_uuid == project_space_uuid)
         .order_by(DiagramView.updated_at.desc())
     )
     return [
         DiagramViewOut(
-            diagram_view_uuid=v.diagram_view_uuid,
-            name=v.name,
-            created_at=v.created_at,
-            updated_at=v.updated_at,
+            diagram_view_uuid=diagram_view.diagram_view_uuid,
+            diagram_name=diagram_view.diagram_name,
+            created_at=diagram_view.created_at,
+            updated_at=diagram_view.updated_at,
         )
-        for v in rows.scalars().all()
+        for diagram_view in query_result.scalars().all()
     ]
 
 
 @router.get("/{diagram_view_uuid}", response_model=DiagramViewDetailOut)
 async def get_view(
     diagram_view_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_read_session),
+    current_user: CurrentUser = Depends(get_current_user),
+    database_session: AsyncSession = Depends(get_read_session),
 ) -> DiagramViewDetailOut:
     """Get one saved view including its layout payload."""
-    view = await _get_authorized_view(session, diagram_view_uuid, user)
-    if view is None:
+    diagram_view = await _get_authorized_view(
+        database_session,
+        diagram_view_uuid,
+        current_user,
+    )
+    if diagram_view is None:
         raise HTTPException(status_code=404, detail="diagram view not found")
     return DiagramViewDetailOut(
-        diagram_view_uuid=view.diagram_view_uuid,
-        name=view.name,
-        layout_json=view.layout_json,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
+        diagram_view_uuid=diagram_view.diagram_view_uuid,
+        diagram_name=diagram_view.diagram_name,
+        layout_json=diagram_view.layout_json,
+        created_at=diagram_view.created_at,
+        updated_at=diagram_view.updated_at,
     )
 
 
 @router.delete("/{diagram_view_uuid}")
 async def delete_view(
     diagram_view_uuid: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user),
+    database_session: AsyncSession = Depends(get_session),
 ) -> dict[str, bool]:
     """Delete a saved view (requires editor membership on its project)."""
-    view = await _get_authorized_view(
-        session, diagram_view_uuid, user, minimum_role="editor"
+    diagram_view = await _get_authorized_view(
+        database_session,
+        diagram_view_uuid,
+        current_user,
+        minimum_role="editor",
     )
-    if view is None:
+    if diagram_view is None:
         raise HTTPException(status_code=404, detail="diagram view not found")
-    await session.delete(view)
-    await session.commit()
+    await database_session.delete(diagram_view)
+    await database_session.commit()
     return {"ok": True}
