@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-20 - [Optimize Node Columns Lookup]
+**Learning:** Found an O(E * C) loop where `node.data.columns.find` scanning was running inside an `O(E)` loop to match foreign key columns in `export.ts` and `prisma.ts`.
+**Action:** When working with column search loops on static Node trees, immediately create O(1) Lookup Maps using `map.set` and `.get()` to skip intermediate callback allocations.
