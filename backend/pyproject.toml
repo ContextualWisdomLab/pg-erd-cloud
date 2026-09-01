@@ -22,7 +22,6 @@ dependencies = [
   "alembic>=1.18.5",
   "cryptography>=50.0.0",
   "httpx>=0.28.1",
-  "python-jose[cryptography]>=3.5.0",
   "redis>=5.0.0",
   "pyjwt>=2.13.0",
   "starlette>=1.1.0",
@@ -53,7 +52,6 @@ dev = [
   "pytest-cov>=7.0.0",
   "mypy>=2.1.0",
   "asyncpg-stubs>=0.31.3",
-  "types-python-jose>=3.5.0.20260408",
   "types-requests",
 ]
 
