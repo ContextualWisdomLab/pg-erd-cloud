@@ -10,6 +10,7 @@ def test_job_queue_owns_semantic_status_column() -> None:
 
     assert "job_status" in JobQueue.__table__.columns
     assert "status" not in JobQueue.__table__.columns
+    assert not hasattr(JobQueue, "status")
 
     job_queue_index = next(
         queue_index
