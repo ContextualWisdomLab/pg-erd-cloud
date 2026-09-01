@@ -80,14 +80,35 @@ via `_get_authorized_snapshot` (a missing or unauthorized snapshot returns a
 uniform `not_found`). No feature flag — the assessment is a shipped product
 feature, not a hidden experiment; no DDL, no writes.
 
+## Hot-partition & growth assessment — landed (first increment)
+
+`app.spec.hot_partition_assessment.assess_hot_partitions(snapshot, *,
+capacity_profile=None)` and `GET
+/api/snapshots/{schema_snapshot_uuid}/hot-partition-assessment`
+(`HotPartitionAssessmentOut`, same access model as the sibling analyzers).
+
+Catalog evidence (declared keys, column types/defaults, PostgreSQL
+partitioning metadata) plus an **optional explicit capacity profile** only —
+no live workload assumed, no data sampled, no DDL. Findings:
+`append_heavy_table` (1NF-style naming + monotonic/time signal),
+`unbounded_retention` (append-heavy with no `deleted_at`/`expires_at`/…),
+`monotonic_key_hot_page` (single-column serial/identity PK),
+`partition_semantics_review` (a partitioned table whose PRIMARY KEY / UNIQUE
+omits the partition key — global uniqueness not enforced), `skew_candidate`
+(a growing table with a low-cardinality `status`/`tenant`/`project`/… axis).
+Concrete remediations are emitted as `proposed` only when a
+`capacity_profile` supplies the missing quantities
+(`expected_rows` / `retention_days` / `write_concentration_keys`) or the
+signal is catalog-declared.
+
+Deferred: generated `EXPLAIN` / `EXPLAIN ANALYZE` partition-pruning fixtures
+against a real PostgreSQL, and persisted `capacity_profile` records.
+
 ## Deferred (later bounded increments on #947)
 
 - **3NF / transitive-dependency** detection — needs data profiling or
   declared functional dependencies; catalog evidence alone cannot prove a
   transitive dependency without asserting a theorem from names.
-- **Hot-partition & growth assessment** — write/read concentration by
-  tenant/status/time key, queue/audit/share-link tables, `EXPLAIN` pruning
-  fixtures against a real PostgreSQL.
 - **Exact-value HTML table + persisted assessment runs** — an accessible
   non-color-only HTML rendering, and the `assessment_run` /
   `capacity_profile` / `partition_candidate` / `remediation_action` records
