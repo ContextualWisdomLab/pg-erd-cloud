@@ -63,10 +63,31 @@ they are no longer the *unaudited runtime authority*.
   created/rotated/revoked timestamps, intended consumer, retrieval audit
   reference) persisted for audit.
 
-## APP_SECRET dual-read / single-write rotation — DESIGN (not yet implemented)
+## APP_SECRET dual-read / single-write rotation
 
 `APP_SECRET` encrypts stored DSNs. Rotating it must re-encrypt existing rows
 without an outage or silent data loss.
+
+**Landed (the pure core): `app/secret_provider/rotation.py`.**
+`dual_read_decrypt(key_set, ciphertext, nonce)` decrypts one AES-256-GCM
+blob by trying each candidate `APP_SECRET` in order (HKDF-derived key, then
+the legacy raw-SHA-256 key — matching `app/security`).
+`plan_key_rotation(active_key, previous_keys, records, *, nonce_source)`
+walks a batch of `{ciphertext, nonce}` records: a row that decrypts with a
+previous key is re-encrypted under the active key (**single-write**); a row
+already under the active key is left alone; a row no key decrypts, or one
+that is malformed, is returned in `needs_key_recovery` (never dropped,
+never re-encrypted from a guess). It is pure — no DB, no `Settings`, no
+I/O — and returns no plaintext or key material. A round-trip test feeds a
+real `app.security.encrypt_text` blob through it and back through
+`app.security.decrypt_text`, so a drift in the key derivation fails loudly.
+
+**Still to build:** the `SecretReference`-backed key set wired into
+`app/security`, the demote/provision step, the resumable migration job over
+`db_connection` rows with optimistic concurrency + progress, and the
+`needs_key_recovery` operator surface.
+
+### Design
 
 1. **Key set, not a key.** The crypto layer takes an ordered key list:
    `[active, *previous]`, each a `SecretReference` (e.g.
