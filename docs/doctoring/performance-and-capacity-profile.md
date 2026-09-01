@@ -1,7 +1,7 @@
 # Performance & capacity profile
 
-Status: **in progress** — first increment (workload generators) landed.
-Tracks issue
+Status: **in progress** — increments 1 (workload generators) and 2 (measured
+baseline harness) landed. Tracks issue
 [#951](https://github.com/ContextualWisdomLab/pg-erd-cloud/issues/951)
 ("[Performance Gap] Establish large-schema SLOs, workload benchmarks, and a
 measured Rust boundary").
@@ -44,14 +44,37 @@ Guarantees:
   (except the deliberately non-ASCII / quoted identifiers in the multilingual
   skew case).
 
+## Decision — measured baseline harness (this increment)
+
+`app/perf/baseline.py` times the *pure*, side-effect-free processing paths
+over a generated workload snapshot and records observations only — no
+threshold, no verdict.
+
+`run_baseline(profile_name, *, seed=None)` returns `profile`, `seed`,
+`generated_at` (UTC ISO-8601), `relation_count`, `column_count`, and a
+`paths` map. Each path reports `wall_seconds`, `peak_bytes` (via
+`tracemalloc`), and `result_size_bytes`. Measured paths:
+
+| Path | What it exercises |
+| --- | --- |
+| `canonical_hash` | `sha256` over sorted-key canonical JSON |
+| `json_round_trip` | `json.dumps` + `json.loads` of the snapshot |
+| `schema_self_diff` | `app.diff.schema_diff.diff_snapshots(s, s)` |
+| `ddl_export_postgresql` | `app.ddl.export.snapshot_json_to_sql(s, "postgresql")` |
+| `ddl_export_snowflake` | `app.ddl.export.snapshot_json_to_sql(s, "snowflake")` |
+| `data_dictionary_markdown` | `app.spec.data_dictionary.snapshot_to_data_dictionary_md(s)` |
+
+CLI: `python -m app.perf.baseline --profile small [--seed N] [--json]`.
+`tracemalloc` is torn down in a `finally` block, so a cancelled run leaves
+no tracing active and never returns a partial report.
+
 ## Deferred (later increments on #951)
 
-- **Baseline harness** — run the measured paths (canonical snapshot
-  hashing, JSON encode/decode + persistence, schema diff, DDL/DBML/Mermaid/
-  Prisma/spec export, API list/detail/pagination/search, queue
-  claim/retry/lease/cleanup/fairness) against each profile and record
-  p50/p95/p99 latency, peak RSS, allocations, query count, lock wait, queue
-  lag, artifact size, cancellation time.
+- **Baseline harness — remaining paths** — DBML/Mermaid/Prisma/spec export,
+  API list/detail/pagination/search, and queue
+  claim/retry/lease/cleanup/fairness, plus p50/p95/p99 across repeated runs,
+  query count, lock wait, and queue lag. The pure snapshot paths above are
+  done; these need a DB / event loop and belong in the benchmark workflow.
 - **`docs/PERFORMANCE.md`** — the versioned capacity profile with
   buyer-facing limits, separated from benchmark targets. **No SLA claim
   until production evidence exists.**
