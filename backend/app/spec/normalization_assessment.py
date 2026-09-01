@@ -1,44 +1,14 @@
 """Catalog-evidence normalization and functional-dependency assessment.
 
-Enterprise buyers routinely ask an architect three questions a generic ERD
-drawer cannot answer:
+The analyzer is intentionally conservative. It reports catalog-visible
+preconditions for normalization review, but it never certifies a relation as
+BCNF merely because no warning is visible: undeclared functional dependencies
+cannot be disproved from keys, nullability, and column types alone.
 
-1. Which relations appear to violate normalization or mix independent facts?
-2. Which of those findings are certain, inferred, or intentionally excepted?
-3. What is the customer's next action for each finding?
-
-This module answers the first two from **catalog evidence only** -- declared
-primary keys, ``UNIQUE`` constraints, ``NOT NULL`` flags, column types, and
-declared foreign keys captured in the schema snapshot. It never profiles table
-data, never asserts a normalization theorem from column *names* alone, and
-never emits or executes DDL. Every finding carries an explicit evidence class
-so a certain observation is never presented as an inferred guess (or the
-reverse).
-
-The analyzer is a pure, dialect-agnostic function over the common snapshot
-JSON shape produced by :mod:`app.pg_introspect.introspect` (and the MySQL and
-Snowflake introspectors), matching the other :mod:`app.spec` analyzers.
-
-Evidence classes (see ``EVIDENCE_CLASSES``):
-
-``observed``
-    Directly visible in the catalog with no inference (e.g. an array column).
-``declared``
-    Proven from a declared constraint (e.g. a ``UNIQUE`` on a nullable column
-    is not a total key).
-``inferred``
-    A structural precondition is present but the catalog cannot confirm an
-    actual dependency; profiling or a declared rule is required.
-``proposed``
-    Reserved for a future increment that emits a concrete remediation.
-``waived``
-    A caller-supplied waiver matched this finding; it is recorded, not hidden.
-
-What this increment deliberately does **not** do yet (tracked on issue #947):
-transitive-dependency (3NF) detection that needs data profiling or declared
-functional dependencies, signed/persisted waiver records, the hot-partition
-and growth assessment, and the versioned report envelope with an HTTP
-endpoint. Those land as separate bounded changes so each is reviewable.
+The function is pure and consumes the common introspection snapshot used by the
+PostgreSQL, MySQL, and Snowflake adapters. Provider-specific representations
+must be normalized at the adapter boundary rather than leaking into domain
+interpretation where practical.
 
 References (APA 7th):
 
@@ -58,16 +28,13 @@ from typing import Any, Iterable
 #: Report contract version. Bump on any breaking change to the output shape.
 ASSESSMENT_VERSION = "1"
 
-#: The evidence classes a finding may carry, from most to least certain.
+#: The evidence classes a finding may carry.
 EVIDENCE_CLASSES = ("observed", "declared", "inferred", "proposed", "waived")
 
-#: Relation kinds worth assessing for normalization. Views and materialized
-#: views derive from base relations, so a finding there belongs on the source.
+#: Relation kinds worth assessing for normalization. Views are derived objects.
 _ASSESSABLE_RELATION_KINDS = frozenset({"r", "p", ""})
-
-#: PostgreSQL ``pg_constraint.contype`` codes used here.
-_CONTYPE_PRIMARY_KEY = "p"
 _CONTYPE_UNIQUE = "u"
+_WAIVER_SCOPE_KEYS = frozenset({"schema", "relation", "kind"})
 
 
 def _norm_type(data_type: object) -> str:
@@ -79,12 +46,7 @@ def _norm_type(data_type: object) -> str:
 
 
 def _is_non_atomic(column: dict[str, Any]) -> tuple[bool, str]:
-    """Return ``(non_atomic, confidence)`` for a column from catalog evidence.
-
-    An array column is a repeating group with high confidence. A ``json`` or
-    ``jsonb`` column *may* be a deliberate document/evidence envelope, so it is
-    flagged with medium confidence and a false-positive caveat downstream.
-    """
+    """Return whether a catalog type is a nested/repeating value and confidence."""
 
     normalized = _norm_type(column.get("data_type"))
     category = str(column.get("type_category") or "")
@@ -92,7 +54,12 @@ def _is_non_atomic(column: dict[str, Any]) -> tuple[bool, str]:
         dimensions = int(column.get("array_dimensions") or 0)
     except (TypeError, ValueError):
         dimensions = 0
-    if category == "A" or dimensions > 0 or normalized.endswith("[]"):
+    if (
+        category == "A"
+        or dimensions > 0
+        or normalized.endswith("[]")
+        or normalized == "array"
+    ):
         return True, "high"
     if normalized in {"json", "jsonb"}:
         return True, "medium"
@@ -100,7 +67,7 @@ def _is_non_atomic(column: dict[str, Any]) -> tuple[bool, str]:
 
 
 def _relation_ref(relation: dict[str, Any]) -> dict[str, Any]:
-    """Build the stable ``{schema, name, oid}`` reference for a relation."""
+    """Build the report reference for a relation."""
 
     return {
         "schema": relation.get("schema_name"),
@@ -109,27 +76,43 @@ def _relation_ref(relation: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _finding_id(relation_oid: object, kind: str, source_names: Iterable[str]) -> str:
-    """Derive a deterministic short id for a finding (stable across runs)."""
+def _finding_id(
+    relation: dict[str, Any], kind: str, source_names: Iterable[str]
+) -> str:
+    """Derive an id stable across relation OID churn for the same logical object."""
 
     payload = "|".join(
-        [str(relation_oid), kind, ",".join(sorted(str(n) for n in source_names))]
+        [
+            str(relation.get("schema_name") or ""),
+            str(relation.get("relation_name") or ""),
+            kind,
+            ",".join(sorted(str(name) for name in source_names)),
+        ]
     )
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def _waiver_matches(waiver: dict[str, Any], relation: dict[str, Any], kind: str) -> bool:
-    """Return ``True`` when every field a waiver's ``scope`` sets matches."""
+def _waiver_matches(
+    waiver: dict[str, Any], relation: dict[str, Any], kind: str
+) -> bool:
+    """Match only a non-empty, explicitly supported waiver scope."""
 
-    scope = waiver.get("scope") or {}
-    if "kind" in scope and scope.get("kind") != kind:
+    raw_scope = waiver.get("scope")
+    if not isinstance(raw_scope, dict) or not raw_scope:
         return False
-    if "schema" in scope and scope.get("schema") != relation.get("schema_name"):
+    if not set(raw_scope).issubset(_WAIVER_SCOPE_KEYS):
         return False
-    if "relation" in scope and scope.get("relation") != relation.get("relation_name"):
+    if "kind" in raw_scope and raw_scope.get("kind") != kind:
         return False
-    # An empty scope would match everything, which is never a deliberate waiver.
-    return bool(scope)
+    if "schema" in raw_scope and raw_scope.get("schema") != relation.get(
+        "schema_name"
+    ):
+        return False
+    if "relation" in raw_scope and raw_scope.get("relation") != relation.get(
+        "relation_name"
+    ):
+        return False
+    return True
 
 
 def _apply_waivers(
@@ -138,20 +121,65 @@ def _apply_waivers(
     kind: str,
     waivers: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Return ``finding`` with evidence class flipped to ``waived`` if matched."""
+    """Return a copy marked waived when a caller-supplied scope matches."""
 
     for waiver in waivers:
         if _waiver_matches(waiver, relation, kind):
-            finding = dict(finding)
-            finding["evidence_class"] = "waived"
-            finding["waiver"] = {
+            waived = dict(finding)
+            waived["evidence_class"] = "waived"
+            waived["waiver"] = {
                 "owner": waiver.get("owner"),
                 "reason": waiver.get("reason"),
                 "review_date": waiver.get("review_date"),
                 "expiry": waiver.get("expiry"),
             }
-            return finding
+            return waived
     return finding
+
+
+def _minimal_candidate_keys(keys: list[list[str]]) -> list[list[str]]:
+    """Return deterministic minimal declared keys, excluding strict superkeys."""
+
+    unique_keys: list[list[str]] = []
+    for key in keys:
+        normalized = sorted(dict.fromkeys(key))
+        if normalized and normalized not in unique_keys:
+            unique_keys.append(normalized)
+    minimal = [
+        key
+        for key in unique_keys
+        if not any(set(other) < set(key) for other in unique_keys)
+    ]
+    return sorted(minimal, key=lambda key: (len(key), key))
+
+
+def _declared_uniques(
+    constraints: list[dict[str, Any]],
+    attname_by_oid_pos: dict[Any, dict[int, str]],
+) -> dict[Any, list[dict[str, Any]]]:
+    """Resolve common-snapshot UNIQUE constraint attnums to column names."""
+
+    unique_by_oid: dict[Any, list[dict[str, Any]]] = {}
+    for constraint in constraints:
+        if str(constraint.get("constraint_type")) != _CONTYPE_UNIQUE:
+            continue
+        oid = constraint.get("relation_oid")
+        pos_map = attname_by_oid_pos.get(oid, {})
+        names: list[str] = []
+        for attnum in constraint.get("constrained_attnums") or []:
+            try:
+                resolved_name = pos_map.get(int(attnum))
+            except (TypeError, ValueError):
+                resolved_name = None
+            if resolved_name is None:
+                names = []
+                break
+            names.append(resolved_name)
+        if names:
+            unique_by_oid.setdefault(oid, []).append(
+                {"name": constraint.get("constraint_name"), "columns": names}
+            )
+    return unique_by_oid
 
 
 def assess_normalization(
@@ -159,36 +187,12 @@ def assess_normalization(
     *,
     waivers: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Assess normalization for every base relation from catalog evidence.
+    """Assess catalog-visible normalization evidence for every base relation.
 
-    Args:
-        snapshot: A schema snapshot in the common introspection JSON shape.
-            ``None`` or missing keys are treated as an empty schema.
-        waivers: Optional list of waiver records. Each is
-            ``{"scope": {"schema"?, "relation"?, "kind"?}, "owner", "reason",
-            "review_date", "expiry"}``. A finding whose relation and kind match
-            every field the ``scope`` sets is recorded with evidence class
-            ``waived`` and an attached ``waiver`` object rather than dropped.
-
-    Returns:
-        A dictionary with:
-
-        ``version``
-            :data:`ASSESSMENT_VERSION`.
-        ``evidence_basis``
-            Always ``"catalog_only"`` for this analyzer.
-        ``relation_assessments``
-            One record per assessed base relation with its catalog-derived
-            candidate keys, prime/non-prime column split, a coarse
-            ``normal_form`` label, and the evidence class of that label.
-        ``findings``
-            Zero or more finding records, each with a deterministic
-            ``finding_id``, ``relation`` reference, ``kind``,
-            ``normal_form_scope``, ``evidence_class``, ``confidence``,
-            ``rationale``, ``false_positive_caveat``, ``source_objects``, and
-            ``next_action``. Findings are sorted for stable output.
-
-        The analyzer performs no I/O and emits no DDL.
+    The result distinguishes observations and declared constraints from inferred
+    review preconditions. A relation with no active finding is labelled
+    ``catalog_reviewed`` rather than a normal-form certification because
+    undeclared functional dependencies remain outside the evidence boundary.
     """
 
     snapshot = snapshot or {}
@@ -220,29 +224,7 @@ def assess_normalization(
         if name is not None:
             pk_by_oid.setdefault(pk.get("relation_oid"), []).append(str(name))
 
-    # Declared UNIQUE constraints, mapped from attnums to column names.
-    unique_by_oid: dict[Any, list[dict[str, Any]]] = {}
-    for constraint in constraints:
-        if str(constraint.get("constraint_type")) != _CONTYPE_UNIQUE:
-            continue
-        oid = constraint.get("relation_oid")
-        attnums = constraint.get("constrained_attnums") or []
-        pos_map = attname_by_oid_pos.get(oid, {})
-        names: list[str] = []
-        resolved = True
-        for attnum in attnums:
-            try:
-                resolved_name = pos_map.get(int(attnum))
-            except (TypeError, ValueError):
-                resolved_name = None
-            if resolved_name is None:
-                resolved = False
-                break
-            names.append(resolved_name)
-        if resolved and names:
-            unique_by_oid.setdefault(oid, []).append(
-                {"name": constraint.get("constraint_name"), "columns": names}
-            )
+    unique_by_oid = _declared_uniques(constraints, attname_by_oid_pos)
 
     fk_child_cols_by_oid: dict[Any, set[str]] = {}
     for edge in fk_edges:
@@ -256,44 +238,38 @@ def assess_normalization(
     findings: list[dict[str, Any]] = []
 
     for relation in relations:
-        kind = str(relation.get("relation_kind") or "")
-        if kind not in _ASSESSABLE_RELATION_KINDS:
+        relation_kind = str(relation.get("relation_kind") or "")
+        if relation_kind not in _ASSESSABLE_RELATION_KINDS:
             continue
         oid = relation.get("relation_oid")
         relation_columns = cols_by_oid.get(oid, [])
         if not relation_columns:
             continue
 
-        not_null: dict[str, bool] = {
-            str(c.get("column_name")): bool(c.get("is_not_null"))
-            for c in relation_columns
-            if c.get("column_name") is not None
+        not_null = {
+            str(column.get("column_name")): bool(column.get("is_not_null"))
+            for column in relation_columns
+            if column.get("column_name") is not None
         }
-        all_column_names = list(not_null.keys())
+        all_column_names = list(not_null)
 
-        # Candidate keys from declared evidence: the PK, plus every UNIQUE whose
-        # columns are all NOT NULL (a UNIQUE with a nullable column is not a
-        # total key in PostgreSQL, where NULLs are distinct).
-        candidate_keys: list[list[str]] = []
+        declared_keys: list[list[str]] = []
         pk_cols = pk_by_oid.get(oid, [])
         if pk_cols:
-            candidate_keys.append(sorted(pk_cols))
+            declared_keys.append(pk_cols)
         nullable_unique_determinants: list[dict[str, Any]] = []
         for unique in unique_by_oid.get(oid, []):
-            unique_columns = unique["columns"]
+            unique_columns = list(unique["columns"])
             if all(not_null.get(name, False) for name in unique_columns):
-                key = sorted(unique_columns)
-                if key not in candidate_keys:
-                    candidate_keys.append(key)
+                declared_keys.append(unique_columns)
             else:
                 nullable_unique_determinants.append(unique)
 
-        prime_columns = sorted({c for key in candidate_keys for c in key})
+        candidate_keys = _minimal_candidate_keys(declared_keys)
+        prime_columns = sorted({column for key in candidate_keys for column in key})
         non_prime_columns = sorted(set(all_column_names) - set(prime_columns))
-
         relation_findings: list[dict[str, Any]] = []
 
-        # --- 1NF: non-atomic columns -------------------------------------
         for column in relation_columns:
             name = column.get("column_name")
             if name is None:
@@ -301,136 +277,138 @@ def assess_normalization(
             non_atomic, confidence = _is_non_atomic(column)
             if not non_atomic:
                 continue
-            kind_key = "non_atomic_column"
+            finding_kind = "non_atomic_column"
             finding = {
-                "finding_id": _finding_id(oid, kind_key, [str(name)]),
+                "finding_id": _finding_id(relation, finding_kind, [str(name)]),
                 "relation": _relation_ref(relation),
-                "kind": kind_key,
+                "kind": finding_kind,
                 "normal_form_scope": "1NF",
                 "evidence_class": "observed",
                 "confidence": confidence,
                 "rationale": (
-                    f"Column {name!r} has type "
-                    f"{_norm_type(column.get('data_type'))!r}, which stores a "
-                    "repeating group or a nested document in a single cell."
+                    f"Column {name!r} has type {_norm_type(column.get('data_type'))!r}, "
+                    "which stores a repeating group or nested document in one cell."
                 ),
                 "false_positive_caveat": (
-                    "Array and JSON columns are frequently a deliberate, valid "
-                    "design (an evidence envelope, an audit payload, a document "
-                    "store). Confirm intent before treating this as a defect."
+                    "Array and JSON columns can be deliberate evidence envelopes, "
+                    "audit payloads, or document values; confirm domain intent first."
                 ),
                 "source_objects": [{"type": "column", "name": name}],
                 "next_action": (
-                    "Confirm whether this column holds a repeating group that "
-                    "belongs in a child table, or record a waiver explaining "
-                    "why the nested value is intentional."
+                    "Confirm whether the value is a repeating group that belongs in "
+                    "a child relation, or record a scoped waiver for the deliberate "
+                    "nested value."
                 ),
             }
             relation_findings.append(
-                _apply_waivers(finding, relation, kind_key, waivers)
+                _apply_waivers(finding, relation, finding_kind, waivers)
             )
 
-        # --- Key evidence: no declared candidate key --------------------
         if not candidate_keys:
-            kind_key = "missing_candidate_key"
+            finding_kind = "missing_candidate_key"
             finding = {
-                "finding_id": _finding_id(oid, kind_key, all_column_names),
+                "finding_id": _finding_id(
+                    relation, finding_kind, all_column_names
+                ),
                 "relation": _relation_ref(relation),
-                "kind": kind_key,
+                "kind": finding_kind,
                 "normal_form_scope": "BCNF",
                 "evidence_class": "inferred",
                 "confidence": "high",
                 "rationale": (
-                    "The relation declares no primary key and no NOT NULL "
-                    "UNIQUE constraint, so no candidate key is visible to the "
-                    "catalog and normalization cannot be assessed."
+                    "No primary key or total declared UNIQUE key is visible, so "
+                    "normal-form assessment lacks a catalog-visible candidate key."
                 ),
                 "false_positive_caveat": (
-                    "The table may still have a natural key that was simply "
-                    "never declared to the database."
+                    "A natural key may exist in the domain but remain undeclared."
                 ),
-                "source_objects": [{"type": "relation", "name": relation.get("relation_name")}],
+                "source_objects": [
+                    {"type": "relation", "name": relation.get("relation_name")}
+                ],
                 "next_action": (
-                    "Declare a primary key or a NOT NULL UNIQUE constraint so "
-                    "the relation's normal form can be evaluated."
+                    "Declare the candidate key, or supply evidence of the domain key "
+                    "before drawing normalization conclusions."
                 ),
             }
             relation_findings.append(
-                _apply_waivers(finding, relation, kind_key, waivers)
+                _apply_waivers(finding, relation, finding_kind, waivers)
             )
 
-        # --- BCNF: UNIQUE on a nullable column --------------------------
         for unique in nullable_unique_determinants:
-            kind_key = "nullable_unique_determinant"
-            unique_columns = unique["columns"]
+            finding_kind = "nullable_unique_determinant"
+            unique_columns = list(unique["columns"])
             finding = {
-                "finding_id": _finding_id(oid, kind_key, unique_columns),
+                "finding_id": _finding_id(
+                    relation, finding_kind, unique_columns
+                ),
                 "relation": _relation_ref(relation),
-                "kind": kind_key,
+                "kind": finding_kind,
                 "normal_form_scope": "BCNF",
                 "evidence_class": "declared",
                 "confidence": "medium",
                 "rationale": (
-                    f"UNIQUE constraint {unique.get('name')!r} covers column(s) "
-                    f"{', '.join(unique_columns)}, at least one of which is "
-                    "nullable. PostgreSQL treats NULLs as distinct, so this "
-                    "determinant does not guarantee a total key."
+                    f"UNIQUE constraint {unique.get('name')!r} covers "
+                    f"{', '.join(unique_columns)}, with at least one nullable "
+                    "column, so it is not treated as a total candidate key."
                 ),
                 "false_positive_caveat": (
-                    "Partial uniqueness is sometimes intentional (for example a "
-                    "single active row per group with the rest NULL)."
+                    "Nullable uniqueness can be intentional and SQL dialects differ "
+                    "in null-distinctness details."
                 ),
                 "source_objects": [
                     {"type": "constraint", "name": unique.get("name")},
-                    *[{"type": "column", "name": c} for c in unique_columns],
+                    *[
+                        {"type": "column", "name": column}
+                        for column in unique_columns
+                    ],
                 ],
                 "next_action": (
-                    "If this should be a key, add NOT NULL to its columns; "
-                    "otherwise document why partial uniqueness is acceptable."
+                    "If the determinant is intended as a total key, make its columns "
+                    "non-null and verify dialect semantics; otherwise document intent."
                 ),
             }
             relation_findings.append(
-                _apply_waivers(finding, relation, kind_key, waivers)
+                _apply_waivers(finding, relation, finding_kind, waivers)
             )
 
-        # --- 2NF: composite-key partial-dependency precondition ---------
-        has_single_column_key = any(len(key) == 1 for key in candidate_keys)
         has_composite_key = any(len(key) >= 2 for key in candidate_keys)
-        if has_composite_key and not has_single_column_key and non_prime_columns:
-            kind_key = "partial_dependency_precondition"
+        if has_composite_key and non_prime_columns:
+            finding_kind = "partial_dependency_precondition"
             finding = {
-                "finding_id": _finding_id(oid, kind_key, non_prime_columns),
+                "finding_id": _finding_id(
+                    relation, finding_kind, non_prime_columns
+                ),
                 "relation": _relation_ref(relation),
-                "kind": kind_key,
+                "kind": finding_kind,
                 "normal_form_scope": "2NF",
                 "evidence_class": "inferred",
                 "confidence": "low",
                 "rationale": (
-                    "The only candidate key is composite and the relation has "
-                    f"non-key column(s) ({', '.join(non_prime_columns)}). That "
-                    "is the structural precondition for a 2NF partial "
-                    "dependency; the catalog cannot confirm an actual one."
+                    "At least one candidate key is composite and the relation has "
+                    f"non-prime column(s) ({', '.join(non_prime_columns)}). This is "
+                    "a structural precondition for a partial dependency, not proof "
+                    "that one exists."
                 ),
                 "false_positive_caveat": (
-                    "This is not a violation on its own. Many relations with a "
-                    "composite key are fully normalized."
+                    "Many relations with composite candidate keys are fully normalized."
                 ),
                 "source_objects": [
-                    {"type": "column", "name": c} for c in non_prime_columns
+                    {"type": "column", "name": column}
+                    for column in non_prime_columns
                 ],
                 "next_action": (
-                    "Profile whether any non-key column depends on only part "
-                    "of the composite key, or declare the functional "
-                    "dependencies so this can be decided from evidence."
+                    "Profile or declare functional dependencies to determine whether "
+                    "a non-prime attribute depends on a proper subset of a composite key."
                 ),
             }
             relation_findings.append(
-                _apply_waivers(finding, relation, kind_key, waivers)
+                _apply_waivers(finding, relation, finding_kind, waivers)
             )
 
-        # --- Coarse normal-form label for the relation -----------------
         active_kinds = {
-            f["kind"] for f in relation_findings if f["evidence_class"] != "waived"
+            finding["kind"]
+            for finding in relation_findings
+            if finding["evidence_class"] != "waived"
         }
         if "missing_candidate_key" in active_kinds:
             normal_form = "insufficient_evidence"
@@ -445,8 +423,8 @@ def assess_normalization(
             normal_form = "bcnf_review"
             nf_evidence = "declared"
         else:
-            normal_form = "bcnf"
-            nf_evidence = "declared"
+            normal_form = "catalog_reviewed"
+            nf_evidence = "inferred"
 
         relation_assessments.append(
             {
@@ -458,27 +436,27 @@ def assess_normalization(
                 "normal_form": normal_form,
                 "evidence_class": nf_evidence,
                 "rationale": (
-                    "Label derived only from declared keys, NOT NULL flags, and "
-                    "column types. Undeclared functional dependencies are not "
-                    "visible to this analyzer."
+                    "Label is derived only from catalog-visible keys, nullability, "
+                    "and column types; absence of a finding does not prove BCNF "
+                    "because undeclared functional dependencies remain unknown."
                 ),
             }
         )
         findings.extend(relation_findings)
 
     findings.sort(
-        key=lambda f: (
-            str(f["relation"].get("schema") or ""),
-            str(f["relation"].get("name") or ""),
-            f["normal_form_scope"],
-            f["kind"],
-            f["finding_id"],
+        key=lambda finding: (
+            str(finding["relation"].get("schema") or ""),
+            str(finding["relation"].get("name") or ""),
+            finding["normal_form_scope"],
+            finding["kind"],
+            finding["finding_id"],
         )
     )
     relation_assessments.sort(
-        key=lambda a: (
-            str(a["relation"].get("schema") or ""),
-            str(a["relation"].get("name") or ""),
+        key=lambda assessment: (
+            str(assessment["relation"].get("schema") or ""),
+            str(assessment["relation"].get("name") or ""),
         )
     )
 
