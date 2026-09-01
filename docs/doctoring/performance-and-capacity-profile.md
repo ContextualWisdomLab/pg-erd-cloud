@@ -1,7 +1,7 @@
 # Performance & capacity profile
 
-Status: **in progress** — increments 1 (workload generators) and 2 (measured
-baseline harness) landed. Tracks issue
+Status: **in progress** — increments 1 (workload generators), 2 (measured
+baseline harness), and 3 (repeat-run aggregation) landed. Tracks issue
 [#951](https://github.com/ContextualWisdomLab/pg-erd-cloud/issues/951)
 ("[Performance Gap] Establish large-schema SLOs, workload benchmarks, and a
 measured Rust boundary").
@@ -68,13 +68,35 @@ CLI: `python -m app.perf.baseline --profile small [--seed N] [--json]`.
 `tracemalloc` is torn down in a `finally` block, so a cancelled run leaves
 no tracing active and never returns a partial report.
 
+## Decision — repeat-run aggregation (this increment)
+
+A single timing is noisy. `app/perf/baseline_stats.py` runs `run_baseline`
+`repeat` times over the *same* seeded workload (snapshot fixed; only the
+timing varies) and reduces each path's `wall_seconds` and `peak_bytes`
+sample lists to a distribution summary — `samples`, `min`, `max`, `mean`,
+`p50`, `p95`, `p99` — via `statistics.quantiles(..., n=100,
+method="inclusive")` (standard library only). `result_size_bytes` is
+deterministic for a fixed snapshot, so it is reported once as a scalar.
+
+`aggregate_baseline(profile_name, *, repeat, seed=None)` adds `repeat` to
+the report metadata. `repeat < 1` raises `ValueError`; `repeat == 1`
+returns a well-formed degenerate summary (every quantile equals the one
+sample). A cancelled aggregation never returns a partial distribution.
+CLI: `python -m app.perf.baseline_stats --profile small --repeat 5
+[--seed N] [--json]`.
+
+Still observations only: no threshold, no verdict. The percentile targets
+a capacity profile eventually publishes are set from measured baseline
+runs and never invented here.
+
 ## Deferred (later increments on #951)
 
 - **Baseline harness — remaining paths** — DBML/Mermaid/Prisma/spec export,
   API list/detail/pagination/search, and queue
-  claim/retry/lease/cleanup/fairness, plus p50/p95/p99 across repeated runs,
-  query count, lock wait, and queue lag. The pure snapshot paths above are
-  done; these need a DB / event loop and belong in the benchmark workflow.
+  claim/retry/lease/cleanup/fairness, plus query count, lock wait, and
+  queue lag. The pure snapshot paths above are done and their percentile
+  aggregation is in place; these remaining paths need a DB / event loop and
+  belong in the benchmark workflow.
 - **`docs/PERFORMANCE.md`** — the versioned capacity profile with
   buyer-facing limits, separated from benchmark targets. **No SLA claim
   until production evidence exists.**

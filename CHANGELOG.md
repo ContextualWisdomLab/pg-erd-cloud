@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 📊 **성능 baseline 반복 집계 (#951 3차 증분)**: `app.perf.baseline_stats`가 고정 시드의 동일 workload에 대해 `run_baseline`을 `repeat`회 실행하고 경로별 `wall_seconds`·`peak_bytes`를 min·max·mean·p50·p95·p99 분포 요약으로 축약합니다(`statistics.quantiles`, 표준 라이브러리만). 임계값·합격 판정 없음. `python -m app.perf.baseline_stats --profile small --repeat 5 [--json]` CLI, `repeat < 1`은 `ValueError`, 취소 시 부분 집계를 반환하지 않습니다.
 - [BE] 📏 **측정 기반 성능 baseline 하네스 (#951 2차 증분)**: `app.perf.baseline`이 생성된 workload 스냅샷에 대해 순수(부수효과 없는) 처리 경로 — canonical 해시, JSON 왕복, self-diff, PostgreSQL/Snowflake DDL export, 데이터 딕셔너리 Markdown — 를 계측해 경로별 `wall_seconds`·`peak_bytes`·`result_size_bytes`만 기록합니다. 임계값·합격 판정 없음(용량 목표는 이 하네스의 측정값으로 산출). `python -m app.perf.baseline --profile small --json` CLI 포함, 취소 시 `tracemalloc`을 정리하고 부분 리포트를 반환하지 않습니다.
 - [BE] 📈 **성능·용량 프로파일 (1차 증분 — 워크로드 생성기)**: `app.perf.workload_profiles`에 결정론적·익명 스키마 스냅샷 생성기를 추가했습니다. `small`/`medium`/`large` 프로파일이 이슈 #951 표의 스키마·relation·컬럼·FK·인덱스 개수를 정확히 맞추며, 시드 고정 시 바이트 단위로 재현됩니다. 편향 케이스도 제공합니다 — 단일 5,000컬럼 relation, 밀집 FK 클러스터, 깊은 종속 체인, 분리된 컴포넌트, 다국어·따옴표 식별자 + 대형 코멘트, RANGE 파티션 계층. 실제 인명·기관명·운영 데이터 값 없음. 지연·처리량·메모리 임계값은 이 모듈에 넣지 않으며(계측된 baseline에서 산출), `docs/doctoring/performance-and-capacity-profile.md`에 계약과 후속 증분(baseline 하네스·`docs/PERFORMANCE.md`·벤치 워크플로·Rust 결정 게이트)을 기록했습니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
