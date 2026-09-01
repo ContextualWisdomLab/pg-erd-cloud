@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🔐 **Credential-provider 경계 (1차 증분)**: `app/secret_provider/` 패키지에 provider-neutral 자격증명 계약을 추가했습니다 — `SecretReference`(비밀 값 미포함 메타데이터), `ResolvedSecret`(값은 `reveal()`로만 접근; `str`/`repr`/`format`/로그 모두 redaction), `CredentialProvider` Protocol, fail-closed `SecretResolutionError`. `LocalMountedFileProvider`(`/run/secrets` 패턴; 누락·빈파일·초과(>64KiB)·심링크·경로이탈·비정규파일·비UTF-8에 fail-closed, 후행 개행 1개만 제거)와 `DeterministicTestProvider`를 제공합니다. `Settings` 연결은 후속 증분. 비밀 값이 로그·repr·format에 절대 노출되지 않음을 테스트로 강제(14종). `docs/doctoring/credential-provider-contract.md`에 계약·bootstrap-transport 입장·APP_SECRET dual-read/single-write 회전 설계를 기록.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
