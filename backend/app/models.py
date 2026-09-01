@@ -206,7 +206,7 @@ class DiagramView(Base):
         ForeignKey("project_space.project_space_uuid", ondelete="CASCADE"),
         index=True,
     )
-    name: Mapped[str] = mapped_column(Text())
+    diagram_name: Mapped[str] = mapped_column(Text())
     # Opaque, client-defined layout payload (node positions, hidden tables,
     # viewport). Stored as JSONB; the API bounds its size.
     layout_json: Mapped[dict] = mapped_column(JSONB())
