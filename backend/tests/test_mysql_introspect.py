@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
-from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
+from app.mysql_introspect.introspect import (
+    MysqlDsnConfig,
+    _introspect_sync,
+    _parse_mysql_dsn,
+    rows_to_snapshot,
+)
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -98,3 +103,58 @@ async def test_dsn_parse_pins_validated_ip_and_rejects_bad():
         await _parse_mysql_dsn("mysql:///nohost")
     with pytest.raises(ValueError):
         await _parse_mysql_dsn("postgres://u@h/db")
+
+
+@pytest.mark.parametrize(
+    ("schema_filter", "expected_clause", "expected_params"),
+    [
+        (
+            "shop' OR 1=1 --",
+            "TABLE_SCHEMA = %s",
+            ("shop' OR 1=1 --",),
+        ),
+        (
+            None,
+            "TABLE_SCHEMA NOT IN (%s, %s, %s, %s)",
+            ("mysql", "information_schema", "performance_schema", "sys"),
+        ),
+    ],
+)
+def test_introspection_queries_keep_schema_values_bound(
+    schema_filter: str | None,
+    expected_clause: str,
+    expected_params: tuple[object, ...],
+):
+    config = MysqlDsnConfig(
+        host="203.0.113.10",
+        server_hostname="db.example.com",
+        port=3306,
+        user="reader",
+        password="secret",
+        database=None,
+    )
+    connection = Mock()
+    observed_calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def fake_fetch(_cursor, sql: str, params: tuple[object, ...] = ()):
+        observed_calls.append((sql, params))
+        if sql == "SELECT VERSION() AS v":
+            return [{"v": "8.4.0"}]
+        return []
+
+    with (
+        patch("app.mysql_introspect.introspect._connect", return_value=connection),
+        patch("app.mysql_introspect.introspect._fetch_dicts", side_effect=fake_fetch),
+    ):
+        snapshot = _introspect_sync(config, schema_filter)
+
+    assert snapshot["schema_filter"] == schema_filter
+    information_schema_calls = observed_calls[1:]
+    assert len(information_schema_calls) == 4
+    for sql, params in information_schema_calls:
+        assert expected_clause in sql
+        assert params == expected_params
+        if schema_filter is not None:
+            assert schema_filter not in sql
+    connection.cursor.assert_called_once_with()
+    connection.close.assert_called_once_with()
