@@ -249,7 +249,11 @@ def rows_to_snapshot(
                 ),
             }
         )
-        if unique and name != "PRIMARY":
+        if (
+            unique
+            and name != "PRIMARY"
+            and all((ix_oid, column) in pos_by_oid_col for column in ordered)
+        ):
             constraints.append(
                 {
                     "constraint_oid": 500000 + len(out_indexes),
