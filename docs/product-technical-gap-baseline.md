@@ -1,6 +1,6 @@
 # Product & technical gap baseline
 
-**Last consolidated:** 2026-09-01 UTC (autonomous review/merge loop, iter20).
+**Last consolidated:** 2026-09-01 UTC (autonomous review/merge loop, iter22).
 
 This document is the single tracker for the distance between what
 pg-erd-cloud does today and a defensible first commercial release. It is
@@ -43,19 +43,21 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter20 the loop is holding **13 stacked increment
+the gate clears. As of iter22 the loop is holding **15 stacked increment
 PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
 baseline draft) is green on every required check and waits only on one
-non-author approval; it is not one of the 13 increments.
+non-author approval; it is not one of the 15 increments.
 
-The 13 increments and the merge-wave order once the gate clears:
+The 15 increments and the merge-wave order once the gate clears:
 
 ```text
 #942  (approval-pending, not an increment)
   -> #1024 -> #1025
-  -> #1031 -> #1032 -> #1033 -> #1035 -> #1048   (#947 chain)
-  -> #1036 -> #1041 -> #1045                     (#951 chain)
-  -> #1037 (#946) -> #1038 (#948) -> #1039 (#950)
+  -> #1031 -> #1032 -> #1033 -> #1035 -> #1048        (#947 chain)
+  -> #1036 -> #1041 -> #1045                          (#951 chain)
+  -> #1037 (#946)
+  -> #1038 (#948) -> #1050
+  -> #1039 (#950) -> #1049
   -> #1040 (this document)
 ```
 
@@ -190,11 +192,18 @@ policy, no recovery checkpoint.
   reported); `apply_promotion` (append-only optimistic concurrency, closes
   prior interval, `PromotionConflictError`); `decide_retention` (disposition
   record, never deletes; promoted + legal-hold protected). 9 tests.
+- **#1050** — `app/lineage/prov_projection.py` (`to_prov_document`): a pure
+  W3C **PROV-JSON** projection of the `build_lineage_graph` result. One
+  `prov:Entity` per snapshot id (including ids referenced only as a dangling
+  parent); one `wasDerivedFrom` per typed edge, carrying `pg:derivationKind`
+  so the "by kind" information survives. PROV-JSON is plain JSON, so no new
+  dependency; deterministic and `json.dumps`-serializable. 9 tests.
 
 **Remaining increments.** Normalized tables + Alembic migration; repositories
 + a `Settings`-gated HTTP surface (history / compare / promote / supersede /
-archive / recover); PROV-JSON-LD projection; embed exact references into every
-export.
+archive / recover); a `wasGeneratedBy` / `activity` layer on the PROV
+projection once the persisted model records the tool / commit / policy per
+snapshot; embed exact references into every export.
 
 **Status:** `in-progress`.
 
@@ -305,13 +314,21 @@ DSNs, share links. No tenant authority; no isolation-mode contract.
   `validate_profile()` honesty validator (rejects a dishonest GA claim for
   either profile), `AUTHORITY_BEARING_OBJECTS` enumeration,
   `PROFILE_A_TEMPLATE` / `PROFILE_B_TEMPLATE`. 9 tests.
+- **#1049** — `app/deploy/tenant_authority_check.py` (`check_tenant_authority`):
+  the concrete check behind the `all_authority_objects_tenant_scoped` bool.
+  Given `{name, columns, derives_tenant_from}` table descriptions it
+  partitions every `AUTHORITY_BEARING_OBJECTS` entry into `carrying` (has
+  `tenant_account_uuid`) / `derived` (scoped through a named parent) /
+  `missing_scoping` / `missing_definition`, and is `compliant` only when
+  neither missing-list has an entry. `single_org_per_database` returns
+  `applicable=False` / `compliant=True` with a reason. Pure; 11 tests.
 
 **Remaining increments.** `tenant_account` authority tables + migration; a
 repository layer deriving `tenant_account_uuid` on every authority-bearing
-read/write + a test that no authority table lacks the column; SSO / SCIM
-identity-link + provisioning flows; data-residency enforcement; a
+read/write, feeding the real ORM metadata to `check_tenant_authority`; SSO /
+SCIM identity-link + provisioning flows; data-residency enforcement; a
 `Settings`-selected active profile with a fail-closed startup self-check
-running `validate_profile`.
+running `validate_profile` and `check_tenant_authority`.
 
 **Status:** `in-progress`.
 
@@ -600,15 +617,17 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. This revision (iter20) added PR #1048
-(transitive-dependency / 3NF assessment) to the #947 list, took the
-stacked-PR count to 13, and inserted it into the merge-wave order. iter19
-fixed the markdownlint MD018 line-start warnings and the reference links
-flagged on PR #1040. iter18 added PR #1045 (repeat-run percentile
-aggregation) to the performance-gap increment list. iter16 filled the three
-epic sections (#949, #952, #953) from their issue bodies and aligned the
-LLM-orchestrator wording with the existing configuration-only
-`/chat/completions` integration in `docs/llm-orchestrator-integration.md`.
+ships or the incident status changes. This revision (iter22) added PR #1049
+(the tenant-authority column-presence check) to the #950 list and PR #1050
+(the lineage PROV-JSON projection) to the #948 list, taking the stacked-PR
+count to 15. iter20 added PR #1048 (transitive-dependency / 3NF assessment)
+to the #947 list. iter19 fixed the markdownlint MD018 line-start warnings
+and the reference links flagged on PR #1040. iter18 added PR #1045
+(repeat-run percentile aggregation) to the performance-gap increment list.
+iter16 filled the three epic sections (#949, #952, #953) from their issue
+bodies and aligned the LLM-orchestrator wording with the existing
+configuration-only `/chat/completions` integration in
+`docs/llm-orchestrator-integration.md`.
 When the gate clears and PR #942 merges, reconcile its
 `docs/product-technical-gap-baseline.md`,
 `docs/doctoring/product-technical-gap-baseline.md`, and
