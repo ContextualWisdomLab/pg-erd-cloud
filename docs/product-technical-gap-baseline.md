@@ -1,6 +1,6 @@
 # Product & technical gap baseline
 
-**Last consolidated:** 2026-09-01 (autonomous review/merge loop, iter14).
+**Last consolidated:** 2026-09-01 (autonomous review/merge loop, iter16).
 
 This document is the single tracker for the distance between what
 pg-erd-cloud does today and a defensible first commercial release. It is
@@ -43,8 +43,15 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter14 the loop has 10 such PRs stacked
-(#942, #1024, #1025, #1031, #1032, #1033, #1035, #1036, #1037, #1038, #1039).
+the gate clears. As of iter16 the loop is holding **11 stacked increment
+PRs** — #1024, #1025, #1031, #1032, #1033, #1035, #1036, #1037, #1038,
+#1039, #1041 — plus **this document** (#1040). Separately, **#942** (the
+original baseline draft) is green on every required check and waits only on
+one non-author approval; it is not one of the 11 increments.
+
+Dependency order for the merge wave once the gate clears: #942 → #1024 →
+#1025 → #1031 → #1032 → #1033 → #1035 → #1036 → #1041 → #1037 → #1038 →
+#1039 → #1040.
 
 ## Status legend
 
@@ -176,27 +183,85 @@ export.
 
 ## #949 — Governed forward-engineering apply, rollback, recovery (`[Product Epic]`)
 
-**Feature spec (summary, from title — full re-read pending).** The
-snapshot → DDL apply path must become *governed*: an approval gate before a
-non-dry-run apply, a recorded plan / run / outcome, a rollback path, and a
-recovery workflow distinct from metadata recovery.
+**Feature spec (summary).** The snapshot → DDL path must become a
+protected, versioned vertical workflow: base snapshot → proposed target →
+deterministic migration plan → risk/precondition review → isolated dry run
+→ live read-only preflight → human approval → bounded apply → convergence
+capture → success or recovery → immutable evidence bundle. The issue
+mandates a **bounded-PR decomposition** rather than one growing branch:
+
+1. **Plan authority & compiler** — immutable source/target snapshot IDs +
+   hashes; deterministic typed operations with dependency order; a
+   dialect/version capability matrix; reversible / conditionally reversible
+   / irreversible classification; fixed resource limits; no free-form SQL
+   authority.
+2. **Sandbox runtime** — ephemeral isolated PostgreSQL 14–18 with no
+   production credentials or customer network; CPU/memory/storage/
+   wall-clock/statement/output bounds; cleanup + orphan reaper; a
+   convergence report.
+3. **Stored-target live preflight provider** — exact project / connection /
+   base-snapshot / attempt-lease binding; post-connect revalidation;
+   read-only catalog capture + precondition checks; DNS/SSRF/TLS + least
+   privilege; secret-safe errors; cancellation.
+4. **Approval & authorization** — deployer role + maker-checker for
+   high-risk plans; exact plan digest / target fingerprint / environment /
+   expiry / scope; approval invalidated on any plan/target/state change; an
+   accessible review UI that explains risk and the next action.
+5. **Apply worker** — production consumer registration; one active attempt
+   per run with fenced leases + heartbeats; statement-level timeouts +
+   cancellation checkpoints; a transaction boundary declared per operation
+   class; retry only where idempotency is proved; no generic replay of
+   partially committed DDL.
+6. **Convergence & recovery** — recapture target state through the same
+   guarded connection; compare actual vs planned; distinguish success /
+   partial / divergent / unknown; generate recovery guidance from known
+   committed operations; integrate approved backup/PITR evidence; never
+   claim automatic rollback for irreversible or non-transactional DDL.
+7. **Operations & evidence** — durable event/outbox/inbox; OpenTelemetry
+   traces + metrics with no DSN/schema-value leakage; incident +
+   cancellation runbooks; downloadable signed execution evidence +
+   machine-readable provenance; recovery from restart / worker crash /
+   lease loss / queue duplication / provider timeout.
+
+**Safety invariants (must hold).** `dry_run=false` stays default-deny
+until deployment policy explicitly enables the final apply capability; a
+legacy free-form SQL route can never silently become structured apply
+authority; the worker never accepts plaintext DSNs, connection overrides,
+or plan SQL from queue payloads; every external identifier is re-resolved
+and re-authorized at execution time; the target is sticky to the approved
+provider/connection lineage; no status is `successful` before post-apply
+convergence evidence is committed transactionally with the outbox event.
 
 **Current state.** `app/ddl/apply_postgres_ddl` runs a validated
 `ForwardDdlBatch` inside one transaction, `dry_run` default, SSRF-guarded.
-`migration_safety.analyze_migration_safety` classifies risk. No approval
-record, no run history, no rollback beyond the single-transaction rollback.
+`migration_safety.analyze_migration_safety` classifies risk. PR #834 built
+an execution-neutral foundation (structured plans, dry-run attempts,
+cancellation, leases, live preflight, audit evidence) but deliberately
+registers no production consumer, provisions no sandbox, grants no live
+apply authority, and proves no process recovery.
 
-**Gap.** No governance record, no multi-statement rollback strategy, no
-recovery workflow.
+**Gap.** No production apply consumer; no sandbox runtime; no approval
+record bound to an exact plan digest; no convergence/recovery step; no
+immutable evidence bundle; #834's useful commits are not yet decomposed
+onto protected `main`.
 
-**This loop's increment PRs.** _none yet._
+**This loop's increment PRs.** _none yet_ — deferred behind the #948
+lineage model (parts 1 and 6 reuse `planned_from` / `exported_from` edges
+and audit records) and the #946 credential boundary (part 3 preflight
+provider). Sequencing #948 → #946 integration → #949 part 1 avoids
+building the plan model twice.
 
-**Remaining increments.** A `migration_plan` / `migration_run` model (can
-reuse the #948 lineage `planned_from` / `exported_from` edges and audit
-records); an approval gate; a `pg_dump`-anchored recovery-point contract;
-apply-time safety re-check against the live target.
+**Remaining increments.** All seven parts above, each as a bounded PR from
+protected `main` with exact-head evidence; realistic acceptance tests on
+PostgreSQL 14–18 (additive column/index/FK, rename, type conversion,
+partition op, extension-owned index AM, quoted multilingual identifiers)
+and failure injection (lock contention, statement timeout, deadlock,
+connection loss, worker `SIGKILL`, lease expiry, duplicate signal, restart;
+plan/target changed after approval; partial-commit recovery without
+replay).
 
-**Status:** `not-started` (adjacent to #948 lineage).
+**Status:** `spec'd` (foundations forming in #948 / #946; adjacent to #948
+lineage).
 
 ---
 
@@ -256,11 +321,23 @@ decision evidence.
   disconnected components, multilingual/quoted identifiers + large comments,
   partition hierarchy). Seeded → byte-identical. **No invented threshold**
   (meta-test enforced). 12 tests; `large` in ~0.4s.
+- **#1041** — `app/perf/baseline.py` (stacked on #1036):
+  `run_baseline(profile_name, *, seed=None) -> dict` times the pure
+  side-effect-free paths — canonical hash, JSON round-trip, self-diff,
+  PostgreSQL + Snowflake DDL export, data-dictionary Markdown — and records
+  only `wall_seconds`, `tracemalloc` `peak_bytes`, and `result_size_bytes`
+  per path. `python -m app.perf.baseline --profile small [--seed N]
+  [--json]` CLI. `tracemalloc` torn down in `finally`; a cancelled run
+  returns no partial report. **No threshold or verdict** (meta-test
+  enforced). 9 tests.
 
-**Remaining increments.** A `run_baseline(profile, paths) -> dict` measurement
-harness (plumbing only, no thresholds); `docs/PERFORMANCE.md`; the
-release-candidate benchmark workflow with a reproducibility receipt; frontend
-traces; per-hotspot Rust decision-gate ADRs.
+**Remaining increments.** Repeat-run percentile aggregation over
+`run_baseline` (p50/p95/p99 + min/max per path, still threshold-free); the
+DB / event-loop paths (API list/detail/pagination/search, queue
+claim/retry/lease/cleanup/fairness) in the benchmark workflow;
+`docs/PERFORMANCE.md`; the release-candidate benchmark workflow with a
+reproducibility receipt; frontend traces; per-hotspot Rust decision-gate
+ADRs.
 
 **Status:** `in-progress`.
 
@@ -268,59 +345,172 @@ traces; per-hotspot Rust decision-gate ADRs.
 
 ## #952 — Tenant-scoped document & LLM workflows without weakening standalone (`[Ecosystem Gap]`)
 
-**Feature spec (summary, from title — full re-read pending).** The reversing
-spec / data-dictionary / document workflows and the LLM draft path must be
-tenant-scoped in the `multi_tenant_saas` profile while the `standalone`
-profile keeps working with no network and no Keyverse. LLM access goes
-through the `contextual-orchestrator` contract, not a per-provider key vault.
+**Feature spec (summary).** Turn the currently-optional connector calls
+into three complete, governed vertical workflows while keeping standalone
+operation fully functional:
 
-**Current state.** `app/spec/llm.py` calls an OpenAI-compatible provider
-directly via `LLM_API_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`; local-only
-reversing spec works without it. No tenant scoping on document artifacts.
+1. **Reference-document attachment** — project/snapshot/table → authorized
+   attachment intent → signed tenant/purpose request → Clearfolio
+   conversion job → durable connector receipt → viewer artifact reference →
+   project evidence drawer. Needs normalized `connector_account` /
+   `connector_grant` / `document_reference` / `attachment_binding` /
+   `connector_job` / `connector_receipt` metadata; opaque external IDs only;
+   short-lived signed tenant/project/purpose claims; an allowlisted
+   endpoint with exact host/port/method/MIME/timeout/size/redirect/retry
+   policy; consent + data-classification review; status/retry/cancel/
+   revoke/expiry; immutable source hash; no document contents in any log,
+   metric, billing record, or LLM trace.
+2. **Grounded reversing specification** — exact snapshot + authorized
+   references → evidence bundle → orchestrator operation (e.g.
+   `draft_database_reversing_spec`) → schema-bound draft → independent
+   grounding verification → reviewed revision. Must send bounded semantic
+   evidence units (never whole documents or DSNs); record snapshot hash,
+   evidence IDs, model/provider IDs, prompt hash, orchestration mode,
+   reasoning effort, knowledge cutoff, and verification result; distinguish
+   local deterministic draft / LLM draft / verified draft / human-approved
+   revision; detect unsupported claims, wrong object names / cardinality,
+   inverted relationships, fabricated rationale, and prompt injection from
+   comments or documents; no automatic publication or migration approval.
+3. **Naruon / context-fabric projection** — a read-only versioned evidence
+   contract for authorized consumers: canonical references, truth status
+   (`observed` / `declared` / `inferred` / `proposed`), valid/system time +
+   knowledge cutoff, provenance + source hashes, policy-filtered metadata
+   with no DSN/secret, an idempotent event/receipt contract, and **no
+   requirement that naruon be present** for standalone operation.
 
-**Gap.** LLM credentials are unmanaged (ties to #946); document artifacts are
-not tenant-scoped (ties to #950); no `contextual-orchestrator` connector.
+**Product boundary (explicit in the issue).** pg-erd-cloud stays the
+authority for ERD projects, connections, snapshots, views, annotations,
+sharing, migration plans/runs, and connector *references*. It does not
+become a document viewer, object store, PIM/knowledge graph, or LLM
+gateway. Clearfolio owns document conversion/viewer jobs; contextual-
+orchestrator owns provider/model discovery, routing, fallback,
+orchestration, evaluation, and cost/quality telemetry; naruon may consume
+pg-erd-cloud evidence through an explicit connector but never owns project
+state. Every integration is optional and fails as an *unavailable
+capability*, not a broken core product.
 
-**This loop's increment PRs.** _none yet_ (foundations in #1037 credential
-boundary and #1039 tenant authority model).
+**Current state.** `app/spec/llm.py` already performs a **configuration-
+only** OpenAI-compatible integration: it calls a `/chat/completions`
+endpoint via `LLM_API_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` (see
+`docs/llm-orchestrator-integration.md`) and the local deterministic
+reversing spec / data dictionary work with no LLM configured. The
+transport works; what is missing is governance, not a connection.
 
-**Remaining increments.** A `contextual-orchestrator` client behind the #946
-provider boundary; tenant-scoping of reversing-spec / data-dictionary /
-connector artifacts per #950; a `standalone` profile conformance test
-(no network, no Keyverse).
+**Gap.** The LLM credentials are unmanaged runtime config (ties to #946);
+model discovery / capability routing / fallback / evaluation are not
+delegated to `contextual-orchestrator` (the issue requires replacing
+direct per-provider runtime authority with a versioned orchestrator
+operation, and supporting non-chat-completions model classes such as
+NVIDIA NIM via discovery + fallback); no tenant/purpose scoping or
+evidence lineage on document artifacts (ties to #950); connector
+failure / retry / revocation is not one coherent UI + audit contract; no
+`standalone`-mode conformance test proving all connectors can be disabled.
 
-**Status:** `not-started` (blocked on #946 + #950 foundations).
+**This loop's increment PRs.** _none yet_ — foundations in #1037
+(credential-provider boundary the orchestrator client sits behind) and
+#1039 (tenant authority model the artifact scoping needs).
+
+**Remaining increments.** A versioned `contextual-orchestrator` client
+behind the #946 provider boundary that replaces the direct
+`LLM_API_*` runtime authority and adds discovery / capability routing /
+fallback / grounding verification; the normalized connector-reference
+metadata + Clearfolio attachment workflow; tenant-scoping of
+reversing-spec / data-dictionary / connector artifacts per #950; the
+naruon read-only evidence contract; a `standalone` profile conformance
+test (no network, no Keyverse, all connectors disabled) plus adversarial
+tests (cross-tenant attachment, credential revocation mid-job, webhook
+replay/reorder, DNS-rebind / oversized body / wrong MIME, document + schema
+comment prompt injection, fabricated table/column/FK in LLM output,
+knowledge-cutoff leakage).
+
+**Status:** `spec'd` (transport exists; governance blocked on #946 + #950
+foundations).
 
 ---
 
 ## #953 — First commercial release with exact-head, migration, operability, supply-chain evidence (`[Release Epic]`)
 
-**Feature spec (summary, from title — full re-read pending).** The umbrella
-release gate: exact-current-head evidence for every claim, a rehearsed
-migration path, an operability baseline (SLOs, dashboards, runbooks), and
-supply-chain evidence (hash-locked deps, digest-pinned images, SBOM,
-attestation). Consumes #946–#952.
+**Feature spec (summary).** Produce the first truthful, installable,
+supportable **single-tenant managed / self-hosted GA candidate**.
+Multi-tenant SaaS stays non-GA until #950 is complete; the release must
+work standalone with optional CWL connectors as capability additions, not
+hidden prerequisites. The epic **owns release integration only** and must
+not duplicate implementation bodies. Its work:
 
-**Current state.** Supply-chain pinning is already enforced (hash-locked pip,
-digest-pinned Docker, SHA-pinned Actions, OpenSSF Scorecard). CI runs mypy +
-pytest + typecheck + vitest + production build + CodeQL + Scorecard +
-dependency-review. No consolidated release evidence manifest.
+- **PR-queue shaping.** Capture the exact protected-`main` SHA, ruleset,
+  required checks, and every open PR's exact head. Classify each PR:
+  unique in-scope change / stack dependency / superseded-duplicate /
+  contaminated aggregate needing reconstruction / experiment-or-post-GA /
+  blocked by the org control-plane incident. Close duplicates with a link
+  to the canonical issue; never transfer stale-head review evidence.
+  Rebase bounded stacks in dependency order without force-pushing over
+  concurrent agent work. Refresh **this document** after each integration
+  wave. A release-cut branch/tag comes only from protected `main`.
+- **Dependency backlog** (each gets an explicit `release_blocker` /
+  `post_ga_committed` / `experimental` / `not_planned` decision + rationale
+  before release): #946, #947, #948, #949, #950, #951, #952, #865
+  (orphaned Actions identities), #899 / #928 / PR #944 (design-system /
+  Storybook contract), PR #936 / #838 (ORM ↔ Alembic exact-head drift).
+  Core security, data integrity, migration safety, standalone deployment,
+  backup/restore, operability, licensing, and supported-database
+  truthfulness cannot be deferred silently.
+- **Required release evidence.** A clean-environment browser/API rehearsal
+  of the full product journey (login → project → encrypted connection →
+  async snapshot → ERD search/layout/annotation/saved view → diff/exports →
+  share + revocation → approved snapshot/history → backup and restore);
+  clean install on PostgreSQL 18 + the compatibility matrix; upgrade from
+  the oldest supported `0.1.x` through every Alembic revision +
+  downgrade/rollback policy; ORM↔migration drift producing no unreviewed
+  DDL; backup + PITR/logical restore + queue/job recovery after restart;
+  100% production statement + branch + public-API docstring coverage with
+  real PostgreSQL fixtures; fuzz/property tests at the DSN / identifier /
+  snapshot / DBML-DDL / import-export / connector boundaries; threat model
+  + secure deployment guide + a CSAP / SOC 2 control **crosswalk** (an
+  engineering evidence map, not a certification claim); reproducible
+  backend/frontend/container builds; an SPDX or CycloneDX **SBOM** per
+  artifact; **SLSA v1.2**-compatible build provenance; container + FS vuln
+  results with reviewed exceptions; a signed tag/release + documented
+  rollback; an **immutable release manifest** (source commit, migrations,
+  dependency locks, workflow provenance, SBOM, image digest, test/benchmark
+  receipts, Figma file ID, known limitations); liveness/readiness split;
+  OpenTelemetry traces/metrics/logs with stable cardinality and no
+  secrets/customer values; SLI/SLO + capacity profile linked to #951;
+  dashboards/alerts + runbooks for secret loss/rotation, target outage,
+  queue backlog, failed migration, backup restore, dependency incident,
+  compromised share/API key.
 
-**Gap.** No single release-evidence manifest; the operability baseline
-(#951), tenant claim (#950), credential lifecycle (#946), lineage (#948), and
-governed apply (#949) are all incomplete.
+**Current state.** At `main@8dc74692` backend + frontend versions are
+`0.1.0`; the repo has 60+ open PRs. Supply-chain pinning is already
+enforced (hash-locked pip, digest-pinned Docker, SHA-pinned Actions,
+OpenSSF Scorecard). CI runs mypy + pytest + typecheck + vitest + production
+build + CodeQL + Scorecard + dependency-review. No tagged,
+provenance-backed release candidate proves the complete buyer journey; no
+consolidated release-evidence manifest exists.
 
-**This loop's increment PRs.** This document is the first artifact toward the
-#953 evidence manifest. Loop PRs #1024 (`.Jules` case-collision fix that
-unblocks CI-clean git ops) and #1025 (local Playwright E2E harness + `nanoid`
-pin, closes #1014) are release-hygiene prerequisites.
+**Gap.** No single release-evidence manifest; no PR-queue classification of
+record; the operability baseline (#951), tenant claim (#950), credential
+lifecycle (#946), lineage (#948), and governed apply (#949) are all
+incomplete; PR #834's useful commits are not yet decomposed onto `main`.
+
+**This loop's increment PRs.**
+- **#1040** — this document: the first artifact toward the #953 evidence
+  manifest and the PR-queue classification of record (every loop PR mapped
+  to its issue, the org-incident blocker named, the merge-wave dependency
+  order stated).
+- **#1024** — `.Jules` ↔ `.jules` case-collision fix that unblocks
+  CI-clean git operations on case-insensitive filesystems (release-hygiene
+  prerequisite for any rebase wave).
+- **#1025** — local Playwright E2E harness + `nanoid` pin (closes #1014);
+  the harness the product-journey rehearsal will extend.
 
 **Remaining increments.** A release-evidence manifest generator; the
-operability baseline; migration rehearsal automation; then a version bump +
-`CHANGELOG` release section once #946–#952 reach `merge-ready` on their MVP
-increments.
+operability baseline; migration rehearsal automation; the per-dependency
+release decision table; then a synchronized version bump + `CHANGELOG`
+release section + `RELEASE_NOTES.md` once #946–#952 reach `merge-ready` on
+their MVP increments.
 
-**Status:** `spec'd`.
+**Status:** `spec'd` (this document + #1024 / #1025 are the first
+release-hygiene increments).
 
 ---
 
@@ -335,10 +525,45 @@ increments.
 | `ContextualWisdomLab/TEPP`, `fast-mlsirm` | Psychometrics platforms — **not consumed by pg-erd-cloud**; listed for ecosystem completeness only. | n/a |
 | `ContextualWisdomLab/RankWeave`, `ThreadWeave`, `LineageWeave`, `disksage` | Independent libraries; `LineageWeave`'s DAG-reconstruction idea informed the #948 lineage model shape but the code is not imported. | n/a |
 
+## References (APA 7th)
+
+The contracts summarized above lean on these external standards; each gap's
+own doctoring note under `docs/doctoring/` carries the domain-specific
+citations for its increment.
+
+- American Educational Research Association, American Psychological
+  Association, & National Council on Measurement in Education. (2014).
+  *Standards for educational and psychological testing*. American
+  Educational Research Association. — evidence-class framing (`observed` /
+  `declared` / `inferred` / `proposed`) in #947, #948, #952.
+- Codd, E. F. (1971). Further normalization of the data base relational
+  model. In R. Rustin (Ed.), *Data base systems* (Courant Computer Science
+  Symposia Series, Vol. 6). Prentice-Hall. — normalization assessment in
+  #947.
+- International Organization for Standardization. (2021). *Health
+  informatics — Pseudonymization* (ISO/TS 25237-adjacent principle:
+  protection by access control, encryption, purpose limitation, and audit
+  rather than blanket masking). — the non-masking protection stance in
+  #946, #949, #953.
+- National Institute of Standards and Technology. (2022). *Secure software
+  development framework (SSDF) version 1.1* (NIST Special Publication
+  800-218). https://doi.org/10.6028/NIST.SP.800-218 — the release evidence
+  and governed-apply controls in #949 and #953.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation:
+  Data definition*. https://www.postgresql.org/docs/18/ddl.html — the
+  supported-operation matrix in #949 and the compatibility matrix in #953.
+- SLSA Community. (2025). *Supply-chain levels for software artifacts
+  specification, version 1.2*. https://slsa.dev/spec/v1.2/ — the build
+  provenance and attestation requirements in #953.
+
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. When the gate clears and PR #942
+ships or the incident status changes (this revision: iter16 — filled the
+#949 / #952 / #953 sections from their issue bodies, added #1041, corrected
+the stacked-PR count, and reconciled the #952 orchestrator wording with the
+existing configuration-only `/chat/completions` integration in
+`docs/llm-orchestrator-integration.md`). When the gate clears and PR #942
 merges, reconcile its `docs/product-technical-gap-baseline.md`,
 `docs/doctoring/product-technical-gap-baseline.md`, and
 `docs/adr/0002-product-technical-gap-baseline.md` with this consolidation.
