@@ -14,9 +14,9 @@ pg-erd-cloud는 PostgreSQL 중심의 클라우드 ERD 협업·공유 서비스�
 - [응답 보안 헤더](response-security-headers.md)
 - [CI 드리프트 검증](ci-drift-check.md)
 - [Azure VMSS 상태 프로브](azure-vmss-health-extension.md)
-- [보안 문서](security/)
-- [UI/UX 문서](ui-ux/)
-- [Doctoring 기록](doctoring/)
+- [보안 문서](security/codeql-sast-backfill.html)
+- [UI/UX 문서](ui-ux/README.html)
+- [Doctoring 기록](doctoring/search-identity-and-sequential-polling.html)
 - [GitHub 릴리스](https://github.com/ContextualWisdomLab/pg-erd-cloud/releases)
 - [Ask DeepWiki](https://deepwiki.com/ContextualWisdomLab/pg-erd-cloud)
 
