@@ -13,7 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, synonym
 
 
 class Base(DeclarativeBase):
@@ -189,6 +189,10 @@ class JobQueue(Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # Transitional Python compatibility for callers created before the persisted
+    # vocabulary was qualified. New organization-owned code uses ``job_status``.
+    status = synonym("job_status")
 
     __table_args__ = (
         Index(
