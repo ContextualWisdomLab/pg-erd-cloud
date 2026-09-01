@@ -11,85 +11,102 @@ from app.auth import CurrentUser
 from app.schemas import DiagramViewCreateIn
 
 
-def _user():
+def _current_user() -> CurrentUser:
+    """Return one authenticated test user."""
     return CurrentUser(
         user_account_uuid=uuid.uuid4(), subject="test", display_name="Test"
     )
 
 
 @pytest.mark.asyncio
-async def test_get_view_returns_404_when_missing_or_unauthorized():
-    # Uniform 404 for both missing and unauthorized (no enumeration).
-    session = AsyncMock()
+async def test_get_view_returns_404_when_missing_or_unauthorized() -> None:
+    """Return a uniform 404 for missing and unauthorized diagram views."""
+    database_session = AsyncMock()
     with patch(
         "app.api.diagram_views._get_authorized_view",
         new_callable=AsyncMock,
         return_value=None,
     ):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(HTTPException) as http_exception:
             await get_view(
-                diagram_view_uuid=uuid.uuid4(), user=_user(), session=session
+                diagram_view_uuid=uuid.uuid4(),
+                current_user=_current_user(),
+                database_session=database_session,
             )
-    assert exc.value.status_code == 404
+    assert http_exception.value.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_get_view_returns_detail_when_authorized():
-    session = AsyncMock()
-    now = dt.datetime.now(dt.timezone.utc)
-    view_id = uuid.uuid4()
-    view = SimpleNamespace(
-        diagram_view_uuid=view_id,
-        name="my view",
+async def test_get_view_returns_detail_when_authorized() -> None:
+    """Return semantic internal fields while retaining the legacy wire alias."""
+    database_session = AsyncMock()
+    current_time = dt.datetime.now(dt.timezone.utc)
+    diagram_view_uuid = uuid.uuid4()
+    diagram_view = SimpleNamespace(
+        diagram_view_uuid=diagram_view_uuid,
+        diagram_name="my view",
         layout_json={"positions": {"public.member": {"x": 10, "y": 20}}},
-        created_at=now,
-        updated_at=now,
+        created_at=current_time,
+        updated_at=current_time,
     )
     with patch(
         "app.api.diagram_views._get_authorized_view",
         new_callable=AsyncMock,
-        return_value=view,
+        return_value=diagram_view,
     ):
-        out = await get_view(
-            diagram_view_uuid=view_id, user=_user(), session=session
+        diagram_view_output = await get_view(
+            diagram_view_uuid=diagram_view_uuid,
+            current_user=_current_user(),
+            database_session=database_session,
         )
-    assert out.diagram_view_uuid == view_id
-    assert out.name == "my view"
-    assert out.layout_json["positions"]["public.member"] == {"x": 10, "y": 20}
+    assert diagram_view_output.diagram_view_uuid == diagram_view_uuid
+    assert diagram_view_output.diagram_name == "my view"
+    assert diagram_view_output.name == "my view"
+    assert diagram_view_output.model_dump(by_alias=True)["name"] == "my view"
+    assert diagram_view_output.layout_json["positions"]["public.member"] == {
+        "x": 10,
+        "y": 20,
+    }
 
 
 @pytest.mark.asyncio
-async def test_create_view_rejects_oversized_layout():
-    session = AsyncMock()
-    huge = {"blob": "a" * (600 * 1024)}  # > 512KB serialized
-    body = DiagramViewCreateIn(name="big", layout_json=huge)
+async def test_create_view_rejects_oversized_layout() -> None:
+    """Reject oversized diagram layouts before persistence."""
+    database_session = AsyncMock()
+    oversized_layout = {"blob": "a" * (600 * 1024)}  # > 512KB serialized
+    diagram_view_request = DiagramViewCreateIn(
+        name="big",
+        layout_json=oversized_layout,
+    )
     with patch(
         "app.api.diagram_views.require_project_member", new_callable=AsyncMock
     ):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(HTTPException) as http_exception:
             await create_view(
                 project_space_uuid=uuid.uuid4(),
-                body=body,
-                user=_user(),
-                session=session,
+                diagram_view_request=diagram_view_request,
+                current_user=_current_user(),
+                database_session=database_session,
             )
-    assert exc.value.status_code == 413
-    # Nothing should have been persisted.
-    session.add.assert_not_called()
-    session.commit.assert_not_called()
+    assert http_exception.value.status_code == 413
+    database_session.add.assert_not_called()
+    database_session.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_delete_view_returns_404_when_unauthorized():
-    session = AsyncMock()
+async def test_delete_view_returns_404_when_unauthorized() -> None:
+    """Do not reveal an unauthorized diagram view through delete."""
+    database_session = AsyncMock()
     with patch(
         "app.api.diagram_views._get_authorized_view",
         new_callable=AsyncMock,
         return_value=None,
     ):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(HTTPException) as http_exception:
             await delete_view(
-                diagram_view_uuid=uuid.uuid4(), user=_user(), session=session
+                diagram_view_uuid=uuid.uuid4(),
+                current_user=_current_user(),
+                database_session=database_session,
             )
-    assert exc.value.status_code == 404
-    session.delete.assert_not_called()
+    assert http_exception.value.status_code == 404
+    database_session.delete.assert_not_called()
