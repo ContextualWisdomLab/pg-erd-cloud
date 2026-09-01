@@ -9,7 +9,10 @@ def test_diagram_view_uses_specific_owned_name_with_legacy_wire_alias() -> None:
     assert "diagram_name" in DiagramView.__table__.columns
     assert "name" not in DiagramView.__table__.columns
 
-    create_request = DiagramViewCreateIn(name="Architecture review")
+    create_request = DiagramViewCreateIn(
+        name="Architecture review",
+        layout_json={"positions": {}},
+    )
     assert create_request.diagram_name == "Architecture review"
     assert "diagram_name" in DiagramViewCreateIn.model_fields
     assert "name" not in DiagramViewCreateIn.model_fields
