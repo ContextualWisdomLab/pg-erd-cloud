@@ -173,7 +173,7 @@ class JobQueue(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     job_type: Mapped[str] = mapped_column(Text())
-    status: Mapped[str] = mapped_column(Text())
+    job_status: Mapped[str] = mapped_column(Text())
     payload_json: Mapped[dict] = mapped_column(JSONB())
     run_after: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
@@ -190,7 +190,13 @@ class JobQueue(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (Index("ix_job_queue__status_run_after", "status", "run_after"),)
+    __table_args__ = (
+        Index(
+            "ix_job_queue__job_status_run_after",
+            "job_status",
+            "run_after",
+        ),
+    )
 
 
 class DiagramView(Base):
