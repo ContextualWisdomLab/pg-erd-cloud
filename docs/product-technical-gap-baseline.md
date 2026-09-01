@@ -1,6 +1,6 @@
 # Product & technical gap baseline
 
-**Last consolidated:** 2026-09-02 (autonomous review/merge loop, iter18).
+**Last consolidated:** 2026-09-01 UTC (autonomous review/merge loop, iter19).
 
 This document is the single tracker for the distance between what
 pg-erd-cloud does today and a defensible first commercial release. It is
@@ -44,14 +44,20 @@ was found and is being addressed in that repo.
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
 the gate clears. As of iter18 the loop is holding **12 stacked increment
-PRs** — #1024, #1025, #1031, #1032, #1033, #1035, #1036, #1041, #1045,
-#1037, #1038, #1039 — plus **this document** (#1040). Separately, **#942**
-(the original baseline draft) is green on every required check and waits
-only on one non-author approval; it is not one of the 12 increments.
+PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
+baseline draft) is green on every required check and waits only on one
+non-author approval; it is not one of the 12 increments.
 
-Dependency order for the merge wave once the gate clears: #942 → #1024 →
-#1025 → #1031 → #1032 → #1033 → #1035 → #1036 → #1041 → #1045 → #1037 →
-#1038 → #1039 → #1040.
+The 12 increments and the merge-wave order once the gate clears:
+
+```text
+#942  (approval-pending, not an increment)
+  -> #1024 -> #1025
+  -> #1031 -> #1032 -> #1033 -> #1035          (#947 chain)
+  -> #1036 -> #1041 -> #1045                   (#951 chain)
+  -> #1037 (#946) -> #1038 (#948) -> #1039 (#950)
+  -> #1040 (this document)
+```
 
 ## Status legend
 
@@ -415,9 +421,9 @@ evidence lineage on document artifacts (ties to #950); connector
 failure / retry / revocation is not one coherent UI + audit contract; no
 `standalone`-mode conformance test proving all connectors can be disabled.
 
-**This loop's increment PRs.** _none yet_ — foundations in #1037
-(credential-provider boundary the orchestrator client sits behind) and
-#1039 (tenant authority model the artifact scoping needs).
+**This loop's increment PRs.** _none yet_. Foundations are in PR #1037 (the
+credential-provider boundary the orchestrator client sits behind) and in
+PR #1039 (the tenant authority model the artifact scoping needs).
 
 **Remaining increments.** A versioned `contextual-orchestrator` client
 behind the #946 provider boundary that replaces the direct
@@ -503,18 +509,27 @@ incomplete; PR #834's useful commits are not yet decomposed onto `main`.
 
 **This loop's increment PRs.**
 - **#1040** — this document: the first artifact toward the #953 evidence
-  manifest and the PR-queue classification of record (every loop PR mapped
-  to its issue, the org-incident blocker named, the merge-wave dependency
-  order stated).
+  manifest. It currently classifies only **this loop's own increment
+  PRs** (each mapped to its issue, with the org-incident blocker named and
+  the merge-wave dependency order stated). The full #953 PR-queue shaping
+  step — every one of the ~60 open PRs captured at its exact head and
+  classified as unique / stack-dependency / superseded-duplicate /
+  contaminated-aggregate / experiment-or-post-GA / blocked-by-incident —
+  is **not yet done** and remains a tracked #953 deliverable (see
+  "Remaining increments").
 - **#1024** — `.Jules` ↔ `.jules` case-collision fix that unblocks
   CI-clean git operations on case-insensitive filesystems (release-hygiene
   prerequisite for any rebase wave).
 - **#1025** — local Playwright E2E harness + `nanoid` pin (closes #1014);
   the harness the product-journey rehearsal will extend.
 
-**Remaining increments.** A release-evidence manifest generator; the
-operability baseline; migration rehearsal automation; the per-dependency
-release decision table; then a synchronized version bump + `CHANGELOG`
+**Remaining increments.** The full open-PR classification table (every
+open PR at its exact head, with a `release_blocker` / `post_ga_committed`
+/ `experimental` / `not_planned` decision + rationale) — deferred until
+the incident clears and the merge wave drains the loop's own stack, since
+classifying ~60 PRs that cannot merge yet would go stale immediately; a
+release-evidence manifest generator; the operability baseline; migration
+rehearsal automation; then a synchronized version bump + `CHANGELOG`
 release section + `RELEASE_NOTES.md` once #946–#952 reach `merge-ready` on
 their MVP increments.
 
@@ -543,17 +558,21 @@ citations for its increment.
 - American Educational Research Association, American Psychological
   Association, & National Council on Measurement in Education. (2014).
   *Standards for educational and psychological testing*. American
-  Educational Research Association. — evidence-class framing (`observed` /
-  `declared` / `inferred` / `proposed`) in #947, #948, #952.
-- Codd, E. F. (1971). Further normalization of the data base relational
-  model. In R. Rustin (Ed.), *Data base systems* (Courant Computer Science
-  Symposia Series, Vol. 6). Prentice-Hall. — normalization assessment in
-  #947.
-- International Organization for Standardization. (2021). *Health
-  informatics — Pseudonymization* (ISO/TS 25237-adjacent principle:
-  protection by access control, encryption, purpose limitation, and audit
-  rather than blanket masking). — the non-masking protection stance in
-  #946, #949, #953.
+  Educational Research Association.
+  https://www.aera.net/Publications/Books/Standards-for-Educational-Psychological-Testing-2014-Edition
+  — evidence-class framing (`observed` / `declared` / `inferred` /
+  `proposed`) in #947, #948, #952.
+- Codd, E. F. (1970). A relational model of data for large shared data
+  banks. *Communications of the ACM, 13*(6), 377–387.
+  https://doi.org/10.1145/362384.362685 — the relational-normalization
+  basis (further normal forms follow in Codd, 1971/1972); normalization
+  assessment in #947.
+- International Organization for Standardization. (2017). *Health
+  informatics — Pseudonymization* (ISO/TS 25237:2017).
+  https://www.iso.org/standard/63553.html — cited for the principle that
+  protection is access control, encryption, purpose limitation, and audit
+  rather than blanket masking; the non-masking protection stance in #946,
+  #949, #953.
 - National Institute of Standards and Technology. (2022). *Secure software
   development framework (SSDF) version 1.1* (NIST Special Publication
   800-218). https://doi.org/10.6028/NIST.SP.800-218 — the release evidence
@@ -568,12 +587,14 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes (this revision: iter18 — added #1045
-(repeat-run percentile aggregation) to the #951 increment list, updated the
-stacked-PR count to 12, and refreshed the merge-wave order. iter16 filled
-the #949 / #952 / #953 sections from their issue bodies and reconciled the
-#952 orchestrator wording with the existing configuration-only
-`/chat/completions` integration in `docs/llm-orchestrator-integration.md`).
+ships or the incident status changes (this revision: iter19 — fixed the
+markdownlint MD018 line-start warnings and the reference links flagged on
+PR #1040. iter18 added PR #1045 (repeat-run percentile aggregation) to the
+performance-gap increment list, took the stacked-PR count to 12, and
+refreshed the merge-wave order. iter16 filled the #949 / #952 / #953
+sections from their issue bodies and aligned the #952 orchestrator wording
+with the existing configuration-only `/chat/completions` integration in
+`docs/llm-orchestrator-integration.md`).
 When the gate clears and PR #942 merges, reconcile its
 `docs/product-technical-gap-baseline.md`,
 `docs/doctoring/product-technical-gap-baseline.md`, and
