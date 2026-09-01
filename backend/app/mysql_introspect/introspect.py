@@ -67,7 +67,7 @@ def _connect(config: MysqlDsnConfig) -> Any:
             "MySQL support requires the PyMySQL package"
         ) from exc
     return pymysql.connect(
-        host=config.host,  # pinned IP (SSRF)
+        host=config.host,
         port=config.port,
         user=config.user,
         password=config.password,
@@ -216,7 +216,9 @@ def rows_to_snapshot(
             }
         )
 
-    # group STATISTICS rows into per-index column lists
+    # STATISTICS is the MySQL source of truth for unique indexes. Normalize
+    # non-primary unique indexes into the common UNIQUE-constraint contract so
+    # downstream schema-domain analyzers never need to parse provider DDL.
     grouped: dict[tuple[str, str, str], list[tuple[int, str, bool]]] = {}
     for row in indexes:
         ix_key = (str(row["TABLE_SCHEMA"]), str(row["TABLE_NAME"]), str(row["INDEX_NAME"]))
@@ -247,6 +249,22 @@ def rows_to_snapshot(
                 ),
             }
         )
+        if unique and name != "PRIMARY":
+            relation = rel_by_oid[ix_oid]
+            constraints.append(
+                {
+                    "constraint_oid": 400000 + len(out_indexes),
+                    "constraint_name": name,
+                    "constraint_type": "u",
+                    "schema_name": schema,
+                    "relation_oid": ix_oid,
+                    "relation_name": table,
+                    "constrained_attnums": [
+                        pos_by_oid_col[(ix_oid, column)] for column in ordered
+                    ],
+                    "constraint_def": f"UNIQUE ({cols_sql})",
+                }
+            )
 
     snapshot = {
         "captured_at": dt.datetime.now(dt.timezone.utc).isoformat(),
