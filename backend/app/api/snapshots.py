@@ -25,6 +25,7 @@ from app.schemas import (
     IndexRedundancyOut,
     InferredRelationshipOut,
     MigrationSafetyOut,
+    HotPartitionAssessmentOut,
     NamingLintOut,
     NormalizationAssessmentOut,
     SchemaStatsOut,
@@ -44,6 +45,7 @@ from app.spec.constraint_inventory import build_constraint_inventory
 from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
+from app.spec.hot_partition_report import build_hot_partition_report
 from app.spec.naming_lint import lint_naming
 from app.spec.normalization_report import build_normalization_report
 from app.spec.orm_codegen import (
@@ -551,6 +553,38 @@ async def normalization_assessment(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = build_normalization_report(data.snapshot_json if data else None)
     return NormalizationAssessmentOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/hot-partition-assessment",
+    response_model=HotPartitionAssessmentOut,
+)
+async def hot_partition_assessment(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> HotPartitionAssessmentOut:
+    """Catalog-evidence hot-partition and unbounded-growth assessment.
+
+    Uses declared keys, column types/defaults, and PostgreSQL partitioning
+    metadata only -- no live workload is assumed and no data is sampled.
+    Findings for append-heavy tables, unbounded retention, monotonic key
+    hot-pages, partition-key/unique-constraint mismatches, and write/read
+    skew axes each carry an evidence class. No DDL. Returns the versioned
+    report envelope.
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return HotPartitionAssessmentOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_hot_partition_report(data.snapshot_json if data else None)
+    return HotPartitionAssessmentOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
