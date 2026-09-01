@@ -339,7 +339,9 @@ def assess_normalization(
             unique_columns = list(unique["columns"])
             finding = {
                 "finding_id": _finding_id(
-                    relation, finding_kind, unique_columns
+                    relation,
+                    finding_kind,
+                    [str(unique.get("name") or ""), *unique_columns],
                 ),
                 "relation": _relation_ref(relation),
                 "kind": finding_kind,
