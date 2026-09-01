@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [Docs] 📐 **product-technical-gap-baseline.md 통합**: 상용화까지의 격차를 단일 추적 문서로 정리했습니다. 상용화 blocker(org CI 인시던트 `.github#1531`로 2026-08-20 이후 pg-erd-cloud main 병합 0, merge-ready PR 10건 대기)를 명시하고, 이슈 #946–#953별로 기능 명세·현행·Gap·이번 루프 증분 PR(#1024/#1025/#1031/#1032/#1033/#1035/#1036/#1037/#1038/#1039)·잔여 증분을 정리했으며, cross-repo(keyverse/contextual-orchestrator/wardnet/.github) 연계와 상태 범례를 포함했습니다. PR #942의 초안 버전을 대체·확장하며 게이트 복구 시 정합화합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
