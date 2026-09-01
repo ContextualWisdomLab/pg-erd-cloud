@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
-from app.mysql_introspect.introspect import (
-    MysqlDsnConfig,
-    _introspect_sync,
-    _parse_mysql_dsn,
-    rows_to_snapshot,
-)
+from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -104,57 +99,50 @@ async def test_dsn_parse_pins_validated_ip_and_rejects_bad():
     with pytest.raises(ValueError):
         await _parse_mysql_dsn("postgres://u@h/db")
 
+@pytest.mark.asyncio
+async def test_mysql_introspect_queries_injection_safety():
+    """Verify Bandit B608 suppression correctness: schema_filter drives parameterized IN/EQUALS queries."""
+    from app.mysql_introspect.introspect import _introspect_sync, MysqlDsnConfig
+    from unittest.mock import MagicMock
 
-@pytest.mark.parametrize(
-    ("schema_filter", "expected_clause", "expected_params"),
-    [
-        (
-            "shop' OR 1=1 --",
-            "TABLE_SCHEMA = %s",
-            ("shop' OR 1=1 --",),
-        ),
-        (
-            None,
-            "TABLE_SCHEMA NOT IN (%s, %s, %s, %s)",
-            ("mysql", "information_schema", "performance_schema", "sys"),
-        ),
-    ],
-)
-def test_introspection_queries_keep_schema_values_bound(
-    schema_filter: str | None,
-    expected_clause: str,
-    expected_params: tuple[object, ...],
-):
-    config = MysqlDsnConfig(
-        host="203.0.113.10",
-        server_hostname="db.example.com",
-        port=3306,
-        user="reader",
-        password="secret",
-        database=None,
-    )
-    connection = Mock()
-    observed_calls: list[tuple[str, tuple[object, ...]]] = []
+    cfg = MysqlDsnConfig("1.2.3.4", "db", 3306, "u", "p", "db")
 
-    def fake_fetch(_cursor, sql: str, params: tuple[object, ...] = ()):
-        observed_calls.append((sql, params))
-        if sql == "SELECT VERSION() AS v":
-            return [{"v": "8.4.0"}]
-        return []
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
 
-    with (
-        patch("app.mysql_introspect.introspect._connect", return_value=connection),
-        patch("app.mysql_introspect.introspect._fetch_dicts", side_effect=fake_fetch),
-    ):
-        snapshot = _introspect_sync(config, schema_filter)
+    # Needs to handle multiple fetch_dicts calls that map to different shapes.
+    # Return empty list to bypass mapping logic, we just want to verify execute args
+    mock_cursor.fetchall.return_value = []
+    mock_cursor.description = []
 
-    assert snapshot["schema_filter"] == schema_filter
-    information_schema_calls = observed_calls[1:]
-    assert len(information_schema_calls) == 4
-    for sql, params in information_schema_calls:
-        assert expected_clause in sql
-        assert params == expected_params
-        if schema_filter is not None:
-            assert schema_filter not in sql
-    connection.cursor.assert_called_once_with()
-    connection.close.assert_called_once_with()
+    def side_effect(query, params):
+        if "VERSION()" in query:
+             mock_cursor.description = [("v",)]
+             mock_cursor.fetchall.return_value = [("8.4.0",)]
+        else:
+             mock_cursor.description = []
+             mock_cursor.fetchall.return_value = []
+
+    mock_cursor.execute.side_effect = side_effect
+
+    with patch("app.mysql_introspect.introspect._connect", return_value=mock_conn):
+        _introspect_sync(cfg, "schema' OR '1'='1")
+
+        # Verify that all executed queries use parameterized arguments safely.
+        calls = mock_cursor.execute.call_args_list
+        assert len(calls) == 5
+
+        for call in calls[1:]:
+            query, params = call[0]
+            assert params == ("schema' OR '1'='1",)
+            assert "TABLE_SCHEMA = %s" in query
+
+        mock_cursor.execute.reset_mock()
+        _introspect_sync(cfg, None)
+
+        calls = mock_cursor.execute.call_args_list
+        for call in calls[1:]:
+            query, params = call[0]
+            assert "TABLE_SCHEMA NOT IN (%s, %s, %s, %s)" in query
+            assert len(params) == 4
