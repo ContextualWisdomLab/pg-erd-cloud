@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🧮 **정규화 평가 리포트·API (2차 증분)**: `GET /api/snapshots/{uuid}/normalization-assessment` 읽기 전용 엔드포인트를 추가했습니다(다른 스냅샷 분석기와 동일한 IDOR-safe 접근 모델, 미조회/미인가 시 uniform not-found). 응답은 버전드 리포트 엔벨로프(`app.spec.normalization_report.build_normalization_report`)로, 스냅샷의 안정적 SHA-256 fingerprint·생성 시각·정규형별/근거 등급별 집계와 한 줄 구매자용 headline을 포함합니다. DDL·쓰기 없음. HTML 표는 후속 증분(#947).
 - [BE] 🧮 **정규화·함수종속 평가 (1차 증분)**: 카탈로그 근거만으로 각 기본 relation의 후보키·정규형을 평가하는 `app.spec.normalization_assessment` 분석기를 추가했습니다. 컬럼명 추론 없이 선언된 PK·`UNIQUE`·`NOT NULL`·타입·FK만 사용하며, 모든 finding에 근거 등급(`observed`/`declared`/`inferred`/`proposed`/`waived`)과 오탐 caveat·다음 행동을 부여합니다. 비원자 컬럼(배열·`jsonb`), 후보키 미선언, nullable `UNIQUE` 결정자, 복합키 부분종속 전제조건을 탐지하고 DDL을 생성·실행하지 않습니다. Waiver를 근거 등급으로 기록합니다. 골든 픽스처 14종. 3NF 이행종속·hot-partition·리포트 엔벨로프·HTTP 표면·Rust 경계는 후속 증분(#947). `docs/doctoring/normalization-and-functional-dependency-assessment.md` 참조.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
