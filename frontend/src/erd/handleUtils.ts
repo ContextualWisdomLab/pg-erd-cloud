@@ -7,6 +7,7 @@ export function sanitizeHandleId(columnName: string): string {
     // for...of iterates over Unicode code points, so char is a single scalar.
     encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
   }
+  // Trigger OpenCode review
 
   return `c-${encoded || 'empty'}`
 }
