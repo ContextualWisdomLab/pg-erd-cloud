@@ -1,7 +1,8 @@
 # Performance & capacity profile
 
 Status: **in progress** — increments 1 (workload generators), 2 (measured
-baseline harness), and 3 (repeat-run aggregation) landed. Tracks issue
+baseline harness), 3 (repeat-run aggregation), and 4 (versioned report
+envelope) landed. Tracks issue
 [#951](https://github.com/ContextualWisdomLab/pg-erd-cloud/issues/951)
 ("[Performance Gap] Establish large-schema SLOs, workload benchmarks, and a
 measured Rust boundary").
@@ -88,6 +89,22 @@ CLI: `python -m app.perf.baseline_stats --profile small --repeat 5
 Still observations only: no threshold, no verdict. The percentile targets
 a capacity profile eventually publishes are set from measured baseline
 runs and never invented here.
+
+## Decision — versioned report envelope (this increment)
+
+`app/perf/baseline_report.py` `build_baseline_report(profile_name, *,
+repeat, seed=None)` wraps the raw `aggregate_baseline` output in a
+buyer-facing envelope, mirroring what `app.spec.normalization_report`
+(#947) does for the normalization assessment: `report_version`,
+`generated_at` (UTC ISO-8601), a `schema_fingerprint` (`"sha256:"`-prefixed
+digest of the exact workload snapshot that was measured, so a report can be
+tied back to its schema), and a `summary` block —
+`{headline, path_count, slowest_path_by_wall_p95}` — that names the path an
+engineer should look at first (largest wall-time 95th percentile) using
+**names and counts only, never a duration value**. The full statistics
+block is preserved verbatim under `statistics`. The `schema_fingerprint`
+helper is a local copy of `app.spec.normalization_report.schema_fingerprint`
+for now (the two branches are unmerged); unify them once both land.
 
 ## Deferred (later increments on #951)
 
