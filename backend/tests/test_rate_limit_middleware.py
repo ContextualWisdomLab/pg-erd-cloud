@@ -140,7 +140,7 @@ def test_rate_limit_disabled_allows_all_requests() -> None:
         assert client.get("/api/ping").status_code == 200
 
 
-def test_rate_limit_trusts_x_forwarded_for_when_enabled() -> None:
+def test_rate_limit_trusts_only_the_nearest_forwarded_client_hop() -> None:
     limiter = InMemoryFixedWindowRateLimiter(max_keys=100)
     policy = RateLimitPolicy(
         enabled=True,
@@ -165,17 +165,98 @@ def test_rate_limit_trusts_x_forwarded_for_when_enabled() -> None:
 
     client = TestClient(app)
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
+        client.get(
+            "/api/ping",
+            headers={"X-Forwarded-For": "203.0.113.200, 1.1.1.1"},
+        ).status_code
         == 200
     )
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "1.1.1.1"}).status_code
+        client.get(
+            "/api/ping",
+            headers={"X-Forwarded-For": "192.0.2.99, 1.1.1.1"},
+        ).status_code
         == 429
     )
     assert (
-        client.get("/api/ping", headers={"X-Forwarded-For": "2.2.2.2"}).status_code
+        client.get(
+            "/api/ping",
+            headers={"X-Forwarded-For": "203.0.113.200, 2.2.2.2"},
+        ).status_code
         == 200
     )
+
+
+def test_rate_limit_uses_the_client_hop_before_an_external_terminator() -> None:
+    limiter = InMemoryFixedWindowRateLimiter(max_keys=100)
+    policy = RateLimitPolicy(
+        enabled=True,
+        requests=1,
+        window_seconds=60.0,
+        route_prefix="/api",
+        trust_x_forwarded_for=True,
+        trusted_proxy_hops=2,
+    )
+
+    app = FastAPI()
+    app.middleware("http")(
+        make_rate_limit_middleware(
+            limiter=limiter,
+            policy=policy,
+            get_subject=_no_subject,
+        )
+    )
+
+    @app.get("/api/ping")
+    def ping() -> dict[str, bool]:
+        return {"ok": True}
+
+    client = TestClient(app)
+    assert client.get(
+        "/api/ping",
+        headers={"X-Forwarded-For": "203.0.113.10, 198.51.100.20"},
+    ).status_code == 200
+    assert client.get(
+        "/api/ping",
+        headers={"X-Forwarded-For": "192.0.2.30, 198.51.100.20"},
+    ).status_code == 200
+    assert client.get(
+        "/api/ping",
+        headers={"X-Forwarded-For": "203.0.113.10, 198.51.100.21"},
+    ).status_code == 429
+
+
+def test_rate_limit_falls_back_to_direct_peer_for_an_incomplete_proxy_chain() -> None:
+    limiter = InMemoryFixedWindowRateLimiter(max_keys=100)
+    policy = RateLimitPolicy(
+        enabled=True,
+        requests=1,
+        window_seconds=60.0,
+        route_prefix="/api",
+        trust_x_forwarded_for=True,
+        trusted_proxy_hops=2,
+    )
+
+    app = FastAPI()
+    app.middleware("http")(
+        make_rate_limit_middleware(
+            limiter=limiter,
+            policy=policy,
+            get_subject=_no_subject,
+        )
+    )
+
+    @app.get("/api/ping")
+    def ping() -> dict[str, bool]:
+        return {"ok": True}
+
+    client = TestClient(app)
+    assert client.get(
+        "/api/ping", headers={"X-Forwarded-For": "203.0.113.10"}
+    ).status_code == 200
+    assert client.get(
+        "/api/ping", headers={"X-Forwarded-For": "192.0.2.30"}
+    ).status_code == 429
 
 
 def test_share_prefix_can_have_tighter_public_limit() -> None:

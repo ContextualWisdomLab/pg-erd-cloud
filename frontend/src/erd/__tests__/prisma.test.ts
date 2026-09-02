@@ -234,4 +234,91 @@ describe('exportPrisma', () => {
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
   });
+
+  it('uses a singular back-relation for a primary-key foreign key', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'users',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'profiles',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'profiles',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'user_id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'profile-user',
+        source: 'profiles',
+        target: 'users',
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
+        label: 'users_profiles',
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+
+    expect(result).toContain(
+      'users_user_id users @relation("users_profiles", fields: [user_id], references: [id])',
+    );
+    expect(result).toContain('profiles_user_id profiles? @relation("users_profiles")');
+    expect(result).not.toContain('profiles_user_id profiles[] @relation("users_profiles")');
+  });
+
+  it('ignores a non-column source handle instead of treating it as handle-less', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'posts',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'posts',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'users',
+        position: { x: 100, y: 100 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, [
+      {
+        id: 'legacy-handle',
+        source: 'posts',
+        target: 'users',
+        sourceHandle: 'legacy-user_id',
+        targetHandle: 'tgt-id',
+      },
+    ]);
+
+    expect(result).toContain('user_id Int');
+    expect(result).not.toContain('@relation');
+  });
 });

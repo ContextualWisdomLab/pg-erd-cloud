@@ -127,3 +127,24 @@ def test_get_client_ip(
         assert _get_client_ip(req) == expected_ip
     finally:
         settings.api_rate_limit_trust_x_forwarded_for = prev_trust
+
+
+def test_get_client_ip_uses_configured_trusted_proxy_hops() -> None:
+    prev_trust = settings.api_rate_limit_trust_x_forwarded_for
+    prev_hops = settings.api_rate_limit_trusted_proxy_hops
+    settings.api_rate_limit_trust_x_forwarded_for = True
+    settings.api_rate_limit_trusted_proxy_hops = 2
+    try:
+        req = Request(
+            {
+                "type": "http",
+                "headers": [
+                    (b"x-forwarded-for", b"203.0.113.10, 198.51.100.20")
+                ],
+                "client": ("172.20.0.2", 12345),
+            }
+        )
+        assert _get_client_ip(req) == "203.0.113.10"
+    finally:
+        settings.api_rate_limit_trust_x_forwarded_for = prev_trust
+        settings.api_rate_limit_trusted_proxy_hops = prev_hops

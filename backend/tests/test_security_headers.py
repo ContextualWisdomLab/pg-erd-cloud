@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 from starlette.requests import Request
+from starlette.responses import Response
 
 from app import security_headers
 from app.csrf import CSRF_HEADER_NAME
@@ -164,3 +165,25 @@ def test_csp_path_normalization_handles_double_slash() -> None:
     }
     request = Request(scope)
     assert security_headers._should_apply_csp(request) is False
+
+
+def test_security_headers_preserve_an_existing_header() -> None:
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "https",
+        "path": "/api/ping",
+        "raw_path": b"/api/ping",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 443),
+        "root_path": "",
+    }
+    response = Response(headers={"X-Frame-Options": "SAMEORIGIN"})
+
+    security_headers.apply_security_headers(Request(scope), response)
+
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"

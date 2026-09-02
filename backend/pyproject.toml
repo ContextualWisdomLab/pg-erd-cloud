@@ -60,9 +60,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [tool.coverage.run]
 include = [
+  "app/api/share.py",
   "app/csrf.py",
   "app/db_introspect.py",
   "app/metrics.py",

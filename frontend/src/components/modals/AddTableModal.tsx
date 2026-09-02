@@ -1,5 +1,5 @@
 import React from 'react';
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface AddTableModalProps {
   isOpen: boolean;
@@ -16,50 +16,44 @@ export function AddTableModal({
   onAddTableCancel,
   onAddTableSubmit,
 }: AddTableModalProps) {
-  const dialogRef = useDialogAccessibility<HTMLFormElement>(isOpen, onAddTableCancel);
-
   if (!isOpen) return null;
+  const isNameMissing = !newTableName.trim();
+
+  const submitIfValid = () => {
+    if (!isNameMissing) {
+      onAddTableSubmit();
+    }
+  };
 
   return (
-    <div
-      className="modalOverlay"
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+    <ModalShell
+      title="테이블 추가"
+      titleId="add-table-title"
+      onClose={onAddTableCancel}
+      closeLabel="테이블 추가 닫기"
+      size="addTable"
+      footer={
+        <>
+          <button type="button" onClick={onAddTableCancel}>취소</button>
+          <button
+            type="submit"
+            form="add-table-form"
+            className="buttonPrimary"
+            aria-disabled={isNameMissing}
+            aria-describedby="add-table-prerequisite"
+          >
+            저장
+          </button>
+        </>
+      }
     >
       <form
-        className="modalContent"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-table-title"
-        ref={dialogRef}
-        tabIndex={-1}
+        id="add-table-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (newTableName.trim()) {
-            onAddTableSubmit();
-          }
-        }}
-        style={{
-          background: "#fff",
-          padding: 20,
-          borderRadius: 8,
-          width: 300,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
+          submitIfValid();
         }}
       >
-        <h3 id="add-table-title">테이블 추가</h3>
         <div className="field">
           <label htmlFor="new-table-name">테이블 이름</label>
           <input
@@ -69,26 +63,13 @@ export function AddTableModal({
             placeholder="users"
             autoFocus
             required
+            aria-describedby="add-table-prerequisite"
           />
-        </div>
-        <div
-          className="row"
-          style={{ justifyContent: "flex-end", marginTop: 8 }}
-        >
-          <button type="button" onClick={onAddTableCancel}>취소</button>
-          <button
-            type="submit"
-            disabled={!newTableName.trim()}
-            style={
-              newTableName.trim()
-                ? { background: "#034ea2", color: "#fff" }
-                : undefined
-            }
-          >
-            저장
-          </button>
+          <span id="add-table-prerequisite" className="srOnly">
+            테이블 이름을 입력하면 저장할 수 있습니다.
+          </span>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 }
