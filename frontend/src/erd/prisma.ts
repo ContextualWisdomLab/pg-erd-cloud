@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
+import { parseColumnNameFromHandle } from "./handleUtils";
 import { sanitizeHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
@@ -70,15 +71,23 @@ export function exportPrisma(
 
     let sourceField = "";
     if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+      const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+      const sourceExists = (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
+      if (sourceExists) {
+        sourceField = parsedSource;
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(parsedSource)}`);
+      }
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
     if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+      const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+      const targetExists = (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
+      if (targetExists) {
+        targetField = parsedTarget;
+      }
     }
 
     if (sourceField) {
