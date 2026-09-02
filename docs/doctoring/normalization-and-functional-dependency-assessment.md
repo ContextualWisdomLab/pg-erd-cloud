@@ -145,6 +145,34 @@ Waivers use the same `scope` shape as `assess_normalization`. Row-level FD
 discovery from table data stays out of scope (it needs profiling, which
 belongs in a separate service).
 
+## Signed waiver records — landed
+
+`app.spec.waiver_record` makes a waiver **tamper-evident** so an auditor can
+trust one without re-reviewing it. It is a pure function pair with no
+database, network, or filesystem access.
+
+- `sign_waiver(waiver, *, signer, signed_at, key_id, key)` returns
+  `{"waiver": <deep copy>, "signature": {"algo", "signer", "signed_at",
+  "key_id", "value"}}`. `value` is an HMAC-SHA256 (`algo` is the constant
+  `WAIVER_SIGNATURE_ALGO = "hmac-sha256"`) over the canonical JSON of the
+  waiver **with the signature metadata folded in** as `_meta`, so altering
+  the signer or the timestamp invalidates the signature exactly as altering
+  the waiver body does. The caller's dict is deep-copied, never mutated.
+- `verify_waiver_signature(record, *, key)` recomputes that HMAC from
+  `record["waiver"]` and the `signer` / `signed_at` / `key_id` in
+  `record["signature"]` and compares it with `hmac.compare_digest`
+  (constant time). Any edit to the body or the metadata, or a wrong key,
+  returns `False`; a missing signature or a non-`hmac-sha256` `algo` raises
+  `ValueError`.
+- Canonical form sorts keys at every level, so a waiver rebuilt in a
+  different key order still verifies. The secret `key` is supplied by the
+  caller and is never stored, logged, or echoed into the record.
+
+What remains deferred: **persisting** these signed records (with owner,
+review date, scope, expiry) alongside the assessment run, and key
+rotation / `key_id` resolution — that is storage-layer work tracked with
+the persisted-assessment-run item below.
+
 ## Deferred (later bounded increments on #947)
 
 - **Row-level functional-dependency discovery** — profiling a sample of
@@ -154,7 +182,9 @@ belongs in a separate service).
   non-color-only HTML rendering, and the `assessment_run` /
   `capacity_profile` / `partition_candidate` / `remediation_action` records
   persisted with tool/commit provenance.
-- **Persisted, signed waiver records** with owner, review date, scope, expiry.
+- **Persisted signed waiver records** — the signing / verification core has
+  landed (`app.spec.waiver_record`, above); storing the signed records with
+  owner, review date, scope, and expiry is the remaining storage-layer step.
 
 ## Rust boundary decision — DEFERRED
 
@@ -191,3 +221,10 @@ https://doi.org/10.1007/978-1-4842-5540-7
 Lucchesi, C. L., & Osborn, S. L. (1978). Candidate keys for relations.
 *Journal of Computer and System Sciences, 17*(2), 270-279.
 https://doi.org/10.1016/0022-0000(78)90009-0
+
+National Institute of Standards and Technology. (2008). *The keyed-hash
+message authentication code (HMAC)* (FIPS PUB 198-1).
+https://doi.org/10.6028/NIST.FIPS.198-1
+
+Rundgren, A., Jordan, B., & Erdtman, S. (2020). *JSON Canonicalization Scheme
+(JCS)* (RFC 8785). RFC Editor. https://doi.org/10.17487/RFC8785
