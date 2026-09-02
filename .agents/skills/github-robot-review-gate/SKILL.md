@@ -85,3 +85,6 @@ context successfully on the protected branch.
   with evidence, then restore once Strix emits.
 - Disabling scanners to merge faster: keep security gates on; fix the gate
   contract or the failing scanner.
+
+## Strix Cost Tracking
+Strix uses the zero-cost `orchestrator/free` route for routine checks to maintain baseline pipeline capacity.
