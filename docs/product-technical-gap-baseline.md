@@ -1,6 +1,6 @@
 # Product & technical gap baseline
 
-**Last consolidated:** 2026-09-01 UTC (autonomous review/merge loop, iter22).
+**Last consolidated:** 2026-09-02 UTC (autonomous review/merge loop, iter28).
 
 This document is the single tracker for the distance between what
 pg-erd-cloud does today and a defensible first commercial release. It is
@@ -43,19 +43,19 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter22 the loop is holding **15 stacked increment
+the gate clears. As of iter28 the loop is holding **16 stacked increment
 PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
 baseline draft) is green on every required check and waits only on one
-non-author approval; it is not one of the 15 increments.
+non-author approval; it is not one of the 16 increments.
 
-The 15 increments and the merge-wave order once the gate clears:
+The 16 increments and the merge-wave order once the gate clears:
 
 ```text
 #942  (approval-pending, not an increment)
   -> #1024 -> #1025
   -> #1031 -> #1032 -> #1033 -> #1035 -> #1048        (#947 chain)
-  -> #1036 -> #1041 -> #1045                          (#951 chain)
-  -> #1037 (#946)
+  -> #1036 -> #1041 -> #1045 -> #1056                 (#951 chain)
+  -> #1037 (#946) -> #1051
   -> #1038 (#948) -> #1050
   -> #1039 (#950) -> #1049
   -> #1040 (this document)
@@ -97,12 +97,23 @@ attribution.
   `LocalMountedFileProvider` (fail-closed on missing/empty/oversized/non-UTF8/
   symlink/path-escape/non-file), `DeterministicTestProvider`. 14 tests incl.
   "value never appears in str/repr/format/logs". Rotation design documented.
+- **#1051** — `app/secret_provider/rotation.py` (stacked on #1037): the pure
+  core of the `APP_SECRET` dual-read / single-write rotation. `dual_read_decrypt`
+  tries each candidate `APP_SECRET` in order (HKDF key, then the legacy
+  raw-SHA-256 key, matching `app/security`); `plan_key_rotation` re-encrypts
+  rows that decrypt with a previous key under the active key, leaves
+  active-key rows alone, and surfaces undecryptable / malformed rows as
+  `needs_key_recovery` — never dropped, never re-encrypted from a guess. No
+  DB, no `Settings`, no plaintext in the result. A round-trip test through
+  `app.security.encrypt_text` / `decrypt_text` guards the key derivation. 10 tests.
 
 **Remaining increments.** `Settings` integration behind a `local_secret_file`
-profile; org credential-registry provider with cache-TTL + fail-closed
-timeout/permission/revoked/stale; implement `APP_SECRET` dual-read rotation +
-resumable re-encryption migration; key-recovery runbook; move LLM credentials
-to `contextual-orchestrator`; persisted non-secret credential metadata.
+profile; the `SecretReference`-backed key set wired into `app/security`; org
+credential-registry provider with cache-TTL + fail-closed
+timeout/permission/revoked/stale; the resumable re-encryption *migration job*
+over `db_connection` rows (needs a DB + PG fixture); key-recovery runbook;
+move LLM credentials to `contextual-orchestrator`; persisted non-secret
+credential metadata.
 
 **Status:** `in-progress`.
 
@@ -377,11 +388,20 @@ decision evidence.
   aggregate. `python -m app.perf.baseline_stats --profile small --repeat 5
   [--seed N] [--json]` CLI. **No threshold or verdict** (meta-test
   enforced). 9 tests.
+- **#1056** — `app/perf/baseline_report.py` (stacked on #1045):
+  `build_baseline_report(profile_name, *, repeat, seed=None) -> dict` wraps
+  `aggregate_baseline` in a versioned buyer-facing envelope — `report_version`,
+  `generated_at` (UTC ISO-8601), a `schema_fingerprint` (`"sha256:"` digest
+  of the exact workload snapshot that was measured), and a `summary`
+  (`{headline, path_count, slowest_path_by_wall_p95}` — names and counts
+  only, never a duration value). The full statistics block is preserved
+  verbatim under `statistics`. Mirrors the #1032 normalization-report
+  envelope pattern. **No threshold or verdict** (meta-test enforced). 8 tests.
 
-**Remaining increments.** The DB / event-loop paths (API
+**Remaining increments.** The DB / event-loop measured paths (API
 list/detail/pagination/search, queue claim/retry/lease/cleanup/fairness) in
 the benchmark workflow; `docs/PERFORMANCE.md`; the release-candidate
-benchmark workflow with a reproducibility receipt; frontend traces;
+benchmark CI workflow with a reproducibility receipt; frontend traces;
 per-hotspot Rust decision-gate ADRs.
 
 **Status:** `in-progress`.
@@ -617,11 +637,12 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. This revision (iter22) added PR #1049
-(the tenant-authority column-presence check) to the #950 list and PR #1050
-(the lineage PROV-JSON projection) to the #948 list, taking the stacked-PR
-count to 15. iter20 added PR #1048 (transitive-dependency / 3NF assessment)
-to the #947 list. iter19 fixed the markdownlint MD018 line-start warnings
+ships or the incident status changes. This revision (iter28) added PR #1056
+(the versioned baseline-report envelope) to the #951 list, taking the
+stacked-PR count to 16. iter22 added PR #1049 (the tenant-authority
+column-presence check) to the #950 list and PR #1050 (the lineage PROV-JSON
+projection) to the #948 list. iter20 added PR #1048 (transitive-dependency /
+3NF assessment) to the #947 list. iter19 fixed the markdownlint MD018 line-start warnings
 and the reference links flagged on PR #1040. iter18 added PR #1045
 (repeat-run percentile aggregation) to the performance-gap increment list.
 iter16 filled the three epic sections (#949, #952, #953) from their issue
