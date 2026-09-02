@@ -66,7 +66,9 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
     simple query protocol.
     """
 
-    dsn, password = build_admin_console_dsn(settings.database_url, admin_db)
+    pooler_dsn, pooler_password = build_admin_console_dsn(
+        settings.database_url, admin_db
+    )
 
     raw_timeout = float(settings.db_pooler_probe_timeout_seconds)
     if raw_timeout <= 0.0:
@@ -76,22 +78,22 @@ async def _probe_pooler_admin_console(admin_db: str) -> str | None:
     # Note: some PostgreSQL/libpq versions effectively treat values < 2 as 2.
     timeout_seconds = max(2, math.ceil(raw_timeout))
 
-    def _run() -> str | None:
+    def _run_pooler_probe() -> str | None:
         with psycopg.connect(
-            dsn,
-            password=password,
+            pooler_dsn,
+            password=pooler_password,
             connect_timeout=timeout_seconds,
-        ) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SHOW VERSION;")
-                row = cur.fetchone()
-                if not row or row[0] is None:
+        ) as pooler_connection:
+            with pooler_connection.cursor() as pooler_cursor:
+                pooler_cursor.execute("SHOW VERSION;")
+                version_row = pooler_cursor.fetchone()
+                if not version_row or version_row[0] is None:
                     return None
-                return str(row[0])
+                return str(version_row[0])
 
     try:
         return await asyncio.wait_for(
-            asyncio.to_thread(_run), timeout=float(timeout_seconds) + 0.2
+            asyncio.to_thread(_run_pooler_probe), timeout=float(timeout_seconds) + 0.2
         )
     except Exception:  # noqa: BLE001
         return None
