@@ -1,0 +1,43 @@
+--- frontend/src/App.coverage.test.tsx
++++ frontend/src/App.coverage.test.tsx
+@@ -611,7 +611,8 @@
+     await renderReadyApp()
+     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
++    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+     vi.useFakeTimers()
+-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
++    fireEvent.click(openButtons[0]!)
+     await act(async () => {
+       vi.advanceTimersByTime(1000)
+       await Promise.resolve()
+@@ -642,7 +643,8 @@
+     await renderReadyApp()
+     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
++    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+     vi.useFakeTimers()
+-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
++    fireEvent.click(openButtons[0]!)
+     await act(async () => {
+       vi.advanceTimersByTime(1000)
+       await Promise.resolve()
+@@ -745,7 +747,8 @@
+     }))
+     await renderReadyApp()
+     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
++    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+     vi.useFakeTimers()
+-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
++    fireEvent.click(openButtons[0]!)
+     await act(async () => {
+       vi.advanceTimersByTime(1000)
+       await Promise.resolve()
+@@ -785,7 +788,8 @@
+     await renderReadyApp()
+     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
++    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+     vi.useFakeTimers()
+-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
++    fireEvent.click(openButtons[0]!)
+     await act(async () => {
+       vi.advanceTimersByTime(1000)
+       await Promise.resolve()
