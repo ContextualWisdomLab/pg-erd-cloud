@@ -43,12 +43,12 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter28 the loop is holding **16 stacked increment
+the gate clears. As of iter32 the loop is holding **17 stacked increment
 PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
 baseline draft) is green on every required check and waits only on one
-non-author approval; it is not one of the 16 increments.
+non-author approval; it is not one of the 17 increments.
 
-The 16 increments and the merge-wave order once the gate clears:
+The 17 increments and the merge-wave order once the gate clears:
 
 ```text
 #942  (approval-pending, not an increment)
@@ -58,6 +58,7 @@ The 16 increments and the merge-wave order once the gate clears:
   -> #1037 (#946) -> #1051
   -> #1038 (#948) -> #1050
   -> #1039 (#950) -> #1049
+  -> #1057 (#953)
   -> #1040 (this document)
 ```
 
@@ -572,14 +573,27 @@ incomplete; PR #834's useful commits are not yet decomposed onto `main`.
   prerequisite for any rebase wave).
 - **#1025** — local Playwright E2E harness + `nanoid` pin (closes #1014);
   the harness the product-journey rehearsal will extend.
+- **#1057** — `app/release/manifest.py` `build_release_manifest(...)`, a
+  pure assembler (no git / network / filesystem) that validates and
+  normalizes the supplied release facts (source commit, backend /
+  frontend versions, migration revisions, dependency-lock digests,
+  included PRs, known limitations, generated-at) into one immutable
+  JSON-serializable manifest; `is_ga_candidate` is `True` only when the
+  known-limitations list is empty (honesty rule); a `ValueError` names
+  the first field that fails validation. New `app/release/` package.
+  Cites NIST SP 800-218 and SLSA v1.2.
 
-**Remaining increments.** The full open-PR classification table (every
-open PR at its exact head, with a `release_blocker` / `post_ga_committed`
-/ `experimental` / `not_planned` decision + rationale) — deferred until
-the incident clears and the merge wave drains the loop's own stack, since
-classifying ~60 PRs that cannot merge yet would go stale immediately; a
-release-evidence manifest generator; the operability baseline; migration
-rehearsal automation; then a synchronized version bump + `CHANGELOG`
+**Remaining increments.** The pure manifest assembler landed (#1057); what
+remains to make it a release-evidence artifact of record: SBOM generation
+(SPDX / CycloneDX) wired into the build; signed build provenance /
+attestation (SLSA v1.2); the operability baseline (SLI / SLO + dashboards
++ runbooks, linked to #951); migration rehearsal automation; the
+per-dependency release-decision table; and the full open-PR classification
+of record (every open PR at its exact head, with a `release_blocker` /
+`post_ga_committed` / `experimental` / `not_planned` decision +
+rationale) — deferred until the incident clears and the merge wave drains
+the loop's own stack, since classifying ~60 PRs that cannot merge yet
+would go stale immediately. Then a synchronized version bump + `CHANGELOG`
 release section + `RELEASE_NOTES.md` once #946–#952 reach `merge-ready` on
 their MVP increments.
 
@@ -637,9 +651,11 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. This revision (iter28) added PR #1056
-(the versioned baseline-report envelope) to the #951 list, taking the
-stacked-PR count to 16. iter22 added PR #1049 (the tenant-authority
+ships or the incident status changes. This revision (iter32) added PR #1057
+(the pure release-manifest assembler, a new `app/release/` package) as the
+release-evidence increment for issue #953, taking the stacked-PR count to 17.
+iter28 added PR #1056 (the versioned baseline-report envelope) to the #951
+list. iter22 added PR #1049 (the tenant-authority
 column-presence check) to the #950 list and PR #1050 (the lineage PROV-JSON
 projection) to the #948 list. iter20 added PR #1048 (transitive-dependency /
 3NF assessment) to the #947 list. iter19 fixed the markdownlint MD018 line-start warnings
