@@ -1,0 +1,58 @@
+# TEMPORARY interim safety net. This repo has had zero CodeQL PR coverage since commit
+# 479fc0556e36bd1524f6011602477c3243860dbf
+# (PR #513 "ci: centralize governance — remove local workflows duplicated by central
+# .github", merged 2026-07-11), which deleted the local codeql.yml on the assumption that
+# ContextualWisdomLab/.github's central required-workflow ruleset (id 18156473) already
+# ran CodeQL PR (codeql-pr.yml) here. That assumption was verified FALSE on 2026-09-02:
+# ruleset 18156473 does not actually include codeql-pr.yml. Remove this workflow once an
+# org admin confirms ruleset 18156473 includes codeql-pr.yml (tracked separately; not
+# fixable from this repo).
+name: codeql-pr-interim
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      # Language matrix verified against this repo (not guessed): matches the
+      # matrix already used by .github/workflows/codeql-backfill.yml and the
+      # repo's actual source languages (Python backend, TS/JS frontend; no
+      # Java/Kotlin present).
+      matrix:
+        language: ["javascript-typescript", "python"]
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout PR head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        with:
+          category: "/language:${{ matrix.language }}"
