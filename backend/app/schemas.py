@@ -7,19 +7,13 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-# Name-like request fields can reach logs, terminals, and generated evidence. Keep
-# ordinary printable Unicode while rejecting C0, DEL, and C1 control characters.
-_REQUEST_NAME_PATTERN = r"^[^\x00-\x1F\x7F-\x9F]+$"
-_REQUEST_SUBJECT_PATTERN = r"^[^\s\x00-\x1F\x7F-\x9F]+$"
-
-
 class ProjectCreateIn(BaseModel):
     """Request body for creating a project."""
 
     project_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=_REQUEST_NAME_PATTERN,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
 
 
@@ -36,7 +30,7 @@ class ProjectMemberAddIn(BaseModel):
     member_subject: str = Field(
         min_length=1,
         max_length=128,
-        pattern=_REQUEST_SUBJECT_PATTERN,
+        pattern=r"^[^\s\x00-\x1F\x7F\x80-\x9F]+$",
         description="OIDC sub, or dev:<name> in dev mode",
     )
     # MVP: restrict to non-owner roles. Owner is assigned at project creation.
@@ -57,7 +51,7 @@ class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=_REQUEST_NAME_PATTERN,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
     dsn: str = Field(
         min_length=1,
@@ -196,11 +190,8 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(
-        min_length=1,
-        max_length=200,
-        pattern=_REQUEST_NAME_PATTERN,
-    )
+    # Security: Reject control characters to prevent log/terminal escape injection
+    name: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$")
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -224,16 +215,10 @@ class DiagramViewDetailOut(DiagramViewOut):
 class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
-    schema_name: str = Field(
-        min_length=1,
-        max_length=255,
-        pattern=_REQUEST_NAME_PATTERN,
-    )
-    relation_name: str = Field(
-        min_length=1,
-        max_length=255,
-        pattern=_REQUEST_NAME_PATTERN,
-    )
+    # Security: Reject control characters to prevent log/terminal escape injection
+    schema_name: str = Field(min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$")
+    # Security: Reject control characters to prevent log/terminal escape injection
+    relation_name: str = Field(min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$")
     body: str = Field(min_length=1, max_length=10_000)
 
 
@@ -320,11 +305,8 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(
-        min_length=1,
-        max_length=128,
-        pattern=_REQUEST_NAME_PATTERN,
-    )
+    # Security: Reject control characters to prevent log/terminal escape injection
+    key_name: str = Field(min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$")
 
 
 class ApiKeyOut(BaseModel):
