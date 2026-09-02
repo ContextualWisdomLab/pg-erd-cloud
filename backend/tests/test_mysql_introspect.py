@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import inspect
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
-from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
+from app.mysql_introspect import introspect as mysql_introspect
+from app.mysql_introspect.introspect import _introspect_sync, _parse_mysql_dsn, rows_to_snapshot
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -79,6 +81,61 @@ def test_snapshot_feeds_ddl_export_and_dialect_detection():
     assert "PRIMARY KEY" in ddl
     assert detect_dsn_dialect("mysql://u:p@db.example.com/shop") == "mysql"
     assert detect_dsn_dialect("mariadb://u:p@db.example.com/shop") == "mysql"
+
+
+class _RecordingCursor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple[object, ...] | None]] = []
+        self.description: list[tuple[str]] = []
+        self._rows: list[tuple[object, ...]] = []
+
+    def execute(self, sql: str, params: tuple[object, ...] | None) -> None:
+        self.calls.append((sql, params))
+        if "SELECT VERSION()" in sql:
+            self.description = [("v",)]
+            self._rows = [("8.4.0",)]
+        else:
+            self.description = []
+            self._rows = []
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return self._rows
+
+
+class _RecordingConnection:
+    def __init__(self) -> None:
+        self.recording_cursor = _RecordingCursor()
+        self.closed = False
+
+    def cursor(self) -> _RecordingCursor:
+        return self.recording_cursor
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_introspection_sql_keeps_hostile_schema_filter_in_parameters_without_suppression() -> None:
+    hostile_schema = "tenant' OR 1=1 --\n"
+    connection = _RecordingConnection()
+    config = mysql_introspect.MysqlDsnConfig(
+        host="203.0.113.10",
+        server_hostname="db.example.com",
+        port=3306,
+        user="reader",
+        password="secret",
+        database=None,
+    )
+
+    with patch("app.mysql_introspect.introspect._connect", return_value=connection):
+        _introspect_sync(config, hostile_schema)
+
+    metadata_calls = connection.recording_cursor.calls[1:]
+    assert len(metadata_calls) == 4
+    for sql, params in metadata_calls:
+        assert hostile_schema not in sql
+        assert params is not None and hostile_schema in params
+    assert connection.closed is True
+    assert "# nosec B608" not in inspect.getsource(mysql_introspect)
 
 
 @pytest.mark.asyncio
