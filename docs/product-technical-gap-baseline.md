@@ -43,12 +43,12 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter36 the loop is holding **18 stacked increment
+the gate clears. As of iter40 the loop is holding **19 stacked increment
 PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
 baseline draft) is green on every required check and waits only on one
-non-author approval; it is not one of the 18 increments.
+non-author approval; it is not one of the 19 increments.
 
-The 18 increments and the merge-wave order once the gate clears:
+The 19 increments and the merge-wave order once the gate clears:
 
 ```text
 #942  (approval-pending, not an increment)
@@ -58,7 +58,7 @@ The 18 increments and the merge-wave order once the gate clears:
   -> #1037 (#946) -> #1051
   -> #1038 (#948) -> #1050
   -> #1039 (#950) -> #1049
-  -> #1057 (#953)
+  -> #1057 -> #1063 (#953)
   -> #1040 (this document)
 ```
 
@@ -591,11 +591,19 @@ incomplete; PR #834's useful commits are not yet decomposed onto `main`.
   known-limitations list is empty (honesty rule); a `ValueError` names
   the first field that fails validation. New `app/release/` package.
   Cites NIST SP 800-218 and SLSA v1.2.
+- **#1063** — `app/release/sbom.py` (`parse_pip_lock` / `parse_npm_lock`
+  / `build_sbom`): a pure text/JSON parser that turns the lockfiles the
+  repo already commits into a **CycloneDX 1.6** `bom` — no `pip`/`npm`
+  run, no dependency resolution, no network. Components are de-duplicated
+  by purl and sorted by `(type, name, version)`; blank envelope metadata
+  raises a `ValueError` naming the field. Cites OWASP CycloneDX 1.6 and
+  NTIA (2021) SBOM minimum elements.
 
-**Remaining increments.** The pure manifest assembler landed (#1057); what
-remains to make it a release-evidence artifact of record: SBOM generation
-(SPDX / CycloneDX) wired into the build; signed build provenance /
-attestation (SLSA v1.2); the operability baseline (SLI / SLO + dashboards
+**Remaining increments.** The pure manifest assembler landed (#1057) and
+the CycloneDX SBOM generator landed (#1063); what remains to make this a
+release-evidence artifact of record: signed build provenance /
+attestation (SLSA v1.2); signing the SBOM and referencing it from the
+manifest by digest; the operability baseline (SLI / SLO + dashboards
 + runbooks, linked to #951); migration rehearsal automation; the
 per-dependency release-decision table; and the full open-PR classification
 of record (every open PR at its exact head, with a `release_blocker` /
@@ -660,10 +668,11 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. This revision (iter36) added PR #1060
-(the signed-waiver helper, `app/spec/waiver_record.py`) to the #947 list,
-taking the stacked-PR count to 18. iter32 added PR #1057 (the pure
-release-manifest assembler, a new `app/release/` package) as the
+ships or the incident status changes. This revision (iter40) added PR #1063
+(the CycloneDX SBOM generator, `app/release/sbom.py`) to the #953 list,
+taking the stacked-PR count to 19. iter36 added PR #1060 (the signed-waiver
+helper, `app/spec/waiver_record.py`) to the #947 list. iter32 added PR #1057
+(the pure release-manifest assembler, a new `app/release/` package) as the
 release-evidence increment for issue #953. iter28 added PR #1056 (the
 versioned baseline-report envelope) to the #951 list. iter22 added PR #1049
 (the tenant-authority
