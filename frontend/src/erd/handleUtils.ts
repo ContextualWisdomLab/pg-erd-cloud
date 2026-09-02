@@ -1,8 +1,13 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  let encoded = ''
+  for (const char of columnName) {
+    if (encoded.length > 0) {
+      encoded += '-'
+    }
+    // for...of iterates over Unicode code points, so char is a single scalar.
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }
+  // Trigger OpenCode review
 
   return `c-${encoded || 'empty'}`
 }
