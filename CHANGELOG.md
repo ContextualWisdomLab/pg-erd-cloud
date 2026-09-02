@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 📦 **릴리스 증거 매니페스트 조립기 (#953 1차 증분)**: `app/release/manifest.py`의 `build_release_manifest(*, source_commit, backend_version, frontend_version, migration_revisions, dependency_lock_digests, included_prs, known_limitations, generated_at) -> dict`를 추가했습니다. 호출자가 이미 수집한 릴리스 사실(commit·버전·Alembic revision·lock 파일 sha256 다이제스트·포함 PR·알려진 한계·생성 시각)을 검증·정규화해 불변·JSON 직렬화 가능한 단일 매니페스트로 만듭니다. git·네트워크·파일시스템 접근 없음. 검증 실패 시 첫 문제 필드명을 담은 `ValueError`. `migration_revisions`/`included_prs`는 정렬·중복 제거, digest는 `^sha256:[0-9a-f]{64}$` 강제. `is_ga_candidate = len(known_limitations) == 0`(한계가 하나라도 있으면 GA 후보 아님 — 정직성 규칙). 테스트 12종. `docs/doctoring/release-manifest.md`에 필드 계약·후속 증분(SBOM·서명 provenance·operability baseline·마이그레이션 리허설) 기록, NIST SP 800-218·SLSA v1.2 인용.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.
