@@ -43,17 +43,17 @@ was found and is being addressed in that repo.
 
 **Consequence for this baseline:** every gap increment below is shipped as a
 small, tested, mypy-clean, 100%-docstring PR and **held merge-ready** until
-the gate clears. As of iter32 the loop is holding **17 stacked increment
+the gate clears. As of iter36 the loop is holding **18 stacked increment
 PRs** plus **this document** (PR #1040). Separately, PR #942 (the original
 baseline draft) is green on every required check and waits only on one
-non-author approval; it is not one of the 17 increments.
+non-author approval; it is not one of the 18 increments.
 
-The 17 increments and the merge-wave order once the gate clears:
+The 18 increments and the merge-wave order once the gate clears:
 
 ```text
 #942  (approval-pending, not an increment)
   -> #1024 -> #1025
-  -> #1031 -> #1032 -> #1033 -> #1035 -> #1048        (#947 chain)
+  -> #1031 -> #1032 -> #1033 -> #1035 -> #1048 -> #1060   (#947 chain)
   -> #1036 -> #1041 -> #1045 -> #1056                 (#951 chain)
   -> #1037 (#946) -> #1051
   -> #1038 (#948) -> #1050
@@ -168,10 +168,19 @@ never described as 3NF proof.
   class `proposed`, never applied). It never infers a dependency from
   column names; unresolvable declared FDs are returned, not dropped.
   13 golden fixtures.
+- **#1060** — `app/spec/waiver_record.py` (`sign_waiver` /
+  `verify_waiver_signature`): a pure, IO-free HMAC-SHA256 tamper-evidence
+  pair for assessment waivers. The canonical JSON folds the
+  signer / signed-at / key-id metadata in, so altering the metadata
+  invalidates the signature exactly as altering the waiver body does;
+  verification is constant-time. The caller supplies the secret key and it
+  is never stored, logged, or echoed into the record. Cites NIST FIPS
+  198-1 and RFC 8785.
 
 **Remaining increments.** Row-level functional-dependency *discovery* from
 table data (a profiling service, out of scope for the pure analyzer);
-persisted signed waiver records; the `EXPLAIN` pruning fixtures against a
+persistence of the signed waiver records (the signing / verification core
+landed in #1060); the `EXPLAIN` pruning fixtures against a
 real PostgreSQL; the versioned `assessment_run` persistence; a Rust core
 once the #951 profile shows a measured hotspot.
 
@@ -651,11 +660,13 @@ citations for its increment.
 ## How this document is maintained
 
 The autonomous review/merge loop updates this file each time a gap increment
-ships or the incident status changes. This revision (iter32) added PR #1057
-(the pure release-manifest assembler, a new `app/release/` package) as the
-release-evidence increment for issue #953, taking the stacked-PR count to 17.
-iter28 added PR #1056 (the versioned baseline-report envelope) to the #951
-list. iter22 added PR #1049 (the tenant-authority
+ships or the incident status changes. This revision (iter36) added PR #1060
+(the signed-waiver helper, `app/spec/waiver_record.py`) to the #947 list,
+taking the stacked-PR count to 18. iter32 added PR #1057 (the pure
+release-manifest assembler, a new `app/release/` package) as the
+release-evidence increment for issue #953. iter28 added PR #1056 (the
+versioned baseline-report envelope) to the #951 list. iter22 added PR #1049
+(the tenant-authority
 column-presence check) to the #950 list and PR #1050 (the lineage PROV-JSON
 projection) to the #948 list. iter20 added PR #1048 (transitive-dependency /
 3NF assessment) to the #947 list. iter19 fixed the markdownlint MD018 line-start warnings
