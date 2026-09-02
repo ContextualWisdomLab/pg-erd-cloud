@@ -30,6 +30,12 @@ The relation remains in third normal form: `diagram_name` is a scalar fact fully
 
 `DiagramViewCreateIn` and `DiagramViewOut` make `diagram_name` authoritative and use the legacy wire alias `name`; serialization with aliases preserves the existing frontend/API payload. `backend/tests/test_diagram_view_naming_contract.py` asserts that the ORM table contains `diagram_name` but not `name`, that the Pydantic field model is semantic, and that wire serialization still emits `name`. Existing endpoint tests use `diagram_name` internally and also assert the legacy Python/wire compatibility view.
 
+### CI RCA: runtime-compatible alias, stale static constructor
+
+PR #1044 exact head `7f45a6a5a989c065ebc1c0c9edb914126a9f053e` reproduced a backend-only typing failure in run `33520335237`, job `100109874318`. Checkout and hash-locked dependency installation succeeded; `PYTHONPATH=. mypy app` then rejected `diagram_name=` at `app/api/diagram_views.py:94,120,144` for `DiagramViewOut` and `DiagramViewDetailOut`. The models already use `ConfigDict(populate_by_name=True)` and `Field(alias="name")`, so runtime accepts the internal field name while retaining the historical wire alias. Inspection of `backend/pyproject.toml` showed that mypy was running without Pydantic's supported `pydantic.mypy` plugin. Without the plugin, the checker did not honor the `populate_by_name` constructor contract and treated the alias as the accepted keyword.
+
+The repair enables `pydantic.mypy` in `[tool.mypy]` rather than changing endpoint constructors back to the generic wire name, suppressing `call-arg`, or weakening mypy. Pydantic's documented plugin contract specifically generates field-name `__init__` parameters when `populate_by_name=True`. The failing mypy job is the pre-existing RED static regression; fresh exact-head CI is required to prove the repair. Frontend rerun job `100109872822` is tracked separately because the PR changes no frontend files and that queued evidence is neither passing nor causally linked to this backend defect.
+
 Fresh exact-head GitHub Checks remain merge authority. No predecessor/base status may be transferred to the final head.
 
 ## Research and standards traceability

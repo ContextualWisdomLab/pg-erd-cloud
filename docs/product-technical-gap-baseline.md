@@ -104,6 +104,10 @@ Do not conflate this invariant with casing-only lint. Existing meaningful multiw
 - `diagram_view.name` → `diagram_name` is metadata-only but takes a strong table lock; revision `0008_diagram_view_semantic_name` applies a transaction-local five-second `lock_timeout` and documents that mixed-version backend processes must be drained before the rename.
 - No Rust-owned mathematical/data-science core computation is introduced by the saved-view naming change.
 
+### Exact-head CI RCA — Pydantic alias/static-constructor mismatch
+
+On PR #1044 exact head `7f45a6a5a989c065ebc1c0c9edb914126a9f053e`, backend run `33520335237` job `100109874318` completed checkout and hash-locked dependency installation, then deterministically failed `PYTHONPATH=. mypy app` with three `call-arg` errors at `app/api/diagram_views.py:94,120,144`: the checker rejected internal `diagram_name=` construction for `DiagramViewOut`/`DiagramViewDetailOut`. Runtime models already declare `ConfigDict(populate_by_name=True)` with the public compatibility alias `Field(alias="name")`; the causal static-tooling gap was that `[tool.mypy]` did not enable Pydantic's supported `pydantic.mypy` plugin, so mypy synthesized alias-shaped constructors without honoring the model's name-population contract. The smallest repair enables that plugin without changing runtime validation, the HTTP `name` wire alias, security/coverage gates, or endpoint semantics. The existing failing mypy lane is the RED regression. Fresh exact-head backend CI remains required; frontend rerun job `100109872822` is an independent queued canary and is not counted as passing.
+
 ## Current product/technical gap status
 
 1. **Naming precision:** active. Saved Diagram View repair is implemented; snapshot/queue/annotation generic persisted fields remain prioritized by operational blast radius.
