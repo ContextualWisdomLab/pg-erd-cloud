@@ -1,19 +1,14 @@
 export function sanitizeHandleId(columnName: string): string {
-  if (!columnName) return 'c-empty';
-
-  let encoded = '';
-  let isFirst = true;
-
+  if (!columnName) return 'c-empty'
+  let encoded = ''
+  let isFirst = true
   for (const char of columnName) {
-    if (isFirst) {
-      isFirst = false;
-    } else {
-      encoded += '-';
-    }
-    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
+    if (!isFirst) encoded += '-'
+    isFirst = false
+    // string iterator yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
   }
-
-  return `c-${encoded}`;
+  return `c-${encoded}`
 }
 
 export function sourceColumnHandleId(columnName: string): string {
