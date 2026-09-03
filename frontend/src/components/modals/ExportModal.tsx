@@ -205,6 +205,7 @@ export function ExportModal({
                 disabled
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
+                title="프로젝트 설정에서 접근 권한을 관리하세요"
               >
                 접근 관리
               </button>

@@ -57,6 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2026-07-23 - Data Type Accessibility in Table Nodes
-**Learning:** Table nodes display data types (like `varchar`, `int`) visually, but without explicit labels, screen readers read the raw text out of context, leading to ambiguity for visually impaired users.
-**Action:** When displaying purely visual metadata like data types in table nodes or dense grids, add an explicit `aria-label` (e.g., `aria-label="데이터 타입: varchar"`) to provide necessary context for screen readers.
+## 2026-07-23 - Accessibility Naming and i18n
+**Learning:** Adding hard-coded `aria-label` values directly to structural elements like `span` not only violates WAI-ARIA accessible-naming rules (which prohibit naming `generic` roles), but also creates un-localizable strings that break internationalization contracts.
+**Action:** Instead of author-naming generic elements, rely on proper semantic relationships (like table headers/cells or `aria-describedby`) and ensure all accessibility text routes through the application's locale resource system. Never patch accessibility issues with hard-coded language literals.

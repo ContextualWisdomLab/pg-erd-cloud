@@ -150,7 +150,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
                   </AccessibleTruncatedText>
                 ) : null}
               </span>
-              <span className="tableNode__colType" aria-label={`데이터 타입: ${c.data_type}`}>{c.data_type}</span>
+              <span className="tableNode__colType" role="cell">{c.data_type}</span>
               {c.is_pk ? (
                 <abbr className="tableNode__badge" title="Primary Key" aria-label="Primary Key">
                   <span aria-hidden="true">PK</span>
