@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-20 - Avoid Array.from for short string iteration in hot paths
+**Learning:** Using `Array.from(string, callback).join()` allocates intermediate arrays for each character and the final string array before joining. In hot paths (like repeatedly generating handle IDs for thousands of columns during ERD rendering/export), this generates significant garbage collection overhead.
+**Action:** Replace `Array.from` on strings with direct `for...of` loops, building the result string through concatenation, to eliminate intermediate array allocations.
