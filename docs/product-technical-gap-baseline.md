@@ -15,10 +15,9 @@
 
 ### G-SEC-001 — 식별자 제어 문자 검증
 
-`DiagramViewCreateIn.name`, `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`, `ApiKeyCreateIn.key_name`은 ASCII C0 제어 문자와 DEL을 거부해야 한다. 반면 `TableAnnotationUpsertIn.body`처럼 실제 멀티라인 콘텐츠를 담는 필드는 개행/탭을 보존해야 한다.
+`DiagramViewCreateIn.name`, `ApiKeyCreateIn.key_name`은 제품 수준의 라벨로 간주되어 ASCII C0 제어 문자와 DEL을 거부해야 한다. 반면 데이터베이스 식별자 도메인인 `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`은 PostgreSQL의 식별자 규칙을 준수하여(NUL을 제외한 모든 문자 허용) 개행 및 탭과 같은 문자를 보존해야 한다. `TableAnnotationUpsertIn.body`처럼 실제 멀티라인 콘텐츠를 담는 필드도 개행/탭을 보존해야 한다. 데이터베이스 식별자에 대한 무조건적인 제어 문자 필터링은 식별자 무결성을 훼손하므로 적용하지 않아야 한다.
 
-- 구현 증거: `0084b0371a266c68edfddcaa78233051d5c9b205`.
-- 회귀 증거: `830304eda6a2792e68b86964ea1008a727ea30b3`에서 NUL/LF/CR/TAB/ESC/DEL을 네 식별자 필드에 대해 검증하고 멀티라인 주석 본문 보존을 별도로 검증한다.
+- 회귀 증거: 새로 추가된 `test_table_annotation_postgres_identity.py`에서 `schema_name`, `relation_name` 필드가 제어 문자(LF, TAB 등)를 올바르게 보존하는지 검증한다. 제품 라벨 필드는 별도로 `test_schema_control_characters.py`에서 제어 문자를 검증한다.
 - 남은 조건: exact-head backend test/lint/security가 실제 runner에서 실행되어 GREEN이어야 한다. CodeQL `startup_failure`나 queued 상태는 성공 증거가 아니다.
 
 ### G-CONFIG-001 — 런타임 secret/config KV 전환

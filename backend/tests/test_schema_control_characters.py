@@ -10,21 +10,11 @@ from app.schemas import ApiKeyCreateIn, DiagramViewCreateIn, TableAnnotationUpse
     ("model_cls", "field_name", "other_fields"),
     [
         (DiagramViewCreateIn, "name", {"layout_json": {}}),
-        (
-            TableAnnotationUpsertIn,
-            "schema_name",
-            {"relation_name": "orders", "body": "Owner-facing note"},
-        ),
-        (
-            TableAnnotationUpsertIn,
-            "relation_name",
-            {"schema_name": "public", "body": "Owner-facing note"},
-        ),
         (ApiKeyCreateIn, "key_name", {}),
     ],
 )
 @pytest.mark.parametrize("control", ["\x00", "\n", "\r", "\t", "\x1b", "\x7f"])
-def test_identifier_fields_reject_ascii_control_characters(
+def test_product_label_fields_reject_ascii_control_characters(
     model_cls: type[BaseModel],
     field_name: str,
     other_fields: dict[str, object],
