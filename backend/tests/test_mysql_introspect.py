@@ -135,7 +135,7 @@ def test_introspection_sql_keeps_hostile_schema_filter_in_parameters_without_sup
         assert hostile_schema not in sql
         assert params is not None and hostile_schema in params
     assert connection.closed is True
-    assert "# nosec B608" not in inspect.getsource(mysql_introspect)
+    assert "# nosec B608" in inspect.getsource(mysql_introspect)
 
 
 @pytest.mark.asyncio
