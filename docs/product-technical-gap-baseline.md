@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-기준일: 2026-09-03
+기준일: 2026-09-04
 
 이 문서는 `pg-erd-cloud`의 코드와 운영 증거에서 확인되는 상용화 Gap만 추적한다. 구현되지 않은 기능을 완료된 것처럼 기록하지 않는다. ERD 프로젝트·스키마·다이어그램·주석·API 키에 관한 도메인 truth는 이 저장소가 소유하고, 조직 공통 CI·보안·릴리스 정책은 `ContextualWisdomLab/.github`의 released contract를 따른다.
 
@@ -15,10 +15,12 @@
 
 ### G-SEC-001 — 식별자 제어 문자 검증
 
-`DiagramViewCreateIn.name`, `ApiKeyCreateIn.key_name`은 제품 수준의 라벨로 간주되어 ASCII C0 제어 문자와 DEL을 거부해야 한다. 반면 데이터베이스 식별자 도메인인 `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`은 PostgreSQL의 식별자 규칙을 준수하여(NUL을 제외한 모든 문자 허용) 개행 및 탭과 같은 문자를 보존해야 한다. `TableAnnotationUpsertIn.body`처럼 실제 멀티라인 콘텐츠를 담는 필드도 개행/탭을 보존해야 한다. 데이터베이스 식별자에 대한 무조건적인 제어 문자 필터링은 식별자 무결성을 훼손하므로 적용하지 않아야 한다.
+`DiagramViewCreateIn.name`, `ApiKeyCreateIn.key_name`은 제품 수준의 라벨로 간주되어 ASCII C0 제어 문자와 DEL을 거부한다. 데이터베이스 식별자 도메인인 `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`은 PostgreSQL quoted identifier 계약에 맞춰 NUL만 거부하고 LF/TAB을 포함한 나머지 문자를 보존한다. `TableAnnotationUpsertIn.body`도 멀티라인 콘텐츠를 그대로 보존한다. 데이터베이스 식별자에 제품 라벨용 blanket C0/DEL 필터를 적용하지 않는다.
 
-- 회귀 증거: 새로 추가된 `test_table_annotation_postgres_identity.py`에서 `schema_name`, `relation_name` 필드가 제어 문자(LF, TAB 등)를 올바르게 보존하는지 검증한다. 제품 라벨 필드는 별도로 `test_schema_control_characters.py`에서 제어 문자를 검증한다.
-- 남은 조건: exact-head backend test/lint/security가 실제 runner에서 실행되어 GREEN이어야 한다. CodeQL `startup_failure`나 queued 상태는 성공 증거가 아니다.
+- production 계약: `backend/app/schemas.py`의 두 데이터베이스 식별자 필드는 `^[^\x00]+$`로 NUL만 거부한다.
+- 회귀 증거: `test_table_annotation_postgres_identity.py`가 LF/TAB 보존과 `schema_name`·`relation_name` 각각의 NUL 거부를 검증한다. `test_schema_control_characters.py`는 제품 라벨의 별도 제어 문자 정책과 annotation body의 멀티라인 보존을 검증한다.
+- 표준 근거: PostgreSQL Global Development Group. (2026). *PostgreSQL 19 documentation: 4.1. Lexical structure*. https://www.postgresql.org/docs/19/sql-syntax-lexical.html — quoted identifier는 code zero를 제외한 문자를 허용한다.
+- 상태: source/test 계약은 일치했다. exact-head backend test/lint/security가 실제 runner에서 terminal GREEN이어야 병합 조건을 충족한다. queued 상태는 성공 증거가 아니다.
 
 ### G-CONFIG-001 — 런타임 secret/config KV 전환
 
@@ -39,4 +41,4 @@
 
 ## 현재 병합 판단
 
-제어 문자 hardening 자체는 production contract와 focused regression test를 갖췄지만, required exact-head workflow가 terminal GREEN이 될 때까지 merge-ready로 간주하지 않는다. 조직 runner/CodeQL control-plane 장애는 leaf 저장소의 gate 완화나 no-op commit으로 우회하지 않고 `.github` owner path에서 복구한다.
+제어 문자 hardening은 database identity와 product label을 분리한 production contract와 focused regression test를 갖췄다. required exact-head workflow가 terminal GREEN이 될 때까지 merge-ready로 간주하지 않는다. 조직 runner/CodeQL control-plane 장애는 leaf 저장소의 gate 완화나 no-op commit으로 우회하지 않고 `.github` owner path에서 복구한다.
