@@ -13,7 +13,7 @@ class ProjectCreateIn(BaseModel):
     project_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$",
     )
 
 
@@ -51,7 +51,7 @@ class ConnectionCreateIn(BaseModel):
     conn_name: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00-\x1F\x7F\x80-\x9F]+$",
     )
     dsn: str = Field(
         min_length=1,
