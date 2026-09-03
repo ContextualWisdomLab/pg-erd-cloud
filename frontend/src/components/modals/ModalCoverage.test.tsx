@@ -194,7 +194,7 @@ describe('modal behavior coverage', () => {
     })
     expect(duplicated.data.columns).not.toBe(tableNode.data.columns)
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '테이블 편집 닫기' }))
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(onDeleteTable).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledTimes(3)
