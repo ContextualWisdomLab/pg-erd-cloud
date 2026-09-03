@@ -218,8 +218,16 @@ class DiagramViewDetailOut(DiagramViewOut):
 class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
-    schema_name: str = Field(min_length=1, max_length=255)
-    relation_name: str = Field(min_length=1, max_length=255)
+    schema_name: str = Field(
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00]+$",
+    )
+    relation_name: str = Field(
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00]+$",
+    )
     body: str = Field(min_length=1, max_length=10_000)
 
 
