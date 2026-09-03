@@ -1,5 +1,5 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName || '', (char) => {
+  const encoded = Array.from(columnName, (char) => {
     // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
     return char.codePointAt(0)!.toString(16).padStart(4, '0')
   }).join('-')
