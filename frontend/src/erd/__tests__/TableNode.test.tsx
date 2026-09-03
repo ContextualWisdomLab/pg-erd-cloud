@@ -76,6 +76,10 @@ describe('TableNode', () => {
       expect(item).not.toHaveAttribute('tabindex', '0');
     }
 
+    const typeNodes = screen.getAllByLabelText('데이터 타입: varchar');
+    expect(typeNodes[0]).toHaveTextContent('varchar');
+    expect(typeNodes[0]).not.toHaveAttribute('tabindex', '0');
+
     const indexName = screen.getByLabelText('idx_users_email_unique_long_name');
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
     expect(indexName).not.toHaveAttribute('tabindex', '0');
