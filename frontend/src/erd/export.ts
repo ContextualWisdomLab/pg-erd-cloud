@@ -60,11 +60,21 @@ type NodeHandleCache = {
   targetHandles: Map<string, string>;
 };
 
+/**
+ * Resolves foreign key columns for an edge.
+ *
+ * Precedence:
+ * 1. Explicit composite columns (`edge.data.sourceColumns` / `targetColumns`)
+ * 2. Handle ID lookup (`edge.sourceHandle` / `targetHandle`) against node columns
+ * 3. Fallback (all non-PK source columns -> all PK target columns)
+ *
+ * @param getHandleCache A lazy cache factory for column handles to avoid O(N*C) upfront allocation when not needed.
+ */
 function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
-  nodeHandleCache: Map<string, NodeHandleCache>
+  getHandleCache: (node: Node<TableNodeData>) => NodeHandleCache
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -73,8 +83,8 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceCache = nodeHandleCache.get(sourceNode.id);
-  const targetCache = nodeHandleCache.get(targetNode.id);
+  const sourceCache = getHandleCache(sourceNode);
+  const targetCache = getHandleCache(targetNode);
   const sourceHandleColumn = sourceCache?.sourceHandles.get(edge.sourceHandle || '');
   const targetHandleColumn = targetCache?.targetHandles.get(edge.targetHandle || '');
 
@@ -95,23 +105,38 @@ function fkColumnsForEdge(
   return null;
 }
 
+/**
+ * Generates SQL DDL from the provided nodes and edges.
+ *
+ * Note: The precomputed handle maps (via getHandleCache) act as an internal
+ * performance acceleration (O(1) lookups) for foreign key resolution and
+ * must not alter the resulting emitted DDL bytes compared to the naive O(N) scan.
+ */
 export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   let ddl = '-- Generated DDL\n\n';
 
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
-  const nodeHandleCache = new Map<string, NodeHandleCache>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
-    const sourceHandles = new Map<string, string>();
-    const targetHandles = new Map<string, string>();
-    for (const col of n.data.columns || []) {
-      sourceHandles.set(sourceColumnHandleId(col.column_name), col.column_name);
-      targetHandles.set(targetColumnHandleId(col.column_name), col.column_name);
-    }
-    nodeHandleCache.set(n.id, { sourceHandles, targetHandles });
   }
+
+  const nodeHandleCache = new Map<string, NodeHandleCache>();
+  const getHandleCache = (node: Node<TableNodeData>): NodeHandleCache => {
+    let cache = nodeHandleCache.get(node.id);
+    if (!cache) {
+      const sourceHandles = new Map<string, string>();
+      const targetHandles = new Map<string, string>();
+      for (const col of node.data.columns || []) {
+        sourceHandles.set(sourceColumnHandleId(col.column_name), col.column_name);
+        targetHandles.set(targetColumnHandleId(col.column_name), col.column_name);
+      }
+      cache = { sourceHandles, targetHandles };
+      nodeHandleCache.set(node.id, cache);
+    }
+    return cache;
+  };
 
   // Export tables
   for (const node of nodes) {
@@ -146,7 +171,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, nodeHandleCache);
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, getHandleCache);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);

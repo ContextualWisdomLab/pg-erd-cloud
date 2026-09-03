@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-20 - [Optimize DDL Export FK lookups]
+**Learning:** Found O(N * C * E) performance bottleneck in DDL export generation due to repeated array searching with `.find()` and redundant `sourceColumnHandleId` calculations inside the edge loops.
+**Action:** Precompute an O(1) Map of handle IDs to column names, but do so lazily (only for nodes actually involved in handle-based FK resolution) to prevent wasted work/allocations on diagrams with explicit FK columns or zero edges.
