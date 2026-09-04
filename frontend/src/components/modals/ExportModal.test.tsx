@@ -179,6 +179,12 @@ describe('ExportModal', () => {
     expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
     accessManagementButton.focus();
     expect(accessManagementButton).toHaveFocus();
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(accessManagementButton.dispatchEvent(clickEvent)).toBe(false);
+    expect(clickEvent.defaultPrevented).toBe(true);
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
   });
