@@ -74,8 +74,16 @@ function fkColumnsForEdge(
   const sourceCols = columnsByNode.get(sourceNode.id);
   const targetCols = columnsByNode.get(targetNode.id);
 
-  const sourceHandleColumn = parsedSource && sourceCols?.has(parsedSource) ? parsedSource : undefined;
-  const targetHandleColumn = parsedTarget && targetCols?.has(parsedTarget) ? parsedTarget : undefined;
+  const sourceHandleColumn = parsedSource
+    && edge.sourceHandle === sourceColumnHandleId(parsedSource)
+    && sourceCols?.has(parsedSource)
+    ? parsedSource
+    : undefined;
+  const targetHandleColumn = parsedTarget
+    && edge.targetHandle === targetColumnHandleId(parsedTarget)
+    && targetCols?.has(parsedTarget)
+    ? parsedTarget
+    : undefined;
 
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
