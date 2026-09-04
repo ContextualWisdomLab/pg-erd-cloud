@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { sanitizeHandleId, parseColumnNameFromHandle } from "./handleUtils";
 
 function sanitizeString(str: string): string {
   if (!str) return "";
@@ -28,15 +28,34 @@ export function exportMermaid(
   const fkNodeColumnPairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
 
+  const validEdges = new Set<string>();
+
   for (const edge of edges) {
+    let sourceValid = true;
+    let targetValid = true;
+
     if (edge.sourceHandle?.startsWith("src-")) {
-      fkNodeColumnPairs.add(`${edge.source}:${edge.sourceHandle.slice(4)}`);
+      const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+      const sourceNode = nodesById.get(edge.source);
+      sourceValid = !!sourceNode && (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
+      if (sourceValid) {
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(parsedSource)}`);
+      }
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     if (edge.targetHandle?.startsWith("tgt-")) {
-      fkNodeColumnPairs.add(`${edge.target}:${edge.targetHandle.slice(4)}`);
+      const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+      const targetNode = nodesById.get(edge.target);
+      targetValid = !!targetNode && (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
+      if (targetValid) {
+        fkNodeColumnPairs.add(`${edge.target}:${sanitizeHandleId(parsedTarget)}`);
+      }
+    }
+
+    if (sourceValid && targetValid) {
+      validEdges.add(edge.id);
     }
   }
 
@@ -64,6 +83,7 @@ export function exportMermaid(
   }
 
   for (const edge of edges) {
+    if (!validEdges.has(edge.id)) continue;
     // ⚡ Bolt: O(1) lookups instead of O(N) array search for every edge
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);

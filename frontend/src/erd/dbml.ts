@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
+import { parseColumnNameFromHandle } from "./handleUtils";
 
 function escapeString(str: string): string {
   return str.replace(/'/g, "''");
@@ -86,11 +87,24 @@ export function exportDbml(
       let targetCols: string[] = [];
 
       if (edgeData?.sourceColumns && edgeData?.targetColumns) {
-        sourceCols = edgeData.sourceColumns.map(safeId);
-        targetCols = edgeData.targetColumns.map(safeId);
+        const sourceExists = edgeData.sourceColumns.every(col => (sourceNode.data.columns || []).some(c => c && c.column_name === col));
+        const targetExists = edgeData.targetColumns.every(col => (targetNode.data.columns || []).some(c => c && c.column_name === col));
+
+        if (sourceExists && targetExists) {
+          sourceCols = edgeData.sourceColumns.map(safeId);
+          targetCols = edgeData.targetColumns.map(safeId);
+        }
       } else if (edge.sourceHandle && edge.targetHandle) {
-         sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
-         targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
+         const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
+         const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
+
+         const sourceExists = (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
+         const targetExists = (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
+
+         if (sourceExists && targetExists) {
+           sourceCols = [safeId(parsedSource)];
+           targetCols = [safeId(parsedTarget)];
+         }
       }
 
       if (sourceCols.length > 0 && targetCols.length > 0) {
