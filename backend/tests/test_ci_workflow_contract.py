@@ -24,10 +24,16 @@ def test_local_workflows_keep_central_ownership_and_pr_concurrency() -> None:
         workflow_path.read_text(encoding="utf-8") for workflow_path in workflow_paths
     )
     ci_workflow = (WORKFLOW_DIRECTORY / "ci.yml").read_text(encoding="utf-8")
+    backfill_workflow = (WORKFLOW_DIRECTORY / "codeql-backfill.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert workflow_names.isdisjoint(CENTRAL_REQUIRED_WORKFLOWS)
     assert "schedule:" not in workflow_text
     assert "sleep " not in workflow_text
+    assert "workflow_dispatch:" in backfill_workflow
+    assert "pull_request:" not in backfill_workflow
+    assert "push:" not in backfill_workflow
     assert (
         "group: ci-${{ github.repository }}-"
         "${{ github.event.pull_request.number || github.run_id }}" in ci_workflow
