@@ -28,12 +28,17 @@ export function exportMermaid(
   const fkNodeColumnPairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
 
+  const validEdges = new Set<string>();
+
   for (const edge of edges) {
+    let sourceValid = true;
+    let targetValid = true;
+
     if (edge.sourceHandle?.startsWith("src-")) {
       const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
       const sourceNode = nodesById.get(edge.source);
-      const sourceExists = sourceNode && (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
-      if (sourceExists) {
+      sourceValid = !!sourceNode && (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
+      if (sourceValid) {
         fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(parsedSource)}`);
       }
     } else if (!edge.sourceHandle) {
@@ -43,10 +48,14 @@ export function exportMermaid(
     if (edge.targetHandle?.startsWith("tgt-")) {
       const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
       const targetNode = nodesById.get(edge.target);
-      const targetExists = targetNode && (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
-      if (targetExists) {
+      targetValid = !!targetNode && (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
+      if (targetValid) {
         fkNodeColumnPairs.add(`${edge.target}:${sanitizeHandleId(parsedTarget)}`);
       }
+    }
+
+    if (sourceValid && targetValid) {
+      validEdges.add(edge.id);
     }
   }
 
@@ -74,6 +83,7 @@ export function exportMermaid(
   }
 
   for (const edge of edges) {
+    if (!validEdges.has(edge.id)) continue;
     // ⚡ Bolt: O(1) lookups instead of O(N) array search for every edge
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);

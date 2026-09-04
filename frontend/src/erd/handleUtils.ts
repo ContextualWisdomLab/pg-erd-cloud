@@ -22,9 +22,18 @@ export function parseColumnNameFromHandle(handleId: string): string {
   const hexParts = prefixRemoved.slice(2).split('-');
   if (hexParts.length === 1 && hexParts[0] === 'empty') return '';
 
-  return hexParts.map(hex => {
+  const decoded = hexParts.map(hex => {
+    if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
     const codePoint = parseInt(hex, 16);
-    if (isNaN(codePoint)) return '';
-    return String.fromCodePoint(codePoint);
-  }).join('');
+    if (isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF) return null;
+    if (codePoint >= 0xD800 && codePoint <= 0xDFFF) return null;
+    try {
+      return String.fromCodePoint(codePoint);
+    } catch {
+      return null;
+    }
+  });
+
+  if (decoded.some(char => char === null)) return '';
+  return decoded.join('');
 }

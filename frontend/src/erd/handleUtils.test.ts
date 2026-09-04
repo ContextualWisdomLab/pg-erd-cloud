@@ -67,5 +67,11 @@ describe('handleUtils', () => {
       expect(parseColumnNameFromHandle('')).toBe('');
       expect(parseColumnNameFromHandle('src-c-invalid')).toBe('');
     });
+
+    it('should reject malformed segments and scalars out of bounds', () => {
+      expect(parseColumnNameFromHandle('src-c-0069g')).toBe('');
+      expect(parseColumnNameFromHandle('src-c-110000')).toBe('');
+      expect(parseColumnNameFromHandle('src-c-D800')).toBe('');
+    });
   });
 });

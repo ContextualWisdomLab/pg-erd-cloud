@@ -70,10 +70,11 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
+    let sourceValid = true;
     if (edge.sourceHandle?.startsWith("src-")) {
       const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
-      const sourceExists = (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
-      if (sourceExists) {
+      sourceValid = (sourceNode.data.columns || []).some(c => c && c.column_name === parsedSource);
+      if (sourceValid) {
         sourceField = parsedSource;
         fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(parsedSource)}`);
       }
@@ -82,15 +83,18 @@ export function exportPrisma(
     }
 
     let targetField = "id"; // fallback
+    let targetValid = true;
     if (edge.targetHandle?.startsWith("tgt-")) {
       const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
-      const targetExists = (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
-      if (targetExists) {
+      targetValid = (targetNode.data.columns || []).some(c => c && c.column_name === parsedTarget);
+      if (targetValid) {
         targetField = parsedTarget;
       }
+    } else if (edge.targetHandle) {
+      targetValid = false; // Present but undecodable
     }
 
-    if (sourceField) {
+    if (sourceField && sourceValid && targetValid) {
       const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];

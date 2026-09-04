@@ -87,8 +87,13 @@ export function exportDbml(
       let targetCols: string[] = [];
 
       if (edgeData?.sourceColumns && edgeData?.targetColumns) {
-        sourceCols = edgeData.sourceColumns.map(safeId);
-        targetCols = edgeData.targetColumns.map(safeId);
+        const sourceExists = edgeData.sourceColumns.every(col => (sourceNode.data.columns || []).some(c => c && c.column_name === col));
+        const targetExists = edgeData.targetColumns.every(col => (targetNode.data.columns || []).some(c => c && c.column_name === col));
+
+        if (sourceExists && targetExists) {
+          sourceCols = edgeData.sourceColumns.map(safeId);
+          targetCols = edgeData.targetColumns.map(safeId);
+        }
       } else if (edge.sourceHandle && edge.targetHandle) {
          const parsedSource = parseColumnNameFromHandle(edge.sourceHandle);
          const parsedTarget = parseColumnNameFromHandle(edge.targetHandle);
