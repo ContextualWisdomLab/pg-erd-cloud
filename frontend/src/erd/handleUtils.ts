@@ -16,14 +16,26 @@ export function targetColumnHandleId(columnName: string): string {
 }
 
 export function parseColumnNameFromHandle(handleId: string | null | undefined): string | null {
-  if (!handleId) return null;
-  const match = handleId.match(/^(?:src|tgt)-c-(.+)$/);
-  if (!match) return null;
-  const encoded = match[1];
-  if (encoded === 'empty') return '';
-  try {
-    return encoded.split('-').map((hex) => String.fromCodePoint(parseInt(hex, 16))).join('');
-  } catch (e) {
-    return null;
+  if (!handleId) return null
+
+  const match = handleId.match(/^(src|tgt)-c-(empty|[0-9a-f]{4,6}(?:-[0-9a-f]{4,6})*)$/)
+  if (!match) return null
+
+  const [, direction, encoded] = match
+  if (encoded === 'empty') return ''
+
+  const chars: string[] = []
+  for (const hex of encoded.split('-')) {
+    const codePoint = Number.parseInt(hex, 16)
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+      return null
+    }
+    chars.push(String.fromCodePoint(codePoint))
   }
+
+  const columnName = chars.join('')
+  const canonicalHandle = direction === 'src'
+    ? sourceColumnHandleId(columnName)
+    : targetColumnHandleId(columnName)
+  return canonicalHandle === handleId ? columnName : null
 }
