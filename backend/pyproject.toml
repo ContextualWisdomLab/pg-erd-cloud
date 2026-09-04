@@ -44,7 +44,6 @@ dev = [
   "asyncpg-stubs>=0.31.3",
   "types-python-jose>=3.5.0.20260408",
   "types-requests",
-  "httpx2>=2.12.0",
 ]
 
 [dependency-groups]
@@ -56,7 +55,6 @@ dev = [
   "asyncpg-stubs>=0.31.3",
   "types-python-jose>=3.5.0.20260408",
   "types-requests",
-  "httpx2>=2.12.0",
 ]
 
 [tool.pytest.ini_options]
