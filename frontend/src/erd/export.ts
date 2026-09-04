@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { parseColumnNameFromHandle } from './handleUtils';
+import { resolveColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -59,6 +59,8 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  sourceColumnNames: ReadonlySet<string>,
+  targetColumnNames: ReadonlySet<string>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -68,19 +70,19 @@ function fkColumnsForEdge(
   }
 
   let sourceHandleColumn: string | undefined = undefined;
-  if (edge.sourceHandle && edge.sourceHandle.startsWith('src-')) {
-    const parsedSource = parseColumnNameFromHandle(edge.sourceHandle.slice(4));
-    if (parsedSource && (sourceNode.data.columns || []).some(c => c.column_name === parsedSource)) {
-      sourceHandleColumn = parsedSource;
-    }
+  if (edge.sourceHandle?.startsWith('src-')) {
+    sourceHandleColumn = resolveColumnNameFromHandle(
+      edge.sourceHandle.slice(4),
+      sourceColumnNames,
+    ) || undefined;
   }
 
   let targetHandleColumn: string | undefined = undefined;
-  if (edge.targetHandle && edge.targetHandle.startsWith('tgt-')) {
-    const parsedTarget = parseColumnNameFromHandle(edge.targetHandle.slice(4));
-    if (parsedTarget && (targetNode.data.columns || []).some(c => c.column_name === parsedTarget)) {
-      targetHandleColumn = parsedTarget;
-    }
+  if (edge.targetHandle?.startsWith('tgt-')) {
+    targetHandleColumn = resolveColumnNameFromHandle(
+      edge.targetHandle.slice(4),
+      targetColumnNames,
+    ) || undefined;
   }
 
   if (sourceHandleColumn && targetHandleColumn) {
@@ -106,8 +108,14 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const columnNamesByNodeId = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    const columnNames = new Set<string>();
+    for (const column of n.data.columns || []) {
+      columnNames.add(column.column_name);
+    }
+    columnNamesByNodeId.set(n.id, columnNames);
   }
 
   // Export tables
@@ -141,9 +149,17 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
+    const sourceColumnNames = columnNamesByNodeId.get(edge.source);
+    const targetColumnNames = columnNamesByNodeId.get(edge.target);
 
-    if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+    if (sourceNode && targetNode && sourceColumnNames && targetColumnNames) {
+      const fkColumns = fkColumnsForEdge(
+        edge,
+        sourceNode,
+        targetNode,
+        sourceColumnNames,
+        targetColumnNames,
+      );
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
