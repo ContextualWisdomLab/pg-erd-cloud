@@ -14,3 +14,9 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function parseColumnNameFromHandle(handleId: string): string {
+  if (!handleId || handleId === 'c-empty' || !handleId.startsWith('c-')) return '';
+  const parts = handleId.slice(2).split('-');
+  return parts.map(p => String.fromCodePoint(parseInt(p, 16))).join('');
+}

@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,12 +67,22 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  let sourceHandleColumn: string | undefined = undefined;
+  if (edge.sourceHandle && edge.sourceHandle.startsWith('src-')) {
+    const parsedSource = parseColumnNameFromHandle(edge.sourceHandle.slice(4));
+    if (parsedSource && (sourceNode.data.columns || []).some(c => c.column_name === parsedSource)) {
+      sourceHandleColumn = parsedSource;
+    }
+  }
+
+  let targetHandleColumn: string | undefined = undefined;
+  if (edge.targetHandle && edge.targetHandle.startsWith('tgt-')) {
+    const parsedTarget = parseColumnNameFromHandle(edge.targetHandle.slice(4));
+    if (parsedTarget && (targetNode.data.columns || []).some(c => c.column_name === parsedTarget)) {
+      targetHandleColumn = parsedTarget;
+    }
+  }
+
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
