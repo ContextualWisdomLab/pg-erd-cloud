@@ -1,27 +1,37 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from '../handleUtils';
+import { sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from '../handleUtils';
 
 describe('Handle encoding/decoding properties', () => {
-  it('should round-trip correctly for arbitrary valid column names (including ASCII, CJK, emoji, punctuation)', () => {
+  it('round-trips arbitrary valid column names, including Unicode', () => {
     fc.assert(
       fc.property(fc.string({ minLength: 0 }), (str) => {
         const sourceHandle = sourceColumnHandleId(str);
-        const parsedSource = parseColumnNameFromHandle(sourceHandle);
-        expect(parsedSource).toBe(str);
+        expect(parseColumnNameFromHandle(sourceHandle)).toBe(str);
 
         const targetHandle = targetColumnHandleId(str);
-        const parsedTarget = parseColumnNameFromHandle(targetHandle);
-        expect(parsedTarget).toBe(str);
+        expect(parseColumnNameFromHandle(targetHandle)).toBe(str);
       })
     );
   });
 
-  it('should handle malformed handles safely by returning null', () => {
-    expect(parseColumnNameFromHandle(null)).toBeNull();
-    expect(parseColumnNameFromHandle(undefined)).toBeNull();
-    expect(parseColumnNameFromHandle('')).toBeNull();
-    expect(parseColumnNameFromHandle('invalid-format')).toBeNull();
-    expect(parseColumnNameFromHandle('src-c-nothex')).toBeNull();
+  it('rejects malformed and noncanonical handles instead of decoding partial values', () => {
+    const malformedHandles = [
+      null,
+      undefined,
+      '',
+      'invalid-format',
+      'src-c-nothex',
+      'src-c-0041junk',
+      'src-c-0041--0042',
+      'src-c-000041',
+      'src-c-004A',
+      'src-c-110000',
+      'src-c-d800',
+    ] as const;
+
+    for (const handle of malformedHandles) {
+      expect(parseColumnNameFromHandle(handle)).toBeNull();
+    }
   });
 });
