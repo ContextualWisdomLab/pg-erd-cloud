@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-07-20 - Native Keyboard Submission with Forms in Sidebars
+**Learning:** Standalone inputs without wrapping `<form>` elements (like in sidebars) inherently lack keyboard submission support, forcing users to switch from keyboard to mouse to click primary buttons.
+**Action:** Always wrap data submission input and button groups in a `<form>` element, handle `onSubmit` (preventing default), and set the primary button to `type="submit"` to provide Enter-key submission capabilities.
