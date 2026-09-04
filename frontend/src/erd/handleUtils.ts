@@ -15,27 +15,25 @@ export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
 
-export function parseColumnNameFromHandle(handleId: string | null | undefined): string | null {
-  if (!handleId) return null
-
-  const match = handleId.match(/^(src|tgt)-c-(empty|[0-9a-f]{4,6}(?:-[0-9a-f]{4,6})*)$/)
-  if (!match) return null
-
-  const [, direction, encoded] = match
-  if (encoded === 'empty') return ''
-
-  const chars: string[] = []
-  for (const hex of encoded.split('-')) {
-    const codePoint = Number.parseInt(hex, 16)
-    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
-      return null
-    }
-    chars.push(String.fromCodePoint(codePoint))
+export function parseColumnNameFromHandle(handleId: string | null | undefined, direction?: 'src' | 'tgt'): string | null {
+  if (!handleId) return null;
+  const match = handleId.match(/^(src|tgt)-c-([0-9a-f-]+|empty)$/);
+  if (!match) return null;
+  const parsedDirection = match[1];
+  if (direction && parsedDirection !== direction) return null;
+  const encoded = match[2];
+  if (encoded === 'empty') return '';
+  try {
+    const decoded = encoded.split('-').map((hex) => {
+      if (!/^[0-9a-f]{4,6}$/.test(hex)) throw new Error('Invalid hex format');
+      const codePoint = parseInt(hex, 16);
+      if (codePoint > 0x10FFFF) throw new Error('Invalid code point');
+      return String.fromCodePoint(codePoint);
+    }).join('');
+    // Verify canonical re-encoding to reject padded or noncanonical hex casing.
+    if (sanitizeHandleId(decoded) !== `c-${encoded}`) return null;
+    return decoded;
+  } catch (e) {
+    return null;
   }
-
-  const columnName = chars.join('')
-  const canonicalHandle = direction === 'src'
-    ? sourceColumnHandleId(columnName)
-    : targetColumnHandleId(columnName)
-  return canonicalHandle === handleId ? columnName : null
 }

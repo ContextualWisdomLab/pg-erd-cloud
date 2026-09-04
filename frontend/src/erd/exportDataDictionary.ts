@@ -59,8 +59,8 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
     }
 
     if (edge.sourceHandle) {
-      const parsedColumn = parseColumnNameFromHandle(edge.sourceHandle);
-      if (parsedColumn && sourceColumnHandleId(parsedColumn) === edge.sourceHandle) {
+      const parsedColumn = parseColumnNameFromHandle(edge.sourceHandle, 'src');
+      if (parsedColumn) {
         info.columns.add(parsedColumn);
       } else {
         info.handles.add(edge.sourceHandle);
