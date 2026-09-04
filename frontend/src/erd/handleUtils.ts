@@ -16,7 +16,34 @@ export function targetColumnHandleId(columnName: string): string {
 }
 
 export function parseColumnNameFromHandle(handleId: string): string {
-  if (!handleId || handleId === 'c-empty' || !handleId.startsWith('c-')) return '';
-  const parts = handleId.slice(2).split('-');
-  return parts.map(p => String.fromCodePoint(parseInt(p, 16))).join('');
+  if (!handleId || handleId === 'c-empty' || !handleId.startsWith('c-')) return ''
+
+  const decoded: string[] = []
+  for (const part of handleId.slice(2).split('-')) {
+    if (!/^[0-9a-f]{4,6}$/i.test(part)) return ''
+
+    const codePoint = Number.parseInt(part, 16)
+    if (
+      codePoint > 0x10ffff ||
+      (codePoint >= 0xd800 && codePoint <= 0xdfff)
+    ) {
+      return ''
+    }
+    decoded.push(String.fromCodePoint(codePoint))
+  }
+
+  return decoded.join('')
+}
+
+export function resolveColumnNameFromHandle(
+  handleId: string,
+  columnNames: { has(columnName: string): boolean },
+): string {
+  if (!handleId) return ''
+
+  const decoded = parseColumnNameFromHandle(handleId)
+  if (decoded && columnNames.has(decoded)) return decoded
+
+  // Persisted diagrams may still carry the pre-hex raw column payload.
+  return columnNames.has(handleId) ? handleId : ''
 }
