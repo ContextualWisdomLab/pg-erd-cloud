@@ -9,6 +9,43 @@ describe('exportTypeOrm', () => {
     expect(result).toBe('// No tables to export\n');
   });
 
+  it('exports tables with various types', () => {
+    const nodes: Node<TableNodeData>[] = [{
+      id: '1', position: { x: 0, y: 0 }, data: { title: 'types', columns: [
+        { column_name: 't_json', data_type: 'json', is_pk: false, is_not_null: true },
+        { column_name: 't_bytea', data_type: 'bytea', is_pk: false, is_not_null: true },
+        { column_name: 't_unknown', data_type: 'unknown', is_pk: false, is_not_null: true },
+        { column_name: 't_serial', data_type: 'serial', is_pk: true, is_not_null: true },
+        { column_name: 't_time', data_type: 'time', is_pk: false, is_not_null: true },
+        { column_name: 't_bool', data_type: 'bool', is_pk: false, is_not_null: true },
+      ], badges: { pk: false, fk: false } }
+    }];
+    const result = exportTypeOrm(nodes, []);
+    expect(result).toContain('t_json!: any;');
+    expect(result).toContain('t_bytea!: Buffer;');
+    expect(result).toContain('t_unknown!: string;');
+    expect(result).toContain('@PrimaryGeneratedColumn()');
+    expect(result).toContain('t_time!: Date;');
+    expect(result).toContain('t_bool!: boolean;');
+  });
+
+  it('handles edge case sanitize function formats', () => {
+    const nodes: Node<TableNodeData>[] = [{
+      id: '1', position: { x: 0, y: 0 }, data: { title: '1invalidClass', columns: [
+        { column_name: '1invalidField', data_type: 'int', is_pk: false, is_not_null: true },
+      ], badges: { pk: false, fk: false } }
+    }];
+    const result = exportTypeOrm(nodes, []);
+    expect(result).toContain('class Entity1invalidClass {');
+    expect(result).toContain('field_1invalidField!: number;');
+  });
+
+  it('ignores edges missing nodes', () => {
+    const edges: Edge[] = [{ id: 'e1', source: 'none1', target: 'none2' }];
+    const result = exportTypeOrm([], edges);
+    expect(result).toBe('// No tables to export\n');
+  });
+
   it('exports a single table with primary key and columns', () => {
     const nodes: Node<TableNodeData>[] = [
       {
@@ -21,6 +58,7 @@ describe('exportTypeOrm', () => {
             { column_name: 'email', data_type: 'varchar', is_pk: false, is_not_null: true },
             { column_name: 'age', data_type: 'int', is_pk: false, is_not_null: false },
           ],
+          badges: { pk: false, fk: false },
         },
       },
     ];
@@ -47,6 +85,7 @@ describe('exportTypeOrm', () => {
           columns: [
             { column_name: 'id', data_type: 'uuid', is_pk: true, is_not_null: true },
           ],
+          badges: { pk: false, fk: false },
         },
       },
       {
@@ -58,6 +97,7 @@ describe('exportTypeOrm', () => {
             { column_name: 'id', data_type: 'uuid', is_pk: true, is_not_null: true },
             { column_name: 'user_id', data_type: 'uuid', is_pk: false, is_not_null: true },
           ],
+          badges: { pk: false, fk: false },
         },
       },
     ];
@@ -73,7 +113,7 @@ describe('exportTypeOrm', () => {
 
     const result = exportTypeOrm(nodes, edges);
     expect(result).toContain("@ManyToOne(() => Users)");
-    expect(result).toContain("@JoinColumn({ name: 'user_id' })");
+    expect(result).toContain("@JoinColumn({ name: 'user_id', referencedColumnName: 'id' })");
     expect(result).toContain("Users_user_id?: Users;");
 
     // Check one to many back relation

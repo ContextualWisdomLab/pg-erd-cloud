@@ -1,6 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
 
 function sanitizeClassName(name: string): string {
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -58,8 +57,6 @@ class Base(DeclarativeBase):
     nodesById.set(n.id, n);
   }
 
-  const fkNodeColumnPairs = new Set<string>();
-  const fkNodesWithoutHandles = new Set<string>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], targetTableName: string }>();
 
   for (const edge of edges) {
@@ -70,9 +67,6 @@ class Base(DeclarativeBase):
     let sourceField = "";
     if (edge.sourceHandle?.startsWith("src-")) {
       sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
-      fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
@@ -114,7 +108,7 @@ class Base(DeclarativeBase):
       let args: string[] = [];
       if (fieldName !== col.column_name) args.push(`'${col.column_name}'`);
 
-      for (const [_, edgeInfo] of edgesProcessed) {
+      for (const edgeInfo of edgesProcessed.values()) {
         if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(col.column_name)) {
           args.push(`ForeignKey('${edgeInfo.targetTableName}.${edgeInfo.targetFields[0]}')`);
         }

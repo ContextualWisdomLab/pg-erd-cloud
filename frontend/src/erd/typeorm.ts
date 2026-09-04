@@ -1,6 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
 
 function sanitizeClassName(name: string): string {
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -57,8 +56,6 @@ export function exportTypeOrm(
     nodesById.set(n.id, n);
   }
 
-  const fkNodeColumnPairs = new Set<string>();
-  const fkNodesWithoutHandles = new Set<string>();
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
 
@@ -72,9 +69,6 @@ export function exportTypeOrm(
     let sourceField = "";
     if (edge.sourceHandle?.startsWith("src-")) {
       sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
-      fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
@@ -110,9 +104,6 @@ export function exportTypeOrm(
       const fieldName = sanitizeFieldName(col.column_name);
       const tsType = mapToTsType(col.data_type);
 
-      let isFk = fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
-                 (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
-
       const isOptional = !col.is_not_null;
       const tsNull = isOptional ? " | null" : "";
       const optionalFlag = isOptional && !col.is_pk ? "?" : "!";
@@ -136,11 +127,11 @@ export function exportTypeOrm(
       output += `  ${fieldName}${optionalFlag}: ${tsType}${tsNull};\n\n`;
 
       // ManyToOne relations
-      for (const [_, edgeInfo] of edgesProcessed) {
+      for (const edgeInfo of edgesProcessed.values()) {
         if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(fieldName)) {
           const relField = sanitizeFieldName(edgeInfo.targetModel) + "_" + fieldName;
           output += `  @ManyToOne(() => ${edgeInfo.targetModel})\n`;
-          output += `  @JoinColumn({ name: '${col.column_name}' })\n`;
+          output += `  @JoinColumn({ name: '${col.column_name}', referencedColumnName: '${edgeInfo.targetFields[0]}' })\n`;
           output += `  ${relField}?: ${edgeInfo.targetModel};\n\n`;
         }
       }

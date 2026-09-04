@@ -125,6 +125,8 @@ describe('ExportModal', () => {
         onDownloadPrisma={onDownloadPrisma}
         onDownloadTypeOrm={onDownloadTypeOrm}
         onDownloadSqlAlchemy={onDownloadSqlAlchemy}
+        onCreateShareLink={vi.fn()}
+        onCopyShareLink={vi.fn()}
       />,
     );
 
