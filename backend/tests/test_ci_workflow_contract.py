@@ -37,10 +37,15 @@ def test_local_workflows_keep_central_ownership_and_pr_concurrency() -> None:
     assert "pull_request:" not in backfill_workflow
     assert "push:" not in backfill_workflow
     assert (
-        "group: ci-${{ github.repository }}-"
+        "group: ${{ github.workflow }}-${{ github.repository }}-"
         "${{ github.event.pull_request.number || github.run_id }}" in ci_workflow
     )
     assert (
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
         in ci_workflow
     )
+    assert (
+        "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]"
+        in ci_workflow
+    )
+    assert ci_workflow.count("github.event.pull_request.draft == false") == 2
