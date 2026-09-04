@@ -37,3 +37,11 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+def test_rejects_c1_control_characters() -> None:
+    # U+0085 is NEL (Next Line), U+009B is CSI (Control Sequence Introducer)
+    with pytest.raises(ValidationError):
+        ProjectCreateIn(project_name="my\x85project")
+    with pytest.raises(ValidationError):
+        ConnectionCreateIn(conn_name="my\x9bconn", dsn="postgresql://localhost/db")
