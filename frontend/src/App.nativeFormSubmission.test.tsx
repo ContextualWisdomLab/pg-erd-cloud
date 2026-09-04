@@ -69,7 +69,9 @@ describe('native form keyboard submission', () => {
     render(<App />)
     await screen.findByRole('heading', { name: '대시보드' })
 
-    const projectName = screen.getByLabelText('New project')
+    await user.click(screen.getByRole('button', { name: '편집기' }))
+
+    const projectName = await screen.findByLabelText('New project')
     await user.clear(projectName)
     await user.type(projectName, 'Keyboard project{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
