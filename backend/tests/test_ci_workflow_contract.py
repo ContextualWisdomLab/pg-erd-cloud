@@ -5,21 +5,23 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIRECTORY = REPOSITORY_ROOT / ".github" / "workflows"
-CENTRAL_REQUIRED_WORKFLOWS = {
-    "codeql-pr.yml",
-    "noema-review.yml",
-    "opencode-review.yml",
-    "pr-review-merge-scheduler.yml",
-    "security-scan.yml",
-    "strix.yml",
-    "sast-semgrep.yml",
+CENTRAL_REQUIRED_WORKFLOW_STEMS = {
+    "codeql-pr",
+    "noema-review",
+    "opencode-review",
+    "pr-review-merge-scheduler",
+    "security-scan",
+    "strix",
+    "sast-semgrep",
 }
 
 
 def test_local_workflows_keep_central_ownership_and_pr_concurrency() -> None:
     """Keep central gates local-free and retire superseded CI heads per PR."""
-    workflow_paths = sorted(WORKFLOW_DIRECTORY.glob("*.yml"))
-    workflow_names = {workflow_path.name for workflow_path in workflow_paths}
+    workflow_paths = sorted(
+        {*WORKFLOW_DIRECTORY.glob("*.yml"), *WORKFLOW_DIRECTORY.glob("*.yaml")}
+    )
+    workflow_stems = {workflow_path.stem for workflow_path in workflow_paths}
     workflow_text = "\n".join(
         workflow_path.read_text(encoding="utf-8") for workflow_path in workflow_paths
     )
@@ -28,7 +30,7 @@ def test_local_workflows_keep_central_ownership_and_pr_concurrency() -> None:
         encoding="utf-8"
     )
 
-    assert workflow_names.isdisjoint(CENTRAL_REQUIRED_WORKFLOWS)
+    assert workflow_stems.isdisjoint(CENTRAL_REQUIRED_WORKFLOW_STEMS)
     assert "schedule:" not in workflow_text
     assert "sleep " not in workflow_text
     assert "workflow_dispatch:" in backfill_workflow
