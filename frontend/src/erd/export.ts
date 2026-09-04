@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sourceColumnHandleId, targetColumnHandleId, parseColumnNameFromHandle } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -59,6 +59,7 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
+  columnsByNode: Map<string, Set<string>>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -67,12 +68,15 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  const parsedSource = parseColumnNameFromHandle(edge.sourceHandle, 'src');
+  const parsedTarget = parseColumnNameFromHandle(edge.targetHandle, 'tgt');
+
+  const sourceCols = columnsByNode.get(sourceNode.id);
+  const targetCols = columnsByNode.get(targetNode.id);
+
+  const sourceHandleColumn = parsedSource && sourceCols?.has(parsedSource) ? parsedSource : undefined;
+  const targetHandleColumn = parsedTarget && targetCols?.has(parsedTarget) ? parsedTarget : undefined;
+
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -127,13 +131,22 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     ddl += '\n);\n\n';
   }
 
+  const columnsByNode = new Map<string, Set<string>>();
+  for (const node of nodes) {
+    const set = new Set<string>();
+    for (const c of node.data.columns || []) {
+      if (c && c.column_name) set.add(c.column_name);
+    }
+    columnsByNode.set(node.id, set);
+  }
+
   // Export foreign keys
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, columnsByNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
