@@ -115,6 +115,6 @@ Three deployable pieces in one repo:
 - Middleware registration order in `app/main.py` is deliberate (security headers registered last so they wrap everything, including 429s and CORS preflight) — read the comments there before reordering.
 - Do not use nested `${VAR:-${OTHER:-default}}` expressions in compose files; podman-compose mishandles them (noted inline in compose.yaml).
 - Supply-chain pinning is enforced (OpenSSF Scorecard): Docker images are pinned by digest, GitHub Actions by commit SHA, and pip installs by `--require-hashes`. Preserve pinning when adding or updating any of these.
-- CI (`.github/workflows/ci.yml`) runs backend mypy + pytest (Python 3.10, hash-locked deps) and frontend typecheck + vitest + production build (Node 26). CodeQL, Scorecard, and dependency-review workflows also run.
+- Local CI (`.github/workflows/ci.yml`) runs backend mypy + pytest (Python 3.10, hash-locked deps) and frontend typecheck + vitest + production build (Node 26). Its concurrency key isolates repository and PR number, so only an older head of the same PR is cancelled. CodeQL PR, Noema, OpenCode, merge scheduling, Security Scan, Strix, and Semgrep are centrally owned by `ContextualWisdomLab/.github`; do not add local copies. The remaining CodeQL backfill workflow is manual-only.
 - User-visible frontend changes are recorded in CHANGELOG.md (Korean) and frontend/CHANGELOG.md.
 - Add or update tests when changing behavior; prefer small, focused PRs (CONTRIBUTING.md).
