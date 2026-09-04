@@ -13,6 +13,10 @@ interface EditTableModalProps {
   onDeleteTable: () => void;
 }
 
+/**
+ * Render the table-editing dialog while keeping graph mutation authority in the
+ * caller-provided state setters and preserving the shared dialog focus contract.
+ */
 export function EditTableModal({
   isOpen,
   editingNode,
