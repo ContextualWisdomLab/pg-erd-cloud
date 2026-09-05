@@ -202,7 +202,9 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
+                aria-disabled={true}
+                onClick={(e) => e.preventDefault()}
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
