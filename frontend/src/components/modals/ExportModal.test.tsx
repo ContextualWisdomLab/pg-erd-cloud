@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportModal } from './ExportModal';
@@ -172,8 +171,7 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('exposes access-control guidance for disabled button', async () => {
-    const user = userEvent.setup();
+  it('keeps access-control guidance focusable while suppressing activation', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
@@ -184,11 +182,7 @@ describe('ExportModal', () => {
 
     accessManagementButton.focus();
     expect(accessManagementButton).toHaveFocus();
-
-    // Attempting to "click" or submit via keyboard should not trigger any action
-    // (though there's no specific prop to mock here, verifying it doesn't throw or navigate is sufficient,
-    // and we simulate the interaction to ensure the preventDefault runs)
-    await user.keyboard('{Enter}');
+    expect(fireEvent.click(accessManagementButton)).toBe(false);
     expect(accessManagementButton).toHaveFocus();
   });
 });
