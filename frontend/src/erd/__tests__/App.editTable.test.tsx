@@ -57,11 +57,9 @@ describe('App edit functionality', () => {
     expect(toolbarQueries.getByRole('button', { name: '인덱스 카디널리티 계산' })).toHaveTextContent('#');
     expect(toolbarQueries.getByRole('button', { name: 'DDL 내보내기' })).toHaveTextContent('SQL');
     expect(toolbarQueries.getByRole('button', { name: '공유 및 내보내기' })).toHaveTextContent('↗');
-    const exportButtons = [
-      toolbarQueries.getByRole('button', { name: '이미지 내보내기 모달 열기' }),
-      toolbarQueries.getByRole('button', { name: 'UML 내보내기 모달 열기' }),
-      toolbarQueries.getByRole('button', { name: 'JSON 내보내기 모달 열기' })
-    ];
+    const exportButtons = toolbarQueries.getAllByRole('button', {
+      name: '이미지/텍스트 내보내기 모달 열기',
+    });
     expect(exportButtons).toHaveLength(3);
     expect(exportButtons[0]).toHaveTextContent('IMG');
     expect(exportButtons[1]).toHaveTextContent('UML');

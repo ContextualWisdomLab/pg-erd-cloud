@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2023-10-27 - [Refined ARIA Labels for Clustered Export Buttons]
-**Learning:** Shared, generic ARIA labels across adjacent icon-only buttons ("이미지/텍스트 내보내기 모달 열기") create ambiguity for screen reader users, failing to distinguish their specific functions (Image vs. UML vs. JSON).
-**Action:** Always provide unique, specific ARIA labels for each icon-only button even when they trigger the same underlying action (like opening a multi-tab modal), to clearly indicate the button's explicit intent.
