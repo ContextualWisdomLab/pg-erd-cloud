@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreateIn(BaseModel):
@@ -190,19 +190,33 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200)
+    model_config = ConfigDict(populate_by_name=True)
+
+    diagram_name: str = Field(alias="name", min_length=1, max_length=200)
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
+
+    @property
+    def name(self) -> str:
+        """Return ``diagram_name`` for legacy Python callers."""
+        return self.diagram_name
 
 
 class DiagramViewOut(BaseModel):
     """Diagram view summary."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     diagram_view_uuid: uuid.UUID
-    name: str
+    diagram_name: str = Field(alias="name")
     created_at: dt.datetime
     updated_at: dt.datetime
+
+    @property
+    def name(self) -> str:
+        """Return ``diagram_name`` for legacy Python callers."""
+        return self.diagram_name
 
 
 class DiagramViewDetailOut(DiagramViewOut):

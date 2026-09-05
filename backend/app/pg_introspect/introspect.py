@@ -43,11 +43,6 @@ class _ServerHostnameSSLContext(ssl.SSLContext):
         )
 
 
-def _requires_verified_tls_hostname(dsn: str) -> bool:
-    query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
-    return query.get("sslmode", "").lower() == "verify-full"
-
-
 def _verified_tls_context(dsn: str, server_hostname: str) -> ssl.SSLContext:
     query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
     context = _ServerHostnameSSLContext(server_hostname)
@@ -67,28 +62,18 @@ async def _connect_guarded_postgres(
     connect_host: str | list[str] = (
         target.hosts[0] if len(target.hosts) == 1 else list(target.hosts)
     )
-    ssl_context = (
-        _verified_tls_context(dsn, target.hostname)
-        if _requires_verified_tls_hostname(dsn)
-        else None
-    )
+    ssl_context = _verified_tls_context(dsn, target.hostname)
     if target.port is not None:
-        if ssl_context is not None:
-            return await asyncpg.connect(
-                dsn,
-                host=connect_host,
-                port=target.port,
-                timeout=timeout,
-                ssl=ssl_context,
-            )
         return await asyncpg.connect(
-            dsn, host=connect_host, port=target.port, timeout=timeout
+            dsn,
+            host=connect_host,
+            port=target.port,
+            timeout=timeout,
+            ssl=ssl_context,
         )
-    if ssl_context is not None:
-        return await asyncpg.connect(
-            dsn, host=connect_host, timeout=timeout, ssl=ssl_context
-        )
-    return await asyncpg.connect(dsn, host=connect_host, timeout=timeout)
+    return await asyncpg.connect(
+        dsn, host=connect_host, timeout=timeout, ssl=ssl_context
+    )
 
 
 async def probe_postgres(dsn: str) -> str:
