@@ -44,12 +44,10 @@ async def test_introspection_enforces_verified_tls_for_default_dsn(
     monkeypatch.setattr(settings, "db_introspection_allowed_hosts", "db.example.com")
     monkeypatch.setattr(introspect.asyncpg, "connect", fake_connect)
 
-    await introspect.introspect_postgres(
-        "postgresql://user:pass@db.example.com:6543/app",
-        schema_filter=None,
-    )
+    dsn = "postgresql://db.example.com:6543/app"
+    await introspect.introspect_postgres(dsn, schema_filter=None)
 
-    assert captured["dsn"] == "postgresql://user:pass@db.example.com:6543/app"
+    assert captured["dsn"] == dsn
     assert captured["host"] == "93.184.216.34"
     assert captured["port"] == 6543
     assert captured["timeout"] == 10
@@ -79,7 +77,7 @@ async def test_introspection_preserves_sni_for_verified_tls(
     monkeypatch.setattr(introspect.asyncpg, "connect", fake_connect)
 
     await introspect.introspect_postgres(
-        "postgresql://user:pass@db.example.com:6543/app?sslmode=verify-full",
+        "postgresql://db.example.com:6543/app?sslmode=verify-full",
         schema_filter=None,
     )
 
@@ -110,7 +108,7 @@ async def test_introspection_dsn_cannot_downgrade_verified_tls(
     monkeypatch.setattr(introspect.asyncpg, "connect", fake_connect)
 
     await introspect.introspect_postgres(
-        "postgresql://user:pass@db.example.com/app?sslmode=disable",
+        "postgresql://db.example.com/app?sslmode=disable",
         schema_filter=None,
     )
 
