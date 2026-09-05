@@ -2,20 +2,32 @@ import type { Node } from "@xyflow/react";
 
 import type { TableNodeData } from "./convert";
 
-function fieldIncludes(value: string | null | undefined, term: string): boolean {
-  return Boolean(value && value.toLocaleLowerCase().includes(term));
+// ⚡ Bolt: Cache lowercased search strings keyed by TableNodeData to prevent redundant
+// string allocations and lowercasing during React Flow re-renders where `node` references change but `node.data` is stable.
+const nodeSearchFieldsCache = new WeakMap<TableNodeData, string[]>();
+
+function getSearchFields(data: TableNodeData): string[] {
+  let fields = nodeSearchFieldsCache.get(data);
+  if (fields !== undefined) return fields;
+
+  fields = [];
+  if (data.title) fields.push(data.title.toLocaleLowerCase());
+  if (data.comment) fields.push(data.comment.toLocaleLowerCase());
+
+  for (const column of data.columns) {
+    if (column.column_name) fields.push(column.column_name.toLocaleLowerCase());
+    if (column.data_type) fields.push(column.data_type.toLocaleLowerCase());
+    if (column.column_comment) fields.push(column.column_comment.toLocaleLowerCase());
+  }
+  nodeSearchFieldsCache.set(data, fields);
+  return fields;
 }
 
 function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
-  if (fieldIncludes(node.data.title, term)) return true;
-  if (fieldIncludes(node.data.comment, term)) return true;
-
-  for (const column of node.data.columns) {
-    if (fieldIncludes(column.column_name, term)) return true;
-    if (fieldIncludes(column.data_type, term)) return true;
-    if (fieldIncludes(column.column_comment, term)) return true;
+  const fields = getSearchFields(node.data);
+  for (const field of fields) {
+    if (field.includes(term)) return true;
   }
-
   return false;
 }
 
