@@ -18,12 +18,12 @@
 **Action:** Always ensure custom modals implement the `dialog` role with an explicit `aria-modal="true"` and an `aria-labelledby` referencing their heading. For non-interactive elements containing labeled groups, explicitly assign `role="group"` or a relevant semantic role when applying an `aria-label`.
 ## 2025-02-23 - Add Confirmation and Accessibility to Destructive Actions
 **Learning:** In the ERD canvas, destructive actions like deleting relations or business groups were missing user confirmation, increasing the chance of accidental data loss. Furthermore, mapped lists of interactive elements like "Business Group" rendering generic "삭제" (delete) buttons lacked `aria-label` context, creating ambiguous screen reader experiences.
-**Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g., `aria-label={`${itemName} 삭제`}`).
+**Action:** Next time, always wrap destructive handlers with `window.confirm` dialogues and ensure mapped delete buttons receive an `aria-label` providing full context (e.g. `aria-label={`${itemName} 삭제`}`).
 ## 2026-06-21 - Form Input Keyboard Navigation
 **Learning:** Standalone inputs without wrapping `<form>` elements inherently lack keyboard submission support, forcing users to switch from keyboard to mouse just to complete simple forms. Furthermore, modal dialogues holding inputs trap keyboard users unless explicit cancelation escapes are implemented.
 **Action:** When implementing inputs outside of standard `<form>` contexts or within custom modals, explicitly add `onKeyDown` handlers to support `Enter` for submission and `Escape` for cancelation.
 ## 2024-06-23 - [Safe Scope UX Tooltips]
-**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g., "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
+**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g. "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
 **Action:** Always verify the security posture of a file before making non-security changes to it. Prefer touching isolated display components (like `TableNode.tsx`) for UX enhancements rather than high-risk root components.
 ## 2026-06-21 - Accessible Badges for Domain Abbreviations
 **Learning:** ERD diagrams heavily use domain abbreviations like "PK", "FK", and "NOT NULL". For visually capable users, these are quickly recognized. However, for screen reader users or beginners, abbreviations can be ambiguous. Wrapping them in generic `span`s without `aria-label` or `title` results in poor accessibility and misses an opportunity to provide helpful context.
@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2026-08-01 - Focusable aria-disabled buttons for screen readers
-**Learning:** Native `disabled` attributes on buttons remove them from the tab order, preventing screen reader users from discovering them and hearing their `aria-describedby` helper text explaining *why* they are disabled.
-**Action:** When a disabled button has important explanatory context (like requiring project permissions), use `aria-disabled="true"` with custom styling (opacity and cursor) and manually prevent action (e.g., `e.preventDefault()`) instead of the native `disabled` attribute to keep it discoverable via keyboard navigation.
