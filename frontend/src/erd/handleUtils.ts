@@ -1,14 +1,8 @@
 export function sanitizeHandleId(columnName: string): string {
-  // ⚡ Bolt: Use a for...of loop instead of Array.from(...).join('-') to prevent
-  // intermediate array allocations and reduce GC pressure in the graph rendering hot path.
-  let encoded = ''
-  let first = true
-  for (const char of columnName) {
-    if (!first) encoded += '-'
-    first = false
-    // string iteration yields valid surrogate pairs, so codePointAt(0) is always defined.
-    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }
+  const encoded = Array.from(columnName, (char) => {
+    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    return char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }).join('-')
 
   return `c-${encoded || 'empty'}`
 }
