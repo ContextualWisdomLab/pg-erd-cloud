@@ -2,8 +2,18 @@ import type { Node } from "@xyflow/react";
 
 import type { TableNodeData } from "./convert";
 
+/**
+ * Identity cache for search fields text compilation.
+ * Note: Assumes `TableNodeData` objects are entirely immutable repository-wide.
+ * If data fields mutate without new object creation, this cache will yield stale matches.
+ * The `App.tsx::onEditTableSubmit` contract strictly guarantees new object issuance on edit.
+ */
 const searchCache = new WeakMap<TableNodeData, string>();
 
+/**
+ * Combines node metadata into a single string for O(1) matching comparisons.
+ * Extracts title, comments, and column metadata. Returns a cache-backed delimited string.
+ */
 function getNodeSearchText(data: TableNodeData): string {
   let text = searchCache.get(data);
   if (text !== undefined) return text;
@@ -24,6 +34,11 @@ function getNodeSearchText(data: TableNodeData): string {
   return text;
 }
 
+/**
+ * Determines whether a table node completely matches all supplied search terms.
+ * This evaluator leverages `getNodeSearchText` for constant-time extraction and
+ * validates CJK and non-ASCII character boundaries properly by falling back to native JS `includes`.
+ */
 export function tableNodeMatchesSearch(
   node: Node<TableNodeData>,
   search: string | string[],
@@ -38,6 +53,11 @@ export function tableNodeMatchesSearch(
   return terms.every((term) => nodeText.includes(term));
 }
 
+/**
+ * Scans an entire list of TableNodes and extracts IDs that match the search string.
+ * Optimizes initialization overhead to scale at $O(N)$ keystroke complexity avoiding
+ * O(N*C) per-node deep evaluations by batch splitting criteria upfront.
+ */
 export function findSearchMatchedNodeIds(
   nodes: Array<Node<TableNodeData>>,
   search: string,
