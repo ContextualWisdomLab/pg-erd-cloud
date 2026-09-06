@@ -444,7 +444,7 @@ async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     )
     pair = row.first()
     if pair is None or pair[0].revoked_at is not None:
-        raise HTTPException(status_code=401, detail="invalid API key")
+        raise HTTPException(status_code=401, detail="invalid token")
     user = pair[1]
     return CurrentUser(
         user_account_uuid=user.user_account_uuid,
