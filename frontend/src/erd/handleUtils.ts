@@ -2,8 +2,6 @@ export function sanitizeHandleId(columnName: string): string {
   if (!columnName) return 'c-empty';
 
   let encoded = '';
-  // ⚡ Bolt: Use for...of loop instead of Array.from(string).join('-') to prevent
-  // intermediate array allocations and reduce garbage collection pressure in hot paths.
   for (const char of columnName) {
     if (encoded.length > 0) {
       encoded += '-';
