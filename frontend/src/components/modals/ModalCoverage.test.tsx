@@ -182,6 +182,7 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(null)).toBeNull()
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.submit(document.getElementById('editTableForm')!)
     fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
