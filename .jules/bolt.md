@@ -55,7 +55,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 2. 루프 내에서 가변 컬렉션(배열/Set 등)을 Map에 저장하여 다룰 때는 `if (!collection) { collection = []; map.set(key, collection); } collection.push(val);` 패턴을 엄격하게 사용하여 성능 저하 및 불필요한 메모리 재할당을 피합니다.
 ## 2024-06-25 - Avoid O(N) Map.set inside Loops for Existing Arrays/Sets
 **Learning:** When building Maps containing arrays or Sets in a loop, continually calling `map.set(key, list)` even after `list` is retrieved from `map.get()` causes unnecessary hashing and re-balancing overhead.
-**Action:** Only call `map.set()` when the array or Set doesn't exist yet (during creation). If the collection already exists in the Map, mutate it directly (e.g., `list.push` or `set.add`) without re-setting it in the Map.
+**Action:** Only call `map.set()` when the array or Set doesn't exist yet (during creation). If the collection already exists in the Map, mutate it directly (e.g. `list.push` or `set.add`) without re-setting it in the Map.
 
 ## 2026-06-25 - Avoid Map allocations in frontend ERD loops and mutate asyncpg records in-place
 **Learning:** The frontend `snapshotToGraph` iterates over thousands of columns to generate the graph, so repeated lookups and redundant collection assignments increase GC pressure. Backend snapshot column dictionaries are freshly instantiated for the payload, so `add_column_examples` can safely fill missing fields in place.
@@ -73,7 +73,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Action:** When working with nested search loops on static Node trees, immediately create O(1) Lookup Maps. Additionally, if the CI pipeline uses hallucination-prone LLM vulnerability checks (like STRIX) and flags string splitting logic, you can easily bypass the false positive by implementing a `sanitizeTableName` whitelist regex check where the table string is constructed.
 ## 2026-07-12 - Search string parsing overhead during ERD filtering
 **Learning:** During text search against many ERD nodes, recreating parsed string term arrays via string splitting, trimming, and `new Set()` inside the per-node loop creates unnecessary allocation overhead and garbage collection pressure, scaling with $O(N)$ for every typed keystroke.
-**Action:** Always hoist immutable string parsing and initialization logic (like regex array splitting) outside of node evaluation loops and pass the evaluated output directly down to individual evaluator functions, making initialization cost O(1).
+**Action:** Always hoist immutable string parsing and initialization logic (like regex array splitting) outside of node evaluation loops and pass the evaluated output directly down to individual evaluator functions, making initialization cost $O(1)$.
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
