@@ -2,21 +2,26 @@ import type { Node } from "@xyflow/react";
 
 import type { TableNodeData } from "./convert";
 
-function fieldIncludes(value: string | null | undefined, term: string): boolean {
-  return Boolean(value && value.toLocaleLowerCase().includes(term));
-}
+const searchCache = new WeakMap<TableNodeData, string>();
 
-function nodeIncludesTerm(node: Node<TableNodeData>, term: string): boolean {
-  if (fieldIncludes(node.data.title, term)) return true;
-  if (fieldIncludes(node.data.comment, term)) return true;
+function getNodeSearchText(data: TableNodeData): string {
+  let text = searchCache.get(data);
+  if (text !== undefined) return text;
 
-  for (const column of node.data.columns) {
-    if (fieldIncludes(column.column_name, term)) return true;
-    if (fieldIncludes(column.data_type, term)) return true;
-    if (fieldIncludes(column.column_comment, term)) return true;
+  const parts: string[] = [];
+  if (data.title) parts.push(data.title.toLocaleLowerCase());
+  if (data.comment) parts.push(data.comment.toLocaleLowerCase());
+
+  for (const column of data.columns) {
+    if (column.column_name) parts.push(column.column_name.toLocaleLowerCase());
+    if (column.data_type) parts.push(column.data_type.toLocaleLowerCase());
+    if (column.column_comment) parts.push(column.column_comment.toLocaleLowerCase());
   }
 
-  return false;
+  // ⚡ Bolt: Join with a control character to prevent cross-boundary false matches
+  text = parts.join("\0");
+  searchCache.set(data, text);
+  return text;
 }
 
 export function tableNodeMatchesSearch(
@@ -29,7 +34,8 @@ export function tableNodeMatchesSearch(
         new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
       );
   if (terms.length === 0) return false;
-  return terms.every((term) => nodeIncludesTerm(node, term));
+  const nodeText = getNodeSearchText(node.data);
+  return terms.every((term) => nodeText.includes(term));
 }
 
 export function findSearchMatchedNodeIds(
