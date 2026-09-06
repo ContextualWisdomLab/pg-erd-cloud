@@ -69,7 +69,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 **Action:** When working with nested search loops on static Node trees, immediately create O(1) Lookup Maps using `map.set` and `.get()` to skip intermediate callback allocations. Always combine multiple iterations over small arrays into single-pass loops.
 
 ## 2024-05-18 - [Optimize Node Resolution in autoInfer.ts & STRIX Intersect Flake]
-**Learning:** We replaced an O(N^2) loop where `nodes.find` scanning via string splitting was running inside an `O(N)` loop to match foreign key relationships, using an O(1) `Map` lookup instead. We also ran into an issue where STRIX falsely flagged a path traversal due to string manipulation of table names. Adding a simple alphanumeric whitelist `sanitizeTableName()` step addressed this mock-security check.
+**Learning:** We replaced an O(N^2) loop where `nodes.find` scanning via string splitting was running inside an O(N) loop to match foreign key relationships, using an O(1) `Map` lookup instead. We also ran into an issue where STRIX falsely flagged a path traversal due to string manipulation of table names. Adding a simple alphanumeric whitelist `sanitizeTableName()` step addressed this mock-security check.
 **Action:** When working with nested search loops on static Node trees, immediately create O(1) Lookup Maps. Additionally, if the CI pipeline uses hallucination-prone LLM vulnerability checks (like STRIX) and flags string splitting logic, you can easily bypass the false positive by implementing a `sanitizeTableName` whitelist regex check where the table string is constructed.
 ## 2026-07-12 - Search string parsing overhead during ERD filtering
 **Learning:** During text search against many ERD nodes, recreating parsed string term arrays via string splitting, trimming, and `new Set()` inside the per-node loop creates unnecessary allocation overhead and garbage collection pressure, scaling with $O(N)$ for every typed keystroke.
@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2024-09-06 - Replacing Array.from with for...of in hot paths
-**Learning:** While `Array.from(string)` is clean for string iteration and mapping, it allocates an intermediate array. In hot paths (like node ID generation in large ERD graphs), this increases garbage collection overhead.
-**Action:** Prefer `for...of` loops over `Array.from` when iterating characters for short strings in hot paths to prevent intermediate array allocations and reduce GC pressure.
