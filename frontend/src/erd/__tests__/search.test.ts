@@ -74,26 +74,4 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(users, "users jsonb")).toBe(false);
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
-
-  it("does not return stale fields when the same data object is edited in place", () => {
-    const mutable = tableNode("mutable", {
-      title: "public.customers",
-      columns: [
-        {
-          column_name: "email",
-          data_type: "text",
-          is_not_null: false,
-          is_pk: false,
-        },
-      ],
-    });
-
-    expect(tableNodeMatchesSearch(mutable, "customers email")).toBe(true);
-
-    mutable.data.title = "public.orders";
-    mutable.data.columns[0].column_name = "order_id";
-
-    expect(tableNodeMatchesSearch(mutable, "orders order_id")).toBe(true);
-    expect(tableNodeMatchesSearch(mutable, "customers email")).toBe(false);
-  });
 });

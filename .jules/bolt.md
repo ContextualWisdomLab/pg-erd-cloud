@@ -77,3 +77,9 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2023-10-24 - React Flow Node Data Caching
+**Learning:** In React Flow, node position updates (e.g., dragging) create new node object references on every frame while `node.data` maintains its object identity. Recalculating expensive derivations like string allocations on every node update causes severe 60fps performance drops.
+**Action:** Memoize expensive derivations (like string concatenations and formatting for search) using a `WeakMap` keyed by `node.data` to prevent redundant calculations during positional re-renders.
+## 2026-09-06 - Avoid caching on mutable objects
+**Learning:** In React Flow, although `node.data` maintains its object identity during node position updates (e.g., dragging), properties *inside* `node.data` (like `columns`) can be mutated in place during node edits. Using a `WeakMap` keyed by `node.data` to cache lowercased string arrays causes stale data bugs because the cache doesn't detect deep mutations.
+**Action:** Do not use `WeakMap` caches for derived data on mutable objects. Instead, optimize the constant factors (like parsing search terms once outside loops) and evaluate fields on the fly to guarantee correctness against in-place edits.
