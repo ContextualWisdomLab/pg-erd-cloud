@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 ### Added
+- **키보드 폼 제출**: 프로젝트 생성(편집기·프로젝트 목록)과 연결 생성 폼을 native `<form>` 제출 경로로 연결해 텍스트 입력에서 Enter로 제출할 수 있게 했습니다. 진행 중에는 submit control과 handler guard가 중복 요청을 막으며, `App.formSubmission.test.tsx`가 각 경로의 단일 요청 계약을 검증합니다. 실제 브라우저의 Enter 동작·포커스·접근성 트리·주요 viewport는 별도 E2E evidence가 확보되기 전까지 완료로 간주하지 않습니다.
 - **테이블 및 컬럼 편집 기능**: UI 패널을 통해 노드를 선택하고, 테이블의 이름/코멘트를 수정하며, 컬럼을 추가/수정/삭제하거나 테이블을 삭제할 수 있는 기능 추가.
 - **테스트 추가**: 프론트엔드 테스트 커버리지 100% 목표 달성을 위해 `cardinality.ts`, `types.ts`, `export.ts` 의 미달성 분기 및 함수 테스트 추가 (`cardinality_extra.test.ts` 등).
 - `.gitignore` 파일에 `coverage/` 폴더를 추가하여 불필요한 테스트 아티팩트가 커밋되지 않도록 보완.
