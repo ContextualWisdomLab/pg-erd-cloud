@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-07-28 - Avoid Array allocations in Data Dictionary Export
+**Learning:** Using `array.map(row => row.map(...).join(',')).join('\n')` on large nested arrays creates excessive intermediate objects and significantly increases garbage collection overhead during large diagram exports. Similarly, allocating intermediate `Set` objects for edge columns per node inside an iterative process results in notable delays.
+**Action:** Iterate through multi-dimensional arrays natively using `for` loops and concatenate resulting string segments manually to minimize object allocation. Iterate over source objects and update existing `Map` or `Set` objects directly instead of creating new instances.

@@ -54,8 +54,12 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
       map.set(edge.source, info);
     }
 
-    for (const column of sourceColumnsForEdge(edge)) {
-      info.columns.add(column);
+    // ⚡ Bolt: Avoid intermediate Set allocation by iterating over source columns directly
+    const data = edge.data as ForeignKeyEdgeData | undefined;
+    if (data?.sourceColumns) {
+      for (const column of data.sourceColumns) {
+        if (column) info.columns.add(column);
+      }
     }
 
     if (edge.sourceHandle) {
@@ -129,7 +133,17 @@ export function exportDictionaryCsv(
     }
   }
 
-  return rows.map((row) => row.map(csvCell).join(',')).join('\n');
+  // ⚡ Bolt: Avoid O(N) array allocation overhead with map/join by building CSV string iteratively
+  let result = '';
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    for (let j = 0; j < row.length; j++) {
+      result += csvCell(row[j]);
+      if (j < row.length - 1) result += ',';
+    }
+    if (i < rows.length - 1) result += '\n';
+  }
+  return result;
 }
 
 export function exportDictionaryMarkdown(
