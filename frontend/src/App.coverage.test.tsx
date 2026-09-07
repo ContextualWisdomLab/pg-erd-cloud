@@ -264,7 +264,11 @@ beforeEach(() => {
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue(connections)
   api.listSnapshots.mockResolvedValue(snapshots)
-  api.createProject.mockResolvedValue({ project_space_uuid: 'p3', project_name: 'New' })
+  let projectCounter = 3;
+  api.createProject.mockImplementation((name) => {
+    projectCounter++;
+    return Promise.resolve({ project_space_uuid: `p${projectCounter}`, project_name: name });
+  });
   api.createConnection.mockResolvedValue({ db_connection_uuid: 'c2', conn_name: 'New DB' })
   api.createSnapshot.mockResolvedValue({ schema_snapshot_uuid: 's3', status: 'queued', schema_filter: 'public' })
   api.getSnapshot.mockResolvedValue({
@@ -361,11 +365,11 @@ describe('App orchestration coverage', () => {
 
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
-    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p4', 'target-db', 'postgresql://db.example/test'))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
-    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p3', 'c2', 'public'))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p4', 'c2', 'public'))
     expect(screen.getByText('스냅샷 생성 중...')).toBeInTheDocument()
   })
 
