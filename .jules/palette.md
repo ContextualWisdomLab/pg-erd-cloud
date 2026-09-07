@@ -23,7 +23,7 @@
 **Learning:** Standalone inputs without wrapping `<form>` elements inherently lack keyboard submission support, forcing users to switch from keyboard to mouse just to complete simple forms. Furthermore, modal dialogues holding inputs trap keyboard users unless explicit cancelation escapes are implemented.
 **Action:** When implementing inputs outside of standard `<form>` contexts or within custom modals, explicitly add `onKeyDown` handlers to support `Enter` for submission and `Escape` for cancelation.
 ## 2024-06-23 - [Safe Scope UX Tooltips]
-**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g., "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
+**Learning:** Adding helpful `title` tooltips to text indicating truncation (e.g. "... N more") significantly improves usability for screen readers and confused users without changing visual layouts. More importantly, when working in a repository with aggressive penetration testing (like STRIX), UX changes must avoid touching components that handle sensitive inputs (like `App.tsx` dealing with DSNs). If an agent modifies a vulnerable file, even just for a UX change, the CI will run the pen-test against that file and block the PR.
 **Action:** Always verify the security posture of a file before making non-security changes to it. Prefer touching isolated display components (like `TableNode.tsx`) for UX enhancements rather than high-risk root components.
 ## 2026-06-21 - Accessible Badges for Domain Abbreviations
 **Learning:** ERD diagrams heavily use domain abbreviations like "PK", "FK", and "NOT NULL". For visually capable users, these are quickly recognized. However, for screen reader users or beginners, abbreviations can be ambiguous. Wrapping them in generic `span`s without `aria-label` or `title` results in poor accessibility and misses an opportunity to provide helpful context.
@@ -57,6 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2025-02-28 - Add form submission via enter key
-**Learning:** Inputs and actions wrapped in generic `<div>` elements cannot be submitted via the enter key, breaking keyboard accessibility and expected user flow.
-**Action:** Always wrap input and action groups in semantic `<form>` elements with an `onSubmit={(e) => e.preventDefault(); ...}` handler and use `type="submit"` for the primary action button to natively support enter key submission.
