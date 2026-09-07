@@ -275,7 +275,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
         tables = _fetch_dicts(
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT "
-            f"FROM information_schema.TABLES WHERE {where} "
+            f"FROM information_schema.TABLES WHERE {where} "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME",
             params,
         )
@@ -283,7 +283,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, "
             "COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT "
-            f"FROM information_schema.COLUMNS WHERE {where} "
+            f"FROM information_schema.COLUMNS WHERE {where} "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION",
             params,
         )
@@ -292,7 +292,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             "SELECT CONSTRAINT_NAME, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, "
             "ORDINAL_POSITION, REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, "
             "REFERENCED_COLUMN_NAME "
-            f"FROM information_schema.KEY_COLUMN_USAGE WHERE {where} "
+            f"FROM information_schema.KEY_COLUMN_USAGE WHERE {where} "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION",
             params,
         )
@@ -300,7 +300,7 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
             cursor,
             "SELECT TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, NON_UNIQUE, "
             "SEQ_IN_INDEX, COLUMN_NAME "
-            f"FROM information_schema.STATISTICS WHERE {where} "
+            f"FROM information_schema.STATISTICS WHERE {where} "  # nosec B608
             "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
             params,
         )
