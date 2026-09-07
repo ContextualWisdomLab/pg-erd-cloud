@@ -74,4 +74,40 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(users, "users jsonb")).toBe(false);
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
+
+  it("preserves results when React Flow replaces only the node wrapper", () => {
+    const cache = new WeakMap<TableNodeData, boolean>();
+    const movedUsers = {
+      ...users,
+      position: { x: 320, y: 180 },
+    };
+
+    expect([...findSearchMatchedNodeIds([users], "customer", cache)]).toEqual([
+      "users",
+    ]);
+    expect([...findSearchMatchedNodeIds([movedUsers], "customer", cache)]).toEqual([
+      "users",
+    ]);
+    expect(movedUsers.data).toBe(users.data);
+  });
+
+  it("recomputes matching after an immutable node-data update", () => {
+    const cache = new WeakMap<TableNodeData, boolean>();
+    const renamedUsers = {
+      ...users,
+      data: {
+        ...users.data,
+        title: "archive.accounts",
+        comment: "Historical account records",
+      },
+    };
+
+    expect([...findSearchMatchedNodeIds([users], "customer", cache)]).toEqual([
+      "users",
+    ]);
+    expect([...findSearchMatchedNodeIds([renamedUsers], "customer", cache)]).toEqual(
+      [],
+    );
+    expect(renamedUsers.data).not.toBe(users.data);
+  });
 });
