@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2026-10-25 - 내보내기 모달 버튼 접근성 개선
-**Learning:** ExportModal의 내보내기 버튼이 비활성화되었을 때, 시각적으로는 "먼저 테이블을 추가하세요"라는 설명이 보이지만 스크린 리더 사용자에게는 이 맥락이 전달되지 않아 왜 비활성화되었는지 알 수 없는 문제가 있었습니다.
-**Action:** 비활성화될 수 있는 버튼 곁에 있는 설명 텍스트 요소에 id를 부여하고, 버튼에 `aria-describedby`를 추가하여 스크린 리더가 비활성화 사유를 읽을 수 있도록 연결해야 합니다.
