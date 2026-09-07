@@ -273,16 +273,11 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         claims = jwt.decode(
             token,
-            jwk,
+            jwt.PyJWK.from_dict(jwk).key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
-            options={
-                "require": ["iss", "exp", "jti"],
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
-            },
+            options={"require": ["iss", "exp", "jti"], "verify_aud": bool(settings.oidc_audience), "verify_signature": True},
         )
     except Exception as err:
         raise HTTPException(status_code=401, detail="invalid token") from err
