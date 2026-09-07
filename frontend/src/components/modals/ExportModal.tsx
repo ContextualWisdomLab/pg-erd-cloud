@@ -26,6 +26,7 @@ interface ExportModalProps {
 }
 
 type ExportArtifact = {
+  id: string;
   label: string;
   description: string;
   buttonLabel: string;
@@ -72,6 +73,7 @@ export function ExportModal({
 
   const artifacts: ExportArtifact[] = [
     {
+      id: 'sql-ddl',
       label: 'SQL DDL',
       description: hasDdlExport ? '스키마 텍스트' : '먼저 테이블을 추가하세요',
       buttonLabel: isCopied ? '복사 완료' : '내보내기',
@@ -80,6 +82,7 @@ export function ExportModal({
       ariaLabel: 'SQL DDL 복사',
     },
     {
+      id: 'svg',
       label: 'SVG 이미지',
       description: hasDiagramExport ? '다이어그램 파일' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -88,6 +91,7 @@ export function ExportModal({
       ariaLabel: 'SVG 이미지 내보내기',
     },
     {
+      id: 'plantuml',
       label: 'PlantUML',
       description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -96,6 +100,7 @@ export function ExportModal({
       ariaLabel: 'PlantUML 내보내기',
     },
     {
+      id: 'mermaid',
       label: 'Mermaid',
       description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -104,6 +109,7 @@ export function ExportModal({
       ariaLabel: 'Mermaid 내보내기',
     },
     {
+      id: 'dbml',
       label: 'DBML',
       description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -112,6 +118,7 @@ export function ExportModal({
       ariaLabel: 'DBML 내보내기',
     },
     {
+      id: 'prisma',
       label: 'Prisma Schema',
       description: hasDiagramExport ? '텍스트 포맷' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -120,6 +127,7 @@ export function ExportModal({
       ariaLabel: 'Prisma Schema 내보내기',
     },
     {
+      id: 'dictionary-csv',
       label: 'Data Dictionary CSV',
       description: hasDictionaryExport ? '테이블/컬럼 목록' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -128,6 +136,7 @@ export function ExportModal({
       ariaLabel: '데이터 사전 CSV 내보내기',
     },
     {
+      id: 'dictionary-markdown',
       label: 'Data Dictionary MD',
       description: hasDictionaryExport ? '마크다운 문서' : '먼저 테이블을 추가하세요',
       buttonLabel: '내보내기',
@@ -223,9 +232,9 @@ export function ExportModal({
 
             <div className="exportModal__artifactList">
               {artifacts.map((artifact) => {
-                const descId = `export-artifact-desc-${artifact.label.replace(/\s+/g, '-')}`;
+                const descId = `export-artifact-desc-${artifact.id}`;
                 return (
-                  <div className="exportModal__artifactRow" key={artifact.label}>
+                  <div className="exportModal__artifactRow" key={artifact.id}>
                     <div>
                       <strong>{artifact.label}</strong>
                       <span id={descId}>{artifact.description}</span>
@@ -236,7 +245,7 @@ export function ExportModal({
                       disabled={artifact.disabled}
                       aria-label={artifact.ariaLabel}
                       aria-describedby={descId}
-                      aria-live={artifact.label === 'SQL DDL' ? 'polite' : undefined}
+                      aria-live={artifact.id === 'sql-ddl' ? 'polite' : undefined}
                     >
                       {artifact.buttonLabel}
                     </button>
