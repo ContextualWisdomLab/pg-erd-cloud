@@ -80,3 +80,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-11-20 - [Fix Search Stutter]
 **Learning:** In React Flow, node dragging triggers 60fps array identity changes for `nodes`. Computations bound to the `nodes` dependency array in `useMemo` will evaluate at 60fps, even if the actual `.data` content hasn't changed.
 **Action:** Use a `WeakMap` keyed on `node.data` to cache expensive results (like search matching). This preserves O(1) lookups during drag updates because `node.data` object references remain stable even when node positions change.
+## 2024-11-20 - [Fix React Testing Library Flakiness]
+**Learning:** In React Testing Library with Vitest, tests that pass locally but fail in CI with `TestingLibraryElementError` due to missing elements often suffer from race conditions. This occurs because elements rendering from asynchronous data (e.g., resolving API mocks) require DOM updates that have not yet occurred when a synchronous query (like `getByText`) is evaluated immediately after user interaction.
+**Action:** When querying elements that render based on asynchronous data, always use asynchronous queries (like `await screen.findByText()`) instead of synchronous ones immediately after user interactions.
