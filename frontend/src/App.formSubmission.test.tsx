@@ -96,6 +96,7 @@ describe('keyboard form submission', () => {
     await user.click(screen.getByRole('button', { name: '편집기' }))
 
     const projectName = screen.getByLabelText('New project')
+    await user.clear(projectName)
     await user.type(projectName, 'Keyboard project{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
     expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled()
@@ -107,7 +108,9 @@ describe('keyboard form submission', () => {
       await projectRequest.promise
     })
 
-    await user.type(screen.getByLabelText('New connection (DSN)'), 'Keyboard DB')
+    const connectionName = screen.getByLabelText('New connection (DSN)')
+    await user.clear(connectionName)
+    await user.type(connectionName, 'Keyboard DB')
     const dsn = screen.getByLabelText('Connection DSN')
     await user.type(dsn, 'postgresql://db.example/test{Enter}')
     await waitFor(() =>
@@ -138,6 +141,7 @@ describe('keyboard form submission', () => {
     await user.click(screen.getByRole('button', { name: '전체 보기' }))
 
     const projectName = screen.getByLabelText('새 프로젝트 이름')
+    await user.clear(projectName)
     await user.type(projectName, 'Keyboard project{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
     expect(screen.getByRole('button', { name: '생성 중' })).toBeDisabled()
