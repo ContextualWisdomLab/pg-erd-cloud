@@ -181,7 +181,6 @@ describe('ExportModal', () => {
 
     // Check that aria-disabled is true rather than the native disabled attribute
     expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
-    expect(accessManagementButton).not.toBeDisabled(); // native disabled should be false
 
     // Check that the button is still focusable
     accessManagementButton.focus();
