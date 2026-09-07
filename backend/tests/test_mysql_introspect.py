@@ -98,3 +98,51 @@ async def test_dsn_parse_pins_validated_ip_and_rejects_bad():
         await _parse_mysql_dsn("mysql:///nohost")
     with pytest.raises(ValueError):
         await _parse_mysql_dsn("postgres://u@h/db")
+
+@pytest.mark.asyncio
+async def test_mysql_introspect_queries_injection_safety():
+    """Verify Bandit B608 suppression correctness: schema_filter drives parameterized IN/EQUALS queries."""
+    from app.mysql_introspect.introspect import _introspect_sync, MysqlDsnConfig
+    from unittest.mock import MagicMock
+
+    cfg = MysqlDsnConfig("1.2.3.4", "db", 3306, "u", "p", "db")
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+
+    # Needs to handle multiple fetch_dicts calls that map to different shapes.
+    # Return empty list to bypass mapping logic, we just want to verify execute args
+    mock_cursor.fetchall.return_value = []
+    mock_cursor.description = []
+
+    def side_effect(query, params):
+        if "VERSION()" in query:
+             mock_cursor.description = [("v",)]
+             mock_cursor.fetchall.return_value = [("8.4.0",)]
+        else:
+             mock_cursor.description = []
+             mock_cursor.fetchall.return_value = []
+
+    mock_cursor.execute.side_effect = side_effect
+
+    with patch("app.mysql_introspect.introspect._connect", return_value=mock_conn):
+        _introspect_sync(cfg, "schema' OR '1'='1")
+
+        # Verify that all executed queries use parameterized arguments safely.
+        calls = mock_cursor.execute.call_args_list
+        assert len(calls) == 5
+
+        for call in calls[1:]:
+            query, params = call[0]
+            assert params == ("schema' OR '1'='1",)
+            assert "TABLE_SCHEMA = %s" in query
+
+        mock_cursor.execute.reset_mock()
+        _introspect_sync(cfg, None)
+
+        calls = mock_cursor.execute.call_args_list
+        for call in calls[1:]:
+            query, params = call[0]
+            assert "TABLE_SCHEMA NOT IN (%s, %s, %s, %s)" in query
+            assert len(params) == 4
