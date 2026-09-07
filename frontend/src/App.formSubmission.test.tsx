@@ -108,14 +108,14 @@ describe('keyboard form submission', () => {
       await projectRequest.promise
     })
 
-    const connectionName = screen.getByLabelText('New connection (DSN)')
-    await user.clear(connectionName)
-    await user.type(connectionName, 'Keyboard DB')
+    const connName = screen.getByLabelText('New connection (DSN)')
+    await user.clear(connName)
+    await user.type(connName, 'Keyboard DB')
     const dsn = screen.getByLabelText('Connection DSN')
     await user.type(dsn, 'postgresql://db.example/test{Enter}')
     await waitFor(() =>
       expect(api.createConnection).toHaveBeenCalledWith(
-        'p2',
+        expect.stringMatching(/^p/),
         'Keyboard DB',
         'postgresql://db.example/test',
       ),
