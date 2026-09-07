@@ -187,7 +187,7 @@ async def test_oidc_rejects_header_selected_algorithm(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -259,7 +259,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     observed: dict[str, object] = {}
 
@@ -291,7 +291,14 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
-        "options": {"require": ["iss", "exp", "jti"], "verify_aud": True, "verify_signature": True},
+        "options": {
+            "verify_aud": True,
+            "require_aud": True,
+            "require_iss": True,
+            "require_exp": True,
+            "require_jti": True,
+            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+        },
     }
 
 
@@ -346,8 +353,8 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {"keys": [{"kid": "new-key", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
-        return {"keys": [{"kid": "old-key", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+            return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+        return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
 
     observed: dict[str, object] = {}
 
@@ -376,7 +383,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] is not None
+    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
 
 
 @pytest.mark.asyncio
@@ -390,7 +397,7 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -424,7 +431,7 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -568,7 +575,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.PyJWTError("mocked decoding error")
@@ -587,7 +594,6 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "invalid token"
 
-
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch: pytest.MonkeyPatch,
@@ -601,7 +607,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "y-0zK2eEsq_g3-1Zl_K7f8z7H4A", "e": "AQAB"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -611,9 +617,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
 
     def fail_decode(*_: object, **__: object) -> dict:
-        raise AssertionError(
-            "jwt.decode must not run for mismatched algorithm/key type"
-        )
+        raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
@@ -622,8 +626,6 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "invalid token"
-
-
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,
