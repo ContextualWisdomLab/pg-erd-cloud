@@ -60,8 +60,16 @@ beforeEach(() => {
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue([])
   api.listSnapshots.mockResolvedValue([])
-  api.createProject.mockResolvedValue({ project_space_uuid: 'p2', project_name: 'Keyboard project' })
-  api.createConnection.mockResolvedValue({ db_connection_uuid: 'c2', conn_name: 'Keyboard DB' })
+  let projectCounter = 2;
+  api.createProject.mockImplementation((name) => {
+    projectCounter++;
+    return Promise.resolve({ project_space_uuid: `p${projectCounter}`, project_name: name });
+  });
+  let connCounter = 1;
+  api.createConnection.mockImplementation((projectId, name, dsn) => {
+    connCounter++;
+    return Promise.resolve({ db_connection_uuid: `c${connCounter}`, conn_name: name });
+  });
   api.createSnapshot.mockResolvedValue({ schema_snapshot_uuid: 's1', status: 'queued', schema_filter: null })
   api.getSnapshot.mockResolvedValue({
     schema_snapshot_uuid: 's1',
@@ -112,6 +120,7 @@ describe('keyboard form submission', () => {
     await user.clear(connName)
     await user.type(connName, 'Keyboard DB')
     const dsn = screen.getByLabelText('Connection DSN')
+    await user.clear(dsn)
     await user.type(dsn, 'postgresql://db.example/test{Enter}')
     await waitFor(() =>
       expect(api.createConnection).toHaveBeenCalledWith(
