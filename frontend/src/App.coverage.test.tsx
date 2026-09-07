@@ -264,16 +264,8 @@ beforeEach(() => {
   api.listProjects.mockResolvedValue(projects)
   api.listConnections.mockResolvedValue(connections)
   api.listSnapshots.mockResolvedValue(snapshots)
-  let projectCounter = 3;
-  api.createProject.mockImplementation((name) => {
-    projectCounter++;
-    return Promise.resolve({ project_space_uuid: `p${projectCounter}`, project_name: name });
-  });
-  let connCounter = 2;
-  api.createConnection.mockImplementation((projectId, name, dsn) => {
-    connCounter++;
-    return Promise.resolve({ db_connection_uuid: `c${connCounter}`, conn_name: name });
-  });
+  api.createProject.mockResolvedValue({ project_space_uuid: 'p3', project_name: 'New' })
+  api.createConnection.mockResolvedValue({ db_connection_uuid: 'c2', conn_name: 'New DB' })
   api.createSnapshot.mockResolvedValue({ schema_snapshot_uuid: 's3', status: 'queued', schema_filter: 'public' })
   api.getSnapshot.mockResolvedValue({
     schema_snapshot_uuid: 's3',
@@ -369,11 +361,11 @@ describe('App orchestration coverage', () => {
 
     fireEvent.change(dsn, { target: { value: 'postgresql://db.example/test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
-    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith(expect.stringMatching(/^p/), 'target-db', 'postgresql://db.example/test'))
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledWith('p3', 'target-db', 'postgresql://db.example/test'))
 
     fireEvent.change(screen.getByLabelText('Schema filter (optional)'), { target: { value: ' public ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
-    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith(expect.stringMatching(/^p/), expect.stringMatching(/^c/), 'public'))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p3', 'c2', 'public'))
     expect(screen.getByText('스냅샷 생성 중...')).toBeInTheDocument()
   })
 
@@ -693,7 +685,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
     await waitFor(() => expect(api.createConnection).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'Reverse engineer → snapshot' }))
-    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p1', expect.stringMatching(/^c/), undefined))
+    await waitFor(() => expect(api.createSnapshot).toHaveBeenCalledWith('p1', 'c2', undefined))
 
     vi.useFakeTimers()
     fireEvent.change(screen.getByLabelText('Project'), { target: { value: '' } })
