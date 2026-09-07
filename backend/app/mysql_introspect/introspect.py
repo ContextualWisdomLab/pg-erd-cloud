@@ -23,6 +23,41 @@ from app.sanitize import sanitize_for_storage
 _SYSTEM_SCHEMAS = ("mysql", "information_schema", "performance_schema", "sys")
 _DEFAULT_PORT = 3306
 
+# Keep all metadata SQL structurally static. The schema selector is expressed
+# entirely through DB-API placeholders so user-controlled schema text can
+# never become SQL syntax, and the security scanner does not need a B608
+# suppression to understand the boundary.
+_TABLES_SQL = (
+    "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT "
+    "FROM information_schema.TABLES "
+    "WHERE ((%s IS NOT NULL AND TABLE_SCHEMA = %s) "
+    "OR (%s IS NULL AND TABLE_SCHEMA NOT IN (%s, %s, %s, %s))) "
+    "ORDER BY TABLE_SCHEMA, TABLE_NAME"
+)
+_COLUMNS_SQL = (
+    "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, "
+    "COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT "
+    "FROM information_schema.COLUMNS "
+    "WHERE ((%s IS NOT NULL AND TABLE_SCHEMA = %s) "
+    "OR (%s IS NULL AND TABLE_SCHEMA NOT IN (%s, %s, %s, %s))) "
+    "ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION"
+)
+_KEY_USAGE_SQL = (
+    "SELECT CONSTRAINT_NAME, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, "
+    "ORDINAL_POSITION, REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, "
+    "REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE "
+    "WHERE ((%s IS NOT NULL AND TABLE_SCHEMA = %s) "
+    "OR (%s IS NULL AND TABLE_SCHEMA NOT IN (%s, %s, %s, %s))) "
+    "ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION"
+)
+_INDEXES_SQL = (
+    "SELECT TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, NON_UNIQUE, "
+    "SEQ_IN_INDEX, COLUMN_NAME FROM information_schema.STATISTICS "
+    "WHERE ((%s IS NOT NULL AND TABLE_SCHEMA = %s) "
+    "OR (%s IS NULL AND TABLE_SCHEMA NOT IN (%s, %s, %s, %s))) "
+    "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX"
+)
+
 
 @dataclass(frozen=True)
 class MysqlDsnConfig:
@@ -84,11 +119,15 @@ def _fetch_dicts(cursor: Any, sql: str, params: tuple[object, ...] = ()) -> list
     return [dict(zip(names, row)) for row in cursor.fetchall()]
 
 
-def _schema_filter_clause(schema_filter: str | None) -> tuple[str, tuple[object, ...]]:
-    if schema_filter:
-        return "TABLE_SCHEMA = %s", (schema_filter,)
-    placeholders = ", ".join(["%s"] * len(_SYSTEM_SCHEMAS))
-    return f"TABLE_SCHEMA NOT IN ({placeholders})", _SYSTEM_SCHEMAS
+def _schema_filter_params(schema_filter: str | None) -> tuple[object, ...]:
+    """Bind one optional schema selector without changing SQL structure."""
+    selected_schema = schema_filter if schema_filter else None
+    return (
+        selected_schema,
+        selected_schema,
+        selected_schema,
+        *_SYSTEM_SCHEMAS,
+    )
 
 
 def rows_to_snapshot(
@@ -271,39 +310,11 @@ def _introspect_sync(config: MysqlDsnConfig, schema_filter: str | None) -> dict[
         cursor = conn.cursor()
         version_rows = _fetch_dicts(cursor, "SELECT VERSION() AS v")
         version = str(version_rows[0]["v"]) if version_rows else "unknown"
-        where, params = _schema_filter_clause(schema_filter)
-        tables = _fetch_dicts(
-            cursor,
-            "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT "
-            f"FROM information_schema.TABLES WHERE {where} "  # nosec B608
-            "ORDER BY TABLE_SCHEMA, TABLE_NAME",
-            params,
-        )
-        columns = _fetch_dicts(
-            cursor,
-            "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, "
-            "COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT "
-            f"FROM information_schema.COLUMNS WHERE {where} "  # nosec B608
-            "ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION",
-            params,
-        )
-        key_usage = _fetch_dicts(
-            cursor,
-            "SELECT CONSTRAINT_NAME, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, "
-            "ORDINAL_POSITION, REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, "
-            "REFERENCED_COLUMN_NAME "
-            f"FROM information_schema.KEY_COLUMN_USAGE WHERE {where} "  # nosec B608
-            "ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION",
-            params,
-        )
-        indexes = _fetch_dicts(
-            cursor,
-            "SELECT TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, NON_UNIQUE, "
-            "SEQ_IN_INDEX, COLUMN_NAME "
-            f"FROM information_schema.STATISTICS WHERE {where} "  # nosec B608
-            "ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
-            params,
-        )
+        params = _schema_filter_params(schema_filter)
+        tables = _fetch_dicts(cursor, _TABLES_SQL, params)
+        columns = _fetch_dicts(cursor, _COLUMNS_SQL, params)
+        key_usage = _fetch_dicts(cursor, _KEY_USAGE_SQL, params)
+        indexes = _fetch_dicts(cursor, _INDEXES_SQL, params)
         return rows_to_snapshot(version, schema_filter, tables, columns, key_usage, indexes)
     finally:
         conn.close()
