@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import userEvent from '@testing-library/user-event'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -43,6 +43,17 @@ import App from './App'
 
 const projects = [{ project_space_uuid: 'p1', project_name: 'Existing project' }]
 
+type ProjectResult = { project_space_uuid: string; project_name: string }
+type ConnectionResult = { db_connection_uuid: string; conn_name: string }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((next) => {
+    resolve = next
+  })
+  return { promise, resolve }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   api.getMe.mockResolvedValue({ subject: 'user', display_name: 'User', user_account_uuid: 'u' })
@@ -73,7 +84,12 @@ afterEach(() => {
 })
 
 describe('keyboard form submission', () => {
-  it('submits editor project and connection forms with Enter exactly once', async () => {
+  it('submits editor project and connection forms with Enter without duplicate requests', async () => {
+    const projectRequest = deferred<ProjectResult>()
+    const connectionRequest = deferred<ConnectionResult>()
+    api.createProject.mockReturnValueOnce(projectRequest.promise)
+    api.createConnection.mockReturnValueOnce(connectionRequest.promise)
+
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: '대시보드' })
@@ -82,10 +98,18 @@ describe('keyboard form submission', () => {
     const projectName = screen.getByLabelText('New project')
     await user.type(projectName, 'Keyboard project{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
     expect(api.createProject).toHaveBeenCalledTimes(1)
 
+    await act(async () => {
+      projectRequest.resolve({ project_space_uuid: 'p2', project_name: 'Keyboard project' })
+      await projectRequest.promise
+    })
+
     await user.type(screen.getByLabelText('New connection (DSN)'), 'Keyboard DB')
-    await user.type(screen.getByLabelText('Connection DSN'), 'postgresql://db.example/test{Enter}')
+    const dsn = screen.getByLabelText('Connection DSN')
+    await user.type(dsn, 'postgresql://db.example/test{Enter}')
     await waitFor(() =>
       expect(api.createConnection).toHaveBeenCalledWith(
         'p2',
@@ -93,18 +117,36 @@ describe('keyboard form submission', () => {
         'postgresql://db.example/test',
       ),
     )
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
     expect(api.createConnection).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      connectionRequest.resolve({ db_connection_uuid: 'c2', conn_name: 'Keyboard DB' })
+      await connectionRequest.promise
+    })
   })
 
-  it('submits the project-list inline creation form with Enter exactly once', async () => {
+  it('submits the project-list inline form with Enter without duplicate requests', async () => {
     api.listProjects.mockResolvedValueOnce([])
+    const projectRequest = deferred<ProjectResult>()
+    api.createProject.mockReturnValueOnce(projectRequest.promise)
+
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: '대시보드' })
     await user.click(screen.getByRole('button', { name: '전체 보기' }))
 
-    await user.type(screen.getByLabelText('새 프로젝트 이름'), 'Keyboard project{Enter}')
+    const projectName = screen.getByLabelText('새 프로젝트 이름')
+    await user.type(projectName, 'Keyboard project{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
+    expect(screen.getByRole('button', { name: '생성 중' })).toBeDisabled()
+    await user.keyboard('{Enter}')
     expect(api.createProject).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      projectRequest.resolve({ project_space_uuid: 'p2', project_name: 'Keyboard project' })
+      await projectRequest.promise
+    })
   })
 })
