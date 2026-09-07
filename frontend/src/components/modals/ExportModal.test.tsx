@@ -183,6 +183,16 @@ describe('ExportModal', () => {
     }
   });
 
+  it('describes enabled exports with their artifact context', () => {
+    render(<ExportModal {...baseProps} />);
+
+    const ddlButton = screen.getByRole('button', { name: 'SQL DDL 복사' });
+    expect(ddlButton).toBeEnabled();
+    const descriptionId = ddlButton.getAttribute('aria-describedby');
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)).toHaveTextContent('스키마 텍스트');
+  });
+
   it('exposes access-control guidance for disabled button', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
