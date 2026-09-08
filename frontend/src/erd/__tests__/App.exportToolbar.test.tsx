@@ -67,13 +67,14 @@ describe('export toolbar chooser', () => {
 
     await user.click(screen.getByRole('button', { name: '공유 및 내보내기 닫기' }));
     expect(screen.queryByRole('dialog', { name: '공유 및 내보내기' })).not.toBeInTheDocument();
+    expect(chooser).toHaveFocus();
 
-    chooser.focus();
     await user.keyboard('{Enter}');
     expect(await screen.findByRole('dialog', { name: '공유 및 내보내기' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '공유 및 내보내기 닫기' }));
-    chooser.focus();
+    expect(chooser).toHaveFocus();
+
     await user.keyboard(' ');
     expect(await screen.findByRole('dialog', { name: '공유 및 내보내기' })).toBeInTheDocument();
   });
