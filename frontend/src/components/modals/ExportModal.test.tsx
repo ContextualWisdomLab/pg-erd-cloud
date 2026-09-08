@@ -26,6 +26,7 @@ const baseProps = {
   onDownloadPrisma: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
+  onOpenAccessManagement: vi.fn(),
 };
 
 afterEach(() => {
@@ -173,15 +174,23 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('explains public share-link access without a dead control', () => {
-    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
+  it('keeps bearer-link disclosure separate from project access management', () => {
+    const onOpenAccessManagement = vi.fn();
+    render(
+      <ExportModal
+        {...baseProps}
+        canCreateShareLink={false}
+        onOpenAccessManagement={onOpenAccessManagement}
+      />,
+    );
 
     expect(
       screen.getByText('링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/프로젝트에 속한 팀원만/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '접근 관리' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /접근/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '접근 관리' }));
+    expect(onOpenAccessManagement).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: '링크 만들기' })).toBeDisabled();
   });
 });
