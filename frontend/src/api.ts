@@ -1,5 +1,5 @@
 import { snapshotDetailFromResponse } from './types'
-import type { Connection, Project, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
+import type { Connection, MutableProjectMemberRole, Project, ProjectMember, ShareLink, Snapshot, SnapshotDetail, SnapshotDetailResponse, SnapshotJson } from './types'
 
 // Default to same-origin in production; set VITE_API_BASE_URL for dev.
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
@@ -28,6 +28,13 @@ const demoSnapshotsByProject: Record<string, Snapshot[]> = {
     { schema_snapshot_uuid: 'demo-commerce-snapshot', status: 'succeeded', schema_filter: 'sales' }
   ]
 }
+
+const demoMembersByProject: Record<string, ProjectMember[]> = Object.fromEntries(
+  demoProjects.map((project) => [
+    project.project_space_uuid,
+    [{ user_account_uuid: 'demo-user', member_subject: 'local', project_role: 'owner' as const }]
+  ])
+)
 
 const demoSnapshotJson: SnapshotJson = {
   relations: [
@@ -75,6 +82,16 @@ type CsrfTokenResponse = {
 }
 
 type ShareLinkResponse = Omit<ShareLink, 'url'>
+
+export class ProjectMemberRequestError extends Error {
+  readonly status: number
+
+  constructor(operation: 'listProjectMembers' | 'upsertProjectMember', status: number) {
+    super(`${operation} failed: ${status}`)
+    this.name = 'ProjectMemberRequestError'
+    this.status = status
+  }
+}
 
 function isLocalDevelopmentHost(hostname: string): boolean {
   return (
@@ -146,6 +163,9 @@ export async function createProject(project_name: string): Promise<Project> {
     demoProjects = [project, ...demoProjects]
     demoConnectionsByProject[project.project_space_uuid] = []
     demoSnapshotsByProject[project.project_space_uuid] = []
+    demoMembersByProject[project.project_space_uuid] = [
+      { user_account_uuid: 'demo-user', member_subject: 'local', project_role: 'owner' }
+    ]
     return project
   }
   const r = await fetch(`${API_BASE}/api/projects`, {
@@ -155,6 +175,48 @@ export async function createProject(project_name: string): Promise<Project> {
     body: JSON.stringify({ project_name })
   })
   if (!r.ok) throw new Error(`createProject failed: ${r.status}`)
+  return r.json()
+}
+
+export async function listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  if (DEMO_MODE) return demoMembersByProject[projectId] ?? []
+
+  const r = await fetch(`${API_BASE}/api/projects/${projectId}/members`, {
+    credentials: 'include'
+  })
+  if (!r.ok) throw new ProjectMemberRequestError('listProjectMembers', r.status)
+  return r.json()
+}
+
+export async function upsertProjectMember(
+  projectId: string,
+  member_subject: string,
+  project_role: MutableProjectMemberRole
+): Promise<ProjectMember> {
+  if (DEMO_MODE) {
+    const members = demoMembersByProject[projectId] ?? []
+    const existing = members.find((member) => member.member_subject === member_subject)
+    if (existing?.project_role === 'owner') {
+      throw new ProjectMemberRequestError('upsertProjectMember', 400)
+    }
+    const nextMember: ProjectMember = {
+      user_account_uuid: existing?.user_account_uuid ?? `demo-member-${Date.now()}`,
+      member_subject,
+      project_role
+    }
+    demoMembersByProject[projectId] = existing
+      ? members.map((member) => member.member_subject === member_subject ? nextMember : member)
+      : [...members, nextMember]
+    return nextMember
+  }
+
+  const r = await fetch(`${API_BASE}/api/projects/${projectId}/members`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await jsonHeaders(),
+    body: JSON.stringify({ member_subject, project_role })
+  })
+  if (!r.ok) throw new ProjectMemberRequestError('upsertProjectMember', r.status)
   return r.json()
 }
 
