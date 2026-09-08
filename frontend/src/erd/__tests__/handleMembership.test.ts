@@ -3,7 +3,8 @@ import type { Edge, Node } from '@xyflow/react';
 
 import type { TableNodeData } from '../convert';
 import { exportDDL } from '../export';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
+import { exportDbml } from '../dbml';
+import { parseHandleId, sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 import { exportPrisma } from '../prisma';
 
 function relationFixture(): { parent: Node<TableNodeData>; child: Node<TableNodeData>; staleEdge: Edge } {
@@ -54,6 +55,16 @@ describe('ERD edge handle membership', () => {
     expect(ddl).toContain('REFERENCES "public.users" ("id")');
   });
 
+  it('does not create a DBML relation from a decodable handle absent from its endpoint node', () => {
+    const { parent, child, staleEdge } = relationFixture();
+
+    const dbml = exportDbml([parent, child], [staleEdge]);
+
+    expect(dbml).not.toContain('ghost_user_id');
+    expect(dbml).not.toContain('ghost_id');
+    expect(dbml).not.toContain('Ref:');
+  });
+
   it('does not create a Prisma relation from a decodable handle absent from its endpoint node', () => {
     const { parent, child, staleEdge } = relationFixture();
 
@@ -62,5 +73,23 @@ describe('ERD edge handle membership', () => {
     expect(schema).not.toContain('ghost_user_id');
     expect(schema).not.toContain('ghost_id');
     expect(schema).not.toContain('@relation("fk_posts_users"');
+  });
+});
+
+
+describe('canonical ERD handle decoding', () => {
+  it('round-trips empty, Unicode, and non-BMP column names', () => {
+    for (const columnName of ['', '사용자_識別子', 'emoji_😀']) {
+      expect(parseHandleId(sourceColumnHandleId(columnName), 'src-')).toBe(columnName);
+      expect(parseHandleId(targetColumnHandleId(columnName), 'tgt-')).toBe(columnName);
+    }
+  });
+
+  it('rejects partial, aliased, out-of-range, and wrong-prefix encodings', () => {
+    expect(parseHandleId('src-c-0061junk', 'src-')).toBeNull();
+    expect(parseHandleId('src-c-00AF', 'src-')).toBeNull();
+    expect(parseHandleId('src-c-000061', 'src-')).toBeNull();
+    expect(parseHandleId('src-c-110000', 'src-')).toBeNull();
+    expect(parseHandleId(sourceColumnHandleId('id'), 'tgt-')).toBeNull();
   });
 });

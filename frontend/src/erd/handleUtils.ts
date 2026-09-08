@@ -28,8 +28,9 @@ export function parseHandleId(handleId: string | null | undefined, prefix: strin
       if (isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF) throw new Error('Invalid hex range');
       return String.fromCodePoint(codePoint);
     });
-    return chars.join('');
-  } catch (e) {
+    const decoded = chars.join('');
+    return `${prefix}${sanitizeHandleId(decoded)}` === handleId ? decoded : null;
+  } catch {
     return null;
   }
 }

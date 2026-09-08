@@ -14,6 +14,17 @@ function safeId(str: string): string {
   return `"${str.replace(/"/g, '""')}"`;
 }
 
+function columnFromHandle(
+  handle: string,
+  prefix: string,
+  columns: Set<string>,
+): string | null {
+  const decoded = parseHandleId(handle, prefix);
+  if (decoded !== null && columns.has(decoded)) return decoded;
+  const legacy = handle.startsWith(prefix) ? handle.slice(prefix.length) : null;
+  return legacy !== null && columns.has(legacy) ? legacy : null;
+}
+
 export function exportDbml(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -86,18 +97,24 @@ export function exportDbml(
       let sourceCols: string[] = [];
       let targetCols: string[] = [];
 
-      if (edgeData?.sourceColumns && edgeData?.targetColumns) {
+      const sourceColumnNames = new Set(sourceNode.data.columns.map((column) => column.column_name));
+      const targetColumnNames = new Set(targetNode.data.columns.map((column) => column.column_name));
+      if (
+        edgeData?.sourceColumns
+        && edgeData?.targetColumns
+        && edgeData.sourceColumns.length > 0
+        && edgeData.sourceColumns.length === edgeData.targetColumns.length
+        && edgeData.sourceColumns.every((column) => sourceColumnNames.has(column))
+        && edgeData.targetColumns.every((column) => targetColumnNames.has(column))
+      ) {
         sourceCols = edgeData.sourceColumns.map(safeId);
         targetCols = edgeData.targetColumns.map(safeId);
       } else if (edge.sourceHandle && edge.targetHandle) {
-        const parsedSource = parseHandleId(edge.sourceHandle, 'src-');
-        const parsedTarget = parseHandleId(edge.targetHandle, 'tgt-');
-        if (parsedSource && parsedTarget) {
-          sourceCols = [safeId(parsedSource)];
-          targetCols = [safeId(parsedTarget)];
-        } else {
-          sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
-          targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
+        const sourceColumn = columnFromHandle(edge.sourceHandle, 'src-', sourceColumnNames);
+        const targetColumn = columnFromHandle(edge.targetHandle, 'tgt-', targetColumnNames);
+        if (sourceColumn !== null && targetColumn !== null) {
+          sourceCols = [safeId(sourceColumn)];
+          targetCols = [safeId(targetColumn)];
         }
       }
 
