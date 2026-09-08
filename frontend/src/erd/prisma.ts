@@ -38,6 +38,28 @@ function mapToPrismaType(pgType: string, isFk: boolean): string {
   return "String"; // fallback
 }
 
+function columnFromHandle(
+  handle: string | null | undefined,
+  prefix: string,
+  columns: Set<string>,
+): string | null {
+  if (!handle) return null;
+
+  const decoded = parseHandleId(handle, prefix);
+  if (decoded && columns.has(decoded)) {
+    return decoded;
+  }
+
+  if (handle.startsWith(prefix)) {
+    const legacyColumn = handle.slice(prefix.length);
+    if (columns.has(legacyColumn)) {
+      return legacyColumn;
+    }
+  }
+
+  return null;
+}
+
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -67,28 +89,32 @@ export function exportPrisma(
     if (!sourceNode || !targetNode) continue;
 
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
+    const sourceColumnNames = new Set(sourceNode.data.columns.map((column) => column.column_name));
+    const targetColumnNames = new Set(targetNode.data.columns.map((column) => column.column_name));
 
     let sourceField = "";
-    const parsedSource = parseHandleId(edge.sourceHandle, 'src-');
-    if (parsedSource) {
-      sourceField = parsedSource;
-      fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
-    } else if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
+    if (edge.sourceHandle) {
+      sourceField = columnFromHandle(edge.sourceHandle, "src-", sourceColumnNames) || "";
+      if (sourceField) {
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
+      }
+    } else {
       fkNodesWithoutHandles.add(edge.source);
     }
 
-    let targetField = "id"; // fallback
-    const parsedTarget = parseHandleId(edge.targetHandle, 'tgt-');
-    if (parsedTarget) {
-      targetField = parsedTarget;
-    } else if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+    let targetField = "id"; // fallback for legacy edges without a target handle
+    let targetFieldValid = !edge.targetHandle;
+    if (edge.targetHandle) {
+      const resolvedTarget = columnFromHandle(edge.targetHandle, "tgt-", targetColumnNames);
+      if (resolvedTarget) {
+        targetField = resolvedTarget;
+        targetFieldValid = true;
+      } else {
+        targetFieldValid = false;
+      }
     }
 
-    if (sourceField) {
+    if (sourceField && targetFieldValid) {
       const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
