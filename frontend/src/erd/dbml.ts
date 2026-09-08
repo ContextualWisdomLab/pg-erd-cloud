@@ -104,8 +104,8 @@ export function exportDbml(
         && edgeData?.targetColumns
         && edgeData.sourceColumns.length > 0
         && edgeData.sourceColumns.length === edgeData.targetColumns.length
-        && edgeData.sourceColumns.every((column) => sourceColumnNames.size === 0 || sourceColumnNames.has(column))
-        && edgeData.targetColumns.every((column) => targetColumnNames.size === 0 || targetColumnNames.has(column))
+        && edgeData.sourceColumns.every((column) => sourceColumnNames.has(column))
+        && edgeData.targetColumns.every((column) => targetColumnNames.has(column))
       ) {
         sourceCols = edgeData.sourceColumns.map(safeId);
         targetCols = edgeData.targetColumns.map(safeId);
