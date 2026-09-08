@@ -185,13 +185,11 @@ describe('modal behavior coverage', () => {
     fireEvent.submit(document.getElementById('editTableForm')!)
     const tableDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const deleteTable = screen.getByRole('button', { name: '테이블 삭제' })
+    tableDeleteConfirm.mockClear()
     fireEvent.click(deleteTable)
     expect(onDeleteTable).not.toHaveBeenCalled()
     fireEvent.click(deleteTable)
-    expect(tableDeleteConfirm).toHaveBeenNthCalledWith(
-      3, // 1, 2는 컬럼 삭제에서 사용됨
-      "정말로 이 테이블을 삭제하시겠습니까?",
-    )
+    expect(tableDeleteConfirm.mock.calls[0][0]).toBe("정말로 이 테이블을 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
