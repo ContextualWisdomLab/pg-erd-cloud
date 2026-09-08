@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -76,8 +76,18 @@ describe('export toolbar chooser', () => {
     expect(chooser).toHaveFocus();
 
     await user.keyboard(' ');
-    expect(await screen.findByRole('dialog', { name: '공유 및 내보내기' })).toBeInTheDocument();
-  });
+    const reopened = await screen.findByRole('dialog', { name: '공유 및 내보내기' });
+    expect(reopened).toBeInTheDocument();
+    await waitFor(() => {
+      expect(reopened.contains(document.activeElement)).toBe(true);
+    });
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '공유 및 내보내기' })).not.toBeInTheDocument();
+    });
+    await waitFor(() => expect(chooser).toHaveFocus());
+  }, 15_000);
 
   it('disables the chooser when neither share nor diagram export is possible', async () => {
     vi.mocked(listProjects).mockResolvedValueOnce([]);
