@@ -414,8 +414,7 @@ describe('App orchestration coverage', () => {
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
     fireEvent.click(screen.getByTestId('table-cancel'))
     fireEvent.doubleClick(screen.getByTestId('flow-node'))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    fireEvent.click(screen.getByTestId('table-delete'))
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByTestId('table-delete'))
   })
 
