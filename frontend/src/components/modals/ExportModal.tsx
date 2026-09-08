@@ -67,7 +67,7 @@ export function ExportModal({
   const shareStatusMessage = shareLinkError
     ? shareLinkError
     : isShareLinkCopied
-      ? '링크가 복사되었습니다. 접근 권한이 있는 팀원이 최신 스냅샷을 열 수 있습니다.'
+      ? '링크가 복사되었습니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.'
       : '선택한 다이어그램을 공유하거나 산출물로 내보낼 준비가 되었습니다.';
 
   const artifacts: ExportArtifact[] = [
@@ -168,8 +168,8 @@ export function ExportModal({
           <section className="exportModal__section" aria-labelledby="share-link-title">
             <h4 id="share-link-title">공유 링크</h4>
             <p>
-              팀원이 최신 스냅샷을 검토할 수 있는 링크를 만듭니다. 복사했다는
-              표시는 작업이 끝난 뒤에도 남습니다.
+              최신 스냅샷을 검토할 수 있는 링크를 만듭니다. 복사했다는 표시는
+              작업이 끝난 뒤에도 남습니다.
             </p>
 
             <input
@@ -202,7 +202,7 @@ export function ExportModal({
               )}
             </div>
             <p className="exportModal__hint">
-              공유 링크는 이미 프로젝트에 속한 팀원만 열 수 있습니다.
+              링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.
             </p>
           </section>
 
