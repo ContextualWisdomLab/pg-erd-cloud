@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { parseHandleId } from './handleUtils';
+import { sourceColumnHandleId } from './handleUtils';
 
 const CONTROL_TEXT_RE = /[\u0000-\u001f\u007f]+/g;
 const CSV_FORMULA_RE = /^[=+\-@]/;
@@ -44,25 +44,22 @@ type ForeignKeyNodeInfo = {
   handles: Set<string>;
 };
 
-function foreignKeyColumnsByNode(edges: Edge[]): Map<string, Set<string>> {
-  const map = new Map<string, Set<string>>();
+function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo> {
+  const map = new Map<string, ForeignKeyNodeInfo>();
 
   for (const edge of edges) {
-    let cols = map.get(edge.source);
-    if (!cols) {
-      cols = new Set<string>();
-      map.set(edge.source, cols);
+    let info = map.get(edge.source);
+    if (!info) {
+      info = { columns: new Set<string>(), handles: new Set<string>() };
+      map.set(edge.source, info);
     }
 
     for (const column of sourceColumnsForEdge(edge)) {
-      cols.add(column);
+      info.columns.add(column);
     }
 
-    const decoded = parseHandleId(edge.sourceHandle, 'src-');
-    if (decoded) {
-      cols.add(decoded);
-    } else if (edge.sourceHandle?.startsWith('src-')) {
-      cols.add(edge.sourceHandle.slice(4));
+    if (edge.sourceHandle) {
+      info.handles.add(edge.sourceHandle);
     }
   }
 
@@ -70,12 +67,19 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, Set<string>> {
 }
 
 function isForeignKeyColumn(
-  edgeColumnsByNode: Map<string, Set<string>>,
+  edgeColumnsByNode: Map<string, ForeignKeyNodeInfo>,
   node: Node<TableNodeData>,
   columnName: string,
 ): boolean {
-  const cols = edgeColumnsByNode.get(node.id);
-  return cols ? cols.has(columnName) : false;
+  const info = edgeColumnsByNode.get(node.id);
+  if (!info) return false;
+
+  if (info.columns.has(columnName)) {
+    return true;
+  }
+
+  const handleId = sourceColumnHandleId(columnName);
+  return info.handles.has(handleId);
 }
 
 function exampleValue(value: TableNodeData['columns'][number]['example_value']): string {

@@ -21,11 +21,14 @@ export function parseHandleId(handleId: string | null | undefined, prefix: strin
   if (encoded === 'empty' || !encoded) return "";
 
   try {
-    return encoded.split('-').map(hex => {
+    const parts = encoded.split('-');
+    const chars = parts.map(hex => {
+      if (!/^[0-9a-fA-F]{1,6}$/.test(hex)) throw new Error('Invalid hex format');
       const codePoint = parseInt(hex, 16);
-      if (isNaN(codePoint)) throw new Error('Invalid hex');
+      if (isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF) throw new Error('Invalid hex range');
       return String.fromCodePoint(codePoint);
-    }).join('');
+    });
+    return chars.join('');
   } catch (e) {
     return null;
   }
