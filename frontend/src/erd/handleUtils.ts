@@ -14,3 +14,19 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function parseHandleId(handleId: string | null | undefined, prefix: string): string | null {
+  if (!handleId || !handleId.startsWith(`${prefix}c-`)) return null;
+  const encoded = handleId.slice(prefix.length + 2);
+  if (encoded === 'empty' || !encoded) return "";
+
+  try {
+    return encoded.split('-').map(hex => {
+      const codePoint = parseInt(hex, 16);
+      if (isNaN(codePoint)) throw new Error('Invalid hex');
+      return String.fromCodePoint(codePoint);
+    }).join('');
+  } catch (e) {
+    return null;
+  }
+}

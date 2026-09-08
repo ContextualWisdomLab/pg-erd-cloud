@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2026-09-08 - O(1) Decoding of Handle IDs
+**Learning:** In edge loops, running `.find()` with repeated formatting strings over an array of columns causes unnecessary O(N) linear time scanning. Reconstructing the column name back from the hex-encoded edge `handleId` enables direct O(1) column identification and prevents intermediate array allocation overhead. Furthermore, when generating DBML, blindly slicing string prefixes without decoding hex values leads to invalid export formats.
+**Action:** Use a deterministic parse/decode function like `parseHandleId` to read data straight from the handle IDs, eliminating array scans inside repetitive loops and fixing downstream schema exports.

@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { sanitizeHandleId, parseHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -69,7 +69,11 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
+    const parsedSource = parseHandleId(edge.sourceHandle, 'src-');
+    if (parsedSource) {
+      sourceField = parsedSource;
+      fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
+    } else if (edge.sourceHandle?.startsWith("src-")) {
       sourceField = edge.sourceHandle.slice(4);
       fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
     } else if (!edge.sourceHandle) {
@@ -77,7 +81,10 @@ export function exportPrisma(
     }
 
     let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
+    const parsedTarget = parseHandleId(edge.targetHandle, 'tgt-');
+    if (parsedTarget) {
+      targetField = parsedTarget;
+    } else if (edge.targetHandle?.startsWith("tgt-")) {
       targetField = edge.targetHandle.slice(4);
     }
 
