@@ -168,8 +168,8 @@ export function ExportModal({
           <section className="exportModal__section" aria-labelledby="share-link-title">
             <h4 id="share-link-title">공유 링크</h4>
             <p>
-              팀원이 검토할 수 있는 API 기반 프로젝트 링크를 생성합니다. 복사
-              피드백은 작업 후에도 확인할 수 있게 유지합니다.
+              팀원이 최신 스냅샷을 검토할 수 있는 링크를 만듭니다. 복사했다는
+              표시는 작업이 끝난 뒤에도 남습니다.
             </p>
 
             <input
@@ -200,18 +200,10 @@ export function ExportModal({
                   {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
                 </button>
               )}
-              <button
-                type="button"
-                disabled
-                aria-describedby="share-export-access-hint"
-                className="exportModal__disabledHintButton"
-              >
-                접근 관리
-              </button>
-              <p id="share-export-access-hint" className="exportModal__hint">
-                접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.
-              </p>
             </div>
+            <p className="exportModal__hint">
+              공유 링크는 이미 프로젝트에 속한 팀원만 열 수 있습니다.
+            </p>
           </section>
 
           <section className="exportModal__section" aria-labelledby="export-artifacts-title">

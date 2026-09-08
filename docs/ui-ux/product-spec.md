@@ -79,10 +79,14 @@ modals.
 | Share and export                               close |
 | Share link: description                 [make link] |
 | [readonly link]                         [copy link] |
+| Access note: only current project members can open   |
 | DDL export: description                   [copy DDL] |
 | [readonly SQL textarea or missing-output hint]       |
 +-----------------------------------------------------+
 ```
+
+The share modal does not include an access-management action. Share links open
+for existing project members; this dialog only creates or copies the link.
 
 ## User Stories
 
