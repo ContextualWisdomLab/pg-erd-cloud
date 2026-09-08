@@ -85,7 +85,9 @@ describe('ExportModal', () => {
       />,
     );
     expect(screen.getByRole('button', { name: '복사 완료' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('링크가 복사되었습니다');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '링크가 복사되었습니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.',
+    );
 
     rerender(
       <ExportModal
@@ -171,12 +173,13 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('explains share-link access without a dead control', () => {
+  it('explains public share-link access without a dead control', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(
-      screen.getByText('공유 링크는 이미 프로젝트에 속한 팀원만 열 수 있습니다.'),
+      screen.getByText('링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/프로젝트에 속한 팀원만/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '접근 관리' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /접근/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '링크 만들기' })).toBeDisabled();
