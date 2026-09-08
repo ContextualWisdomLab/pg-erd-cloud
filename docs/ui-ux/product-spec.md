@@ -79,14 +79,16 @@ modals.
 | Share and export                               close |
 | Share link: description                 [make link] |
 | [readonly link]                         [copy link] |
-| Access note: only current project members can open   |
+| Access note: link recipients can open without login |
 | DDL export: description                   [copy DDL] |
 | [readonly SQL textarea or missing-output hint]       |
 +-----------------------------------------------------+
 ```
 
-The share modal does not include an access-management action. Share links open
-for existing project members; this dialog only creates or copies the link.
+The share modal does not include an access-management action. Creating a share
+link is owner-only, but the resulting share endpoints are intentionally
+unauthenticated bearer-link access; this dialog must state that boundary rather
+than imply project-membership enforcement.
 
 ## User Stories
 
