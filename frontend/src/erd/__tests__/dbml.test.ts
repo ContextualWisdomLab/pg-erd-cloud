@@ -126,11 +126,23 @@ describe('exportDbml', () => {
   it('exports a schema-qualified source to an unqualified target', () => {
     const source = {
       id: 'source', type: 'tableNode', position: { x: 0, y: 0 },
-      data: { title: 'audit.events', badges: { pk: false, fk: true }, columns: [] },
+      data: {
+        title: 'audit.events',
+        badges: { pk: false, fk: true },
+        columns: [
+          { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
+        ],
+      },
     } as Node<TableNodeData>;
     const target = {
       id: 'target', type: 'tableNode', position: { x: 0, y: 0 },
-      data: { title: 'users', badges: { pk: true, fk: false }, columns: [] },
+      data: {
+        title: 'users',
+        badges: { pk: true, fk: false },
+        columns: [
+          { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+        ],
+      },
     } as Node<TableNodeData>;
     expect(exportDbml([source, target], [{
       id: 'edge', source: 'source', target: 'target',
