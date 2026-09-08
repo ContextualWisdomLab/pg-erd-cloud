@@ -23,6 +23,7 @@ interface ExportModalProps {
   onDownloadPrisma: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
+  onOpenAccessManagement: () => void;
 }
 
 type ExportArtifact = {
@@ -56,6 +57,7 @@ export function ExportModal({
   onDownloadPrisma,
   onCreateShareLink,
   onCopyShareLink,
+  onOpenAccessManagement,
 }: ExportModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseExport);
 
@@ -200,9 +202,16 @@ export function ExportModal({
                   {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={onOpenAccessManagement}
+                disabled={!canCreateShareLink}
+              >
+                접근 관리
+              </button>
             </div>
             <p className="exportModal__hint">
-              링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.
+              프로젝트 멤버십과 공유 링크는 별도 권한 경계입니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.
             </p>
           </section>
 
