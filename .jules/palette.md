@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2026-09-08 - [테이블 삭제에 window.confirm 추가]
-**Learning:** EditTableModal에서의 테이블 삭제 액션은 부모 컴포넌트(App.tsx) 레벨에서 window.confirm을 호출하고 있었습니다. 컴포넌트의 책임을 명확히 하고, 모달에서 발생하는 파괴적 액션의 시각적 컨텍스트를 유지하기 위해서는 삭제 버튼이 있는 모달 컴포넌트 내부에서 즉각적으로 사용자 확인을 받는 것이 더 나은 UX를 제공합니다.
-**Action:** 항상 파괴적인 작업(예: 삭제)을 수행할 때는 상태를 관리하는 상위 컴포넌트로 이관하기 전에, 해당 작업을 발생시키는 컴포넌트의 핸들러(onClick)에서 직접 window.confirm() 대화상자를 감싸서 실행하도록 합니다. 그리고 관련된 테스트에서 window.confirm을 올바르게 모의(mock)했는지 확인합니다.
