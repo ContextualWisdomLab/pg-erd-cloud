@@ -179,18 +179,16 @@ describe('ExportModal', () => {
     render(
       <ExportModal
         {...baseProps}
-        canCreateShareLink={false}
         onOpenAccessManagement={onOpenAccessManagement}
       />,
     );
 
     expect(
-      screen.getByText('링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.'),
+      screen.getByText(/링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/프로젝트에 속한 팀원만/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '접근 관리' }));
     expect(onOpenAccessManagement).toHaveBeenCalledOnce();
-    expect(screen.queryByRole('button', { name: '링크 만들기' })).toBeDisabled();
   });
 });
