@@ -183,9 +183,22 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
     fireEvent.submit(document.getElementById('editTableForm')!)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("정말로 이 테이블을 삭제하시겠습니까?")
+    const tableDeleteConfirm = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+    const deleteTable = screen.getByRole('button', { name: '테이블 삭제' })
+    fireEvent.click(deleteTable)
+    expect(onDeleteTable).not.toHaveBeenCalled()
+    fireEvent.click(deleteTable)
+    expect(tableDeleteConfirm).toHaveBeenNthCalledWith(
+      1,
+      "정말로 이 테이블을 삭제하시겠습니까?",
+    )
+    expect(tableDeleteConfirm).toHaveBeenNthCalledWith(
+      2,
+      "정말로 이 테이블을 삭제하시겠습니까?",
+    )
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
