@@ -23,7 +23,7 @@ interface ExportModalProps {
   onDownloadPrisma: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
-  onOpenAccessManagement: () => void;
+  onOpenAccessManagement?: () => void;
 }
 
 type ExportArtifact = {
@@ -205,7 +205,7 @@ export function ExportModal({
               <button
                 type="button"
                 onClick={onOpenAccessManagement}
-                disabled={!canCreateShareLink}
+                disabled={!canCreateShareLink || !onOpenAccessManagement}
               >
                 접근 관리
               </button>
