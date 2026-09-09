@@ -1,7 +1,8 @@
 # Performance & capacity profile
 
-Status: **in progress** — first increment (workload generators) landed.
-Tracks issue
+Status: **in progress** — increments 1 (workload generators), 2 (measured
+baseline harness), 3 (repeat-run aggregation), and 4 (versioned report
+envelope) landed. Tracks issue
 [#951](https://github.com/ContextualWisdomLab/pg-erd-cloud/issues/951)
 ("[Performance Gap] Establish large-schema SLOs, workload benchmarks, and a
 measured Rust boundary").
@@ -44,14 +45,75 @@ Guarantees:
   (except the deliberately non-ASCII / quoted identifiers in the multilingual
   skew case).
 
+## Decision — measured baseline harness (this increment)
+
+`app/perf/baseline.py` times the *pure*, side-effect-free processing paths
+over a generated workload snapshot and records observations only — no
+threshold, no verdict.
+
+`run_baseline(profile_name, *, seed=None)` returns `profile`, `seed`,
+`generated_at` (UTC ISO-8601), `relation_count`, `column_count`, and a
+`paths` map. Each path reports `wall_seconds`, `peak_bytes` (via
+`tracemalloc`), and `result_size_bytes`. Measured paths:
+
+| Path | What it exercises |
+| --- | --- |
+| `canonical_hash` | `sha256` over sorted-key canonical JSON |
+| `json_round_trip` | `json.dumps` + `json.loads` of the snapshot |
+| `schema_self_diff` | `app.diff.schema_diff.diff_snapshots(s, s)` |
+| `ddl_export_postgresql` | `app.ddl.export.snapshot_json_to_sql(s, "postgresql")` |
+| `ddl_export_snowflake` | `app.ddl.export.snapshot_json_to_sql(s, "snowflake")` |
+| `data_dictionary_markdown` | `app.spec.data_dictionary.snapshot_to_data_dictionary_md(s)` |
+
+CLI: `python -m app.perf.baseline --profile small [--seed N] [--json]`.
+`tracemalloc` is torn down in a `finally` block, so a cancelled run leaves
+no tracing active and never returns a partial report.
+
+## Decision — repeat-run aggregation (this increment)
+
+A single timing is noisy. `app/perf/baseline_stats.py` runs `run_baseline`
+`repeat` times over the *same* seeded workload (snapshot fixed; only the
+timing varies) and reduces each path's `wall_seconds` and `peak_bytes`
+sample lists to a distribution summary — `samples`, `min`, `max`, `mean`,
+`p50`, `p95`, `p99` — via `statistics.quantiles(..., n=100,
+method="inclusive")` (standard library only). `result_size_bytes` is
+deterministic for a fixed snapshot, so it is reported once as a scalar.
+
+`aggregate_baseline(profile_name, *, repeat, seed=None)` adds `repeat` to
+the report metadata. `repeat < 1` raises `ValueError`; `repeat == 1`
+returns a well-formed degenerate summary (every quantile equals the one
+sample). A cancelled aggregation never returns a partial distribution.
+CLI: `python -m app.perf.baseline_stats --profile small --repeat 5
+[--seed N] [--json]`.
+
+Still observations only: no threshold, no verdict. The percentile targets
+a capacity profile eventually publishes are set from measured baseline
+runs and never invented here.
+
+## Decision — versioned report envelope (this increment)
+
+`app/perf/baseline_report.py` `build_baseline_report(profile_name, *,
+repeat, seed=None)` wraps the raw `aggregate_baseline` output in a
+buyer-facing envelope, mirroring what `app.spec.normalization_report`
+(#947) does for the normalization assessment: `report_version`,
+`generated_at` (UTC ISO-8601), a `schema_fingerprint` (`"sha256:"`-prefixed
+digest of the exact workload snapshot that was measured, so a report can be
+tied back to its schema), and a `summary` block —
+`{headline, path_count, slowest_path_by_wall_p95}` — that names the path an
+engineer should look at first (largest wall-time 95th percentile) using
+**names and counts only, never a duration value**. The full statistics
+block is preserved verbatim under `statistics`. The `schema_fingerprint`
+helper is a local copy of `app.spec.normalization_report.schema_fingerprint`
+for now (the two branches are unmerged); unify them once both land.
+
 ## Deferred (later increments on #951)
 
-- **Baseline harness** — run the measured paths (canonical snapshot
-  hashing, JSON encode/decode + persistence, schema diff, DDL/DBML/Mermaid/
-  Prisma/spec export, API list/detail/pagination/search, queue
-  claim/retry/lease/cleanup/fairness) against each profile and record
-  p50/p95/p99 latency, peak RSS, allocations, query count, lock wait, queue
-  lag, artifact size, cancellation time.
+- **Baseline harness — remaining paths** — DBML/Mermaid/Prisma/spec export,
+  API list/detail/pagination/search, and queue
+  claim/retry/lease/cleanup/fairness, plus query count, lock wait, and
+  queue lag. The pure snapshot paths above are done and their percentile
+  aggregation is in place; these remaining paths need a DB / event loop and
+  belong in the benchmark workflow.
 - **`docs/PERFORMANCE.md`** — the versioned capacity profile with
   buyer-facing limits, separated from benchmark targets. **No SLA claim
   until production evidence exists.**
