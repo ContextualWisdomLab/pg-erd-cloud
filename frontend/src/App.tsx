@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 import {
+  AccessManagementModal,
   AddTableModal,
   CardinalityModal,
   EditEdgeModal,
@@ -31,8 +32,11 @@ import {
   createSnapshot,
   getSnapshot,
   listConnections,
+  listProjectMembers,
   listProjects,
   listSnapshots,
+  upsertProjectMember,
+  ProjectMemberRequestError,
 } from "./api";
 import TableNode from "./erd/TableNode";
 import {
@@ -64,7 +68,7 @@ import { exportDbml } from "./erd/dbml";
 import { exportPrisma } from "./erd/prisma";
 import { GRID_COLUMNS, GRID_X_GAP, GRID_Y_GAP } from "./erd/layoutConstants";
 import { findSearchMatchedNodeIds } from "./erd/search";
-import type { Connection, Project, Snapshot, SnapshotDetail } from "./types";
+import type { Connection, MutableProjectMemberRole, Project, ProjectMember, Snapshot, SnapshotDetail } from "./types";
 
 const TERMINAL_SNAPSHOT_STATUSES = new Set([
   "succeeded",
@@ -166,6 +170,16 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [accessMembers, setAccessMembers] = useState<ProjectMember[]>([]);
+  const [isAccessLoading, setIsAccessLoading] = useState(false);
+  const [accessLoadError, setAccessLoadError] = useState<{
+    kind: "permission" | "error";
+    message: string;
+  } | null>(null);
+  const [isAccessSaving, setIsAccessSaving] = useState(false);
+  const [accessSaveError, setAccessSaveError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -617,6 +631,57 @@ export default function App() {
       setIsCreatingShareLink(false);
     }
   }, [isCreatingShareLink, selectedProjectId]);
+
+  const onOpenAccessManagement = useCallback(async () => {
+    if (!selectedProjectId || isAccessLoading) return;
+
+    setIsAccessModalOpen(true);
+    setIsAccessLoading(true);
+    setAccessLoadError(null);
+    setAccessSaveError(null);
+
+    try {
+      setAccessMembers(await listProjectMembers(selectedProjectId));
+    } catch (error) {
+      if (
+        error instanceof ProjectMemberRequestError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        setAccessLoadError({ kind: "permission", message: String(error) });
+      } else {
+        setAccessLoadError({ kind: "error", message: String(error) });
+      }
+    } finally {
+      setIsAccessLoading(false);
+    }
+  }, [isAccessLoading, selectedProjectId]);
+
+  const onCloseAccessManagement = useCallback(() => {
+    setIsAccessModalOpen(false);
+    setAccessSaveError(null);
+  }, []);
+
+  const onSaveAccessMember = useCallback(
+    async (
+      memberSubject: string,
+      projectRole: MutableProjectMemberRole,
+    ) => {
+      if (!selectedProjectId || isAccessSaving) return;
+
+      setIsAccessSaving(true);
+      setAccessSaveError(null);
+
+      try {
+        await upsertProjectMember(selectedProjectId, memberSubject, projectRole);
+        setAccessMembers(await listProjectMembers(selectedProjectId));
+      } catch (error) {
+        setAccessSaveError(String(error));
+      } finally {
+        setIsAccessSaving(false);
+      }
+    },
+    [isAccessSaving, selectedProjectId],
+  );
 
   const onCopyShareLink = useCallback(async () => {
     if (!shareLinkUrl) return;
@@ -1653,6 +1718,20 @@ export default function App() {
             onDownloadPrisma={onDownloadPrisma}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
+            onOpenAccessManagement={onOpenAccessManagement}
+          />
+
+          <AccessManagementModal
+            isOpen={isAccessModalOpen}
+            projectName={selectedProject?.project_name || "선택 안 됨"}
+            currentSubject={me?.subject || ""}
+            members={accessMembers}
+            isLoading={isAccessLoading}
+            loadError={accessLoadError}
+            isSaving={isAccessSaving}
+            saveError={accessSaveError}
+            onClose={onCloseAccessManagement}
+            onSaveMember={onSaveAccessMember}
           />
 
           <EditEdgeModal
