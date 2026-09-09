@@ -10,7 +10,7 @@ from typing import Any, cast
 import httpx
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from sqlalchemy import delete, select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -194,8 +194,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.db import SessionLocal
     from app.models import RevokedToken
+    from app.db import SessionLocal
 
     if not jwt_id:
         return
@@ -213,8 +213,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.db import SessionLocal
     from app.models import RevokedToken
+    from app.db import SessionLocal
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
@@ -459,7 +459,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

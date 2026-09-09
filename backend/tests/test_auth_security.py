@@ -4,10 +4,11 @@ import asyncio
 import uuid
 
 import pytest
-from app import auth
-from app.settings import settings
 from fastapi import HTTPException
 from starlette.requests import Request
+
+from app import auth
+from app.settings import settings
 
 
 @pytest.mark.parametrize(
