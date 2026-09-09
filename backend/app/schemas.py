@@ -290,6 +290,14 @@ class NormalizationAssessmentOut(BaseModel):
     report: dict | None
 
 
+class HotPartitionAssessmentOut(BaseModel):
+    """Catalog-evidence hot-partition / unbounded-growth report."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class DbmlConvertIn(BaseModel):
     """Request body for converting DBML text into a snapshot."""
 
