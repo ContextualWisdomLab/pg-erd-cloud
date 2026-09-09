@@ -26,6 +26,7 @@ from app.schemas import (
     InferredRelationshipOut,
     MigrationSafetyOut,
     NamingLintOut,
+    NormalizationAssessmentOut,
     SchemaStatsOut,
     SensitiveColumnsOut,
     SnapshotCreateIn,
@@ -44,6 +45,7 @@ from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
 from app.spec.naming_lint import lint_naming
+from app.spec.normalization_report import build_normalization_report
 from app.spec.orm_codegen import (
     generate_prisma_schema,
     generate_sqlalchemy_models,
@@ -519,6 +521,36 @@ async def constraint_inventory(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = build_constraint_inventory(data.snapshot_json if data else None)
     return ConstraintInventoryOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/normalization-assessment",
+    response_model=NormalizationAssessmentOut,
+)
+async def normalization_assessment(
+    schema_snapshot_uuid: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> NormalizationAssessmentOut:
+    """Catalog-evidence normalization / functional-dependency assessment.
+
+    Uses only declared keys, UNIQUE constraints, NOT NULL flags, column types,
+    and declared foreign keys -- no data profiling, no inference from column
+    names, no DDL. Every finding carries an explicit evidence class. Returns
+    the versioned report envelope (fingerprint, summary, findings).
+
+    IDOR-safe (uniform not-found for missing/unauthorized snapshots).
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return NormalizationAssessmentOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_normalization_report(data.snapshot_json if data else None)
+    return NormalizationAssessmentOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 

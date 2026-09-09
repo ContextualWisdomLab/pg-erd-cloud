@@ -282,6 +282,14 @@ class NamingLintOut(BaseModel):
     report: dict | None
 
 
+class NormalizationAssessmentOut(BaseModel):
+    """Catalog-evidence normalization / functional-dependency report."""
+
+    schema_snapshot_uuid: uuid.UUID
+    status: str
+    report: dict | None
+
+
 class DbmlConvertIn(BaseModel):
     """Request body for converting DBML text into a snapshot."""
 

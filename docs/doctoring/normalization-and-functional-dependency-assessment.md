@@ -105,19 +105,34 @@ A matched finding is returned with `evidence_class = "waived"` and the waiver
 metadata attached. Signed, persisted waiver records with an approval workflow
 remain a later increment.
 
+## Report envelope & HTTP surface — landed
+
+`app.spec.normalization_report.build_normalization_report(snapshot, *,
+waivers=None)` wraps the analyzer output additively with `report_version`,
+`generated_at`, a stable `schema_fingerprint` (SHA-256 of the canonical
+snapshot JSON), and a `summary` block (counts by normal form and evidence
+class plus a one-line buyer-facing `headline`).
+
+`GET /api/snapshots/{schema_snapshot_uuid}/normalization-assessment`
+(`NormalizationAssessmentOut`) returns that envelope as JSON. It follows the
+same access model as the sibling snapshot analyzers (`/wide-tables`,
+`/constraint-inventory`, `/naming-lint`): authenticated, read-only, IDOR-safe
+via `_get_authorized_snapshot` (a missing or unauthorized snapshot returns a
+uniform `not_found`). No feature flag — the assessment is a shipped product
+feature, not a hidden experiment; no DDL, no writes.
+
 ## Deferred (later bounded increments on #947)
 
 - **3NF / transitive-dependency** detection — requires declared functional
   dependencies or profiled evidence; catalog keys and column names alone cannot
   establish the relevant dependencies.
 - **Hot-partition & growth assessment** — write/read concentration by
-  tenant/status/time key, queue/audit/share-link tables, and real-database
-  pruning evidence.
-- **Report envelope & HTTP surface** — the versioned `assessment_run` /
-  `finding_record` / `evidence_record` / `waiver_record` /
-  `capacity_profile` / `partition_candidate` / `remediation_action` model, a
-  gated read-only `/api` endpoint, and JSON + exact-value HTML + buyer-facing
-  summary renderings.
+  tenant/status/time key, queue/audit/share-link tables, `EXPLAIN` pruning
+  fixtures against a real PostgreSQL.
+- **Exact-value HTML table + persisted assessment runs** — an accessible
+  non-color-only HTML rendering, and the `assessment_run` /
+  `capacity_profile` / `partition_candidate` / `remediation_action` records
+  persisted with tool/commit provenance.
 - **Persisted, signed waiver records** with owner, review date, scope, expiry.
 - **Typed public snapshot/report contracts** — replace broad `dict[str, Any]`
   surfaces with explicit common-snapshot and assessment contracts after the
