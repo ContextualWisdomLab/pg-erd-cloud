@@ -145,16 +145,87 @@ signal is catalog-declared.
 Deferred: generated `EXPLAIN` / `EXPLAIN ANALYZE` partition-pruning fixtures
 against a real PostgreSQL, and persisted `capacity_profile` records.
 
+## Exact-value HTML view — landed
+
+`app.spec.assessment_html.render_assessment_html(report, *, title)` renders
+either report envelope (they share the `summary` + `relation_assessments` +
+`findings` shape) as a self-contained accessible HTML fragment: every cell is
+`html.escape(…, quote=True)`, state is a text label (`[declared]`,
+`risk: review`) never colour alone, one `<table>` per finding kind with
+`<caption>` and `<th scope>`, scoped inline `<style>`, no external
+CSS/JS/scripts. Both assessment endpoints accept `?format=html` (returns
+`text/html`); the uniform JSON not-found response is unchanged regardless of
+`format`.
+
+## Transitive-dependency (3NF) assessment — landed
+
+`app.spec.transitive_dependency_assessment.assess_transitive_dependencies(
+snapshot, *, declared_functional_dependencies=None, waivers=None)` adds the
+third-normal-form layer the catalog-only analyzer deliberately skips. It
+works from two evidence sources and never infers a dependency from column
+names:
+
+- **Catalog only** → `non_key_reference_cluster` (evidence class
+  `inferred`, confidence `low`): a relation carries more than one
+  foreign-key column that is not a candidate key, alongside non-prime
+  descriptive columns. That is the *structural precondition* for a
+  transitive dependency, not proof of one — the finding says so and points
+  the caller at profiling or a declared FD.
+- **Caller-declared functional dependencies** → `transitive_dependency_via_declared_fd`
+  (evidence class `declared`): a supplied FD `X → Y` where `X` is not a
+  superkey and every column of `Y` is non-prime. That is a genuine 3NF
+  violation, asserted only because the caller supplied the dependency.
+  Each such finding is paired with a `candidate_3nf_split` proposal
+  (evidence class `proposed`, never applied automatically).
+
+`declared_functional_dependencies` is an optional list of
+`{"relation": "schema.table", "determinant": [...], "dependent": [...]}`.
+Entries naming an unknown relation or column are returned under
+`unresolved_declared_fds` with a reason rather than silently dropped.
+Waivers use the same `scope` shape as `assess_normalization`. Row-level FD
+discovery from table data stays out of scope (it needs profiling, which
+belongs in a separate service).
+
+## Signed waiver records — landed
+
+`app.spec.waiver_record` makes a waiver **tamper-evident** so an auditor can
+trust one without re-reviewing it. It is a pure function pair with no
+database, network, or filesystem access.
+
+- `sign_waiver(waiver, *, signer, signed_at, key_id, key)` returns
+  `{"waiver": <deep copy>, "signature": {"algo", "signer", "signed_at",
+  "key_id", "value"}}`. `value` is an HMAC-SHA256 (`algo` is the constant
+  `WAIVER_SIGNATURE_ALGO = "hmac-sha256"`) over the canonical JSON of the
+  waiver **with the signature metadata folded in** as `_meta`, so altering
+  the signer or the timestamp invalidates the signature exactly as altering
+  the waiver body does. The caller's dict is deep-copied, never mutated.
+- `verify_waiver_signature(record, *, key)` recomputes that HMAC from
+  `record["waiver"]` and the `signer` / `signed_at` / `key_id` in
+  `record["signature"]` and compares it with `hmac.compare_digest`
+  (constant time). Any edit to the body or the metadata, or a wrong key,
+  returns `False`; a missing signature or a non-`hmac-sha256` `algo` raises
+  `ValueError`.
+- Canonical form sorts keys at every level, so a waiver rebuilt in a
+  different key order still verifies. The secret `key` is supplied by the
+  caller and is never stored, logged, or echoed into the record.
+
+What remains deferred: **persisting** these signed records (with owner,
+review date, scope, expiry) alongside the assessment run, and key
+rotation / `key_id` resolution — that is storage-layer work tracked with
+the persisted-assessment-run item below.
+
 ## Deferred (later bounded increments on #947)
 
-- **3NF / transitive-dependency** detection — needs data profiling or
-  declared functional dependencies; catalog evidence alone cannot prove a
-  transitive dependency without asserting a theorem from names.
-- **Exact-value HTML table + persisted assessment runs** — an accessible
+- **Row-level functional-dependency discovery** — profiling a sample of
+  table data to *find* the dependencies a caller would otherwise have to
+  declare; belongs in a separate profiling service, not this pure analyzer.
+- **Persisted assessment runs** — an accessible
   non-color-only HTML rendering, and the `assessment_run` /
   `capacity_profile` / `partition_candidate` / `remediation_action` records
   persisted with tool/commit provenance.
-- **Persisted, signed waiver records** with owner, review date, scope, expiry.
+- **Persisted signed waiver records** — the signing / verification core has
+  landed (`app.spec.waiver_record`, above); storing the signed records with
+  owner, review date, scope, and expiry is the remaining storage-layer step.
 - **Typed public snapshot/report contracts** — replace broad `dict[str, Any]`
   surfaces with explicit common-snapshot and assessment contracts after the
   cross-dialect record shape is settled, rather than introducing a second
@@ -213,3 +284,10 @@ Relevance: studies candidate-key computation from functional dependencies and
 reinforces the distinction between minimal candidate keys and non-minimal
 superkeys. The current catalog-only analyzer does not attempt general FD-based
 key discovery.
+
+National Institute of Standards and Technology. (2008). *The keyed-hash
+message authentication code (HMAC)* (FIPS PUB 198-1).
+https://doi.org/10.6028/NIST.FIPS.198-1
+
+Rundgren, A., Jordan, B., & Erdtman, S. (2020). *JSON Canonicalization Scheme
+(JCS)* (RFC 8785). RFC Editor. https://doi.org/10.17487/RFC8785
