@@ -1,10 +1,10 @@
 import { defineConfig, type Plugin } from 'vite'
 
-const STRICT_STYLE_CSP = "style-src 'self'"
+const STRICT_STYLE_CSP = "style-src 'self';"
 
 // `vite dev` injects HMR styles as inline <style> tags. Relax only the exact
-// strict policy shipped by index.html, and fail fast if that policy drifts so a
-// broader CSP change cannot be silently reinterpreted as a development rule.
+// strict directive shipped by index.html, and fail fast if that directive
+// drifts so a broader CSP cannot be silently reinterpreted as a dev rule.
 function devCspInlineStyles(): Plugin {
   return {
     name: 'dev-csp-inline-styles',
@@ -15,7 +15,7 @@ function devCspInlineStyles(): Plugin {
       }
       return html.replace(
         STRICT_STYLE_CSP,
-        `${STRICT_STYLE_CSP} 'unsafe-inline'`,
+        "style-src 'self' 'unsafe-inline';",
       )
     },
   }
