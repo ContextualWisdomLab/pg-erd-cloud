@@ -455,7 +455,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByTestId('card-apply-second'))
     fireEvent.click(screen.getByTestId('card-close'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'DDL 내보내기' }))
+    fireEvent.click(screen.getByRole('button', { name: '공유 및 내보내기' }))
     for (const id of ['export-copy-ddl', 'export-svg', 'export-uml', 'export-mermaid', 'export-dbml', 'export-csv', 'export-md']) {
       fireEvent.click(screen.getByTestId(id))
     }

@@ -1515,63 +1515,15 @@ export default function App() {
             <button
               type="button"
               onClick={onOpenExport}
-              disabled={nodes.length === 0}
+              disabled={!selectedProjectId && nodes.length === 0}
               title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "DDL 내보내기"
-              }
-              aria-label="DDL 내보내기"
-            >
-              SQL
-            </button>
-            <button
-              type="button"
-              onClick={onOpenExport}
-              disabled={!selectedProjectId}
-              title={
-                !selectedProjectId
-                  ? "공유할 프로젝트를 먼저 선택하세요"
+                !selectedProjectId && nodes.length === 0
+                  ? "공유할 프로젝트나 내보낼 테이블이 없습니다"
                   : "공유 및 내보내기"
               }
               aria-label="공유 및 내보내기"
             >
               ↗
-            </button>
-            <button
-              type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0
-                  ? "내보낼 테이블이 없습니다"
-                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
-              }
-              aria-label="이미지/텍스트 내보내기 모달 열기"
-            >
-              IMG
-            </button>
-            <button
-              type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0 ? "내보낼 테이블이 없습니다" : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
-              }
-              aria-label="이미지/텍스트 내보내기 모달 열기"
-            >
-              UML
-            </button>
-            <button
-              type="button"
-              onClick={onOpenExport}
-              disabled={nodes.length === 0}
-              title={
-                nodes.length === 0
-                  ? "내보낼 테이블이 없습니다"
-                  : "SVG/PlantUML/Mermaid 내보내기 모달 열기"
-              }
-              aria-label="이미지/텍스트 내보내기 모달 열기"
-            >
-              {"{}"}
             </button>
             <div className="srOnly" aria-live="polite">
               {[layoutMessage, nodeSearchStatus].filter(Boolean).join(" ")}

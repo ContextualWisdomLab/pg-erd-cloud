@@ -63,7 +63,7 @@ modals.
 
 ```text
 +----------------------+---------------------------------------------+
-| Project selector     | [search] [layout] [undo] [+] [group] [SQL] |
+| Project selector     | [search] [layout] [undo] [+] [group] [share/export] |
 | New project          |                                             |
 | Connection selector  |                                             |
 | New connection       |                ERD canvas                    |
@@ -97,7 +97,8 @@ modals.
 - As a data architect, I can group tables and review index-cardinality guidance
   without losing canvas context.
 - As a collaborator, I can create a share link and copy DDL from one export
-  surface.
+  surface. The editor toolbar exposes a single share-and-export chooser; format
+  shortcuts that only opened the same dialog are not shown.
 
 ## Implementation Checklist
 
