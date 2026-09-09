@@ -71,6 +71,21 @@ always wins.
 state. **Live customer-database recovery requires a separately approved
 migration/backup workflow and is never implied by this feature.**
 
+## Decision — PROV-JSON projection (this increment)
+
+`app/lineage/prov_projection.py` `to_prov_document(lineage_graph, *,
+base_uri="urn:pg-erd-cloud:")` projects the `build_lineage_graph` result
+into a W3C **PROV-JSON** document — the interchange format an auditor or a
+downstream lineage consumer already understands. Every snapshot id (nodes
+plus any id referenced only as a dangling parent) becomes a `prov:Entity`
+under the `pg:` prefix; every typed derivation edge becomes one
+`wasDerivedFrom` relation (`_:wdf<N>`) with `prov:generatedEntity` = the
+child, `prov:usedEntity` = the parent, and `pg:derivationKind` carrying the
+edge kind so the "by kind" information is not lost. PROV-JSON is plain JSON
+— no dependency — and the projection is deterministic (relations numbered in
+`(kind, child, parent)` order). The internal graph stays authoritative; the
+PROV document is a read-only view.
+
 ## Deferred (later increments on #948)
 
 - Normalized tables + Alembic migration (`snapshot_lineage`,
@@ -80,8 +95,9 @@ migration/backup workflow and is never implied by this feature.**
 - Repositories + a `Settings`-gated HTTP surface for history / compare /
   promote / supersede / archive / recover with accessible non-color-only
   state cues.
-- Optional PROV-JSON-LD / JSON-LD projection with the relational model
-  authoritative.
+- A `wasGeneratedBy` / `used` / `activity` layer on the PROV projection once
+  the persisted model records the tool + commit + policy that produced each
+  snapshot (the current projection is entity + derivation only).
 - Embedding the exact snapshot / promotion / tool / commit / policy
   references into every export and migration plan for reproducibility.
 
