@@ -1,18 +1,21 @@
 import { defineConfig, type Plugin } from 'vite'
 
-// Dev-only CSP relaxation (issue #1108): `vite dev` injects HMR styles as
-// inline <style> tags, which the strict `style-src 'self'` meta in
-// index.html drops, leaving the app unstyled under the dev server.
-// Production builds emit external CSS files that satisfy 'self', so the
-// shipped header stays strict. `apply: 'serve'` keeps this out of builds.
+const STRICT_STYLE_CSP = "style-src 'self'"
+
+// `vite dev` injects HMR styles as inline <style> tags. Relax only the exact
+// strict policy shipped by index.html, and fail fast if that policy drifts so a
+// broader CSP change cannot be silently reinterpreted as a development rule.
 function devCspInlineStyles(): Plugin {
   return {
     name: 'dev-csp-inline-styles',
     apply: 'serve',
     transformIndexHtml(html) {
+      if (!html.includes(STRICT_STYLE_CSP)) {
+        throw new Error(`dev CSP transform expected ${STRICT_STYLE_CSP}`)
+      }
       return html.replace(
-        "style-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
+        STRICT_STYLE_CSP,
+        `${STRICT_STYLE_CSP} 'unsafe-inline'`,
       )
     },
   }
