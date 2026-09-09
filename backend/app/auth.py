@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
+import logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
 from sqlalchemy import select, delete
@@ -166,6 +170,7 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
 
     exp = claims.get("exp")
     if not isinstance(exp, int | float):
+        logger.warning("Authentication failed: token missing exp")
         raise HTTPException(status_code=401, detail="invalid token")
     return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
 
@@ -179,14 +184,17 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
             not isinstance(token_type, str)
             or token_type.strip().lower() not in OIDC_ALLOWED_TOKEN_TYPES
         ):
+            logger.warning("Authentication failed: unsupported token type")
             raise HTTPException(status_code=401, detail="invalid token")
 
     content_type = header.get("cty")
     if content_type is not None:
+        logger.warning("Authentication failed: unsupported token content type")
         raise HTTPException(status_code=401, detail="invalid token")
 
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
+        logger.warning("Authentication failed: token missing alg")
         raise HTTPException(status_code=401, detail="invalid token")
     return header_alg_raw.upper()
 
@@ -230,6 +238,7 @@ def _bearer_token_from_request(request: Request) -> str:
 
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
+        logger.warning("Authentication failed: missing bearer token")
         raise HTTPException(status_code=401, detail="invalid token")
     return auth.split(" ", 1)[1].strip()
 
@@ -240,10 +249,12 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
     except Exception:  # noqa: BLE001
+        logger.warning("Authentication failed: invalid token header")
         raise HTTPException(status_code=401, detail="invalid token")
 
     header_alg = _validate_jwt_header(header)
     if header_alg not in OIDC_ALLOWED_ALGORITHMS:
+        logger.warning("Authentication failed: unsupported token algorithm")
         raise HTTPException(status_code=401, detail="invalid token")
 
     jwks = await _get_jwks()
@@ -252,19 +263,24 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         jwks = await _get_jwks(force_refresh=True)
         jwk = _pick_jwk(jwks, header.get("kid"))
     if jwk is None:
+        logger.warning("Authentication failed: unknown signing key")
         raise HTTPException(status_code=401, detail="invalid token")
 
     kty = jwk.get("kty")
     if not isinstance(kty, str):
+        logger.warning("Authentication failed: algorithm/key type mismatch")
         raise HTTPException(status_code=401, detail="invalid token")
     jwk_kty = kty.upper()
     if jwk_kty == "RSA":
         if not (header_alg.startswith("RS") or header_alg.startswith("PS")):
+            logger.warning("Authentication failed: algorithm/key type mismatch")
             raise HTTPException(status_code=401, detail="invalid token")
     elif jwk_kty == "EC":
         if not header_alg.startswith("ES"):
+            logger.warning("Authentication failed: algorithm/key type mismatch")
             raise HTTPException(status_code=401, detail="invalid token")
     else:
+        logger.warning("Authentication failed: algorithm/key type mismatch")
         raise HTTPException(status_code=401, detail="invalid token")
 
     try:
@@ -284,6 +300,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
             },
         )
     except Exception as err:
+        logger.warning("Authentication failed: token verification failed")
         raise HTTPException(status_code=401, detail="invalid token") from err
 
     return cast(dict[str, Any], claims)
@@ -298,12 +315,15 @@ async def _verified_token_from_claims(
     jwt_id = claims.get("jti")
     name = claims.get("name") or claims.get("preferred_username")
     if not isinstance(sub, str):
+        logger.warning("Authentication failed: token missing sub")
         raise HTTPException(status_code=401, detail="invalid token")
     if not isinstance(jwt_id, str) or not jwt_id.strip():
+        logger.warning("Authentication failed: token missing jti")
         raise HTTPException(status_code=401, detail="invalid token")
 
     expires_at = _jwt_expiry(claims)
     if verify_revocation and await is_token_jti_revoked(jwt_id):
+        logger.warning("Authentication failed: token revoked")
         raise HTTPException(status_code=401, detail="invalid token")
 
     return VerifiedToken(
@@ -439,6 +459,7 @@ async def _user_from_api_key(session: AsyncSession, token: str) -> CurrentUser:
     )
     pair = row.first()
     if pair is None or pair[0].revoked_at is not None:
+        logger.warning("Authentication failed: invalid API key")
         raise HTTPException(status_code=401, detail="invalid token")
     user = pair[1]
     return CurrentUser(
@@ -459,7 +480,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
+        return await _user_from_api_key(session, auth_header[len("Bearer "):])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
