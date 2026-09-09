@@ -60,3 +60,6 @@
 ## 2026-09-09 - [Accessible Context for Mapped List Buttons]
 **Learning:** In mapped lists of entities (like projects or diagrams), generic action buttons (e.g., "열기", "삭제") lack intrinsic context when read by screen readers, making it difficult for users to distinguish which entity the action applies to.
 **Action:** Always provide an explicit, context-rich `aria-label` on action buttons within mapped lists (e.g., `${itemName} 프로젝트 열기`) to ensure the action is unambiguous for assistive technologies.
+## 2026-09-09 - [Update React Testing Library Selectors for Context-Rich aria-labels]
+**Learning:** When adding context-rich `aria-label` attributes to generic action buttons (e.g., "Open", "Delete") within mapped UI lists to improve screen reader accessibility, tests that query for exact matches (e.g., `getByRole('button', { name: '열기' })`) will fail because the button's accessible name has changed.
+**Action:** Always update corresponding React Testing Library queries to use regex matching (e.g., `name: / (프로젝트|다이어그램) 열기$/`) to accommodate the dynamic accessible names and prevent test suite failures.
