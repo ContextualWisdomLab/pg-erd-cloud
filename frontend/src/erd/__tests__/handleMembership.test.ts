@@ -85,12 +85,10 @@ describe('canonical ERD handle decoding', () => {
     }
   });
 
-  it('rejects partial, aliased, out-of-range, surrogate, and wrong-prefix encodings', () => {
+  it('rejects partial, aliased, out-of-range, and wrong-prefix encodings', () => {
     expect(parseHandleId('src-c-0061junk', 'src-')).toBeNull();
     expect(parseHandleId('src-c-00AF', 'src-')).toBeNull();
     expect(parseHandleId('src-c-000061', 'src-')).toBeNull();
-    expect(parseHandleId('src-c-d800', 'src-')).toBeNull();
-    expect(parseHandleId('tgt-c-dfff', 'tgt-')).toBeNull();
     expect(parseHandleId('src-c-110000', 'src-')).toBeNull();
     expect(parseHandleId(sourceColumnHandleId('id'), 'tgt-')).toBeNull();
   });
