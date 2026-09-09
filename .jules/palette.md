@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-09-09 - [Accessible Context for Mapped List Buttons]
+**Learning:** In mapped lists of entities (like projects or diagrams), generic action buttons (e.g., "열기", "삭제") lack intrinsic context when read by screen readers, making it difficult for users to distinguish which entity the action applies to.
+**Action:** Always provide an explicit, context-rich `aria-label` on action buttons within mapped lists (e.g., `${itemName} 프로젝트 열기`) to ensure the action is unambiguous for assistive technologies.
