@@ -79,7 +79,12 @@ def _relation_ref(relation: dict[str, Any]) -> dict[str, Any]:
 def _finding_id(
     relation: dict[str, Any], kind: str, source_names: Iterable[str]
 ) -> str:
-    """Derive an id stable across relation OID churn for the same logical object."""
+    """Derive an id stable across relation OID churn for the same logical object.
+
+    SHA-256 is used (truncated to 16 hex chars) so the identifier is both
+    stable and free of the SHA-1 findings flagged by SAST gates; the id is
+    a non-cryptographic correlator, never a security boundary.
+    """
 
     payload = "|".join(
         [
@@ -89,7 +94,7 @@ def _finding_id(
             ",".join(sorted(str(name) for name in source_names)),
         ]
     )
-    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _waiver_matches(
