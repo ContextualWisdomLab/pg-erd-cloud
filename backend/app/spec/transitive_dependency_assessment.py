@@ -285,7 +285,7 @@ def assess_transitive_dependencies(
         kind_key = "transitive_dependency_via_declared_fd"
         relation = record["relation"]
         finding = {
-            "finding_id": _finding_id(oid, kind_key, sorted(det_set) + sorted(dependent)),
+            "finding_id": _finding_id(relation, kind_key, sorted(det_set) + sorted(dependent)),
             "relation": _relation_ref(relation),
             "kind": kind_key,
             "normal_form_scope": "3NF",
@@ -318,7 +318,7 @@ def assess_transitive_dependencies(
 
         split_kind = "candidate_3nf_split"
         split = {
-            "finding_id": _finding_id(oid, split_kind, sorted(det_set) + sorted(dependent)),
+            "finding_id": _finding_id(relation, split_kind, sorted(det_set) + sorted(dependent)),
             "relation": _relation_ref(relation),
             "kind": split_kind,
             "normal_form_scope": "3NF",
@@ -363,7 +363,7 @@ def assess_transitive_dependencies(
         kind_key = "non_key_reference_cluster"
         relation = record["relation"]
         finding = {
-            "finding_id": _finding_id(oid, kind_key, fk_columns),
+            "finding_id": _finding_id(relation, kind_key, fk_columns),
             "relation": _relation_ref(relation),
             "kind": kind_key,
             "normal_form_scope": "3NF",

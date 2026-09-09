@@ -63,8 +63,8 @@ def test_summary_headline_for_a_clean_schema() -> None:
     summary = build_normalization_report(_CLEAN_SNAPSHOT)["summary"]
     assert summary["relations_assessed"] == 1
     assert summary["relations_needing_review"] == 0
-    assert summary["relations_by_normal_form"] == {"bcnf": 1}
-    assert "BCNF" in summary["headline"]
+    assert summary["relations_by_normal_form"] == {"catalog_reviewed": 1}
+    assert "no open findings" in summary["headline"]
 
 
 def test_summary_counts_findings_and_review_relations() -> None:
