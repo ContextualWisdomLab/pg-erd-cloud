@@ -1,6 +1,5 @@
 export function sanitizeHandleId(columnName: string): string {
   const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
     return char.codePointAt(0)!.toString(16).padStart(4, '0')
   }).join('-')
 
@@ -25,7 +24,14 @@ export function parseHandleId(handleId: string | null | undefined, prefix: strin
     const chars = parts.map(hex => {
       if (!/^[0-9a-fA-F]{1,6}$/.test(hex)) throw new Error('Invalid hex format');
       const codePoint = parseInt(hex, 16);
-      if (isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF) throw new Error('Invalid hex range');
+      if (
+        isNaN(codePoint) ||
+        codePoint < 0 ||
+        codePoint > 0x10FFFF ||
+        (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+      ) {
+        throw new Error('Invalid Unicode scalar');
+      }
       return String.fromCodePoint(codePoint);
     });
     const decoded = chars.join('');
