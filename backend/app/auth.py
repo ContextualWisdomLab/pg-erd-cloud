@@ -10,7 +10,7 @@ from typing import Any, cast
 import httpx
 from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -194,8 +194,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
 async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
     """Record a JWT ID as revoked until its natural expiry."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     if not jwt_id:
         return
@@ -213,8 +213,8 @@ async def revoke_token_jti(jwt_id: str, expires_at: dt.datetime) -> None:
 async def is_token_jti_revoked(jwt_id: str) -> bool:
     """Return whether the JWT ID is currently revoked."""
 
-    from app.models import RevokedToken
     from app.db import SessionLocal
+    from app.models import RevokedToken
 
     current = dt.datetime.now(dt.timezone.utc)
     async with SessionLocal() as session:
