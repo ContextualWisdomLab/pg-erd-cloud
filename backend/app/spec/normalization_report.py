@@ -51,15 +51,18 @@ def _summarize(assessment: dict[str, Any]) -> dict[str, Any]:
 
     relations_assessed = len(assessment.get("relation_assessments", []))
     # A relation needs review when it carries at least one finding that is
-    # not waived. Waived findings record an accepted risk, so they no longer
-    # drive review demand; finding-free relations (e.g. ``catalog_reviewed``)
-    # likewise have nothing open. The analyzer never certifies ``bcnf`` from
-    # catalog-only evidence, so review demand is counted from open findings,
-    # not from the absence of a ``bcnf`` label.
+    # not waived. Findings link their relation via the ``{"schema", "name",
+    # "oid"}`` reference built by ``_relation_ref`` (NOT the snapshot's
+    # ``schema_name``/``relation_name`` keys), so group by those keys.
+    # Waived findings record an accepted risk, so they no longer drive review
+    # demand; finding-free relations (e.g. ``catalog_reviewed``) likewise have
+    # nothing open. The analyzer never certifies ``bcnf`` from catalog-only
+    # evidence, so review demand is counted from open findings, not from the
+    # absence of a ``bcnf`` label.
     relations_with_open_findings = {
         (
-            str((finding.get("relation") or {}).get("schema_name")),
-            str((finding.get("relation") or {}).get("relation_name")),
+            str((finding.get("relation") or {}).get("schema")),
+            str((finding.get("relation") or {}).get("name")),
         )
         for finding in assessment.get("findings", [])
         if str(finding.get("evidence_class")) != "waived"

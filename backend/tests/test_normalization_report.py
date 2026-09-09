@@ -94,3 +94,46 @@ def test_empty_snapshot_yields_a_stable_no_relations_report() -> None:
     assert report["summary"]["relations_assessed"] == 0
     assert "No base relations" in report["summary"]["headline"]
     assert report["findings"] == []
+
+
+_TWO_RELATION_SNAPSHOT: dict[str, Any] = {
+    "relations": [
+        {"relation_oid": 1, "schema_name": "public", "relation_name": "event_log", "relation_kind": "r"},
+        {"relation_oid": 2, "schema_name": "public", "relation_name": "audit_log", "relation_kind": "r"},
+    ],
+    "columns": [
+        {"relation_oid": 1, "column_position": 1, "column_name": "event_id", "data_type": "bigint", "is_not_null": True},
+        {"relation_oid": 1, "column_position": 2, "column_name": "event_payload", "data_type": "jsonb", "is_not_null": True},
+        {"relation_oid": 2, "column_position": 1, "column_name": "audit_id", "data_type": "bigint", "is_not_null": True},
+        {"relation_oid": 2, "column_position": 2, "column_name": "audit_payload", "data_type": "jsonb", "is_not_null": True},
+    ],
+    "pk_columns": [
+        {"relation_oid": 1, "column_name": "event_id"},
+        {"relation_oid": 2, "column_name": "audit_id"},
+    ],
+}
+
+
+def test_summary_counts_each_relation_with_open_findings_separately() -> None:
+    # Regression: findings link relations via the {"schema", "name", "oid"}
+    # reference, so grouping must use those keys — grouping by the
+    # snapshot's schema_name/relation_name keys collapses every finding to
+    # one bucket and undercounts multi-relation assessments.
+    summary = build_normalization_report(_TWO_RELATION_SNAPSHOT)["summary"]
+    assert summary["relations_assessed"] == 2
+    assert summary["relations_needing_review"] == 2
+    assert summary["findings_by_evidence_class"].get("observed") == 2
+
+
+def test_summary_waiver_clears_only_its_own_relation() -> None:
+    waivers = [
+        {
+            "scope": {"relation": "event_log", "kind": "non_atomic_column"},
+            "owner": "data-platform",
+            "reason": "deliberate evidence envelope",
+        }
+    ]
+    summary = build_normalization_report(_TWO_RELATION_SNAPSHOT, waivers=waivers)["summary"]
+    assert summary["findings_by_evidence_class"].get("waived") == 1
+    assert summary["findings_by_evidence_class"].get("observed") == 1
+    assert summary["relations_needing_review"] == 1
