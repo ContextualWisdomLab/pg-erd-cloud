@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +26,9 @@ from app.schemas import (
     IndexRedundancyOut,
     InferredRelationshipOut,
     MigrationSafetyOut,
+    HotPartitionAssessmentOut,
     NamingLintOut,
+    NormalizationAssessmentOut,
     SchemaStatsOut,
     SensitiveColumnsOut,
     SnapshotCreateIn,
@@ -43,7 +46,10 @@ from app.spec.constraint_inventory import build_constraint_inventory
 from app.spec.fk_cycles import detect_fk_cycles
 from app.spec.index_redundancy import detect_index_redundancy
 from app.spec.data_dictionary import snapshot_to_data_dictionary_md
+from app.spec.assessment_html import render_assessment_html
+from app.spec.hot_partition_report import build_hot_partition_report
 from app.spec.naming_lint import lint_naming
+from app.spec.normalization_report import build_normalization_report
 from app.spec.orm_codegen import (
     generate_prisma_schema,
     generate_sqlalchemy_models,
@@ -519,6 +525,82 @@ async def constraint_inventory(
     data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
     report = build_constraint_inventory(data.snapshot_json if data else None)
     return ConstraintInventoryOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/normalization-assessment",
+    response_model=NormalizationAssessmentOut,
+)
+async def normalization_assessment(
+    schema_snapshot_uuid: uuid.UUID,
+    format: Literal["json", "html"] = Query("json"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> NormalizationAssessmentOut | HTMLResponse:
+    """Catalog-evidence normalization / functional-dependency assessment.
+
+    Uses only declared keys, UNIQUE constraints, NOT NULL flags, column types,
+    and declared foreign keys -- no data profiling, no inference from column
+    names, no DDL. Every finding carries an explicit evidence class. Returns
+    the versioned report envelope (fingerprint, summary, findings) as JSON, or
+    an accessible exact-value HTML table when ``format=html``.
+
+    IDOR-safe: the uniform JSON not-found response is returned for
+    missing/unauthorized snapshots regardless of ``format``.
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return NormalizationAssessmentOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_normalization_report(data.snapshot_json if data else None)
+    if format == "html":
+        return HTMLResponse(
+            render_assessment_html(report, title="Normalization assessment")
+        )
+    return NormalizationAssessmentOut(
+        schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
+    )
+
+
+@router.get(
+    "/{schema_snapshot_uuid}/hot-partition-assessment",
+    response_model=HotPartitionAssessmentOut,
+)
+async def hot_partition_assessment(
+    schema_snapshot_uuid: uuid.UUID,
+    format: Literal["json", "html"] = Query("json"),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_read_session),
+) -> HotPartitionAssessmentOut | HTMLResponse:
+    """Catalog-evidence hot-partition and unbounded-growth assessment.
+
+    Uses declared keys, column types/defaults, and PostgreSQL partitioning
+    metadata only -- no live workload is assumed and no data is sampled.
+    Findings for append-heavy tables, unbounded retention, monotonic key
+    hot-pages, partition-key/unique-constraint mismatches, and write/read
+    skew axes each carry an evidence class. No DDL. Returns the versioned
+    report envelope as JSON, or an accessible exact-value HTML table when
+    ``format=html``.
+
+    IDOR-safe: the uniform JSON not-found response is returned for
+    missing/unauthorized snapshots regardless of ``format``.
+    """
+    snap = await _get_authorized_snapshot(session, schema_snapshot_uuid, user)
+    if snap is None:
+        return HotPartitionAssessmentOut(
+            schema_snapshot_uuid=schema_snapshot_uuid, status="not_found", report=None
+        )
+    data = await session.get(SchemaSnapshotData, schema_snapshot_uuid)
+    report = build_hot_partition_report(data.snapshot_json if data else None)
+    if format == "html":
+        return HTMLResponse(
+            render_assessment_html(report, title="Hot-partition assessment")
+        )
+    return HotPartitionAssessmentOut(
         schema_snapshot_uuid=schema_snapshot_uuid, status="ok", report=report
     )
 
