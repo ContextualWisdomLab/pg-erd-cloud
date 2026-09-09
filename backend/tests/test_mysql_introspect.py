@@ -7,6 +7,7 @@ import pytest
 from app.db_introspect import detect_dsn_dialect
 from app.ddl.export import snapshot_json_to_sql
 from app.mysql_introspect.introspect import _parse_mysql_dsn, rows_to_snapshot
+from app.spec.normalization_assessment import assess_normalization
 
 TABLES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "TABLE_TYPE": "BASE TABLE", "TABLE_COMMENT": "회원"},
@@ -34,6 +35,8 @@ KEY_USAGE = [
 INDEXES = [
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "INDEX_NAME": "ix_orders_member",
      "NON_UNIQUE": 1, "SEQ_IN_INDEX": 1, "COLUMN_NAME": "member_id"},
+    {"TABLE_SCHEMA": "shop", "TABLE_NAME": "orders", "INDEX_NAME": "ux_orders_member",
+     "NON_UNIQUE": 0, "SEQ_IN_INDEX": 1, "COLUMN_NAME": "member_id"},
     {"TABLE_SCHEMA": "shop", "TABLE_NAME": "member", "INDEX_NAME": "PRIMARY",
      "NON_UNIQUE": 0, "SEQ_IN_INDEX": 1, "COLUMN_NAME": "member_id"},
 ]
@@ -59,9 +62,28 @@ def test_maps_pks_and_fks_by_name():
     rel = {r["relation_oid"]: r["relation_name"] for r in snap["relations"]}
     assert rel[edge["child_relation_oid"]] == "orders"
     assert rel[edge["parent_relation_oid"]] == "member"
-    # constraints derived so DDL export renders PK/FK
     assert any(c["constraint_type"] == "p" for c in snap["constraints"])
     assert any(c["constraint_type"] == "f" for c in snap["constraints"])
+
+
+def test_unique_indexes_are_normalized_into_common_unique_constraints():
+    snap = _snap()
+    unique = next(
+        c
+        for c in snap["constraints"]
+        if c["constraint_type"] == "u" and c["constraint_name"] == "ux_orders_member"
+    )
+    assert unique["constrained_attnums"] == [2]
+    constraint_oids = [c["constraint_oid"] for c in snap["constraints"]]
+    assert len(constraint_oids) == len(set(constraint_oids))
+
+    result = assess_normalization(snap)
+    orders = next(
+        record
+        for record in result["relation_assessments"]
+        if record["relation"]["name"] == "orders"
+    )
+    assert ["member_id"] in orders["candidate_keys"]
 
 
 def test_index_rows_grouped_into_defs():
@@ -90,7 +112,7 @@ async def test_dsn_parse_pins_validated_ip_and_rejects_bad():
     ) as guard:
         cfg = await _parse_mysql_dsn("mysql://user:s3cret@db.example.com:3307/shop")
     guard.assert_awaited_once_with("db.example.com", is_hostaddr=False, port=3307)
-    assert cfg.host == "93.184.216.34"  # pinned IP, not the hostname
+    assert cfg.host == "93.184.216.34"
     assert cfg.server_hostname == "db.example.com"
     assert cfg.port == 3307 and cfg.user == "user" and cfg.database == "shop"
 

@@ -67,7 +67,7 @@ def _assessment(result: dict[str, Any], relation: str) -> dict[str, Any]:
     raise AssertionError(f"no assessment for {relation!r}")
 
 
-def test_clean_single_key_table_is_bcnf_with_no_findings() -> None:
+def test_clean_single_key_table_reports_catalog_reviewed_not_bcnf_proof() -> None:
     snapshot = {
         "relations": [_relation(1, "app_user")],
         "columns": [
@@ -81,8 +81,9 @@ def test_clean_single_key_table_is_bcnf_with_no_findings() -> None:
     assert result["evidence_basis"] == "catalog_only"
     assert result["findings"] == []
     record = _assessment(result, "app_user")
-    assert record["normal_form"] == "bcnf"
-    assert record["evidence_class"] == "declared"
+    assert record["normal_form"] == "catalog_reviewed"
+    assert record["evidence_class"] == "inferred"
+    assert "does not prove" in record["rationale"]
     assert record["candidate_keys"] == [["user_id"]]
     assert record["non_prime_columns"] == ["email_address"]
 
@@ -104,6 +105,22 @@ def test_array_column_is_a_high_confidence_1nf_observation() -> None:
     assert finding["confidence"] == "high"
     assert finding["source_objects"] == [{"type": "column", "name": "answer_codes"}]
     assert _assessment(result, "survey_response")["normal_form"] == "1nf_review"
+
+
+def test_snowflake_array_literal_is_a_high_confidence_1nf_observation() -> None:
+    snapshot = {
+        "source_dialect": "snowflake",
+        "relations": [_relation(1, "event_payload")],
+        "columns": [
+            _column(1, 1, "event_id", "NUMBER", not_null=True),
+            _column(1, 2, "tags", "ARRAY"),
+        ],
+        "pk_columns": [{"relation_oid": 1, "column_name": "event_id"}],
+    }
+    result = assess_normalization(snapshot)
+    finding = _find(result, "event_payload", "non_atomic_column")
+    assert finding is not None
+    assert finding["confidence"] == "high"
 
 
 def test_jsonb_column_is_a_medium_confidence_1nf_observation() -> None:
@@ -145,7 +162,7 @@ def test_nullable_unique_is_a_declared_bcnf_finding_not_a_candidate_key() -> Non
         "relations": [_relation(1, "billing_account")],
         "columns": [
             _column(1, 1, "account_id", "bigint", not_null=True),
-            _column(1, 2, "external_reference", "text"),  # nullable
+            _column(1, 2, "external_reference", "text"),
         ],
         "pk_columns": [{"relation_oid": 1, "column_name": "account_id"}],
         "constraints": [
@@ -163,7 +180,7 @@ def test_nullable_unique_is_a_declared_bcnf_finding_not_a_candidate_key() -> Non
     assert finding["evidence_class"] == "declared"
     record = _assessment(result, "billing_account")
     assert record["normal_form"] == "bcnf_review"
-    assert record["candidate_keys"] == [["account_id"]]  # the nullable UNIQUE is excluded
+    assert record["candidate_keys"] == [["account_id"]]
 
 
 def test_not_null_unique_becomes_a_candidate_key() -> None:
@@ -186,9 +203,37 @@ def test_not_null_unique_becomes_a_candidate_key() -> None:
     result = assess_normalization(snapshot)
     assert _find(result, "billing_account", "nullable_unique_determinant") is None
     record = _assessment(result, "billing_account")
-    assert record["normal_form"] == "bcnf"
+    assert record["normal_form"] == "catalog_reviewed"
     assert ["external_reference"] in record["candidate_keys"]
     assert record["non_prime_columns"] == []
+
+
+def test_candidate_keys_exclude_declared_strict_superkeys() -> None:
+    snapshot = {
+        "relations": [_relation(1, "account_member")],
+        "columns": [
+            _column(1, 1, "account_id", "bigint", not_null=True),
+            _column(1, 2, "member_id", "bigint", not_null=True),
+            _column(1, 3, "display_name", "text", not_null=True),
+        ],
+        "pk_columns": [
+            {"relation_oid": 1, "column_name": "account_id"},
+            {"relation_oid": 1, "column_name": "member_id"},
+        ],
+        "constraints": [
+            {
+                "relation_oid": 1,
+                "constraint_type": "u",
+                "constraint_name": "account_member_account_id_key",
+                "constrained_attnums": [1],
+            }
+        ],
+    }
+    result = assess_normalization(snapshot)
+    record = _assessment(result, "account_member")
+    assert record["candidate_keys"] == [["account_id"]]
+    assert record["prime_columns"] == ["account_id"]
+    assert record["non_prime_columns"] == ["display_name", "member_id"]
 
 
 def test_composite_key_with_extra_column_flags_partial_dependency_precondition() -> None:
@@ -215,7 +260,7 @@ def test_composite_key_with_extra_column_flags_partial_dependency_precondition()
     assert _assessment(result, "order_line")["normal_form"] == "2nf_review"
 
 
-def test_pure_junction_table_with_only_key_columns_is_bcnf() -> None:
+def test_pure_junction_table_with_only_key_columns_is_catalog_reviewed() -> None:
     snapshot = {
         "relations": [_relation(1, "role_permission")],
         "columns": [
@@ -229,10 +274,10 @@ def test_pure_junction_table_with_only_key_columns_is_bcnf() -> None:
     }
     result = assess_normalization(snapshot)
     assert _find(result, "role_permission", "partial_dependency_precondition") is None
-    assert _assessment(result, "role_permission")["normal_form"] == "bcnf"
+    assert _assessment(result, "role_permission")["normal_form"] == "catalog_reviewed"
 
 
-def test_composite_key_plus_single_column_key_suppresses_partial_dependency() -> None:
+def test_composite_candidate_key_is_reviewed_even_with_single_column_key() -> None:
     snapshot = {
         "relations": [_relation(1, "order_line")],
         "columns": [
@@ -241,25 +286,26 @@ def test_composite_key_plus_single_column_key_suppresses_partial_dependency() ->
             _column(1, 3, "product_id", "bigint", not_null=True),
             _column(1, 4, "quantity", "integer", not_null=True),
         ],
-        "pk_columns": [
-            {"relation_oid": 1, "column_name": "order_id"},
-            {"relation_oid": 1, "column_name": "product_id"},
-        ],
+        "pk_columns": [{"relation_oid": 1, "column_name": "line_id"}],
         "constraints": [
             {
                 "relation_oid": 1,
                 "constraint_type": "u",
-                "constraint_name": "order_line_line_id_key",
-                "constrained_attnums": [1],
+                "constraint_name": "order_line_order_product_key",
+                "constrained_attnums": [2, 3],
             }
         ],
     }
     result = assess_normalization(snapshot)
-    assert _find(result, "order_line", "partial_dependency_precondition") is None
-    assert _assessment(result, "order_line")["normal_form"] == "bcnf"
+    finding = _find(result, "order_line", "partial_dependency_precondition")
+    assert finding is not None
+    assert _assessment(result, "order_line")["candidate_keys"] == [
+        ["line_id"],
+        ["order_id", "product_id"],
+    ]
 
 
-def test_waiver_records_a_finding_as_waived_and_relaxes_the_label() -> None:
+def test_waiver_records_a_finding_as_waived_without_claiming_bcnf() -> None:
     snapshot = {
         "relations": [_relation(1, "schema_snapshot_data")],
         "columns": [
@@ -282,8 +328,7 @@ def test_waiver_records_a_finding_as_waived_and_relaxes_the_label() -> None:
     assert finding is not None
     assert finding["evidence_class"] == "waived"
     assert finding["waiver"]["owner"] == "data-platform"
-    # A waived finding no longer drives the relation label.
-    assert _assessment(result, "schema_snapshot_data")["normal_form"] == "bcnf"
+    assert _assessment(result, "schema_snapshot_data")["normal_form"] == "catalog_reviewed"
 
 
 def test_waiver_with_empty_scope_never_matches() -> None:
@@ -299,6 +344,41 @@ def test_waiver_with_empty_scope_never_matches() -> None:
     finding = _find(result, "survey_response", "non_atomic_column")
     assert finding is not None
     assert finding["evidence_class"] == "observed"
+
+
+def test_waiver_with_unknown_scope_key_never_matches() -> None:
+    snapshot = {
+        "relations": [_relation(1, "survey_response")],
+        "columns": [
+            _column(1, 1, "response_id", "bigint", not_null=True),
+            _column(1, 2, "answer_codes", "integer[]", type_category="A", array_dimensions=1),
+        ],
+        "pk_columns": [{"relation_oid": 1, "column_name": "response_id"}],
+    }
+    result = assess_normalization(
+        snapshot,
+        waivers=[{"scope": {"relation_nam": "survey_response"}, "owner": "x", "reason": "typo"}],
+    )
+    finding = _find(result, "survey_response", "non_atomic_column")
+    assert finding is not None
+    assert finding["evidence_class"] == "observed"
+
+
+def test_finding_id_is_stable_when_relation_oid_changes() -> None:
+    def snapshot(oid: int) -> dict[str, Any]:
+        return {
+            "relations": [_relation(oid, "survey_response", schema="assessment")],
+            "columns": [
+                _column(oid, 1, "response_id", "bigint", not_null=True),
+                _column(oid, 2, "answer_codes", "integer[]", type_category="A", array_dimensions=1),
+            ],
+            "pk_columns": [{"relation_oid": oid, "column_name": "response_id"}],
+        }
+
+    first = _find(assess_normalization(snapshot(10)), "survey_response", "non_atomic_column")
+    second = _find(assess_normalization(snapshot(20)), "survey_response", "non_atomic_column")
+    assert first is not None and second is not None
+    assert first["finding_id"] == second["finding_id"]
 
 
 def test_views_are_not_assessed() -> None:

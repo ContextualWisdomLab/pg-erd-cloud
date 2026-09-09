@@ -50,22 +50,31 @@ def _summarize(assessment: dict[str, Any]) -> dict[str, Any]:
         by_evidence_class[cls] = by_evidence_class.get(cls, 0) + 1
 
     relations_assessed = len(assessment.get("relation_assessments", []))
-    needs_review = sum(
-        count
-        for label, count in by_normal_form.items()
-        if label not in {"bcnf"}
-    )
+    # A relation needs review when it carries at least one finding that is
+    # not waived. Waived findings record an accepted risk, so they no longer
+    # drive review demand; finding-free relations (e.g. ``catalog_reviewed``)
+    # likewise have nothing open. The analyzer never certifies ``bcnf`` from
+    # catalog-only evidence, so review demand is counted from open findings,
+    # not from the absence of a ``bcnf`` label.
+    relations_with_open_findings = {
+        (
+            str((finding.get("relation") or {}).get("schema_name")),
+            str((finding.get("relation") or {}).get("relation_name")),
+        )
+        for finding in assessment.get("findings", [])
+        if str(finding.get("evidence_class")) != "waived"
+    }
+    needs_review = len(relations_with_open_findings)
     waived = by_evidence_class.get("waived", 0)
 
     if relations_assessed == 0:
         headline = "No base relations were available to assess."
     elif needs_review == 0:
         headline = (
-            f"All {relations_assessed} assessed relation(s) are in BCNF by "
-            "declared-key evidence"
+            f"All {relations_assessed} assessed relation(s) have no open findings"
             + (f" ({waived} finding(s) waived)" if waived else "")
-            + ". Undeclared dependencies are not visible to this catalog-only "
-            "check."
+            + ". Normal-form labels record catalog evidence only; undeclared "
+            "dependencies are not visible to this check."
         )
     else:
         headline = (
