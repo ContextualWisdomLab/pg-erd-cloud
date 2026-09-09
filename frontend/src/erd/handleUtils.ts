@@ -1,10 +1,20 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  if (!columnName) return 'c-empty';
 
-  return `c-${encoded || 'empty'}`
+  // ⚡ Bolt: Use for...of loop instead of Array.from to prevent intermediate array
+  // allocations and reduce garbage collection pressure in this hot path.
+  let encoded = '';
+  let first = true;
+  for (const char of columnName) {
+    if (!first) {
+      encoded += '-';
+    }
+    // for...of only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
+    first = false;
+  }
+
+  return `c-${encoded}`;
 }
 
 export function sourceColumnHandleId(columnName: string): string {
