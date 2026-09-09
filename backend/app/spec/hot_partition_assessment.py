@@ -160,12 +160,16 @@ def _relation_ref(relation: dict[str, Any]) -> dict[str, Any]:
 
 
 def _finding_id(relation_oid: object, kind: str, source_names: Iterable[str]) -> str:
-    """Derive a deterministic short id for a finding (stable across runs)."""
+    """Derive a deterministic short id for a finding (stable across runs).
+
+    SHA-256 (truncated) keeps the SAST gate clean; the id is a
+    non-cryptographic correlator, never a security boundary.
+    """
 
     payload = "|".join(
         [str(relation_oid), kind, ",".join(sorted(str(n) for n in source_names))]
     )
-    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _is_serial_default(column: dict[str, Any]) -> bool:
