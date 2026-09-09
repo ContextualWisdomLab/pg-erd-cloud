@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportModal } from './ExportModal';
@@ -171,13 +172,40 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('exposes access-control guidance for disabled button', () => {
+  it('exposes access-control guidance for disabled button', async () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
+    expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
+
+    // Verify it is still keyboard focusable and has no side effects on enter/space
+    accessManagementButton.focus();
+    expect(accessManagementButton).toHaveFocus();
+
+    // Ensure the event handler prevents default and propagation
+    const preventDefaultSpy = vi.fn();
+    const stopPropagationSpy = vi.fn();
+
+    const event = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+    });
+    event.preventDefault = preventDefaultSpy;
+    event.stopPropagation = stopPropagationSpy;
+
+    fireEvent(accessManagementButton, event);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+    expect(stopPropagationSpy).toHaveBeenCalled();
+
+    const user = userEvent.setup();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+
+    // Explicitly verify tab order inclusion behavior: naturally focusable without negative tabindex
+    expect(accessManagementButton).not.toHaveAttribute('tabindex');
   });
 });
