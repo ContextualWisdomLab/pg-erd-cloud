@@ -67,12 +67,34 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  // ⚡ Bolt: Optimize O(N) array search inside export loops.
+  // Using explicit for-loops and breaking early prevents multiple intermediate array and callback allocations,
+  // substantially improving performance when processing graphs with large node counts.
+  let sourceHandleColumn;
+  if (edge.sourceHandle && sourceNode.data.columns) {
+    const srcHandle = edge.sourceHandle;
+    const cols = sourceNode.data.columns;
+    for (let i = 0, len = cols.length; i < len; i++) {
+      const col = cols[i].column_name;
+      if (sourceColumnHandleId(col) === srcHandle) {
+        sourceHandleColumn = col;
+        break;
+      }
+    }
+  }
+
+  let targetHandleColumn;
+  if (edge.targetHandle && targetNode.data.columns) {
+    const tgtHandle = edge.targetHandle;
+    const cols = targetNode.data.columns;
+    for (let i = 0, len = cols.length; i < len; i++) {
+      const col = cols[i].column_name;
+      if (targetColumnHandleId(col) === tgtHandle) {
+        targetHandleColumn = col;
+        break;
+      }
+    }
+  }
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
