@@ -1371,7 +1371,7 @@ export default function App() {
                   <span role="cell">
                     <button
                       type="button"
-                      aria-label={`${sanitizeHtml(project.project_name)} 프로젝트 열기`}
+                      aria-label={`${project.project_name} 프로젝트 열기`}
                       onClick={() => {
                         setSelectedProjectId(project.project_space_uuid);
                         setActiveView("diagrams");
