@@ -196,4 +196,45 @@ describe('project access-management lifecycle', () => {
     expect(screen.getByTestId('access-members')).toHaveTextContent('0')
     expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
   })
+
+  it('clears saving state when project selection invalidates a pending save', async () => {
+    api.listProjectMembers.mockResolvedValueOnce([])
+    api.upsertProjectMember.mockImplementationOnce(() => new Promise(() => {}))
+
+    await openAccessManagement()
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+
+    fireEvent.click(screen.getByTestId('access-save'))
+    await waitFor(() => expect(screen.getByTestId('access-saving')).toHaveTextContent('true'))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(screen.getByTestId('access-project')).toHaveTextContent('HR'))
+
+    expect(screen.getByTestId('access-modal')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
+  })
+
+  it('does not launch a project A refresh after a pending upsert resolves in project B', async () => {
+    let resolveUpsert!: (value: unknown) => void
+    api.listProjectMembers.mockResolvedValueOnce([])
+    api.upsertProjectMember.mockReturnValueOnce(new Promise((resolve) => { resolveUpsert = resolve }))
+
+    await openAccessManagement()
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+
+    fireEvent.click(screen.getByTestId('access-save'))
+    await waitFor(() => expect(api.upsertProjectMember).toHaveBeenCalledWith('p1', 'member-1', 'viewer'))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(screen.getByTestId('access-project')).toHaveTextContent('HR'))
+
+    await act(async () => {
+      resolveUpsert({})
+      await Promise.resolve()
+    })
+
+    expect(api.listProjectMembers).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('access-members')).toHaveTextContent('0')
+    expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
+  })
 })
