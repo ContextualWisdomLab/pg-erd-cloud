@@ -37,3 +37,37 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        *(chr(code_point) for code_point in range(0x00, 0x20)),
+        chr(0x7F),
+        *(chr(code_point) for code_point in range(0x80, 0xA0)),
+        "\u2028",
+        "\u2029",
+    ],
+)
+@pytest.mark.parametrize("placement", ["prefix", "middle", "suffix"])
+def test_dsn_rejects_non_text_controls_at_every_position(
+    control: str, placement: str
+) -> None:
+    if placement == "prefix":
+        dsn = f"{control}postgresql://localhost/db"
+    elif placement == "middle":
+        dsn = f"postgresql://local{control}host/db"
+    else:
+        dsn = f"postgresql://localhost/db{control}"
+
+    with pytest.raises(ValidationError):
+        ConnectionCreateIn(conn_name="target", dsn=dsn)
+
+
+def test_dsn_preserves_printable_unicode_and_encoded_credentials() -> None:
+    body = ConnectionCreateIn(
+        conn_name="target",
+        dsn="postgresql://사용자:%E2%9C%93%20secret@db.example/データベース",
+    )
+
+    assert body.dsn == "postgresql://사용자:%E2%9C%93%20secret@db.example/データベース"
