@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2024-09-10 - Add tooltips to non-obvious UI elements like 'X' buttons
-**Learning:** Icon-only close buttons (like "X") or disabled states that lack immediate context for why they are disabled (like "접근 관리") benefit greatly from native `title` tooltips. This enhances accessibility and user comprehension.
-**Action:** When working on modals or disabling specific functionality, ensure non-descriptive icon buttons (e.g. `X`) have a `title` explaining their action (e.g. "공유 및 내보내기 닫기"), and disabled buttons have a `title` explaining why they are disabled or where to manage access.
