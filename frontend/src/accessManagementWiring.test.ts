@@ -8,7 +8,9 @@ describe('project access-management application wiring', () => {
   });
 
   it('uses the selected project as the member API authority', () => {
-    expect(appSource).toContain('listProjectMembers(selectedProjectId');
-    expect(appSource).toContain('upsertProjectMember(selectedProjectId');
+    expect(appSource).toContain('const projectId = selectedProjectId;');
+    expect(appSource).toContain('upsertProjectMember(projectId');
+    expect(appSource).toContain('listProjectMembers(projectId');
+    expect(appSource).toContain('accessRequestRef.current !== requestId');
   });
 });

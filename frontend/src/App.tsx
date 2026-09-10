@@ -261,6 +261,7 @@ export default function App() {
     setAccessMembers([]);
     setIsAccessLoading(false);
     setAccessLoadError(null);
+    setIsAccessSaving(false);
     setAccessSaveError(null);
   }, [selectedProjectId]);
 
@@ -686,16 +687,27 @@ export default function App() {
     ) => {
       if (!selectedProjectId || isAccessSaving) return;
 
+      const requestId = accessRequestRef.current + 1;
+      accessRequestRef.current = requestId;
+      const projectId = selectedProjectId;
       setIsAccessSaving(true);
       setAccessSaveError(null);
 
       try {
-        await upsertProjectMember(selectedProjectId, memberSubject, projectRole);
-        setAccessMembers(await listProjectMembers(selectedProjectId));
+        await upsertProjectMember(projectId, memberSubject, projectRole);
+        if (accessRequestRef.current !== requestId) return;
+
+        const members = await listProjectMembers(projectId);
+        if (accessRequestRef.current !== requestId) return;
+        setAccessMembers(members);
       } catch (error) {
-        setAccessSaveError(String(error));
+        if (accessRequestRef.current === requestId) {
+          setAccessSaveError(String(error));
+        }
       } finally {
-        setIsAccessSaving(false);
+        if (accessRequestRef.current === requestId) {
+          setIsAccessSaving(false);
+        }
       }
     },
     [isAccessSaving, selectedProjectId],
