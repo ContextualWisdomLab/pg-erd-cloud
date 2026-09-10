@@ -58,7 +58,13 @@ vi.mock('./components/modals', () => ({
       <span data-testid="access-project">{props.projectName}</span>
       <span data-testid="access-members">{props.members.length}</span>
       <span data-testid="access-loading">{String(props.isLoading)}</span>
-      {props.isOpen ? <button type="button" data-testid="access-close" onClick={props.onClose}>close</button> : null}
+      <span data-testid="access-saving">{String(props.isSaving)}</span>
+      {props.isOpen ? (
+        <>
+          <button type="button" data-testid="access-save" onClick={() => props.onSaveMember('member-1', 'viewer')}>save</button>
+          <button type="button" data-testid="access-close" onClick={props.onClose}>close</button>
+        </>
+      ) : null}
     </div>
   ),
   AddTableModal: () => null,
@@ -161,5 +167,33 @@ describe('project access-management lifecycle', () => {
     expect(screen.getByTestId('access-modal')).toHaveAttribute('data-open', 'false')
     expect(screen.getByTestId('access-members')).toHaveTextContent('0')
     expect(screen.getByTestId('access-loading')).toHaveTextContent('false')
+  })
+
+  it('does not commit a project A post-save refresh after selection moves to project B', async () => {
+    let resolveProjectARefresh!: (members: unknown[]) => void
+    api.listProjectMembers
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(new Promise((resolve) => { resolveProjectARefresh = resolve }))
+
+    await openAccessManagement()
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+
+    fireEvent.click(screen.getByTestId('access-save'))
+    await waitFor(() => expect(api.upsertProjectMember).toHaveBeenCalledWith('p1', 'member-1', 'viewer'))
+    await waitFor(() => expect(api.listProjectMembers).toHaveBeenCalledTimes(2))
+
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p2' } })
+    await waitFor(() => expect(screen.getByTestId('access-project')).toHaveTextContent('HR'))
+
+    await act(async () => {
+      resolveProjectARefresh([
+        { user_account_uuid: 'a2', member_subject: 'late-project-a-member', project_role: 'viewer' },
+      ])
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('access-modal')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('access-members')).toHaveTextContent('0')
+    expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
   })
 })
