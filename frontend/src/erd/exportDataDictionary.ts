@@ -30,14 +30,7 @@ function markdownText(value: unknown): string {
     .replace(MARKDOWN_ESCAPE_RE, (char) => `\\${char}`);
 }
 
-function sourceColumnsForEdge(edge: Edge): Set<string> {
-  const columns = new Set<string>();
-  const data = edge.data as ForeignKeyEdgeData | undefined;
-  for (const column of data?.sourceColumns || []) {
-    if (column) columns.add(column);
-  }
-  return columns;
-}
+
 
 type ForeignKeyNodeInfo = {
   columns: Set<string>;
@@ -54,8 +47,14 @@ function foreignKeyColumnsByNode(edges: Edge[]): Map<string, ForeignKeyNodeInfo>
       map.set(edge.source, info);
     }
 
-    for (const column of sourceColumnsForEdge(edge)) {
-      info.columns.add(column);
+    // ⚡ Bolt: Inline source column extraction to prevent allocating a Set via sourceColumnsForEdge
+    // inside the tight loop, avoiding O(N * E) intermediate allocations.
+    const data = edge.data as ForeignKeyEdgeData | undefined;
+    if (data?.sourceColumns) {
+      for (let i = 0, len = data.sourceColumns.length; i < len; i++) {
+        const column = data.sourceColumns[i];
+        if (column) info.columns.add(column);
+      }
     }
 
     if (edge.sourceHandle) {
