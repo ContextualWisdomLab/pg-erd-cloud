@@ -158,6 +158,7 @@ export function ExportModal({
             type="button"
             className="exportModal__iconButton"
             aria-label="공유 및 내보내기 닫기"
+            title="공유 및 내보내기 닫기"
             onClick={onCloseExport}
           >
             X
@@ -203,6 +204,7 @@ export function ExportModal({
               <button
                 type="button"
                 disabled
+                title="접근 관리는 프로젝트 권한 설정에서 처리합니다."
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >

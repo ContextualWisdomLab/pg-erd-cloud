@@ -178,6 +178,6 @@ describe('ExportModal', () => {
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
     expect(accessManagementButton).toBeDisabled();
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
-    expect(accessManagementButton).not.toHaveAttribute('title');
+    expect(accessManagementButton).toHaveAttribute('title', '접근 관리는 프로젝트 권한 설정에서 처리합니다.');
   });
 });
