@@ -237,4 +237,29 @@ describe('project access-management lifecycle', () => {
     expect(screen.getByTestId('access-members')).toHaveTextContent('0')
     expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
   })
+
+  it('clears saving state when the access modal closes during a pending save', async () => {
+    let resolveUpsert!: (value: unknown) => void
+    api.listProjectMembers.mockResolvedValueOnce([])
+    api.upsertProjectMember.mockReturnValueOnce(new Promise((resolve) => { resolveUpsert = resolve }))
+
+    await openAccessManagement()
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+
+    fireEvent.click(screen.getByTestId('access-save'))
+    await waitFor(() => expect(screen.getByTestId('access-saving')).toHaveTextContent('true'))
+
+    fireEvent.click(screen.getByTestId('access-close'))
+
+    expect(screen.getByTestId('access-modal')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
+
+    await act(async () => {
+      resolveUpsert({})
+      await Promise.resolve()
+    })
+
+    expect(api.listProjectMembers).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
+  })
 })
