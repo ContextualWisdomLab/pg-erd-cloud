@@ -159,6 +159,7 @@ export default function App() {
   > | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
+  const accessRequestRef = useRef(0);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -255,6 +256,12 @@ export default function App() {
     setShareLinkUrl("");
     setIsShareLinkCopied(false);
     setShareLinkError(null);
+    accessRequestRef.current += 1;
+    setIsAccessModalOpen(false);
+    setAccessMembers([]);
+    setIsAccessLoading(false);
+    setAccessLoadError(null);
+    setAccessSaveError(null);
   }, [selectedProjectId]);
 
   const onConnect = useCallback(
@@ -635,14 +642,19 @@ export default function App() {
   const onOpenAccessManagement = useCallback(async () => {
     if (!selectedProjectId || isAccessLoading) return;
 
+    const requestId = accessRequestRef.current + 1;
+    accessRequestRef.current = requestId;
     setIsAccessModalOpen(true);
     setIsAccessLoading(true);
     setAccessLoadError(null);
     setAccessSaveError(null);
 
     try {
-      setAccessMembers(await listProjectMembers(selectedProjectId));
+      const members = await listProjectMembers(selectedProjectId);
+      if (accessRequestRef.current !== requestId) return;
+      setAccessMembers(members);
     } catch (error) {
+      if (accessRequestRef.current !== requestId) return;
       if (
         error instanceof ProjectMemberRequestError &&
         (error.status === 401 || error.status === 403)
@@ -652,12 +664,18 @@ export default function App() {
         setAccessLoadError({ kind: "error", message: String(error) });
       }
     } finally {
-      setIsAccessLoading(false);
+      if (accessRequestRef.current === requestId) {
+        setIsAccessLoading(false);
+      }
     }
   }, [isAccessLoading, selectedProjectId]);
 
   const onCloseAccessManagement = useCallback(() => {
+    accessRequestRef.current += 1;
     setIsAccessModalOpen(false);
+    setAccessMembers([]);
+    setIsAccessLoading(false);
+    setAccessLoadError(null);
     setAccessSaveError(null);
   }, []);
 
