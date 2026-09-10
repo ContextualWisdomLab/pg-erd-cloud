@@ -250,7 +250,7 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         header = cast(dict[str, Any], jwt.get_unverified_header(token))
     except Exception:  # noqa: BLE001
         logger.warning("Authentication failed: invalid token header")
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail="invalid token") from None
 
     header_alg = _validate_jwt_header(header)
     if header_alg not in OIDC_ALLOWED_ALGORITHMS:

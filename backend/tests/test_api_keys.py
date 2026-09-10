@@ -69,12 +69,14 @@ async def test_auth_accepts_valid_key_and_rejects_revoked_or_unknown():
     with pytest.raises(HTTPException) as e:
         await _user_from_api_key(session, token)
     assert e.value.status_code == 401
+    assert e.value.detail == "invalid token"
 
     # unknown
     session.execute = AsyncMock(return_value=SimpleNamespace(first=lambda: None))
     with pytest.raises(HTTPException) as e2:
         await _user_from_api_key(session, token)
     assert e2.value.status_code == 401
+    assert e2.value.detail == "invalid token"
 
 
 @pytest.mark.asyncio
