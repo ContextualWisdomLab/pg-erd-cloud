@@ -195,9 +195,13 @@ export default function App() {
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
+
+  // ⚡ Bolt: Cache node matches during 60fps drag operations
+  const isMatchCache = useMemo(() => new WeakMap<TableNodeData, boolean>(), [normalizedNodeSearch]);
+
   const searchMatchedNodeIds = useMemo(() => {
-    return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
-  }, [nodes, normalizedNodeSearch]);
+    return findSearchMatchedNodeIds(nodes, normalizedNodeSearch, isMatchCache);
+  }, [nodes, normalizedNodeSearch, isMatchCache]);
 
   // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
   const searchCache = useMemo(() => new WeakMap<TableNodeData, TableNodeData>(), [normalizedNodeSearch]);

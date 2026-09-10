@@ -77,3 +77,11 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2025-02-28 - [React Flow Node Rendering Optimization during Search]
+**Learning:** I discovered that in `App.tsx`, standard React Flow nodes undergo a `map` operation to decorate them with highlighting state (e.g., `isDimmed`, `isHighlighted`). This map operation triggers a new node object creation. Combined with the search logic in `search.ts`, which parsed search terms inside a loop, it created an O(N) penalty per keystroke and caused expensive recalcs. Furthermore, updating node objects un-memoizes React Flow's internal cache if node data references are destroyed.
+**Action:** I moved the search string parsing outside the loop in `findSearchMatchedNodeIds` to make it O(1) string splitting and caching match states via `WeakMap` linked to the unchanged `node.data` identity, preserving component rendering performance.
+
+## 2025-02-28 - [검색 중 React Flow 노드 렌더링 최적화]
+**Learning:** `App.tsx`에서 표준 React Flow 노드는 강조 상태를 데코레이트하기 위해 `map` 연산을 거치며 새로운 노드 객체를 생성합니다. 이로 인해 `search.ts` 내부 루프에서 검색어를 파싱하는 로직과 결합되어 키 입력마다 O(N)의 성능 패널티와 값비싼 재계산을 유발했습니다.
+**Action:** `findSearchMatchedNodeIds` 내부의 검색어 파싱 로직을 루프 밖으로 이동하여 O(1) 문자열 분할로 최적화하고, 변경되지 않는 `node.data` 식별자에 연결된 `WeakMap`을 통해 일치 상태를 캐싱함으로써 컴포넌트 렌더링 성능을 보존했습니다.
