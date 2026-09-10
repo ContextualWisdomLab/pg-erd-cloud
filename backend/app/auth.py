@@ -480,7 +480,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)
