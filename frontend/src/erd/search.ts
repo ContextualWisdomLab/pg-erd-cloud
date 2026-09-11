@@ -34,15 +34,17 @@ export function tableNodeMatchesSearch(
 
 export function findSearchMatchedNodeIds(
   nodes: Array<Node<TableNodeData>>,
-  search: string,
+  search: string | string[],
   cache?: WeakMap<TableNodeData, boolean>,
 ): Set<string> {
   const matches = new Set<string>();
   // ⚡ Bolt: Parse search terms ONCE outside the loop (O(1)) instead of inside tableNodeMatchesSearch for every node (O(N)),
   // eliminating redundant string allocations, regex splits, and Sets per node.
-  const terms = Array.from(
-    new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
-  );
+  const terms = Array.isArray(search)
+    ? search
+    : Array.from(
+        new Set(search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)),
+      );
   if (terms.length === 0) return matches;
 
   for (const node of nodes) {
