@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2024-09-12 - [아이콘 전용 닫기 버튼 접근성 개선]
+**Learning:** 아이콘 전용 닫기 버튼에 "X"나 "닫기" 텍스트를 사용할 경우 시각적으로 디자인이 투박해지거나 의도와 다르게 보일 수 있으나, 단순히 시각적 개선을 위해 특수 기호("✕")로 변경하더라도 ARIA 레이블(`aria-label`)이 적용되어 있다면 스크린 리더 등 보조 기기를 사용하는 사용자에게는 동일한 접근성을 제공할 수 있음을 발견함.
+**Action:** 앞으로 아이콘 전용 닫기 버튼 구현 시 `aria-label`을 통해 접근 가능한 이름을 반드시 제공하되, 시각적인 요소는 디자인 시스템의 아이콘이나 적절한 특수 기호를 사용하여 시각적 만족도와 접근성을 모두 충족하도록 해야 함.

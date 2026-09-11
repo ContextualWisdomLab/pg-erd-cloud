@@ -68,7 +68,7 @@ export function CardinalityModal({
             onClick={onCloseCardinalityWizard}
             aria-label="카디널리티 계산 닫기"
           >
-            닫기
+            ✕
           </button>
         </div>
 

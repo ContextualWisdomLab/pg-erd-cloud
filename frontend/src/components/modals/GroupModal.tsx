@@ -52,7 +52,7 @@ export function GroupModal({
             onClick={onCloseGroupManager}
             aria-label="업무 그룹 닫기"
           >
-            닫기
+            ✕
           </button>
         </div>
 
