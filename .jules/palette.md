@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-07-25 - [Add Confirmation and Accessibility to Table Deletion]
+**Learning:** In the ERD canvas, editing a table node could accidentally trigger a destructive action because the "Delete Table" button was missing user confirmation. This increases the chance of accidental data loss.
+**Action:** Always wrap destructive handlers with `window.confirm` dialogues and ensure the UI requires explicit user intent before irreversible actions occur.
