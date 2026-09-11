@@ -27,20 +27,26 @@ flowchart LR
     audit -. sink-specific encoding .-> operator[Operator]
 ```
 
-The boundary follows PostgreSQL 18: quoted identifiers can contain any character except code zero, while PostgreSQL character types cannot store NUL. Product labels therefore have a deliberately narrower admission contract than externally owned PostgreSQL identity.
+The admission boundary follows PostgreSQL 18 documentation: quoted identifiers can contain any character except code zero, while PostgreSQL character types cannot store NUL. Product labels therefore have a deliberately narrower admission contract than externally owned PostgreSQL identity. The current runtime acceptance lane uses the repository's supported PostgreSQL 16 image from `compose.yaml`; documentation version and tested runtime version are not conflated.
 
 ## Current repair lineage
 
-PR #1126 (`fix(schema): preserve PostgreSQL source identifier truth`) owns the current repair. At the time this baseline is created, the branch is Draft and not release-authorized.
+PR #1126 (`fix(schema): preserve PostgreSQL source identifier truth`) owns the current repair and remains Draft / not release-authorized.
 
-The source contract is:
+The source and acceptance contracts are:
 
 - `TableAnnotationUpsertIn.schema_name` and `relation_name` reject NUL but preserve other source characters accepted by the PostgreSQL identity contract.
 - `DiagramViewCreateIn.name` and `ApiKeyCreateIn.key_name` retain the product-label C0/DEL restriction.
 - `test_schema_identifier_boundaries.py` fixes the admission boundary in regression tests.
 - `test_api_annotations.py::test_annotation_source_identifiers_survive_write_and_read_mapping` verifies that accepted source identity reaches the annotation persistence adapter unchanged and is returned unchanged by the application read mapping.
+- `test_postgres_identifier_roundtrip.py` drives the production annotation write/read functions through a real `AsyncSession`, closes the session between write and read, and verifies byte-for-byte source identity after PostgreSQL persistence.
+- The CI backend lane starts the same pinned PostgreSQL 16 image used by `compose.yaml`, applies Alembic migrations, and activates the PostgreSQL integration test as normal PR evidence.
 
-The application mapping test is **not** evidence of a real PostgreSQL storage round trip. That distinction is intentional.
+### Integration RED → repair candidate
+
+Commit `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` activated the new PostgreSQL round-trip test before a database fixture existed. Hosted CI run `34582422611`, backend job `103208841676`, reached the test step and failed. That is a real acceptance-infrastructure RED: the repository previously had no PostgreSQL-backed PR lane capable of proving the documented storage contract.
+
+Commit `3970e64e36632b9e81818b1032434d4fc2a1a9cc` adds the causal fixture rather than skipping the test: a health-checked pinned PostgreSQL service plus `alembic upgrade head` before pytest. It is a GREEN candidate only until a fresh exact-head run proves the test and the rest of the repository gates terminally pass.
 
 ## Gap ledger
 
@@ -50,17 +56,19 @@ The application mapping test is **not** evidence of a real PostgreSQL storage ro
 
 **Decision.** Separate admission policies by ownership. NUL remains invalid for PostgreSQL-backed character identity; product labels keep the narrower control-character policy. Generic log/terminal concerns are handled at the actual interpretation sink.
 
-**Current acceptance evidence.** Schema-level regression and application write/read mapping regression exist on PR #1126. Repository CI for the previous exact generation was green, but every source/document change requires new exact-head evidence.
+**Current acceptance evidence.** Schema-level regression, application write/read mapping regression, and a PostgreSQL-backed round-trip test are present on PR #1126. The database test is not accepted until the unchanged current head has terminal CI evidence.
 
-**Close only when.** The unchanged PR head has terminal repository CI, SAST and security evidence; delegated CodeQL is settled for that exact identity; current-head review has no valid unresolved finding; and a real PostgreSQL integration test proves a representative accepted non-NUL identifier survives write/read without normalization.
+**Close only when.** The unchanged PR head has terminal repository CI, SAST and security evidence; delegated CodeQL is settled for that exact identity; current-head review has no valid unresolved finding; and the PostgreSQL integration lane proves the representative accepted non-NUL identifier survives write/read without normalization.
 
 ### G-002 — Real PostgreSQL round-trip evidence
 
 **Problem.** Unit/application mapping tests can prove that pg-erd-cloud itself does not rewrite a value, but they cannot prove driver/database/encoding behavior.
 
-**Required RED.** A PostgreSQL-backed integration test must exercise an identifier containing a representative non-NUL character outside the product-label policy and fail if any storage/readback layer rewrites or rejects it contrary to the documented PostgreSQL contract.
+**Observed RED.** `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` made the integration contract executable in ordinary CI and exposed the absence of any PostgreSQL fixture/migration stage: backend CI failed when pytest reached the activated database test.
 
-**Required GREEN.** Create/read through the production persistence path on the supported PostgreSQL version returns the exact same identifier; cleanup leaves no residual test object; the test is included in normal release evidence rather than a manual-only probe.
+**Repair candidate.** `3970e64e36632b9e81818b1032434d4fc2a1a9cc` provisions the repository's pinned PostgreSQL 16 image, runs Alembic migrations, and executes the test through production annotation functions. The test closes and reopens the application session before readback and removes its user/project/annotation rows in `finally` cleanup.
+
+**Required GREEN.** A fresh unchanged-head PR generation must show the PostgreSQL-backed backend job terminal GREEN; source identity returned after persistence must exactly equal the submitted value; cleanup must complete; and the test must remain part of normal PR/release evidence rather than a manual-only probe.
 
 ### G-003 — Central delegated CodeQL settlement
 
@@ -72,7 +80,7 @@ The application mapping test is **not** evidence of a real PostgreSQL storage ro
 
 ## Product/release decisions
 
-- **Draft remains correct** while G-001 exact-head evidence and G-002 database evidence are incomplete.
+- **Draft remains correct** while current-head G-001/G-002 evidence or G-003 delegated settlement is incomplete.
 - No version, tag, package, immutable release, SBOM/provenance claim, deployment, or rollback claim is created by this repair alone.
 - If a downstream UI, log or audit sink proves unsafe for a legal PostgreSQL identifier, fix the sink with escaping/encoding and add a hostile regression there. Do not expand source admission restrictions as a shortcut.
 - A later material UI that displays these identities must additionally verify normal/loading/empty/error/permission states, keyboard and accessible naming behavior, responsive widths, and KO/EN/JA/ZH/VI/ES/DE/FR text behavior before its Delivery Gate can pass.
@@ -85,6 +93,10 @@ The application mapping test is **not** evidence of a real PostgreSQL storage ro
 | `backend/app/api/annotations.py` | Exact source identity used for annotation lookup/create and output mapping. |
 | `backend/tests/test_schema_identifier_boundaries.py` | Schema admission regression. |
 | `backend/tests/test_api_annotations.py` | Application write/read mapping regression. |
+| `backend/tests/test_postgres_identifier_roundtrip.py` | Real PostgreSQL persistence/readback acceptance through the production annotation path. |
+| `.github/workflows/ci.yml` | Pinned PostgreSQL CI fixture, Alembic migration stage, and normal activation of the database acceptance test. |
+| `compose.yaml` | Current supported/pinned PostgreSQL runtime image used by the product stack. |
+| CI run `34582422611`, job `103208841676` | Hosted RED showing the new acceptance test could not be satisfied without an actual database fixture. |
 | PR #1126 | Review, exact-head checks, repair lineage and acceptance state. |
 | PostgreSQL 18 §4.1 Lexical Structure | Primary source for quoted-identifier character contract. |
 | PostgreSQL 18 §8.3 Character Types | Primary source for NUL prohibition in PostgreSQL character data. |
