@@ -41,6 +41,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
+          PG_ERD_RUN_POSTGRES_INTEGRATION: "1"
         run: pytest -q
 
   frontend:
