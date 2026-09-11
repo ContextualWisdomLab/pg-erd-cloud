@@ -35,7 +35,6 @@ export function tableNodeMatchesSearch(
 export function findSearchMatchedNodeIds(
   nodes: Array<Node<TableNodeData>>,
   search: string,
-  cache?: WeakMap<TableNodeData, boolean>,
 ): Set<string> {
   const matches = new Set<string>();
   // ⚡ Bolt: Parse search terms ONCE outside the loop (O(1)) instead of inside tableNodeMatchesSearch for every node (O(N)),
@@ -46,19 +45,8 @@ export function findSearchMatchedNodeIds(
   if (terms.length === 0) return matches;
 
   for (const node of nodes) {
-    if (cache) {
-      let isMatch = cache.get(node.data);
-      if (isMatch === undefined) {
-        isMatch = tableNodeMatchesSearch(node, terms);
-        cache.set(node.data, isMatch);
-      }
-      if (isMatch) {
-        matches.add(node.id);
-      }
-    } else {
-      if (tableNodeMatchesSearch(node, terms)) {
-        matches.add(node.id);
-      }
+    if (tableNodeMatchesSearch(node, terms)) {
+      matches.add(node.id);
     }
   }
   return matches;
