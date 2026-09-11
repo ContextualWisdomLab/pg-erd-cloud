@@ -75,10 +75,10 @@ function fkColumnsForEdge(
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
-    .filter((column) => !column.is_pk && column.column_name != null)
+    .filter((column) => !column.is_pk)
     .map((column) => column.column_name);
   const fallbackTarget = (targetNode.data.columns || [])
-    .filter((column) => column.is_pk && column.column_name != null)
+    .filter((column) => column.is_pk)
     .map((column) => column.column_name);
   if (fallbackSource.length > 0 && fallbackSource.length === fallbackTarget.length) {
     return { sourceColumns: fallbackSource, targetColumns: fallbackTarget };
