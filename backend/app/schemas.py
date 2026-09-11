@@ -221,12 +221,12 @@ class TableAnnotationUpsertIn(BaseModel):
     schema_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00]+$",
     )
     relation_name: str = Field(
         min_length=1,
         max_length=255,
-        pattern=r"^[^\x00-\x1F\x7F]+$",
+        pattern=r"^[^\x00]+$",
     )
     body: str = Field(min_length=1, max_length=10_000)
 
