@@ -63,6 +63,54 @@ async def test_upsert_creates_new_annotation_when_absent():
 
 
 @pytest.mark.asyncio
+async def test_annotation_source_identifiers_survive_write_and_read_mapping():
+    write_session = AsyncMock()
+    write_session.add = Mock()
+    write_session.scalar = AsyncMock(return_value=None)
+    project_space_uuid = uuid.uuid4()
+    body = TableAnnotationUpsertIn(
+        schema_name="audit\x01trail",
+        relation_name="line\x7fitem",
+        body="source identity note",
+    )
+
+    with patch(
+        "app.api.annotations.require_project_member", new_callable=AsyncMock
+    ):
+        written = await upsert_annotation(
+            project_space_uuid=project_space_uuid,
+            body=body,
+            user=_user(),
+            session=write_session,
+        )
+
+    persisted = write_session.add.call_args.args[0]
+    assert persisted.schema_name == body.schema_name
+    assert persisted.relation_name == body.relation_name
+    assert written.schema_name == body.schema_name
+    assert written.relation_name == body.relation_name
+
+    read_session = AsyncMock()
+    read_session.execute = AsyncMock(
+        return_value=SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: [persisted])
+        )
+    )
+    with patch(
+        "app.api.annotations.require_project_member", new_callable=AsyncMock
+    ):
+        listed = await list_annotations(
+            project_space_uuid=project_space_uuid,
+            user=_user(),
+            session=read_session,
+        )
+
+    assert listed[0].schema_name == body.schema_name
+    assert listed[0].relation_name == body.relation_name
+    write_session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_upsert_updates_existing_annotation_without_insert():
     session = AsyncMock()
     session.add = Mock()
