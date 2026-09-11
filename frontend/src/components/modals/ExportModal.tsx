@@ -21,6 +21,7 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadTypeOrm: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -54,6 +55,7 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadTypeOrm,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -118,6 +120,14 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
       ariaLabel: 'Prisma Schema 내보내기',
+    },
+    {
+      label: 'TypeORM Entities',
+      description: hasDiagramExport ? 'TypeScript 클래스' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadTypeOrm,
+      ariaLabel: 'TypeORM Entities 내보내기',
     },
     {
       label: 'Data Dictionary CSV',

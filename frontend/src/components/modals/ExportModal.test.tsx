@@ -24,6 +24,7 @@ const baseProps = {
   onExportDictionaryMarkdown: vi.fn(),
   onDownloadDbml: vi.fn(),
   onDownloadPrisma: vi.fn(),
+  onDownloadTypeOrm: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
 };
@@ -160,13 +161,14 @@ describe('ExportModal', () => {
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
+    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(9);
     expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Mermaid 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'DBML 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Prisma Schema 내보내기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'TypeORM Entities 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
