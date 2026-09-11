@@ -42,13 +42,13 @@ The source and acceptance contracts are:
 - `test_postgres_identifier_roundtrip.py` drives the production annotation write/read functions through a real `AsyncSession`, closes the session between write and read, and verifies byte-for-byte source identity after PostgreSQL persistence.
 - The CI backend lane starts the same pinned PostgreSQL 16 image used by `compose.yaml`, applies Alembic migrations, and activates the PostgreSQL integration test as normal PR evidence.
 
-### Integration RED → repair candidate
+### Integration RED → GREEN lineage
 
-Commit `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` activated the new PostgreSQL round-trip test before a database fixture existed. Hosted CI run `34582422611`, backend job `103208841676`, reached the test step and failed. That is a real acceptance-infrastructure RED: the repository previously had no PostgreSQL-backed PR lane capable of proving the documented storage contract.
+Commit `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` activated the new PostgreSQL round-trip test before a database fixture existed. Hosted CI run `34582422611`, backend job `103208841676`, reached the test step and failed. That exposed the absence of any PostgreSQL-backed PR lane capable of proving the documented storage contract.
 
-Commit `3970e64e36632b9e81818b1032434d4fc2a1a9cc` added the causal database fixture rather than skipping the test: a health-checked pinned PostgreSQL service plus `alembic upgrade head` before pytest. The next hosted generation exposed a second causal defect instead of reaching pytest. On exact head `def3d55c803ffbed84a232cc0301829e61c67eea`, CI run `34582691173`, backend job `103209685132`, PostgreSQL was healthy but Alembic failed immediately with `ModuleNotFoundError: No module named 'app'` while importing `backend/alembic/env.py`. The migration command is a console-script entry point, so its import path did not inherit the backend working directory as the application package root.
+Commit `3970e64e36632b9e81818b1032434d4fc2a1a9cc` added the causal database fixture rather than skipping the test: a health-checked pinned PostgreSQL service plus `alembic upgrade head` before pytest. The next hosted generation exposed a second causal defect. On exact head `def3d55c803ffbed84a232cc0301829e61c67eea`, CI run `34582691173`, backend job `103209685132`, PostgreSQL was healthy but Alembic failed with `ModuleNotFoundError: No module named 'app'` while importing `backend/alembic/env.py`. The migration command is a console-script entry point, so its import path did not expose the backend package root.
 
-Commit `b4d6e18d11bd830fdb9e25e326e7e87476537c03` is the minimal causal repair: `PYTHONPATH: .` is set only on the backend Alembic step, matching the existing mypy/pytest package boundary. No migration, source model, database fixture, or gate is weakened. This remains a GREEN candidate until a fresh unchanged-head generation proves migrations and the PostgreSQL round-trip test terminally pass.
+Commit `b4d6e18d11bd830fdb9e25e326e7e87476537c03` set `PYTHONPATH: .` only on the Alembic step, matching the existing mypy/pytest package boundary. On exact head `472747a45cc052515a23a9f1131d302743db1994`, CI run `34583199485`, backend job `103211300848`, the pinned PostgreSQL service initialized successfully, Alembic migration passed, mypy passed, and the full pytest step including the PostgreSQL round-trip acceptance passed. Frontend job `103211301138` also passed. This closes the repository-owned G-002 runtime-evidence gap for that generation without claiming release readiness; every later change still needs its own exact-head checks.
 
 ## Gap ledger
 
@@ -58,19 +58,19 @@ Commit `b4d6e18d11bd830fdb9e25e326e7e87476537c03` is the minimal causal repair: 
 
 **Decision.** Separate admission policies by ownership. NUL remains invalid for PostgreSQL-backed character identity; product labels keep the narrower control-character policy. Generic log/terminal concerns are handled at the actual interpretation sink.
 
-**Current acceptance evidence.** Schema-level regression, application write/read mapping regression, and a PostgreSQL-backed round-trip test are present on PR #1126. The database test is not accepted until the unchanged current head has terminal CI evidence.
+**Current acceptance evidence.** Schema-level regression, application write/read mapping regression, and the real PostgreSQL persistence/readback acceptance all passed in CI run `34583199485` on exact head `472747a45cc052515a23a9f1131d302743db1994`.
 
-**Close only when.** The unchanged PR head has terminal repository CI, SAST and security evidence; delegated CodeQL is settled for that exact identity; current-head review has no valid unresolved finding; and the PostgreSQL integration lane proves the representative accepted non-NUL identifier survives write/read without normalization.
+**Close only when.** The current unchanged PR head has terminal repository CI, SAST and security evidence; delegated CodeQL is settled for that exact identity; and current-head review has no valid unresolved finding. The PostgreSQL round-trip contract must remain in normal PR/release evidence.
 
 ### G-002 — Real PostgreSQL round-trip evidence
 
 **Problem.** Unit/application mapping tests can prove that pg-erd-cloud itself does not rewrite a value, but they cannot prove driver/database/encoding behavior.
 
-**Observed RED.** `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` made the integration contract executable in ordinary CI and exposed the absence of any PostgreSQL fixture/migration stage: backend CI failed when pytest reached the activated database test. After adding the fixture, `def3d55c803ffbed84a232cc0301829e61c67eea` exposed the next concrete infrastructure defect: the Alembic console script could not import `app` because the backend package root was absent from `PYTHONPATH`.
+**Observed RED.** `6d9804ffa172f9ba7ce0eeb680644f7bcf80ccc4` exposed the missing PostgreSQL fixture. After adding the fixture, `def3d55c803ffbed84a232cc0301829e61c67eea` exposed the Alembic console-script package-path defect.
 
-**Repair candidate.** The lane now provisions the repository's pinned PostgreSQL 16 image, runs Alembic migrations with the backend package root explicitly available, and executes the test through production annotation functions. The test closes and reopens the application session before readback and removes its user/project/annotation rows in `finally` cleanup.
+**GREEN.** On `472747a45cc052515a23a9f1131d302743db1994`, the repository's pinned PostgreSQL 16 service became healthy, Alembic migrations completed, and pytest completed successfully with `PG_ERD_RUN_POSTGRES_INTEGRATION=1`. The acceptance test writes through `upsert_annotation()`, opens a new session, reads through `list_annotations()`, compares the exact source identity, and cleans up its rows.
 
-**Required GREEN.** A fresh unchanged-head PR generation must show the PostgreSQL-backed backend job terminal GREEN; source identity returned after persistence must exactly equal the submitted value; cleanup must complete; and the test must remain part of normal PR/release evidence rather than a manual-only probe.
+**Regression condition.** Any future change to the annotation persistence path, PostgreSQL runtime image, migrations, schema admission, or CI fixture must retain the same database-backed evidence on the exact candidate head.
 
 ### G-003 — Central delegated CodeQL settlement
 
@@ -82,7 +82,7 @@ Commit `b4d6e18d11bd830fdb9e25e326e7e87476537c03` is the minimal causal repair: 
 
 ## Product/release decisions
 
-- **Draft remains correct** while current-head G-001/G-002 evidence or G-003 delegated settlement is incomplete.
+- **Draft remains correct** until current-head repository checks, delegated CodeQL settlement, and independent review are complete.
 - No version, tag, package, immutable release, SBOM/provenance claim, deployment, or rollback claim is created by this repair alone.
 - If a downstream UI, log or audit sink proves unsafe for a legal PostgreSQL identifier, fix the sink with escaping/encoding and add a hostile regression there. Do not expand source admission restrictions as a shortcut.
 - A later material UI that displays these identities must additionally verify normal/loading/empty/error/permission states, keyboard and accessible naming behavior, responsive widths, and KO/EN/JA/ZH/VI/ES/DE/FR text behavior before its Delivery Gate can pass.
@@ -98,8 +98,9 @@ Commit `b4d6e18d11bd830fdb9e25e326e7e87476537c03` is the minimal causal repair: 
 | `backend/tests/test_postgres_identifier_roundtrip.py` | Real PostgreSQL persistence/readback acceptance through the production annotation path. |
 | `.github/workflows/ci.yml` | Pinned PostgreSQL CI fixture, Alembic migration stage with explicit backend import path, and normal activation of the database acceptance test. |
 | `compose.yaml` | Current supported/pinned PostgreSQL runtime image used by the product stack. |
-| CI run `34582422611`, job `103208841676` | Hosted RED showing the new acceptance test could not be satisfied without an actual database fixture. |
-| CI run `34582691173`, job `103209685132` | Hosted RED isolating Alembic package-import failure after PostgreSQL became healthy. |
+| CI run `34582422611`, job `103208841676` | RED: missing database fixture. |
+| CI run `34582691173`, job `103209685132` | RED: Alembic package-import failure after PostgreSQL became healthy. |
+| CI run `34583199485`, jobs `103211300848` / `103211301138` | GREEN: backend PostgreSQL/migration/typecheck/pytest and frontend typecheck/test/build all passed. |
 | PR #1126 | Review, exact-head checks, repair lineage and acceptance state. |
 | PostgreSQL 18 §4.1 Lexical Structure | Primary source for quoted-identifier character contract. |
 | PostgreSQL 18 §8.3 Character Types | Primary source for NUL prohibition in PostgreSQL character data. |
