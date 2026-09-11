@@ -59,7 +59,7 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
-  handleToColumn: Map<string, string>,
+  handleToColumnByNode: Map<string, Map<string, string>>,
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -68,8 +68,8 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = edge.sourceHandle ? handleToColumn.get(edge.sourceHandle) : undefined;
-  const targetHandleColumn = edge.targetHandle ? handleToColumn.get(edge.targetHandle) : undefined;
+  const sourceHandleColumn = edge.sourceHandle ? handleToColumnByNode.get(edge.source)?.get(edge.sourceHandle) : undefined;
+  const targetHandleColumn = edge.targetHandle ? handleToColumnByNode.get(edge.target)?.get(edge.targetHandle) : undefined;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -93,13 +93,15 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
-  const handleToColumn = new Map<string, string>();
+  const handleToColumnByNode = new Map<string, Map<string, string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    const nodeHandles = new Map<string, string>();
+    handleToColumnByNode.set(n.id, nodeHandles);
     for (const c of n.data.columns || []) {
       if (c.column_name) {
-        handleToColumn.set(sourceColumnHandleId(c.column_name), c.column_name);
-        handleToColumn.set(targetColumnHandleId(c.column_name), c.column_name);
+        nodeHandles.set(sourceColumnHandleId(c.column_name), c.column_name);
+        nodeHandles.set(targetColumnHandleId(c.column_name), c.column_name);
       }
     }
   }
@@ -137,7 +139,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, handleToColumn);
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, handleToColumnByNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
