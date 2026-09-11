@@ -93,23 +93,4 @@ describe("ERD node search", () => {
     // This second call should hit the cache for both nodes
     expect([...findSearchMatchedNodeIds([modifiedUsers, modifiedAudit], "audit jsonb", cache)]).toEqual(["users"]);
   });
-
-  it("utilizes WeakMap cache to prevent redundant search execution", () => {
-    const cache = new WeakMap<TableNodeData, boolean>();
-
-    // First run populates the cache
-    expect([...findSearchMatchedNodeIds([users, audit], "PUBLIC uuid", cache)]).toEqual(["users"]);
-    expect(cache.has(users.data)).toBe(true);
-    expect(cache.has(audit.data)).toBe(true);
-    expect(cache.get(users.data)).toBe(true);
-    expect(cache.get(audit.data)).toBe(false);
-
-    // Modify the node properties outside the cache.
-    // If the cache is used, it should still return the cached result.
-    const modifiedUsers = { ...users, data: users.data };
-    const modifiedAudit = { ...audit, data: audit.data };
-
-    // This second call should hit the cache for both nodes
-    expect([...findSearchMatchedNodeIds([modifiedUsers, modifiedAudit], "audit jsonb", cache)]).toEqual(["users"]);
-  });
 });
