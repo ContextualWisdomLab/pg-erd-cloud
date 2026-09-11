@@ -11,6 +11,23 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user -d test_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://test_user:test_password@127.0.0.1:5432/test_db
+      APP_SECRET: test-secret
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -30,6 +47,10 @@ jobs:
         run: |
           # Use a hash-locked lockfile to satisfy Scorecard Pinned-Dependencies.
           python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Apply PostgreSQL migrations
+        working-directory: backend
+        run: alembic upgrade head
 
       - name: Typecheck (mypy)
         working-directory: backend
