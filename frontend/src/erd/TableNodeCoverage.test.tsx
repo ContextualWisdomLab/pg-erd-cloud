@@ -42,8 +42,10 @@ afterEach(cleanup)
 describe('TableNode rendering and memo coverage', () => {
   it('renders truncation, empty metadata, falsy examples, badges, and overflow summaries', () => {
     const { rerender } = render(element(baseData))
-    expect(screen.getByLabelText('생략된 컬럼이 더 있습니다')).toHaveTextContent('1 more')
-    expect(screen.getByLabelText('생략된 인덱스가 더 있습니다')).toHaveTextContent('1 more indexes')
+    expect(screen.getByRole('region')).toHaveAttribute('aria-label', expect.stringContaining('생략된 컬럼 1개'))
+    expect(screen.getByRole('region')).toHaveAttribute('aria-label', expect.stringContaining('생략된 인덱스 1개'))
+    expect(screen.getByText('… 1 more')).toBeInTheDocument()
+    expect(screen.getByText('… 1 more indexes')).toBeInTheDocument()
     expect(screen.getByText('e.g. 0')).toBeInTheDocument()
     expect(screen.getByText('e.g. false')).toBeInTheDocument()
     expect(screen.queryByText('e.g.')).not.toBeInTheDocument()

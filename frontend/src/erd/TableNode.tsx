@@ -69,6 +69,9 @@ function formatExample(value: Column["example_value"]): string | null {
 function TableNode(props: NodeProps<TableNodeNode>) {
   const { data } = props;
   const accessibleTableName = data.title.trim() || "이름 없는";
+  const omittedCols = data.columns.length > MAX_RENDERED_COLUMNS ? data.columns.length - MAX_RENDERED_COLUMNS : 0;
+  const omittedIdxs = (data.indexes?.length ?? 0) > 4 ? data.indexes!.length - 4 : 0;
+  const accessibleLabel = `${accessibleTableName} 테이블` + (omittedCols > 0 ? `, 생략된 컬럼 ${omittedCols}개` : "") + (omittedIdxs > 0 ? `, 생략된 인덱스 ${omittedIdxs}개` : "");
   const groupColor = data.businessGroup
     ? normalizeBusinessGroupColor(data.businessGroup.color)
     : undefined;
@@ -94,7 +97,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
       className={className}
       style={style}
       role="region"
-      aria-label={`${accessibleTableName} 테이블`}
+      aria-label={accessibleLabel}
     >
       <Handle type="target" position={Position.Top} />
       <div className="tableNode__title">
@@ -177,8 +180,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
         {data.columns.length > MAX_RENDERED_COLUMNS ? (
           <div
             className="tableNode__more"
-            title="생략된 컬럼이 더 있습니다"
-            aria-label="생략된 컬럼이 더 있습니다"
+            aria-hidden="true"
           >
             … {data.columns.length - MAX_RENDERED_COLUMNS} more
           </div>
@@ -207,8 +209,7 @@ function TableNode(props: NodeProps<TableNodeNode>) {
             {data.indexes.length > 4 ? (
               <div
                 className="tableNode__more"
-                title="생략된 인덱스가 더 있습니다"
-                aria-label="생략된 인덱스가 더 있습니다"
+                aria-hidden="true"
               >
                 … {data.indexes.length - 4} more indexes
               </div>
