@@ -58,6 +58,6 @@
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
 
-## 2024-09-12 - [아이콘 전용 닫기 버튼 접근성 개선]
-**Learning:** 내보내기 모달 등에서 아이콘 전용 닫기 버튼에 "X"나 "닫기" 텍스트를 사용할 경우 시각적으로 투박해지나, 시각적 개선을 위해 특수 기호("✕")로 변경하더라도 ARIA 레이블(`aria-label`)이 있으면 스크린 리더에서 동일한 접근성을 제공할 수 있음을 발견함.
-**Action:** 앞으로 아이콘 전용 닫기 버튼 구현 시 `aria-label`을 통해 접근 가능한 이름을 반드시 제공하되, 시각적인 요소는 디자인 시스템의 아이콘이나 적절한 특수 기호("✕")를 사용하여 만족도와 접근성을 모두 충족해야 함.
+## 2024-09-12 - [생략된 텍스트 요소 포커스 접근성 개선]
+**Learning:** `text-overflow: ellipsis` 등 CSS에 의해 생략된 텍스트는 `title` 속성이 있더라도 키보드나 스크린 리더 사용자에게는 탐색이 어렵다는 점을 발견함. 특히 "생략된 컬럼이 더 있습니다"와 같은 안내 문구는 시각장애인에게도 중요한 문맥을 제공함.
+**Action:** 생략된 텍스트 요소가 스크린 리더 사용자에게도 접근 가능하도록 해당 `div`에 `tabIndex={0}` 속성을 추가하여 키보드 탐색을 지원하도록 개선함.
