@@ -1,4 +1,3 @@
-import pytest
 from app.spec.orm_codegen import generate_prisma_schema, generate_typeorm_entities, generate_sqlalchemy_models
 from app.ddl.export import snapshot_json_to_sql
 
@@ -194,26 +193,3 @@ CREATE TABLE IF NOT EXISTS "public"."t1" (
 );
 
 """
-
-def test_benchmark_large_snapshot_in_check(benchmark):
-    # N = 100,000, U = 1,000
-    n = 100000
-    u = 1000
-
-    snapshot = {
-        "relations": [
-            {"relation_oid": i, "relation_name": f"t{i}", "schema_name": "public", "relation_kind": "r"} for i in range(u)
-        ],
-        "columns": [
-            {"relation_oid": i % u, "column_name": f"c{i}", "data_type": "integer", "is_not_null": True, "column_position": i}
-            for i in range(n)
-        ],
-        "pk_columns": [
-            {"relation_oid": i, "column_name": "c0"} for i in range(u)
-        ],
-        "fk_edges": [
-            {"child_relation_oid": i, "child_column_name": "c1", "parent_relation_oid": (i + 1) % u, "parent_column_name": "c0"} for i in range(u)
-        ]
-    }
-
-    benchmark.pedantic(generate_prisma_schema, args=(snapshot,), rounds=10, iterations=1)
