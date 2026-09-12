@@ -19,7 +19,7 @@ function renderTableNode(data: TableNodeData): string {
 }
 
 describe('TableNode truncated-population accessibility', () => {
-  it('keeps omitted column and index summaries keyboard-focusable and explicitly named', () => {
+  it('keeps inert summaries out of focus and exposes omitted counts on the table region', () => {
     const columns = Array.from({ length: 26 }, (_, index) => ({
       column_name: `column_${index + 1}`,
       data_type: 'text',
@@ -43,14 +43,18 @@ describe('TableNode truncated-population accessibility', () => {
       indexes,
       badges: { pk: false, fk: false }
     })
+    const summaryTags = markup.match(/<div class="tableNode__more"[^>]*>/g)
 
     expect(markup).toContain(
-      'aria-hidden="true"'
+      'aria-label="orders 테이블, 생략된 컬럼 1개, 생략된 인덱스 1개"'
     )
+    expect(summaryTags).toHaveLength(2)
+    for (const summaryTag of summaryTags ?? []) {
+      expect(summaryTag).toContain('aria-hidden="true"')
+      expect(summaryTag).not.toContain('tabindex=')
+      expect(summaryTag).not.toContain('role="button"')
+    }
     expect(markup).toContain('… 1 more')
-    expect(markup).toContain(
-      'aria-hidden="true"'
-    )
     expect(markup).toContain('… 1 more indexes')
   })
 })
