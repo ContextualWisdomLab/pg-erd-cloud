@@ -3,6 +3,15 @@ export type Project = {
   project_name: string
 }
 
+export type ProjectMemberRole = 'owner' | 'editor' | 'viewer'
+export type MutableProjectMemberRole = Exclude<ProjectMemberRole, 'owner'>
+
+export type ProjectMember = {
+  user_account_uuid: string
+  member_subject: string
+  project_role: ProjectMemberRole
+}
+
 export type Connection = {
   db_connection_uuid: string
   conn_name: string

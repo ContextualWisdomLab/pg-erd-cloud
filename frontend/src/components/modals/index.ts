@@ -1,3 +1,4 @@
+export { AccessManagementModal } from './AccessManagementModal';
 export { AddTableModal } from './AddTableModal';
 export { CardinalityModal } from './CardinalityModal';
 export { EditEdgeModal } from './EditEdgeModal';

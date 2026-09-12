@@ -23,6 +23,7 @@ interface ExportModalProps {
   onDownloadPrisma: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
+  onOpenAccessManagement?: () => void;
 }
 
 type ExportArtifact = {
@@ -56,6 +57,7 @@ export function ExportModal({
   onDownloadPrisma,
   onCreateShareLink,
   onCopyShareLink,
+  onOpenAccessManagement,
 }: ExportModalProps) {
   const dialogRef = useDialogAccessibility(isOpen, onCloseExport);
 
@@ -67,7 +69,7 @@ export function ExportModal({
   const shareStatusMessage = shareLinkError
     ? shareLinkError
     : isShareLinkCopied
-      ? '링크가 복사되었습니다. 접근 권한이 있는 팀원이 최신 스냅샷을 열 수 있습니다.'
+      ? '링크가 복사되었습니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.'
       : '선택한 다이어그램을 공유하거나 산출물로 내보낼 준비가 되었습니다.';
 
   const artifacts: ExportArtifact[] = [
@@ -168,8 +170,8 @@ export function ExportModal({
           <section className="exportModal__section" aria-labelledby="share-link-title">
             <h4 id="share-link-title">공유 링크</h4>
             <p>
-              팀원이 검토할 수 있는 API 기반 프로젝트 링크를 생성합니다. 복사
-              피드백은 작업 후에도 확인할 수 있게 유지합니다.
+              최신 스냅샷을 검토할 수 있는 링크를 만듭니다. 복사했다는 표시는
+              작업이 끝난 뒤에도 남습니다.
             </p>
 
             <input
@@ -202,16 +204,15 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                disabled
-                aria-describedby="share-export-access-hint"
-                className="exportModal__disabledHintButton"
+                onClick={onOpenAccessManagement}
+                disabled={!canCreateShareLink || !onOpenAccessManagement}
               >
                 접근 관리
               </button>
-              <p id="share-export-access-hint" className="exportModal__hint">
-                접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.
-              </p>
             </div>
+            <p className="exportModal__hint">
+              프로젝트 멤버십과 공유 링크는 별도 권한 경계입니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.
+            </p>
           </section>
 
           <section className="exportModal__section" aria-labelledby="export-artifacts-title">

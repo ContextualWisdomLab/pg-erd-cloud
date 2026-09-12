@@ -42,6 +42,7 @@ vi.mock('./erd/dbml', () => ({ exportDbml: vi.fn(() => '') }))
 vi.mock('./erd/prisma', () => ({ exportPrisma: vi.fn(() => '') }))
 vi.mock('./erd/autoInfer', () => ({ inferRelationships: vi.fn(() => []) }))
 vi.mock('./components/modals', () => ({
+  AccessManagementModal: () => null,
   AddTableModal: () => null,
   CardinalityModal: () => null,
   EditEdgeModal: () => null,

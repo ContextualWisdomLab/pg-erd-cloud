@@ -26,6 +26,7 @@ const baseProps = {
   onDownloadPrisma: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
+  onOpenAccessManagement: vi.fn(),
 };
 
 afterEach(() => {
@@ -85,7 +86,9 @@ describe('ExportModal', () => {
       />,
     );
     expect(screen.getByRole('button', { name: '복사 완료' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('링크가 복사되었습니다');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '링크가 복사되었습니다. 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다.',
+    );
 
     rerender(
       <ExportModal
@@ -171,13 +174,45 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('exposes access-control guidance for disabled button', () => {
-    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
+  it('disables access management without project authority or a handler', () => {
+    const onOpenAccessManagement = vi.fn();
+    const { rerender } = render(
+      <ExportModal
+        {...baseProps}
+        canCreateShareLink={false}
+        onOpenAccessManagement={onOpenAccessManagement}
+      />,
+    );
 
-    expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
-    const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
-    expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
-    expect(accessManagementButton).not.toHaveAttribute('title');
+    const button = screen.getByRole('button', { name: '접근 관리' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onOpenAccessManagement).not.toHaveBeenCalled();
+
+    rerender(
+      <ExportModal
+        {...baseProps}
+        onOpenAccessManagement={undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '접근 관리' })).toBeDisabled();
+  });
+
+  it('keeps bearer-link disclosure separate from project access management', () => {
+    const onOpenAccessManagement = vi.fn();
+    render(
+      <ExportModal
+        {...baseProps}
+        onOpenAccessManagement={onOpenAccessManagement}
+      />,
+    );
+
+    expect(
+      screen.getByText(/링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있습니다/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/프로젝트에 속한 팀원만/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '접근 관리' }));
+    expect(onOpenAccessManagement).toHaveBeenCalledOnce();
   });
 });

@@ -111,6 +111,18 @@ vi.mock('./erd/convert', async () => {
 })
 
 vi.mock('./components/modals', () => ({
+  AccessManagementModal: (props: any) => (
+    <div data-testid="access-modal" data-open={props.isOpen}>
+      <span data-testid="access-members">{props.members.length}</span>
+      <span data-testid="access-loading">{String(props.isLoading)}</span>
+      {props.isOpen ? (
+        <>
+          <button type="button" data-testid="access-close" onClick={props.onClose} />
+          <button type="button" data-testid="access-save" onClick={() => props.onSaveMember('member-subject', 'viewer')} />
+        </>
+      ) : null}
+    </div>
+  ),
   AddTableModal: (props: any) => (
     <div data-testid="add-modal" data-open={props.isOpen}>
       <button type="button" data-testid="add-guard" onClick={props.onAddTableSubmit} />

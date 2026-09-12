@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- [FE] 🔄 **접근 관리 저장 lifecycle 재조정**: 프로젝트 멤버 저장이 완료되기 전에 modal을 닫고 같은 프로젝트를 다시 열어도 backend truth를 재조회합니다. lifecycle request, 최신 mutation, 현재 열린 프로젝트 identity를 분리해 다른 프로젝트·닫힌 modal·새 저장에는 오래된 결과를 투영하지 않습니다. RED `3bd5ed8b…`에서 1 failed / 217 passed를 재현했고 GREEN `b90a6e4a…`에서 218 tests를 통과했습니다.
+- [FE] 공유·내보내기 창의 `접근 관리` 버튼이 프로젝트 멤버 관리 모달을 엽니다. 프로젝트 멤버십과 별개로, 공유 링크는 링크를 받은 사람이 로그인 없이 공유 스냅샷을 열 수 있는 bearer-read 경계임을 안내합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.

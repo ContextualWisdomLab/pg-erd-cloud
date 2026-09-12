@@ -168,6 +168,17 @@ describe('API client coverage', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['listProjectMembers', (api: ApiModule) => api.listProjectMembers('p')],
+    ['upsertProjectMember', (api: ApiModule) => api.upsertProjectMember('p', 'subject', 'viewer')],
+  ])('rejects insecure credential transport before %s', async (_name, invoke) => {
+    const api = await loadApi({ baseUrl: 'http://members.example.test' })
+    await expect(invoke(api)).rejects.toThrow(
+      'createConnection requires HTTPS for credential transport',
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it.each(['http://localhost:8080', 'http://127.0.0.1:8080', 'http://[::1]:8080'])(
     'permits credential transport to local development host %s',
     async (baseUrl) => {

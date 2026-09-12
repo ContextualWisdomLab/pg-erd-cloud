@@ -1,6 +1,10 @@
 # CHANGELOG
 
 ## [Unreleased]
+### Changed
+- **같은 프로젝트 저장 close→reopen 복구**: pending 멤버 저장이 성공하면 현재 열린 프로젝트가 동일하고 해당 mutation이 최신일 때만 backend membership을 다시 읽습니다. 재오픈 list를 새 request generation으로 대체하되 다른 프로젝트, 닫힌 modal, 더 새로운 저장에는 결과를 반영하지 않습니다.
+- **접근 관리와 공유 링크 안내**: 공유·내보내기의 `접근 관리` 버튼이 프로젝트 멤버 관리 모달을 엽니다. 프로젝트 멤버십과 별개로, 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있다는 bearer-read 경계를 표시합니다.
+
 ### Added
 - **테이블 및 컬럼 편집 기능**: UI 패널을 통해 노드를 선택하고, 테이블의 이름/코멘트를 수정하며, 컬럼을 추가/수정/삭제하거나 테이블을 삭제할 수 있는 기능 추가.
 - **테스트 추가**: 프론트엔드 테스트 커버리지 100% 목표 달성을 위해 `cardinality.ts`, `types.ts`, `export.ts` 의 미달성 분기 및 함수 테스트 추가 (`cardinality_extra.test.ts` 등).
