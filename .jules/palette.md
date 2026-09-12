@@ -57,6 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2026-09-12 - [Focus Order on Static Text]
-**Learning:** Adding `tabIndex={0}` to static textual `div` elements (like "… N more" summaries) creates a dead focus stop in the tab sequence. This is an accessibility anti-pattern because the user focuses an element expecting interactivity but finds none.
-**Action:** Expose static summary information (like omitted element counts) in the accessible name (`aria-label`) of the parent grouping container rather than placing focus stops on individual text summaries.
