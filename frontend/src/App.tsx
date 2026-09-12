@@ -677,6 +677,7 @@ export default function App() {
     setAccessMembers([]);
     setIsAccessLoading(false);
     setAccessLoadError(null);
+    setIsAccessSaving(false);
     setAccessSaveError(null);
   }, []);
 
