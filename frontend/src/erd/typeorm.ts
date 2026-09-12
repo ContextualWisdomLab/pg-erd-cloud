@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
-import { sanitizeHandleId, decodeHandleId } from "./handleUtils";
+import { decodeHandleId } from "./handleUtils";
 
 function sanitizeClassName(name: string): string {
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -36,7 +36,11 @@ function mapToTsType(pgType: string): string {
 }
 
 function escapeLiteral(value: string): string {
-  return JSON.stringify(value).slice(1, -1);
+  const serializedValue = JSON.stringify(value);
+  if (serializedValue === undefined) {
+    throw new TypeError("Unable to serialize TypeORM metadata");
+  }
+  return serializedValue.slice(1, -1);
 }
 export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   if (nodes.length === 0) {
