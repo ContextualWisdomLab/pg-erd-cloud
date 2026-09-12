@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
+import { sanitizeHandleId, decodeHandleId } from "./handleUtils";
 
 function sanitizeClassName(name: string): string {
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -46,47 +46,90 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
 
   const fkNodeColumnPairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
+
+  // Track all relationships coming INTO a target model
   const incomingRelationsByNode = new Map<string, Array<{ sourceModel: string, sourceField: string, targetField: string }>>();
+
+  // Track relationship configurations for the source models
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[] }>();
+
+  // Ensure unique class names
+  const usedClassNames = new Map<string, string>();
+  for (const node of nodes) {
+    let baseName = sanitizeClassName(node.data.title.split('.').pop() || "table");
+    let className = baseName;
+    let counter = 1;
+    while (Array.from(usedClassNames.values()).includes(className)) {
+      className = `${baseName}_${counter}`;
+      counter++;
+    }
+    usedClassNames.set(node.id, className);
+  }
 
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
     if (!sourceNode || !targetNode) continue;
 
-    let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
-      fkNodesWithoutHandles.add(edge.source);
+    const sourceModel = usedClassNames.get(sourceNode.id)!;
+    const targetModel = usedClassNames.get(targetNode.id)!;
+
+    let sourceCols: string[] = [];
+    let targetCols: string[] = [];
+
+    const edgeData = edge.data as ForeignKeyEdgeData | undefined;
+
+    if (edgeData?.sourceColumns && edgeData?.targetColumns) {
+      sourceCols = [...edgeData.sourceColumns];
+      targetCols = [...edgeData.targetColumns];
+
+      for (const col of sourceCols) {
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(col)}`);
+      }
+    } else {
+      let sourceField = "";
+      if (edge.sourceHandle?.startsWith("src-")) {
+        sourceField = decodeHandleId(edge.sourceHandle);
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
+      } else if (!edge.sourceHandle) {
+        fkNodesWithoutHandles.add(edge.source);
+      }
+
+      let targetField = "id";
+      if (edge.targetHandle?.startsWith("tgt-")) {
+        targetField = decodeHandleId(edge.targetHandle);
+      }
+
+      if (sourceField) {
+         sourceCols = [sourceField];
+         targetCols = [targetField];
+      }
     }
 
-    let targetField = "id";
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
-    }
-
-    if (sourceField) {
+    if (sourceCols.length > 0) {
       const relList = incomingRelationsByNode.get(edge.target) || [];
+      // Combine multiple columns into a signature for naming if necessary
+      const combinedSourceField = sourceCols.map(sanitizePropertyName).join("_");
+      const combinedTargetField = targetCols.map(sanitizePropertyName).join("_");
+
       relList.push({
-        sourceModel: sanitizeClassName(sourceNode.data.title),
-        sourceField: sanitizePropertyName(sourceField),
-        targetField: sanitizePropertyName(targetField)
+        sourceModel,
+        sourceField: combinedSourceField,
+        targetField: combinedTargetField
       });
       incomingRelationsByNode.set(edge.target, relList);
 
       edgesProcessed.set(edge.id, {
-        sourceModel: sanitizeClassName(sourceNode.data.title),
-        targetModel: sanitizeClassName(targetNode.data.title),
-        sourceFields: [sanitizePropertyName(sourceField)],
-        targetFields: [sanitizePropertyName(targetField)]
+        sourceModel,
+        targetModel,
+        sourceFields: sourceCols,
+        targetFields: targetCols
       });
     }
   }
 
   for (const node of nodes) {
-    const className = sanitizeClassName(node.data.title);
+    const className = usedClassNames.get(node.id)!;
     const tableNameParts = node.data.title.split('.');
     let tableName = node.data.title;
     let schemaName = 'public';
@@ -103,14 +146,15 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
       const tsType = mapToTsType(col.data_type);
       const isFk = fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) || (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
-      let colDecorator = "@Column()";
+      let colDecorator = "";
       if (col.is_pk) {
-        if (tsType === "number" && col.data_type.toLowerCase().includes("serial")) {
-          colDecorator = "@PrimaryGeneratedColumn()";
-        } else if (tsType === "string" && col.data_type.toLowerCase().includes("uuid")) {
-          colDecorator = `@PrimaryGeneratedColumn("uuid")`;
+        if (col.data_type.toLowerCase().includes("serial")) {
+          colDecorator = `@PrimaryGeneratedColumn({ name: "${col.column_name}" })`;
         } else {
-          colDecorator = "@PrimaryColumn()";
+          const colOpts = [];
+          colOpts.push(`name: "${col.column_name}"`);
+          if (col.data_type) colOpts.push(`type: "${col.data_type}"`);
+          colDecorator = `@PrimaryColumn({ ${colOpts.join(", ")} })`;
         }
       } else {
         const colOpts = [];
@@ -122,15 +166,25 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
 
       const optional = col.is_not_null ? "" : "?";
       output += `  ${colDecorator}\n  ${propName}${optional}: ${tsType};\n\n`;
+    }
 
-      for (const [_, edgeInfo] of edgesProcessed) {
-        if (edgeInfo.sourceModel === className && edgeInfo.sourceFields.includes(propName)) {
-          const relProp = edgeInfo.targetModel.charAt(0).toLowerCase() + edgeInfo.targetModel.slice(1) + "_" + propName;
-          output += `  @ManyToOne(() => ${edgeInfo.targetModel})\n  @JoinColumn({ name: "${col.column_name}", referencedColumnName: "${edgeInfo.targetFields[0]}" })\n  ${relProp}${optional}: ${edgeInfo.targetModel};\n\n`;
+    // Add forward relations
+    for (const [_, edgeInfo] of edgesProcessed) {
+      if (edgeInfo.sourceModel === className) {
+        const relProp = edgeInfo.targetModel.charAt(0).toLowerCase() + edgeInfo.targetModel.slice(1) + "_" + edgeInfo.sourceFields.map(sanitizePropertyName).join("_");
+        const isOptional = true; // Could map strictly based on is_not_null of source fields
+        output += `  @ManyToOne(() => ${edgeInfo.targetModel})\n`;
+        if (edgeInfo.sourceFields.length === 1) {
+            output += `  @JoinColumn({ name: "${edgeInfo.sourceFields[0]}", referencedColumnName: "${edgeInfo.targetFields[0]}" })\n`;
+        } else {
+            const joinColumns = edgeInfo.sourceFields.map((sf, i) => `{ name: "${sf}", referencedColumnName: "${edgeInfo.targetFields[i]}" }`).join(", ");
+            output += `  @JoinColumn([${joinColumns}])\n`;
         }
+        output += `  ${relProp}?: ${edgeInfo.targetModel};\n\n`;
       }
     }
 
+    // Add back relations
     const incoming = incomingRelationsByNode.get(node.id) || [];
     for (const inc of incoming) {
       const relPropName = inc.sourceModel.charAt(0).toLowerCase() + inc.sourceModel.slice(1) + "s_" + inc.sourceField;

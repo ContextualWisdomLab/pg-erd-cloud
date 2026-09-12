@@ -14,3 +14,20 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function decodeHandleId(handleId: string): string {
+  if (!handleId || handleId.endsWith('-c-empty') || handleId === 'c-empty') {
+    return '';
+  }
+  let encodedPart = handleId;
+  if (handleId.startsWith('src-c-')) {
+    encodedPart = handleId.slice(6);
+  } else if (handleId.startsWith('tgt-c-')) {
+    encodedPart = handleId.slice(6);
+  } else if (handleId.startsWith('c-')) {
+    encodedPart = handleId.slice(2);
+  }
+
+  const parts = encodedPart.split('-');
+  return parts.map(hex => String.fromCodePoint(parseInt(hex, 16))).join('');
+}
