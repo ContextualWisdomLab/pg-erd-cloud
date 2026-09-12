@@ -59,5 +59,11 @@ describe('handleUtils', () => {
     it('should handle emojis', () => {
       expect(decodeHandleId('c-0069-0064-005f-1f680')).toBe('id_🚀');
     });
+
+    it('should throw RangeError for invalid handle formats', () => {
+       expect(() => decodeHandleId('src-c-zzzz')).toThrow(RangeError);
+       expect(() => decodeHandleId('invalid-prefix')).toThrow(RangeError);
+       expect(() => decodeHandleId('src-c-111111111111')).toThrow(RangeError);
+    });
   });
 });

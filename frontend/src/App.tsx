@@ -669,7 +669,11 @@ export default function App() {
   }
 
   function onDownloadTypeOrm() {
-    downloadText("pg-erd-entities.ts", exportTypeOrm(nodes, edges), "text/plain");
+    try {
+      downloadText("pg-erd-entities.ts", exportTypeOrm(nodes, edges), "text/plain");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to export TypeORM entities");
+    }
   }
 
   function onExportDictionaryCsv() {

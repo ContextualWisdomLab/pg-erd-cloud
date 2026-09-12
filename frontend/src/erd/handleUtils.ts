@@ -26,8 +26,19 @@ export function decodeHandleId(handleId: string): string {
     encodedPart = handleId.slice(6);
   } else if (handleId.startsWith('c-')) {
     encodedPart = handleId.slice(2);
+  } else {
+    throw new RangeError("Invalid handle format");
   }
 
   const parts = encodedPart.split('-');
-  return parts.map(hex => String.fromCodePoint(parseInt(hex, 16))).join('');
+  return parts.map(hex => {
+    if (!/^[0-9a-fA-F]+$/.test(hex)) {
+      throw new RangeError("Invalid handle format");
+    }
+    const codePoint = parseInt(hex, 16);
+    if (isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF) {
+       throw new RangeError("Invalid handle format");
+    }
+    return String.fromCodePoint(codePoint);
+  }).join('');
 }
