@@ -181,6 +181,7 @@ export async function createProject(project_name: string): Promise<Project> {
 export async function listProjectMembers(projectId: string): Promise<ProjectMember[]> {
   if (DEMO_MODE) return demoMembersByProject[projectId] ?? []
 
+  requireSecureCredentialTransport()
   const r = await fetch(`${API_BASE}/api/projects/${projectId}/members`, {
     credentials: 'include'
   })
@@ -210,6 +211,7 @@ export async function upsertProjectMember(
     return nextMember
   }
 
+  requireSecureCredentialTransport()
   const r = await fetch(`${API_BASE}/api/projects/${projectId}/members`, {
     method: 'POST',
     credentials: 'include',
