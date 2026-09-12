@@ -189,7 +189,10 @@ export function EditTableModal({
           <div className="row" style={{ gap: 8 }}>
             <button
               type="button"
-              onClick={onDeleteTable}
+              onClick={() => {
+                if (!window.confirm(`'${editingNode.data.title}' 테이블을 삭제하시겠습니까?`)) return;
+                onDeleteTable();
+              }}
               style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
             >
               테이블 삭제
