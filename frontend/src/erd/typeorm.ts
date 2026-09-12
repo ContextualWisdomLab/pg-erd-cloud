@@ -20,6 +20,9 @@ function sanitizePropertyName(name: string): string {
 
 function mapToTsType(pgType: string): string {
   const t = pgType.toLowerCase();
+  if (t.includes("int8") || t.includes("bigint") || t.includes("bigserial")) {
+    return "bigint";
+  }
   if (t.includes("int") || t.includes("serial") || t.includes("float") || t.includes("double") || t.includes("numeric") || t.includes("real") || t.includes("decimal")) {
     return "number";
   }
@@ -32,6 +35,10 @@ function mapToTsType(pgType: string): string {
   return "string";
 }
 
+function escapeLiteral(str: string): string {
+  if (!str) return "";
+  return str.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+}
 export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   if (nodes.length === 0) {
     return "// No tables to export\n";
@@ -55,15 +62,29 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
 
   // Ensure unique class names
   const usedClassNames = new Map<string, string>();
-  for (const node of nodes) {
-    let baseName = sanitizeClassName(node.data.title.split('.').pop() || "table");
-    let className = baseName;
+  const classNamesSet = new Set<string>();
+
+  // To ensure stable alphabetical suffixing or mapping, sort nodes by id (which are basically relation_oids).
+  const sortedNodes = [...nodes].sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const node of sortedNodes) {
+    let schemaName = 'public';
+    let baseName = node.data.title;
+    const parts = node.data.title.split('.');
+    if (parts.length > 1) {
+      schemaName = parts[0];
+      baseName = parts.slice(1).join('.');
+    }
+
+    let candidate = sanitizeClassName(schemaName + "_" + baseName);
+    let finalClassName = candidate;
     let counter = 1;
-    while (Array.from(usedClassNames.values()).includes(className)) {
-      className = `${baseName}_${counter}`;
+    while (classNamesSet.has(finalClassName)) {
+      finalClassName = candidate + "_" + counter;
       counter++;
     }
-    usedClassNames.set(node.id, className);
+    classNamesSet.add(finalClassName);
+    usedClassNames.set(node.id, finalClassName);
   }
 
   for (const edge of edges) {
@@ -80,6 +101,16 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
     const edgeData = edge.data as ForeignKeyEdgeData | undefined;
 
     if (edgeData?.sourceColumns && edgeData?.targetColumns) {
+      if (edgeData.sourceColumns.length === 0 || edgeData.sourceColumns.length !== edgeData.targetColumns.length) {
+         throw new Error("Invalid composite foreign key metadata");
+      }
+      // Check column membership
+      const srcNodeHasCols = edgeData.sourceColumns.every(col => sourceNode.data.columns.some(c => c.column_name === col));
+      const tgtNodeHasCols = edgeData.targetColumns.every(col => targetNode.data.columns.some(c => c.column_name === col));
+      if (!srcNodeHasCols || !tgtNodeHasCols) {
+         throw new Error("Invalid composite foreign key metadata: missing columns");
+      }
+
       sourceCols = [...edgeData.sourceColumns];
       targetCols = [...edgeData.targetColumns];
 
@@ -152,13 +183,13 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
           colDecorator = `@PrimaryGeneratedColumn({ name: "${col.column_name}" })`;
         } else {
           const colOpts = [];
-          colOpts.push(`name: "${col.column_name}"`);
+          colOpts.push(`name: "${escapeLiteral(col.column_name)}"`);
           if (col.data_type) colOpts.push(`type: "${col.data_type}"`);
           colDecorator = `@PrimaryColumn({ ${colOpts.join(", ")} })`;
         }
       } else {
         const colOpts = [];
-        colOpts.push(`name: "${col.column_name}"`);
+        colOpts.push(`name: "${escapeLiteral(col.column_name)}"`);
         if (!col.is_not_null) colOpts.push(`nullable: true`);
         if (col.data_type) colOpts.push(`type: "${col.data_type}"`);
         colDecorator = `@Column({ ${colOpts.join(", ")} })`;
@@ -187,8 +218,13 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
     // Add back relations
     const incoming = incomingRelationsByNode.get(node.id) || [];
     for (const inc of incoming) {
-      const relPropName = inc.sourceModel.charAt(0).toLowerCase() + inc.sourceModel.slice(1) + "s_" + inc.sourceField;
-      output += `  @OneToMany(() => ${inc.sourceModel}, (e) => e.${inc.sourceModel.charAt(0).toLowerCase() + inc.sourceModel.slice(1)}_${inc.sourceField})\n  ${relPropName}: ${inc.sourceModel}[];\n\n`;
+      const sourcePropLower = inc.sourceModel.charAt(0).toLowerCase() + inc.sourceModel.slice(1);
+      const relPropName = sourcePropLower + "s_" + inc.sourceField;
+      const childRelationProp = sourcePropLower + "_" + inc.sourceField;
+      output += `  @OneToMany(() => ${inc.sourceModel}, (e) => e.${childRelationProp})
+  ${relPropName}: ${inc.sourceModel}[];
+
+`;
     }
 
     output += `}\n\n`;

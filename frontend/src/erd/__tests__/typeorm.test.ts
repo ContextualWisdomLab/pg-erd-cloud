@@ -79,27 +79,27 @@ describe("exportTypeOrm", () => {
     const output = exportTypeOrm(nodes, edges);
     expect(output).toContain("import { Entity, PrimaryGeneratedColumn, Column");
     expect(output).toContain("@Entity({ name: \"users\", schema: \"public\" })");
-    expect(output).toContain("export class Users {");
+    expect(output).toContain("export class Public_users {");
     expect(output).toContain("@PrimaryGeneratedColumn({ name: \"id\" })");
     expect(output).toContain("id: number;");
     expect(output).toContain("is_active?: boolean;");
     expect(output).toContain("created_at?: Date;");
-    expect(output).toContain("@OneToMany(() => Posts, (e) => e.posts_user_id)");
+    expect(output).toContain("@OneToMany(() => Public_posts, (e) => e.public_posts_user_id)");
 
     expect(output).toContain("@Entity({ name: \"posts\", schema: \"public\" })");
-    expect(output).toContain("export class Posts {");
+    expect(output).toContain("export class Public_posts {");
     // UUID should be PrimaryColumn with type, NOT PrimaryGeneratedColumn
     expect(output).toContain("@PrimaryColumn({ name: \"id\", type: \"uuid\" })");
     expect(output).toContain("id: string;");
     expect(output).toContain("amount: number;");
-    expect(output).toContain("@ManyToOne(() => Users)");
+    expect(output).toContain("@ManyToOne(() => Public_users)");
     expect(output).toContain("@JoinColumn({ name: \"user_id\", referencedColumnName: \"id\" })");
 
     expect(output).toContain("@PrimaryColumn({ name: \"code\", type: \"varchar\" })");
     expect(output).toContain("code: string;");
 
     // Collision checking
-    expect(output).toContain("export class Users_1 {");
+    expect(output).toContain("export class Public_users_1 {");
   });
 
   it("should handle composite foreign keys using sourceColumns array", () => {
@@ -147,7 +147,7 @@ describe("exportTypeOrm", () => {
 
     const output = exportTypeOrm(nodes, edges);
     expect(output).toContain("@JoinColumn([{ name: \"fk1\", referencedColumnName: \"k1\" }, { name: \"fk2\", referencedColumnName: \"k2\" }])");
-    expect(output).toContain("parent_fk1_fk2?: Parent;");
+    expect(output).toContain("public_parent_fk1_fk2?: Public_parent;");
   });
 
   it("should sanitize names and handle edges without handles", () => {
@@ -188,7 +188,7 @@ describe("exportTypeOrm", () => {
     ];
 
     const output = exportTypeOrm(nodes, edges);
-    expect(output).toContain("export class Entity_1invalid {");
+    expect(output).toContain("export class Public_1invalid {");
     expect(output).toContain("prop_1id: number;");
   });
 
@@ -217,6 +217,6 @@ describe("exportTypeOrm", () => {
     ];
 
     const output = exportTypeOrm(nodes, edges);
-    expect(output).toContain("export class Valid {");
+    expect(output).toContain("export class Public_valid {");
   });
 });

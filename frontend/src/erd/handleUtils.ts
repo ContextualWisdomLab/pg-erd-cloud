@@ -20,10 +20,14 @@ export function decodeHandleId(handleId: string): string {
     return '';
   }
   let encodedPart = handleId;
+  let isSrc = false;
+  let isTgt = false;
   if (handleId.startsWith('src-c-')) {
     encodedPart = handleId.slice(6);
+    isSrc = true;
   } else if (handleId.startsWith('tgt-c-')) {
     encodedPart = handleId.slice(6);
+    isTgt = true;
   } else if (handleId.startsWith('c-')) {
     encodedPart = handleId.slice(2);
   } else {
@@ -31,7 +35,7 @@ export function decodeHandleId(handleId: string): string {
   }
 
   const parts = encodedPart.split('-');
-  return parts.map(hex => {
+  const decoded = parts.map(hex => {
     if (!/^[0-9a-fA-F]+$/.test(hex)) {
       throw new RangeError("Invalid handle format");
     }
@@ -41,4 +45,15 @@ export function decodeHandleId(handleId: string): string {
     }
     return String.fromCodePoint(codePoint);
   }).join('');
+
+  // Canonical identity verification
+  let expected = sanitizeHandleId(decoded);
+  if (isSrc) expected = "src-" + expected;
+  else if (isTgt) expected = "tgt-" + expected;
+
+  if (expected !== handleId) {
+     throw new RangeError("Invalid handle format: not canonical");
+  }
+
+  return decoded;
 }

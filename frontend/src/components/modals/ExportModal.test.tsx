@@ -14,6 +14,7 @@ const baseProps = {
   isCreatingShareLink: false,
   isShareLinkCopied: false,
   shareLinkError: null,
+  exportError: null,
   canCreateShareLink: true,
   onCloseExport: vi.fn(),
   onCopyExportDdl: vi.fn(),

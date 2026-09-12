@@ -167,6 +167,7 @@ export default function App() {
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [editingNode, setEditingNode] = useState<Node<TableNodeData> | null>(null);
@@ -669,10 +670,11 @@ export default function App() {
   }
 
   function onDownloadTypeOrm() {
+    setExportError(null);
     try {
       downloadText("pg-erd-entities.ts", exportTypeOrm(nodes, edges), "text/plain");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to export TypeORM entities");
+      setExportError(err instanceof Error ? err.message : "Failed to export TypeORM entities");
     }
   }
 
@@ -1650,6 +1652,7 @@ export default function App() {
             isCreatingShareLink={isCreatingShareLink}
             isShareLinkCopied={isShareLinkCopied}
             shareLinkError={shareLinkError}
+            exportError={exportError}
             canCreateShareLink={Boolean(selectedProjectId)}
             onCloseExport={onCloseExport}
             onCopyExportDdl={onCopyExportDdl}
