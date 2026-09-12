@@ -160,6 +160,8 @@ export default function App() {
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const shareCopyFeedbackTimeoutRef = useRef<number | null>(null);
   const accessRequestRef = useRef(0);
+  const accessMutationRef = useRef(0);
+  const accessOpenProjectRef = useRef<string | null>(null);
   const dsnInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isLayouting, setIsLayouting] = useState(false);
@@ -257,6 +259,7 @@ export default function App() {
     setIsShareLinkCopied(false);
     setShareLinkError(null);
     accessRequestRef.current += 1;
+    accessOpenProjectRef.current = null;
     setIsAccessModalOpen(false);
     setAccessMembers([]);
     setIsAccessLoading(false);
@@ -645,6 +648,7 @@ export default function App() {
 
     const requestId = accessRequestRef.current + 1;
     accessRequestRef.current = requestId;
+    accessOpenProjectRef.current = selectedProjectId;
     setIsAccessModalOpen(true);
     setIsAccessLoading(true);
     setAccessLoadError(null);
@@ -673,6 +677,7 @@ export default function App() {
 
   const onCloseAccessManagement = useCallback(() => {
     accessRequestRef.current += 1;
+    accessOpenProjectRef.current = null;
     setIsAccessModalOpen(false);
     setAccessMembers([]);
     setIsAccessLoading(false);
@@ -690,16 +695,31 @@ export default function App() {
 
       const requestId = accessRequestRef.current + 1;
       accessRequestRef.current = requestId;
+      const mutationId = accessMutationRef.current + 1;
+      accessMutationRef.current = mutationId;
       const projectId = selectedProjectId;
       setIsAccessSaving(true);
       setAccessSaveError(null);
 
       try {
         await upsertProjectMember(projectId, memberSubject, projectRole);
-        if (accessRequestRef.current !== requestId) return;
+        if (
+          accessMutationRef.current !== mutationId ||
+          accessOpenProjectRef.current !== projectId
+        ) {
+          return;
+        }
 
+        const refreshRequestId = accessRequestRef.current + 1;
+        accessRequestRef.current = refreshRequestId;
         const members = await listProjectMembers(projectId);
-        if (accessRequestRef.current !== requestId) return;
+        if (
+          accessMutationRef.current !== mutationId ||
+          accessRequestRef.current !== refreshRequestId ||
+          accessOpenProjectRef.current !== projectId
+        ) {
+          return;
+        }
         setAccessMembers(members);
       } catch (error) {
         if (accessRequestRef.current === requestId) {
