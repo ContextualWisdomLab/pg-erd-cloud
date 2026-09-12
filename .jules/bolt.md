@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2023-10-25 - [Prevent O(N) garbage allocations in backend grouping loops]
+**Learning:** `dict.setdefault(key, []).append(val)` in Python evaluates the default argument `[]` or `set()` *before* calling the function, resulting in the allocation of an unused empty list/set on every loop iteration where the key already exists. In large snapshot loops, this causes massive GC pressure.
+**Action:** For loops that group large datasets, use standard `if key in dict:` checks or `collections.defaultdict` instead of `dict.setdefault()` with mutable defaults.
