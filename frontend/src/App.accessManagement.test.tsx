@@ -262,4 +262,37 @@ describe('project access-management lifecycle', () => {
     expect(api.listProjectMembers).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('access-saving')).toHaveTextContent('false')
   })
+
+  it('reconciles a successful save after closing and reopening the same project', async () => {
+    let resolveUpsert!: (value: unknown) => void
+    api.listProjectMembers
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { user_account_uuid: 'a3', member_subject: 'member-1', project_role: 'viewer' },
+      ])
+    api.upsertProjectMember.mockReturnValueOnce(new Promise((resolve) => { resolveUpsert = resolve }))
+
+    await openAccessManagement()
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+
+    fireEvent.click(screen.getByTestId('access-save'))
+    await waitFor(() => expect(api.upsertProjectMember).toHaveBeenCalledWith('p1', 'member-1', 'viewer'))
+
+    fireEvent.click(screen.getByTestId('access-close'))
+    fireEvent.click(screen.getByTestId('access-open'))
+    await waitFor(() => expect(api.listProjectMembers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByTestId('access-loading')).toHaveTextContent('false'))
+    expect(screen.getByTestId('access-modal')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('access-members')).toHaveTextContent('0')
+
+    await act(async () => {
+      resolveUpsert({})
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(api.listProjectMembers).toHaveBeenCalledTimes(3))
+    expect(screen.getByTestId('access-members')).toHaveTextContent('1')
+  })
+
 })
