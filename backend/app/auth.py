@@ -167,7 +167,10 @@ def _jwt_expiry(claims: dict[str, Any]) -> dt.datetime:
     exp = claims.get("exp")
     if not isinstance(exp, int | float):
         raise HTTPException(status_code=401, detail="invalid token")
-    return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
+    try:
+        return dt.datetime.fromtimestamp(float(exp), tz=dt.timezone.utc)
+    except (OverflowError, OSError, ValueError) as err:
+        raise HTTPException(status_code=401, detail="invalid token") from err
 
 
 def _validate_jwt_header(header: dict[str, Any]) -> str:
