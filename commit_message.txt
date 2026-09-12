@@ -1,0 +1,8 @@
+feat(frontend): ERD 다이어그램에서 SQLAlchemy 모델 코드 내보내기 기능 추가
+
+사용자가 ERD 다이어그램(노드 및 엣지)을 Python의 SQLAlchemy 모델 코드로 변환하여 다운로드할 수 있는 기능을 구현했습니다.
+
+* `frontend/src/erd/sqlalchemy.ts`: SQLAlchemy 내보내기 파서 로직(클래스명, 필드명, 관계 속성, 타입 매핑) 구현
+* `frontend/src/erd/__tests__/sqlalchemy.test.ts`: 파서 로직에 대한 단위 테스트 작성 및 100% 커버리지 확보
+* `frontend/src/components/modals/ExportModal.tsx`: 공유 및 내보내기 모달에 'SQLAlchemy Models' 버튼 추가
+* `frontend/src/App.tsx`: 다운로드 핸들러 `onDownloadSqlalchemy` 연결

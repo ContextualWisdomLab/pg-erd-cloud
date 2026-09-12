@@ -372,9 +372,9 @@ describe('App orchestration coverage', () => {
   it('polls a terminal snapshot, builds graph state, and exercises editor handlers', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = await screen.findAllByRole('button', { name: '열기' })
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
-    fireEvent.click(openButtons[0]!)
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -528,7 +528,8 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '편집기로 이동' }))
@@ -541,7 +542,8 @@ describe('App orchestration coverage', () => {
     fireEvent.change(screen.getByLabelText('새 프로젝트 이름'), { target: { value: 'Roadmap' } })
     fireEvent.click(screen.getByRole('button', { name: '새 프로젝트' }))
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Roadmap'))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
     fireEvent.click(screen.getByRole('button', { name: '목록 보기' }))
@@ -611,7 +613,8 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -642,7 +645,8 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -717,7 +721,8 @@ describe('App orchestration coverage', () => {
       />,
     )
     expect(screen.getAllByText('현재 프로젝트')).toHaveLength(2)
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     expect(onOpenEditor).toHaveBeenCalledWith('s1')
   })
 
@@ -745,7 +750,8 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -785,7 +791,8 @@ describe('App orchestration coverage', () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     vi.useFakeTimers()
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()
@@ -826,7 +833,8 @@ describe('App orchestration coverage', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     api.getSnapshot.mockRejectedValueOnce(new Error('poll down'))
-    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+    var openBtns = await screen.findAllByRole('button', { name: '열기' })
+    fireEvent.click(openBtns[0]!)
     await act(async () => {
       vi.advanceTimersByTime(1000)
       await Promise.resolve()

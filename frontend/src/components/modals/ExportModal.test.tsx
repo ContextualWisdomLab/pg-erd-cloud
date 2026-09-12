@@ -24,6 +24,7 @@ const baseProps = {
   onExportDictionaryMarkdown: vi.fn(),
   onDownloadDbml: vi.fn(),
   onDownloadPrisma: vi.fn(),
+    onDownloadSqlalchemy: vi.fn(),
   onCreateShareLink: vi.fn(),
   onCopyShareLink: vi.fn(),
 };
@@ -160,7 +161,7 @@ describe('ExportModal', () => {
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
+    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(9);
     expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
