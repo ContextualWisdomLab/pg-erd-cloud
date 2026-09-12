@@ -259,13 +259,15 @@ describe("exportTypeOrm", () => {
   });
 
   it("matches TypeORM bigint runtime values and escapes generated string literals", () => {
+    const tableName = 'weird"table' + String.fromCharCode(10) + 'name';
+    const columnName = 'large"identifier' + String.fromCharCode(10) + 'value';
     const nodes: Node<TableNodeData>[] = [{
       id: "quoted",
       position: { x: 0, y: 0 },
       data: {
-        title: "audit.weird\\\"table\\nname",
+        title: `audit.${tableName}`,
         columns: [{
-          column_name: "large\\\"identifier\\nvalue",
+          column_name: columnName,
           data_type: "bigint",
           is_pk: true,
           is_not_null: true
@@ -276,8 +278,12 @@ describe("exportTypeOrm", () => {
 
     const output = exportTypeOrm(nodes, []);
 
-    expect(output).toContain('@Entity({ name: "weird\\\\\\\"table\\\\nname", schema: "audit" })');
-    expect(output).toContain('@PrimaryColumn({ name: "large\\\\\\\"identifier\\\\nvalue", type: "bigint" })');
+    expect(output).toContain(
+      `@Entity({ name: ${JSON.stringify(tableName)}, schema: "audit" })`
+    );
+    expect(output).toContain(
+      `@PrimaryColumn({ name: ${JSON.stringify(columnName)}, type: "bigint" })`
+    );
     expect(output).toContain("large_identifier_value: string;");
   });
 
