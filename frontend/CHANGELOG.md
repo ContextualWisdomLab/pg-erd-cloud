@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 ### Changed
+- **같은 프로젝트 저장 close→reopen 복구**: pending 멤버 저장이 성공하면 현재 열린 프로젝트가 동일하고 해당 mutation이 최신일 때만 backend membership을 다시 읽습니다. 재오픈 list를 새 request generation으로 대체하되 다른 프로젝트, 닫힌 modal, 더 새로운 저장에는 결과를 반영하지 않습니다.
 - **접근 관리와 공유 링크 안내**: 공유·내보내기의 `접근 관리` 버튼이 프로젝트 멤버 관리 모달을 엽니다. 프로젝트 멤버십과 별개로, 링크를 받은 사람은 로그인 없이 공유 스냅샷을 열 수 있다는 bearer-read 경계를 표시합니다.
 
 ### Added
