@@ -174,6 +174,30 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
+  it('disables access management without project authority or a handler', () => {
+    const onOpenAccessManagement = vi.fn();
+    const { rerender } = render(
+      <ExportModal
+        {...baseProps}
+        canCreateShareLink={false}
+        onOpenAccessManagement={onOpenAccessManagement}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '접근 관리' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onOpenAccessManagement).not.toHaveBeenCalled();
+
+    rerender(
+      <ExportModal
+        {...baseProps}
+        onOpenAccessManagement={undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '접근 관리' })).toBeDisabled();
+  });
+
   it('keeps bearer-link disclosure separate from project access management', () => {
     const onOpenAccessManagement = vi.fn();
     render(
