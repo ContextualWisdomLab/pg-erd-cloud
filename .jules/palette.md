@@ -57,7 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-
-## 2024-09-12 - [생략된 텍스트 요소 포커스 접근성 개선]
-**Learning:** `text-overflow: ellipsis` 등 CSS에 의해 생략된 텍스트는 `title` 속성이 있더라도 키보드나 스크린 리더 사용자에게는 탐색이 어렵다는 점을 발견함. 특히 "생략된 컬럼이 더 있습니다"와 같은 안내 문구는 시각장애인에게도 중요한 문맥을 제공함.
-**Action:** 생략된 텍스트 요소가 스크린 리더 사용자에게도 접근 가능하도록 해당 `div`에 `tabIndex={0}` 속성을 추가하여 키보드 탐색을 지원하도록 개선함.
