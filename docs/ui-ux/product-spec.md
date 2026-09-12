@@ -85,10 +85,11 @@ modals.
 +-----------------------------------------------------+
 ```
 
-The share modal does not include an access-management action. Creating a share
-link is owner-only, but the resulting share endpoints are intentionally
-unauthenticated bearer-link access; this dialog must state that boundary rather
-than imply project-membership enforcement.
+The share modal includes an access-management action that opens project member
+management for the selected project. Creating a share link is owner-only, but
+the resulting share endpoints are intentionally unauthenticated bearer-link
+access; the dialog must present project membership and bearer-link access as
+separate authorization boundaries.
 
 ## User Stories
 
