@@ -84,7 +84,7 @@ describe("exportTypeOrm", () => {
     expect(output).toContain("id: number;");
     expect(output).toContain("is_active?: boolean;");
     expect(output).toContain("created_at?: Date;");
-    expect(output).toContain("@OneToMany(() => Public_posts, (e) => e.public_posts_user_id)");
+    expect(output).toContain("@OneToMany(() => Public_posts, (e) => e.public_users_user_id)");
 
     expect(output).toContain("@Entity({ name: \"posts\", schema: \"public\" })");
     expect(output).toContain("export class Public_posts {");
@@ -219,4 +219,66 @@ describe("exportTypeOrm", () => {
     const output = exportTypeOrm(nodes, edges);
     expect(output).toContain("export class Public_valid {");
   });
+  it("fails closed when single-column relationship handles reference missing columns", () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: "source",
+        position: { x: 0, y: 0 },
+        data: {
+          title: "child",
+          columns: [{ column_name: "parent_id", data_type: "bigint", is_pk: false, is_not_null: true }],
+          badges: { pk: false, fk: true }
+        }
+      },
+      {
+        id: "target",
+        position: { x: 10, y: 10 },
+        data: {
+          title: "parent",
+          columns: [{ column_name: "id", data_type: "bigint", is_pk: true, is_not_null: true }],
+          badges: { pk: true, fk: false }
+        }
+      }
+    ];
+
+    expect(() => exportTypeOrm(nodes, [{
+      id: "missing-source",
+      source: "source",
+      target: "target",
+      sourceHandle: sourceColumnHandleId("missing"),
+      targetHandle: targetColumnHandleId("id")
+    }])).toThrow("missing columns");
+
+    expect(() => exportTypeOrm(nodes, [{
+      id: "missing-target",
+      source: "source",
+      target: "target",
+      sourceHandle: sourceColumnHandleId("parent_id"),
+      targetHandle: targetColumnHandleId("missing")
+    }])).toThrow("missing columns");
+  });
+
+  it("matches TypeORM bigint runtime values and escapes generated string literals", () => {
+    const nodes: Node<TableNodeData>[] = [{
+      id: "quoted",
+      position: { x: 0, y: 0 },
+      data: {
+        title: "audit.weird\\\"table\\nname",
+        columns: [{
+          column_name: "large\\\"identifier\\nvalue",
+          data_type: "bigint",
+          is_pk: true,
+          is_not_null: true
+        }],
+        badges: { pk: true, fk: false }
+      }
+    }];
+
+    const output = exportTypeOrm(nodes, []);
+
+    expect(output).toContain('@Entity({ name: "weird\\\\\\\"table\\\\nname", schema: "audit" })');
+    expect(output).toContain('@PrimaryColumn({ name: "large\\\\\\\"identifier\\\\nvalue", type: "bigint" })');
+    expect(output).toContain("large_identifier_value: string;");
+  });
+
 });
