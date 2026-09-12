@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import TableNode from './TableNode'
+import type { IndexRecommendation } from './cardinality'
 import type { TableNodeData } from './convert'
 
 const TableNodeForTest = TableNode as unknown as React.ComponentType<{
@@ -25,10 +26,15 @@ describe('TableNode truncated-population accessibility', () => {
       is_not_null: false,
       is_pk: false
     }))
-    const indexes = Array.from({ length: 5 }, (_, index) => ({
+    const indexes: IndexRecommendation[] = Array.from({ length: 5 }, (_, index) => ({
       index_name: `idx_${index + 1}`,
       columns: ['column_1'],
-      access_method: 'btree'
+      access_method: 'btree',
+      estimated_distinct: 100,
+      cardinality_ratio: 0.5,
+      strength: 'recommended',
+      reason: 'focused accessibility fixture',
+      source: 'cardinality-wizard'
     }))
 
     const markup = renderTableNode({
