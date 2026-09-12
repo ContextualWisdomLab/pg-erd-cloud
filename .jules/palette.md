@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-24 - [파괴적 행동에 대한 확인 추가]
+**Learning:** 중요한 리소스(예: 테이블)를 삭제하는 것과 같은 파괴적인 작업에는 사용자가 실수를 복구할 수 있도록 확인 단계를 추가하는 것이 필수적입니다.
+**Action:** 테이블 삭제 시 `window.confirm`을 도입하여 사용자 경험의 안정성과 신뢰성을 높였습니다.

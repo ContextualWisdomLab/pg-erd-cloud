@@ -183,6 +183,7 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
     fireEvent.submit(document.getElementById('editTableForm')!)
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
     fireEvent.click(screen.getByRole('button', { name: '복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
