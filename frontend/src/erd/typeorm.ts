@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
-import { decodeHandleId } from "./handleUtils";
+import { sanitizeHandleId, decodeHandleId } from "./handleUtils";
 
 function sanitizeClassName(name: string): string {
   let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -21,7 +21,7 @@ function sanitizePropertyName(name: string): string {
 function mapToTsType(pgType: string): string {
   const t = pgType.toLowerCase();
   if (t.includes("int8") || t.includes("bigint") || t.includes("bigserial")) {
-    return "string";
+    return "bigint";
   }
   if (t.includes("int") || t.includes("serial") || t.includes("float") || t.includes("double") || t.includes("numeric") || t.includes("real") || t.includes("decimal")) {
     return "number";
@@ -35,12 +35,9 @@ function mapToTsType(pgType: string): string {
   return "string";
 }
 
-function escapeLiteral(value: string): string {
-  const serializedValue = JSON.stringify(value);
-  if (serializedValue === undefined) {
-    throw new TypeError("Unable to serialize TypeORM metadata");
-  }
-  return serializedValue.slice(1, -1);
+function escapeLiteral(str: string): string {
+  if (!str) return "";
+  return str.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
 }
 export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   if (nodes.length === 0) {
@@ -54,8 +51,11 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
     nodesById.set(n.id, n);
   }
 
+  const fkNodeColumnPairs = new Set<string>();
+  const fkNodesWithoutHandles = new Set<string>();
+
   // Track all relationships coming INTO a target model
-  const incomingRelationsByNode = new Map<string, Array<{ sourceModel: string, sourceField: string }>>();
+  const incomingRelationsByNode = new Map<string, Array<{ sourceModel: string, sourceField: string, targetField: string }>>();
 
   // Track relationship configurations for the source models
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[] }>();
@@ -114,10 +114,16 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
       sourceCols = [...edgeData.sourceColumns];
       targetCols = [...edgeData.targetColumns];
 
+      for (const col of sourceCols) {
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(col)}`);
+      }
     } else {
       let sourceField = "";
       if (edge.sourceHandle?.startsWith("src-")) {
         sourceField = decodeHandleId(edge.sourceHandle);
+        fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
+      } else if (!edge.sourceHandle) {
+        fkNodesWithoutHandles.add(edge.source);
       }
 
       let targetField = "id";
@@ -126,17 +132,8 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
       }
 
       if (sourceField) {
-        const sourceHasColumn = sourceNode.data.columns.some(
-          (column) => column.column_name === sourceField
-        );
-        const targetHasColumn = targetNode.data.columns.some(
-          (column) => column.column_name === targetField
-        );
-        if (!sourceHasColumn || !targetHasColumn) {
-          throw new Error("Invalid foreign key metadata: missing columns");
-        }
-        sourceCols = [sourceField];
-        targetCols = [targetField];
+         sourceCols = [sourceField];
+         targetCols = [targetField];
       }
     }
 
@@ -144,10 +141,12 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
       const relList = incomingRelationsByNode.get(edge.target) || [];
       // Combine multiple columns into a signature for naming if necessary
       const combinedSourceField = sourceCols.map(sanitizePropertyName).join("_");
+      const combinedTargetField = targetCols.map(sanitizePropertyName).join("_");
 
       relList.push({
         sourceModel,
-        sourceField: combinedSourceField
+        sourceField: combinedSourceField,
+        targetField: combinedTargetField
       });
       incomingRelationsByNode.set(edge.target, relList);
 
@@ -171,26 +170,28 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
       tableName = tableNameParts.slice(1).join('.');
     }
 
-    output += `@Entity({ name: "${escapeLiteral(tableName)}", schema: "${escapeLiteral(schemaName)}" })\nexport class ${className} {\n`;
+    output += `@Entity({ name: "${tableName}", schema: "${schemaName}" })\nexport class ${className} {\n`;
 
     for (const col of node.data.columns) {
       const propName = sanitizePropertyName(col.column_name);
       const tsType = mapToTsType(col.data_type);
+      const isFk = fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) || (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
+
       let colDecorator = "";
       if (col.is_pk) {
         if (col.data_type.toLowerCase().includes("serial")) {
-          colDecorator = `@PrimaryGeneratedColumn({ name: "${escapeLiteral(col.column_name)}" })`;
+          colDecorator = `@PrimaryGeneratedColumn({ name: "${col.column_name}" })`;
         } else {
           const colOpts = [];
           colOpts.push(`name: "${escapeLiteral(col.column_name)}"`);
-          if (col.data_type) colOpts.push(`type: "${escapeLiteral(col.data_type)}"`);
+          if (col.data_type) colOpts.push(`type: "${col.data_type}"`);
           colDecorator = `@PrimaryColumn({ ${colOpts.join(", ")} })`;
         }
       } else {
         const colOpts = [];
         colOpts.push(`name: "${escapeLiteral(col.column_name)}"`);
         if (!col.is_not_null) colOpts.push(`nullable: true`);
-        if (col.data_type) colOpts.push(`type: "${escapeLiteral(col.data_type)}"`);
+        if (col.data_type) colOpts.push(`type: "${col.data_type}"`);
         colDecorator = `@Column({ ${colOpts.join(", ")} })`;
       }
 
@@ -202,11 +203,12 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
     for (const [_, edgeInfo] of edgesProcessed) {
       if (edgeInfo.sourceModel === className) {
         const relProp = edgeInfo.targetModel.charAt(0).toLowerCase() + edgeInfo.targetModel.slice(1) + "_" + edgeInfo.sourceFields.map(sanitizePropertyName).join("_");
+        const isOptional = true; // Could map strictly based on is_not_null of source fields
         output += `  @ManyToOne(() => ${edgeInfo.targetModel})\n`;
         if (edgeInfo.sourceFields.length === 1) {
-            output += `  @JoinColumn({ name: "${escapeLiteral(edgeInfo.sourceFields[0])}", referencedColumnName: "${escapeLiteral(edgeInfo.targetFields[0])}" })\n`;
+            output += `  @JoinColumn({ name: "${edgeInfo.sourceFields[0]}", referencedColumnName: "${edgeInfo.targetFields[0]}" })\n`;
         } else {
-            const joinColumns = edgeInfo.sourceFields.map((sourceField, index) => `{ name: "${escapeLiteral(sourceField)}", referencedColumnName: "${escapeLiteral(edgeInfo.targetFields[index])}" }`).join(", ");
+            const joinColumns = edgeInfo.sourceFields.map((sf, i) => `{ name: "${sf}", referencedColumnName: "${edgeInfo.targetFields[i]}" }`).join(", ");
             output += `  @JoinColumn([${joinColumns}])\n`;
         }
         output += `  ${relProp}?: ${edgeInfo.targetModel};\n\n`;
@@ -218,7 +220,7 @@ export function exportTypeOrm(nodes: Node<TableNodeData>[], edges: Edge[]): stri
     for (const inc of incoming) {
       const sourcePropLower = inc.sourceModel.charAt(0).toLowerCase() + inc.sourceModel.slice(1);
       const relPropName = sourcePropLower + "s_" + inc.sourceField;
-      const childRelationProp = className.charAt(0).toLowerCase() + className.slice(1) + "_" + inc.sourceField;
+      const childRelationProp = sourcePropLower + "_" + inc.sourceField;
       output += `  @OneToMany(() => ${inc.sourceModel}, (e) => e.${childRelationProp})
   ${relPropName}: ${inc.sourceModel}[];
 
