@@ -11,6 +11,7 @@ interface ExportModalProps {
   isCreatingShareLink: boolean;
   isShareLinkCopied: boolean;
   shareLinkError: string | null;
+  exportError?: string | null;
   canCreateShareLink: boolean;
   onCloseExport: () => void;
   onCopyExportDdl: () => void;
@@ -21,6 +22,7 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadTypeOrm: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -44,6 +46,7 @@ export function ExportModal({
   isCreatingShareLink,
   isShareLinkCopied,
   shareLinkError,
+  exportError,
   canCreateShareLink,
   onCloseExport,
   onCopyExportDdl,
@@ -54,6 +57,7 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadTypeOrm,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -61,11 +65,12 @@ export function ExportModal({
 
   if (!isOpen) return null;
 
-  const shareStatusKind = shareLinkError ? 'error' : isShareLinkCopied ? 'success' : 'neutral';
-  const shareStatusRole = shareLinkError ? 'alert' : 'status';
-  const shareStatusLive = shareLinkError ? 'assertive' : 'polite';
-  const shareStatusMessage = shareLinkError
-    ? shareLinkError
+  const mergedError = shareLinkError || exportError;
+  const shareStatusKind = mergedError ? 'error' : isShareLinkCopied ? 'success' : 'neutral';
+  const shareStatusRole = mergedError ? 'alert' : 'status';
+  const shareStatusLive = mergedError ? 'assertive' : 'polite';
+  const shareStatusMessage = mergedError
+    ? mergedError
     : isShareLinkCopied
       ? '링크가 복사되었습니다. 접근 권한이 있는 팀원이 최신 스냅샷을 열 수 있습니다.'
       : '선택한 다이어그램을 공유하거나 산출물로 내보낼 준비가 되었습니다.';
@@ -118,6 +123,14 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
       ariaLabel: 'Prisma Schema 내보내기',
+    },
+    {
+      label: 'TypeORM Entities',
+      description: hasDiagramExport ? 'TypeScript 클래스' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadTypeOrm,
+      ariaLabel: 'TypeORM Entities 내보내기',
     },
     {
       label: 'Data Dictionary CSV',
