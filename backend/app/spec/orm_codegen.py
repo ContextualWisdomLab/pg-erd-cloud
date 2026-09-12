@@ -82,12 +82,21 @@ def _index(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     ]
     cols_by_oid: dict[Any, list[dict[str, Any]]] = {}
     for c in snapshot.get("columns") or []:
-        cols_by_oid.setdefault(c.get("relation_oid"), []).append(c)
+        oid = c.get("relation_oid")
+        if oid in cols_by_oid:
+            cols_by_oid[oid].append(c)
+        else:
+            cols_by_oid[oid] = [c]
     for cols in cols_by_oid.values():
         cols.sort(key=lambda c: c.get("column_position") or 0)
     pk_by_oid: dict[Any, set[str]] = {}
     for pk in snapshot.get("pk_columns") or []:
-        pk_by_oid.setdefault(pk.get("relation_oid"), set()).add(str(pk.get("column_name")))
+        oid = pk.get("relation_oid")
+        name = str(pk.get("column_name"))
+        if oid in pk_by_oid:
+            pk_by_oid[oid].add(name)
+        else:
+            pk_by_oid[oid] = {name}
     fk_by_child: dict[tuple[Any, str], dict[str, Any]] = {}
     for e in snapshot.get("fk_edges") or []:
         fk_by_child[(e.get("child_relation_oid"), str(e.get("child_column_name")))] = e
@@ -172,7 +181,11 @@ def generate_prisma_schema(snapshot: dict[str, Any] | None) -> str:
     # child fk list per parent for reverse relation fields
     children_of: dict[Any, list[dict[str, Any]]] = {}
     for (child_oid, _), e in ix["fk_by_child"].items():
-        children_of.setdefault(e.get("parent_relation_oid"), []).append(e)
+        parent_oid = e.get("parent_relation_oid")
+        if parent_oid in children_of:
+            children_of[parent_oid].append(e)
+        else:
+            children_of[parent_oid] = [e]
 
     for rel in ix["relations"]:
         oid = rel.get("relation_oid")
@@ -250,7 +263,11 @@ def generate_typeorm_entities(snapshot: dict[str, Any] | None) -> str:
     # reverse-relation index: parent oid -> child fk edges
     children_of: dict[Any, list[dict[str, Any]]] = {}
     for (child_oid, _), e in ix["fk_by_child"].items():
-        children_of.setdefault(e.get("parent_relation_oid"), []).append(e)
+        parent_oid = e.get("parent_relation_oid")
+        if parent_oid in children_of:
+            children_of[parent_oid].append(e)
+        else:
+            children_of[parent_oid] = [e]
 
     for rel in ix["relations"]:
         oid = rel.get("relation_oid")

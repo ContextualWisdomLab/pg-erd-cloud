@@ -273,7 +273,10 @@ def _group_by_relation(rows: object) -> dict[int, list[dict]]:
             continue
         oid = row.get("relation_oid")
         if isinstance(oid, int):
-            grouped.setdefault(oid, []).append(row)
+            if oid in grouped:
+                grouped[oid].append(row)
+            else:
+                grouped[oid] = [row]
     return grouped
 
 
