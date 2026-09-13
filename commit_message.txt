@@ -1,0 +1,3 @@
+feat(a11y): improve accessibility of disabled create project button
+
+Replaced the native `disabled` attribute with `aria-disabled="true"` on the 'Create' project button and added corresponding CSS and onClick event handlers. This ensures the disabled button remains focusable in the tab order, allowing screen readers to access and announce its `aria-describedby` hint explaining why it is disabled.
