@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-09-13 - Focusable Disabled Buttons in Project Creation
+**Learning:** The "Create project" button natively disabled via the HTML `disabled` attribute prevented screen reader users from accessing the `aria-describedby` hint explaining why the button was disabled. Replacing `disabled` with `aria-disabled="true"` and styling it identically resolves the issue but requires handling the disabled state manually in React to prevent default actions.
+**Action:** Always replace the native `disabled` attribute with `aria-disabled="true"` and an appropriate `onClick` manual override when disabled buttons carry explanatory text for accessibility purposes.
