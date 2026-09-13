@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2024-05-18 - Add tooltips to disabled form submission buttons
+**Learning:** Disabled buttons without clear context cause user confusion on forms. Adding native title attributes as tooltips easily resolves this by explaining missing requirements.
+**Action:** Add `title` attribute tooltips to disabled form submission buttons in AddTableModal, GroupModal, and App workspaces.
