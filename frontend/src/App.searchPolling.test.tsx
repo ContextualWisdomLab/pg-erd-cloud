@@ -133,7 +133,7 @@ async function renderReadyApp() {
 
 async function diagramOpenButtons() {
   fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-  return screen.findAllByRole('button', { name: '열기' })
+  return screen.findAllByRole('button', { name: (content, element) => element?.textContent === '열기' })
 }
 
 async function openSnapshot(index: number) {
