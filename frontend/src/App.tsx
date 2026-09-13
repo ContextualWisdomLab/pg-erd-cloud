@@ -1124,6 +1124,7 @@ export default function App() {
               type="button"
               onClick={onCreateProject}
               disabled={!projectName.trim() || isCreatingProject}
+              title={!projectName.trim() ? "프로젝트 이름을 입력하세요" : undefined}
               aria-busy={isCreatingProject}
               aria-describedby={
                 createProjectHint ? "create-project-hint" : undefined
@@ -1187,6 +1188,11 @@ export default function App() {
               !isDsnPresent ||
               isCreatingConnection
             }
+            title={
+              !selectedProjectId ? "프로젝트를 먼저 선택하세요" :
+              !connName.trim() ? "연결 이름을 입력하세요" :
+              !isDsnPresent ? "DSN을 입력하세요" : undefined
+            }
             aria-busy={isCreatingConnection}
             aria-describedby={
               createConnectionHint ? "create-connection-hint" : undefined
@@ -1215,6 +1221,10 @@ export default function App() {
           type="button"
           onClick={onCreateSnapshot}
           disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
+          title={
+            !selectedProjectId ? "프로젝트를 선택하세요" :
+            !selectedConnId ? "연결을 선택하세요" : undefined
+          }
           aria-busy={isCreatingSnapshot}
           aria-describedby={
             createSnapshotHint ? "create-snapshot-hint" : undefined
@@ -1353,6 +1363,7 @@ export default function App() {
                   type="button"
                   onClick={onCreateProject}
                   disabled={!projectName.trim() || isCreatingProject}
+                  title={!projectName.trim() ? "프로젝트 이름을 입력하세요" : undefined}
                 >
                   {isCreatingProject ? "생성 중" : "새 프로젝트"}
                 </button>

@@ -79,6 +79,7 @@ export function AddTableModal({
           <button
             type="submit"
             disabled={!newTableName.trim()}
+            title={!newTableName.trim() ? "테이블 이름을 입력하세요" : undefined}
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }
