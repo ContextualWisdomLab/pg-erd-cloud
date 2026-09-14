@@ -1125,7 +1125,6 @@ export default function App() {
               onClick={(e) => {
                 if (!projectName.trim() || isCreatingProject) {
                   e.preventDefault();
-                  e.stopPropagation();
                   return;
                 }
                 onCreateProject();
