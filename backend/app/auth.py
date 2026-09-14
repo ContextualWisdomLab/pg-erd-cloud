@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -273,16 +273,13 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     try:
         claims = jwt.decode(
             token,
-            jwk,
+            jwt.PyJWK.from_dict(jwk).key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
             options={
                 "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
+                "require": ["iss", "exp", "jti"] + (["aud"] if bool(settings.oidc_audience) else []),
                 "leeway": OIDC_JWT_LEEWAY_SECONDS,
             },
         )
