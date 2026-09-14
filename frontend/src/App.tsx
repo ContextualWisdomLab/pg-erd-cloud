@@ -1371,7 +1371,6 @@ export default function App() {
                   <span role="cell">
                     <button
                       type="button"
-                      aria-label={`${sanitizeHtml(project.project_name)} 열기`}
                       onClick={() => {
                         setSelectedProjectId(project.project_space_uuid);
                         setActiveView("diagrams");
@@ -1780,7 +1779,6 @@ export function DiagramTable({
           <span role="cell">
             <button
               type="button"
-              aria-label={`${name} 열기`}
               onClick={() => onOpenEditor(item.schema_snapshot_uuid)}
             >
               열기
