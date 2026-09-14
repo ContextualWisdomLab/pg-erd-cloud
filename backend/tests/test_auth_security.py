@@ -187,8 +187,12 @@ async def test_oidc_rejects_header_selected_algorithm(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -233,6 +237,10 @@ async def test_oidc_decode_rejects_kty_mismatch(
     async def fake_jwks() -> dict:
         return {"keys": [jwk]}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     def fail_decode(*_: object, **__: object) -> dict:
@@ -259,7 +267,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -268,12 +276,17 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         observed["kwargs"] = kwargs
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
         return jti == "revoked-jwt"
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: type("MockPyJWK", (), {"key": jwk})())
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
 
     async def mock_is_token_revoked(jti):
@@ -292,13 +305,10 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
         "options": {
-            "verify_aud": True,
-            "require_aud": True,
-            "require_iss": True,
-            "require_exp": True,
-            "require_jti": True,
-            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
-        },
+                "verify_aud": True,
+                "require": ["iss", "exp", "jti", "aud"],
+                "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
+            },
     }
 
 
@@ -353,8 +363,8 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {"keys": [{"kid": "new-key", "kty": "RSA"}]}
-        return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
+            return {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
+        return {"keys": [{"kid": "old-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
     observed: dict[str, object] = {}
 
@@ -363,12 +373,17 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
         observed["kwargs"] = kwargs
         return {"sub": "user-1", "name": "User One", "jti": "jwt-1", "exp": exp_claim()}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
         return jti == "revoked-jwt"
 
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: type("MockPyJWK", (), {"key": jwk})())
     monkeypatch.setattr(auth.jwt, "decode", fake_decode)
 
     async def mock_is_token_revoked(jti):
@@ -383,7 +398,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert observed["key"] == {"kid": "new-key", "kty": "RSA"}
+    assert observed["key"] == {"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}
 
 
 @pytest.mark.asyncio
@@ -397,8 +412,12 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -431,11 +450,15 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
     )
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -575,11 +598,15 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.PyJWTError("mocked decoding error")
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -607,8 +634,12 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {"keys": [{"kid": "key-1", "kty": "RSA"}]}
+        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
 
+    class MockPyJWK:
+        def __init__(self, key):
+            self.key = key
+    monkeypatch.setattr(auth.jwt.PyJWK, "from_dict", lambda jwk: MockPyJWK(jwk))
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
     async def mock_is_token_revoked2(jti):
@@ -647,7 +678,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
             request_count += 1
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA"}]})
+            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -665,12 +696,12 @@ async def test_oidc_jwks_refresh_rate_limiting(
     )
 
     jwks = await auth._get_jwks()
-    assert jwks == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+    assert jwks == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
     assert request_count == 2
 
     before_second_refresh = request_count
     jwks2 = await auth._get_jwks(force_refresh=True)
-    assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA"}]}
+    assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]}
     assert request_count == before_second_refresh
 
 
@@ -696,7 +727,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
             await asyncio.sleep(0)
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA"}]})
+            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -726,10 +757,10 @@ async def test_oidc_jwks_force_refresh_is_serialized(
     )
 
     assert refreshed == [
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]},
+        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "nQ", "e": "AQAB"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
