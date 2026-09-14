@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-07-30 - Add required field indicators to form labels
+**Learning:** When modifying form `<label>` elements to include visual indicators (e.g., a required asterisk `<span>`), React Testing Library queries using exact string matches like `getByLabelText('Label Name')` will fail.
+**Action:** Update the tests to use regex matching (e.g., `getByLabelText(/Label Name/)`) to prevent test suite failures, and ensure the exact styling matches the existing codebase.
