@@ -3,7 +3,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ConnectionCreateIn, ProjectCreateIn, ProjectMemberAddIn
+from app.schemas import (
+    ConnectionCreateIn,
+    ProjectCreateIn,
+    ProjectMemberAddIn,
+    DiagramViewCreateIn,
+    ApiKeyCreateIn,
+    TableAnnotationUpsertIn,
+)
 
 
 def test_project_name_length_is_bounded() -> None:
@@ -37,3 +44,28 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+
+def test_diagram_view_name_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\x00view", layout_json={})
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\nview", layout_json={})
+
+
+def test_api_key_name_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="ci\x00key")
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="ci\nkey")
+
+
+def test_table_annotation_identifiers_reject_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name="public\n", relation_name="tbl", body="note"
+        )
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(
+            schema_name="public", relation_name="tb\x00l", body="note"
+        )
