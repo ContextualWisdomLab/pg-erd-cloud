@@ -17,3 +17,7 @@
 ## [Unreleased]
 ### Security
 - `backend/app/schemas.py`: 로그 인젝션 및 터미널 이스케이프 인젝션 취약점을 방지하기 위해 `DiagramViewCreateIn.name`, `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`, `ApiKeyCreateIn.key_name` 문자열 필드에 정규식 유효성 검사(`pattern=r"^[^\x00-\x1F\x7F]+$"`)를 추가했습니다 (Sentinel).
+
+## [Unreleased]
+### Security
+- `backend/pyproject.toml`: `ecdsa` 패키지를 `<0.19.2` 버전으로 고정하여 Minerva 타이밍 공격(PYSEC-2026-1325) 취약점을 방지했습니다.
