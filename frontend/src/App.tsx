@@ -1752,7 +1752,7 @@ export function DiagramTable({
   if (!rows.length) {
     return (
       <div className="panelEmpty">
-        {snapshots.length
+        {searchText.trim() || snapshots.length
           ? "검색 결과가 없습니다."
           : "아직 다이어그램 스냅샷이 없습니다. 편집기에서 데이터베이스를 역공학해 시작하세요."}
       </div>
