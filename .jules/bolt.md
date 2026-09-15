@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-09-15 - Optimize O(E * C) loops in exportDDL and exportPrisma
+**Learning:** In `export.ts` and `prisma.ts`, searching for node columns using `Array.find()` inside loops that iterate over graph edges results in `O(E * C)` complexity, causing bottlenecks in large ERD exports.
+**Action:** Always pre-compute a `Map` of columns (by node ID and then by column handle/name) outside the edge loop to convert the search complexity to `O(1)`, significantly reducing GC overhead and CPU cycles during diagram export.
