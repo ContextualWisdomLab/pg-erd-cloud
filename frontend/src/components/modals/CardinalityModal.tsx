@@ -227,6 +227,18 @@ export function CardinalityModal({
                   onClick={() =>
                     onApplyCardinalityRecommendation(recommendation)
                   }
+                  aria-label={
+                    isApplied
+                      ? `${recommendation.index_name} 인덱스 적용됨`
+                      : `${recommendation.index_name} 인덱스 적용`
+                  }
+                  title={
+                    isApplied
+                      ? "이미 적용된 인덱스입니다"
+                      : recommendation.strength === "skip"
+                        ? "추천하지 않는 인덱스입니다"
+                        : "이 인덱스를 테이블에 적용합니다"
+                  }
                 >
                   {isApplied ? "적용됨" : "적용"}
                 </button>
