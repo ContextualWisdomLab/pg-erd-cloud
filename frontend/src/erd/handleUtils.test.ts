@@ -1,8 +1,33 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('sanitizeHandleId', () => {
+    it('should memoize calculations and limit cache size', () => {
+      const spy = vi.spyOn(Array, 'from');
+      // 1. Initial call computes
+      sanitizeHandleId('test1');
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      // 2. Second call should hit cache (no additional Array.from call)
+      sanitizeHandleId('test1');
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      // 3. Force cache eviction (max size 1000)
+      for (let i = 0; i < 1001; i++) {
+        sanitizeHandleId(`evict-${i}`);
+      }
+
+      // 4. 'test1' should be evicted, so it computes again
+      spy.mockClear();
+      sanitizeHandleId('test1');
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
     it('should encode a simple ascii string', () => {
       expect(sanitizeHandleId('id')).toBe('c-0069-0064');
     });
