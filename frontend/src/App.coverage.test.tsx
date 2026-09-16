@@ -258,6 +258,7 @@ const snapshots = [
   { schema_snapshot_uuid: 's2', status: 'failed', schema_filter: null },
 ]
 
+afterEach(cleanup)
 beforeEach(() => {
   vi.clearAllMocks()
   api.getMe.mockResolvedValue({ subject: 'user', display_name: 'User', user_account_uuid: 'u' })
