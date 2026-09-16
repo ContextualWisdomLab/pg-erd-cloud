@@ -190,7 +190,12 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(
+        min_length=1,
+        max_length=200,
+        # Prevents ASCII control character injection (e.g. log injection)
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -302,7 +307,12 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128)
+    key_name: str = Field(
+        min_length=1,
+        max_length=128,
+        # Prevents ASCII control character injection (e.g. log injection)
+        pattern=r"^[^\x00-\x1F\x7F]+$",
+    )
 
 
 class ApiKeyOut(BaseModel):
