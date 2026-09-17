@@ -390,7 +390,7 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('email distinct count'), { target: { value: '75' } })
     fireEvent.click(screen.getByLabelText('email 사용'))
     expect(screen.getByText('50%')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /적용됨/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: '적용됨' })).toHaveLength(2)
 
     rerender(
       <CardinalityModal
@@ -402,7 +402,7 @@ describe('modal behavior coverage', () => {
         appliedCardinalitySignatures={{ names: new Set(), columns: new Set() }}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: /적용/ }))
+    fireEvent.click(screen.getByRole('button', { name: '적용' }))
     fireEvent.click(screen.getByRole('button', { name: '카디널리티 계산 닫기' }))
     expect(callbacks.table).toHaveBeenCalledWith('table-1')
     expect(callbacks.rows).toHaveBeenCalledWith('200')

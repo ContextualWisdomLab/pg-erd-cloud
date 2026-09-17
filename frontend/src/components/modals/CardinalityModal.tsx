@@ -207,16 +207,13 @@ export function CardinalityModal({
               <div
                 className={`cardinalityRecommendation cardinalityRecommendation--${recommendation.strength}`}
                 key={`${recommendation.index_name}-${recommendation.columns.join("-")}`}
-                role="group"
-                aria-labelledby={`title-${recommendation.index_name}`}
-                aria-describedby={`reason-${recommendation.index_name}`}
               >
                 <div>
-                  <div className="cardinalityRecommendation__title" id={`title-${recommendation.index_name}`}>
+                  <div className="cardinalityRecommendation__title">
                     <span>{strengthLabel(recommendation.strength)}</span>
                     <strong>{recommendation.index_name}</strong>
                   </div>
-                  <div className="field-hint" id={`reason-${recommendation.index_name}`}>
+                  <div className="field-hint">
                     {recommendation.columns.join(", ")} ·{" "}
                     {formatPercent(recommendation.cardinality_ratio)} ·{" "}
                     {recommendation.reason}
@@ -229,11 +226,6 @@ export function CardinalityModal({
                   }
                   onClick={() =>
                     onApplyCardinalityRecommendation(recommendation)
-                  }
-                  aria-label={
-                    isApplied
-                      ? `${recommendation.index_name} 인덱스 적용됨`
-                      : `${recommendation.index_name} 인덱스 적용`
                   }
                 >
                   {isApplied ? "적용됨" : "적용"}
