@@ -80,3 +80,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-09-15 - Optimize O(E * C) loops in exportDDL and exportPrisma
 **Learning:** In `export.ts` and `prisma.ts`, searching for node columns using `Array.find()` inside loops that iterate over graph edges results in `O(E * C)` complexity, causing bottlenecks in large ERD exports.
 **Action:** Always pre-compute a `Map` of columns (by node ID and then by column handle/name) outside the edge loop to convert the search complexity to `O(1)`, significantly reducing GC overhead and CPU cycles during diagram export.
+
+## 2026-09-17 - OpenCode review failure analysis
+**Learning:** The CI check `opencode-review` failed because the `opencode-agent` review process didn't register an `APPROVED` or `CHANGES_REQUESTED` state. This happens asynchronously and acts as an external blocker for the CI run if the approval receipt is missing.
+**Action:** Since we've already applied and pushed the correct optimization, this CI failure appears to be a synchronization issue with the external review service. We will retry the PR submission to trigger the workflow again.
