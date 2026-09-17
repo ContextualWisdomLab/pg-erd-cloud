@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2026-07-20 - O(E) 루프를 O(1) Map 조회로 대체하여 Prisma export 최적화
+**Learning:** Prisma 스키마를 생성하는 `exportPrisma` 함수 내에서 각 컬럼을 순회할 때마다 모든 연결된 엣지(edgesProcessed)를 순회(O(E*C*N))하는 것은 다이어그램이 커질수록 심각한 성능 병목을 발생시킵니다.
+**Action:** 엣지를 처리할 때 `${sourceModel}:${sourceField}` 형태의 키를 가진 O(1) 조회용 Map(`relationsBySourceField`)을 미리 생성하여 불필요한 반복문을 피하십시오.
