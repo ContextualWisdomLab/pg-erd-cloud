@@ -59,7 +59,6 @@ function fkColumnsForEdge(
   edge: Edge,
   sourceNode: Node<TableNodeData>,
   targetNode: Node<TableNodeData>,
-  columnsByNodeHandle: Map<string, Map<string, string>>
 ): { sourceColumns: string[]; targetColumns: string[] } | null {
   const data = edge.data as ForeignKeyEdgeData | undefined;
   const sourceColumns = data?.sourceColumns?.filter(Boolean) || [];
@@ -68,12 +67,12 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceColMap = columnsByNodeHandle.get(sourceNode.id);
-  const targetColMap = columnsByNodeHandle.get(targetNode.id);
-
-  const sourceHandleColumn = sourceColMap?.get(edge.sourceHandle || '');
-  const targetHandleColumn = targetColMap?.get(edge.targetHandle || '');
-
+  const sourceHandleColumn = (sourceNode.data.columns || [])
+    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
+    ?.column_name;
+  const targetHandleColumn = (targetNode.data.columns || [])
+    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
+    ?.column_name;
   if (sourceHandleColumn && targetHandleColumn) {
     return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
   }
@@ -97,15 +96,8 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
   // Bolt: Use map for O(1) node lookup instead of O(N) array find
   // Avoid Map(array.map) to prevent O(N) intermediate tuple array allocation overhead
   const nodesById = new Map<string, Node<TableNodeData>>();
-  const columnsByNodeHandle = new Map<string, Map<string, string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
-    const colMap = new Map<string, string>();
-    for (const col of n.data.columns || []) {
-      colMap.set(sourceColumnHandleId(col.column_name), col.column_name);
-      colMap.set(targetColumnHandleId(col.column_name), col.column_name);
-    }
-    columnsByNodeHandle.set(n.id, colMap);
   }
 
   // Export tables
@@ -141,7 +133,7 @@ export function exportDDL(nodes: Node<TableNodeData>[], edges: Edge[]): string {
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode, columnsByNodeHandle);
+      const fkColumns = fkColumnsForEdge(edge, sourceNode, targetNode);
       const constraintName = edge.label ? edge.label : `fk_${edge.source}_${edge.target}`;
       const sourceTable = quoteSqlIdentifier(sourceNode.data.title || sourceNode.id);
       const targetTable = quoteSqlIdentifier(targetNode.data.title || targetNode.id);
