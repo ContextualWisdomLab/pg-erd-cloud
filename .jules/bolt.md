@@ -84,3 +84,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-09-17 - OpenCode review failure analysis
 **Learning:** The CI check `opencode-review` failed because the `opencode-agent` review process didn't register an `APPROVED` or `CHANGES_REQUESTED` state. This happens asynchronously and acts as an external blocker for the CI run if the approval receipt is missing.
 **Action:** Since we've already applied and pushed the correct optimization, this CI failure appears to be a synchronization issue with the external review service. We will retry the PR submission to trigger the workflow again.
+
+## 2026-09-17 - React Testing Library missing button
+**Learning:** `App.coverage.test.tsx` fails because it cannot find the button with the name `'열기'` (Open).
+**Action:** Let's look at `frontend/src/erd/__tests__/App.editTable.test.tsx` which tests rendering of compact visual labels. The accessible names for generic action buttons like "Open" (`열기`) might have been changed dynamically to include context (e.g. `Item Name Open`) or it's a test issue where it expects an exact string but the DOM has multiple elements or additional hidden text. I need to update the test to query via a regular expression (e.g. `/열기/`) or fix the component.
