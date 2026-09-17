@@ -1,16 +1,8 @@
 export function sanitizeHandleId(columnName: string): string {
-  // ⚡ Bolt: Use for...of loop instead of Array.from(string).map().join('-')
-  // to prevent intermediate array allocations and GC pauses in the ERD hot paths.
-  let encoded = ''
-  let isFirst = true
-  for (const char of columnName) {
-    if (!isFirst) {
-      encoded += '-'
-    }
-    // char.codePointAt(0) is defined for valid strings in a for...of loop
-    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
-    isFirst = false
-  }
+  const encoded = Array.from(columnName, (char) => {
+    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    return char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }).join('-')
 
   return `c-${encoded || 'empty'}`
 }
