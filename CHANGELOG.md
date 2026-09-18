@@ -16,3 +16,5 @@
 
 ### 기타 변경 사항
 - **CI 설정 변경**: CI frontend 작업에서 npm 대신 pnpm을 사용하도록 수정하여, 의존성 설치 및 캐싱 문제를 해결했습니다.
+
+- **보안 설정 수정**: pnpm 10 버전 이상의 `minimumReleaseAge` 정책으로 인한 CI 설치 실패를 우회하기 위해 `frontend/.npmrc`에 `minimum-release-age=0` 설정을 추가했습니다.
