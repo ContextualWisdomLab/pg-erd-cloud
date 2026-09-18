@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createSanitizeHandleIdCache } from './handleUtils';
+import { describe, it, expect } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -21,38 +21,6 @@ describe('handleUtils', () => {
 
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
-    });
-  });
-
-  describe('createSanitizeHandleIdCache', () => {
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should cache results and use LRU eviction policy', () => {
-      const spy = vi.spyOn(Array, 'from');
-      const customSanitize = createSanitizeHandleIdCache(2);
-
-      expect(customSanitize('A')).toBe('c-0041');
-      expect(spy).toHaveBeenCalledTimes(1);
-
-      expect(customSanitize('B')).toBe('c-0042');
-      expect(spy).toHaveBeenCalledTimes(2);
-
-      expect(customSanitize('A')).toBe('c-0041');
-      expect(spy).toHaveBeenCalledTimes(2);
-
-      expect(customSanitize('C')).toBe('c-0043');
-      expect(spy).toHaveBeenCalledTimes(3);
-
-      expect(customSanitize('A')).toBe('c-0041');
-      expect(spy).toHaveBeenCalledTimes(3);
-
-      expect(customSanitize('C')).toBe('c-0043');
-      expect(spy).toHaveBeenCalledTimes(3);
-
-      expect(customSanitize('B')).toBe('c-0042');
-      expect(spy).toHaveBeenCalledTimes(4);
     });
   });
 

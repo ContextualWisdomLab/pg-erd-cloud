@@ -14,6 +14,5 @@
 - [FE] ⬇️ **DBML Export**: ERD 다이어그램을 DBML (Database Markup Language) 형식으로 내보낼 수 있는 기능을 추가했습니다. 상단의 DBML 버튼을 클릭하여 다운로드할 수 있습니다.
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
 
-## [Unreleased]
-### 변경 사항
-- **성능 개선**: `sanitizeHandleId` 함수에 LRU(Least Recently Used) 캐시를 적용하여 ERD 렌더링 시 빈번하게 발생하는 문자열 변환 연산을 최적화했습니다. 테스트 커버리지를 100%로 유지하며 성능을 높였습니다.
+### 기타 변경 사항
+- **CI 설정 변경**: CI frontend 작업에서 npm 대신 pnpm을 사용하도록 수정하여, 의존성 설치 및 캐싱 문제를 해결했습니다.
