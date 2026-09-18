@@ -19,6 +19,7 @@ from app.settings import settings
 
 API_KEY_PREFIX = "pgerd_"
 
+
 def _parse_oidc_algorithms(raw: str) -> list[str]:
     """Parse OIDC_ALGORITHMS into a non-empty allowlist.
 
@@ -352,7 +353,7 @@ async def try_get_subject_for_rate_limit(request: Request) -> str | None:
     """
 
     auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer " + API_KEY_PREFIX):
+    if auth_header.lower().startswith("bearer " + API_KEY_PREFIX.lower()):
         return None
 
     try:
