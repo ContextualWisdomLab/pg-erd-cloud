@@ -61,6 +61,16 @@ export function exportPrisma(
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
 
+  const pkNodeColumnPairs = new Set<string>();
+  for (const n of nodes) {
+    for (const col of n.data.columns) {
+      if (col.is_pk) {
+        // Use exact column name to avoid sanitizeHandleId overhead and collisions
+        pkNodeColumnPairs.add(`${n.id}:${col.column_name}`);
+      }
+    }
+  }
+
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
@@ -82,7 +92,7 @@ export function exportPrisma(
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      const isUnique = pkNodeColumnPairs.has(`${edge.source}:${sourceField}`);
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
