@@ -1,11 +1,7 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createHandleIdSanitizer } from './handleUtils';
+import { describe, it, expect } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe('sanitizeHandleId', () => {
     it('should encode a simple ascii string', () => {
       expect(sanitizeHandleId('id')).toBe('c-0069-0064');
@@ -25,26 +21,6 @@ describe('handleUtils', () => {
 
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
-    });
-  });
-
-  describe('cache eviction', () => {
-    it('should evict the oldest item when exceeding maxSize', () => {
-      const sanitizer = createHandleIdSanitizer(2);
-      const spy = vi.spyOn(Array, 'from');
-
-      sanitizer('a'); // cache: 'a'
-      sanitizer('b'); // cache: 'a', 'b'
-      expect(spy).toHaveBeenCalledTimes(2);
-
-      sanitizer('a'); // cache: 'b', 'a' (LRU update)
-      expect(spy).toHaveBeenCalledTimes(2); // cached
-
-      sanitizer('c'); // cache: 'a', 'c' (evicts 'b')
-      expect(spy).toHaveBeenCalledTimes(3);
-
-      sanitizer('b'); // 'b' was evicted, must recompute
-      expect(spy).toHaveBeenCalledTimes(4); // recomputed
     });
   });
 

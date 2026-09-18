@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2024-05-18 - Optimize high-frequency string parsing
-**Learning:** Re-computing expensive string operations like Array.from and codePointAt on column names during graph rendering and export operations adds huge per-node overhead leading to poor interactive performance.
-**Action:** Use a bounded LRU Map cache for functions operating on strings used as static handles to make them O(1) across high-frequency re-renders.
