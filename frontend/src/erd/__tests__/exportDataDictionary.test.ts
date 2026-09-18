@@ -2,7 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import type { TableNodeData } from '../convert';
-import { exportDictionaryCsv, exportDictionaryMarkdown } from '../exportDataDictionary';
+import { exportDictionaryCsv, exportDictionaryMarkdown, exportDictionaryJson } from '../exportDataDictionary';
 
 describe('exportDataDictionary', () => {
   const nodes: Node<TableNodeData>[] = [
@@ -183,5 +183,38 @@ describe('exportDataDictionary', () => {
 
   it('handles empty Markdown exports', () => {
     expect(exportDictionaryMarkdown([], edges)).toBe('# Data Dictionary\n\nNo tables found.');
+  });
+
+  it('exports table and column metadata to JSON', () => {
+    const jsonStr = exportDictionaryJson(nodes, edges);
+    const parsed = JSON.parse(jsonStr);
+
+    expect(parsed).toHaveLength(3);
+
+    expect(parsed[0].table_name).toBe('public.users');
+    expect(parsed[0].table_comment).toBe('User accounts');
+    expect(parsed[0].columns).toHaveLength(3);
+
+    const idCol = parsed[0].columns[0];
+    expect(idCol.column_name).toBe('id');
+    expect(idCol.data_type).toBe('integer');
+    expect(idCol.is_pk).toBe(true);
+    expect(idCol.is_fk).toBe(false);
+    expect(idCol.is_not_null).toBe(true);
+    expect(idCol.column_comment).toBe('Primary Key');
+    expect(idCol.example_value).toBe(1);
+
+    const fkCol = parsed[0].columns[1];
+    expect(fkCol.column_name).toBe('account_id');
+    expect(fkCol.is_fk).toBe(true);
+
+    expect(parsed[2].table_name).toBe('empty_table');
+    expect(parsed[2].columns).toHaveLength(0);
+  });
+
+  it('handles empty JSON exports', () => {
+    const jsonStr = exportDictionaryJson([], edges);
+    const parsed = JSON.parse(jsonStr);
+    expect(parsed).toEqual([]);
   });
 });
