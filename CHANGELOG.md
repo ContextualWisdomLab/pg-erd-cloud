@@ -13,3 +13,8 @@
 - [FE] `autoInfer.ts`에 대한 단위 테스트 및 UI 컴포넌트 단위 테스트를 추가하여 100% 테스트 커버리지를 유지합니다.
 - [FE] ⬇️ **DBML Export**: ERD 다이어그램을 DBML (Database Markup Language) 형식으로 내보낼 수 있는 기능을 추가했습니다. 상단의 DBML 버튼을 클릭하여 다운로드할 수 있습니다.
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
+
+### 기타 변경 사항
+- **CI 설정 변경**: CI frontend 작업에서 npm 대신 pnpm을 사용하도록 수정하여, 의존성 설치 및 캐싱 문제를 해결했습니다.
+
+- **보안 설정 수정**: pnpm 10 버전 이상의 `minimumReleaseAge` 정책으로 인한 CI 설치 실패를 우회하기 위해 `frontend/.npmrc`에 `minimum-release-age=0` 설정을 추가했습니다.
