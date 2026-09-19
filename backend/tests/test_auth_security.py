@@ -773,6 +773,12 @@ def test_validate_jwt_header_crit():
     assert exc.value.status_code == 401
     assert exc.value.detail == "invalid crit header"
 
+    # An explicitly present null crit value is invalid, not equivalent to absence.
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": None})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
     # Test empty crit
     with pytest.raises(HTTPException) as exc:
         _validate_jwt_header({"alg": "RS256", "crit": []})
