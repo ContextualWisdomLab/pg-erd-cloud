@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-24 - Form accessibility for Enter key submissions
+**Learning:** Wrapping single inputs and buttons in `<form>` and converting the action button to `type="submit"` significantly improves accessibility, natively enabling "Enter" key submissions without the need for manual `onKeyDown` handlers.
+**Action:** Always wrap inputs in a `<form>` with an `onSubmit` handler, removing `onClick` on buttons and setting them to `type="submit"`.
