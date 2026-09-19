@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -340,6 +341,89 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('프로젝트가 없습니다. 이름을 입력해 새 프로젝트를 만드세요.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     expect(screen.getByText('프로젝트를 선택하세요.')).toBeInTheDocument()
+  })
+
+  it('blocks repeated Enter while creation requests are in flight', async () => {
+    let resolveProject!: (project: { project_space_uuid: string; project_name: string }) => void
+    let resolveConnection!: (connection: { db_connection_uuid: string; conn_name: string }) => void
+    api.createProject.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveProject = resolve }),
+    )
+    api.createConnection.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveConnection = resolve }),
+    )
+
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const projectName = screen.getByLabelText('New project')
+    await user.clear(projectName)
+    await user.type(projectName, 'Busy project')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveProject({ project_space_uuid: 'p-busy', project_name: 'Busy project' })
+      await Promise.resolve()
+    })
+
+    const connectionDsn = screen.getByLabelText('Connection DSN')
+    await user.type(connectionDsn, 'postgresql://db.example/busy')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
+    expect(api.createConnection).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveConnection({ db_connection_uuid: 'c-busy', conn_name: 'target-db' })
+      await Promise.resolve()
+    })
+  })
+
+  it('submits all three creation forms exactly once with Enter', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const editorProjectName = screen.getByLabelText('New project')
+    await user.clear(editorProjectName)
+    await user.keyboard('{Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
+    await user.type(editorProjectName, 'Keyboard project')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+
+    const connectionDsn = screen.getByLabelText('Connection DSN')
+    await user.click(connectionDsn)
+    await user.keyboard('{Enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
+    await user.type(connectionDsn, 'postgresql://db.example/keyboard')
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(api.createConnection).toHaveBeenCalledWith(
+        'p3',
+        'target-db',
+        'postgresql://db.example/keyboard',
+      ),
+    )
+    expect(api.createConnection).toHaveBeenCalledTimes(1)
+
+    api.createProject.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
+    const projectListName = screen.getByLabelText('새 프로젝트 이름')
+    await user.clear(projectListName)
+    await user.keyboard('{Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
+    await user.type(projectListName, 'Keyboard roadmap')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard roadmap'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
   })
 
   it('creates projects, validates and creates connections, and starts a snapshot', async () => {
