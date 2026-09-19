@@ -58,5 +58,5 @@
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
 ## 2024-09-18 - App Creation Forms converted to Native Forms
-**Learning:** In React, simple input + button pairs meant to create new entities (like projects and connections) are often built with `<div>` wrappers and `onClick` handlers. However, users expect to submit these inputs simply by pressing the 'Enter' key. Replacing `<div>` with native `<form>` elements and mapping `onSubmit` ensures implicit submission accessibility and better keyboard UX.
-**Action:** Always wrap input+button creation sets in `<form onSubmit={(e) => e.preventDefault(); action()} />` rather than relying solely on `onClick` handlers.
+**Learning:** A group that creates an entity is a submission interaction, so native `<form>` semantics provide expected Enter-key behavior. Close, cancel, and auxiliary actions are not submissions and must not inherit that behavior.
+**Action:** Wrap only a true submission group in `<form onSubmit={(event) => { event.preventDefault(); action(); }}>...</form>`, set only its submit action to `type="submit"`, and preserve `type="button"` plus existing handlers for close, cancel, and auxiliary actions.
