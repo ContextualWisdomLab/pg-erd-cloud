@@ -17,6 +17,8 @@ from app.db import get_session
 from app.models import ApiKey, UserAccount
 from app.settings import settings
 
+API_KEY_PREFIX = "pgerd_"
+
 
 def _parse_oidc_algorithms(raw: str) -> list[str]:
     """Parse OIDC_ALGORITHMS into a non-empty allowlist.
@@ -350,6 +352,10 @@ async def try_get_subject_for_rate_limit(request: Request) -> str | None:
       unauthenticated requests can still be limited by IP.
     """
 
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer " + API_KEY_PREFIX.lower()):
+        return None
+
     try:
         subject, _ = await _get_subject_from_request(request, verify_revocation=False)
         return subject
@@ -407,7 +413,6 @@ async def _ensure_user(
     return user
 
 
-API_KEY_PREFIX = "pgerd_"
 API_KEY_PBKDF2_ITERATIONS = 210_000
 
 
