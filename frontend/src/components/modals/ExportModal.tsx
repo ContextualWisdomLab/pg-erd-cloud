@@ -200,11 +200,13 @@ export function ExportModal({
                   {isCreatingShareLink ? '생성 중...' : '링크 만들기'}
                 </button>
               )}
-              <div
+              <p
+                id="share-export-access-hint"
+                className="exportModal__hint"
                 role="note"
                 aria-label="접근 관리 안내"
-              />
-              <p id="share-export-access-hint" className="exportModal__hint">
+              >
+                <strong>접근 관리:</strong>{' '}
                 접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.
               </p>
             </div>
