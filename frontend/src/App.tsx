@@ -1159,8 +1159,7 @@ export default function App() {
           </select>
         </div>
 
-        <div className="field">
-          <form onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
+        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1193,13 +1192,12 @@ export default function App() {
           >
             {isCreatingConnection ? "Saving…" : "Save connection"}
           </button>
-          </form>
           {createConnectionHint ? (
             <span id="create-connection-hint" className="field-hint">
               {createConnectionHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
         <div className="field">
           <label htmlFor="schema-filter">Schema filter (optional)</label>
