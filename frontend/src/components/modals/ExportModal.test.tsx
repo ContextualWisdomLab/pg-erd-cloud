@@ -175,9 +175,7 @@ describe('ExportModal', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
-    const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
-    expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
-    expect(accessManagementButton).not.toHaveAttribute('title');
+    const accessManagementNote = screen.getByRole('note', { name: '접근 관리 안내' });
+    expect(accessManagementNote).toBeInTheDocument();
   });
 });
