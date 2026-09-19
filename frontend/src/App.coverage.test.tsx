@@ -343,6 +343,48 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('프로젝트를 선택하세요.')).toBeInTheDocument()
   })
 
+  it('blocks repeated Enter while creation requests are in flight', async () => {
+    let resolveProject!: (project: { project_space_uuid: string; project_name: string }) => void
+    let resolveConnection!: (connection: { db_connection_uuid: string; conn_name: string }) => void
+    api.createProject.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveProject = resolve }),
+    )
+    api.createConnection.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveConnection = resolve }),
+    )
+
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const projectName = screen.getByLabelText('New project')
+    await user.clear(projectName)
+    await user.type(projectName, 'Busy project')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveProject({ project_space_uuid: 'p-busy', project_name: 'Busy project' })
+      await Promise.resolve()
+    })
+
+    const connectionDsn = screen.getByLabelText('Connection DSN')
+    await user.type(connectionDsn, 'postgresql://db.example/busy')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createConnection).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    await user.keyboard('{Enter}')
+    expect(api.createConnection).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveConnection({ db_connection_uuid: 'c-busy', conn_name: 'target-db' })
+      await Promise.resolve()
+    })
+  })
+
   it('submits all three creation forms exactly once with Enter', async () => {
     const user = userEvent.setup()
     await renderReadyApp()
