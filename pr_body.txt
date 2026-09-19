@@ -17,3 +17,5 @@
 Noema LLM CI review hallucinated a transient error. Resubmitting.
 
 Triggering CI again for OpenCode review sync.
+
+Triggering CI again to sync CodeQL asynchronous scan.
