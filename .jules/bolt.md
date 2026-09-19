@@ -80,3 +80,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-28 - Optimize O(E*C) lookups to O(1) Sets for ERD Prisma generation
 **Learning:** Using `Array.find()` inside an edge loop to check if a source field is a primary key results in O(E*C) complexity where E is edges and C is columns per node.
 **Action:** Pre-compute a `Set` of PK column handles keyed by `${node.id}:${sanitizeHandleId(columnName)}` before looping over edges to achieve O(N*C + E) performance when checking uniqueness constraints in Prisma schema generation.
+## 2026-09-19 - Use exact keys for performance sets and avoid tests coverage drops
+**Learning:** Adding string modifications like `sanitizeHandleId` during Map/Set pre-computation inside hot loops can break backwards-compatibility with unmodified access strings in exact equality checks, failing STRIX tests or breaking the logic.
+**Action:** Always strictly mirror the exact string matching format that the legacy O(N) `.find()` logic used. Avoid introducing extra sanitization functions if they were not present in the original loop condition. Furthermore, missing out on updating tests drops test coverage which causes CI checks to fail. Add targeted assertions to cover new pre-computed logic to restore coverage to 100%.

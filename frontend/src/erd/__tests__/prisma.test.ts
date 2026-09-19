@@ -112,7 +112,75 @@ describe('exportPrisma', () => {
     expect(result).toContain('c_other String');
   });
 
-  it('handles unique constraints properly', () => {
+it('handles unique constraints properly', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'unique_test',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'email', data_type: 'text', is_not_null: true, is_pk: false },
+          ],
+
+        },
+      },
+    ];
+
+    const result = exportPrisma(nodes, []);
+    expect(result).toContain('email String @unique');
+  });
+
+  it('optimizes primary key lookups via pre-computed Set', () => {
+    // This test ensures the optimized Set lookup works correctly
+    // by evaluating edge cases where the sourceField matches a primary key exactly.
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: 'node1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'users',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'user_id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: 'node2',
+        position: { x: 100, y: 0 },
+        data: {
+          title: 'profiles',
+          badges: { pk: true, fk: true },
+          columns: [
+            { column_name: 'profile_id', data_type: 'integer', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'integer', is_not_null: true, is_pk: true }, // PK and FK
+          ],
+        },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'edge1',
+        source: 'node2', // The side holding the FK
+        target: 'node1', // The referenced side
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-user_id',
+        label: '1_to_1_user_profile',
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+
+    // Check if the relation considers uniqueness (isUnique=true) when the foreign key is also a primary key
+    // The test ensures it detects isUnique = true. A true unique means the relation object gets a '?' suffix (optional/unique reference) instead of '[]' array
+    expect(result).toContain('profiles_user_id profiles? @relation("M_1_to_1_user_profile")');
+  });
+
+  it('handles unique constraints properly (legacy)', () => {
     const nodes: Node<TableNodeData>[] = [
       {
         id: '1',
