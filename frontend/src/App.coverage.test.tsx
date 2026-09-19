@@ -350,12 +350,17 @@ describe('App orchestration coverage', () => {
 
     const editorProjectName = screen.getByLabelText('New project')
     await user.clear(editorProjectName)
+    await user.keyboard('{Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
     await user.type(editorProjectName, 'Keyboard project')
     await user.keyboard('{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
     expect(api.createProject).toHaveBeenCalledTimes(1)
 
     const connectionDsn = screen.getByLabelText('Connection DSN')
+    await user.click(connectionDsn)
+    await user.keyboard('{Enter}')
+    expect(api.createConnection).not.toHaveBeenCalled()
     await user.type(connectionDsn, 'postgresql://db.example/keyboard')
     await user.keyboard('{Enter}')
     await waitFor(() =>
@@ -371,6 +376,8 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
     const projectListName = screen.getByLabelText('새 프로젝트 이름')
     await user.clear(projectListName)
+    await user.keyboard('{Enter}')
+    expect(api.createProject).not.toHaveBeenCalled()
     await user.type(projectListName, 'Keyboard roadmap')
     await user.keyboard('{Enter}')
     await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard roadmap'))
