@@ -10,8 +10,6 @@ from typing import Any, cast
 import httpx
 import jwt
 from fastapi import Depends, HTTPException, Request
-from jwt.algorithms import AllowedPublicKeys, ECAlgorithm, RSAAlgorithm
-from jwt.types import Options
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -286,24 +284,29 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
     else:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
-    decode_options: Options = {
-        "verify_aud": bool(settings.oidc_audience),
-        "require": ["iss", "exp", "jti"]
-        + (["aud"] if settings.oidc_audience else []),
-    }
     try:
+        import json
+
+        verification_key: Any = None
         if jwk_kty == "RSA":
-            verification_key = cast(AllowedPublicKeys, RSAAlgorithm.from_jwk(jwk))
+            verification_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+        elif jwk_kty == "EC":
+            verification_key = jwt.algorithms.ECAlgorithm.from_jwk(json.dumps(jwk))
         else:
-            verification_key = cast(AllowedPublicKeys, ECAlgorithm.from_jwk(jwk))
+            raise ValueError(f"unsupported key type: {jwk_kty}")
+
         claims = jwt.decode(
             token,
             verification_key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
-            options=decode_options,
             leeway=OIDC_JWT_LEEWAY_SECONDS,
+            options={
+                "verify_aud": bool(settings.oidc_audience),
+                "require": ["iss", "exp", "jti"]
+                + (["aud"] if settings.oidc_audience else []),
+            },
         )
     except Exception as err:
         raise HTTPException(
