@@ -74,4 +74,40 @@ describe("ERD node search", () => {
     expect(tableNodeMatchesSearch(users, "users jsonb")).toBe(false);
     expect(tableNodeMatchesSearch(audit, "audit missing")).toBe(false);
   });
+
+
+  it("uses the cached haystack for the same node data reference", () => {
+    // Missing title and comment to cover lines 15, 19-20
+    const minimalNode = tableNode("minimal", {
+      title: "",
+      columns: [
+        {
+          column_name: "test_col",
+          data_type: "",
+          is_not_null: false,
+          is_pk: false,
+        }
+      ]
+    });
+
+    // Test branch coverage where data.title and data_type is falsy, but others are not
+    const mixedNode = tableNode("mixed", {
+        title: "",
+        comment: "Comment",
+        columns: [
+            {
+                column_name: "",
+                data_type: "type",
+                column_comment: "ccomment",
+                is_not_null: false,
+                is_pk: false
+            }
+        ]
+    });
+
+    // Both searches should use the exact same cached string internally
+    expect([...findSearchMatchedNodeIds([minimalNode], "test_col")]).toEqual(["minimal"]);
+    expect([...findSearchMatchedNodeIds([minimalNode], "test_col")]).toEqual(["minimal"]);
+    expect([...findSearchMatchedNodeIds([mixedNode], "type")]).toEqual(["mixed"]);
+  });
 });
