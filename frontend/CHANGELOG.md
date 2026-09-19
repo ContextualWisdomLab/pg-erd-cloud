@@ -1,6 +1,9 @@
 # CHANGELOG
 
 ## [Unreleased]
+### Changed
+- **공유 접근 안내 의미론**: 권한 관리 동작이 구현되지 않은 `ExportModal`의 비활성 버튼을 제거하고, 안내를 읽기 순서의 `role="note"`로 제공합니다. 이로써 스크린 리더가 설명을 읽을 수 있으면서 keyboard 사용자는 동작 없는 focus stop을 만나지 않습니다.
+
 ### Added
 - **테이블 및 컬럼 편집 기능**: UI 패널을 통해 노드를 선택하고, 테이블의 이름/코멘트를 수정하며, 컬럼을 추가/수정/삭제하거나 테이블을 삭제할 수 있는 기능 추가.
 - **테스트 추가**: 프론트엔드 테스트 커버리지 100% 목표 달성을 위해 `cardinality.ts`, `types.ts`, `export.ts` 의 미달성 분기 및 함수 테스트 추가 (`cardinality_extra.test.ts` 등).
