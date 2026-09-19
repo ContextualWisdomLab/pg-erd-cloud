@@ -190,7 +190,11 @@ class IndexRedundancyOut(BaseModel):
 class DiagramViewCreateIn(BaseModel):
     """Request body for saving an ERD canvas view."""
 
-    name: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00-\x1F\x7F]+$")
+    name: str = Field(
+        min_length=1,
+        max_length=200,
+        pattern=r"^[^\x00-\x1F\x7F\x{80}-\x{9F}]+$",
+    )
     # Opaque client layout (node positions, hidden tables, viewport). The API
     # bounds the serialized size in the endpoint to prevent abuse.
     layout_json: dict
@@ -215,10 +219,14 @@ class TableAnnotationUpsertIn(BaseModel):
     """Request body for creating/updating a table annotation."""
 
     schema_name: str = Field(
-        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00-\x1F\x7F\x{80}-\x{9F}]+$",
     )
     relation_name: str = Field(
-        min_length=1, max_length=255, pattern=r"^[^\x00-\x1F\x7F]+$"
+        min_length=1,
+        max_length=255,
+        pattern=r"^[^\x00-\x1F\x7F\x{80}-\x{9F}]+$",
     )
     body: str = Field(min_length=1, max_length=10_000)
 
@@ -306,7 +314,11 @@ class DbmlConvertOut(BaseModel):
 class ApiKeyCreateIn(BaseModel):
     """Request body for creating an API key."""
 
-    key_name: str = Field(min_length=1, max_length=128, pattern=r"^[^\x00-\x1F\x7F]+$")
+    key_name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1F\x7F\x{80}-\x{9F}]+$",
+    )
 
 
 class ApiKeyOut(BaseModel):
