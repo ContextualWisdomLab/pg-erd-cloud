@@ -187,8 +187,8 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if content_type is not None:
         raise HTTPException(status_code=401, detail="unsupported token content type")
 
-    crit = header.get("crit")
-    if crit is not None:
+    if "crit" in header:
+        crit = header["crit"]
         if (
             not isinstance(crit, list)
             or len(crit) == 0
