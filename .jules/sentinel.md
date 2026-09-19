@@ -7,6 +7,7 @@
 **Vulnerability:** JWT 파싱 중 `crit` (critical) 헤더가 있을 경우 이를 엄격히 검증하여 거부하는 로직이 없어 RFC 7515 표준을 위반하고, 잠재적으로 공격자가 지원되지 않는 중요 확장을 강제할 수 있는 보안 취약점이 있었습니다.
 **Learning:** `crit` 헤더는 토큰 처리자가 반드시 이해하고 처리해야 하는 확장 파라미터의 목록을 명시합니다. 이를 무시하면 서명 검증을 우회하거나 예기치 않은 토큰 처리가 발생할 수 있다는 점을 배웠습니다.
 **Prevention:** JOSE 헤더 검증 로직(`_validate_jwt_header`)에 `crit` 파라미터 존재 여부를 명시적으로 확인하고, 존재할 경우 엄격한 타입 검사를 수행한 뒤 모두 지원되지 않는 것으로 간주하여 `401 Unauthorized`를 반환하도록 수정해야 합니다.
+**Evidence:** Jones, M., Bradley, J., & Sakimura, N. (2015). *JSON Web Signature (JWS)* (RFC 7515, §4.1.11). Internet Engineering Task Force. https://doi.org/10.17487/RFC7515 — `crit`은 비어 있지 않은 문자열 배열이어야 하며, 수신자가 이해하지 못하는 중요 파라미터가 있으면 JWS를 거부해야 합니다. Fett, D., Küsters, R., & Schmitz, G. (2017). The Web SSO standard OpenID Connect: In-depth formal security analysis and security guidelines. *Proceedings of the 2017 ACM SIGSAC Conference on Computer and Communications Security*, 1893–1908. https://doi.org/10.1145/3133956.3134041 — OpenID Connect 구현에서 명시적 검증 규칙과 fail-closed 처리의 필요성을 정형 분석으로 뒷받침합니다.
 
 ## 2026-08-21 - ecdsa 취약점 제거 (python-jose 의존성 교체)
 **Vulnerability:** `python-jose`가 내부적으로 사용하는 `ecdsa` 라이브러리에 P-256 관련 타이밍 공격(Minerva timing attack, CVE-2024-23342) 취약점이 발견되었습니다.
