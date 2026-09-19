@@ -38,11 +38,17 @@ jobs:
       - name: Enumerate target commits
         id: commits
         shell: bash
+        # Dispatch inputs reach the shell through env, never through ${{ }}
+        # interpolation into the script body: a branch name containing shell
+        # metacharacters would otherwise execute here.
+        env:
+          COMMIT_COUNT: ${{ inputs.commit_count }}
+          BRANCH: ${{ inputs.branch }}
         run: |
           set -euo pipefail
 
-          count="${{ inputs.commit_count }}"
-          branch="${{ inputs.branch }}"
+          count="$COMMIT_COUNT"
+          branch="$BRANCH"
 
           if ! [[ "${count}" =~ ^[0-9]+$ ]]; then
             echo "commit_count must be a positive integer" >&2
@@ -51,6 +57,11 @@ jobs:
 
           if (( count < 1 || count > 127 )); then
             echo "commit_count must be between 1 and 127 to stay within the GitHub Actions workflow job limit" >&2
+            exit 1
+          fi
+
+          if ! git check-ref-format --branch "${branch}" >/dev/null 2>&1; then
+            echo "branch must be a valid git branch name" >&2
             exit 1
           fi
 
