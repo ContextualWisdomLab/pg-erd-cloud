@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -340,6 +341,40 @@ describe('App orchestration coverage', () => {
     expect(screen.getByText('프로젝트가 없습니다. 이름을 입력해 새 프로젝트를 만드세요.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
     expect(screen.getByText('프로젝트를 선택하세요.')).toBeInTheDocument()
+  })
+
+  it('submits all three creation forms exactly once with Enter', async () => {
+    const user = userEvent.setup()
+    await renderReadyApp()
+    fireEvent.click(screen.getByRole('button', { name: '편집기' }))
+
+    const editorProjectName = screen.getByLabelText('New project')
+    await user.clear(editorProjectName)
+    await user.type(editorProjectName, 'Keyboard project')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard project'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
+
+    const connectionDsn = screen.getByLabelText('Connection DSN')
+    await user.type(connectionDsn, 'postgresql://db.example/keyboard')
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(api.createConnection).toHaveBeenCalledWith(
+        'p3',
+        'target-db',
+        'postgresql://db.example/keyboard',
+      ),
+    )
+    expect(api.createConnection).toHaveBeenCalledTimes(1)
+
+    api.createProject.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '프로젝트' }))
+    const projectListName = screen.getByLabelText('새 프로젝트 이름')
+    await user.clear(projectListName)
+    await user.type(projectListName, 'Keyboard roadmap')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith('Keyboard roadmap'))
+    expect(api.createProject).toHaveBeenCalledTimes(1)
   })
 
   it('creates projects, validates and creates connections, and starts a snapshot', async () => {
