@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🔒 **식별자 제어문자 검증 복구**: 다이어그램 뷰, 테이블 주석, API 키 이름에서 C0·DEL·C1 제어문자(`U+0000–U+001F`, `U+007F–U+009F`)를 거부해 로그/터미널 인젝션 경계를 복구하고, 정상 한국어·일본어·중국어·emoji 식별자는 보존합니다.
 - [BE] 🔒 **OIDC JWK 검증 경계 정합화**: PyJWT가 RSA/EC JWK를 실제 공개 키 객체로 변환한 뒤 고정 알고리즘 allowlist와 top-level `leeway`로 검증하도록 수리했습니다. 유효한 RSA JWK fixture가 변환 경계를 직접 검증하며, `python-jose`·`types-python-jose` 및 전이 의존성을 선언·hash-locked 설치 경로에서 제거했습니다. 명시적 `"crit": null`도 RFC 7515 §4.1.11에 따라 fail-closed로 거부합니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
@@ -14,7 +15,3 @@
 - [FE] `autoInfer.ts`에 대한 단위 테스트 및 UI 컴포넌트 단위 테스트를 추가하여 100% 테스트 커버리지를 유지합니다.
 - [FE] ⬇️ **DBML Export**: ERD 다이어그램을 DBML (Database Markup Language) 형식으로 내보낼 수 있는 기능을 추가했습니다. 상단의 DBML 버튼을 클릭하여 다운로드할 수 있습니다.
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
-
-## [Unreleased]
-### Security
-- `backend/app/schemas.py`: 로그 인젝션 및 터미널 이스케이프 인젝션 취약점을 방지하기 위해 `DiagramViewCreateIn.name`, `TableAnnotationUpsertIn.schema_name`, `TableAnnotationUpsertIn.relation_name`, `ApiKeyCreateIn.key_name` 문자열 필드에 정규식 유효성 검사(`pattern=r"^[^\x00-\x1F\x7F]+$"`)를 추가했습니다 (Sentinel).
