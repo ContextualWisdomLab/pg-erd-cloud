@@ -4,11 +4,26 @@ import asyncio
 import uuid
 
 import pytest
+from app import auth
+from app.settings import settings
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app import auth
-from app.settings import settings
+
+_RSA_PUBLIC_MODULUS = (
+    "q4dUjdkfPgAceTa2oP7Wfb62UTBurPQmZmqGm7b0nKY4f3gxEfmMZd1sgRxfkUge"
+    "TaLiNnWNN5DOGBa-NCsGcCAyhitaeAldEo7A4yppcdcuELAv6v9-PYXkAhrgotydm8"
+    "aVVKDV8huewcgB-6cAl8LukmpcuK7FfpfMYTIJBbQU0NKt9PNaF6fF3HGuxn6nJ7J3"
+    "nsX2HIhggI_-PMSRvDqPG2KqF9mBWP59WKFQ6g9JoQXrOIcugH6te_sLsR0jCD1YE0K"
+    "w8LrWnQuDQNILYsuzYIzBznSjOmXYrNrTVpxy0HDdF-RLC6zzsSn2WbTf5FhMQ2IEsnf"
+    "1Rq9qCuimzw"
+)
+
+
+def _rsa_public_jwk(key_id: str) -> dict[str, str]:
+    """Return deterministic RSA public JWK test material."""
+
+    return {"kid": key_id, "kty": "RSA", "n": _RSA_PUBLIC_MODULUS, "e": "AQAB"}
 
 
 @pytest.mark.parametrize(
@@ -71,7 +86,7 @@ async def test_oidc_config_fetch_disables_redirects(
         def __init__(self, **kwargs: object) -> None:
             observed.update(kwargs)
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -109,7 +124,7 @@ async def test_oidc_config_rejects_redirect_response(
         def __init__(self, **_kwargs: object) -> None:
             return None
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -147,7 +162,7 @@ async def test_jwks_fetch_disables_redirects(
         def __init__(self, **kwargs: object) -> None:
             observed.update(kwargs)
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -187,7 +202,7 @@ async def test_oidc_rejects_header_selected_algorithm(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -259,7 +274,7 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     observed: dict[str, object] = {}
 
@@ -287,11 +302,18 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     assert subject == "user-1"
     assert display_name == "User One"
+    decode_args = observed["args"]
+    assert isinstance(decode_args, tuple)
+    assert decode_args[0] == "token"
+    assert hasattr(decode_args[1], "verify")
     assert observed["kwargs"] == {
         "algorithms": ["RS256"],
         "audience": "pg-erd",
         "issuer": "https://issuer.example",
-        "options": {"verify_aud": True, "require": ["iss", "exp", "jti"]},
+        "options": {
+            "verify_aud": True,
+            "require": ["iss", "exp", "jti", "aud"],
+        },
         "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
     }
 
@@ -347,8 +369,8 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     async def fake_jwks(force_refresh: bool = False) -> dict:
         refresh_calls.append(force_refresh)
         if force_refresh:
-            return {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
-        return {"keys": [{"kid": "old-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+            return {"keys": [_rsa_public_jwk("new-key")]}
+        return {"keys": [_rsa_public_jwk("old-key")]}
 
     observed: dict[str, object] = {}
 
@@ -377,7 +399,7 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
     assert subject == "user-1"
     assert display_name == "User One"
     assert refresh_calls == [False, True]
-    assert hasattr(observed["key"], "public_bytes") # Check if it is a public key object
+    assert hasattr(observed["key"], "verify")
 
 
 @pytest.mark.asyncio
@@ -391,7 +413,7 @@ async def test_oidc_requires_jti_claim(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -425,7 +447,7 @@ async def test_oidc_rejects_revoked_jti(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     expires_at = auth.dt.datetime.now(auth.dt.timezone.utc) + auth.dt.timedelta(
         minutes=5
@@ -569,7 +591,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     )
 
     async def fake_jwks() -> dict:
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     def fail_decode(*_args: object, **_kwargs: object) -> dict:
         raise auth.jwt.PyJWTError("mocked decoding error")
@@ -588,6 +610,7 @@ async def test_oidc_decode_rejects_jwt_decode_error(
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "token verification failed"
 
+
 @pytest.mark.asyncio
 async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch: pytest.MonkeyPatch,
@@ -601,7 +624,7 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     async def fake_jwks() -> dict:
         # JWK says RSA, but header says HS256
-        return {"keys": [{"kid": "key-1", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+        return {"keys": [_rsa_public_jwk("key-1")]}
 
     monkeypatch.setattr(auth, "_get_jwks", fake_jwks)
 
@@ -611,7 +634,9 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
     monkeypatch.setattr(auth, "is_token_jti_revoked", mock_is_token_revoked2)
 
     def fail_decode(*_: object, **__: object) -> dict:
-        raise AssertionError("jwt.decode must not run for mismatched algorithm/key type")
+        raise AssertionError(
+            "jwt.decode must not run for mismatched algorithm/key type"
+        )
 
     monkeypatch.setattr(auth.jwt, "decode", fail_decode)
 
@@ -620,6 +645,8 @@ async def test_oidc_rejects_algorithm_key_type_mismatch(
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "algorithm/key type mismatch"
+
+
 @pytest.mark.asyncio
 async def test_oidc_jwks_refresh_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,
@@ -630,7 +657,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
         def __init__(self, **kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -641,7 +668,7 @@ async def test_oidc_jwks_refresh_rate_limiting(
             request_count += 1
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]})
+            return _FakeHttpResponse({"keys": [_rsa_public_jwk("new-key")]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -659,12 +686,12 @@ async def test_oidc_jwks_refresh_rate_limiting(
     )
 
     jwks = await auth._get_jwks()
-    assert jwks == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+    assert jwks == {"keys": [_rsa_public_jwk("new-key")]}
     assert request_count == 2
 
     before_second_refresh = request_count
     jwks2 = await auth._get_jwks(force_refresh=True)
-    assert jwks2 == {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]}
+    assert jwks2 == {"keys": [_rsa_public_jwk("new-key")]}
     assert request_count == before_second_refresh
 
 
@@ -678,7 +705,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         def __init__(self, **kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> "FakeAsyncClient":
+        async def __aenter__(self) -> FakeAsyncClient:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
@@ -690,7 +717,7 @@ async def test_oidc_jwks_force_refresh_is_serialized(
             if url.endswith("openid-configuration"):
                 return _FakeHttpResponse({"jwks_uri": "https://issuer.example/jwks"})
             await asyncio.sleep(0)
-            return _FakeHttpResponse({"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]})
+            return _FakeHttpResponse({"keys": [_rsa_public_jwk("new-key")]})
 
     monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeAsyncClient)
@@ -720,10 +747,47 @@ async def test_oidc_jwks_force_refresh_is_serialized(
     )
 
     assert refreshed == [
-        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]},
-        {"keys": [{"kid": "new-key", "kty": "RSA", "n": "n3H_", "e": "AQAB"}]},
+        {"keys": [_rsa_public_jwk("new-key")]},
+        {"keys": [_rsa_public_jwk("new-key")]},
+        {"keys": [_rsa_public_jwk("new-key")]},
+        {"keys": [_rsa_public_jwk("new-key")]},
+        {"keys": [_rsa_public_jwk("new-key")]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+
+def test_validate_jwt_header_crit():
+    import pytest
+    from app.auth import _validate_jwt_header
+    from fastapi import HTTPException
+
+    # A present `crit` member is not the same as an absent one. RFC 7515
+    # requires a non-empty string array, so explicit JSON null must fail.
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": None})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
+    # Test valid crit (which is still rejected as unsupported)
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": ["b64"]})
+    assert exc.value.status_code == 401
+    assert "unsupported critical parameter" in exc.value.detail
+
+    # Test invalid crit type
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": "b64"})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
+    # Test empty crit
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": []})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
+
+    # Test crit with invalid element type
+    with pytest.raises(HTTPException) as exc:
+        _validate_jwt_header({"alg": "RS256", "crit": [123]})
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "invalid crit header"
