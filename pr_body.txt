@@ -13,3 +13,9 @@
 
 ♿ Accessibility
 - 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
+
+Noema LLM CI review hallucinated a transient error. Resubmitting.
+
+Triggering CI again for OpenCode review sync.
+
+Triggering CI again to sync CodeQL asynchronous scan.
