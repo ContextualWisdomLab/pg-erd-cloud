@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-24 - [필수 입력 필드 시각적 표시 추가]
+**Learning:** 폼의 필수 입력 필드에 `*` 표시(시각적)를 추가하면, React Testing Library의 `getByLabelText('Label Name')`와 같은 정확한 문자열 일치 쿼리가 실패합니다.
+**Action:** 라벨에 시각적 요소(예: `<span>*</span>`)가 포함되는 경우, 테스트에서는 정규표현식(예: `getByLabelText(/Label Name/)`)을 사용하여 유연하게 매칭하도록 테스트를 작성해야 합니다. 또한, 시각적 표시는 스크린 리더 중복 읽기를 방지하기 위해 `aria-hidden="true"`를 설정해야 합니다.
