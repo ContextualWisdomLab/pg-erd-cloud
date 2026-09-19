@@ -80,3 +80,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-05-24 - [Avoid Array.from for Strings in Hot Paths]
 **Learning:** Using `Array.from` on strings to iterate over characters creates intermediate array allocations and increases garbage collection overhead. In hot paths like ERD graph processing, this can lead to performance degradation.
 **Action:** Prefer `for...of` loops over `Array.from` when iterating over characters in short strings within frequently called functions to reduce memory pressure.
+## 2024-05-24 - Async DOM Synchronization in App Tests
+**Learning:** During UI testing in React (`@testing-library/react`), synchronous `getAllByRole` calls can fail unpredictably with "Unable to find an accessible element" if there's a slight asynchronous rendering delay or DOM cleanup bleed from previous test runs, especially on views that dynamically load lists.
+**Action:** When querying for elements that might render asynchronously (like dynamic list items or layout components), prefer `findAllByRole` over `getAllByRole` to provide robust, asynchronous waiting mechanics and prevent flaky UI tests.
