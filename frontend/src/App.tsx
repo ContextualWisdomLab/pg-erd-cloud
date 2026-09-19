@@ -56,6 +56,7 @@ import {
   exportDiagramSvg,
   exportDictionaryCsv,
   exportDictionaryMarkdown,
+  exportDictionaryJson,
   exportPlantUml,
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
@@ -680,6 +681,14 @@ export default function App() {
       "data_dictionary.md",
       exportDictionaryMarkdown(nodes, edges),
       "text/markdown;charset=utf-8",
+    );
+  }
+
+  function onExportDictionaryJson() {
+    downloadText(
+      "data_dictionary.json",
+      exportDictionaryJson(nodes, edges),
+      "application/json;charset=utf-8",
     );
   }
 
@@ -1649,6 +1658,7 @@ export default function App() {
             onDownloadMermaid={onDownloadMermaid}
             onExportDictionaryCsv={onExportDictionaryCsv}
             onExportDictionaryMarkdown={onExportDictionaryMarkdown}
+            onExportDictionaryJson={onExportDictionaryJson}
             onDownloadDbml={onDownloadDbml}
             onDownloadPrisma={onDownloadPrisma}
             onCreateShareLink={onCreateShareLink}
