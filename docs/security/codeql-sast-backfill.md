@@ -1,15 +1,23 @@
 # CodeQL SAST backfill workflow
 
+Status date: 2026-08-09
+Lifecycle: manual repository backfill `implemented_on_main`; ordinary required
+pull-request CodeQL gate `downstream`
+Owner: repository maintainers for manual backfill; organization security for
+the ordinary required gate
+
 The `codeql-sast-backfill` workflow is a manual recovery path for improving
 OpenSSF Scorecard SAST coverage after CodeQL upload was unavailable for part of
 the recent `main` history.
 
 ## Intent
 
-Scorecard evaluates whether recent commits have SAST results. The normal CodeQL
-workflow now uploads CodeQL results for new pull requests, but older recent
-commits still need analyses before the SAST coverage ratio catches up. This
-workflow lets maintainers explicitly analyze recent commits on a target branch.
+Scorecard evaluates whether recent commits have SAST results. The repository
+contains only this manually dispatched recovery workflow; the ordinary required
+CodeQL analysis for new pull requests is supplied by downstream organization
+governance. Older recent commits can still need analyses before the SAST
+coverage ratio catches up, so this workflow lets maintainers explicitly analyze
+recent commits on a target branch.
 
 ## Manual dispatch
 

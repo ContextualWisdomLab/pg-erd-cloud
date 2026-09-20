@@ -65,8 +65,16 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
+    expect(screen.getByRole('dialog', { name: '테이블 추가' })).toBeInTheDocument()
+    const blankSave = screen.getByRole('button', { name: '저장' })
+    expect(blankSave).toHaveAttribute('aria-disabled', 'true')
+    expect(blankSave).toBeEnabled()
+    expect(blankSave).toHaveAttribute('aria-describedby', 'add-table-prerequisite')
+    expect(screen.getByLabelText('테이블 이름')).toHaveAttribute('aria-describedby', 'add-table-prerequisite')
+    fireEvent.click(blankSave)
+    expect(onSubmit).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
-    fireEvent.submit(screen.getByRole('dialog'))
+    fireEvent.submit(document.getElementById('add-table-form')!)
     expect(setNewTableName).toHaveBeenCalledWith('users')
     expect(onSubmit).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
@@ -81,9 +89,10 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
-    fireEvent.submit(screen.getByRole('dialog'))
+    fireEvent.submit(document.getElementById('add-table-form')!)
     expect(onSubmit).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '저장' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '저장' })).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('covers EditEdgeModal visibility and actions', () => {
@@ -116,12 +125,12 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    const confirmSpy = vi.spyOn(window, 'confirm')
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    fireEvent.submit(document.getElementById('relationship-form')!)
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
+    expect(confirmSpy).not.toHaveBeenCalled()
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
     expect(onSubmit).toHaveBeenCalledOnce()
@@ -183,8 +192,8 @@ describe('modal behavior coverage', () => {
     expect(deleteEditing(tableNode)?.data.columns).toHaveLength(1)
 
     fireEvent.submit(document.getElementById('editTableForm')!)
-    fireEvent.click(screen.getByRole('button', { name: '테이블 삭제' }))
-    fireEvent.click(screen.getByRole('button', { name: '복제' }))
+    fireEvent.click(screen.getByRole('button', { name: 'public.users 테이블 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: 'public.users 테이블 복제' }))
     const duplicate = setNodes.mock.calls[2]?.[0] as (nodes: Node<TableNodeData>[]) => Node<TableNodeData>[]
     const duplicated = duplicate([tableNode])[1]!
     expect(duplicated).toMatchObject({
@@ -245,6 +254,8 @@ describe('modal behavior coverage', () => {
     )
     expect(screen.getByText('등록된 그룹이 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '추가' })).toBeDisabled()
+    fireEvent.submit(screen.getByLabelText('그룹 이름').closest('form')!)
+    expect(onCreate).not.toHaveBeenCalled()
 
     rerender(
       <GroupModal
@@ -261,18 +272,19 @@ describe('modal behavior coverage', () => {
         onAssignBusinessGroup={onAssign}
       />,
     )
+    expect(screen.getByRole('radiogroup', { name: '그룹 색상' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
-    fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
+    fireEvent.click(screen.getAllByRole('radio', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    const confirmSpy = vi.spyOn(window, 'confirm')
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: '업무 그룹 닫기' }))
     expect(setName).toHaveBeenCalledWith('New')
     expect(setColor).toHaveBeenCalled()
     expect(onCreate).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledWith('g1')
+    expect(confirmSpy).not.toHaveBeenCalled()
     expect(onAssign).toHaveBeenCalledWith('table-1', '')
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -355,6 +367,9 @@ describe('modal behavior coverage', () => {
         appliedCardinalitySignatures={{ names: new Set(), columns: new Set() }}
       />,
     )
+    expect(
+      screen.getByRole('dialog', { name: '인덱스 카디널리티 계산' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Rows 값을 입력하세요.')).toBeInTheDocument()
     expect(screen.getAllByText('—')).toHaveLength(2)
 

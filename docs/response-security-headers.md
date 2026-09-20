@@ -1,5 +1,10 @@
 # Response security headers
 
+Status date: 2026-08-09
+Lifecycle: application/static-server headers `implemented_on_main`; external
+TLS-edge policy `downstream`
+Owner: application maintainers; deployment owner for the external edge
+
 ## Why
 
 The backend is an API-first service, but it still benefits from baseline

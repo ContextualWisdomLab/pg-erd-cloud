@@ -1,5 +1,10 @@
 # API Security Checklist (pg-erd-cloud)
 
+Status date: 2026-08-09
+Lifecycle: application controls are mixed `implemented_on_main`/`active_pr`;
+edge and organization controls are `downstream`
+Owner: application security maintainers; deployment owners for external controls
+
 이 문서는 `pg-erd-cloud`의 **backend HTTP API (FastAPI)** 기준으로, 설계/구현/
 배포/운영에서 확인해야 할 보안 체크리스트를 정리한 것입니다. 체크리스트 항목은
 코드/문서/CI 근거를 함께 남겨 “현재 상태”를 지속적으로 추적하는 것을 목표로
@@ -54,12 +59,13 @@
 - 🟡 Origin allowlist 기반 설정
   - 설정: `CORS_ORIGINS` (comma-separated)
   - 근거: `backend/app/main.py`, `backend/app/settings.py`
-- ✅ 기본값은 `allow_credentials=False` + `allow_methods`/`allow_headers`
+- ✅ 기본값은 `allow_credentials=False` + 실제 라우터가 사용하는
+  `GET`/`POST`/`PUT`/`DELETE`/`OPTIONS` 및 헤더 allowlist
   명시적 allowlist를 권장(“reviewable”)
   - 체크 포인트:
     - `allow_origins`는 최소 허용(정확한 allowlist)으로 유지
     - `allow_methods`/`allow_headers`는 가능한 한 명시적 allowlist로 제한
-      (예: GET/POST/OPTIONS, Authorization/Content-Type 등)
+      (예: GET/POST/PUT/DELETE/OPTIONS, Authorization/Content-Type 등)
     - public API라면 `allow_credentials=True` 필요성 재검토(필요 시에만; 기본은 False 권장)
     - ingress/ALB 등 외부 계층에서도 동일 정책(또는 더 엄격한 정책)을 적용했는지 확인
 
@@ -93,6 +99,14 @@
 - `API_RATE_LIMIT_TRUST_X_FORWARDED_FOR` (default: `false`)
   - 프록시/Ingress가 `X-Forwarded-For`를 신뢰 가능한 형태로 세팅/정제하는 경우에만
     `true`
+- `API_RATE_LIMIT_TRUSTED_PROXY_HOPS` (default: `1`)
+  - 신뢰할 `X-Forwarded-For` 주소를 오른쪽에서 몇 번째 hop으로 읽을지 정합니다.
+  - `compose.prod.yaml`은 백엔드를 호스트에 공개하지 않고 Traefik만 경유시킵니다.
+    loopback port 앞의 host-local TLS terminator가 Docker NAT를 거친 뒤 Traefik에
+    보이는 최소 direct-peer `/32` 또는 `/128` CIDR을
+    `TRAEFIK_TRUSTED_PROXY_CIDRS`에 allowlist하고, `client, trusted-peer` 체인의 두
+    번째 hop을 읽도록 값을 `2`로 재정의합니다. 체인이 더 짧으면 헤더를 쓰지 않고
+    direct peer로 안전하게 fallback합니다.
 - `API_RATE_LIMIT_MAX_KEYS` (default: `10000`)
 
 ##### Trade-offs / 향후 계획
@@ -107,7 +121,10 @@
 
 ### Input validation / Data safety
 
-- ✅ 민감정보를 URL로 받지 않음(권장: Authorization header)
+- 🟡 일반 인증정보는 URL로 받지 않지만, 공개 공유의
+  `/share/{share_link_uuid}`는 URL 자체가 bearer capability입니다. 브라우저 기록,
+  복사, 프록시/분석 로그, referrer 유출을 전제로 취급하고 응답에는
+  `Referrer-Policy: no-referrer`와 `Cache-Control: no-store`를 유지합니다.
 - ✅ 문자열 입력에서 NUL(0x00) 제거(특히 PostgreSQL text/json 방어)
   - 근거: `backend/app/sanitize.py`
 - 🟡 스키마명 등 일부 입력은 제한(예: PostgreSQL identifier)
@@ -115,8 +132,10 @@
 
 ### Processing / DoS 방어
 
-- ✅ 요청 경로에서 장시간 작업을 블로킹하지 않음(큐/워커)
-  - 근거: `backend/app/jobs/*`, `backend/app/main.py`(lifespan worker)
+- 🟡 스냅샷 introspection은 요청 경로를 블로킹하지 않고 큐/워커를 사용합니다.
+  단, deprecated `/apply-sql`은 대상 DB에서 동기 실행되므로 production Forward
+  Engineering의 durable job 증거가 아닙니다.
+  - 근거: `backend/app/jobs/*`, `backend/app/main.py`, `backend/app/api/connections.py`
 - ✅ 고유 식별자는 UUID 사용
   - 근거: migrations / models
 
@@ -149,7 +168,9 @@
 
 ### CI / CD / Supply chain
 
-- ✅ Code scanning(CodeQL) + dependency review + Scorecard 워크플로 운영
-  - 근거: `.github/workflows/*`
+- 🟡 CodeQL/dependency review/Scorecard/Security Scan은 조직의 downstream required
+  workflow로 PR에서 실행됩니다. 이 저장소의 `.github/workflows/`에는 일반 CI만
+  있으므로 중앙 거버넌스의 실행 결과를 exact head에 연결해야 합니다.
+  - 근거: GitHub PR required checks, `.github/workflows/ci.yml`
 - ✅ GitHub Actions `uses:` SHA pinning
   - 근거: `.github/workflows/*.yml`

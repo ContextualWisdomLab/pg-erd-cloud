@@ -3,23 +3,23 @@
 #
 # Compares the latest schema snapshot (target) against an approved baseline
 # snapshot (base) via the diff API and fails the pipeline when the schema
-# changed. Pair with GET .../migration.sql to print the SQL that would
-# reconcile the drift.
+# changed. Review reconciliation SQL only through an access-controlled artifact;
+# the gate deliberately does not print it into CI logs.
 #
 # Usage:
 #   PG_ERD_BASE_URL=https://erd.example.com \
-#   PG_ERD_COOKIE="session=..." \
+#   PG_ERD_TOKEN="pgerd_..." \
 #   ./check_schema_drift.sh <baseline_snapshot_uuid> <target_snapshot_uuid>
 #
 # Exit codes:
 #   0  no drift (schemas identical)
-#   1  drift detected (diff summary printed, migration SQL printed)
+#   1  drift detected (diff summary printed)
 #   2  usage / API error (snapshot missing or unauthorized)
 set -euo pipefail
 
 usage() {
   echo "usage: check_schema_drift.sh <baseline_uuid> <target_uuid>" >&2
-  echo "required env: PG_ERD_BASE_URL and PG_ERD_COOKIE" >&2
+  echo "required env: PG_ERD_BASE_URL and PG_ERD_TOKEN" >&2
 }
 
 if [ "$#" -ne 2 ]; then
@@ -34,8 +34,8 @@ if [ -z "${PG_ERD_BASE_URL:-}" ]; then
   exit 2
 fi
 
-if [ -z "${PG_ERD_COOKIE:-}" ]; then
-  echo "drift-check: PG_ERD_COOKIE is not set." >&2
+if [ -z "${PG_ERD_TOKEN:-}" ]; then
+  echo "drift-check: PG_ERD_TOKEN is not set." >&2
   usage
   exit 2
 fi
@@ -46,7 +46,7 @@ TARGET_UUID="$2"
 api() {
   local path="$1"
   if ! curl --fail --silent --show-error \
-    --cookie "${PG_ERD_COOKIE}" \
+    --header "Authorization: Bearer ${PG_ERD_TOKEN}" \
     "${PG_ERD_BASE_URL}${path}"
   then
     echo "drift-check: API request failed for ${path}." >&2
@@ -80,6 +80,4 @@ fi
 
 echo "drift-check: DRIFT DETECTED - schema differs from the approved baseline." >&2
 printf '%s' "${DIFF_JSON}" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["diff"]["summary"], indent=2))' >&2
-echo "--- migration SQL that would reconcile the drift ---" >&2
-api "/api/snapshots/${TARGET_UUID}/migration.sql?against=${BASE_UUID}" >&2 || true
 exit 1

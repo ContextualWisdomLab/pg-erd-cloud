@@ -17,6 +17,7 @@ afterEach(() => {
 
 vi.mock('../../api', () => ({
   getMe: vi.fn().mockResolvedValue({ subject: 'test-user', display_name: 'Test User' }),
+  publicShareIdFromPath: vi.fn().mockReturnValue(null),
   listProjects: vi.fn().mockResolvedValue([
     { project_space_uuid: 'project-1', project_name: 'Billing' },
   ]),
@@ -35,7 +36,7 @@ vi.mock('../../api', () => ({
 describe('App edit functionality', () => {
   it('renders without crashing', () => {
     render(<App />);
-    expect(screen.getByText('pg-erd-cloud')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cloud ERD' })).toBeInTheDocument();
   });
 
   it('renders compact visual labels while preserving toolbar accessible names', async () => {
@@ -50,20 +51,36 @@ describe('App edit functionality', () => {
     const toolbarQueries = within(toolbar);
     expect(toolbarQueries.getByRole('button', { name: 'ERD 자동 정렬' })).toHaveTextContent('↔');
     expect(toolbarQueries.getByRole('button', { name: '정렬 되돌리기' })).toHaveTextContent('↶');
-    expect(toolbarQueries.getByRole('button', { name: '관계 자동 추론' })).toHaveTextContent('🪄');
-    expect(toolbarQueries.getByRole('button', { name: '모든 노드 지우기' })).toHaveTextContent('🗑️');
     expect(toolbarQueries.getByRole('button', { name: '테이블 추가' })).toHaveTextContent('+');
     expect(toolbarQueries.getByRole('button', { name: '업무 그룹' })).toHaveTextContent('◇');
     expect(toolbarQueries.getByRole('button', { name: '인덱스 카디널리티 계산' })).toHaveTextContent('#');
     expect(toolbarQueries.getByRole('button', { name: 'DDL 내보내기' })).toHaveTextContent('SQL');
     expect(toolbarQueries.getByRole('button', { name: '공유 및 내보내기' })).toHaveTextContent('↗');
-    const exportButtons = toolbarQueries.getAllByRole('button', {
-      name: '이미지/텍스트 내보내기 모달 열기',
-    });
-    expect(exportButtons).toHaveLength(3);
-    expect(exportButtons[0]).toHaveTextContent('IMG');
-    expect(exportButtons[1]).toHaveTextContent('UML');
-    expect(exportButtons[2]).toHaveTextContent('{}');
+    expect(toolbarQueries.getByRole('button', { name: 'SVG 이미지 내보내기' })).toHaveTextContent('IMG');
+    expect(toolbarQueries.getByRole('button', { name: 'PlantUML 내보내기' })).toHaveTextContent('UML');
+    expect(toolbarQueries.getByRole('button', { name: 'Mermaid 내보내기' })).toHaveTextContent('{}');
+  });
+
+  it('renders the Figma editor shell with a dedicated properties region', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: '편집기' }));
+
+    const toolbar = await screen.findByRole('toolbar', { name: 'ERD 캔버스 도구' });
+    const properties = screen.getByRole('complementary', { name: 'ERD 속성' });
+
+    expect(properties).toHaveAttribute('data-dialog-focus-fallback', 'true');
+    expect(properties).toHaveAttribute('tabindex', '-1');
+    expect(within(properties).getByRole('heading', { name: '속성' })).toBeInTheDocument();
+    expect(within(properties).getByLabelText('테이블 또는 컬럼 검색')).toBeInTheDocument();
+    expect(within(properties).getByRole('button', { name: '공유 열기' })).toBeInTheDocument();
+    expect(within(properties).getByRole('button', { name: '내보내기 열기' })).toBeInTheDocument();
+    expect(within(properties).getByRole('button', { name: '관계 자동 추론' })).toBeInTheDocument();
+    expect(within(properties).getByRole('button', { name: '모든 노드 지우기' })).toBeInTheDocument();
+    expect(within(toolbar).queryByLabelText('테이블 또는 컬럼 검색')).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '관계 자동 추론' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '모든 노드 지우기' })).not.toBeInTheDocument();
   });
 
   it('filters the diagram list by search text', async () => {

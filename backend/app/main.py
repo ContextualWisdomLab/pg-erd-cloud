@@ -70,6 +70,7 @@ CORS_ALLOW_HEADERS = [
     "Content-Type",
     CSRF_HEADER_NAME,
 ]
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 _rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
@@ -80,6 +81,7 @@ _rate_limit_policy = RateLimitPolicy(
     window_seconds=settings.api_rate_limit_window_seconds,
     route_prefix="/api",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+    trusted_proxy_hops=settings.api_rate_limit_trusted_proxy_hops,
 )
 _share_link_rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.share_link_rate_limit_max_keys
@@ -90,6 +92,7 @@ _share_link_rate_limit_policy = RateLimitPolicy(
     window_seconds=settings.share_link_rate_limit_window_seconds,
     route_prefix="/api/share",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+    trusted_proxy_hops=settings.api_rate_limit_trusted_proxy_hops,
 )
 _revoke_rate_limiter = InMemoryFixedWindowRateLimiter(
     max_keys=settings.api_rate_limit_max_keys
@@ -100,6 +103,7 @@ _revoke_rate_limit_policy = RateLimitPolicy(
     window_seconds=60,
     route_prefix="/api/auth/logout",
     trust_x_forwarded_for=settings.api_rate_limit_trust_x_forwarded_for,
+    trusted_proxy_hops=settings.api_rate_limit_trusted_proxy_hops,
 )
 
 app.middleware("http")(
@@ -132,7 +136,7 @@ app.add_middleware(
     # actually need cookie-based auth.
     allow_credentials=False,
     # Explicit allowlist (avoid "*") so CORS behavior is reviewable.
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=CORS_ALLOW_METHODS,
     allow_headers=CORS_ALLOW_HEADERS,
 )
 

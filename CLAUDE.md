@@ -4,9 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-pg-erd-cloud is a PostgreSQL-focused cloud ERD (entity-relationship diagram) collaboration/sharing service — currently a runnable MVP skeleton. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders them as an interactive ERD (React Flow), and forward-engineers snapshots into DDL exports (PostgreSQL or Snowflake dialect), schema diffs/migration SQL, DBML/Mermaid exports, and "DB reversing spec" documents (markdown draft, LLM prompt, or live LLM draft via an OpenAI-compatible provider configured with `LLM_API_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`). Project owners can create share links for unauthenticated read/export access.
+pg-erd-cloud is a standalone PostgreSQL-focused cloud ERD collaboration and sharing product. It reverse-engineers a target PostgreSQL database (optionally Snowflake) into JSON schema snapshots, renders snapshots plus transient local edits as an interactive ERD (React Flow), and produces partial DDL/diff/migration and documentation exports. Those artifacts are not the governed production Forward Engineering executor defined in ADR-0004. Project owners can create bearer links for unauthenticated read/export access to sanitized stored snapshots.
 
 Repository docs are mixed-language: README.md and CHANGELOG.md are Korean; CONTRIBUTING.md, SECURITY.md, and most of docs/ are English.
+
+Start documentation work at `docs/README.md`. `ARCHITECTURE.md`, PRD, TRD,
+ADRs, UML, ERD, threat model, test strategy, API/operations/release contracts,
+and traceability use explicit lifecycle labels; never infer shipped behavior
+from Figma, chat, or a planned diagram.
 
 ## Common commands
 
@@ -60,7 +65,7 @@ npm run test -- src/erd/__tests__/cardinality.test.ts    # single test file
 npm run build                                            # tsc -b && vite build
 ```
 
-CI uses npm with `package-lock.json` (a `pnpm-lock.yaml` also exists, but CI caches npm).
+CI uses npm with `package-lock.json`; no `pnpm-lock.yaml` is maintained.
 
 ### Production-style (Docker + Traefik)
 
@@ -85,19 +90,19 @@ Three deployable pieces in one repo:
 ### Backend layout (backend/app/)
 
 - `api/` — FastAPI routers (projects, connections, snapshots, share, diagram_views, annotations, api_keys, auth_routes, me), all mounted in `main.py` under `/api`.
-- `jobs/` — Postgres-backed job queue (`JobQueue` table). Reverse engineering never blocks the request path: the API enqueues a `snapshot` job, and an in-process worker task (started in the FastAPI lifespan in `main.py`) claims and executes it. Optional Valkey/Redis (`valkey_queue.py`) is only a wake-up signal; Postgres remains the source of truth.
+- `jobs/` — Postgres-backed job queue (`JobQueue` table). Reverse engineering never blocks the request path: the API enqueues a `snapshot` job, and an in-process worker task (started in the FastAPI lifespan in `main.py`) claims and executes it. Optional Valkey/Redis (`valkey_queue.py`) is only a wake-up signal; Postgres remains the source of truth. Current claim state has no lease/reclaim, so a crash can strand `running` work.
 - `pg_introspect/` — pg_catalog-based introspection of the *target* PostgreSQL: schemas/tables/columns, PK/FK/UNIQUE/CHECK, indexes. Index access methods are discovered dynamically from `pg_am`/`pg_class.relam` and index DDL is preserved losslessly via `pg_get_indexdef()` — do not hardcode an index-type list (project principle, see README). Also synthesizes safe `example_value` column hints from name/type metadata only (never samples real table data).
 - `snowflake_introspect/` — optional Snowflake reverse engineering (INFORMATION_SCHEMA; requires the `snowflake` extra).
 - `ddl/` — forward engineering: snapshot → DDL export with dialect mapping, migration SQL, migration-safety checks.
 - `diff/` — snapshot-to-snapshot schema diff.
 - `spec/` — reversing-spec generation, naming lint, data dictionary, relationship inference, LLM integration.
-- Cross-cutting: `auth.py` (OIDC/Casdoor JWT verification when `OIDC_ISSUER` is set, plus API keys and token revocation), `csrf.py`, `rate_limit.py` (in-memory fixed-window; global `/api/*` limit plus a stricter separate limit for public `/api/share/*`), `security_headers.py`, `observability.py` (JSON request logs + Prometheus metrics — see docs/observability.md), `sanitize.py`/`dsn_redaction.py`, `settings.py` (pydantic-settings; env vars are documented in `.env.example`).
+- Cross-cutting: `auth.py` (OIDC/Casdoor JWT verification when `OIDC_ISSUER` is set, plus API keys and token revocation), `csrf.py`, `rate_limit.py` (in-memory fixed-window; global `/api/*` limit plus a stricter separate limit for public `/api/share/*`), `security_headers.py`, `observability.py` (JSON request logs + Prometheus metrics — see docs/observability.md), `sanitize.py`/`dsn_redaction.py`, `settings.py` (pydantic-settings; `.env.example` is a deployment template, not a complete authority for every setting, and runtime env loading is a documented org-policy deviation in `AGENTS.md`).
 
 ### Data flow
 
 1. A user registers a target-DB connection; the DSN is encrypted with `APP_SECRET` before being stored in the app DB.
 2. Requesting a snapshot enqueues a job; the background worker connects to the target DB, introspects it, and stores a JSON snapshot (`SchemaSnapshot` + `SchemaSnapshotData`).
-3. The frontend fetches snapshots via `/api/*` and renders the ERD; all exports (DDL, diff/migration SQL, reversing spec, DBML/Mermaid) are derived from the stored snapshot, not from live DB access.
+3. The frontend fetches stored snapshots via `/api/*` and may build transient local graph edits. Backend DDL/diff/migration/spec exports derive from stored snapshots; frontend DBML/Mermaid/Prisma/dictionary outputs may derive from the current local graph; `/api/dbml/convert` is a separate design-first input. None is an immutable server-side desired-model revision today.
 4. Share links expose read-only snapshot/export routes under `/api/share/{share_uuid}/...` with a tighter rate limit, and sensitive fields (schema comments, example values) are redacted from publicly shared payloads.
 
 ### Dev vs prod compose
@@ -115,6 +120,6 @@ Three deployable pieces in one repo:
 - Middleware registration order in `app/main.py` is deliberate (security headers registered last so they wrap everything, including 429s and CORS preflight) — read the comments there before reordering.
 - Do not use nested `${VAR:-${OTHER:-default}}` expressions in compose files; podman-compose mishandles them (noted inline in compose.yaml).
 - Supply-chain pinning is enforced (OpenSSF Scorecard): Docker images are pinned by digest, GitHub Actions by commit SHA, and pip installs by `--require-hashes`. Preserve pinning when adding or updating any of these.
-- CI (`.github/workflows/ci.yml`) runs backend mypy + pytest (Python 3.10, hash-locked deps) and frontend typecheck + vitest + production build (Node 26). CodeQL, Scorecard, and dependency-review workflows also run.
+- Local CI (`.github/workflows/ci.yml`) runs backend mypy + pytest (Python 3.10, hash-locked deps) and frontend typecheck + vitest + production build (Node 26). CodeQL, Scorecard, dependency review and other required security/review jobs are downstream organization workflows visible on the exact PR head, not definitions owned by this repository.
 - User-visible frontend changes are recorded in CHANGELOG.md (Korean) and frontend/CHANGELOG.md.
 - Add or update tests when changing behavior; prefer small, focused PRs (CONTRIBUTING.md).

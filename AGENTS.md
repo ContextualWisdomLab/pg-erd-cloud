@@ -6,6 +6,20 @@ agent (Claude, Codex, Cursor, opencode, …). This is a Python backend
 (`frontend/`), shipped via Docker Compose (`compose.yaml`, `compose.prod.yaml`)
 behind Traefik (`deploy/traefik/`).
 
+## Documentation authority
+
+Start at [`docs/README.md`](docs/README.md) for the canonical PRD, TRD,
+Architecture, ADR, UML, ERD, API, security, test, operations, release, and
+traceability graph. Do not present `planned`, `research_only`, `downstream`, or
+`active_pr` behavior as shipped on `main`.
+
+Update the governing document and traceability when a change affects product
+acceptance (PRD), technical contracts or quality attributes (TRD/API), system
+boundaries (Architecture), durable decisions (ADR), behavior/data shape
+(UML/ERD), threat controls, verification strategy, operations, or release and
+recovery evidence. A documentation-only follow-up is not a substitute for
+keeping the authority graph consistent in the same change.
+
 <!-- BEGIN cwl-agent-guidance -->
 ## Agent guidance (CWL governance)
 
@@ -22,8 +36,7 @@ behind Traefik (`deploy/traefik/`).
   gate:
   - Vulnerable dependency: bump it. Python lives in `backend/requirements.lock`
     / `backend/requirements-dev.lock` (hash-locked) and `backend/pyproject.toml`;
-    frontend in `frontend/package.json` + `frontend/package-lock.json` /
-    `frontend/pnpm-lock.yaml`.
+    frontend in `frontend/package.json` + `frontend/package-lock.json`.
   - Container/config misconfig: fix the offending `backend/Dockerfile`,
     `frontend/Dockerfile`, `frontend/Dockerfile.prod`, the `compose*.yaml`
     files, or `deploy/traefik/dynamic.yaml`.

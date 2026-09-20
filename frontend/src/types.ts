@@ -12,27 +12,29 @@ export type ShareLink = {
   share_link_uuid: string
   permission_kind: string
   url_path: string
+  expires_at: string
   url: string
+}
+
+export type SharedSnapshotSummary = Snapshot & {
+  created_at: string
+}
+
+export type SharedLinkInfo = {
+  project_space_uuid: string
+  permission_kind: string
+  snapshots: SharedSnapshotSummary[]
 }
 
 declare const plainTextBrand: unique symbol
 
 export type PlainText = string & { readonly [plainTextBrand]: true }
 
-const HTML_TEXT_ENTITIES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;'
-}
-
 export function toPlainText(value: unknown): PlainText | null {
   if (typeof value !== 'string' || value.length === 0) return null
 
   return value
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
-    .replace(/[&<>"']/g, (char) => HTML_TEXT_ENTITIES[char])
     .trim() as PlainText
 }
 

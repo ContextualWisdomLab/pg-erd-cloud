@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Node } from "@xyflow/react";
 import type { TableNodeData } from "../../erd/convert";
-import { useDialogAccessibility } from './useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface EditTableModalProps {
   isOpen: boolean;
@@ -22,20 +22,68 @@ export function EditTableModal({
   onEditTableSubmit,
   onDeleteTable,
 }: EditTableModalProps) {
-  const dialogRef = useDialogAccessibility(isOpen && Boolean(editingNode), onEditTableCancel);
-
   if (!isOpen || !editingNode) return null;
 
   return (
-    <div className="modalOverlay">
-      <div className="modal" style={{ width: 800, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column" }} role="dialog" aria-modal="true" aria-labelledby="edit-table-title" ref={dialogRef} tabIndex={-1}>
-        <div className="modal__header">
-          <h3 id="edit-table-title">테이블 편집</h3>
-          <button type="button" aria-label="닫기" onClick={onEditTableCancel}>X</button>
+    <ModalShell
+      title="테이블 편집"
+      titleId="edit-table-title"
+      onClose={onEditTableCancel}
+      closeLabel="닫기"
+      size="editTable"
+      footer={
+        <div className="editTableModal__actions">
+          <div className="row">
+            <button
+              type="button"
+              onClick={onDeleteTable}
+              className="buttonDanger"
+              aria-label={`${editingNode.data.title} 테이블 삭제`}
+            >
+              테이블 삭제
+            </button>
+            <button
+              type="button"
+              aria-label={`${editingNode.data.title} 테이블 복제`}
+              onClick={() => {
+                const dupId = `${editingNode.id}_copy_${Date.now()}`;
+                setNodes((nds) => [
+                  ...nds,
+                  {
+                    ...editingNode,
+                    id: dupId,
+                    position: {
+                      x: editingNode.position.x + 40,
+                      y: editingNode.position.y + 40,
+                    },
+                    data: {
+                      ...editingNode.data,
+                      title: `${editingNode.data.title}_copy`,
+                      columns: editingNode.data.columns.map((column) => ({ ...column })),
+                    },
+                  },
+                ]);
+                onEditTableCancel();
+              }}
+            >
+              복제
+            </button>
+          </div>
+          <div className="row">
+            <button type="button" onClick={onEditTableCancel}>취소</button>
+            <button
+              type="submit"
+              form="editTableForm"
+              className="buttonPrimary"
+            >
+              저장
+            </button>
+          </div>
         </div>
-        <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
-          <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
-            <div className="col">
+      }
+    >
+          <form id="editTableForm" onSubmit={onEditTableSubmit} className="editTableForm">
+            <div className="formStack">
               <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
               <input
                 id="editTableTitle"
@@ -45,7 +93,7 @@ export function EditTableModal({
                 autoFocus
               />
             </div>
-            <div className="col">
+            <div className="formStack">
               <label htmlFor="editTableComment">코멘트 (선택)</label>
               <input
                 id="editTableComment"
@@ -55,9 +103,9 @@ export function EditTableModal({
               />
             </div>
 
-            <div className="col" style={{ marginTop: 16 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <h4 style={{ margin: 0 }}>컬럼</h4>
+            <div className="formStack editTableForm__columns">
+              <div className="row editTableForm__columnsHeader">
+                <h4>컬럼</h4>
                 <button
                   type="button"
                   onClick={() => {
@@ -107,15 +155,15 @@ export function EditTableModal({
                 </button>
               </div>
 
-              <div className="col" style={{ gap: 8 }}>
+              <div className="formStack">
                 {editingNode.data.columns.map((col, idx) => (
-                  <div key={`${col.column_name}-${idx}`} className="row" style={{ gap: 8, alignItems: "center" }}>
+                  <div key={`${col.column_name}-${idx}`} className="editTableForm__columnRow">
                     <input
                       type="text"
                       name={`col_name_${idx}`}
                       defaultValue={col.column_name}
                       placeholder="컬럼명"
-                      style={{ flex: 2 }}
+                      className="editTableForm__columnName"
                       aria-label={`${col.column_name} 컬럼명`}
                     />
                     <input
@@ -123,10 +171,10 @@ export function EditTableModal({
                       name={`col_type_${idx}`}
                       defaultValue={col.data_type}
                       placeholder="데이터 타입"
-                      style={{ flex: 1.5 }}
+                      className="editTableForm__columnType"
                       aria-label={`${col.column_name} 데이터 타입`}
                     />
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label className="row editTableForm__flag">
                       <input
                         type="checkbox"
                         name={`col_pk_${idx}`}
@@ -135,7 +183,7 @@ export function EditTableModal({
                       />
                       PK
                     </label>
-                    <label className="row" style={{ gap: 4, whiteSpace: "nowrap" }}>
+                    <label className="row editTableForm__flag">
                       <input
                         type="checkbox"
                         name={`col_nn_${idx}`}
@@ -173,7 +221,7 @@ export function EditTableModal({
                            };
                         });
                       }}
-                      style={{ color: "#b91c1c", padding: "4px 8px" }}
+                      className="buttonDanger"
                       aria-label={`${col.column_name} 컬럼 삭제`}
                     >
                       삭제
@@ -183,57 +231,6 @@ export function EditTableModal({
               </div>
             </div>
           </form>
-        </div>
-
-        <div className="row" style={{ justifyContent: "space-between", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
-          <div className="row" style={{ gap: 8 }}>
-            <button
-              type="button"
-              onClick={onDeleteTable}
-              style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-            >
-              테이블 삭제
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const dupId = `${editingNode.id}_copy_${Date.now()}`;
-                setNodes((nds) => [
-                  ...nds,
-                  {
-                    ...editingNode,
-                    id: dupId,
-                    position: {
-                      x: editingNode.position.x + 40,
-                      y: editingNode.position.y + 40,
-                    },
-                    data: {
-                      ...editingNode.data,
-                      title: `${editingNode.data.title}_copy`,
-                      // 깊은 복사를 통해 컬럼 배열 분리
-                      columns: editingNode.data.columns.map((c) => ({ ...c })),
-                    },
-                  },
-                ]);
-                onEditTableCancel();
-              }}
-              style={{ color: "#034ea2", borderColor: "#93c5fd" }}
-            >
-              복제
-            </button>
-          </div>
-          <div className="row">
-            <button type="button" onClick={onEditTableCancel}>취소</button>
-            <button
-              type="submit"
-              form="editTableForm"
-              style={{ background: "#034ea2", color: "#fff" }}
-            >
-              저장
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

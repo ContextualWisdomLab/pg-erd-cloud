@@ -1,8 +1,12 @@
 # Contributing to pg-erd-cloud
 
 Thank you for helping improve pg-erd-cloud. This project is a PostgreSQL-focused
-cloud ERD and DDL workflow MVP with a Python backend, TypeScript frontend, and
+cloud ERD and governed schema workflow product with a Python backend, TypeScript frontend, and
 Docker-based local environment.
+
+The canonical product and engineering documentation starts at
+[`docs/README.md`](docs/README.md). Lifecycle labels there distinguish shipped,
+active-PR, planned, research, downstream, deprecated, and excluded behavior.
 
 ## Ways to contribute
 
@@ -52,6 +56,10 @@ npm run dev
 - Add or update tests when changing behavior.
 - Update documentation when changing setup, security behavior, user-visible
   flows, APIs, or operational requirements.
+- Update PRD acceptance, TRD/API contracts, Architecture/ADRs, UML/ERD,
+  threat/test strategy, operations/release evidence, and traceability whenever
+  the corresponding requirement, boundary, decision, behavior, data shape,
+  control, or recovery contract changes.
 - Keep generated files, local secrets, and `.env` files out of commits.
 - Prefer small pull requests over broad rewrites.
 

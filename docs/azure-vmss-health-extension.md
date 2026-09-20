@@ -1,5 +1,9 @@
 # Azure VMSS Application Health Extension
 
+Status date: 2026-08-09
+Lifecycle: deployment-specific guidance `downstream`
+Owner: Azure deployment operator
+
 Issue: #33
 
 Azure Virtual Machine Scale Sets(VMSS)는 **Application Health Extension**으로 VM 내부에서
