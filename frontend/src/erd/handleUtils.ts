@@ -14,7 +14,8 @@ export function createSanitizeHandleIdCache(maxSize: number = 1000) {
     }
 
     let result = 'c-empty';
-    if (columnName) {
+    // 🛡️ Sentinel: Enforce maximum length and character whitelist to prevent cache flooding/OOM
+    if (columnName && columnName.length <= 255) {
       let encoded = '';
       let first = true;
 
@@ -24,7 +25,10 @@ export function createSanitizeHandleIdCache(maxSize: number = 1000) {
         if (!first) {
           encoded += '-';
         }
-        encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
+        const codePoint = char.codePointAt(0);
+        if (codePoint !== undefined) {
+          encoded += codePoint.toString(16).padStart(4, '0');
+        }
         first = false;
       }
       result = `c-${encoded}`;

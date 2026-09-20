@@ -27,6 +27,11 @@ describe('handleUtils', () => {
       expect(sanitizeHandleId('test_hit')).toBe('c-0074-0065-0073-0074-005f-0068-0069-0074');
       expect(sanitizeHandleId('test_hit')).toBe('c-0074-0065-0073-0074-005f-0068-0069-0074');
     });
+
+    it('rejects strings longer than 255 characters', () => {
+      const longString = 'a'.repeat(256);
+      expect(sanitizeHandleId(longString)).toBe('c-empty');
+    });
   });
 
   describe('sourceColumnHandleId', () => {
