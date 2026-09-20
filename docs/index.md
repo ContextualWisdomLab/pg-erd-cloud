@@ -11,6 +11,7 @@ pg-erd-cloud는 PostgreSQL 중심의 클라우드 ERD 협업·공유 서비스�
 - [관측성](observability.md)
 - [Clearfolio 통합](clearfolio-integration.md)
 - [LLM 오케스트레이터 통합](llm-orchestrator-integration.md)
+- [Product and technical Gap baseline](product-technical-gap-baseline.md)
 - [응답 보안 헤더](response-security-headers.md)
 - [CI 드리프트 검증](ci-drift-check.md)
 - [Azure VMSS 상태 프로브](azure-vmss-health-extension.md)
@@ -28,7 +29,7 @@ pg-erd-cloud는 데이터베이스 스키마를 읽고 구조화된 스냅샷과
 
 ## 현재 워크플로
 
-승인된 사용자는 프로젝트와 데이터베이스 연결을 구성하고 비동기 스냅샷 작업을 실행합니다. 성공한 스냅샷은 스키마·테이블·컬럼·키·인덱스와 같은 구조 메타데이터의 검토 가능한 시점을 만들며, 프론트엔드는 이를 관계 그래프로 탐색하고 검색·레이아웃·내보내기 흐름에 사용합니다. 공개 공유 export는 민감한 코멘트와 예시 값을 redaction하지만, 현재 `llm-draft` 모드는 외부 provider 호출을 유발할 수 있으므로 공개 링크 자체를 비용·권한 경계로 간주해서는 안 됩니다.
+승인된 사용자는 프로젝트와 데이터베이스 연결을 구성하고 비동기 스냅샷 작업을 실행합니다. 성공한 스냅샷은 스키마·테이블·컬럼·키·인덱스와 같은 구조 메타데이터의 검토 가능한 시점을 만들며, 프론트엔드는 이를 관계 그래프로 탐색하고 검색·레이아웃·내보내기 흐름에 사용합니다. 공개 공유 export는 민감한 코멘트와 예시 값을 redaction하며, 외부 provider를 호출하는 `llm-draft` 모드는 인증된 `/api/snapshots/...` 경로에서만 사용할 수 있습니다.
 
 ## 검증과 릴리스 경계
 
@@ -40,4 +41,4 @@ pg-erd-cloud는 데이터베이스 스키마를 읽고 구조화된 스냅샷과
 
 ## 라이선스
 
-pg-erd-cloud 소스는 [Apache License 2.0](https://github.com/ContextualWisdomLab/pg-erd-cloud/blob/main/LICENSE)으로 제공됩니다. 제3자 의존성은 각자의 라이선스 조건을 유지합니다.
+pg-erd-cloud 소스는 [Apache License 2.0](https://github.com/ContextualWisdomLab/pg-erd-cloud/blob/8dc746920c12988f082e914879d95e13c9693535/LICENSE)으로 제공됩니다. 제3자 의존성은 각자의 라이선스 조건을 유지합니다.
