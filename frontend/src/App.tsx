@@ -57,6 +57,9 @@ import {
   exportDictionaryCsv,
   exportDictionaryMarkdown,
   exportPlantUml,
+  exportTypeORM,
+  exportSqlAlchemy,
+  exportZod,
 } from "./erd/export";
 import { exportMermaid } from "./erd/mermaid";
 import { inferRelationships } from "./erd/autoInfer";
@@ -665,6 +668,18 @@ export default function App() {
 
   function onDownloadPrisma() {
     downloadText("pg-erd-diagram.prisma", exportPrisma(nodes, edges), "text/plain");
+  }
+
+  function onDownloadTypeORM() {
+    downloadText("pg-erd-diagram.typeorm.ts", exportTypeORM(nodes), "text/plain");
+  }
+
+  function onDownloadSqlAlchemy() {
+    downloadText("pg-erd-diagram.sqlalchemy.py", exportSqlAlchemy(nodes), "text/plain");
+  }
+
+  function onDownloadZod() {
+    downloadText("pg-erd-diagram.zod.ts", exportZod(nodes), "text/plain");
   }
 
   function onExportDictionaryCsv() {
@@ -1651,6 +1666,9 @@ export default function App() {
             onExportDictionaryMarkdown={onExportDictionaryMarkdown}
             onDownloadDbml={onDownloadDbml}
             onDownloadPrisma={onDownloadPrisma}
+            onDownloadTypeORM={onDownloadTypeORM}
+            onDownloadSqlAlchemy={onDownloadSqlAlchemy}
+            onDownloadZod={onDownloadZod}
             onCreateShareLink={onCreateShareLink}
             onCopyShareLink={onCopyShareLink}
           />
