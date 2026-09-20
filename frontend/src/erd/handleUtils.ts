@@ -1,15 +1,15 @@
 // ⚡ Bolt: Caches the result of sanitizeHandleId using an LRU cache.
 // 🎯 Why: String manipulation (Array.from, codePointAt) is an expensive O(C) operation.
 // 📊 Impact: Cache hits avoid ~14x overhead per handle ID generation.
-export const _handleCacheForTest = new Map<string, string>();
-const CACHE_SIZE_LIMIT = 1000;
+const CACHE_SIZE_LIMIT = 1000
+const handleCache = new Map<string, string>()
 
 export function sanitizeHandleId(columnName: string): string {
-  let cached = _handleCacheForTest.get(columnName);
+  let cached = handleCache.get(columnName)
   if (cached !== undefined) {
-    _handleCacheForTest.delete(columnName);
-    _handleCacheForTest.set(columnName, cached);
-    return cached;
+    handleCache.delete(columnName)
+    handleCache.set(columnName, cached)
+    return cached
   }
 
   const encoded = Array.from(columnName, (char) => {
@@ -17,17 +17,22 @@ export function sanitizeHandleId(columnName: string): string {
     return char.codePointAt(0)!.toString(16).padStart(4, '0')
   }).join('-')
 
-  const result = `c-${encoded || 'empty'}`;
+  const result = `c-${encoded || 'empty'}`
 
-  if (_handleCacheForTest.size >= CACHE_SIZE_LIMIT) {
-    const firstKey = _handleCacheForTest.keys().next().value;
+  if (handleCache.size >= CACHE_SIZE_LIMIT) {
+    const firstKey = handleCache.keys().next().value
     if (firstKey !== undefined) {
-      _handleCacheForTest.delete(firstKey);
+      handleCache.delete(firstKey)
     }
   }
-  _handleCacheForTest.set(columnName, result);
+  handleCache.set(columnName, result)
 
-  return result;
+  return result
+}
+
+// Exposed for testing
+export function _clearHandleCache() {
+  handleCache.clear()
 }
 
 export function sourceColumnHandleId(columnName: string): string {
