@@ -39,6 +39,7 @@ does not replace the authorities below.
 | Safe operations and incident boundaries | [Operations runbook](operations-runbook.md) |
 | Release, rollback and recovery evidence | [Release plan](release-plan.md) |
 | External commercial work-loop behavior and evidence | [Automation contract](automation-contract.md) |
+| Product/technical Gap, owner action and acceptance status | [Gap baseline](product-technical-gap-baseline.md) |
 
 ## Evidence precedence
 
