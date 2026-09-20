@@ -103,6 +103,18 @@ export function exportPrisma(
     }
   }
 
+  // ⚡ Bolt: Pre-compute relation definition strings to avoid O(N * C * E) lookups
+  const relationsByField = new Map<string, string>();
+  for (const [_, edgeInfo] of edgesProcessed) {
+    for (const sourceField of edgeInfo.sourceFields) {
+      const key = `${edgeInfo.sourceModel}:${sourceField}`;
+      const optional = true; // optionality is handled later, we just need the relation string part
+      const relField = sanitizeName(edgeInfo.targetModel) + "_" + sourceField;
+      const relationDef = `\n  ${relField} ${edgeInfo.targetModel}___OPTIONAL___ @relation("${edgeInfo.relationName}", fields: [${sourceField}], references: [${edgeInfo.targetFields[0]}])`;
+      relationsByField.set(key, relationDef);
+    }
+  }
+
   for (const node of nodes) {
     const modelName = sanitizeName(node.data.title);
     output += `model ${modelName} {\n`;
@@ -134,15 +146,10 @@ export function exportPrisma(
 
       const optional = col.is_not_null ? "" : "?";
 
-      // Determine if there is a relation defined on this field
-      let relationDef = "";
-      for (const [_, edgeInfo] of edgesProcessed) {
-        if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(fieldName)) {
-          // This field is a foreign key, but in Prisma, we typically define the relation object field
-          // alongside the scalar field. We will add the relation object field here.
-          const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-          relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
-        }
+      // ⚡ Bolt: O(1) lookup for relation definitions
+      let relationDef = relationsByField.get(`${modelName}:${fieldName}`) || "";
+      if (relationDef) {
+        relationDef = relationDef.replace("___OPTIONAL___", optional);
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;
