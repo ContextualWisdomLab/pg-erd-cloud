@@ -29,6 +29,7 @@ CANONICAL_FILES = (
     "docs/operations-runbook.md",
     "docs/release-plan.md",
     "docs/automation-contract.md",
+    "docs/product-technical-gap-baseline.md",
     "docs/adr/README.md",
     "docs/ui-ux/figma-contract.md",
 )
@@ -244,3 +245,39 @@ def test_planned_forward_engineering_entities_follow_naming_contract() -> None:
         "migration_audit_checkpoint",
     ):
         assert f"`{table_name}`" in erd or table_name.upper() in erd
+
+
+def test_public_share_documentation_blocks_live_llm_drafts() -> None:
+    """Public share guidance must not imply that bearer links can invoke live LLMs."""
+
+    public_index = _read("docs/index.md")
+    assert "공개 링크 자체를 비용·권한 경계로 간주해서는 안 됩니다" not in public_index
+    assert (
+        "외부 provider를 호출하는 `llm-draft` 모드는 인증된 "
+        "`/api/snapshots/...` 경로에서만 사용할 수 있습니다"
+    ) in public_index
+
+
+def test_public_license_link_is_immutable() -> None:
+    """Package-facing license evidence must not follow a mutable branch."""
+
+    public_index = _read("docs/index.md")
+    assert "/blob/main/LICENSE" not in public_index
+    assert (
+        "/blob/8dc746920c12988f082e914879d95e13c9693535/LICENSE"
+        in public_index
+    )
+
+
+def test_gap_baseline_covers_required_decision_surfaces() -> None:
+    """The product Gap ledger keeps the mandatory architecture and action map."""
+
+    baseline = _read("docs/product-technical-gap-baseline.md")
+    for required_heading in (
+        "## Evidence boundary",
+        "## PRD, TRD, UML, and ERD status",
+        "## Context Map",
+        "## Gap, Action, and Status",
+        "## Release and licensing boundary",
+    ):
+        assert required_heading in baseline
