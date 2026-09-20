@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-10 - Add visual "required" indicators to mandatory form fields
+**Learning:** React Testing Library strict string matching (e.g. `getByLabelText('Label Name')`) breaks when accessibility `<span aria-hidden="true">*</span>` are added to labels for visual feedback.
+**Action:** Update RTL queries to use regex matching (e.g. `getByLabelText(/Label Name/)`) when adding visually hidden semantic elements to labels, keeping tests robust and UI accessible.
