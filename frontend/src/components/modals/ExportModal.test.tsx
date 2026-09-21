@@ -171,13 +171,12 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('exposes access-control guidance for disabled button', () => {
+  it('presents access-management guidance without a dead control', () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
-    expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
-    const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
-    expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
-    expect(accessManagementButton).not.toHaveAttribute('title');
+    expect(screen.queryByRole('button', { name: '접근 관리' })).not.toBeInTheDocument();
+    expect(screen.getByRole('note', { name: '접근 관리 안내' })).toHaveTextContent(
+      '접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.',
+    );
   });
 });
