@@ -5,7 +5,7 @@ const CACHE_SIZE_LIMIT = 1000
 const handleCache = new Map<string, string>()
 
 export function sanitizeHandleId(columnName: string): string {
-  let cached = handleCache.get(columnName)
+  const cached = handleCache.get(columnName)
   if (cached !== undefined) {
     handleCache.delete(columnName)
     handleCache.set(columnName, cached)
