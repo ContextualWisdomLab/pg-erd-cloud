@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-05-18 - [LRU Cache for Handle IDs]
+**Learning:** React Flow renders and ERD exports frequently trigger `sanitizeHandleId`, resulting in a high volume of redundant and expensive string manipulations (`Array.from`, `codePointAt`, `.padStart`).
+**Action:** Utilize a `Map` to implement a bounded LRU cache (e.g., max size 10000) for deterministic string transformations to significantly reduce repetitive computation overhead on hot paths, as `Map` naturally preserves insertion order allowing easy eviction of the oldest entry using `.keys().next().value`.
