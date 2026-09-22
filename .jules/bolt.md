@@ -81,3 +81,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-05-18 - Optimize Handle ID Generation
 **Learning:** Using `Array.from(string)` to iterate over Unicode characters allocates intermediate array objects, increasing garbage collection overhead in hot loops like frontend ERD handle string generation.
 **Action:** Replace `Array.from` string iteration patterns with direct `for...of` loops, which natively and efficiently yield correct Unicode code points without temporary array allocation.
+
+## 2024-05-18 - Fix flaky UI search test due to DOM bleed / async state updates
+**Learning:** React Testing Library's `fireEvent.change` for search interactions may race against async API boundaries (like snapshot lists loading). Expecting a "No match found" result synchronously before verifying the base content has finished rendering leads to flaky assertions.
+**Action:** Always wrap `expect` queries in `waitFor(...)` (e.g. `await waitFor(() => expect(...).toBeInTheDocument())`) for dynamic DOM elements like filtered search results to ensure async updates resolve properly.
