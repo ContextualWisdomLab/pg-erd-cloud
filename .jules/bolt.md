@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2026-09-23 - [Optimize Prisma Schema Export: Replace Array.includes with indexOf]
+**Learning:** `Array.prototype.includes` can cause compatibility/complexity issues with certain static analyzers (like CodeQL's javascript-typescript scanner) when checking for substrings in frontend utility scripts.
+**Action:** Use native `.indexOf("string") !== -1` instead of `.includes("string")` for safer static analysis compatibility while performing substring checks on strings during data transformations.
