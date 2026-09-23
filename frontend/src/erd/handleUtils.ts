@@ -1,12 +1,8 @@
 export function sanitizeHandleId(columnName: string): string {
-  let encoded = "";
-  let first = true;
-  for (const char of columnName) {
-    if (!first) encoded += "-";
-    // Using for...of string iteration correctly yields full Unicode code points
-    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
-    first = false;
-  }
+  const encoded = Array.from(columnName, (char) => {
+    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    return char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }).join('-')
 
   return `c-${encoded || 'empty'}`
 }
