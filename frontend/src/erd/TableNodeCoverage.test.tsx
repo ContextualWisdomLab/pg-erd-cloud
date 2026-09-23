@@ -47,7 +47,7 @@ describe('TableNode rendering and memo coverage', () => {
     expect(screen.getByText('e.g. 0')).toBeInTheDocument()
     expect(screen.getByText('e.g. false')).toBeInTheDocument()
     expect(screen.queryByText('e.g.')).not.toBeInTheDocument()
-    expect(screen.getAllByLabelText('Primary Key').length).toBeGreaterThan(1)
+    expect(screen.getAllByLabelText('Primary Key (기본키)').length).toBeGreaterThan(1)
     expect(screen.getByRole('region')).toHaveClass('tableNode--grouped', 'tableNode--dimmed', 'tableNode--highlighted')
 
     rerender(

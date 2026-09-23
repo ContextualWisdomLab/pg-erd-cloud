@@ -80,8 +80,8 @@ describe('TableNode', () => {
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
     expect(indexName).not.toHaveAttribute('tabindex', '0');
 
-    const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
-    expect(notNullBadge).toHaveAttribute('title', 'Not Null');
+    const [notNullBadge] = screen.getAllByLabelText('Not Null (필수 입력)');
+    expect(notNullBadge).toHaveAttribute('title', 'Not Null (필수 입력)');
     expect(notNullBadge).toHaveTextContent('NN');
   });
 
