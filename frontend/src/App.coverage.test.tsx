@@ -670,9 +670,8 @@ describe('App orchestration coverage', () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
       await Promise.resolve()
-      await Promise.resolve()
     })
-    await waitFor(() => expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument())
+    expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
   })
 
   it('renders snapshot failures and polls without a selected project', async () => {
