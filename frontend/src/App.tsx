@@ -195,8 +195,36 @@ export default function App() {
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
+
+  // ⚡ Bolt: Decouple search recalculation from node position changes.
+  // React Flow creates new Node objects on drag, which triggered O(N*C) search recalculation.
+  // We use a ref to cache the previous calculation and only re-run if node.data or search changes.
+  const prevSearchRef = useRef<{
+    search: string;
+    nodes: Node<TableNodeData>[];
+    result: Set<string>;
+  }>({ search: "", nodes: [], result: new Set() });
+
   const searchMatchedNodeIds = useMemo(() => {
-    return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
+    const prev = prevSearchRef.current;
+    let isDataSame = prev.search === normalizedNodeSearch && prev.nodes.length === nodes.length;
+
+    if (isDataSame) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (prev.nodes[i].data !== nodes[i].data || prev.nodes[i].id !== nodes[i].id) {
+          isDataSame = false;
+          break;
+        }
+      }
+    }
+
+    if (isDataSame) {
+      return prev.result;
+    }
+
+    const result = findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
+    prevSearchRef.current = { search: normalizedNodeSearch, nodes, result };
+    return result;
   }, [nodes, normalizedNodeSearch]);
 
   // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
