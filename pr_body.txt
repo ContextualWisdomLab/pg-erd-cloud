@@ -1,4 +1,15 @@
-💡 작업 내용: Prisma 스키마 변환 시 배열 검색을 O(1) Map 조회로 개선 (성능 최적화)
-🎯 이유: `exportPrisma` 생성 과정 중, edge 배열을 반복할 때마다 `node.data.columns.find` 및 배열 `.includes` 탐색을 수행하여 O(N*C*E) 병목 현상이 발생함. 이는 큰 다이어그램 내보내기 성능 저하로 이어질 수 있음.
-📊 영향: 중첩 O(N) 순회 방식을 고정 시간인 O(1) Map 및 Set 조회 방식으로 교체하여 대규모 엔티티/관계 다이어그램 변환 속도(O(N*C) + O(E))를 대폭 단축함. 누락된 edge case에 대한 테스트 코드를 보완하여 커버리지 100%를 달성함.
-🔬 확인: `frontend/` 디렉터리 내에서 `npm run coverage` 실행을 통해 모든 테스트 항목 통과 및 커버리지 유지(100%) 확인.
+💡 What
+- ExportModal에 DBML 다운로드 버튼 추가
+- 메인 화면에 있던 독립된 DBML 다운로드 버튼을 제거하고, ExportModal 안으로 통합하였습니다.
+- 관련된 통합테스트 및 유닛 테스트 업데이트 (`App.coverage.test.tsx`, `ExportModal.test.tsx`)
+
+🎯 Why
+- 기존에 분리되어 있던 DBML 내보내기 버튼을 모달 안으로 통합하여 사용자 인터페이스의 일관성을 높였습니다.
+- SVG, PlantUML 등 다른 파일 형식과 동일한 경험을 제공합니다.
+
+📸 Before/After
+- Before: 메인 도구 모음에 `DBML 내보내기` 버튼이 존재
+- After: `공유 및 내보내기` 모달 안 `산출물` 목록에 DBML 항목으로 이동됨
+
+♿ Accessibility
+- 버튼 및 다이얼로그의 기존 접근성 속성을 그대로 유지하고 동일한 규칙을 따라 작성했습니다.
