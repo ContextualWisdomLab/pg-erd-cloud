@@ -164,3 +164,29 @@ async def test_apply_database_sql_rejects_unsafe_forward_ddl(
     m.assert_not_awaited()
     assert expected_error in str(e.value)
     assert "s3cret" not in str(e.value)
+
+
+@pytest.mark.asyncio
+async def test_apply_sql_raises_other_http_exceptions():
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    with patch(
+        "app.api.connections.require_project_member",
+        new_callable=AsyncMock,
+        side_effect=HTTPException(status_code=500, detail="some error"),
+    ):
+        with pytest.raises(HTTPException) as e:
+            await apply_sql(db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session)
+    assert e.value.status_code == 500
+
+@pytest.mark.asyncio
+async def test_apply_sql_returns_404_when_connection_deleted_after_check():
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    session.get = AsyncMock(return_value=None)
+    with patch(
+        "app.api.connections.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as e:
+            await apply_sql(db_connection_uuid=uuid.uuid4(), body=_body(), user=_user(), session=session)
+    assert e.value.status_code == 404

@@ -118,3 +118,29 @@ async def test_probe_database_wraps_and_redacts_errors():
             await probe_database(dsn)
     # Credentials must never surface in the wrapped error.
     assert "s3cret" not in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_test_connection_raises_other_http_exceptions():
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    with patch(
+        "app.api.connections.require_project_member",
+        new_callable=AsyncMock,
+        side_effect=HTTPException(status_code=500, detail="some error"),
+    ):
+        with pytest.raises(HTTPException) as e:
+            await run_connection_test(db_connection_uuid=uuid.uuid4(), user=_user(), session=session)
+    assert e.value.status_code == 500
+
+@pytest.mark.asyncio
+async def test_test_connection_returns_404_when_connection_deleted_after_check():
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=uuid.uuid4())
+    session.get = AsyncMock(return_value=None)
+    with patch(
+        "app.api.connections.require_project_member", new_callable=AsyncMock
+    ):
+        with pytest.raises(HTTPException) as e:
+            await run_connection_test(db_connection_uuid=uuid.uuid4(), user=_user(), session=session)
+    assert e.value.status_code == 404
