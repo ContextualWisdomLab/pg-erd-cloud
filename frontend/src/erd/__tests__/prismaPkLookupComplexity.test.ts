@@ -53,4 +53,45 @@ describe('exportPrisma primary-key lookup', () => {
     expect(output).toContain('user_id Int @id');
     expect(output).toContain('profiles_user_id profiles? @relation("profiles_user")');
   });
+
+  it('preserves first-match primary-key semantics for duplicate column names', () => {
+    const users: Node<TableNodeData> = {
+      id: 'users',
+      position: { x: 0, y: 0 },
+      data: {
+        title: 'users',
+        badges: { pk: true, fk: false },
+        columns: [
+          { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
+        ],
+      },
+    };
+    const source: Node<TableNodeData> = {
+      id: 'source',
+      position: { x: 100, y: 0 },
+      data: {
+        title: 'legacy_source',
+        badges: { pk: true, fk: true },
+        columns: [
+          { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
+          { column_name: 'user_id', data_type: 'integer', is_pk: true, is_not_null: true },
+        ],
+      },
+    };
+    const edges: Edge[] = [
+      {
+        id: 'legacy-source-user',
+        source: source.id,
+        target: users.id,
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id',
+        label: 'legacy_source_user',
+      },
+    ];
+
+    const output = exportPrisma([users, source], edges);
+
+    expect(output).toContain('legacy_source_user_id legacy_source[] @relation("legacy_source_user")');
+    expect(output).not.toContain('legacy_source_user_id legacy_source? @relation("legacy_source_user")');
+  });
 });
