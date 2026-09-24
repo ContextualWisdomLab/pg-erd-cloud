@@ -86,9 +86,8 @@ export function EditEdgeModal({
               onRelDelete();
             }}
             style={{ color: "#b91c1c", borderColor: "#fca5a5" }}
-            aria-label="관계 삭제"
           >
-            삭제
+            관계 삭제
           </button>
           <div className="row">
             <button type="button" onClick={onRelCancel}>취소</button>
