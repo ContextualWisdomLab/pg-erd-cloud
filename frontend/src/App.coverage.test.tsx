@@ -670,6 +670,7 @@ describe('App orchestration coverage', () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
       await Promise.resolve()
+      await Promise.resolve()
     })
     expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
   })
