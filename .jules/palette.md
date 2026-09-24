@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-02-23 - Text Truncation Focusability
+**Learning:** Elements using `text-overflow: ellipsis` hide text from users but their `title` and `aria-label` attributes provide accessibility. However, if these elements are purely structural (like a generic `span` without a semantic role) and are not natively focusable, screen reader and keyboard-only users will bypass them completely and never hear the accessible name or trigger the native `title` tooltip.
+**Action:** When truncating informative, purely textual elements (like table names in the GroupModal list) using CSS, always add `tabIndex={0}` so keyboard and screen reader users can focus the element and read the full context provided by the `aria-label` or `title`.
