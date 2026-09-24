@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2025-02-12 - Decouple search recalculation from node position changes
-**Learning:** In the frontend React codebase, `findSearchMatchedNodeIds` was a source of expensive O(N*C) search recalculation (where N is the number of nodes, and C is the number of columns per node) on every node position change (like a 60fps drag event) because `useMemo` for `searchMatchedNodeIds` depended on the `nodes` array directly.
-**Action:** Decouple search recalculation from the array reference identity by using a `useRef` to store the last search dependencies. Implement a custom equality check that verifies the stability of node IDs and their data object references (which contain the text being searched) without comparing node positions (like `.position.x` and `.position.y`). This skips the expensive search match on drag events while keeping the application responsive.
