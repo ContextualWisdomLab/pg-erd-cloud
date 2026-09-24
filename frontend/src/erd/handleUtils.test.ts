@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createSanitizeHandleCache } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -21,6 +21,45 @@ describe('handleUtils', () => {
 
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
+    });
+  });
+
+  describe('LRU Cache', () => {
+    it('should return cached result on subsequent calls', () => {
+      const boundedCache = createSanitizeHandleCache(2);
+
+      const spy = vi.spyOn(Array, 'from');
+
+      boundedCache('col1');
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      boundedCache('col1');
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      spy.mockRestore();
+    });
+
+    it('should evict oldest item when max size is exceeded', () => {
+      const boundedCache = createSanitizeHandleCache(2);
+
+      boundedCache('col1');
+      boundedCache('col2');
+
+      boundedCache('col1'); // map is [col2, col1]
+
+      const spy = vi.spyOn(Array, 'from');
+      boundedCache('col3'); // size 3 -> evict col2 -> map is [col1, col3]
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      spy.mockClear();
+      boundedCache('col2'); // cache miss for col2 -> map is [col1, col3, col2] -> evicts col1 -> map is [col3, col2]
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      spy.mockClear();
+      boundedCache('col1'); // miss for col1
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      spy.mockRestore();
     });
   });
 
