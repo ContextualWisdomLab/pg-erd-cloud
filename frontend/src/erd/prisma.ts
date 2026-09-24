@@ -140,10 +140,9 @@ export function exportPrisma(
       if (col.is_pk) {
         attributes += " @id";
         hasId = true;
-        const dataTypeLower = col.data_type.toLowerCase();
-        if (prismaType === "Int" && dataTypeLower.indexOf("serial") !== -1) {
+        if (prismaType === "Int" && col.data_type.toLowerCase().includes("serial")) {
           attributes += " @default(autoincrement())";
-        } else if (prismaType === "String" && dataTypeLower.indexOf("uuid") !== -1) {
+        } else if (prismaType === "String" && col.data_type.toLowerCase().includes("uuid")) {
           attributes += " @default(uuid())";
         }
       } else if (isColUnique) {
