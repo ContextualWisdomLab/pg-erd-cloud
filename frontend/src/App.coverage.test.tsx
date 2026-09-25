@@ -325,10 +325,11 @@ describe('App orchestration coverage', () => {
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('HR 프로젝트의 스냅샷')).toBeInTheDocument()); // Wait for diagrams to load
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
-    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
-    expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('ERD_all_2')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: '편집기 열기' }))
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
 
@@ -610,6 +611,7 @@ describe('App orchestration coverage', () => {
   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0));
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -641,6 +643,7 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0));
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -666,6 +669,7 @@ describe('App orchestration coverage', () => {
     await act(async () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
+      await Promise.resolve()
       await Promise.resolve()
     })
     expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()
@@ -784,6 +788,7 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0));
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
