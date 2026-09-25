@@ -28,13 +28,14 @@ describe('handleUtils', () => {
     it('should return cached result on subsequent calls', () => {
       const boundedCache = createSanitizeHandleCache(2);
 
-      const spy = vi.spyOn(Array, 'from');
+      const spy = vi.spyOn(String.prototype, 'codePointAt');
 
       boundedCache('col1');
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalled();
 
+      spy.mockClear();
       boundedCache('col1');
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).not.toHaveBeenCalled(); // Cache hit
 
       spy.mockRestore();
     });
@@ -47,17 +48,17 @@ describe('handleUtils', () => {
 
       boundedCache('col1'); // map is [col2, col1]
 
-      const spy = vi.spyOn(Array, 'from');
+      const spy = vi.spyOn(String.prototype, 'codePointAt');
       boundedCache('col3'); // size 3 -> evict col2 -> map is [col1, col3]
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalled();
 
       spy.mockClear();
       boundedCache('col2'); // cache miss for col2 -> map is [col1, col3, col2] -> evicts col1 -> map is [col3, col2]
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalled();
 
       spy.mockClear();
       boundedCache('col1'); // miss for col1
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalled();
 
       spy.mockRestore();
     });

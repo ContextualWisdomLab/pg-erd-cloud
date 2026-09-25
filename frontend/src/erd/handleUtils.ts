@@ -9,10 +9,13 @@ export function createSanitizeHandleCache(maxSize: number = 10000) {
       return cached
     }
 
-    const encoded = Array.from(columnName, (char) => {
-      // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-      return char.codePointAt(0)!.toString(16).padStart(4, '0')
-    }).join('-')
+    let encoded = ''
+    for (const char of columnName) {
+      const codePoint = char.codePointAt(0)
+      if (codePoint !== undefined) {
+        encoded += (encoded ? '-' : '') + codePoint.toString(16).padStart(4, '0')
+      }
+    }
 
     const result = `c-${encoded || 'empty'}`
 
