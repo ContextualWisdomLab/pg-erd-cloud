@@ -67,7 +67,7 @@ describe('ExportModal', () => {
       />,
     );
 
-    expect(screen.getByLabelText('공유 링크 URL')).toHaveValue(
+    expect(screen.getByLabelText(/공유 링크 URL/)).toHaveValue(
       'http://localhost/api/share/share-123',
     );
     fireEvent.click(screen.getByRole('button', { name: '링크 복사' }));
