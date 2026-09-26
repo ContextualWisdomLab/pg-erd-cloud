@@ -54,6 +54,24 @@ def test_parses_refs_inline_and_standalone_deduped_semantics():
     assert len(snap["fk_edges"]) == 2  # parser is literal; dedup is the caller's choice
 
 
+def test_standalone_reference_accepts_relationship_options():
+    """DBML relationship actions are valid trailing reference settings."""
+
+    dbml = """
+Table users {
+  id integer [pk]
+}
+Table posts {
+  user_id integer
+}
+Ref: posts.user_id > users.id [delete: cascade, update: no action]
+"""
+
+    edge = parse_dbml(dbml)["fk_edges"][0]
+    assert edge["child_column_name"] == "user_id"
+    assert edge["parent_column_name"] == "id"
+
+
 def test_standalone_reference_rejects_trailing_tokens():
     dbml = """
 Table users {
