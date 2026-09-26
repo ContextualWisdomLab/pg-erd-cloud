@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createSanitizeHandleCache } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -21,6 +21,23 @@ describe('handleUtils', () => {
 
     it('should handle emojis', () => {
       expect(sanitizeHandleId('id_🚀')).toBe('c-0069-0064-005f-1f680');
+    });
+  });
+
+  describe('Cache', () => {
+    it('should return cached result on subsequent calls', () => {
+      const boundedCache = createSanitizeHandleCache();
+
+      const spy = vi.spyOn(String.prototype, 'codePointAt');
+
+      boundedCache('col1');
+      expect(spy).toHaveBeenCalled();
+
+      spy.mockClear();
+      boundedCache('col1');
+      expect(spy).not.toHaveBeenCalled(); // Cache hit
+
+      spy.mockRestore();
     });
   });
 
