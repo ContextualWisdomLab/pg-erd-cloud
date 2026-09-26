@@ -1,7 +1,11 @@
 export function createSanitizeHandleId(maxSize: number = 1000) {
   const cache = new Map<string, string>();
 
-  return function sanitizeHandleId(columnName: string): string {
+  return function sanitizeHandleId(columnName: string | null | undefined): string {
+    if (!columnName) {
+      return 'c-empty';
+    }
+
     if (cache.has(columnName)) {
       const value = cache.get(columnName)!;
       cache.delete(columnName);
@@ -30,10 +34,10 @@ export function createSanitizeHandleId(maxSize: number = 1000) {
 
 export const sanitizeHandleId = createSanitizeHandleId();
 
-export function sourceColumnHandleId(columnName: string): string {
+export function sourceColumnHandleId(columnName: string | null | undefined): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
-export function targetColumnHandleId(columnName: string): string {
+export function targetColumnHandleId(columnName: string | null | undefined): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }

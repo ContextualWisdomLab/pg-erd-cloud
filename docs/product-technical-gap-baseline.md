@@ -1,8 +1,8 @@
 # Product–Technical Gap Baseline
 
-Status: Proposed  
-Evidence date: 2026-09-26  
-Product PR: [#1222](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/1222)  
+Status: Proposed
+Evidence date: 2026-09-26
+Product PR: [#1222](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/1222)
 Source exact product head before baseline restoration: `18e386c46a1463bd700cdfc8c26d4dc10ca1d7df`
 
 ## PRD
