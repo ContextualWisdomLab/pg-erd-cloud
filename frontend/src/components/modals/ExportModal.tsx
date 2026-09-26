@@ -157,6 +157,7 @@ export function ExportModal({
           <button
             type="button"
             className="exportModal__iconButton"
+            title="공유 및 내보내기 닫기"
             aria-label="공유 및 내보내기 닫기"
             onClick={onCloseExport}
           >
