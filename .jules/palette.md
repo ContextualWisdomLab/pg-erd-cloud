@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-19 - Adding enter-to-submit to generic input fields
+**Learning:** Native React buttons with an onClick handler next to a raw input are fundamentally inaccessible to keyboard users because they do not trigger when the user presses Enter inside the input field. This is a very common oversight in non-form layouts.
+**Action:** Always wrap standard textual input fields and their primary action buttons in `<form>` tags, remove the `onClick` from the `<button>`, change it to `type="submit"`, and handle the submission via `onSubmit={(e) => { e.preventDefault(); ... }}` on the form to natively support keyboard accessibility without Javascript keydown listeners.
