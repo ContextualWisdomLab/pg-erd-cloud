@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -271,9 +271,15 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
+        from jwt import PyJWK
+
+        try:
+            key = PyJWK(jwk).key
+        except Exception:
+            key = jwk
         claims = jwt.decode(
             token,
-            jwk,
+            key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
@@ -464,7 +470,7 @@ async def get_current_user(
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer " + API_KEY_PREFIX):
-        return await _user_from_api_key(session, auth_header[len("Bearer "):])
+        return await _user_from_api_key(session, auth_header[len("Bearer ") :])
     subject, display_name = await _get_subject_from_request(request)
     async with session.begin():
         return await _ensure_user(session, subject, display_name)

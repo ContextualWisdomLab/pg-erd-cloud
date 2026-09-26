@@ -263,6 +263,18 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
 
     observed: dict[str, object] = {}
 
+    class FakePyJWK:
+
+        def __init__(self, jwk):
+
+            self.key = jwk
+
+    import jwt
+
+    monkeypatch.setattr(jwt, "PyJWK", FakePyJWK, raising=False)
+
+    monkeypatch.setattr(auth, "jwt", jwt, raising=False)
+
     def fake_decode(*args: object, **kwargs: object) -> dict:
         observed["args"] = args
         observed["kwargs"] = kwargs
@@ -357,6 +369,18 @@ async def test_oidc_refreshes_jwks_when_kid_is_unknown(
         return {"keys": [{"kid": "old-key", "kty": "RSA"}]}
 
     observed: dict[str, object] = {}
+
+    class FakePyJWK:
+
+        def __init__(self, jwk):
+
+            self.key = jwk
+
+    import jwt
+
+    monkeypatch.setattr(jwt, "PyJWK", FakePyJWK, raising=False)
+
+    monkeypatch.setattr(auth, "jwt", jwt, raising=False)
 
     def fake_decode(*args: object, **kwargs: object) -> dict:
         observed["key"] = args[1]
