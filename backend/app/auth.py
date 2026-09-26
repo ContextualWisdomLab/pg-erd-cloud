@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import httpx
 from fastapi import Depends, HTTPException, Request
-from jose import jwt
+import jwt
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -271,24 +271,29 @@ async def _decode_verified_oidc_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="algorithm/key type mismatch")
 
     try:
+        # PyJWT expects required claims under the "require" list option,
+        # not individual boolean options like require_iss.
+        options = {
+            "verify_aud": bool(settings.oidc_audience),
+            "require": ["iss", "exp", "jti"],
+        }
+        if settings.oidc_audience:
+            options["require"].append("aud")
+
         claims = jwt.decode(
             token,
-            jwk,
+            # For PyJWT with a JWK dictionary, we must instantiate a PyJWK and use its key.
+            jwt.PyJWK.from_dict(jwk).key,
             algorithms=list(OIDC_ALLOWED_ALGORITHMS),
             audience=settings.oidc_audience,
             issuer=settings.oidc_issuer,
-            options={
-                "verify_aud": bool(settings.oidc_audience),
-                "require_aud": bool(settings.oidc_audience),
-                "require_iss": True,
-                "require_exp": True,
-                "require_jti": True,
-                "leeway": OIDC_JWT_LEEWAY_SECONDS,
-            },
+            leeway=OIDC_JWT_LEEWAY_SECONDS,
+            options=options,
         )
-    except Exception as err:
+    except jwt.PyJWTError as err:
+        # Avoid leaking specific token verification errors (like "Signature has expired")
         raise HTTPException(
-            status_code=401, detail="token verification failed"
+            status_code=401, detail="invalid token"
         ) from err
 
     return cast(dict[str, Any], claims)
@@ -303,13 +308,13 @@ async def _verified_token_from_claims(
     jwt_id = claims.get("jti")
     name = claims.get("name") or claims.get("preferred_username")
     if not isinstance(sub, str):
-        raise HTTPException(status_code=401, detail="token missing sub")
+        raise HTTPException(status_code=401, detail="invalid token")
     if not isinstance(jwt_id, str) or not jwt_id.strip():
-        raise HTTPException(status_code=401, detail="token missing jti")
+        raise HTTPException(status_code=401, detail="invalid token")
 
     expires_at = _jwt_expiry(claims)
     if verify_revocation and await is_token_jti_revoked(jwt_id):
-        raise HTTPException(status_code=401, detail="token revoked")
+        raise HTTPException(status_code=401, detail="invalid token")
 
     return VerifiedToken(
         subject=sub,
