@@ -113,7 +113,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);
