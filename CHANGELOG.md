@@ -12,5 +12,3 @@
 - [FE] `autoInfer.ts`에 대한 단위 테스트 및 UI 컴포넌트 단위 테스트를 추가하여 100% 테스트 커버리지를 유지합니다.
 - [FE] ⬇️ **DBML Export**: ERD 다이어그램을 DBML (Database Markup Language) 형식으로 내보낼 수 있는 기능을 추가했습니다. 상단의 DBML 버튼을 클릭하여 다운로드할 수 있습니다.
 - [FE] 📚 **Data Dictionary Export**: ERD 테이블/컬럼 메타데이터를 CSV 및 Markdown으로 내보내며, CSV formula injection과 Markdown 렌더링 escape를 적용했습니다.
-- [FE] 🛡️ **nanoid 무한 루프 DoS 취약점 해결**: 크기가 0인 커스텀 생성기 사용 시 무한 루프가 발생하는 취약점을 방지하기 위해 nanoid 버전을 ^3.3.18로 강제 오버라이드하여 갱신했습니다.
-- [FE] ⚡ **React Flow 노드 검색 캐싱 최적화**: 렌더링 프레임 단위의 드래그 연산 시 검색을 위해 순회 및 문자열 할당을 하는 O(N*C) 병목을 O(1) 단위의 WeakMap 캐시 조회로 대폭 개선하고 불변 데이터 계약 모델로 고도화했습니다.
