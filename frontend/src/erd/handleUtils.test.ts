@@ -24,9 +24,9 @@ describe('handleUtils', () => {
     });
   });
 
-  describe('LRU Cache', () => {
+  describe('Cache', () => {
     it('should return cached result on subsequent calls', () => {
-      const boundedCache = createSanitizeHandleCache(2);
+      const boundedCache = createSanitizeHandleCache();
 
       const spy = vi.spyOn(String.prototype, 'codePointAt');
 
@@ -36,29 +36,6 @@ describe('handleUtils', () => {
       spy.mockClear();
       boundedCache('col1');
       expect(spy).not.toHaveBeenCalled(); // Cache hit
-
-      spy.mockRestore();
-    });
-
-    it('should evict oldest item when max size is exceeded', () => {
-      const boundedCache = createSanitizeHandleCache(2);
-
-      boundedCache('col1');
-      boundedCache('col2');
-
-      boundedCache('col1'); // map is [col2, col1]
-
-      const spy = vi.spyOn(String.prototype, 'codePointAt');
-      boundedCache('col3'); // size 3 -> evict col2 -> map is [col1, col3]
-      expect(spy).toHaveBeenCalled();
-
-      spy.mockClear();
-      boundedCache('col2'); // cache miss for col2 -> map is [col1, col3, col2] -> evicts col1 -> map is [col3, col2]
-      expect(spy).toHaveBeenCalled();
-
-      spy.mockClear();
-      boundedCache('col1'); // miss for col1
-      expect(spy).toHaveBeenCalled();
 
       spy.mockRestore();
     });

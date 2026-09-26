@@ -1,11 +1,9 @@
-export function createSanitizeHandleCache(maxSize: number = 10000) {
+export function createSanitizeHandleCache() {
   const cache = new Map<string, string>()
 
   return function sanitizeHandleId(columnName: string): string {
-    if (cache.has(columnName)) {
-      const cached = cache.get(columnName)!
-      cache.delete(columnName)
-      cache.set(columnName, cached)
+    const cached = cache.get(columnName)
+    if (cached !== undefined) {
       return cached
     }
 
@@ -20,14 +18,6 @@ export function createSanitizeHandleCache(maxSize: number = 10000) {
     const result = `c-${encoded || 'empty'}`
 
     cache.set(columnName, result)
-
-    if (cache.size > maxSize) {
-      const firstKey = cache.keys().next().value
-      if (firstKey !== undefined) {
-        cache.delete(firstKey)
-      }
-    }
-
     return result
   }
 }
