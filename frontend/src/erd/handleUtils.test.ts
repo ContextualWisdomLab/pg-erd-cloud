@@ -15,6 +15,12 @@ describe('handleUtils', () => {
       expect(sanitizeHandleId('')).toBe('c-empty');
     });
 
+    it.each([null, undefined])('should reject missing column name %s', (columnName) => {
+      expect(() => sanitizeHandleId(columnName as unknown as string)).toThrow(
+        new TypeError('columnName must be a string'),
+      );
+    });
+
     it('should handle special characters', () => {
       expect(sanitizeHandleId('user_id')).toBe('c-0075-0073-0065-0072-005f-0069-0064');
     });
