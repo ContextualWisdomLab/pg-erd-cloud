@@ -170,7 +170,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} onEditTableCancel={onEditTableCancelMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '복제' }));
+    await user.click(screen.getByRole('button', { name: 'test_table 테이블 복제' })); // Without schema it's test_table
 
     expect(setNodesMock).toHaveBeenCalled();
     expect(onEditTableCancelMock).toHaveBeenCalled();
@@ -183,5 +183,52 @@ describe('EditTableModal', () => {
     expect(newNodes[1].data.title).toBe('test_table_copy');
     expect(newNodes[1].data.columns).not.toBe(editingNode.data.columns); // Deep copy check
     expect(newNodes[1].data.columns[0]).toEqual(editingNode.data.columns[0]);
+  });
+
+  it('calls onDeleteTable when 테이블 삭제 is clicked', async () => {
+    const onDeleteTableMock = vi.fn();
+    const editingNodeLocal = {
+      id: 'table-1',
+      type: 'tableNode',
+      position: { x: 0, y: 0 },
+      data: {
+        id: 'table-1',
+        schema: 'public',
+        title: 'test_table',
+        comment: 'test comment',
+        columns: [
+          {
+            column_name: 'test_col',
+            data_type: 'int',
+          },
+        ],
+      },
+    };
+
+    render(<EditTableModal {...defaultProps} editingNode={editingNodeLocal as any} setEditingNode={vi.fn()} setNodes={vi.fn()} onDeleteTable={onDeleteTableMock} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'public.test_table 테이블 삭제' })); // With schema it's public.test_table
+
+    expect(onDeleteTableMock).toHaveBeenCalled();
+  });
+
+
+  it('uses stable table identity for labels across schemas', async () => {
+    const schemaNode = {
+      id: 'table-2',
+      type: 'tableNode',
+      position: { x: 0, y: 0 },
+      data: {
+        id: 'table-2',
+        schema: 'auth',
+        title: 'users',
+        comment: '',
+        columns: [],
+      },
+    };
+    render(<EditTableModal isOpen={true} setEditingNode={vi.fn()} setNodes={vi.fn()} onEditTableCancel={vi.fn()} onEditTableSubmit={vi.fn()} onDeleteTable={vi.fn()} editingNode={schemaNode as any} />);
+    expect(screen.getByRole('button', { name: 'auth.users 테이블 삭제' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'auth.users 테이블 복제' })).toBeInTheDocument();
   });
 });
