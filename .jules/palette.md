@@ -57,9 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2026-09-13 - Focusable Disabled Buttons in Project Creation
-**Learning:** The "Create project" button natively disabled via the HTML `disabled` attribute prevented screen reader users from accessing the `aria-describedby` hint explaining why the button was disabled. Replacing `disabled` with `aria-disabled="true"` and styling it identically resolves the issue but requires handling the disabled state manually in React to prevent default actions.
-**Action:** Always replace the native `disabled` attribute with `aria-disabled="true"` and an appropriate `onClick` manual override when disabled buttons carry explanatory text for accessibility purposes.
-## 2026-09-14 - STRIX accessibility guidelines and event bubbling tests
-**Learning:** The STRIX guidelines recommend `e.preventDefault(); e.stopPropagation();` for custom `aria-disabled` interactions. However, in this project's test suite, `App.coverage.test.tsx` artificially dispatches clicks using a `forceClick` helper on elements to test internal component guards without simulating full DOM updates. Calling `e.stopPropagation()` stops the test's artificial `forceClick` events from bubbling up correctly and causes subsequent global polling/timer operations in tests to timeout or stall.
-**Action:** When manually intercepting `aria-disabled` elements, use `e.preventDefault(); return;` without `e.stopPropagation()` if `e.stopPropagation()` breaks existing test logic that relies on unhandled/unprevented event propagation at the container level.
