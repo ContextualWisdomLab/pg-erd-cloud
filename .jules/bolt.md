@@ -80,3 +80,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2026-06-25 - Avoid Array.from for short string iteration in hot paths
 **Learning:** `Array.from(string)` increases garbage collection overhead and intermediate array allocations. Replacing it with a simple `for...of` loop for string character iteration provides ~50% faster execution in frequently called graph path resolution methods like `sanitizeHandleId`.
 **Action:** In hot paths, prefer `for...of` loops over `Array.from` when iterating characters or mapping values to prevent intermediate array allocations and reduce garbage collection pressure.
+
+## 2026-09-21 - Avoiding STRIX / OpenCode Transient Failures
+**Learning:** If OpenCode Review or STRIX CI workflows fail with "No APPROVED or CHANGES_REQUESTED from opencode-agent", it indicates a transient LLM infrastructure timeout/hallucination, not a code issue.
+**Action:** Do not repeatedly trigger empty commits to fix this, as the external CI runner requires actual code changes or an authenticated exact-head verdict from the bot. Ensure any unresolved review threads are addressed before further action.
