@@ -46,7 +46,7 @@ _PATH = rf'(?:{_QUOTED_IDENTIFIER}|\w+)(?:\.(?:{_QUOTED_IDENTIFIER}|\w+))*'
 _REF_RE = re.compile(
     r"ref\s*(?:(?P<block_name>\w+)\s*\{\s*|(?:(?P<short_name>\w+)\s*)?:?\s*)"
     rf"(?P<from>{_PATH})\s*(?P<op>[<>-])\s*(?P<to>{_PATH})\s*"
-    r"(?(block_name)\})",
+    r"(?:\[[^\[\]]*\]\s*)?(?(block_name)\})",
     re.IGNORECASE,
 )
 _INLINE_REF_RE = re.compile(
