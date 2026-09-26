@@ -157,6 +157,7 @@ export function ExportModal({
           <button
             type="button"
             className="exportModal__iconButton"
+            title="공유 및 내보내기 닫기"
             aria-label="공유 및 내보내기 닫기"
             onClick={onCloseExport}
           >
@@ -202,8 +203,7 @@ export function ExportModal({
               )}
               <button
                 type="button"
-                aria-disabled={true}
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                disabled
                 aria-describedby="share-export-access-hint"
                 className="exportModal__disabledHintButton"
               >
