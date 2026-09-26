@@ -6,9 +6,22 @@ from typing import Any
 import pytest
 
 from app.snowflake_introspect.introspect import (
+    _q,
     _parse_snowflake_dsn,
     introspect_snowflake,
 )
+
+
+def test_snowflake_identifier_quote_allows_names_longer_than_postgresql_limit() -> None:
+    identifier = "x" * 64
+
+    assert _q(identifier) == f'"{identifier}"'
+
+
+@pytest.mark.parametrize("identifier", ["", "bad\x00name"])
+def test_snowflake_identifier_quote_rejects_unsafe_names(identifier: str) -> None:
+    with pytest.raises(ValueError, match="Snowflake identifier"):
+        _q(identifier)
 
 
 class FakeCursor:

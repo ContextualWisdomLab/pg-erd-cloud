@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- [BE] 🛠️ **DBML·Snowflake 호환성 보정**: 이름이 붙은 콜론형 DBML 참조와 따옴표가 섞인 note/default 설정을 보존하고, Snowflake의 PostgreSQL 63바이트 제한 오적용을 제거했습니다.
+- [BE] 🛠️ **Snowflake DDL 식별자 보존**: Snowflake 스키마·테이블·컬럼·제약조건·인덱스 내보내기에 PostgreSQL 63바이트 제한을 적용하지 않고 Snowflake의 255바이트 경계를 사용해 긴 객체 이름을 누락 없이 생성합니다.
+- [BE] 🔒 **SQL 요청 제어문자·검증 응답 하드닝**: 멀티라인 DDL의 탭·LF·CR 및 Unicode는 보존하면서 NUL, 기타 비텍스트 C0 제어문자와 DEL을 요청 스키마에서 거부합니다. 모든 422 요청 검증 응답에서 원문 입력을 제거해 SQL·자격 증명 값이 반사되지 않도록 합니다.
+- [BE] 🔒 **DBML 식별자→DDL 신뢰 경계**: DBML의 인용 식별자에서 PostgreSQL식 이중 따옴표 이스케이프를 손실 없이 해석하고, NUL·빈 값·63 UTF-8 바이트 초과·잘못된 인용·모호한 경로를 부분 변환 대신 422로 거부합니다. DDL·migration·index-design·Snowflake 경로는 하나의 검증/인용 함수로 수렴하며 세미콜론과 주석 표식은 인용 토큰 내부 데이터로 보존됩니다.
 - [BE] 🔒 **Cryptography 50+ 보안 경계 갱신**: `pyproject.toml`과 두 hash-locked 요구사항 파일을 동일한 Cryptography 50+ 해석으로 정합화하여 PKCS#7 오류·타이밍 구분으로 인한 CVE-2026-69247 완화를 실제 설치·검증 경로에 반영했습니다.
 - [FE] ⚡ **검색 노드 참조 안정화 및 순차 스냅샷 폴링**: 같은 정규화 검색어와 원본 테이블 데이터에는 장식된 `node.data` 참조를 재사용하여 드래그 중 불필요한 하위 렌더링과 할당을 줄입니다. 스냅샷 폴링은 이전 요청이 끝난 뒤에만 다음 요청을 예약하며, 선택 변경·언마운트 후 도착한 오래된 성공 또는 실패 응답을 무시합니다.
 - [BE] 🔒 **공유 export 전 경로 redaction**: 공개 share의 SQL / index-design / reversing-spec export에서 코멘트·`example_value`를 제거합니다. 단위 테스트로 누출을 차단합니다.

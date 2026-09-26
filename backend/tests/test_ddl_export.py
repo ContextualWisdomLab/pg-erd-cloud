@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.ddl.export import snapshot_json_to_sql
+from app.ddl.identifiers import quote_snowflake_identifier, validate_snowflake_identifier
 
 
 def test_snapshot_export_preserves_table_tablespace() -> None:
@@ -29,6 +32,20 @@ def test_snapshot_export_preserves_table_tablespace() -> None:
 
     assert 'CREATE TABLE IF NOT EXISTS "public"."events" (' in sql
     assert ') TABLESPACE "fast_space";' in sql
+
+
+def test_snowflake_identifier_limit_and_quoting() -> None:
+    identifier = 'name"' + "n" * 249
+
+    assert validate_snowflake_identifier(identifier) == identifier
+    assert quote_snowflake_identifier(identifier).startswith('"name""')
+
+    with pytest.raises(ValueError, match="255-byte"):
+        validate_snowflake_identifier("x" * 256)
+    with pytest.raises(ValueError, match="must not be empty"):
+        validate_snowflake_identifier("")
+    with pytest.raises(ValueError, match="must not contain NUL"):
+        validate_snowflake_identifier("safe\x00name")
 
 
 def test_snapshot_export_preserves_index_tablespace() -> None:
@@ -200,6 +217,58 @@ def test_snapshot_export_can_target_snowflake_from_postgres_snapshot() -> None:
     assert '  CONSTRAINT "orders_pkey" PRIMARY KEY ("id")' in sql
     assert '-- NOTE: skipped PostgreSQL CHECK constraint "orders_amount_check"' in sql
     assert '-- NOTE: PostgreSQL index "orders_amount_idx" on "public"."orders"' in sql
+
+
+def test_snowflake_export_preserves_names_longer_than_postgresql_limit() -> None:
+    long_schema = "schema_" + "s" * 60
+    long_table = "table_" + "t" * 60
+    long_column = "column_" + "c" * 60
+    long_constraint = "constraint_" + "k" * 60
+    long_index = "index_" + "i" * 60
+    sql = snapshot_json_to_sql(
+        {
+            "source_dialect": "snowflake",
+            "relations": [
+                {
+                    "schema_name": long_schema,
+                    "relation_name": long_table,
+                    "relation_oid": 30,
+                    "relation_kind": "r",
+                }
+            ],
+            "columns": [
+                {
+                    "relation_oid": 30,
+                    "column_position": 1,
+                    "column_name": long_column,
+                    "data_type": "VARCHAR",
+                }
+            ],
+            "constraints": [
+                {
+                    "relation_oid": 30,
+                    "constraint_name": long_constraint,
+                    "constraint_type": "p",
+                    "constraint_def": "PRIMARY KEY",
+                    "constrained_attnums": [1],
+                }
+            ],
+            "indexes": [
+                {
+                    "index_name": long_index,
+                    "table_schema_name": long_schema,
+                    "table_name": long_table,
+                }
+            ],
+        },
+        target_dialect="snowflake",
+    )
+
+    assert f'CREATE SCHEMA IF NOT EXISTS "{long_schema}";' in sql
+    assert f'CREATE TABLE IF NOT EXISTS "{long_schema}"."{long_table}" (' in sql
+    assert f'  "{long_column}" VARCHAR' in sql
+    assert f'CONSTRAINT "{long_constraint}" PRIMARY KEY ("{long_column}")' in sql
+    assert f'PostgreSQL index "{long_index}" on "{long_schema}"."{long_table}"' in sql
 
 
 def test_snapshot_export_can_target_postgresql_from_snowflake_snapshot() -> None:

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections import defaultdict
 from typing import Literal
 
+from app.ddl.identifiers import quote_identifier
 from app.jobs.valkey_queue import valkey_queue_config_summary
 
 
 SpecMode = Literal["markdown", "llm-prompt"]
-MAX_IDENTIFIER_LENGTH = 63
+MAX_IDENTIFIER_BYTES = 63
+INDEX_HASH_LENGTH = 12
 
 
 def _text(value: object, default: str = "") -> str:
@@ -24,7 +27,7 @@ def _rows(snapshot: dict, key: str) -> list[dict]:
 
 
 def _q(identifier: str) -> str:
-    return '"' + identifier.replace('"', '""') + '"'
+    return quote_identifier(identifier)
 
 
 def _qname(schema: str, name: str) -> str:
@@ -41,7 +44,14 @@ def _identifier_part(value: str) -> str:
 
 def _index_name(table_name: str, columns: list[str]) -> str:
     raw = f"idx_{_identifier_part(table_name)}_{'_'.join(_identifier_part(c) for c in columns)}"
-    return raw[:MAX_IDENTIFIER_LENGTH]
+    encoded = raw.encode("utf-8")
+    if len(encoded) <= MAX_IDENTIFIER_BYTES:
+        return raw
+
+    digest = hashlib.sha256(encoded).hexdigest()[:INDEX_HASH_LENGTH]
+    prefix_bytes = encoded[: MAX_IDENTIFIER_BYTES - INDEX_HASH_LENGTH - 1]
+    prefix = prefix_bytes.decode("utf-8", errors="ignore")
+    return f"{prefix}_{digest}"
 
 
 def _escape_cell(value: object) -> str:

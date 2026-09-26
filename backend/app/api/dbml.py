@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import CurrentUser, get_current_user
 from app.ddl.export import snapshot_json_to_sql
 from app.schemas import DbmlConvertIn, DbmlConvertOut
-from app.spec.dbml_import import parse_dbml
+from app.spec.dbml_import import DbmlParseError, parse_dbml
 
 router = APIRouter(prefix="/api/dbml", tags=["dbml"])
 
@@ -22,7 +22,10 @@ async def convert_dbml(
     works on a design that never touched a database. Pure computation — no
     project resources involved, so authentication alone suffices.
     """
-    snapshot = parse_dbml(body.dbml)
+    try:
+        snapshot = parse_dbml(body.dbml)
+    except DbmlParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     ddl = (
         snapshot_json_to_sql(snapshot, target_dialect=body.dialect)
         if body.include_ddl

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from app.settings import settings
-from app.spec.index_design import generate_index_design_spec
+from app.spec.index_design import _index_name, generate_index_design_spec
 
 
 def _snapshot() -> dict:
@@ -99,3 +99,20 @@ def test_generate_index_design_llm_prompt_contains_compact_json_summary() -> Non
     assert summary["tables"][0]["name"] == "public.orders"
     assert summary["candidate_indexes"][0]["index_name"] == "idx_orders_user_id"
     assert summary["workload_observations"][0]["actual_ms"] == 42
+
+
+def test_index_name_respects_postgresql_utf8_byte_limit() -> None:
+    name = _index_name("表" * 20, ["列"])
+
+    assert len(name.encode("utf-8")) <= 63
+
+
+def test_truncated_index_names_keep_distinct_hash_suffixes() -> None:
+    shared_prefix = "a" * 63
+
+    first = _index_name(shared_prefix + "x", ["column"])
+    second = _index_name(shared_prefix + "y", ["column"])
+
+    assert first != second
+    assert len(first.encode("utf-8")) <= 63
+    assert len(second.encode("utf-8")) <= 63
