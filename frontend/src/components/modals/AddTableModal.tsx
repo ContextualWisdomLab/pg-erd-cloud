@@ -61,7 +61,7 @@ export function AddTableModal({
       >
         <h3 id="add-table-title">테이블 추가</h3>
         <div className="field">
-          <label htmlFor="new-table-name">테이블 이름</label>
+          <label htmlFor="new-table-name">테이블 이름<span aria-hidden="true" style={{ color: "#ef4444" }}> *</span></label>
           <input
             id="new-table-name"
             value={newTableName}
@@ -69,6 +69,7 @@ export function AddTableModal({
             placeholder="users"
             autoFocus
             required
+            aria-required="true"
           />
         </div>
         <div
@@ -79,6 +80,7 @@ export function AddTableModal({
           <button
             type="submit"
             disabled={!newTableName.trim()}
+            title={!newTableName.trim() ? "테이블 이름을 입력하세요" : "저장"}
             style={
               newTableName.trim()
                 ? { background: "#034ea2", color: "#fff" }

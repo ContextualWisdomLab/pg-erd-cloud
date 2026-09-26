@@ -58,7 +58,7 @@ describe('modal dialog accessibility', () => {
     const opener = screen.getByRole('button', { name: 'Open group manager' });
     await user.click(opener);
 
-    await waitFor(() => expect(screen.getByLabelText('그룹 이름')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText(/그룹 이름/)).toHaveFocus());
     await user.keyboard('{Escape}');
     expect(onCloseGroupManager).toHaveBeenCalledOnce();
 
@@ -77,7 +77,7 @@ describe('modal dialog accessibility', () => {
       />,
     );
 
-    const tableNameInput = screen.getByLabelText('테이블 이름');
+    const tableNameInput = screen.getByLabelText(/테이블 이름/);
     const saveButton = screen.getByRole('button', { name: '저장' });
 
     await waitFor(() => expect(tableNameInput).toHaveFocus());
