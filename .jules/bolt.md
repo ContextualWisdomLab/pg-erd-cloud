@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-08-25 - [Search Performance] 노드 텍스트 통합 및 WeakMap 캐싱을 통한 ERD 검색 최적화
+**Learning:** 다수의 문자열 필드를 개별적으로 `.toLocaleLowerCase()` 호출하여 검색하면, 검색어 입력마다 수많은 문자열 객체가 생성되어 GC 부하와 프레임 드랍이 발생합니다. V8의 단일 문자열 탐색이 JS 루프보다 훨씬 빠릅니다.
+**Action:** 노드의 모든 검색 대상 텍스트를 하나의 문자열로 결합한 뒤 소문자로 변환하고, 이를 안정적인 `node.data` 객체를 키로 하는 `WeakMap`에 캐싱하여 O(1) 조회로 최적화해야 합니다.
