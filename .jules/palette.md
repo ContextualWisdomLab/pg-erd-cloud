@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2023-10-27 - [a11y: Fix screen-reader tab discoverability for modal disabled buttons]
+**Learning:** Native `disabled` buttons are entirely removed from the focus order, making it impossible for screen reader and keyboard users to discover important contextual hints (like `aria-describedby` explaining why it is disabled).
+**Action:** When a disabled button has important context/tooltips, replace the HTML `disabled` attribute with `aria-disabled={true}` and use an `onClick={(e) => e.preventDefault()}` handler. Update `.css` to style `button[aria-disabled="true"]` like `button:disabled`.
