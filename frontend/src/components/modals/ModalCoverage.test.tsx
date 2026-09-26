@@ -65,7 +65,7 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
-    fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
+    fireEvent.change(screen.getByLabelText(/테이블 이름/), { target: { value: 'users' } })
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
     expect(onSubmit).not.toHaveBeenCalled()
