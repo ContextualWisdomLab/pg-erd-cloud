@@ -209,11 +209,18 @@ export default function App() {
       let cachedData = searchCache.get(node.data);
       if (!cachedData) {
         const isHighlighted = searchMatchedNodeIds.has(node.id);
-        cachedData = {
-          ...node.data,
-          isDimmed: !isHighlighted,
-          isHighlighted,
-        };
+
+        // ⚡ Bolt: Check if React Flow or tests injected a previously decorated node.data.
+        // If it already perfectly matches the target state for this search query, reuse the identity to prevent remounts.
+        if (node.data.isHighlighted === isHighlighted && node.data.isDimmed === !isHighlighted) {
+           cachedData = node.data;
+        } else {
+          cachedData = {
+            ...node.data,
+            isDimmed: !isHighlighted,
+            isHighlighted,
+          };
+        }
         searchCache.set(node.data, cachedData);
       }
       return {
