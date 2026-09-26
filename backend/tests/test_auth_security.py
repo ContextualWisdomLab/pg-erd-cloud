@@ -733,3 +733,26 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+@pytest.mark.asyncio
+async def test_oidc_rejects_unsupported_crit_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+    monkeypatch.setattr(
+        auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["b64"]}
+    )
+
+    async def fail_jwks() -> dict:
+        raise AssertionError("JWKS must not load for unsupported token headers")
+
+    monkeypatch.setattr(auth, "_get_jwks", fail_jwks)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_subject_from_request(
+            make_request({"Authorization": "Bearer token"})
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "invalid token"

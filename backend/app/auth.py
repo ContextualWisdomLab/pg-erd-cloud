@@ -185,6 +185,14 @@ def _validate_jwt_header(header: dict[str, Any]) -> str:
     if content_type is not None:
         raise HTTPException(status_code=401, detail="invalid token")
 
+    crit = header.get("crit")
+    if crit is not None:
+        if not isinstance(crit, list) or not crit or len(crit) > 10:
+            raise HTTPException(status_code=401, detail="invalid token")
+        for item in crit:
+            if not isinstance(item, str) or item not in (): # No critical headers supported
+                raise HTTPException(status_code=401, detail="invalid token")
+
     header_alg_raw = header.get("alg")
     if not isinstance(header_alg_raw, str) or not header_alg_raw:
         raise HTTPException(status_code=401, detail="invalid token")
