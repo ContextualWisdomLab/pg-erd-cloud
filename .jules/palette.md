@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-03-24 - 필수 입력 필드 시각적 표시 추가
+**Learning:** 폼 레이블에 텍스트와 함께 필수 입력 필드를 나타내는 시각적 기호(*)를 추가하면 테스트 코드가 `getByLabelText`에 정확한 문자열로 요소에 접근하지 못하는 문제가 발생함을 알게 되었습니다.
+**Action:** 향후 접근성을 해치지 않으면서 테스트 코드에서 요소를 찾을 수 있도록 정규표현식을 사용해 요소를 찾거나(예: `getByLabelText(/테이블 이름/)`), 별도의 텍스트 노드로 분리하여 접근성 트리에서 무시되도록 처리(`aria-hidden="true"`)하는 방법을 고려해야 합니다.

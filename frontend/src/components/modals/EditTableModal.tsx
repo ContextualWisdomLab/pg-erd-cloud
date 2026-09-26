@@ -36,7 +36,7 @@ export function EditTableModal({
         <div style={{ overflowY: "auto", padding: "0 4px", flex: 1 }}>
           <form id="editTableForm" onSubmit={onEditTableSubmit} className="col" style={{ gap: 12 }}>
             <div className="col">
-              <label htmlFor="editTableTitle">테이블명 (schema.table)</label>
+              <label htmlFor="editTableTitle">테이블명 (schema.table) <span className="error" aria-hidden="true">*</span></label>
               <input
                 id="editTableTitle"
                 name="title"
