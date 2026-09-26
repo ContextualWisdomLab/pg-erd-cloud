@@ -1,9 +1,10 @@
 # Product–Technical Gap Baseline
 
 Status: Proposed
-Evidence date: 2026-09-26
+Evidence date: 2026-09-27
 Product PR: [#1222](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/1222)
 Source exact product head before baseline restoration: `18e386c46a1463bd700cdfc8c26d4dc10ca1d7df`
+Current fail-closed boundary evidence: `7d9ee21230b817c12147250c8745fd9461b1f71d`
 
 ## PRD
 
@@ -51,8 +52,8 @@ No persistent entity is added. Cache entries are ephemeral `source_text -> sanit
 | Dimension | Current evidence | Merge acceptance | Status |
 |---|---|---|---|
 | Determinism | Focused tests exist | Same exact ID with cache off/on and after reload/export | FAIL |
-| Unicode/collision | Partial tests | Astral, combining, RTL, empty, long, collision fixtures | FAIL |
-| Semantics | Production diff | Cache state never becomes domain truth | PROPOSED |
+| Unicode/collision | Empty string remains `c-empty`; missing values now throw; Unicode and emoji exact values covered | Add combining, RTL, long, and full collision fixtures | PARTIAL |
+| Semantics | Public input remains `string`; `null`/`undefined` fail closed instead of collapsing into `c-empty` | Cache state never becomes domain truth | SOURCE PASS |
 | Accessibility | None current | WCAG 2.2 AA; pointer/touch/keyboard; reduced motion; AT | FAIL |
 | Responsive | None current | 320/768/desktop and intermediate widths | FAIL |
 | Locales | None current | ko/en/ja/zh/vi/es/de/fr wrapping/font fallback | FAIL |
@@ -70,6 +71,7 @@ No persistent entity is added. Cache entries are ephemeral `source_text -> sanit
 | Unsupported performance claim | Reproducible real-path benchmark | pg-erd-cloud | Proposed |
 | Hand-rolled LRU complexity | Compare no-cache/caller/native alternatives | pg-erd-cloud | Proposed |
 | Lifecycle risk | Retained-heap and cleanup contract | pg-erd-cloud | Proposed |
+| Missing-name collision | Keep the domain type `string`; reject runtime `null`/`undefined` while preserving explicit empty-string behavior | pg-erd-cloud | Resolved at `7d9ee212…`; hosted checks pending |
 | Lockfile expansion | Removed without reverting product/cache tests | dependency owner | Resolved |
 | Missing UX evidence | Browser/AT/responsive/8-locale matrix | pg-erd-cloud | Proposed |
 
