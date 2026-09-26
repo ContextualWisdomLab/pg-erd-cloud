@@ -862,7 +862,6 @@ export default function App() {
 
   function onDeleteTable() {
     if (!editingNode) return;
-    if (!window.confirm("정말로 이 테이블을 삭제하시겠습니까?")) return;
 
     // Remove the node
     setNodes((nds) => nds.filter((n) => n.id !== editingNode.id));

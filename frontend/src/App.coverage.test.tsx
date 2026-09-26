@@ -237,7 +237,7 @@ vi.mock('./components/modals', () => ({
             <input name="title" defaultValue=" " />
             <input name="comment" defaultValue=" " />
           </form>
-          <button type="button" data-testid="table-delete" onClick={props.onDeleteTable} />
+          <button type="button" data-testid="table-delete" onClick={() => { if (window.confirm("정말로 이 테이블을 삭제하시겠습니까?")) props.onDeleteTable(); }} />
           <button type="button" data-testid="table-cancel" onClick={props.onEditTableCancel} />
         </>
       ) : null}
