@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, createEvent, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportModal } from './ExportModal';
@@ -171,13 +171,17 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('exposes access-control guidance for disabled button', () => {
+  it('exposes access-control guidance for disabled button', async () => {
     render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
-    expect(accessManagementButton).toBeDisabled();
+    expect(accessManagementButton).toHaveAttribute("aria-disabled", "true");
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
+
+    const clickEvent = createEvent.click(accessManagementButton);
+    fireEvent(accessManagementButton, clickEvent);
+    expect(clickEvent.defaultPrevented).toBe(true);
   });
 });
