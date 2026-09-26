@@ -87,6 +87,7 @@ export function GroupModal({
           <button
             type="submit"
             disabled={!newGroupName.trim()}
+            title={!newGroupName.trim() ? "그룹 이름을 입력하세요" : undefined}
           >
             추가
           </button>
