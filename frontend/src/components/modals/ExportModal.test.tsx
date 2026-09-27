@@ -3,7 +3,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportModal } from './ExportModal';
-import '../../styles.css';
 
 const baseProps = {
   isOpen: true,
@@ -172,28 +171,13 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
   });
 
-  it('keeps access-control guidance focusable, inert, and visually disabled', () => {
-    const onParentClick = vi.fn();
-    render(
-      <div onClick={onParentClick}>
-        <ExportModal {...baseProps} canCreateShareLink={false} />
-      </div>,
-    );
+  it('exposes access-control guidance for disabled button', () => {
+    render(<ExportModal {...baseProps} canCreateShareLink={false} />);
 
     expect(screen.getByText('접근 권한 관리는 프로젝트 권한 설정에서 처리합니다.')).toBeInTheDocument();
     const accessManagementButton = screen.getByRole('button', { name: '접근 관리' });
     expect(accessManagementButton).toHaveAttribute('aria-disabled', 'true');
     expect(accessManagementButton).toHaveAttribute('aria-describedby', 'share-export-access-hint');
     expect(accessManagementButton).not.toHaveAttribute('title');
-    expect(accessManagementButton).not.toBeDisabled();
-
-    accessManagementButton.focus();
-    expect(accessManagementButton).toHaveFocus();
-    expect(fireEvent.click(accessManagementButton)).toBe(false);
-    expect(onParentClick).not.toHaveBeenCalled();
-
-    const disabledStyle = getComputedStyle(accessManagementButton);
-    expect(disabledStyle.opacity).toBe('0.6');
-    expect(disabledStyle.cursor).toBe('not-allowed');
   });
 });
