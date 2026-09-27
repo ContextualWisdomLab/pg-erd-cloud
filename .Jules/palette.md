@@ -59,3 +59,6 @@
 ## 2026-06-25 - [Add Confirmation to Table Deletion]
 **Learning:** Destructive actions such as deleting a table need user confirmation to prevent accidental data loss. Using `window.confirm` provides a simple, native way to add this safeguard without requiring complex custom modal logic, significantly improving the safety of the UI.
 **Action:** Always wrap destructive action handlers with `window.confirm` dialogues (e.g., `'${itemName}' 테이블을 삭제하시겠습니까?`) to ensure users explicitly verify their intent before the action is executed.
+## 2026-09-27 - [Test Race Conditions]
+**Learning:** Adding or removing asynchronous UI interactions (like `window.confirm`) can expose pre-existing race conditions in tests. Tests that rely on implicit, immediate DOM updates (like expecting elements to render instantly after clicking) may fail intermittently or consistently in CI.
+**Action:** Always replace synchronous queries (`getAllByRole`, `getByText`) with asynchronous ones (`findAllByRole`, `findByText`) when elements render based on asynchronous data or actions, especially after simulating user interactions like clicks. Also ensure that `window.confirm` is correctly mocked across all affected tests.
