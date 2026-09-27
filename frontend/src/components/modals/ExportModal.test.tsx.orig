@@ -192,5 +192,8 @@ describe('ExportModal', () => {
     expect(fireEvent.click(accessManagementButton)).toBe(false);
     expect(onParentClick).not.toHaveBeenCalled();
 
+    const disabledStyle = getComputedStyle(accessManagementButton);
+    expect(disabledStyle.opacity).toBe('0.9');
+    expect(disabledStyle.cursor).toBe('not-allowed');
   });
 });
