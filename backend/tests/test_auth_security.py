@@ -5,6 +5,7 @@ import uuid
 
 import pytest
 from fastapi import HTTPException
+from app.auth import _validate_jwt_header
 from starlette.requests import Request
 
 from app import auth
@@ -733,3 +734,24 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+def test_validate_jwt_header_crit_missing():
+    assert _validate_jwt_header({"alg": "RS256"}) == "RS256"
+
+def test_validate_jwt_header_crit_unsupported():
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_jwt_header({"alg": "RS256", "crit": ["b64"]})
+    assert exc_info.value.status_code == 401
+    assert "unsupported critical extension" in exc_info.value.detail
+
+def test_validate_jwt_header_crit_invalid_type():
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_jwt_header({"alg": "RS256", "crit": "b64"})
+    assert exc_info.value.status_code == 401
+    assert "invalid crit header" in exc_info.value.detail
+
+def test_validate_jwt_header_crit_too_long():
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_jwt_header({"alg": "RS256", "crit": ["b64"] * 11})
+    assert exc_info.value.status_code == 401
+    assert "invalid crit header" in exc_info.value.detail
