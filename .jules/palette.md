@@ -57,6 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2024-09-26 - Added asterisk to required form fields
-**Learning:** Adding a visible indicator (like an asterisk) to required form fields improves UX and accessibility by clearly communicating expectations to users before submission.
-**Action:** When adding required form fields, always include a visual indicator (like `<span className="error" aria-hidden="true">*</span>`) and update associated test queries to use regex matching instead of exact strings.
+## 2026-09-27 - Required-field indicators preserve the field name
+**Learning:** A visible asterisk can communicate a required field without changing the control's accessible name when the marker is decorative.
+**Action:** Keep the native `required` attribute and exact associated label, hide only the visual marker with `aria-hidden="true"`, and test the exact accessible name rather than weakening the query to a regular expression.
