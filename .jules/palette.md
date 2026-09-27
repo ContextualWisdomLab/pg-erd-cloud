@@ -66,3 +66,6 @@
 ## 2026-09-27 - Vitest Async Mocking Pitfalls
 **Learning:** Adding `await waitFor` to `screen.queryByText` inside a UI flow test can cause downstream test steps to fail by misaligning the test timeline (e.g. elements that appear shortly after might get unmounted or rerendered before `waitFor` resolves, causing `Unable to find an accessible element` errors later in the test).
 **Action:** When a test expects a missing element (e.g. empty states), prefer synchronous `.not.toBeInTheDocument()` without `await waitFor` unless the missing element is explicitly guaranteed to disappear after a specific async trigger within the test's scope.
+## 2026-09-27 - Expected CodeQL Dispatch Status
+**Learning:** CodeQL dispatch CI jobs intentionally return a `pending` state accompanied by an `exit code 1` when initially triggered. This is an expected artifact of the dispatch mechanism before the terminal verdict is published.
+**Action:** Do not attempt to fix or modify the repository for these dispatch triggers, as they are not true failures. Wait for the final rerun.
