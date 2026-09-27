@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { AddTableModal } from './AddTableModal';
@@ -77,7 +77,10 @@ describe('modal dialog accessibility', () => {
       />,
     );
 
-    const tableNameInput = screen.getByLabelText(/테이블 이름/);
+    const tableNameInput = screen.getByLabelText('테이블 이름');
+    const tableNameLabel = screen.getByText('테이블 이름', { selector: 'label' });
+    expect(tableNameInput).toBeRequired();
+    expect(within(tableNameLabel).getByText('*')).toHaveAttribute('aria-hidden', 'true');
     const saveButton = screen.getByRole('button', { name: '저장' });
 
     await waitFor(() => expect(tableNameInput).toHaveFocus());
