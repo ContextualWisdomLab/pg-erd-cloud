@@ -14,20 +14,29 @@ function mapToSqlAlchemyType(pgType: string): string {
   return "String";
 }
 
+function sanitizeIdentifier(name: string): string {
+  let sanitized = name.replace(/[^a-zA-Z0-9_]/g, "");
+  if (!/^[a-zA-Z_]/.test(sanitized)) {
+    sanitized = "_" + sanitized;
+  }
+  return sanitized || "_unnamed";
+}
+
 export function exportSqlAlchemy(nodes: Node<TableNodeData>[]): string {
   if (nodes.length === 0) return "# No tables to export\n";
 
   let output = `from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, Float, Numeric, JSON\nfrom sqlalchemy.orm import declarative_base\n\nBase = declarative_base()\n\n`;
 
   for (const node of nodes) {
-    const tableName = node.data.title.split('.').pop() || node.data.title;
+    const rawTableName = node.data.title.split('.').pop() || node.data.title;
+    const tableName = sanitizeIdentifier(rawTableName);
     const modelName = tableName.replace(/(^\w|-\w|_\w)/g, (m) => m.replace(/-|_/, "").toUpperCase());
 
     output += `class ${modelName}(Base):\n`;
     output += `    __tablename__ = '${tableName}'\n\n`;
 
     for (const col of node.data.columns) {
-      const fieldName = col.column_name;
+      const fieldName = sanitizeIdentifier(col.column_name);
       const saType = mapToSqlAlchemyType(col.data_type);
       const args = [];
       if (col.is_pk) args.push("primary_key=True");
