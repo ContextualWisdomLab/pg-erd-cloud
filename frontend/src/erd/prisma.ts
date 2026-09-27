@@ -61,6 +61,9 @@ export function exportPrisma(
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
   const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
 
+  // ⚡ Bolt: Pre-compute a lookup Map for relations to avoid O(N * C * E) nested loops during field generation
+  const edgesByModelAndField = new Map<string, { targetModel: string, targetFields: string[], relationName: string }>();
+
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
     const targetNode = nodesById.get(edge.target);
@@ -103,6 +106,12 @@ export function exportPrisma(
     }
   }
 
+  for (const edgeInfo of edgesProcessed.values()) {
+    for (const sourceField of edgeInfo.sourceFields) {
+      edgesByModelAndField.set(`${edgeInfo.sourceModel}:${sourceField}`, edgeInfo);
+    }
+  }
+
   for (const node of nodes) {
     const modelName = sanitizeName(node.data.title);
     output += `model ${modelName} {\n`;
@@ -136,13 +145,12 @@ export function exportPrisma(
 
       // Determine if there is a relation defined on this field
       let relationDef = "";
-      for (const [_, edgeInfo] of edgesProcessed) {
-        if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(fieldName)) {
-          // This field is a foreign key, but in Prisma, we typically define the relation object field
-          // alongside the scalar field. We will add the relation object field here.
-          const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-          relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
-        }
+      const edgeInfo = edgesByModelAndField.get(`${modelName}:${fieldName}`);
+      if (edgeInfo) {
+        // This field is a foreign key, but in Prisma, we typically define the relation object field
+        // alongside the scalar field. We will add the relation object field here.
+        const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
+        relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;
