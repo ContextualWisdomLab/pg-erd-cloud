@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-08-21 - React Flow 노드 검색 문자열 캐싱 최적화
+**Learning:** React Flow에서 드래그 이벤트로 인해 60fps로 프레임이 렌더링될 때, 매 프레임마다 검색 필터링을 위해 노드의 모든 필드(이름, 코멘트, 컬럼 등)에 대해 `.toLocaleLowerCase()`를 호출하고 문자열을 생성하면 심각한 가비지 컬렉션(GC) 부하와 프레임 드롭이 발생합니다.
+**Action:** `WeakMap<TableNodeData, string>`을 사용하여 검색용으로 정규화된 텍스트 문자열을 캐싱합니다. React Flow는 위치가 변경되더라도 `node.data`의 객체 식별성을 유지하므로, 데이터를 기반으로 캐싱하면 불필요한 문자열 메모리 할당을 제거하고 성능을 대폭 개선할 수 있습니다.
