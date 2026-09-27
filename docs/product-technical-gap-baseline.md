@@ -86,3 +86,22 @@ Product writer [PR #1224](https://github.com/ContextualWisdomLab/pg-erd-cloud/pu
 | Recovery | Cancel/reopen and value/error restoration evidence absent | FAIL |
 
 Keep #1224 Draft/Proposed until current-head hosted checks, independent approval, real-browser/AT evidence, responsive screenshots, and all eight locale contracts exist. Product source must not be copied into this ledger branch.
+
+## Writer reconciliation — pg-erd-cloud#959
+
+[PR #959](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/959) proposes the same ExportModal access-management surface at evidence head `9b1742b9c9ea0384cd6f911f13305551d910be75`. It preserves the useful focusable `aria-disabled` intent but is not a complete successor to this canonical writer: click propagation cancellation, the scoped visual contract, this ledger, real-browser/AT evidence, and current-head approval are absent. Keep both PRs Draft/open until protected integration proves complete delta and requirement carryover; do not copy product source between branches.
+
+## Native Enter submission — pg-erd-cloud#1225
+
+[PR #1225](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/1225) at evidence head `c32867d2a078a1473f3011857ae26232ff7b8bbe` replaces three click-only create controls with native forms.
+
+| Concern | Current evidence | Gate |
+|---|---|---|
+| Native semantics | Three buttons become `type="submit"` inside forms | Source PASS |
+| Exact actions | Focused regression tests for all three Enter paths are absent | FAIL |
+| Empty/busy behavior | Disabled source guards exist; Enter and duplicate-submit execution are unproved | FAIL |
+| Accessibility | Native form direction is valid; real keyboard/AT and focus-visible evidence absent | FAIL |
+| Recovery | success/error/retry, focus restoration, reload and race evidence absent | FAIL |
+| Responsive/locales | 320/768/desktop and ko/en/ja/zh/vi/es/de/fr evidence absent | FAIL |
+
+Keep #1225 Draft/Proposed until focused contracts, exact-head checks, current-head approval, and real browser/AT evidence satisfy the applicable rows.
