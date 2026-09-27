@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-24 - Form Submission Accessibility
+**Learning:** Inputs and action buttons for simple actions like "Create Project" or "Add Connection" should be wrapped in native HTML `<form>` tags rather than relying on `onClick` event listeners on standard `<button>`s. This ensures keyboard users can seamlessly trigger actions by pressing the 'Enter' key, significantly improving accessibility.
+**Action:** Always wrap contextual inputs and their primary action buttons in a `<form onSubmit={(e) => e.preventDefault(); action()}>` and change the button to `type="submit"` to provide robust keyboard navigation without additional javascript keydown listeners.
