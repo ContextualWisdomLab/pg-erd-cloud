@@ -103,12 +103,10 @@ export function exportPrisma(
     }
   }
 
-  // ⚡ Bolt: Pre-compute relation definition strings to avoid O(N * C * E) lookups
   const relationsByField = new Map<string, string>();
   for (const [_, edgeInfo] of edgesProcessed) {
     for (const sourceField of edgeInfo.sourceFields) {
       const key = `${edgeInfo.sourceModel}:${sourceField}`;
-      const optional = true; // optionality is handled later, we just need the relation string part
       const relField = sanitizeName(edgeInfo.targetModel) + "_" + sourceField;
       const relationDef = `\n  ${relField} ${edgeInfo.targetModel}___OPTIONAL___ @relation("${edgeInfo.relationName}", fields: [${sourceField}], references: [${edgeInfo.targetFields[0]}])`;
       relationsByField.set(key, relationDef);
@@ -146,7 +144,6 @@ export function exportPrisma(
 
       const optional = col.is_not_null ? "" : "?";
 
-      // ⚡ Bolt: O(1) lookup for relation definitions
       let relationDef = relationsByField.get(`${modelName}:${fieldName}`) || "";
       if (relationDef) {
         relationDef = relationDef.replace("___OPTIONAL___", optional);
