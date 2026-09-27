@@ -63,3 +63,6 @@
 ## 2026-08-24 - Transient STRIX Failures
 **Learning:** If the STRIX CI penetration test fails with 'provider/backend was unavailable' or 'LLM CONNECTION FAILED', this indicates a transient infrastructure failure with the Strix AI provider backend, not a codebase vulnerability.
 **Action:** Do not attempt to modify the repository to fix this specific connection error, simply resubmit to trigger a new run.
+## 2026-09-27 - Vitest Async Mocking Pitfalls
+**Learning:** Adding `await waitFor` to `screen.queryByText` inside a UI flow test can cause downstream test steps to fail by misaligning the test timeline (e.g. elements that appear shortly after might get unmounted or rerendered before `waitFor` resolves, causing `Unable to find an accessible element` errors later in the test).
+**Action:** When a test expects a missing element (e.g. empty states), prefer synchronous `.not.toBeInTheDocument()` without `await waitFor` unless the missing element is explicitly guaranteed to disappear after a specific async trigger within the test's scope.
