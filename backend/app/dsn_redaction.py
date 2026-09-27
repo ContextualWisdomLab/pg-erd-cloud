@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlsplit
+from urllib.parse import quote, quote_plus, unquote_plus, urlsplit
 
 _SECRET_KEY_PATTERN = re.compile(
     r"(?:pass(?:word|wd)?|pwd|token|secret|private[_-]?key|api[_-]?key|"
@@ -57,15 +57,21 @@ def _password_candidates_from_dsn(dsn: str) -> set[str]:
         netloc, query = _split_dsn_best_effort(dsn)
 
     if password:
+        decoded_password = unquote_plus(password)
         candidates.add(password)
-        candidates.add(quote(password, safe=""))
+        candidates.add(decoded_password)
+        candidates.add(quote(decoded_password, safe=""))
+        candidates.add(quote_plus(decoded_password, safe=""))
 
     if "@" in netloc:
         userinfo = netloc.rsplit("@", 1)[0]
         if ":" in userinfo:
             raw_password = userinfo.split(":", 1)[1]
+            decoded_raw = unquote_plus(raw_password)
             candidates.add(raw_password)
-            candidates.add(unquote(raw_password))
+            candidates.add(decoded_raw)
+            candidates.add(quote(decoded_raw, safe=""))
+            candidates.add(quote_plus(decoded_raw, safe=""))
 
     for part in query.split("&"):
         key, sep, raw_value = part.partition("=")
@@ -86,7 +92,9 @@ def _redact_secret_occurrences(message: str, secret: str) -> str:
     if len(secret) > 4:
         return message.replace(secret, "***")
 
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(secret)}(?![A-Za-z0-9])")
+    prefix = r"(?<![A-Za-z0-9])" if secret and secret[0].isalnum() else ""
+    suffix = r"(?![A-Za-z0-9])" if secret and secret[-1].isalnum() else ""
+    pattern = re.compile(rf"{prefix}{re.escape(secret)}{suffix}")
     return pattern.sub("***", message)
 
 
