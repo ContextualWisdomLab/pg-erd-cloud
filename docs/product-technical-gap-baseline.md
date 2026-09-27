@@ -69,3 +69,20 @@ None. This proposal changes presentation semantics only. Project, membership, an
 | Approval and checks | Require current-head required checks and independent approval | Open |
 
 Do not mark this PR merge-ready until every applicable FAIL is repaired or explicitly bounded by an accepted decision.
+
+## Required-field indicator — pg-erd-cloud#1224
+
+Product writer [PR #1224](https://github.com/ContextualWisdomLab/pg-erd-cloud/pull/1224) at evidence ancestor `5e45a108afbc96fab8d6be82675b21bfdeafddb5` adds a visual required marker to `AddTableModal` without moving table-name truth into presentation state.
+
+| Concern | Current evidence | Gate |
+|---|---|---|
+| Exact semantics | Associated label remains exactly `테이블 이름`; input retains native `required`; marker alone is `aria-hidden` | Source PASS |
+| Validation and CTA | Empty/trimmed submit behavior remains component-tested | Partial |
+| Accessibility | jsdom exact-name contract exists; real accessibility-tree and screen-reader replay absent | FAIL |
+| Pointer/touch/keyboard | Existing focus-trap coverage exists; real pointer/touch/keyboard submission replay absent | FAIL |
+| Responsive | 320/768/desktop modal screenshots absent | FAIL |
+| Locales | ko is inline; en/ja/zh/vi/es/de/fr versioned resource, expansion, CJK, and fallback evidence absent | FAIL |
+| Loading/error/offline/permission/read-only/stale/conflict/retry/busy | Required-marker applicability is bounded; form lifecycle state matrix remains undocumented | Open |
+| Recovery | Cancel/reopen and value/error restoration evidence absent | FAIL |
+
+Keep #1224 Draft/Proposed until current-head hosted checks, independent approval, real-browser/AT evidence, responsive screenshots, and all eight locale contracts exist. Product source must not be copied into this ledger branch.
