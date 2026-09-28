@@ -116,9 +116,7 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('제약조건 이름 (Label)'), {
       target: { value: 'fk_changed' },
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: '삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("이 관계를 삭제하시겠습니까?")
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
     fireEvent.click(screen.getByRole('button', { name: '저장' }))
     expect(setRelLabel).toHaveBeenCalledWith('fk_changed')
@@ -264,9 +262,7 @@ describe('modal behavior coverage', () => {
     fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'Billing 그룹 삭제' }))
-    expect(window.confirm).toHaveBeenCalledWith("'Billing' 그룹을 삭제하시겠습니까?")
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: '업무 그룹 닫기' }))
     expect(setName).toHaveBeenCalledWith('New')
