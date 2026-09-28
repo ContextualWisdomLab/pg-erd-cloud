@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2026-09-28 - [Add aria-label to delete buttons in Modals]
+**Learning:** Screen readers might struggle to differentiate multiple "삭제" (delete) buttons across different modales (like table delete vs edge delete vs column delete) if context is missing from the button text alone. Generic accessible names should be enriched with contexts like "테이블 삭제" (Delete Table) or "관계 삭제" (Delete Edge).
+**Action:** Always verify if standalone action buttons (like "삭제", "수정") have an explicit `aria-label` defining what is being acted upon when they are placed inside generalized container modals or repeated elements.
