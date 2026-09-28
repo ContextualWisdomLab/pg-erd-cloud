@@ -65,7 +65,7 @@ describe('modal behavior coverage', () => {
         onAddTableSubmit={onSubmit}
       />,
     )
-    fireEvent.change(screen.getByLabelText('테이블 이름'), { target: { value: 'users' } })
+    fireEvent.change(screen.getByLabelText(/테이블 이름/), { target: { value: 'users' } })
     fireEvent.submit(screen.getByRole('dialog'))
     expect(setNewTableName).toHaveBeenCalledWith('users')
     expect(onSubmit).not.toHaveBeenCalled()
@@ -261,7 +261,7 @@ describe('modal behavior coverage', () => {
         onAssignBusinessGroup={onAssign}
       />,
     )
-    fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText(/그룹 이름/), { target: { value: 'New' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^색상 / })[1]!)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)

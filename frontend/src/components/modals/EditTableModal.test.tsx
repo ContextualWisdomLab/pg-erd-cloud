@@ -110,7 +110,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} setEditingNode={setEditingNodeMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_col 컬럼 삭제' }));
+    await user.click(screen.getByRole('button', { name: /test_col 컬럼 삭제/ }));
 
     expect(window.confirm).toHaveBeenCalledWith("'test_col' 컬럼을 삭제하시겠습니까?");
     expect(setNodesMock).toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe('EditTableModal', () => {
     render(<EditTableModal {...defaultProps} editingNode={editingNode as any} setNodes={setNodesMock} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'test_col 컬럼 삭제' }));
+    await user.click(screen.getByRole('button', { name: /test_col 컬럼 삭제/ }));
 
     expect(window.confirm).toHaveBeenCalled();
     expect(setNodesMock).not.toHaveBeenCalled();
