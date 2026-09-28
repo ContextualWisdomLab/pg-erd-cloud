@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2026-09-19 - [Optimize ERD handle generation]
+**Learning:** In highly interactive frontend views like React Flow, O(N) operations per node (like regex splits or code point mappings in handle generation) quickly bottleneck 60fps rendering since they execute thousands of times per interaction. JavaScript Map preserves insertion order, making it an extremely lightweight and native way to implement a bounded LRU cache for these operations without external dependencies.
+**Action:** Profile string manipulations and array mappings executed during React render loops. If they represent pure functions (like converting a column name to an encoded handle ID), wrap them in an encapsulated LRU cache (using `Map`) to reduce CPU overhead to O(1) amortized.
