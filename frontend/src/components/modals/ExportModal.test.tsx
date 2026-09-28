@@ -3,7 +3,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportModal } from './ExportModal';
-import '../../styles.css';
 
 const baseProps = {
   isOpen: true,
@@ -191,6 +190,5 @@ describe('ExportModal', () => {
     expect(accessManagementButton).toHaveFocus();
     expect(fireEvent.click(accessManagementButton)).toBe(false);
     expect(onParentClick).not.toHaveBeenCalled();
-
   });
 });
