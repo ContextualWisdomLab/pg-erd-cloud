@@ -57,3 +57,8 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+
+## 2024-09-28 - [Distinct ARIA labels for similar icon buttons]
+**Learning:** Having multiple buttons with different visual icons (IMG, UML, {}) but the exact same `aria-label` ("이미지/텍스트 내보내기 모달 열기") makes it impossible for screen reader users to distinguish their specific functions before clicking.
+**Action:** When adding multiple action buttons that trigger similar but distinct flows, ensure each button has a specific, descriptive `aria-label` and `title` that matches its visual distinctiveness (e.g., "이미지 내보내기 모달 열기", "UML 내보내기 모달 열기").
