@@ -7,6 +7,21 @@ export function sanitizeHandleId(columnName: string): string {
   return `c-${encoded || 'empty'}`
 }
 
+export function parseHandleId(handleId: string | null | undefined): string | null {
+  if (!handleId) return null;
+  const prefixMatch = handleId.match(/^(?:src|tgt)-c-(.*)$/);
+  if (!prefixMatch) return null;
+
+  const encoded = prefixMatch[1]!;
+  if (encoded === 'empty') return '';
+
+  try {
+    return encoded.split('-').map(part => String.fromCodePoint(parseInt(part, 16))).join('');
+  } catch (e) {
+    return null;
+  }
+}
+
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
