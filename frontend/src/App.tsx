@@ -1122,8 +1122,14 @@ export default function App() {
             />
             <button
               type="button"
-              onClick={onCreateProject}
-              disabled={!projectName.trim() || isCreatingProject}
+              onClick={(e) => {
+                if (!projectName.trim() || isCreatingProject) {
+                  e.preventDefault();
+                  return;
+                }
+                onCreateProject();
+              }}
+              aria-disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
               aria-describedby={
                 createProjectHint ? "create-project-hint" : undefined
