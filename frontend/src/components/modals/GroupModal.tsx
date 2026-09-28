@@ -49,6 +49,7 @@ export function GroupModal({
           <h3 id="group-manager-title">업무 그룹</h3>
           <button
             type="button"
+            title="업무 그룹 닫기"
             onClick={onCloseGroupManager}
             aria-label="업무 그룹 닫기"
           >
