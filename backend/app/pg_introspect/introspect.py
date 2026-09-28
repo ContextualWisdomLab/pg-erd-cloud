@@ -83,7 +83,7 @@ async def _connect_guarded_postgres(
 ) -> asyncpg.Connection:
     query = dict(parse_qsl(urlparse(dsn).query, keep_blank_values=True))
     for key in ("sslrootcert", "sslcert", "sslkey", "sslcrl", "passfile"):
-        if query.get(key):
+        if key in query:
             _validate_tls_file_path(query[key])
 
     target = await validate_postgres_dsn_target(dsn)
