@@ -733,3 +733,36 @@ async def test_oidc_jwks_force_refresh_is_serialized(
         {"keys": [{"kid": "new-key", "kty": "RSA"}]},
     ]
     assert request_count == before_concurrent_refresh + 1
+
+@pytest.mark.asyncio
+async def test_oidc_decode_rejects_invalid_crit_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "oidc_issuer", "https://issuer.example")
+    monkeypatch.setattr(settings, "oidc_audience", "pg-erd")
+
+    # Invalid crit type (not a list)
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": "not-a-list"})
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
+
+    # Invalid crit elements (not strings)
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": [123]})
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
+
+    # Too many crit elements
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["a"] * 11})
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
+
+    # Unrecognized crit elements
+    monkeypatch.setattr(auth.jwt, "get_unverified_header", lambda _: {"kid": "key-1", "alg": "RS256", "crit": ["unrecognized"]})
+    with pytest.raises(HTTPException) as excinfo:
+        await auth._decode_verified_oidc_token("token")
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "invalid token header"
