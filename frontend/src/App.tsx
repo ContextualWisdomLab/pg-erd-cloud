@@ -195,8 +195,31 @@ export default function App() {
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ tableNode: TableNode }), []);
   const normalizedNodeSearch = nodeSearch.trim().toLocaleLowerCase();
+  // ⚡ Bolt: Use ref to decouple search recalculation from node position changes.
+  // We only care about nodes changing their id or data.
+  const searchDepsRef = useRef<{ nodes: typeof nodes; search: string; matchedIds: Set<string> }>({
+    nodes: [],
+    search: "",
+    matchedIds: new Set(),
+  });
+
   const searchMatchedNodeIds = useMemo(() => {
-    return findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
+    const prev = searchDepsRef.current;
+    if (prev.search === normalizedNodeSearch && prev.nodes.length === nodes.length) {
+      let isDataSame = true;
+      for (let i = 0; i < prev.nodes.length; i++) {
+        if (nodes[i].id !== prev.nodes[i].id || nodes[i].data !== prev.nodes[i].data) {
+          isDataSame = false;
+          break;
+        }
+      }
+      if (isDataSame) {
+        return prev.matchedIds;
+      }
+    }
+    const matchedIds = findSearchMatchedNodeIds(nodes, normalizedNodeSearch);
+    searchDepsRef.current = { nodes, search: normalizedNodeSearch, matchedIds };
+    return matchedIds;
   }, [nodes, normalizedNodeSearch]);
 
   // ⚡ Bolt: Cache decorated search state to preserve node.data identity during 60fps drag updates
