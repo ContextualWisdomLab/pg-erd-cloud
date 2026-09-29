@@ -641,6 +641,10 @@ describe('App orchestration coverage', () => {
       .mockRejectedValueOnce(new Error('terminal refresh down'))
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+
+    // We must wait for the diagram table to render "열기" buttons
+    await screen.findAllByRole('button', { name: '열기' })
+
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
@@ -666,6 +670,7 @@ describe('App orchestration coverage', () => {
     await act(async () => {
       rejectConnections(new Error('stale connections'))
       rejectSnapshots(new Error('stale snapshots'))
+      await Promise.resolve()
       await Promise.resolve()
     })
     expect(screen.queryByText(/stale (connections|snapshots)/)).not.toBeInTheDocument()

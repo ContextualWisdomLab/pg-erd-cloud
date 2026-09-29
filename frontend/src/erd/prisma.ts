@@ -82,7 +82,13 @@ export function exportPrisma(
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      let isUnique = false;
+      for (const c of sourceNode.data.columns) {
+        if (c.column_name === sourceField) {
+          isUnique = c.is_pk || false;
+          break;
+        }
+      }
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
