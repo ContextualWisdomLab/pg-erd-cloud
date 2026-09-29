@@ -1112,7 +1112,7 @@ export default function App() {
           </div>
         </div>
 
-        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
+        <form className="field" onSubmit={(e) => { e.preventDefault(); if (projectName.trim() && !isCreatingProject) onCreateProject(); }}>
           <label htmlFor="project-name">New project</label>
           <div className="row">
             <input
@@ -1159,7 +1159,7 @@ export default function App() {
           </select>
         </div>
 
-        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
+        <form className="field" onSubmit={(e) => { e.preventDefault(); if (selectedProjectId && connName.trim() && isDsnPresent && !isCreatingConnection) onCreateConnection(); }}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1341,7 +1341,7 @@ export default function App() {
                 <h1 id="projects-title">프로젝트</h1>
                 <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
               </div>
-              <form className="inlineCreate" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
+              <form className="inlineCreate" onSubmit={(e) => { e.preventDefault(); if (projectName.trim() && !isCreatingProject) onCreateProject(); }}>
                 <input
                   aria-label="새 프로젝트 이름"
                   value={projectName}
