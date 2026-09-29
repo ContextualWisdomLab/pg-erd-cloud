@@ -62,3 +62,6 @@
 ## 2026-09-27 - [Test Race Conditions]
 **Learning:** Adding or removing asynchronous UI interactions (like `window.confirm`) can expose pre-existing race conditions in tests. Tests that rely on implicit, immediate DOM updates (like expecting elements to render instantly after clicking) may fail intermittently or consistently in CI.
 **Action:** Always replace synchronous queries (`getAllByRole`, `getByText`) with asynchronous ones (`findAllByRole`, `findByText`) when elements render based on asynchronous data or actions, especially after simulating user interactions like clicks. Also ensure that `window.confirm` is correctly mocked across all affected tests.
+## 2026-09-29 - [Wait for Async State Updates Before Expect]
+**Learning:** If a test modifies state that depends on resolving asynchronous promises (like API mocks), asserting on the rendered state immediately with `getByText` can fail intermittently (flakiness).
+**Action:** Replace synchronous assertions like `expect(screen.getByText('...')).toBeInTheDocument()` with `expect(await screen.findByText('...')).toBeInTheDocument()` to correctly wait for React state updates.
