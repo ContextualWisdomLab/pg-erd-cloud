@@ -56,3 +56,12 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+## 2026-06-25 - [Add Confirmation to Table Deletion]
+**Learning:** Destructive actions such as deleting a table need user confirmation to prevent accidental data loss. Using `window.confirm` provides a simple, native way to add this safeguard without requiring complex custom modal logic, significantly improving the safety of the UI.
+**Action:** Always wrap destructive action handlers with `window.confirm` dialogues (e.g., `'${itemName}' 테이블을 삭제하시겠습니까?`) to ensure users explicitly verify their intent before the action is executed.
+## 2026-09-27 - [Test Race Conditions]
+**Learning:** Adding or removing asynchronous UI interactions (like `window.confirm`) can expose pre-existing race conditions in tests. Tests that rely on implicit, immediate DOM updates (like expecting elements to render instantly after clicking) may fail intermittently or consistently in CI.
+**Action:** Always replace synchronous queries (`getAllByRole`, `getByText`) with asynchronous ones (`findAllByRole`, `findByText`) when elements render based on asynchronous data or actions, especially after simulating user interactions like clicks. Also ensure that `window.confirm` is correctly mocked across all affected tests.
+## 2026-09-29 - [Wait for Async State Updates Before Expect]
+**Learning:** If a test modifies state that depends on resolving asynchronous promises (like API mocks), asserting on the rendered state immediately with `getByText` can fail intermittently (flakiness).
+**Action:** Replace synchronous assertions like `expect(screen.getByText('...')).toBeInTheDocument()` with `expect(await screen.findByText('...')).toBeInTheDocument()` to correctly wait for React state updates.
