@@ -326,6 +326,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
+    await screen.findByText('검색 결과가 없습니다.')
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'failed' } })
     expect(screen.getByText('ERD_all_2')).toBeInTheDocument()
@@ -784,6 +785,7 @@ describe('App orchestration coverage', () => {
     })
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     await act(async () => {
