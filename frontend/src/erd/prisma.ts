@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { sanitizeHandleId, parseColumnNameFromHandle } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -69,16 +69,22 @@ export function exportPrisma(
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
     let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
-    } else if (!edge.sourceHandle) {
+    if (edge.sourceHandle) {
+      const parsed = parseColumnNameFromHandle(edge.sourceHandle);
+      if (parsed && (sourceNode.data.columns || []).some(c => c && c.column_name === parsed)) {
+        sourceField = parsed;
+        fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+      }
+    } else {
       fkNodesWithoutHandles.add(edge.source);
     }
 
     let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
+    if (edge.targetHandle) {
+      const parsed = parseColumnNameFromHandle(edge.targetHandle);
+      if (parsed && (targetNode.data.columns || []).some(c => c && c.column_name === parsed)) {
+        targetField = parsed;
+      }
     }
 
     if (sourceField) {
@@ -113,7 +119,7 @@ export function exportPrisma(
       const fieldName = sanitizeName(col.column_name);
 
       const isFk =
-        fkNodeColumnPairs.has(`${node.id}:${sanitizeHandleId(col.column_name)}`) ||
+        fkNodeColumnPairs.has(`${node.id}:${col.column_name}`) ||
         (fkNodesWithoutHandles.has(node.id) && node.data.badges?.fk);
 
       const prismaType = mapToPrismaType(col.data_type, isFk);

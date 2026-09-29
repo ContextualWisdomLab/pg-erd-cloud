@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2024-05-18 - Avoid O(N*C*E) Complexity for ERD Handle Parsing
+**Learning:** Parsing encoded ERD edge handles dynamically within O(N*C) node/column search loops causes extreme O(N*C*E) CPU overhead for large schemas because it executes string splitting and hex parsing repeatedly for identical elements. The previous implementation mapped `sanitizeHandleId` on the fly inside nested loops, degrading export performance drastically as table counts climbed.
+**Action:** When working with relation mapping and exporting to DBML, Prisma, Mermaid, and Dictionary formats, use a utility like `parseColumnNameFromHandle` strictly on the O(E) edges loop to resolve names upfront into lookup Sets or Maps. Never execute complex string transformations inside deeply nested O(N*C) node and column mapping iterations.
