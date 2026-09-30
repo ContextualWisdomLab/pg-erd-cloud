@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-15 - [O(1) Handle parsing during edge resolution]
+**Learning:** During graph traversal (like edge to column resolution), repeatedly taking existing column names and running them through O(N) hex-encoding algorithms to see if they match a pre-computed graph handle is extremely inefficient. It leads to O(E * N) complexity and heavy allocations inside loops.
+**Action:** When a static identifier (like a hex encoded string) is provided, and the source items exist in plain text, do not iteratively re-encode the source plain text for comparison. Instead, write a reverse-parser (`parseHandleId`) that decodes the ID back into plain text once (O(1)), then use simple string comparison against the source array.
