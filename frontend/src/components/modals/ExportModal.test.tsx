@@ -22,6 +22,7 @@ const baseProps = {
   onDownloadMermaid: vi.fn(),
   onExportDictionaryCsv: vi.fn(),
   onExportDictionaryMarkdown: vi.fn(),
+  onExportDictionaryJson: vi.fn(),
   onDownloadDbml: vi.fn(),
   onDownloadPrisma: vi.fn(),
   onCreateShareLink: vi.fn(),
@@ -55,6 +56,7 @@ describe('ExportModal', () => {
     expect(screen.getByText('Prisma Schema')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary CSV')).toBeInTheDocument();
     expect(screen.getByText('Data Dictionary MD')).toBeInTheDocument();
+    expect(screen.getByText('Data Dictionary JSON')).toBeInTheDocument();
   });
 
   it('copies an already generated share link', () => {
@@ -103,6 +105,7 @@ describe('ExportModal', () => {
     const onDownloadMermaid = vi.fn();
     const onExportDictionaryCsv = vi.fn();
     const onExportDictionaryMarkdown = vi.fn();
+    const onExportDictionaryJson = vi.fn();
     const onDownloadDbml = vi.fn();
     const onDownloadPrisma = vi.fn();
 
@@ -115,6 +118,7 @@ describe('ExportModal', () => {
         onDownloadMermaid={onDownloadMermaid}
         onExportDictionaryCsv={onExportDictionaryCsv}
         onExportDictionaryMarkdown={onExportDictionaryMarkdown}
+        onExportDictionaryJson={onExportDictionaryJson}
         onDownloadDbml={onDownloadDbml}
         onDownloadPrisma={onDownloadPrisma}
       />,
@@ -128,6 +132,7 @@ describe('ExportModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Prisma Schema 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' }));
     fireEvent.click(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' }));
+    fireEvent.click(screen.getByRole('button', { name: '데이터 사전 JSON 내보내기' }));
 
     expect(onCopyExportDdl).toHaveBeenCalledOnce();
     expect(onDownloadSvg).toHaveBeenCalledOnce();
@@ -137,6 +142,7 @@ describe('ExportModal', () => {
     expect(onDownloadPrisma).toHaveBeenCalledOnce();
     expect(onExportDictionaryCsv).toHaveBeenCalledOnce();
     expect(onExportDictionaryMarkdown).toHaveBeenCalledOnce();
+    expect(onExportDictionaryJson).toHaveBeenCalledOnce();
   });
 
   it('shows share link copy or creation errors', () => {
@@ -160,7 +166,7 @@ describe('ExportModal', () => {
       />,
     );
 
-    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(8);
+    expect(screen.getAllByText('먼저 테이블을 추가하세요')).toHaveLength(9);
     expect(screen.getByRole('button', { name: 'SQL DDL 복사' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'SVG 이미지 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'PlantUML 내보내기' })).toBeDisabled();
@@ -169,6 +175,7 @@ describe('ExportModal', () => {
     expect(screen.getByRole('button', { name: 'Prisma Schema 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 CSV 내보내기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '데이터 사전 Markdown 내보내기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '데이터 사전 JSON 내보내기' })).toBeDisabled();
   });
 
   it('exposes access-control guidance for disabled button', () => {

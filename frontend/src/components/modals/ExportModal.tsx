@@ -19,6 +19,7 @@ interface ExportModalProps {
   onDownloadMermaid: () => void;
   onExportDictionaryCsv: () => void;
   onExportDictionaryMarkdown: () => void;
+  onExportDictionaryJson: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
   onCreateShareLink: () => void;
@@ -52,6 +53,7 @@ export function ExportModal({
   onDownloadMermaid,
   onExportDictionaryCsv,
   onExportDictionaryMarkdown,
+  onExportDictionaryJson,
   onDownloadDbml,
   onDownloadPrisma,
   onCreateShareLink,
@@ -134,6 +136,14 @@ export function ExportModal({
       disabled: !hasDictionaryExport,
       onExport: onExportDictionaryMarkdown,
       ariaLabel: '데이터 사전 Markdown 내보내기',
+    },
+    {
+      label: 'Data Dictionary JSON',
+      description: hasDictionaryExport ? 'JSON 데이터' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDictionaryExport,
+      onExport: onExportDictionaryJson,
+      ariaLabel: '데이터 사전 JSON 내보내기',
     },
   ];
 

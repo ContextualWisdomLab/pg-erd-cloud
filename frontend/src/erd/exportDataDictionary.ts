@@ -172,3 +172,33 @@ export function exportDictionaryMarkdown(
 
   return lines.join('\n').trim();
 }
+
+
+export function exportDictionaryJson(
+  nodes: Node<TableNodeData>[],
+  edges: Edge[],
+): string {
+  const fkColumnsByNode = foreignKeyColumnsByNode(edges);
+
+  const result = nodes.map((node) => {
+    const tableName = node.data.title || node.id;
+    const tableComment = node.data.comment || null;
+    const columns = node.data.columns || [];
+
+    return {
+      table_name: tableName,
+      table_comment: tableComment,
+      columns: columns.map((column) => ({
+        column_name: column.column_name,
+        data_type: column.data_type,
+        is_pk: column.is_pk,
+        is_fk: isForeignKeyColumn(fkColumnsByNode, node, column.column_name),
+        is_not_null: column.is_not_null,
+        column_comment: column.column_comment || null,
+        example_value: column.example_value === undefined ? null : column.example_value,
+      })),
+    };
+  });
+
+  return JSON.stringify(result, null, 2);
+}
