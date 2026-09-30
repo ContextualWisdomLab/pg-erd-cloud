@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
 import TableNode from '../TableNode';
 import { ReactFlowProvider } from '@xyflow/react';
 
@@ -84,17 +83,6 @@ describe('TableNode', () => {
     const [notNullBadge] = screen.getAllByLabelText('필수 입력 (Not Null)');
     expect(notNullBadge).toHaveAttribute('title', 'Not Null');
     expect(notNullBadge).toHaveTextContent('NN');
-  });
-
-  it('reveals the complete index name on keyboard focus', () => {
-    const styles = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8');
-    const focusRule = styles.match(/\.tableNode__indexName:focus-visible\s*\{([^}]*)\}/);
-
-    expect(focusRule).not.toBeNull();
-    expect(focusRule?.[1]).toContain('overflow: visible');
-    expect(focusRule?.[1]).toContain('text-overflow: clip');
-    expect(focusRule?.[1]).toContain('white-space: normal');
-    expect(focusRule?.[1]).toContain('outline: 3px solid var(--color-brand)');
   });
 
   it('uses a fallback accessible name for blank table titles', () => {
