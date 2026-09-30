@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createHandleIdCache } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -33,6 +33,41 @@ describe('handleUtils', () => {
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('createHandleIdCache', () => {
+    it('should memoize handle ids and enforce max size LRU policy', () => {
+      const cacheSanitize = createHandleIdCache(2);
+      const arrayFromSpy = vi.spyOn(Array, 'from');
+
+      // Misses
+      cacheSanitize('a');
+      cacheSanitize('b');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(2);
+
+      // Hits
+      cacheSanitize('a');
+      cacheSanitize('b');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(2);
+
+      // Access 'a' to make it most recently used
+      cacheSanitize('a');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(2);
+
+      // Insert 'c' (miss), cache is now ['a', 'c'], 'b' is evicted
+      cacheSanitize('c');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(3);
+
+      // Access 'a' (hit because it was recently used before 'c' and therefore not evicted)
+      cacheSanitize('a');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(3);
+
+      // Access 'b' (miss because it was evicted)
+      cacheSanitize('b');
+      expect(arrayFromSpy).toHaveBeenCalledTimes(4);
+
+      arrayFromSpy.mockRestore();
     });
   });
 });
