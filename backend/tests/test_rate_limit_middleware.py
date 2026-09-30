@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from app import rate_limit as rate_limit_module
 from app.rate_limit import (
     InMemoryFixedWindowRateLimiter,
     RateLimitPolicy,
@@ -15,12 +13,6 @@ from app.rate_limit import (
 
 async def _no_subject(_: Request) -> str | None:
     return None
-
-
-@pytest.fixture(autouse=True)
-def _freeze_rate_limit_clock(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep every request in this module inside one deterministic window."""
-    monkeypatch.setattr(rate_limit_module.time, "monotonic", lambda: 30.0)
 
 
 def test_rate_limit_applies_to_api_prefix_and_returns_429() -> None:
