@@ -1,10 +1,28 @@
 import '@testing-library/jest-dom/vitest';
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TableNode from '../TableNode';
 import { ReactFlowProvider } from '@xyflow/react';
 
 describe('TableNode', () => {
+  it('reveals the complete index name when keyboard focus lands on it', () => {
+    const stylesheet = readFileSync(
+      new URL('../../styles.css', import.meta.url),
+      'utf8',
+    );
+    const match = stylesheet.match(
+      /\.tableNode__indexName:focus-visible\s*\{([^}]*)\}/,
+    );
+
+    expect(match).not.toBeNull();
+    const declarations = match?.[1] ?? '';
+    expect(declarations).toContain('overflow: visible;');
+    expect(declarations).toContain('text-overflow: clip;');
+    expect(declarations).toContain('white-space: normal;');
+    expect(declarations).toContain('outline: 3px solid var(--color-brand);');
+  });
+
   it('renders table title and columns', () => {
     const data = {
       title: 'public.users',
