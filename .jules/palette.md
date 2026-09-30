@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-09-21 - Accessible Disabled Buttons
+**Learning:** By changing native `disabled` to `aria-disabled="true"` to make elements focusable, CSS must also be updated to ensure `[aria-disabled="true"]` styles perfectly match the previous `:disabled` state, including negating hover events.
+**Action:** Always meticulously update corresponding stylesheets when migrating buttons off the native `disabled` attribute.
