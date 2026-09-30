@@ -57,3 +57,10 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2025-01-20 - Disabled state accessibility for hints
+
+**Learning:**
+Buttons that are explicitly `disabled` using the HTML attribute drop out of the tab flow, meaning their `aria-describedby` hint text is inaccessible to screen-reader users navigating by keyboard, because focus never lands on the button. Using `aria-disabled="true"` preserves the focusability (and the hint explanation) while semantics remain correct. However, we must ensure CSS styles (`button:disabled, button[aria-disabled="true"]`) and any keyboard interaction interceptors (such as `pointer-events: none` or JS handlers stopping default actions) correctly enforce the disabled visual and functional state.
+
+**Action:**
+When exposing disabled hint tooltips, replace the native `disabled` attribute with `aria-disabled="true"` on the button and add `onClick={(e) => e.preventDefault()}` to block clicks. Ensure that corresponding accessibility hooks (like `useDialogAccessibility` tracking focusable elements) appropriately update their selectors to treat `button:not([disabled])` correctly (or leave it as is so it can receive focus). Also remember to update the corresponding CSS tests (like `.toBeDisabled()` -> `.toHaveAttribute('aria-disabled', 'true')`).
