@@ -320,7 +320,7 @@ describe('App orchestration coverage', () => {
 
   it('navigates dashboard, project, and diagram states including empty/search branches', async () => {
     await renderReadyApp()
-    expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('<Billing & Core>').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
