@@ -77,6 +77,3 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
-## 2025-03-02 - React Flow Graph Performance Optimization
-**Learning:** In a React Flow application, graph node position updates during drag events cause the entire `nodes` array reference to change at 60fps. This can trigger expensive `useMemo` dependencies that rely on `nodes`, like recalculating search matches across the whole graph, leading to severe main thread blocking and laggy interactions.
-**Action:** Use `useRef` to cache the search inputs (`nodes`, `search string`, and previous `matchedIds`). In the `useMemo` hook, check if the graph nodes only changed their positions by performing a shallow equality check on stable properties like `node.id` and `node.data`. If data is identical, return the cached result instead of recalculating.
