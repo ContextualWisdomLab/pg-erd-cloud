@@ -1,0 +1,11 @@
+--- frontend/src/App.coverage.test.tsx
++++ frontend/src/App.coverage.test.tsx
+@@ -609,7 +609,7 @@
+
+   it('logs auto-layout failures and preserves nodes added after the undo snapshot', async () => {
+     await renderReadyApp()
+-    fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
++    fireEvent.click(screen.getAllByRole('button', { name: '다이어그램' })[0]!)
+     vi.useFakeTimers()
+     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
+     await act(async () => {

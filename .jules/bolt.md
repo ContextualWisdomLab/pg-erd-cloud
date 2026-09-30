@@ -77,3 +77,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+
+## 2026-09-25 - Avoid Map allocations for simple caching
+**Learning:** For extremely tight, high-frequency frontend operations like `sanitizeHandleId` (which gets called repeatedly during ERD rendering and search), maintaining a bounded LRU `Map` cache introduces measurable overhead through `cache.set()`, `cache.delete()`, and iteration. The cost of maintaining the cache data structure exceeds the cost of a simple `Map` without bounded eviction if the dataset is naturally bounded (e.g. column names in a DB schema).
+**Action:** Simplify caching to an unbounded `Map` when the key domain is known to be relatively small and constrained, or pre-compute IDs. Do not use an LRU eviction strategy inside hot render loops.
