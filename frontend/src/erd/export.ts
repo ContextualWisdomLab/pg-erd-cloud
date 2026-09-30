@@ -5,6 +5,9 @@ import type { ForeignKeyEdgeData, TableNodeData } from './convert';
 import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
+export * from './typeorm';
+export * from './sqlalchemy';
+export * from './zod';
 
 type SnapshotJson = {
   relations?: Array<{ relation_oid: number; schema_name: string; relation_name: string; relation_kind: string; relation_comment?: string | null }>

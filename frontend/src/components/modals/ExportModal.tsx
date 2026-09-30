@@ -21,6 +21,9 @@ interface ExportModalProps {
   onExportDictionaryMarkdown: () => void;
   onDownloadDbml: () => void;
   onDownloadPrisma: () => void;
+  onDownloadTypeORM: () => void;
+  onDownloadSqlAlchemy: () => void;
+  onDownloadZod: () => void;
   onCreateShareLink: () => void;
   onCopyShareLink: () => void;
 }
@@ -54,6 +57,9 @@ export function ExportModal({
   onExportDictionaryMarkdown,
   onDownloadDbml,
   onDownloadPrisma,
+  onDownloadTypeORM,
+  onDownloadSqlAlchemy,
+  onDownloadZod,
   onCreateShareLink,
   onCopyShareLink,
 }: ExportModalProps) {
@@ -118,6 +124,30 @@ export function ExportModal({
       disabled: !hasDiagramExport,
       onExport: onDownloadPrisma,
       ariaLabel: 'Prisma Schema 내보내기',
+    },
+    {
+      label: 'TypeORM',
+      description: hasDiagramExport ? 'TypeScript 코드' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadTypeORM,
+      ariaLabel: 'TypeORM 내보내기',
+    },
+    {
+      label: 'SQLAlchemy',
+      description: hasDiagramExport ? 'Python 코드' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadSqlAlchemy,
+      ariaLabel: 'SQLAlchemy 내보내기',
+    },
+    {
+      label: 'Zod',
+      description: hasDiagramExport ? 'TypeScript Schema' : '먼저 테이블을 추가하세요',
+      buttonLabel: '내보내기',
+      disabled: !hasDiagramExport,
+      onExport: onDownloadZod,
+      ariaLabel: 'Zod Schema 내보내기',
     },
     {
       label: 'Data Dictionary CSV',
