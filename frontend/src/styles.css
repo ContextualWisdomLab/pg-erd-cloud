@@ -592,6 +592,17 @@ button:disabled {
   white-space: nowrap;
 }
 
+.tableNode__indexName:focus-visible {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  background: var(--color-surface);
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
 .tableNode__indexCols {
   color: var(--color-success);
   font-size: 11px;
