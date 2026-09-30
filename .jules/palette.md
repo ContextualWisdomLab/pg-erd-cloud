@@ -57,3 +57,7 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+
+## 2026-08-01 - [Required Form Inputs]
+**Learning:** In custom forms, the native 'required' attribute isn't always visually obvious to all users. Adding a clear visual indicator like an asterisk helps users understand which fields are mandatory.
+**Action:** When adding required fields to custom forms, ensure they have a visible asterisk and use 'aria-hidden' to prevent redundant screen reader announcements.
