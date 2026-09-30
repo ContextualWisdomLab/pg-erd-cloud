@@ -37,3 +37,24 @@ def test_conn_name_rejects_control_characters() -> None:
         ConnectionCreateIn(conn_name="my\x00conn", dsn="postgresql://localhost/db")
     with pytest.raises(ValidationError):
         ConnectionCreateIn(conn_name="my\nconn", dsn="postgresql://localhost/db")
+
+def test_diagram_view_name_rejects_control_characters() -> None:
+    from app.schemas import DiagramViewCreateIn
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\x00view", layout_json={})
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="my\nview", layout_json={})
+
+def test_table_annotation_rejects_control_characters() -> None:
+    from app.schemas import TableAnnotationUpsertIn
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(schema_name="my\x00schema", relation_name="my_rel", body="test")
+    with pytest.raises(ValidationError):
+        TableAnnotationUpsertIn(schema_name="my_schema", relation_name="my\nrel", body="test")
+
+def test_api_key_rejects_control_characters() -> None:
+    from app.schemas import ApiKeyCreateIn
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="my\x00key")
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="my\nkey")
