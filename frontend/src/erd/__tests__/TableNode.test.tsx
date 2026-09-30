@@ -88,7 +88,7 @@ describe('TableNode', () => {
 
   it('reveals the complete index name on keyboard focus', () => {
     const styles = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8');
-    const focusRule = styles.match(/\\.tableNode__indexName:focus-visible\\s*\\{([^}]*)\\}/);
+    const focusRule = styles.match(/\.tableNode__indexName:focus-visible\s*\{([^}]*)\}/);
 
     expect(focusRule).not.toBeNull();
     expect(focusRule?.[1]).toContain('overflow: visible');
