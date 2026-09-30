@@ -4,6 +4,8 @@ Status: Proposed
 Predecessor pull request: #1241
 Predecessor exact head reviewed: `4c41d7038008599946b4954bcbe3e2b726572f83`
 Successor branch: `codex/design-assurance-pg-erd-cloud-1241-20260930`
+Typecheck RED evidence head: `c1f78d1b63f60ce76c3acb1af2f0032395bf5f60`
+Test-boundary repair head: `32d73287d549cfb99e6b50d0dfaaa4d031e0f929`
 
 ## Goal and ownership
 
