@@ -234,4 +234,40 @@ describe('exportPrisma', () => {
     expect(result).toContain('users_user_id users? @relation("M_1to1", fields: [user_id], references: [id])');
     expect(result).toContain('profiles_user_id profiles[] @relation("M_1to1")');
   });
+
+  it('handles edges without source handle', () => {
+    const nodes = [
+      { id: '1', data: { title: 'User', columns: [{ column_name: 'id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } },
+      { id: '2', data: { title: 'Post', columns: [{ column_name: 'id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } }
+    ];
+    const edges = [
+      { id: 'e1', source: '1', target: '2', sourceHandle: null, targetHandle: null }
+    ];
+    const result = exportPrisma(nodes as any, edges as any);
+    expect(result).toContain('model User');
+  });
+
+  it('handles 1:1 unique relations', () => {
+    const nodes = [
+      { id: '1', data: { title: 'User', columns: [{ column_name: 'id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } },
+      { id: '2', data: { title: 'Profile', columns: [{ column_name: 'user_id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } }
+    ];
+    const edges = [
+      { id: 'e1', source: '2', target: '1', sourceHandle: 'src-user_id', targetHandle: 'tgt-id' }
+    ];
+    const result = exportPrisma(nodes as any, edges as any);
+    expect(result).toContain('Profile_user_id Profile? @relation("Profile_User")');
+  });
+
+  it('handles edges with source handle that does not start with src-', () => {
+    const nodes = [
+      { id: '1', data: { title: 'User', columns: [{ column_name: 'id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } },
+      { id: '2', data: { title: 'Post', columns: [{ column_name: 'id', is_pk: true, data_type: 'uuid' }] }, position: { x: 0, y: 0 } }
+    ];
+    const edges = [
+      { id: 'e1', source: '1', target: '2', sourceHandle: 'invalid-handle', targetHandle: null }
+    ];
+    const result = exportPrisma(nodes as any, edges as any);
+    expect(result).toContain('model User');
+  });
 });
