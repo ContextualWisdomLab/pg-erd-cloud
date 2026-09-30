@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-14 - [Optimize Prisma Export Array Finding]
+**Learning:** Found an O(N^2) loop where `edgesProcessed` (an array mapped via `edgesProcessed = new Map()`) was being iterated via a standard `for (const [_, edgeInfo] of edgesProcessed)` lookup and then executing an array lookup using `edgeInfo.sourceFields.includes(fieldName)` inside another `for (const col of node.data.columns)` loop.
+**Action:** Always extract O(N^2) array/collection looping inside nested components by extracting specific lookup mapping criteria to an independent map `relationsBySourceField`. This converts O(N) internal iterations to O(1) map lookups, removing intermediate variable instantiations.
