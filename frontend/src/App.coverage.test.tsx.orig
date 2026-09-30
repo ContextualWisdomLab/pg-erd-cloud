@@ -323,7 +323,7 @@ describe('App orchestration coverage', () => {
     expect(screen.getAllByText('&lt;Billing &amp; Core&gt;').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }))
     expect(screen.getByRole('heading', { name: '프로젝트' })).toBeInTheDocument()
-    fireEvent.click((await screen.findAllByRole('button', { name: '열기' }))[1]!)
+    fireEvent.click(screen.getAllByRole('button', { name: '열기' })[1]!)
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('다이어그램 검색'), { target: { value: 'no-match' } })
     expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
@@ -372,7 +372,7 @@ describe('App orchestration coverage', () => {
   it('polls a terminal snapshot, builds graph state, and exercises editor handlers', async () => {
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
-    const openButtons = screen.getAllByRole('button', { name: '열기' })
+    const openButtons = await screen.findAllByRole('button', { name: '열기' })
     vi.useFakeTimers()
     fireEvent.click(openButtons[0]!)
     await act(async () => {
@@ -527,6 +527,7 @@ describe('App orchestration coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Billing.*다이어그램 보기/ }))
     expect(screen.getByRole('heading', { name: '다이어그램' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
     expect(screen.getByRole('toolbar', { name: 'ERD 캔버스 도구' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '대시보드' }))
@@ -822,6 +823,7 @@ describe('App orchestration coverage', () => {
     api.listSnapshots.mockResolvedValue(snapshots)
     await renderReadyApp()
     fireEvent.click(screen.getByRole('button', { name: '다이어그램' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '열기' }).length).toBeGreaterThan(0))
     vi.useFakeTimers()
     api.getSnapshot.mockRejectedValueOnce(new Error('poll down'))
     fireEvent.click(screen.getAllByRole('button', { name: '열기' })[0]!)
