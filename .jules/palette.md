@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2023-10-01 - Keyboard Focus for Truncated Text
+**Learning:** When truncating informative, purely textual elements (like TableNode names, comments, etc) that rely on `title` or `aria-label` for accessibility, we must ensure they receive keyboard focus so screen readers and keyboard users can access the full context.
+**Action:** Always add `tabIndex={0}` to custom text truncation wrapper components (`AccessibleTruncatedText`) to make them accessible via keyboard navigation.
