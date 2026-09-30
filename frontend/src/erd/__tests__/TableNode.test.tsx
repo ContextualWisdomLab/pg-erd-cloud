@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { readFileSync } from 'node:fs';
+import stylesheet from '../../styles.css?raw';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TableNode from '../TableNode';
@@ -7,10 +7,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 
 describe('TableNode', () => {
   it('reveals the complete index name when keyboard focus lands on it', () => {
-    const stylesheet = readFileSync(
-      new URL('../../styles.css', import.meta.url),
-      'utf8',
-    );
     const match = stylesheet.match(
       /\.tableNode__indexName:focus-visible\s*\{([^}]*)\}/,
     );
