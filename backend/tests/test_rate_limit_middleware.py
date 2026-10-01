@@ -16,7 +16,6 @@ from app.rate_limit import (
 
 @pytest.fixture(autouse=True)
 def freeze_time(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Freeze the monotonic clock so limiter assertions remain deterministic."""
     monkeypatch.setattr("app.rate_limit.time.monotonic", lambda: 30.0)
 
 async def _no_subject(_: Request) -> str | None:
