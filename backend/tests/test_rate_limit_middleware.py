@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -10,6 +12,11 @@ from app.rate_limit import (
     make_rate_limit_middleware,
 )
 
+
+
+@pytest.fixture(autouse=True)
+def freeze_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.rate_limit.time.monotonic", lambda: 30.0)
 
 async def _no_subject(_: Request) -> str | None:
     return None
