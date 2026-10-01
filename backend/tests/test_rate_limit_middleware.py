@@ -108,20 +108,15 @@ def test_rate_limit_separates_by_subject_when_provided() -> None:
     def ping() -> dict[str, bool]:
         return {"ok": True}
 
-    # Use separate TestClients to prevent connection pooling / implicit IP sharing state
-    # across requests that could accidentally merge the rate limit buckets.
-    # Note: Starlette TestClient might use the same "testserver" IP by default,
-    # but separating clients guarantees a fresh state if the underlying ASGI changes.
-    client_a = TestClient(app)
-    client_b = TestClient(app)
+    client = TestClient(app)
 
     # subject A: first ok, second blocked
-    assert client_a.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
-    assert client_a.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
+    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 200
+    assert client.get("/api/ping", headers={"X-Subject": "a"}).status_code == 429
 
     # subject B: independent key -> first ok
-    assert client_b.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
-    assert client_b.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
+    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 200
+    assert client.get("/api/ping", headers={"X-Subject": "b"}).status_code == 429
 
 
 def test_rate_limit_disabled_allows_all_requests() -> None:
