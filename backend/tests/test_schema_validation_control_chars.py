@@ -1,18 +1,21 @@
 import pytest
 from pydantic import ValidationError
+
 from app.schemas import ApiKeyCreateIn, DiagramViewCreateIn, TableAnnotationUpsertIn
 
+
 def test_api_key_create_in_rejects_control_characters() -> None:
-    with pytest.raises(ValidationError):
-        ApiKeyCreateIn(key_name="Test\x00Key")
-    with pytest.raises(ValidationError):
-        ApiKeyCreateIn(key_name="Test\x7fKey")
+    """API key display names reject both C0 controls and DEL."""
+    for key_name in ("Test\x00Key", "Test\x7fKey"):
+        with pytest.raises(ValidationError):
+            ApiKeyCreateIn(key_name=key_name)
+
 
 def test_diagram_view_create_in_rejects_control_characters() -> None:
-    with pytest.raises(ValidationError):
-        DiagramViewCreateIn(name="Diagram\nView", layout_json={})
-    with pytest.raises(ValidationError):
-        DiagramViewCreateIn(name="Diagram\x7fView", layout_json={})
+    """Diagram view names reject both C0 controls and DEL."""
+    for view_name in ("Diagram\nView", "Diagram\x7fView"):
+        with pytest.raises(ValidationError):
+            DiagramViewCreateIn(name=view_name, layout_json={})
 
 
 def test_table_annotation_identifiers_reject_only_nul() -> None:
