@@ -3,7 +3,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import (\n    ApiKeyCreateIn,\n    ConnectionCreateIn,\n    DiagramViewCreateIn,\n    ProjectCreateIn,\n    ProjectMemberAddIn,\n    TableAnnotationUpsertIn,\n)
+from app.schemas import (
+    ApiKeyCreateIn,
+    ConnectionCreateIn,
+    DiagramViewCreateIn,
+    ProjectCreateIn,
+    ProjectMemberAddIn,
+    TableAnnotationUpsertIn,
+)
 
 
 def test_project_name_length_is_bounded() -> None:
