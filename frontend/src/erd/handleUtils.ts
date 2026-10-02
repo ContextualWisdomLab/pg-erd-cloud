@@ -1,9 +1,14 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
-
+  let encoded = "";
+  let isFirst = true;
+  for (const char of columnName) {
+    if (!isFirst) {
+      encoded += "-";
+    }
+    // for...of only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
+    isFirst = false;
+  }
   return `c-${encoded || 'empty'}`
 }
 
