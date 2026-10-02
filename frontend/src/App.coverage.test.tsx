@@ -308,7 +308,6 @@ function forceClick(button: HTMLButtonElement) {
 }
 
 describe('App orchestration coverage', () => {
-  afterEach(cleanup)
   it('shows loading and explicit authentication failure', async () => {
     let rejectMe!: (reason?: unknown) => void
     api.getMe.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectMe = reject }))
