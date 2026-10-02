@@ -1114,15 +1114,14 @@ export default function App() {
 
         <div className="field">
           <label htmlFor="project-name">New project</label>
-          <div className="row">
+          <form className="row" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
             <input
               id="project-name"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
             />
             <button
-              type="button"
-              onClick={onCreateProject}
+              type="submit"
               disabled={!projectName.trim() || isCreatingProject}
               aria-busy={isCreatingProject}
               aria-describedby={
@@ -1131,7 +1130,7 @@ export default function App() {
             >
               {isCreatingProject ? "Creating…" : "Create"}
             </button>
-          </div>
+          </form>
           {createProjectHint ? (
             <span id="create-project-hint" className="field-hint">
               {createProjectHint}
@@ -1160,7 +1159,7 @@ export default function App() {
           </select>
         </div>
 
-        <div className="field">
+        <form className="field" onSubmit={(e) => { e.preventDefault(); onCreateConnection(); }}>
           <label htmlFor="conn-name">New connection (DSN)</label>
           <input
             id="conn-name"
@@ -1179,8 +1178,7 @@ export default function App() {
             aria-label="Connection DSN"
           />
           <button
-            type="button"
-            onClick={onCreateConnection}
+            type="submit"
             disabled={
               !selectedProjectId ||
               !connName.trim() ||
@@ -1199,34 +1197,35 @@ export default function App() {
               {createConnectionHint}
             </span>
           ) : null}
-        </div>
+        </form>
 
-        <div className="field">
-          <label htmlFor="schema-filter">Schema filter (optional)</label>
-          <input
-            id="schema-filter"
-            value={schemaFilter}
-            onChange={(e) => setSchemaFilter(e.target.value)}
-            placeholder="public"
-          />
-        </div>
+        <form onSubmit={(e) => { e.preventDefault(); onCreateSnapshot(); }} style={{ display: "flex", flexDirection: "column" }}>
+          <div className="field">
+            <label htmlFor="schema-filter">Schema filter (optional)</label>
+            <input
+              id="schema-filter"
+              value={schemaFilter}
+              onChange={(e) => setSchemaFilter(e.target.value)}
+              placeholder="public"
+            />
+          </div>
 
-        <button
-          type="button"
-          onClick={onCreateSnapshot}
-          disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
-          aria-busy={isCreatingSnapshot}
-          aria-describedby={
-            createSnapshotHint ? "create-snapshot-hint" : undefined
-          }
-        >
-          {isCreatingSnapshot ? "Starting…" : "Reverse engineer → snapshot"}
-        </button>
-        {createSnapshotHint ? (
-          <span id="create-snapshot-hint" className="field-hint">
-            {createSnapshotHint}
-          </span>
-        ) : null}
+          <button
+            type="submit"
+            disabled={!selectedProjectId || !selectedConnId || isCreatingSnapshot}
+            aria-busy={isCreatingSnapshot}
+            aria-describedby={
+              createSnapshotHint ? "create-snapshot-hint" : undefined
+            }
+          >
+            {isCreatingSnapshot ? "Starting…" : "Reverse engineer → snapshot"}
+          </button>
+          {createSnapshotHint ? (
+            <span id="create-snapshot-hint" className="field-hint">
+              {createSnapshotHint}
+            </span>
+          ) : null}
+        </form>
 
         <div style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
           Snapshot: {snapshot?.status || "—"}
@@ -1343,20 +1342,19 @@ export default function App() {
                 <h1 id="projects-title">프로젝트</h1>
                 <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
               </div>
-              <div className="inlineCreate">
+              <form className="inlineCreate" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
                 <input
                   aria-label="새 프로젝트 이름"
                   value={projectName}
                   onChange={(event) => setProjectName(event.currentTarget.value)}
                 />
                 <button
-                  type="button"
-                  onClick={onCreateProject}
+                  type="submit"
                   disabled={!projectName.trim() || isCreatingProject}
                 >
                   {isCreatingProject ? "생성 중" : "새 프로젝트"}
                 </button>
-              </div>
+              </form>
             </div>
             <div className="dataTable" role="table" aria-label="프로젝트 목록">
               <div className="dataTable__row dataTable__row--projects dataTable__row--head" role="row">
