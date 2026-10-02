@@ -297,8 +297,8 @@ async def test_oidc_decode_uses_fixed_algorithm_allowlist(
             "require_iss": True,
             "require_exp": True,
             "require_jti": True,
+            "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
         },
-        "leeway": auth.OIDC_JWT_LEEWAY_SECONDS,
     }
 
 
