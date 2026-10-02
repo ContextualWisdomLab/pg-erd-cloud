@@ -9,7 +9,6 @@ export function sanitizeHandleId(columnName: string): string {
     encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
     isFirst = false;
   }
-
   return `c-${encoded || 'empty'}`
 }
 
