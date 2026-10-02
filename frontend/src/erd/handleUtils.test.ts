@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createHandleCache } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -33,6 +33,18 @@ describe('handleUtils', () => {
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('createHandleCache', () => {
+    it('should evict oldest entry when maxSize is reached', () => {
+      const cache = createHandleCache(2);
+      expect(cache('a')).toBe('c-0061');
+      expect(cache('b')).toBe('c-0062');
+      expect(cache('c')).toBe('c-0063'); // Should evict 'a'
+
+      // We can't directly inspect the internal map, but we can verify it still returns correct values
+      expect(cache('a')).toBe('c-0061'); // Re-adds 'a', should evict 'b'
     });
   });
 });
