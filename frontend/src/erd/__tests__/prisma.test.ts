@@ -133,6 +133,49 @@ describe('exportPrisma', () => {
     expect(result).toContain('email String @unique');
   });
 
+  it('generates relations correctly with pre-computed map', () => {
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'Users',
+          columns: [{ column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true }],
+          badges: { pk: true, fk: false }
+        }
+      },
+      {
+        id: '2',
+        type: 'tableNode',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'Posts',
+          columns: [
+            { column_name: 'id', data_type: 'int', is_pk: true, is_not_null: true },
+            { column_name: 'user_id', data_type: 'int', is_pk: false, is_not_null: true }
+          ],
+          badges: { pk: true, fk: true }
+        }
+      }
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '2',
+        target: '1',
+        sourceHandle: 'src-user_id',
+        targetHandle: 'tgt-id'
+      }
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('model Users {');
+    expect(result).toContain('model Posts {');
+    expect(result).toContain('Users_user_id Users @relation("Posts_Users", fields: [user_id], references: [id])');
+  });
+
   it('handles invalid prisma identifier names', () => {
     const nodes: Node<TableNodeData>[] = [
       {
