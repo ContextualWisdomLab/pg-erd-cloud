@@ -1,7 +1,5 @@
+/** Encode a column name as a React Flow-safe handle identifier. */
 export function sanitizeHandleId(columnName: string): string {
-  // ⚡ Bolt: Replace Array.from(columnName).join('-') with for...of and string concatenation
-  // to avoid intermediate array allocation and garbage collection pressure in high-frequency paths.
-  // Measurement: ~40% faster execution time for column parsing in node setups (e.g. 1.15s -> 0.68s per 100k ops).
   let encoded = '';
   for (const char of columnName) {
     if (encoded) encoded += '-';
@@ -12,10 +10,12 @@ export function sanitizeHandleId(columnName: string): string {
   return `c-${encoded || 'empty'}`
 }
 
+/** Build the source-side handle identifier for a column. */
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
+/** Build the target-side handle identifier for a column. */
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
