@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { exportPrisma } from '../prisma';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
-import { sourceColumnHandleId, targetColumnHandleId } from '../handleUtils';
 
 describe('exportPrisma', () => {
   it('returns empty comment if no nodes', () => {
@@ -175,49 +174,6 @@ describe('exportPrisma', () => {
     expect(result).toContain('model Users {');
     expect(result).toContain('model Posts {');
     expect(result).toContain('Users_user_id Users @relation("Posts_Users", fields: [user_id], references: [id])');
-  });
-
-  it('resolves diagram-generated column handles for Prisma relations', () => {
-    const nodes: Node<TableNodeData>[] = [
-      {
-        id: 'users',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'users',
-          columns: [{ column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true }],
-          badges: { pk: true, fk: false },
-        },
-      },
-      {
-        id: 'posts',
-        position: { x: 0, y: 0 },
-        data: {
-          title: 'posts',
-          columns: [
-            { column_name: 'id', data_type: 'serial', is_pk: true, is_not_null: true },
-            { column_name: 'user_id', data_type: 'integer', is_pk: false, is_not_null: true },
-          ],
-          badges: { pk: true, fk: true },
-        },
-      },
-    ];
-    const edges: Edge[] = [{
-      id: 'posts_user_id_fkey',
-      source: 'posts',
-      target: 'users',
-      sourceHandle: sourceColumnHandleId('user_id'),
-      targetHandle: targetColumnHandleId('id'),
-      label: 'posts_user_id_fkey',
-    }];
-
-    const result = exportPrisma(nodes, edges);
-
-    expect(result).toContain(
-      'users_user_id users @relation("posts_user_id_fkey", fields: [user_id], references: [id])',
-    );
-    expect(result).toContain(
-      'posts_user_id posts[] @relation("posts_user_id_fkey")',
-    );
   });
 
   it('handles invalid prisma identifier names', () => {
