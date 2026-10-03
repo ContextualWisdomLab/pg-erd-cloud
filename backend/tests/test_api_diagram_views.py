@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.api.diagram_views import create_view, delete_view, get_view
 from app.auth import CurrentUser
 from app.schemas import DiagramViewCreateIn
+from pydantic import ValidationError
 
 
 def _user():
@@ -93,3 +94,10 @@ async def test_delete_view_returns_404_when_unauthorized():
             )
     assert exc.value.status_code == 404
     session.delete.assert_not_called()
+
+
+def test_diagram_view_create_schema_invalid_control_chars():
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="test\nview", layout_json={})
+    with pytest.raises(ValidationError):
+        DiagramViewCreateIn(name="test\x00view", layout_json={})
