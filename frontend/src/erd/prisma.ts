@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId } from "./handleUtils";
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores
@@ -38,6 +38,7 @@ function mapToPrismaType(pgType: string, isFk: boolean): string {
   return "String"; // fallback
 }
 
+/** Export ERD nodes and relationships as a Prisma schema. */
 export function exportPrisma(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
@@ -49,8 +50,24 @@ export function exportPrisma(
   let output = `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n`;
 
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const sourceColumnNamesByHandle = new Map<string, Map<string, string>>();
+  const targetColumnNamesByHandle = new Map<string, Map<string, string>>();
+  const columnsByNodeAndName = new Map<string, Map<string, TableNodeData["columns"][number]>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    const sourceColumns = new Map<string, string>();
+    const targetColumns = new Map<string, string>();
+    const columnsByName = new Map<string, TableNodeData["columns"][number]>();
+    for (const column of n.data.columns) {
+      sourceColumns.set(sourceColumnHandleId(column.column_name), column.column_name);
+      sourceColumns.set(`src-${column.column_name}`, column.column_name);
+      targetColumns.set(targetColumnHandleId(column.column_name), column.column_name);
+      targetColumns.set(`tgt-${column.column_name}`, column.column_name);
+      columnsByName.set(column.column_name, column);
+    }
+    sourceColumnNamesByHandle.set(n.id, sourceColumns);
+    targetColumnNamesByHandle.set(n.id, targetColumns);
+    columnsByNodeAndName.set(n.id, columnsByName);
   }
 
   // To build relations, we need to know which fields are foreign keys.
@@ -69,21 +86,17 @@ export function exportPrisma(
 
     const relName = sanitizeName(String(edge.label || `${sourceNode.data.title}_${targetNode.data.title}`));
 
-    let sourceField = "";
-    if (edge.sourceHandle?.startsWith("src-")) {
-      sourceField = edge.sourceHandle.slice(4);
-      fkNodeColumnPairs.add(`${edge.source}:${sourceField}`);
+    const sourceField = sourceColumnNamesByHandle.get(edge.source)?.get(edge.sourceHandle || "") || "";
+    if (sourceField) {
+      fkNodeColumnPairs.add(`${edge.source}:${sanitizeHandleId(sourceField)}`);
     } else if (!edge.sourceHandle) {
       fkNodesWithoutHandles.add(edge.source);
     }
 
-    let targetField = "id"; // fallback
-    if (edge.targetHandle?.startsWith("tgt-")) {
-      targetField = edge.targetHandle.slice(4);
-    }
+    const targetField = targetColumnNamesByHandle.get(edge.target)?.get(edge.targetHandle || "") || "id";
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      const isUnique = columnsByNodeAndName.get(edge.source)?.get(sourceField)?.is_pk || false;
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
