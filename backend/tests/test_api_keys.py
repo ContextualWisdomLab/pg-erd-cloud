@@ -15,6 +15,7 @@ from app.auth import (
     hash_api_key,
 )
 from app.schemas import ApiKeyCreateIn
+from pydantic import ValidationError
 
 
 def _user(uid=None):
@@ -121,3 +122,10 @@ async def test_list_returns_only_metadata():
     out = await list_api_keys(user=user, session=session)
     assert len(out) == 1
     assert not hasattr(out[0], "secret")
+
+
+def test_api_key_create_schema_invalid_control_chars():
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="test\nkey")
+    with pytest.raises(ValidationError):
+        ApiKeyCreateIn(key_name="test\x00key")
