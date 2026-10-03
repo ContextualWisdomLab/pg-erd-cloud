@@ -1,9 +1,5 @@
-/** Create a bounded least-recently-used cache for stable column handle IDs. */
+// ⚡ Bolt: Cache string manipulation for high-frequency ERD operations
 export function createHandleCache(maxSize: number = 1000) {
-  if (!Number.isInteger(maxSize) || maxSize < 0) {
-    throw new RangeError('maxSize must be a finite nonnegative integer');
-  }
-
   const cache = new Map<string, string>();
   return (columnName: string): string => {
     let result = cache.get(columnName);
@@ -14,18 +10,12 @@ export function createHandleCache(maxSize: number = 1000) {
       return result;
     }
 
-    let encoded = '';
-    for (const char of columnName) {
-      if (encoded) encoded += '-';
-      // for...of only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-      encoded += char.codePointAt(0)!.toString(16).padStart(4, '0');
-    }
+    const encoded = Array.from(columnName, (char) => {
+      // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
+      return char.codePointAt(0)!.toString(16).padStart(4, '0')
+    }).join('-')
 
     result = `c-${encoded || 'empty'}`;
-
-    if (maxSize === 0) {
-      return result;
-    }
 
     if (cache.size >= maxSize) {
       // Evict oldest (first item in Map)
@@ -42,17 +32,14 @@ export function createHandleCache(maxSize: number = 1000) {
 
 const defaultCache = createHandleCache();
 
-/** Encode a column name as a React Flow-safe handle identifier. */
 export function sanitizeHandleId(columnName: string): string {
   return defaultCache(columnName);
 }
 
-/** Build the source-side handle identifier for a column. */
 export function sourceColumnHandleId(columnName: string): string {
   return `src-${sanitizeHandleId(columnName)}`
 }
 
-/** Build the target-side handle identifier for a column. */
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
