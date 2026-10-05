@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-10-25 - Prevent O(N * C * E) Performance Bottleneck in Prisma Generation
+**Learning:** Iterating over graph edges for every column in every node during Prisma schema generation results in a massive O(N * C * E) performance penalty for large schemas.
+**Action:** Pre-compute an O(1) lookup `Map` utilizing a composite string key (e.g. `${sourceModel}:${sourceField}`) to resolve relationship definitions instantly without nested iteration.
