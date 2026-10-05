@@ -227,6 +227,7 @@ export function CardinalityModal({
                   onClick={() =>
                     onApplyCardinalityRecommendation(recommendation)
                   }
+                  aria-label={isApplied ? `${recommendation.index_name} 추천 적용됨` : `${recommendation.index_name} 추천 적용`}
                 >
                   {isApplied ? "적용됨" : "적용"}
                 </button>

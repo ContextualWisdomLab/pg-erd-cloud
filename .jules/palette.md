@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-05-18 - [Accessibility] Unique aria-labels for repeated application buttons
+**Learning:** Screen readers announce repetitive button labels (like '적용', '삭제') indiscriminately across list items. Context derived from adjacent visual elements is often missed if the screen reader focus moves directly to the action button.
+**Action:** Consistently include unique identifiers in `aria-label`s for interactive items inside dynamic lists (e.g., `<button aria-label={\`\${itemName} 추천 적용\`} ...>`).
