@@ -48,7 +48,7 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-05-19 - React Flow 렌더링 최적화와 JavaScript Map 자료구조 최적화
 **Learning:**
 1. React Flow는 노드의 위치(드래그)나 선택 상태만 변경될 때 새로운 Node 객체를 만들지만, 내부의 `data` 참조는 유지합니다. React의 `memo` 커스텀 비교 함수 상단에 `prev.data === next.data` 참조 비교(fast-path)를 추가하면, 복잡한 컬럼 리스트 비교 등 깊은 비교 연산을 건너뛸 수 있어 그래프 조작 시 렌더링 성능이 크게 향상됩니다.
-2. 대규모 컬럼 및 참조 제약조건 정보를 변환할 때(O(N)), 루프 내부에서 `map.get()`으로 불러온 배열이나 Set에 단순히 `push()`나 `add()` 하는 대신 다시 `map.set()`을 호출하는 중복 연산은 GC 압박을 가중시킵니다. 참조 자료구조에서는 초기 생성 시에만 `set`을 호출하고 그 이후엔 객체를 직접 수정하는 것이 성능 최적화에 유리합니다.
+2. 대규모 컬럼 및 참조 제약조건 정보를 변환할 때(O(N)), 루프 내부에서 `map.get()`으로 불러온 배열이나 Set에 단순히 `push()`나 `add()` 하는 대신 다시 `map.set()`을 호출하는 중복 연산은 GC 압박을 가중시킵니다. 참조 자료구조에서는 초기 생성 시에만 `set`을 호출하고 그 이후엔 객체를 직접 수정하는 메모리 할당 최적화에 유리합니다.
 
 **Action:**
 1. React Flow를 활용하는 경우, 노드의 속성이 분리된 형태(위치 vs 데이터)를 인식하고 `memo` 비교 시 참조 비교(fast-path)를 적극 적용하여 비용이 큰 깊은 비교를 회피하도록 합니다.
@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-14 - Optimize Prisma export O(N*C*E) loops
+**Learning:** In the Prisma exporter, nested loops for exporting relational fields iterated over `nodes`, then `columns`, then `edgesProcessed`, creating an O(N * C * E) complexity that caused severe CPU spikes for large schemas.
+**Action:** Always pre-compute relationships keyed by `ModelName.FieldName` into an O(1) lookup Map before iterating over nodes and columns to generate relations.
