@@ -1,6 +1,8 @@
 export function sanitizeHandleId(columnName: string): string {
   if (!columnName) return 'c-empty'
   let encoded = ''
+  // ⚡ Bolt: Use for...of to iterate over Unicode scalars without creating intermediate O(N) arrays.
+  // This prevents GC pressure in hot paths. codePointAt(0) is always defined for non-empty scalars.
   for (const char of columnName) {
     if (encoded) encoded += '-'
     encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
