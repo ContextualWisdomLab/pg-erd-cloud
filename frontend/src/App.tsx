@@ -1114,7 +1114,7 @@ export default function App() {
 
         <div className="field">
           <label htmlFor="project-name">New project</label>
-          <form className="row" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
+          <form className="row" onSubmit={(e) => { e.preventDefault(); if (projectName.trim() && !isCreatingProject) onCreateProject(); }}>
             <input
               id="project-name"
               value={projectName}
@@ -1342,7 +1342,7 @@ export default function App() {
                 <h1 id="projects-title">프로젝트</h1>
                 <p>프로젝트를 선택하면 해당 다이어그램 목록을 볼 수 있습니다.</p>
               </div>
-              <form className="inlineCreate" onSubmit={(e) => { e.preventDefault(); onCreateProject(); }}>
+              <form className="inlineCreate" onSubmit={(e) => { e.preventDefault(); if (projectName.trim() && !isCreatingProject) onCreateProject(); }}>
                 <input
                   aria-label="새 프로젝트 이름"
                   value={projectName}
