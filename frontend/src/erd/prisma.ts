@@ -49,8 +49,16 @@ export function exportPrisma(
   let output = `// Prisma schema generated from ERD\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n`;
 
   const nodesById = new Map<string, Node<TableNodeData>>();
+  const pkColumnsByNode = new Map<string, Set<string>>();
   for (const n of nodes) {
     nodesById.set(n.id, n);
+    const pkSet = new Set<string>();
+    for (const c of n.data.columns) {
+      if (c.is_pk) {
+        pkSet.add(c.column_name);
+      }
+    }
+    pkColumnsByNode.set(n.id, pkSet);
   }
 
   // To build relations, we need to know which fields are foreign keys.
@@ -59,7 +67,8 @@ export function exportPrisma(
   const fkNodeColumnPairs = new Set<string>();
   const fkNodesWithoutHandles = new Set<string>();
   const incomingRelationsByNode = new Map<string, Array<{ relationName: string, sourceModel: string, sourceField: string, isUnique: boolean }>>();
-  const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceFields: string[], targetFields: string[], relationName: string }>();
+  // ⚡ Bolt: Use a composite string key Map for O(1) lookups to prevent O(N * C * E) performance bottlenecks
+  const edgesProcessed = new Map<string, { sourceModel: string, targetModel: string, sourceField: string, targetField: string, relationName: string }>();
 
   for (const edge of edges) {
     const sourceNode = nodesById.get(edge.source);
@@ -82,22 +91,25 @@ export function exportPrisma(
     }
 
     if (sourceField) {
-      const isUnique = sourceNode.data.columns.find(c => c.column_name === sourceField)?.is_pk || false;
+      // ⚡ Bolt: Replace O(C) inline array search with O(1) Set lookup
+      const isUnique = pkColumnsByNode.get(edge.source)?.has(sourceField) || false;
+      const sModel = sanitizeName(sourceNode.data.title);
+      const sField = sanitizeName(sourceField);
 
       const relList = incomingRelationsByNode.get(edge.target) || [];
       relList.push({
         relationName: relName,
-        sourceModel: sanitizeName(sourceNode.data.title),
-        sourceField: sanitizeName(sourceField),
+        sourceModel: sModel,
+        sourceField: sField,
         isUnique
       });
       incomingRelationsByNode.set(edge.target, relList);
 
-      edgesProcessed.set(edge.id, {
-        sourceModel: sanitizeName(sourceNode.data.title),
+      edgesProcessed.set(`${sModel}:${sField}`, {
+        sourceModel: sModel,
         targetModel: sanitizeName(targetNode.data.title),
-        sourceFields: [sanitizeName(sourceField)],
-        targetFields: [sanitizeName(targetField)],
+        sourceField: sField,
+        targetField: sanitizeName(targetField),
         relationName: relName
       });
     }
@@ -136,13 +148,13 @@ export function exportPrisma(
 
       // Determine if there is a relation defined on this field
       let relationDef = "";
-      for (const [_, edgeInfo] of edgesProcessed) {
-        if (edgeInfo.sourceModel === modelName && edgeInfo.sourceFields.includes(fieldName)) {
-          // This field is a foreign key, but in Prisma, we typically define the relation object field
-          // alongside the scalar field. We will add the relation object field here.
-          const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
-          relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetFields[0]}])`;
-        }
+      // ⚡ Bolt: O(1) lookup instead of iterating over all edges for every column
+      const edgeInfo = edgesProcessed.get(`${modelName}:${fieldName}`);
+      if (edgeInfo) {
+        // This field is a foreign key, but in Prisma, we typically define the relation object field
+        // alongside the scalar field. We will add the relation object field here.
+        const relField = sanitizeName(edgeInfo.targetModel) + "_" + fieldName;
+        relationDef = `\n  ${relField} ${edgeInfo.targetModel}${optional} @relation("${edgeInfo.relationName}", fields: [${fieldName}], references: [${edgeInfo.targetField}])`;
       }
 
       output += `  ${fieldName} ${prismaType}${optional}${attributes}${relationDef}\n`;

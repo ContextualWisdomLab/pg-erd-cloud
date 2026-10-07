@@ -4,6 +4,77 @@ import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../convert';
 
 describe('exportPrisma', () => {
+  it('handles edge cases when sourceHandle or targetHandle is missing or edge nodes are not found', () => {
+    const nodes2: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'A',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+      {
+        id: '2',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'B',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const edges3: Edge[] = [
+      {
+        id: 'e5',
+        source: '1',
+        target: '2',
+        sourceHandle: 'src-id',
+      }
+    ];
+    exportPrisma(nodes2, edges3);
+
+    const nodes: Node<TableNodeData>[] = [
+      {
+        id: '1',
+        position: { x: 0, y: 0 },
+        data: {
+          title: 'A',
+          badges: { pk: true, fk: false },
+          columns: [
+            { column_name: 'id', data_type: 'integer', is_pk: true, is_not_null: true },
+          ],
+        },
+      },
+    ];
+
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        source: '1',
+        target: '2', // Target node does not exist
+      },
+      {
+        id: 'e2',
+        source: '3', // Source node does not exist
+        target: '1',
+      },
+      {
+        id: 'e3',
+        source: '1',
+        target: '1', // No handles
+      },
+    ];
+
+    const result = exportPrisma(nodes, edges);
+    expect(result).toContain('model A {');
+  });
   it('returns empty comment if no nodes', () => {
     const result = exportPrisma([], []);
     expect(result).toBe('// No tables to export\n');
@@ -70,6 +141,9 @@ describe('exportPrisma', () => {
     ];
 
     const result = exportPrisma(nodes, edges);
+
+    // Check edges coverage for branches
+    expect(result).toContain('users_posts');
 
     // Check posts model
     expect(result).toContain('model posts {');
@@ -185,6 +259,17 @@ describe('exportPrisma', () => {
       { id: 'e1', source: 'invalid', target: '2' },
       { id: 'e2', source: '1', target: '2' },
     ];
+
+    const edges2: Edge[] = [
+      {
+        id: 'e4',
+        source: '1',
+        target: '2',
+        sourceHandle: 'invalid-format',
+      }
+    ];
+    const result2 = exportPrisma(nodes, edges2);
+    expect(result2).toContain('model B');
 
     const result = exportPrisma(nodes, edges);
     expect(result).toContain('model A');
