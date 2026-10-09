@@ -1,3 +1,6 @@
+## 2026-07-28 - Avoid O(N) Array.find for lookups inside graph iteration loops
+**Learning:** In exporters like Prisma schema generator, iterating over edges (O(E)) and checking column states (like `is_pk`) using `sourceNode.data.columns.find` creates O(E * C) complexity. This degrades performance significantly for large ERDs with wide tables.
+**Action:** Pre-compute lookup Sets (like `pkColumnsByNode`) in O(N * C) once before the edge loop, turning the O(C) array scan into an O(1) Set `has()` check, bringing the edge iteration back to O(E).
 ## 2024-06-21 - [Avoid Map Creation on High-Frequency React Arrays]
 **Learning:** React Flow updates the `nodes` array extremely frequently (e.g., during dragging). Creating a `Map` (like `nodesById`) using a `useMemo` that depends on this array forces a full O(N) iteration, memory allocation, and GC on every single micro-update.
 **Action:** For standard node lookups in a typically sized ERD (10-500 tables), prefer an O(N) `Array.prototype.find()` without allocating intermediate memory structures over building and looking up a `Map`.
