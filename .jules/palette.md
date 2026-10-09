@@ -57,6 +57,3 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
-## 2024-10-09 - Added Placeholders to New Project Inputs
-**Learning:** Added helpful placeholders for new project name inputs to guide users on expected format, improving usability when fields are empty.
-**Action:** Ensure consistent localization language (Korean vs English) across placeholders in similar contexts in future enhancements.
