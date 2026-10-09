@@ -1,8 +1,11 @@
 export function sanitizeHandleId(columnName: string): string {
-  const encoded = Array.from(columnName, (char) => {
-    // Array.from only yields non-empty Unicode scalars, so codePointAt(0) is defined.
-    return char.codePointAt(0)!.toString(16).padStart(4, '0')
-  }).join('-')
+  // ⚡ Bolt: Use for...of string iteration to avoid Array.from intermediate array allocations
+  // and GC pressure during high-frequency graph edge calculations.
+  let encoded = ''
+  for (const char of columnName) {
+    if (encoded) encoded += '-'
+    encoded += char.codePointAt(0)!.toString(16).padStart(4, '0')
+  }
 
   return `c-${encoded || 'empty'}`
 }
