@@ -1119,6 +1119,7 @@ export default function App() {
               id="project-name"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
+              placeholder="name"
             />
             <button
               type="button"
@@ -1348,6 +1349,7 @@ export default function App() {
                   aria-label="새 프로젝트 이름"
                   value={projectName}
                   onChange={(event) => setProjectName(event.currentTarget.value)}
+                  placeholder="새 프로젝트 이름"
                 />
                 <button
                   type="button"
