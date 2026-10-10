@@ -76,6 +76,19 @@ describe('TableNode', () => {
       expect(item).not.toHaveAttribute('tabindex', '0');
     }
 
+    const data2 = { ...data, columns: Array.from({ length: 26 }, (_, i) => ({ column_name: `col${i}`, data_type: 'int', is_not_null: false, is_pk: false })), indexes: Array.from({ length: 5 }, (_, i) => ({ index_name: `idx${i}`, columns: ['col0'], access_method: 'btree' })) };
+    render(
+      <ReactFlowProvider>
+        <TableNode {...({ data: data2, id: "2", type: "tableNode", isConnectable: true } as any)} />
+      </ReactFlowProvider>
+    );
+
+    const moreCols = screen.getByLabelText('생략된 컬럼이 더 있습니다');
+    expect(moreCols).toHaveAttribute('tabindex', '0');
+
+    const moreIndexes = screen.getByLabelText('생략된 인덱스가 더 있습니다');
+    expect(moreIndexes).toHaveAttribute('tabindex', '0');
+
     const indexName = screen.getByLabelText('idx_users_email_unique_long_name');
     expect(indexName).toHaveAttribute('title', 'Access method: btree');
     expect(indexName).not.toHaveAttribute('tabindex', '0');
