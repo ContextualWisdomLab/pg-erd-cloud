@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, createSanitizeHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -33,6 +33,38 @@ describe('handleUtils', () => {
   describe('targetColumnHandleId', () => {
     it('should prepend tgt- to sanitized id', () => {
       expect(targetColumnHandleId('id')).toBe('tgt-c-0069-0064');
+    });
+  });
+
+  describe('createSanitizeHandleId cache eviction', () => {
+    it('should evict the oldest entry when exceeding maxSize', () => {
+      const cachedSanitize = createSanitizeHandleId(2);
+
+      // Fill cache to max
+      cachedSanitize('id1');
+      cachedSanitize('id2');
+
+      // Access id1 to update its insertion order (making id2 the oldest)
+      cachedSanitize('id1');
+
+      // Add id3, which should exceed maxSize and evict id2
+      cachedSanitize('id3');
+
+      const arrayFromSpy = vi.spyOn(Array, 'from');
+
+      // id1 should be in cache (no computation)
+      cachedSanitize('id1');
+      expect(arrayFromSpy).not.toHaveBeenCalled();
+
+      // id3 should be in cache (no computation)
+      cachedSanitize('id3');
+      expect(arrayFromSpy).not.toHaveBeenCalled();
+
+      // id2 should have been evicted, requiring computation
+      cachedSanitize('id2');
+      expect(arrayFromSpy).toHaveBeenCalled();
+
+      arrayFromSpy.mockRestore();
     });
   });
 });
