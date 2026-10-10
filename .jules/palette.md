@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2026-06-25 - Text Truncation Accessibility with tabIndex
+**Learning:** When truncating informative, purely textual elements (like "... N more columns") that rely on title or aria-label for accessibility context, they cannot be focused by default, hiding the tooltip and aria context from keyboard/screen reader users.
+**Action:** Always add tabIndex={0} to purely informative truncated elements to make them focusable so users can access the full context.

@@ -1,0 +1,4 @@
+💡 What: Added `tabIndex={0}` to truncated element indicators ("... N more columns/indexes") in `TableNode.tsx`.
+🎯 Why: Without a tab index, purely textual truncation elements relying on `title` or `aria-label` for context cannot be focused by keyboard or screen reader users, hiding critical table metadata.
+📸 Before/After: Not applicable (invisible a11y improvement).
+♿ Accessibility: Keyboard focus enabled for hidden overflow metadata markers.
