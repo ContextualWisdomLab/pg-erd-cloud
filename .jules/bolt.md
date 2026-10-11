@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2025-02-23 - [Optimization in `sanitizeHandleId`]
+**Learning:** React flow components use handle IDs in rendering paths frequently. The previous implementation used `Array.from` which created intermediate arrays, adding garbage collection pressure in high frequency rendering paths.
+**Action:** Use `for...of` loop which natively handles Unicode surrogate pairs (including emojis) without intermediate array allocation.
