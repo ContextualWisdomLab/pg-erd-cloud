@@ -57,3 +57,6 @@
 ## 2026-07-30 - Add window.confirm for destructive actions
 **Learning:** Destructive actions like deleting groups and edge relationships previously occurred immediately without user confirmation.
 **Action:** Always wrap delete operations with window.confirm() dialogs and ensure corresponding tests successfully mock window.confirm.
+## 2024-10-11 - Accessibility on Disabled Hint Buttons
+**Learning:** We replaced a standard `disabled` attribute with `aria-disabled="true"` on the Export Modal's "접근 관리" (Access Control) button, making it discoverable for screen readers while preventing click events manually.
+**Action:** Next time, when an interactive element like a disabled button has an `aria-describedby` hint, replacing the native `disabled` attribute with `aria-disabled="true"` ensures the element remains in the document's tab order, allowing keyboard and screen reader users to focus the element and hear the helpful context. Also remember to handle manual `onClick` prevention.
