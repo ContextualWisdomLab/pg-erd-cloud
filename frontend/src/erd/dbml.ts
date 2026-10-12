@@ -1,3 +1,4 @@
+import { parseHandleId } from "./handleUtils";
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData, ForeignKeyEdgeData } from "./convert";
 
@@ -89,8 +90,8 @@ export function exportDbml(
         sourceCols = edgeData.sourceColumns.map(safeId);
         targetCols = edgeData.targetColumns.map(safeId);
       } else if (edge.sourceHandle && edge.targetHandle) {
-         sourceCols = [safeId(edge.sourceHandle.replace('src-', ''))];
-         targetCols = [safeId(edge.targetHandle.replace('tgt-', ''))];
+         sourceCols = [safeId(parseHandleId(edge.sourceHandle.replace('src-', '')))];
+         targetCols = [safeId(parseHandleId(edge.targetHandle.replace('tgt-', '')))];
       }
 
       if (sourceCols.length > 0 && targetCols.length > 0) {

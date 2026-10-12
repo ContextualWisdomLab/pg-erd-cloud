@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sanitizeHandleId, sourceColumnHandleId, targetColumnHandleId, parseHandleId } from './handleUtils';
 
 describe('handleUtils', () => {
   describe('sanitizeHandleId', () => {
@@ -36,3 +36,21 @@ describe('handleUtils', () => {
     });
   });
 });
+
+  describe('parseHandleId', () => {
+    it('should decode a simple ascii string', () => {
+      expect(parseHandleId('c-0069-0064')).toBe('id');
+    });
+
+    it('should handle empty encoded string', () => {
+      expect(parseHandleId('c-empty')).toBe('');
+    });
+
+    it('should return original if not encoded', () => {
+      expect(parseHandleId('id')).toBe('id');
+    });
+
+    it('should handle unicode characters', () => {
+      expect(parseHandleId('c-0069-0064-005f-ac00')).toBe('id_가');
+    });
+  });
