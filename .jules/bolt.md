@@ -77,3 +77,10 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-07-28 - Prisma Export O(N^2) Optimization
+**Learning:** Found O(N * C * E) performance bottleneck in ERD prisma exporter due to repeatedly iterating `edgesProcessed` Map in an inner loop using `for (const [_, edgeInfo] of edgesProcessed)` over nodes and columns to resolve target relation definitions.
+**Action:** Always pre-compute a lookup `Map` with an appropriate composite key (e.g. `${modelName}:${fieldName}`) in O(1) outside or parallel to the loop instead of iterating inner maps linearly.
+
+## 2024-07-28 - DBML Export string processing
+**Learning:** String splitting inside an un-gated outer loop for `sourceNode.data.title.split('.')` adds unnecessary memory pressure and string allocations when `sourceCols` and `targetCols` evaluation dictates if string processing is even needed.
+**Action:** Defer heavy string processing until conditions confirm the evaluation is required.
