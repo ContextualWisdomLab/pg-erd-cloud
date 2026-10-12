@@ -70,16 +70,7 @@ export function exportDbml(
     const targetNode = nodesById.get(edge.target);
 
     if (sourceNode && targetNode) {
-      const sourceNameParts = sourceNode.data.title.split('.');
-      const sourceTableName = sourceNameParts.length > 1
-        ? `${safeId(sourceNameParts[0])}.${safeId(sourceNameParts.slice(1).join('.'))}`
-        : safeId(sourceNode.data.title);
-
-      const targetNameParts = targetNode.data.title.split('.');
-      const targetTableName = targetNameParts.length > 1
-        ? `${safeId(targetNameParts[0])}.${safeId(targetNameParts.slice(1).join('.'))}`
-        : safeId(targetNode.data.title);
-
+      // ⚡ Bolt: Only parse edgeData and calculate columns if we actually have nodes.
       const edgeData = edge.data as ForeignKeyEdgeData | undefined;
 
       let sourceCols: string[] = [];
@@ -94,6 +85,16 @@ export function exportDbml(
       }
 
       if (sourceCols.length > 0 && targetCols.length > 0) {
+        const sourceNameParts = sourceNode.data.title.split('.');
+        const sourceTableName = sourceNameParts.length > 1
+          ? `${safeId(sourceNameParts[0])}.${safeId(sourceNameParts.slice(1).join('.'))}`
+          : safeId(sourceNode.data.title);
+
+        const targetNameParts = targetNode.data.title.split('.');
+        const targetTableName = targetNameParts.length > 1
+          ? `${safeId(targetNameParts[0])}.${safeId(targetNameParts.slice(1).join('.'))}`
+          : safeId(targetNode.data.title);
+
         if (sourceCols.length === 1) {
            output += `Ref: ${sourceTableName}.${sourceCols[0]} > ${targetTableName}.${targetCols[0]}\n`;
         } else {
