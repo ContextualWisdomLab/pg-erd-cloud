@@ -77,3 +77,6 @@ Optimized metric route processing to O(N) by creating a mapping of routes direct
 ## 2024-07-13 - [Optimize Export Dictionary FK lookups]
 **Learning:** Found O(N * C * E) performance bottleneck in ERD export dictionaries due to repeated array searching with `edges.some()` inside a nested loop over nodes and columns.
 **Action:** Replace repeated linear array scans for edges by precomputing O(1) Set lookups of foreign key column handles per node before looping.
+## 2024-10-12 - Reverse Parsing Hex Handles in ERD Exports
+**Learning:** In frontend ERD exports (Mermaid and Prisma), column handles are hex-encoded strings (e.g., `src-c-0061...`). To prevent O(N) overhead per edge resolution when resolving relations, reverse-parse the hex handle directly into the original column name using Unicode code points (`String.fromCodePoint`), rather than iteratively re-encoding all existing column names for comparison.
+**Action:** Implement `parseHandleId` to convert hex-encoded handles back to their original string representation and use this parsed string directly when comparing against column names in O(1) Map/Set structures.
