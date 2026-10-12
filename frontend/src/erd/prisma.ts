@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId, parseHandleId } from "./handleUtils";
+import { parseHandleId } from "./handleUtils";
 
 function sanitizeName(name: string): string {
   // Prisma model and field names must start with a letter and contain only alphanumeric characters and underscores

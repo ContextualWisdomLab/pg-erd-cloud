@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { TableNodeData } from "./convert";
-import { sanitizeHandleId, parseHandleId } from "./handleUtils";
+import { parseHandleId } from "./handleUtils";
 
 function sanitizeString(str: string): string {
   if (!str) return "";
