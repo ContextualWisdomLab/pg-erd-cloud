@@ -56,3 +56,7 @@
 ## 2024-07-14 - Native Keyboard Submission with Forms for Modals
 **Learning:** Modals designed with plain `<div>` elements as wrappers instead of `<form>` lack native keyboard submission support, forcing users to switch from keyboard to mouse to confirm actions like "Save".
 **Action:** When designing modals or popups containing inputs, always use a `<form>` element to wrap the content, handle the `onSubmit` event (calling `e.preventDefault()`), and set the primary confirmation button to `type="submit"` to enable seamless Enter-key submission for keyboard users.
+
+## 2024-05-18 - Tooltips on disabled disabled elements
+**Learning:** Elements using the native `disabled` attribute are removed from the accessibility tree in many screen readers, meaning users can't navigate to them or read their `title` or `aria-describedby` tooltips explaining *why* they are disabled.
+**Action:** When an interactive element like a disabled button has a helpful tooltip or hint, replace the native `disabled` attribute with `aria-disabled="true"` and an explicitly blocked `onClick` handler. This keeps the element focusable and ensures users can hear the helpful context.
