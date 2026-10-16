@@ -14,3 +14,16 @@ export function sourceColumnHandleId(columnName: string): string {
 export function targetColumnHandleId(columnName: string): string {
   return `tgt-${sanitizeHandleId(columnName)}`
 }
+
+export function parseHandleId(handleStr: string): string {
+  let hexStr = "";
+  if (handleStr.startsWith("src-c-") || handleStr.startsWith("tgt-c-")) {
+    hexStr = handleStr.slice(6);
+  } else if (handleStr.startsWith("c-")) {
+    hexStr = handleStr.slice(2);
+  } else {
+    return handleStr;
+  }
+  if (hexStr === "empty") return "";
+  return hexStr.split("-").map((hex) => String.fromCodePoint(parseInt(hex, 16))).join("");
+}

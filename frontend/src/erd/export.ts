@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { normalizeBusinessGroupColor } from './businessGroups';
 import type { IndexRecommendation } from './cardinality';
 import type { ForeignKeyEdgeData, TableNodeData } from './convert';
-import { sourceColumnHandleId, targetColumnHandleId } from './handleUtils';
+import { sourceColumnHandleId, targetColumnHandleId, parseHandleId } from './handleUtils';
 
 export * from './exportDataDictionary';
 
@@ -67,14 +67,15 @@ function fkColumnsForEdge(
     return { sourceColumns, targetColumns };
   }
 
-  const sourceHandleColumn = (sourceNode.data.columns || [])
-    .find((column) => sourceColumnHandleId(column.column_name) === edge.sourceHandle)
-    ?.column_name;
-  const targetHandleColumn = (targetNode.data.columns || [])
-    .find((column) => targetColumnHandleId(column.column_name) === edge.targetHandle)
-    ?.column_name;
+  const sourceHandleColumn = edge.sourceHandle ? parseHandleId(edge.sourceHandle) : undefined;
+  const targetHandleColumn = edge.targetHandle ? parseHandleId(edge.targetHandle) : undefined;
+
   if (sourceHandleColumn && targetHandleColumn) {
-    return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+    const srcExists = sourceNode.data.columns?.some(c => c.column_name === sourceHandleColumn);
+    const tgtExists = targetNode.data.columns?.some(c => c.column_name === targetHandleColumn);
+    if (srcExists && tgtExists) {
+      return { sourceColumns: [sourceHandleColumn], targetColumns: [targetHandleColumn] };
+    }
   }
 
   const fallbackSource = (sourceNode.data.columns || [])
